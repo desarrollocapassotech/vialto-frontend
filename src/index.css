@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  /* Manual de marca — primarios */
+  --color-vialto-fire: #e8470a;
+  --color-vialto-bright: #ff6b2b;
+  --color-vialto-light: #ff9a5c;
+  --color-vialto-gold: #c8853a;
+
+  /* Neutros */
+  --color-vialto-charcoal: #1a1a1a;
+  --color-vialto-graphite: #2e2e2e;
+  --color-vialto-steel: #4a4a4a;
+  --color-vialto-mist: #f5f3f0;
+  --color-vialto-white: #ffffff;
+
+  --font-display: "Bebas Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-body: Barlow, ui-sans-serif, system-ui, sans-serif;
+  --font-ui: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+    font-family: var(--font-body);
+    color: var(--color-vialto-charcoal);
+    background-color: var(--color-vialto-mist);
+  }
+}
