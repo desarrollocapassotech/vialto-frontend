@@ -2,24 +2,50 @@ import { NavLink, Outlet } from 'react-router-dom';
 import {
   OrganizationSwitcher,
   UserButton,
+  useAuth,
   useOrganization,
+  useUser,
 } from '@clerk/clerk-react';
+import { useMemo } from 'react';
 import { Logo } from './Logo';
+import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
   orgSwitcherSidebarAppearance,
   userButtonSidebarAppearance,
 } from './clerkSidebarAppearance';
 
-const nav: { to: string; label: string; end?: boolean }[] = [
-  { to: '/', label: 'Inicio', end: true },
-  { to: '/viajes', label: 'Viajes' },
-  { to: '/clientes', label: 'Clientes' },
-  { to: '/choferes', label: 'Choferes' },
-  { to: '/vehiculos', label: 'Vehículos' },
-];
-
 export function AppShell() {
   const { organization } = useOrganization();
+  const { orgRole } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+
+  const superadmin =
+    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+
+  const nav = useMemo(() => {
+    const homeLabel = superadmin ? 'Panorama' : 'Inicio';
+    const items: { to: string; label: string; end?: boolean }[] = [
+      { to: '/', label: homeLabel, end: true },
+      { to: '/viajes', label: 'Viajes' },
+      { to: '/clientes', label: 'Clientes' },
+      { to: '/choferes', label: 'Choferes' },
+      { to: '/vehiculos', label: 'Vehículos' },
+    ];
+    return items;
+  }, [superadmin]);
+
+  const platformRole =
+    typeof user?.publicMetadata?.vialtoRole === 'string'
+      ? user.publicMetadata.vialtoRole
+      : null;
+
+  const roleText = userLoaded
+    ? userRoleDisplay({
+        orgRole,
+        platformRole,
+        hasOrganization: Boolean(organization),
+      })
+    : '…';
 
   return (
     <div className="min-h-screen flex bg-vialto-mist">
@@ -29,6 +55,12 @@ export function AppShell() {
           <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
             TRANSPORTE Y LOGISTICA
           </p>
+          {superadmin && (
+            <p className="mt-2 text-[11px] leading-snug text-vialto-bright/90 pr-1">
+              En cada sección elegís empresa primero; los datos vienen filtrados
+              del servidor. Para operar en Clerk como una org, usá Empresa abajo.
+            </p>
+          )}
         </div>
 
         <nav className="flex flex-col gap-1">
@@ -80,6 +112,12 @@ export function AppShell() {
                 afterSignOutUrl="/sign-in"
                 appearance={userButtonSidebarAppearance}
               />
+            </div>
+            <div className="pl-0.5 pt-1 space-y-0.5">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
+                Rol
+              </p>
+              <p className="text-sm text-white/90 leading-snug pr-1">{roleText}</p>
             </div>
           </div>
         </div>

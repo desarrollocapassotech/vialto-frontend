@@ -1,7 +1,7 @@
 import { SignIn, SignUp, useAuth } from '@clerk/clerk-react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
-import { DashboardPage } from '@/pages/DashboardPage';
+import { HomePage } from '@/pages/HomePage';
 import { ViajesPage } from '@/pages/ViajesPage';
 import { ClientesPage } from '@/pages/ClientesPage';
 import { ChoferesPage } from '@/pages/ChoferesPage';
@@ -76,7 +76,7 @@ export default function App() {
 
       <Route element={<RequireAuth />}>
         <Route path="/" element={<AppShell />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<HomePage />} />
           <Route path="viajes" element={<ViajesPage />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="choferes" element={<ChoferesPage />} />

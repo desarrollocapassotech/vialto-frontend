@@ -1,9 +1,9 @@
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
-import { ChoferesSuperadminPage } from '@/pages/ChoferesSuperadminPage';
-import { ChoferesTenantPage } from '@/pages/ChoferesTenantPage';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { SuperadminHomePage } from '@/pages/SuperadminHomePage';
 
-export function ChoferesPage() {
+export function HomePage() {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
@@ -13,8 +13,8 @@ export function ChoferesPage() {
   }
 
   if (isPlatformSuperadmin(user?.publicMetadata)) {
-    return <ChoferesSuperadminPage />;
+    return <SuperadminHomePage />;
   }
 
-  return <ChoferesTenantPage />;
+  return <DashboardPage />;
 }

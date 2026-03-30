@@ -1,11 +1,18 @@
 /**
- * Cliente HTTP hacia el backend NestJS (`/api`, prefijo global).
- * En desarrollo, Vite proxy reenvía a `VITE_API_PROXY_TARGET` (default localhost:8080).
- * En producción, usar `VITE_API_URL` (URL absoluta del API) o mismo origen si hay reverse proxy.
+ * Origen del API (sin `/api` final; las rutas ya llevan `/api/...`).
+ *
+ * En desarrollo, por defecto se usa `http://localhost:8080` para hablar **directo**
+ * con Nest (CORS ya permitido en el backend). Así se evitan 404 del proxy de Vite
+ * con rutas como `/api/platform/viajes?tenantId=...` (superadmin).
+ *
+ * Podés forzar con `VITE_API_URL` (p. ej. otro puerto o túnel).
  */
 function baseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
   if (configured) return configured;
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8080';
+  }
   return '';
 }
 

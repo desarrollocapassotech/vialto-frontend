@@ -12,10 +12,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    /** Respaldo si algo usa fetch relativo a /api sin VITE_API_URL (el cliente usa origen absoluto en dev). */
     proxy: {
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
         changeOrigin: true,
+        secure: false,
       },
     },
   },

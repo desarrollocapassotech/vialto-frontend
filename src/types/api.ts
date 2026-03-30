@@ -24,6 +24,9 @@ export interface Viaje {
   createdBy: string;
 }
 
+/** Respuesta de GET /api/platform/* (superadmin). */
+export type ConEmpresa<T> = T & { empresaNombre: string };
+
 export interface Cliente {
   id: string;
   tenantId: string;
@@ -57,5 +60,20 @@ export interface Vehiculo {
   año: number | null;
   kmActual: number;
   transportistaId: string | null;
+  createdAt: string;
+}
+
+/** Empresa registrada en Vialto. */
+export interface Tenant {
+  id: string;
+  clerkOrgId: string;
+  name: string;
+  cuit: string | null;
+  plan: string;
+  modules: string[];
+  maxUsers: number;
+  billingStatus: string;
+  billingRenewsAt: string | null;
+  whiteLabelDomain: string | null;
   createdAt: string;
 }
