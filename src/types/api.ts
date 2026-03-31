@@ -69,7 +69,6 @@ export interface Tenant {
   clerkOrgId: string;
   name: string;
   cuit: string | null;
-  plan: string;
   modules: string[];
   maxUsers: number;
   billingStatus: string;

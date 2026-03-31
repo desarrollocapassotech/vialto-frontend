@@ -12,7 +12,6 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
     name: t.name,
     clerkOrgId: t.clerkOrgId,
     cuit: t.cuit ?? '',
-    plan: (t.plan as TenantFormValues['plan']) ?? 'basico',
     modules: t.modules ?? [],
     billingStatus: (t.billingStatus as TenantFormValues['billingStatus']) ?? 'trial',
     maxUsers: String(t.maxUsers),
@@ -71,7 +70,6 @@ export function SuperadminTenantEditPage() {
         body: JSON.stringify({
           name: values.name.trim() || undefined,
           cuit: values.cuit.trim() || null,
-          plan: values.plan,
           modules: values.modules,
           billingStatus: values.billingStatus,
           maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
@@ -113,7 +111,7 @@ export function SuperadminTenantEditPage() {
           Editar empresa
         </h1>
         <p className="mt-2 text-vialto-steel">
-          Actualizá plan, módulos y configuración comercial de la empresa.
+          Actualizá módulos y configuración comercial de la empresa.
         </p>
 
         <div className="mt-4">

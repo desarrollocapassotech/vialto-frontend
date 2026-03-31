@@ -10,7 +10,6 @@ const INITIAL_VALUES: TenantFormValues = {
   name: '',
   clerkOrgId: '',
   cuit: '',
-  plan: 'basico',
   modules: [],
 };
 
@@ -22,16 +21,30 @@ export function SuperadminTenantCreatePage() {
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
+    const name = values.name.trim();
+    const hasModules = values.modules.length > 0;
+
+    if (!name && !hasModules) {
+      setError('Ingresá el nombre de la empresa y seleccioná al menos un módulo.');
+      return;
+    }
+    if (!name) {
+      setError('Ingresá el nombre de la empresa.');
+      return;
+    }
+    if (!hasModules) {
+      setError('Seleccioná al menos un módulo para crear la empresa.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       await apiJson('/api/tenants', () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
-          name: values.name.trim(),
-          clerkOrgId: values.clerkOrgId.trim(),
+          name,
           cuit: values.cuit.trim() || undefined,
-          plan: values.plan,
           modules: values.modules,
         }),
       });
@@ -50,7 +63,7 @@ export function SuperadminTenantCreatePage() {
           Crear empresa
         </h1>
         <p className="mt-2 text-vialto-steel">
-          Alta de nueva empresa para la plataforma Vialto.
+          Alta de una nueva empresa.
         </p>
 
         <div className="mt-4">
@@ -74,6 +87,8 @@ export function SuperadminTenantCreatePage() {
           onSubmit={onSubmit}
           submitLabel="Crear empresa"
           loading={loading}
+          showOrgIdInput={false}
+          submitAlign="right"
         />
       </div>
     </SuperadminOnly>

@@ -2,7 +2,7 @@ import { useOrganization } from '@clerk/clerk-react';
 import { TenantModulesGrid } from '@/components/tenant/TenantModulesGrid';
 import { TenantOverviewCards } from '@/components/tenant/TenantOverviewCards';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { labelBillingStatus, labelPlan } from '@/lib/platformLabels';
+import { labelBillingStatus } from '@/lib/platformLabels';
 import { toTenantModuleCards } from '@/lib/tenantModules';
 
 export function TenantHomePage() {
@@ -18,7 +18,7 @@ export function TenantHomePage() {
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
         Vista adaptada a los módulos contratados por tu organización. Cada
-        empresa ve un inicio diferente según su plan activo.
+        empresa ve un inicio diferente según sus módulos activos.
       </p>
 
       {!organization && (
@@ -41,7 +41,7 @@ export function TenantHomePage() {
 
       <TenantOverviewCards
         loading={loading}
-        plan={tenant ? labelPlan(tenant.plan) : '—'}
+        subscriptionModel="Por módulos"
         billingStatus={tenant ? labelBillingStatus(tenant.billingStatus) : '—'}
         modulesCount={tenant?.modules.length ?? 0}
       />

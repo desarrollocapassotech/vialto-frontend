@@ -137,6 +137,7 @@ Este patrón evita condicionales gigantes y mejora reutilización.
 
 - El frontend consume módulos del backend (viajes, clientes, choferes, vehículos, etc.) sin romper aislamiento por tenant.
 - Clerk es fuente de verdad para sesión, organización y rol.
+- La suscripción comercial es por módulos habilitados por empresa (sin planes fijos).
 - Firestore (si se usa en futuros módulos de tiempo real) debe limitarse a casos de actualización en vivo; el resto continúa en flujo API sobre PostgreSQL vía backend.
 
 ---

@@ -5,7 +5,6 @@ export interface TenantFormValues {
   name: string;
   clerkOrgId: string;
   cuit: string;
-  plan: 'basico' | 'pro' | 'enterprise';
   modules: string[];
   billingStatus?: 'trial' | 'active' | 'suspended';
   maxUsers?: string;
@@ -21,6 +20,8 @@ interface TenantFormProps {
   loading: boolean;
   includeAdvancedFields?: boolean;
   disableOrgId?: boolean;
+  showOrgIdInput?: boolean;
+  submitAlign?: 'left' | 'right';
 }
 
 export function TenantForm({
@@ -31,6 +32,8 @@ export function TenantForm({
   loading,
   includeAdvancedFields = false,
   disableOrgId = false,
+  showOrgIdInput = true,
+  submitAlign = 'left',
 }: TenantFormProps) {
   const toggleModule = (moduleCode: string) => {
     const exists = values.modules.includes(moduleCode);
@@ -60,21 +63,23 @@ export function TenantForm({
             className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
           />
         </label>
-        <label className="space-y-1">
-          <span className="text-xs uppercase tracking-wider text-vialto-steel">
-            Org ID de Clerk *
-          </span>
-          <input
-            value={values.clerkOrgId}
-            onChange={(e) => onChange({ ...values, clerkOrgId: e.target.value })}
-            required
-            disabled={disableOrgId}
-            className="h-10 w-full border border-black/15 bg-white px-3 text-sm disabled:bg-black/5"
-          />
-        </label>
+        {showOrgIdInput && (
+          <label className="space-y-1">
+            <span className="text-xs uppercase tracking-wider text-vialto-steel">
+              Org ID de Clerk *
+            </span>
+            <input
+              value={values.clerkOrgId}
+              onChange={(e) => onChange({ ...values, clerkOrgId: e.target.value })}
+              required
+              disabled={disableOrgId}
+              className="h-10 w-full border border-black/15 bg-white px-3 text-sm disabled:bg-black/5"
+            />
+          </label>
+        )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div>
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-wider text-vialto-steel">
             CUIT
@@ -85,25 +90,6 @@ export function TenantForm({
             placeholder="Solo números"
             className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
           />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs uppercase tracking-wider text-vialto-steel">
-            Plan *
-          </span>
-          <select
-            value={values.plan}
-            onChange={(e) =>
-              onChange({
-                ...values,
-                plan: e.target.value as TenantFormValues['plan'],
-              })
-            }
-            className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
-          >
-            <option value="basico">Básico</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
         </label>
       </div>
 
@@ -188,7 +174,7 @@ export function TenantForm({
         </div>
       )}
 
-      <div>
+      <div className={submitAlign === 'right' ? 'flex justify-end' : ''}>
         <button
           type="submit"
           disabled={loading}

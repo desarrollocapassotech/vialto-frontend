@@ -1,7 +1,6 @@
 import {
   labelBillingStatus,
   labelModulo,
-  labelPlan,
 } from '@/lib/platformLabels';
 import { Link } from 'react-router-dom';
 import type { Tenant } from '@/types/api';
@@ -37,7 +36,6 @@ export function TenantsTable({
         <thead>
           <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
             <th className="px-4 py-3">Empresa</th>
-            <th className="px-4 py-3">Plan</th>
             <th className="px-4 py-3">Suscripción</th>
             <th className="px-4 py-3">Funciones</th>
             <th className="px-4 py-3 whitespace-nowrap">Alta</th>
@@ -47,14 +45,14 @@ export function TenantsTable({
         <tbody>
           {loading && (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+              <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                 Cargando empresas…
               </td>
             </tr>
           )}
           {!loading && items.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+              <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                 No encontramos empresas para este criterio.
               </td>
             </tr>
@@ -66,9 +64,6 @@ export function TenantsTable({
                 className="border-b border-black/5 hover:bg-vialto-mist/80 align-top"
               >
                 <td className="px-4 py-3 font-medium">{tenant.name}</td>
-                <td className="px-4 py-3 text-vialto-steel">
-                  {labelPlan(tenant.plan)}
-                </td>
                 <td className="px-4 py-3">
                   <span className="inline-block font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 bg-vialto-charcoal text-white">
                     {labelBillingStatus(tenant.billingStatus)}

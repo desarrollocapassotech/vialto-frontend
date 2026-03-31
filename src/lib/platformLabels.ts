@@ -1,9 +1,3 @@
-const planes: Record<string, string> = {
-  basico: 'Básico',
-  pro: 'Pro',
-  enterprise: 'Enterprise',
-};
-
 const facturacion: Record<string, string> = {
   trial: 'En prueba',
   active: 'Al día',
@@ -21,11 +15,6 @@ const modulos: Record<string, string> = {
   turnos: 'Turnos',
   reportes: 'Reportes',
 };
-
-export function labelPlan(plan: string): string {
-  const p = plan.toLowerCase();
-  return planes[p] ?? plan.charAt(0).toUpperCase() + plan.slice(1);
-}
 
 export function labelBillingStatus(status: string): string {
   const s = status.toLowerCase();

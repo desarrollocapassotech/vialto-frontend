@@ -64,12 +64,6 @@ export function AppShell() {
           <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
             TRANSPORTE Y LOGISTICA
           </p>
-          {superadmin && (
-            <p className="mt-2 text-[11px] leading-snug text-vialto-bright/90 pr-1">
-              En cada sección elegís empresa primero; los datos vienen filtrados
-              del servidor. Para operar en Clerk como una org, usá Empresa abajo.
-            </p>
-          )}
         </div>
 
         <nav className="flex flex-col gap-1">
