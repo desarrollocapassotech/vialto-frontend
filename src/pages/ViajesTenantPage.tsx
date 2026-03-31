@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { estadoViajeLabel } from '@/lib/viajesEstados';
@@ -40,6 +41,14 @@ export function ViajesTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Número, estado, origen, destino y margen de cada operación.
       </p>
+      <div className="mt-4 flex justify-end">
+        <Link
+          to="/viajes/nuevo"
+          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        >
+          Crear viaje
+        </Link>
+      </div>
 
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -56,19 +65,20 @@ export function ViajesTenantPage() {
               <th className="px-4 py-3">Origen</th>
               <th className="px-4 py-3">Destino</th>
               <th className="px-4 py-3 text-right">Margen</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Todavía no hay viajes cargados.
                 </td>
               </tr>
@@ -94,6 +104,14 @@ export function ViajesTenantPage() {
                   {v.gananciaBruta != null
                     ? `$ ${v.gananciaBruta.toLocaleString('es-AR')}`
                     : '—'}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    to={`/viajes/${encodeURIComponent(v.id)}/editar`}
+                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                  >
+                    Editar
+                  </Link>
                 </td>
               </tr>
             ))}

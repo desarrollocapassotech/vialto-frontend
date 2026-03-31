@@ -6,7 +6,7 @@ export interface TenantFormValues {
   clerkOrgId: string;
   cuit: string;
   modules: string[];
-  billingStatus?: 'trial' | 'active' | 'suspended';
+  billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
   maxUsers?: string;
   billingRenewsAt?: string;
   whiteLabelDomain?: string;
@@ -132,6 +132,7 @@ export function TenantForm({
               <option value="trial">En prueba</option>
               <option value="active">Al día</option>
               <option value="suspended">Suspendido</option>
+              <option value="expired">Vencido</option>
             </select>
           </label>
           <label className="space-y-1">

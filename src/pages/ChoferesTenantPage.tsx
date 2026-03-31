@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer } from '@/types/api';
@@ -41,6 +42,14 @@ export function ChoferesTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Quienes manejan tus unidades, con datos de contacto a mano.
       </p>
+      <div className="mt-4 flex justify-end">
+        <Link
+          to="/choferes/nuevo"
+          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        >
+          Crear chofer
+        </Link>
+      </div>
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
@@ -53,12 +62,20 @@ export function ChoferesTenantPage() {
         {rows?.map((c) => (
           <li
             key={c.id}
-            className="rounded border border-black/5 bg-white px-4 py-3 flex justify-between gap-4 flex-wrap"
+            className="rounded border border-black/5 bg-white px-4 py-3 flex justify-between gap-4 items-center flex-wrap"
           >
-            <span className="font-medium">{c.nombre}</span>
-            <span className="text-vialto-steel text-sm">
-              {c.telefono ?? c.dni ?? '—'}
-            </span>
+            <div>
+              <span className="font-medium">{c.nombre}</span>
+              <span className="ml-3 text-vialto-steel text-sm">
+                {c.telefono ?? c.dni ?? '—'}
+              </span>
+            </div>
+            <Link
+              to={`/choferes/${encodeURIComponent(c.id)}/editar`}
+              className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+            >
+              Editar
+            </Link>
           </li>
         ))}
         {rows?.length === 0 && (

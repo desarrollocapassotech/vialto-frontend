@@ -30,6 +30,9 @@ export function TenantsTable({
   statusUpdatingByOrgId,
   onToggleEnabled,
 }: TenantsTableProps) {
+  const isDisabledStatus = (status: string) =>
+    ['suspended', 'expired'].includes(status.toLowerCase());
+
   return (
     <div className="mt-10 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
       <table className="w-full text-left text-sm">
@@ -98,18 +101,18 @@ export function TenantsTable({
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={tenant.billingStatus.toLowerCase() !== 'suspended'}
+                      aria-checked={!isDisabledStatus(tenant.billingStatus)}
                       aria-label={`Estado de ${tenant.name}`}
                       disabled={Boolean(statusUpdatingByOrgId[tenant.clerkOrgId])}
                       onClick={() =>
                         onToggleEnabled(
                           tenant.clerkOrgId,
-                          tenant.billingStatus.toLowerCase() === 'suspended',
+                          isDisabledStatus(tenant.billingStatus),
                         )
                       }
                       className={[
                         'group relative inline-flex h-7 w-28 items-center rounded-full border transition-colors px-2',
-                        tenant.billingStatus.toLowerCase() === 'suspended'
+                        isDisabledStatus(tenant.billingStatus)
                           ? 'bg-white border-black/20'
                           : 'bg-vialto-charcoal border-vialto-charcoal',
                         statusUpdatingByOrgId[tenant.clerkOrgId]
@@ -120,19 +123,19 @@ export function TenantsTable({
                       <span
                         className={[
                           'w-full text-[10px] uppercase tracking-wider text-center select-none',
-                          tenant.billingStatus.toLowerCase() === 'suspended'
+                          isDisabledStatus(tenant.billingStatus)
                             ? 'text-vialto-steel'
                             : 'text-white',
                         ].join(' ')}
                       >
-                        {tenant.billingStatus.toLowerCase() === 'suspended'
+                        {isDisabledStatus(tenant.billingStatus)
                           ? 'Deshabilitado'
                           : 'Habilitado'}
                       </span>
                       <span
                         className={[
                           'absolute h-5 w-5 rounded-full shadow-sm transition-transform',
-                          tenant.billingStatus.toLowerCase() === 'suspended'
+                          isDisabledStatus(tenant.billingStatus)
                             ? 'left-1 bg-vialto-steel/70'
                             : 'left-[5.5rem] bg-white',
                         ].join(' ')}

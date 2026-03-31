@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -45,7 +46,7 @@ export function ChoferesSuperadminPage() {
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Choferes
       </h1>
@@ -59,6 +60,23 @@ export function ChoferesSuperadminPage() {
           onChange={setFiltroEmpresa}
         />
       </div>
+      <div className="mt-4 flex justify-end">
+        <Link
+          to={
+            filtroEmpresa
+              ? `/choferes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
+              : '#'
+          }
+          className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
+            filtroEmpresa
+              ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
+              : 'bg-vialto-charcoal/50 pointer-events-none'
+          }`}
+          aria-disabled={!filtroEmpresa}
+        >
+          Crear chofer
+        </Link>
+      </div>
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
@@ -68,9 +86,9 @@ export function ChoferesSuperadminPage() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3 min-w-[160px]">Empresa</th>
               <th className="px-4 py-3">Nombre</th>
               <th className="px-4 py-3">Contacto</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -101,12 +119,19 @@ export function ChoferesSuperadminPage() {
                   key={c.id}
                   className="border-b border-black/5 hover:bg-vialto-mist/80"
                 >
-                  <td className="px-4 py-3 font-medium text-vialto-charcoal">
-                    {c.empresaNombre}
-                  </td>
                   <td className="px-4 py-3">{c.nombre}</td>
                   <td className="px-4 py-3 text-vialto-steel">
                     {c.telefono ?? c.dni ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(
+                        filtroEmpresa,
+                      )}`}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Editar
+                    </Link>
                   </td>
                 </tr>
               ))}

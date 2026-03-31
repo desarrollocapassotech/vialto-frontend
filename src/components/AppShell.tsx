@@ -29,6 +29,11 @@ export function AppShell() {
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
     const items: { to: string; label: string; end?: boolean }[] = [{ to: '/', label: homeLabel, end: true }];
 
+    if (superadmin) {
+      items.push({ to: '/superadmin/empresas', label: 'Empresas' });
+      items.push({ to: '/superadmin/usuarios', label: 'Usuarios' });
+    }
+
     if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
       items.push({ to: '/viajes', label: 'Viajes' });
     }
@@ -55,6 +60,34 @@ export function AppShell() {
         hasOrganization: Boolean(organization),
       })
     : '…';
+
+  const accountAvatarUrl = useMemo(() => {
+    const googleAccount = user?.externalAccounts?.find(
+      (account) => account.provider === 'google',
+    );
+    const hasClerkImage = Boolean(user?.hasImage && user?.imageUrl);
+    if (hasClerkImage) return user?.imageUrl ?? null;
+    return googleAccount?.imageUrl ?? user?.imageUrl ?? null;
+  }, [user]);
+
+  const accountName =
+    user?.fullName?.trim() ||
+    user?.primaryEmailAddress?.emailAddress ||
+    'Cuenta';
+
+  const accountInitial =
+    accountName.trim().charAt(0).toUpperCase() || 'U';
+
+  const clickableAvatarUserButtonAppearance = {
+    ...userButtonSidebarAppearance,
+    elements: {
+      ...userButtonSidebarAppearance.elements,
+      rootBox: 'h-8 w-8 shrink-0',
+      userButtonTrigger:
+        'h-8 w-8 rounded-full border border-white/15 bg-transparent hover:bg-white/10 transition-colors',
+      userButtonAvatarBox: 'opacity-0',
+    },
+  } as const;
 
   return (
     <div className="min-h-screen flex bg-vialto-mist">
@@ -110,11 +143,27 @@ export function AppShell() {
             <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
               Tu cuenta
             </p>
-            <div className="w-full min-w-0 flex justify-start">
-              <UserButton
-                afterSignOutUrl="/sign-in"
-                appearance={userButtonSidebarAppearance}
-              />
+            <div className="pl-0.5 pr-1 flex items-center gap-2 min-w-0">
+              <div className="relative h-8 w-8 shrink-0">
+                <div className="absolute inset-0 pointer-events-none">
+                  {accountAvatarUrl ? (
+                    <img
+                      src={accountAvatarUrl}
+                      alt="Foto de perfil"
+                      className="h-8 w-8 rounded-full object-cover ring-2 ring-white/20"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-white/10 text-white/80 text-xs font-semibold flex items-center justify-center ring-2 ring-white/20">
+                      {accountInitial}
+                    </div>
+                  )}
+                </div>
+                <UserButton
+                  afterSignOutUrl="/sign-in"
+                  appearance={clickableAvatarUserButtonAppearance}
+                />
+              </div>
+              <p className="text-sm text-white/90 truncate flex-1">{accountName}</p>
             </div>
             <div className="pl-0.5 pt-1 space-y-0.5">
               <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">

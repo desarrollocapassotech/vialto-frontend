@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -46,7 +47,7 @@ export function ViajesSuperadminPage() {
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
   return (
-    <div className="max-w-[90rem]">
+    <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Viajes
       </h1>
@@ -62,6 +63,23 @@ export function ViajesSuperadminPage() {
           onChange={setFiltroEmpresa}
         />
       </div>
+      <div className="mt-4 flex justify-end">
+        <Link
+          to={
+            filtroEmpresa
+              ? `/viajes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
+              : '#'
+          }
+          className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
+            filtroEmpresa
+              ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
+              : 'bg-vialto-charcoal/50 pointer-events-none'
+          }`}
+          aria-disabled={!filtroEmpresa}
+        >
+          Crear viaje
+        </Link>
+      </div>
 
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -73,12 +91,12 @@ export function ViajesSuperadminPage() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3 min-w-[140px]">Empresa</th>
               <th className="px-4 py-3">Número</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Origen</th>
               <th className="px-4 py-3">Destino</th>
               <th className="px-4 py-3 text-right">Margen</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -109,9 +127,6 @@ export function ViajesSuperadminPage() {
                   key={v.id}
                   className="border-b border-black/5 hover:bg-vialto-mist/80"
                 >
-                  <td className="px-4 py-3 font-medium text-vialto-charcoal max-w-[200px]">
-                    {v.empresaNombre}
-                  </td>
                   <td className="px-4 py-3 font-medium">{v.numero}</td>
                   <td className="px-4 py-3">
                     <span className="inline-block font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 bg-vialto-charcoal text-white">
@@ -128,6 +143,16 @@ export function ViajesSuperadminPage() {
                     {v.gananciaBruta != null
                       ? `$ ${v.gananciaBruta.toLocaleString('es-AR')}`
                       : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      to={`/viajes/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(
+                        filtroEmpresa,
+                      )}`}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Editar
+                    </Link>
                   </td>
                 </tr>
               ))}

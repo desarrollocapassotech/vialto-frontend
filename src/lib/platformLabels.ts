@@ -2,6 +2,7 @@ const facturacion: Record<string, string> = {
   trial: 'En prueba',
   active: 'Al día',
   suspended: 'Suspendido',
+  expired: 'Vencido',
 };
 
 const modulos: Record<string, string> = {

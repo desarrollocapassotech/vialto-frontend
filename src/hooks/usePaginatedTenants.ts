@@ -18,6 +18,7 @@ export interface TenantsPageStats {
   enPrueba: number;
   activos: number;
   suspendidos: number;
+  vencidos: number;
 }
 
 export function usePaginatedTenants() {
@@ -85,7 +86,10 @@ export function usePaginatedTenants() {
     const suspendidos = items.filter(
       (t) => t.billingStatus.toLowerCase() === 'suspended',
     ).length;
-    return { total: meta.total, enPrueba, activos, suspendidos };
+    const vencidos = items.filter(
+      (t) => t.billingStatus.toLowerCase() === 'expired',
+    ).length;
+    return { total: meta.total, enPrueba, activos, suspendidos, vencidos };
   }, [items, meta.total]);
 
   function applySearch() {

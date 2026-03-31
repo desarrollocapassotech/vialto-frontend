@@ -90,3 +90,12 @@ export interface PaginatedTenantsResponse {
   items: Tenant[];
   meta: PaginatedMeta;
 }
+
+export interface PlatformUser {
+  userId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  role: string;
+  createdAt: number | string;
+}

@@ -36,7 +36,7 @@ export function userRoleDisplay({
     case 'org:admin':
       return 'Administrador';
     case 'org:supervisor':
-      return 'Supervisor';
+      return 'Operador';
     case 'org:member':
       return 'Operador';
     default: {
