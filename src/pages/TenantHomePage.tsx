@@ -1,15 +1,16 @@
 import { useOrganization } from '@clerk/clerk-react';
 import { TenantOverviewCards } from '@/components/tenant/TenantOverviewCards';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { labelBillingStatus } from '@/lib/platformLabels';
+import { useTenantDashboardMetrics } from '@/hooks/useTenantDashboardMetrics';
 
 export function TenantHomePage() {
   const { organization } = useOrganization();
   const { tenant, loading, error } = useCurrentTenant();
   const companyName = tenant?.name?.trim() || organization?.name?.trim() || 'empresa';
+  const dashboard = useTenantDashboardMetrics(tenant?.modules ?? []);
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
         Panel de {companyName}
       </h1>
@@ -36,9 +37,8 @@ export function TenantHomePage() {
       )}
 
       <TenantOverviewCards
-        loading={loading}
-        billingStatus={tenant ? labelBillingStatus(tenant.billingStatus) : '—'}
-        modulesCount={tenant?.modules.length ?? 0}
+        loading={loading || dashboard.loading}
+        cards={dashboard.cards}
       />
     </div>
   );

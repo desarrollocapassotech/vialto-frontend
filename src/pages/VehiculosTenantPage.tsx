@@ -4,28 +4,39 @@ import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { labelVehiculoTipo } from '@/lib/labels';
-import type { Vehiculo } from '@/types/api';
+import type { PaginatedMeta, Vehiculo } from '@/types/api';
+
+type VehiculosPaginatedResponse = {
+  items: Vehiculo[];
+  meta: PaginatedMeta;
+};
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiJson<Vehiculo[]>('/api/vehiculos', () =>
-          getToken(),
+        const data = await apiJson<VehiculosPaginatedResponse>(
+          `/api/vehiculos/paginated?page=${page}&pageSize=${pageSize}`,
+          () => getToken(),
         );
         if (!cancelled) {
-          setRows(data);
+          setRows(data.items);
+          setMeta(data.meta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
+          setMeta(null);
           setError(friendlyError(e, 'vehiculos'));
         }
       }
@@ -33,10 +44,10 @@ export function VehiculosTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Vehículos
       </h1>
@@ -56,38 +67,96 @@ export function VehiculosTenantPage() {
           {error}
         </p>
       )}
-      <ul className="mt-8 space-y-2">
-        {rows === null && !error && (
-          <li className="text-vialto-steel">Cargando…</li>
-        )}
-        {rows?.map((v) => (
-          <li
-            key={v.id}
-            className="rounded border border-black/5 bg-white px-4 py-3 flex justify-between gap-4 items-center flex-wrap"
-          >
-            <div>
-              <span className="font-[family-name:var(--font-ui)] tracking-wider font-semibold">
-                {v.patente}
-              </span>
-              <span className="ml-3 text-vialto-steel text-sm capitalize">
-                {labelVehiculoTipo(v.tipo)}
-                {v.marca ? ` · ${v.marca}` : ''}
-              </span>
-            </div>
-            <Link
-              to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
-              className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
+              <th className="px-4 py-3">Patente</th>
+              <th className="px-4 py-3">Tipo</th>
+              <th className="px-4 py-3">Marca</th>
+              <th className="px-4 py-3">Modelo</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows === null && !error && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                  Cargando…
+                </td>
+              </tr>
+            )}
+            {rows?.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                  Todavía no tenés vehículos cargados.
+                </td>
+              </tr>
+            )}
+            {rows?.map((v) => (
+              <tr key={v.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
+                <td className="px-4 py-3 font-[family-name:var(--font-ui)] tracking-wider font-semibold">
+                  {v.patente}
+                </td>
+                <td className="px-4 py-3 text-vialto-steel">{labelVehiculoTipo(v.tipo)}</td>
+                <td className="px-4 py-3 text-vialto-steel">{v.marca ?? '—'}</td>
+                <td className="px-4 py-3 text-vialto-steel">{v.modelo ?? '—'}</td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
+                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                  >
+                    Editar
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {meta && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-vialto-steel">
+              Página {meta.page} de {meta.totalPages} · {meta.total} registros
+            </p>
+            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
+              Mostrar
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-8 border border-black/20 bg-white px-2 text-xs"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              disabled={!meta.hasPrev}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
             >
-              Editar
-            </Link>
-          </li>
-        ))}
-        {rows?.length === 0 && (
-          <li className="text-vialto-steel">
-            Todavía no tenés vehículos cargados.
-          </li>
-        )}
-      </ul>
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={!meta.hasNext}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
