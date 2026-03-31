@@ -77,3 +77,17 @@ export interface Tenant {
   whiteLabelDomain: string | null;
   createdAt: string;
 }
+
+export interface PaginatedMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
+
+export interface PaginatedTenantsResponse {
+  items: Tenant[];
+  meta: PaginatedMeta;
+}

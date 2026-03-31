@@ -6,6 +6,8 @@ import { ViajesPage } from '@/pages/ViajesPage';
 import { ClientesPage } from '@/pages/ClientesPage';
 import { ChoferesPage } from '@/pages/ChoferesPage';
 import { VehiculosPage } from '@/pages/VehiculosPage';
+import { SuperadminTenantCreatePage } from '@/pages/SuperadminTenantCreatePage';
+import { SuperadminTenantEditPage } from '@/pages/SuperadminTenantEditPage';
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -81,6 +83,11 @@ export default function App() {
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="choferes" element={<ChoferesPage />} />
           <Route path="vehiculos" element={<VehiculosPage />} />
+          <Route path="superadmin/empresas/nueva" element={<SuperadminTenantCreatePage />} />
+          <Route
+            path="superadmin/empresas/:orgId/editar"
+            element={<SuperadminTenantEditPage />}
+          />
         </Route>
       </Route>
 

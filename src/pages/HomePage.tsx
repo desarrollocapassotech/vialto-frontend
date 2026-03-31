@@ -1,7 +1,7 @@
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
-import { DashboardPage } from '@/pages/DashboardPage';
 import { SuperadminHomePage } from '@/pages/SuperadminHomePage';
+import { TenantHomePage } from '@/pages/TenantHomePage';
 
 export function HomePage() {
   const { user, isLoaded } = useUser();
@@ -16,5 +16,5 @@ export function HomePage() {
     return <SuperadminHomePage />;
   }
 
-  return <DashboardPage />;
+  return <TenantHomePage />;
 }

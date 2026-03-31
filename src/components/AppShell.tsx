@@ -8,6 +8,8 @@ import {
 } from '@clerk/clerk-react';
 import { useMemo } from 'react';
 import { Logo } from './Logo';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
   orgSwitcherSidebarAppearance,
@@ -18,21 +20,28 @@ export function AppShell() {
   const { organization } = useOrganization();
   const { orgRole } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
+  const { tenant } = useCurrentTenant();
 
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
 
   const nav = useMemo(() => {
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
-    const items: { to: string; label: string; end?: boolean }[] = [
-      { to: '/', label: homeLabel, end: true },
-      { to: '/viajes', label: 'Viajes' },
+    const items: { to: string; label: string; end?: boolean }[] = [{ to: '/', label: homeLabel, end: true }];
+
+    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
+      items.push({ to: '/viajes', label: 'Viajes' });
+    }
+
+    // Entidades core: disponibles para toda empresa.
+    items.push(
       { to: '/clientes', label: 'Clientes' },
       { to: '/choferes', label: 'Choferes' },
       { to: '/vehiculos', label: 'Vehículos' },
-    ];
+    );
+
     return items;
-  }, [superadmin]);
+  }, [superadmin, tenant?.modules]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === 'string'
