@@ -8,7 +8,8 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { PlatformUser } from '@/types/api';
 
-function formatRole(role: string) {
+function formatRole(role: string, platformRole?: string | null) {
+  if (platformRole === 'superadmin') return 'Superadmin';
   if (role === 'org:admin') return 'Admin';
   if (role === 'org:supervisor') return 'Miembro';
   if (role === 'org:member') return 'Miembro';
@@ -166,7 +167,7 @@ export function SuperadminUsersPage() {
                       {[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'}
                     </td>
                     <td className="px-4 py-3 text-vialto-steel">{u.email ?? '—'}</td>
-                    <td className="px-4 py-3">{formatRole(u.role)}</td>
+                    <td className="px-4 py-3">{formatRole(u.role, u.platformRole)}</td>
                     <td className="px-4 py-3 text-vialto-steel">
                       {formatDate(u.createdAt)}
                     </td>

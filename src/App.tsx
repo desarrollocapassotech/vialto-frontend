@@ -4,12 +4,15 @@ import { AppShell } from '@/components/AppShell';
 import { HomePage } from '@/pages/HomePage';
 import { ViajesPage } from '@/pages/ViajesPage';
 import { ClientesPage } from '@/pages/ClientesPage';
+import { TransportistasPage } from '@/pages/TransportistasPage';
 import { ChoferesPage } from '@/pages/ChoferesPage';
 import { VehiculosPage } from '@/pages/VehiculosPage';
 import { SuperadminTenantCreatePage } from '@/pages/SuperadminTenantCreatePage';
 import { SuperadminTenantEditPage } from '@/pages/SuperadminTenantEditPage';
 import { ClienteCreatePage } from '@/pages/ClienteCreatePage';
 import { ClienteEditPage } from '@/pages/ClienteEditPage';
+import { TransportistaCreatePage } from '@/pages/TransportistaCreatePage';
+import { TransportistaEditPage } from '@/pages/TransportistaEditPage';
 import { ChoferCreatePage } from '@/pages/ChoferCreatePage';
 import { ChoferEditPage } from '@/pages/ChoferEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
@@ -91,6 +94,9 @@ export default function App() {
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
           <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
+          <Route path="transportistas" element={<TransportistasPage />} />
+          <Route path="transportistas/nuevo" element={<TransportistaCreatePage />} />
+          <Route path="transportistas/:id/editar" element={<TransportistaEditPage />} />
           <Route path="choferes" element={<ChoferesPage />} />
           <Route path="choferes/nuevo" element={<ChoferCreatePage />} />
           <Route path="choferes/:id/editar" element={<ChoferEditPage />} />

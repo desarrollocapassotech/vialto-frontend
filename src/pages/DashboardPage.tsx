@@ -3,11 +3,29 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import type { Viaje } from '@/types/api';
+
+type TableroGeneralResponse = {
+  deudores: Array<{
+    clienteId: string;
+    clienteNombre: string;
+    saldo: number;
+    deuda: number;
+  }>;
+  inconsistencias: {
+    viajesFinalizadosSinCargo: Array<{ id: string; numero: string }>;
+  };
+  alertasOperativas: {
+    viajesEnCursoHaceMasDeXHoras: Array<{ id: string; numero: string }>;
+  };
+  facturacion: {
+    mesActual: number;
+    mesAnterior: number;
+  };
+};
 
 export function DashboardPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [viajes, setViajes] = useState<Viaje[] | null>(null);
+  const [tablero, setTablero] = useState<TableroGeneralResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,17 +33,17 @@ export function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiJson<Viaje[]>(
-          '/api/viajes',
+        const data = await apiJson<TableroGeneralResponse>(
+          '/api/reportes/tablero-general',
           () => getToken(),
         );
         if (!cancelled) {
-          setViajes(data);
+          setTablero(data);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
-          setViajes(null);
+          setTablero(null);
           setError(friendlyError(e, 'tablero'));
         }
       }
@@ -35,9 +53,11 @@ export function DashboardPage() {
     };
   }, [getToken, isLoaded, isSignedIn]);
 
-  const total = viajes?.length ?? 0;
-  const enTransito =
-    viajes?.filter((v) => v.estado === 'en_transito').length ?? 0;
+  const totalDeudores = tablero?.deudores.length ?? 0;
+  const totalInconsistencias = tablero?.inconsistencias.viajesFinalizadosSinCargo.length ?? 0;
+  const totalViajesAtrasados = tablero?.alertasOperativas.viajesEnCursoHaceMasDeXHoras.length ?? 0;
+  const facturadoActual = tablero?.facturacion.mesActual ?? 0;
+  const facturadoAnterior = tablero?.facturacion.mesAnterior ?? 0;
 
   return (
     <div className="max-w-5xl">
@@ -45,8 +65,7 @@ export function DashboardPage() {
         Tablero
       </h1>
       <p className="mt-2 text-vialto-steel max-w-xl">
-        Un vistazo rápido a tus viajes: cuántos registraste y cuántos están en
-        camino.
+        Resumen operativo y financiero del tenant actual.
       </p>
 
       {error && (
@@ -61,42 +80,61 @@ export function DashboardPage() {
       <div className="mt-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <div className="bg-vialto-graphite p-6 flex flex-col justify-between min-h-[140px]">
           <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
-            Viajes registrados
+            Clientes deudores
           </span>
           <div>
             <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
-              {viajes === null && !error ? '—' : total}
+              {tablero === null && !error ? '—' : totalDeudores}
             </span>
             <p className="mt-1 font-[family-name:var(--font-ui)] text-xs text-vialto-bright tracking-wide">
-              Últimos movimientos
+              Saldo negativo en cuenta corriente
             </p>
           </div>
         </div>
         <div className="bg-vialto-graphite p-6 flex flex-col justify-between min-h-[140px]">
           <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
-            En tránsito
+            Inconsistencias
           </span>
           <div>
             <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
-              {viajes === null && !error ? '—' : enTransito}
+              {tablero === null && !error ? '—' : totalInconsistencias}
             </span>
             <p className="mt-1 font-[family-name:var(--font-ui)] text-xs text-white/50 tracking-wide">
-              En camino a destino
+              Viajes finalizados sin cargo
             </p>
           </div>
         </div>
         <div className="bg-vialto-graphite p-6 flex flex-col justify-between min-h-[140px] sm:col-span-2 lg:col-span-1">
           <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
-            Acción rápida
+            En curso {'>'} X horas
           </span>
-          <Link
-            to="/viajes"
-            className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.15em] text-vialto-bright hover:text-vialto-light mt-2"
-          >
-            Ver todos los viajes →
-          </Link>
+          <p className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
+            {tablero === null && !error ? '—' : totalViajesAtrasados}
+          </p>
         </div>
       </div>
+
+      <div className="mt-6 grid gap-2 sm:grid-cols-2">
+        <div className="bg-white border border-black/10 p-5">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-vialto-steel">Facturado mes actual</p>
+          <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-vialto-charcoal">
+            ${facturadoActual.toLocaleString('es-AR')}
+          </p>
+        </div>
+        <div className="bg-white border border-black/10 p-5">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-vialto-steel">Facturado mes anterior</p>
+          <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-vialto-charcoal">
+            ${facturadoAnterior.toLocaleString('es-AR')}
+          </p>
+        </div>
+      </div>
+
+      <Link
+        to="/viajes"
+        className="mt-6 inline-flex font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.15em] text-vialto-fire hover:text-vialto-charcoal"
+      >
+        Ver todos los viajes →
+      </Link>
     </div>
   );
 }

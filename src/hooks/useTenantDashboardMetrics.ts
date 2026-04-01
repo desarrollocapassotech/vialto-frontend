@@ -146,10 +146,10 @@ export function useTenantDashboardMetrics(modules: string[]) {
 
       if (viajes) {
         const enCurso = viajes.filter((v) =>
-          ['en_transito', 'despachado'].includes((v.estado ?? '').toLowerCase()),
+          ['en_curso'].includes((v.estado ?? '').toLowerCase()),
         ).length;
         const cerrados = viajes.filter(
-          (v) => (v.estado ?? '').toLowerCase() === 'cerrado',
+          (v) => (v.estado ?? '').toLowerCase() === 'finalizado',
         );
         const cerradosIds = new Set(cerrados.map((v) => v.id));
 
@@ -178,13 +178,13 @@ export function useTenantDashboardMetrics(modules: string[]) {
             key: 'viajes-en-curso',
             title: 'Viajes en curso',
             value: String(enCurso),
-            hint: 'En tránsito + despachados',
+            hint: 'Estado EN_CURSO',
           },
           {
             key: 'viajes-por-facturar',
             title: 'Viajes por facturar',
             value: String(porFacturar),
-            hint: 'Cerrados sin factura asociada',
+            hint: 'Finalizados sin factura asociada',
           },
           {
             key: 'viajes-facturados',

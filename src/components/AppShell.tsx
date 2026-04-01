@@ -41,6 +41,7 @@ export function AppShell() {
     // Entidades core: disponibles para toda empresa.
     items.push(
       { to: '/clientes', label: 'Clientes' },
+      { to: '/transportistas', label: 'Transportistas' },
       { to: '/choferes', label: 'Choferes' },
       { to: '/vehiculos', label: 'Vehículos' },
     );

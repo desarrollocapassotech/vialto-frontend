@@ -8,18 +8,24 @@ export interface Viaje {
   transportistaId: string | null;
   choferId: string | null;
   vehiculoId: string | null;
+  patenteTractor: string | null;
+  patenteSemirremolque: string | null;
   origen: string | null;
   destino: string | null;
+  fechaCarga: string | null;
+  fechaDescarga: string | null;
   fechaSalida: string | null;
   fechaLlegada: string | null;
   mercaderia: string | null;
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
+  monto: number | null;
   precioCliente: number | null;
-  precioFletero: number | null;
+  precioTransportistaExterno: number | null;
   gananciaBruta: number | null;
   documentacion: string[];
   observaciones: string | null;
+  fechaFinalizado: string | null;
   createdAt: string;
   createdBy: string;
 }
@@ -63,6 +69,16 @@ export interface Vehiculo {
   createdAt: string;
 }
 
+export interface Transportista {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  cuit: string | null;
+  email: string | null;
+  telefono: string | null;
+  createdAt: string;
+}
+
 /** Empresa registrada en Vialto. */
 export interface Tenant {
   id: string;
@@ -97,5 +113,6 @@ export interface PlatformUser {
   lastName: string | null;
   email: string | null;
   role: string;
+  platformRole?: string | null;
   createdAt: number | string;
 }

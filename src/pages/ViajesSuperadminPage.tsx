@@ -1,22 +1,38 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { estadoViajeLabel } from '@/lib/viajesEstados';
-import type { ConEmpresa, Viaje } from '@/types/api';
+import type { Chofer, Cliente, ConEmpresa, Transportista, Vehiculo, Viaje } from '@/types/api';
 
-const ESTADOS = ['pendiente', 'en_transito', 'despachado', 'cerrado'] as const;
+const ESTADOS = ['pendiente', 'en_curso', 'finalizado', 'cancelado'] as const;
 
 type ViajeInlineDraft = {
   numero: string;
   estado: string;
+  clienteId: string;
+  choferId: string;
+  transportistaId: string;
+  vehiculoId: string;
+  patenteTractor: string;
+  patenteSemirremolque: string;
   origen: string;
   destino: string;
+  fechaCarga: string;
+  fechaDescarga: string;
+  fechaSalida: string;
+  fechaLlegada: string;
+  mercaderia: string;
+  observaciones: string;
+  monto: string;
+  kmRecorridos: string;
+  litrosConsumidos: string;
   precioCliente: string;
-  precioFletero: string;
+  precioTransportistaExterno: string;
+  documentacionCsv: string;
 };
 
 export function ViajesSuperadminPage() {
@@ -27,7 +43,16 @@ export function ViajesSuperadminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [transportistas, setTransportistas] = useState<Transportista[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const tenants = useTenantsList();
+
+  function toLocalDateTime(value?: string | null) {
+    if (!value) return '';
+    return new Date(value).toISOString().slice(0, 16);
+  }
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -60,15 +85,69 @@ export function ViajesSuperadminPage() {
     };
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !filtroEmpresa) {
+      setClientes([]);
+      setChoferes([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [clientesData, choferesData, transportistasData, vehiculosData] = await Promise.all([
+          apiJson<Cliente[]>(`/api/platform/clientes?tenantId=${encodeURIComponent(filtroEmpresa)}`, () => getToken()),
+          apiJson<Chofer[]>(`/api/platform/choferes?tenantId=${encodeURIComponent(filtroEmpresa)}`, () => getToken()),
+          apiJson<Transportista[]>(`/api/platform/transportistas?tenantId=${encodeURIComponent(filtroEmpresa)}`, () => getToken()),
+          apiJson<Vehiculo[]>(`/api/platform/vehiculos?tenantId=${encodeURIComponent(filtroEmpresa)}`, () => getToken()),
+        ]);
+        if (!cancelled) {
+          setClientes(clientesData);
+          setChoferes(choferesData);
+          setTransportistas(transportistasData);
+          setVehiculos(vehiculosData);
+        }
+      } catch {
+        if (!cancelled) {
+          setClientes([]);
+          setChoferes([]);
+          setTransportistas([]);
+          setVehiculos([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
+
   function startEdit(v: ConEmpresa<Viaje>) {
     setEditingId(v.id);
     setDraft({
       numero: v.numero ?? '',
       estado: v.estado ?? 'pendiente',
+      clienteId: v.clienteId ?? '',
+      choferId: v.choferId ?? '',
+      transportistaId: v.transportistaId ?? '',
+      vehiculoId: v.vehiculoId ?? '',
+      patenteTractor: v.patenteTractor ?? '',
+      patenteSemirremolque: v.patenteSemirremolque ?? '',
       origen: v.origen ?? '',
       destino: v.destino ?? '',
+      fechaCarga: toLocalDateTime(v.fechaCarga),
+      fechaDescarga: toLocalDateTime(v.fechaDescarga),
+      fechaSalida: toLocalDateTime(v.fechaSalida),
+      fechaLlegada: toLocalDateTime(v.fechaLlegada),
+      mercaderia: v.mercaderia ?? '',
+      observaciones: v.observaciones ?? '',
+      monto: v.monto != null ? String(v.monto) : '',
+      kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : '',
+      litrosConsumidos: v.litrosConsumidos != null ? String(v.litrosConsumidos) : '',
       precioCliente: v.precioCliente != null ? String(v.precioCliente) : '',
-      precioFletero: v.precioFletero != null ? String(v.precioFletero) : '',
+      precioTransportistaExterno:
+        v.precioTransportistaExterno != null
+          ? String(v.precioTransportistaExterno)
+          : '',
+      documentacionCsv: (v.documentacion ?? []).join(', '),
     });
   }
 
@@ -96,10 +175,31 @@ export function ViajesSuperadminPage() {
           body: JSON.stringify({
             numero: draft.numero.trim(),
             estado: draft.estado,
+            clienteId: draft.clienteId || undefined,
+            choferId: draft.choferId || undefined,
+            transportistaId: draft.transportistaId.trim() || undefined,
+            vehiculoId: draft.vehiculoId.trim() || undefined,
+            patenteTractor: draft.patenteTractor.trim() || undefined,
+            patenteSemirremolque: draft.patenteSemirremolque.trim() || undefined,
             origen: draft.origen.trim() || undefined,
             destino: draft.destino.trim() || undefined,
+            fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
+            fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
+            fechaSalida: draft.fechaSalida ? new Date(draft.fechaSalida).toISOString() : undefined,
+            fechaLlegada: draft.fechaLlegada ? new Date(draft.fechaLlegada).toISOString() : undefined,
+            mercaderia: draft.mercaderia.trim() || undefined,
+            observaciones: draft.observaciones.trim() || undefined,
+            monto: draft.monto.trim() ? Number(draft.monto) : undefined,
+            kmRecorridos: draft.kmRecorridos.trim() ? Number(draft.kmRecorridos) : undefined,
+            litrosConsumidos: draft.litrosConsumidos.trim() ? Number(draft.litrosConsumidos) : undefined,
             precioCliente: draft.precioCliente.trim() ? Number(draft.precioCliente) : undefined,
-            precioFletero: draft.precioFletero.trim() ? Number(draft.precioFletero) : undefined,
+            precioTransportistaExterno: draft.precioTransportistaExterno.trim()
+              ? Number(draft.precioTransportistaExterno)
+              : undefined,
+            documentacion: draft.documentacionCsv
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
           }),
         },
       );
@@ -161,8 +261,8 @@ export function ViajesSuperadminPage() {
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Origen</th>
               <th className="px-4 py-3">Destino</th>
-              <th className="px-4 py-3 text-right">Precio cliente</th>
-              <th className="px-4 py-3 text-right">Precio fletero</th>
+              <th className="px-4 py-3 text-right">Monto</th>
+              <th className="px-4 py-3 text-right">Precio transportista externo</th>
               <th className="px-4 py-3 text-right">Margen</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -191,10 +291,8 @@ export function ViajesSuperadminPage() {
             )}
             {filtroEmpresa &&
               rows?.map((v) => (
-                <tr
-                  key={v.id}
-                  className="border-b border-black/5 hover:bg-vialto-mist/80"
-                >
+                <Fragment key={v.id}>
+                <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
                   <td className="px-4 py-3 font-medium">
                     {editingId === v.id ? (
                       <input
@@ -259,14 +357,14 @@ export function ViajesSuperadminPage() {
                     {editingId === v.id ? (
                       <input
                         type="number"
-                        value={draft?.precioCliente ?? ''}
+                        value={draft?.monto ?? ''}
                         onChange={(e) =>
-                          setDraft((prev) => (prev ? { ...prev, precioCliente: e.target.value } : prev))
+                          setDraft((prev) => (prev ? { ...prev, monto: e.target.value } : prev))
                         }
                         className="h-9 w-[8rem] border border-black/15 bg-white px-2 text-sm text-right"
                       />
-                    ) : v.precioCliente != null ? (
-                      `$ ${v.precioCliente.toLocaleString('es-AR')}`
+                    ) : v.monto != null ? (
+                      `$ ${v.monto.toLocaleString('es-AR')}`
                     ) : (
                       '—'
                     )}
@@ -275,14 +373,14 @@ export function ViajesSuperadminPage() {
                     {editingId === v.id ? (
                       <input
                         type="number"
-                        value={draft?.precioFletero ?? ''}
+                        value={draft?.precioTransportistaExterno ?? ''}
                         onChange={(e) =>
-                          setDraft((prev) => (prev ? { ...prev, precioFletero: e.target.value } : prev))
+                          setDraft((prev) => (prev ? { ...prev, precioTransportistaExterno: e.target.value } : prev))
                         }
                         className="h-9 w-[8rem] border border-black/15 bg-white px-2 text-sm text-right"
                       />
-                    ) : v.precioFletero != null ? (
-                      `$ ${v.precioFletero.toLocaleString('es-AR')}`
+                    ) : v.precioTransportistaExterno != null ? (
+                      `$ ${v.precioTransportistaExterno.toLocaleString('es-AR')}`
                     ) : (
                       '—'
                     )}
@@ -293,36 +391,66 @@ export function ViajesSuperadminPage() {
                       : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {editingId === v.id ? (
-                      <div className="inline-flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => saveInline(v.id)}
-                          disabled={savingId === v.id}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
-                        >
-                          {savingId === v.id ? 'Guardando…' : 'Guardar'}
+                    <button
+                      type="button"
+                      onClick={() => (editingId === v.id ? cancelEdit() : startEdit(v))}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      {editingId === v.id ? 'Cerrar' : 'Edición rápida'}
+                    </button>
+                  </td>
+                </tr>
+                {editingId === v.id && draft && (
+                  <tr className="border-b border-black/10 bg-vialto-mist/40">
+                    <td colSpan={8} className="px-4 py-4">
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        <input value={draft.numero} onChange={(e) => setDraft((p) => (p ? { ...p, numero: e.target.value } : p))} placeholder="Número" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <select value={draft.estado} onChange={(e) => setDraft((p) => (p ? { ...p, estado: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                          {ESTADOS.map((x) => <option key={x} value={x}>{estadoViajeLabel[x] ?? x}</option>)}
+                        </select>
+                        <select value={draft.clienteId} onChange={(e) => setDraft((p) => (p ? { ...p, clienteId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                          {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                        </select>
+                        <select value={draft.choferId} onChange={(e) => setDraft((p) => (p ? { ...p, choferId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                          {choferes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                        </select>
+                        <select value={draft.transportistaId} onChange={(e) => setDraft((p) => (p ? { ...p, transportistaId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                          <option value="">Sin transportista</option>
+                          {transportistas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                        </select>
+                        <select value={draft.vehiculoId} onChange={(e) => setDraft((p) => (p ? { ...p, vehiculoId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                          <option value="">Sin vehículo</option>
+                          {vehiculos.map((vh) => <option key={vh.id} value={vh.id}>{vh.patente}</option>)}
+                        </select>
+                        <input value={draft.patenteTractor} onChange={(e) => setDraft((p) => (p ? { ...p, patenteTractor: e.target.value } : p))} placeholder="Patente tractor" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input value={draft.patenteSemirremolque} onChange={(e) => setDraft((p) => (p ? { ...p, patenteSemirremolque: e.target.value } : p))} placeholder="Patente semirremolque" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input value={draft.origen} onChange={(e) => setDraft((p) => (p ? { ...p, origen: e.target.value } : p))} placeholder="Origen" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input value={draft.destino} onChange={(e) => setDraft((p) => (p ? { ...p, destino: e.target.value } : p))} placeholder="Destino" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="datetime-local" value={draft.fechaCarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="datetime-local" value={draft.fechaDescarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaDescarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="datetime-local" value={draft.fechaSalida} onChange={(e) => setDraft((p) => (p ? { ...p, fechaSalida: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="datetime-local" value={draft.fechaLlegada} onChange={(e) => setDraft((p) => (p ? { ...p, fechaLlegada: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input value={draft.mercaderia} onChange={(e) => setDraft((p) => (p ? { ...p, mercaderia: e.target.value } : p))} placeholder="Mercadería" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Observaciones" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="number" value={draft.monto} onChange={(e) => setDraft((p) => (p ? { ...p, monto: e.target.value } : p))} placeholder="Monto" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="number" value={draft.kmRecorridos} onChange={(e) => setDraft((p) => (p ? { ...p, kmRecorridos: e.target.value } : p))} placeholder="Km recorridos" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="number" value={draft.litrosConsumidos} onChange={(e) => setDraft((p) => (p ? { ...p, litrosConsumidos: e.target.value } : p))} placeholder="Litros consumidos" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="number" value={draft.precioCliente} onChange={(e) => setDraft((p) => (p ? { ...p, precioCliente: e.target.value } : p))} placeholder="Precio cliente" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <input type="number" value={draft.precioTransportistaExterno} onChange={(e) => setDraft((p) => (p ? { ...p, precioTransportistaExterno: e.target.value } : p))} placeholder="Precio transportista externo" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <textarea value={draft.documentacionCsv} onChange={(e) => setDraft((p) => (p ? { ...p, documentacionCsv: e.target.value } : p))} placeholder="Documentación (URLs separadas por coma)" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm md:col-span-2 lg:col-span-3" />
+                      </div>
+                      <div className="mt-3 inline-flex gap-2">
+                        <button type="button" onClick={() => saveInline(v.id)} disabled={savingId === v.id} className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60">
+                          {savingId === v.id ? 'Guardando…' : 'Guardar cambios'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          disabled={savingId === v.id}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-60"
-                        >
+                        <button type="button" onClick={cancelEdit} disabled={savingId === v.id} className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-60">
                           Cancelar
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => startEdit(v)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
           </tbody>
         </table>
