@@ -5,9 +5,18 @@ import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
+import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import {
+  ViajeOperacionTipoFieldset,
+  type ViajeOperacionModo,
+} from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { apiJson } from '@/lib/api';
+import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
-import type { Chofer, Cliente, Viaje } from '@/types/api';
+import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion, type PaisCodigo } from '@/lib/ciudades';
+import { estadoViajeLabel } from '@/lib/viajesEstados';
+import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
 
 const ESTADOS = ['pendiente', 'en_curso', 'finalizado', 'cancelado'] as const;
 
@@ -19,14 +28,19 @@ export function ViajeEditPage() {
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [transportistas, setTransportistas] = useState<Transportista[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [numero, setNumero] = useState('');
   const [estado, setEstado] = useState<(typeof ESTADOS)[number]>('pendiente');
   const [clienteId, setClienteId] = useState('');
   const [choferId, setChoferId] = useState('');
   const [transportistaId, setTransportistaId] = useState('');
+  const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('propio');
   const [vehiculoId, setVehiculoId] = useState('');
   const [patenteTractor, setPatenteTractor] = useState('');
   const [patenteSemirremolque, setPatenteSemirremolque] = useState('');
+  const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
+  const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState('');
   const [fechaCarga, setFechaCarga] = useState('');
@@ -64,40 +78,49 @@ export function ViajeEditPage() {
         const choferesPath = tenantId
           ? `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`
           : '/api/choferes';
-        const [row, clientesData, choferesData] = await Promise.all([
+        const transportistasPath = tenantId
+          ? `/api/platform/transportistas?tenantId=${encodeURIComponent(tenantId)}`
+          : '/api/transportistas';
+        const vehiculosPath = tenantId
+          ? `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`
+          : '/api/vehiculos';
+        const [row, clientesData, choferesData, transportistasData, vehiculosData] = await Promise.all([
           apiJson<Viaje>(viajePath, () => getToken()),
           apiJson<Cliente[]>(clientesPath, () => getToken()),
           apiJson<Chofer[]>(choferesPath, () => getToken()),
+          apiJson<Transportista[]>(transportistasPath, () => getToken()),
+          apiJson<Vehiculo[]>(vehiculosPath, () => getToken()),
         ]);
         if (!cancelled) {
           setClientes(clientesData);
           setChoferes(choferesData);
+          setTransportistas(transportistasData);
+          setVehiculos(vehiculosData);
           setNumero(row.numero);
           setEstado((ESTADOS.includes(row.estado as any) ? row.estado : 'pendiente') as (typeof ESTADOS)[number]);
           setClienteId(row.clienteId);
           setChoferId(row.choferId ?? choferesData[0]?.id ?? '');
           setTransportistaId(row.transportistaId ?? '');
+          setModoOperacion((row.transportistaId ?? '').trim() ? 'externo' : 'propio');
           setVehiculoId(row.vehiculoId ?? '');
           setPatenteTractor(row.patenteTractor ?? '');
           setPatenteSemirremolque(row.patenteSemirremolque ?? '');
           setOrigen(row.origen ?? '');
           setDestino(row.destino ?? '');
+          setPaisOrigen(inferirPaisDesdeUbicacion(row.origen ?? ''));
+          setPaisDestino(inferirPaisDesdeUbicacion(row.destino ?? ''));
           setFechaCarga(row.fechaCarga ? new Date(row.fechaCarga).toISOString().slice(0, 16) : '');
           setFechaDescarga(row.fechaDescarga ? new Date(row.fechaDescarga).toISOString().slice(0, 16) : '');
           setFechaSalida(row.fechaSalida ? new Date(row.fechaSalida).toISOString().slice(0, 16) : '');
           setFechaLlegada(row.fechaLlegada ? new Date(row.fechaLlegada).toISOString().slice(0, 16) : '');
           setMercaderia(row.mercaderia ?? '');
           setObservaciones(row.observaciones ?? '');
-          setMonto(row.monto != null ? String(row.monto) : '');
+          setMonto(formatCurrencyArFromNumber(row.monto));
           setKmRecorridos(row.kmRecorridos != null ? String(row.kmRecorridos) : '');
           setLitrosConsumidos(row.litrosConsumidos != null ? String(row.litrosConsumidos) : '');
           setDocumentacionCsv((row.documentacion ?? []).join(', '));
-          setPrecioCliente(row.precioCliente != null ? String(row.precioCliente) : '');
-          setPrecioTransportistaExterno(
-            row.precioTransportistaExterno != null
-              ? String(row.precioTransportistaExterno)
-              : '',
-          );
+          setPrecioCliente(formatCurrencyArFromNumber(row.precioCliente));
+          setPrecioTransportistaExterno(formatCurrencyArFromNumber(row.precioTransportistaExterno));
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'viajes'));
@@ -110,6 +133,17 @@ export function ViajeEditPage() {
     };
   }, [getToken, id, tenantId]);
 
+  function applyModoOperacion(m: ViajeOperacionModo) {
+    setModoOperacion(m);
+    if (m === 'externo') {
+      setChoferId('');
+      setVehiculoId('');
+    } else {
+      setTransportistaId('');
+      setChoferId((prev) => prev || choferes[0]?.id || '');
+    }
+  }
+
   async function onSave() {
     if (!id) return;
     if (!numero.trim()) {
@@ -120,9 +154,26 @@ export function ViajeEditPage() {
       setError('Seleccioná un cliente.');
       return;
     }
-    if (!choferId) {
-      setError('Seleccioná un chofer.');
+    const externo = modoOperacion === 'externo';
+    if (externo && !transportistaId.trim()) {
+      setError('Seleccioná un transportista externo.');
       return;
+    }
+    if (!externo && (!choferId || !vehiculoId.trim())) {
+      setError('En flota propia, seleccioná chofer y vehículo.');
+      return;
+    }
+    const o = origen.trim();
+    const d = destino.trim();
+    if (o || d) {
+      const [okO, okD] = await Promise.all([
+        o ? esEtiquetaCiudadValida(paisOrigen, o) : Promise.resolve(true),
+        d ? esEtiquetaCiudadValida(paisDestino, d) : Promise.resolve(true),
+      ]);
+      if (!okO || !okD) {
+        setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+        return;
+      }
     }
     setLoading(true);
     setError(null);
@@ -138,9 +189,17 @@ export function ViajeEditPage() {
           numero: numero.trim(),
           estado,
           clienteId,
-          choferId,
-          transportistaId: transportistaId.trim() || undefined,
-          vehiculoId: vehiculoId.trim() || undefined,
+          ...(externo
+            ? {
+                transportistaId: transportistaId.trim(),
+                choferId: null,
+                vehiculoId: null,
+              }
+            : {
+                transportistaId: null,
+                choferId,
+                vehiculoId: vehiculoId.trim(),
+              }),
           patenteTractor: patenteTractor.trim().toUpperCase(),
           patenteSemirremolque: patenteSemirremolque.trim().toUpperCase(),
           origen: origen.trim() || undefined,
@@ -157,11 +216,9 @@ export function ViajeEditPage() {
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean),
-          monto: monto ? Number(monto) : undefined,
-          precioCliente: precioCliente ? Number(precioCliente) : undefined,
-          precioTransportistaExterno: precioTransportistaExterno
-            ? Number(precioTransportistaExterno)
-            : undefined,
+          monto: parseCurrencyAr(monto),
+          precioCliente: parseCurrencyAr(precioCliente),
+          precioTransportistaExterno: parseCurrencyAr(precioTransportistaExterno),
         }),
       });
       navigate('/viajes', { replace: true });
@@ -204,17 +261,21 @@ export function ViajeEditPage() {
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
         <>
-          <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
-            <label className="grid gap-1.5">
+          <form
+            className="mt-6 grid gap-4 md:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSave();
+            }}
+          >
+            <div className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Numero
+                Número de viaje
               </span>
-              <CrudInput
-                value={numero}
-                placeholder="Ej: VIA-000123"
-                onChange={(e) => setNumero(e.target.value)}
-              />
-            </label>
+              <span className="flex min-h-[2.25rem] items-center text-sm font-medium text-vialto-charcoal">
+                {numero || '—'}
+              </span>
+            </div>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Estado
@@ -225,7 +286,7 @@ export function ViajeEditPage() {
               >
                 {ESTADOS.map((x) => (
                   <option key={x} value={x}>
-                    {x}
+                    {estadoViajeLabel[x] ?? x}
                   </option>
                 ))}
               </CrudSelect>
@@ -242,38 +303,71 @@ export function ViajeEditPage() {
                 ))}
               </CrudSelect>
             </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Chofer
-              </span>
-              <CrudSelect value={choferId} onChange={(e) => setChoferId(e.target.value)}>
-                {choferes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </CrudSelect>
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Transportista ID
-              </span>
-              <CrudInput
-                value={transportistaId}
-                placeholder="Opcional"
-                onChange={(e) => setTransportistaId(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Vehículo ID
-              </span>
-              <CrudInput
-                value={vehiculoId}
-                placeholder="Opcional"
-                onChange={(e) => setVehiculoId(e.target.value)}
-              />
-            </label>
+            <ViajeOperacionTipoFieldset
+              modo={modoOperacion}
+              onModoChange={applyModoOperacion}
+              className="col-span-full grid min-w-0 gap-3 border-0 p-0"
+              externoContent={
+                <>
+                  <label className="grid gap-1.5">
+                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                      Transportista externo
+                    </span>
+                    <CrudSelect value={transportistaId} onChange={(e) => setTransportistaId(e.target.value)}>
+                      <option value="">Elegí un transportista…</option>
+                      {transportistas.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nombre}
+                        </option>
+                      ))}
+                    </CrudSelect>
+                  </label>
+                  <label className="grid gap-1.5 pt-1">
+                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                      Precio transportista externo
+                    </span>
+                    <CrudInput
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="Ej: 1.200.000,50"
+                      value={precioTransportistaExterno}
+                      onChange={(e) => setPrecioTransportistaExterno(maskCurrencyArInput(e.target.value))}
+                      className="text-right tabular-nums"
+                    />
+                  </label>
+                </>
+              }
+              propioContent={
+                <>
+                  <label className="grid gap-1.5">
+                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                      Chofer
+                    </span>
+                    <CrudSelect value={choferId} onChange={(e) => setChoferId(e.target.value)}>
+                      {choferes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </CrudSelect>
+                  </label>
+                  <label className="grid gap-1.5 pt-1">
+                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                      Vehículo
+                    </span>
+                    <CrudSelect value={vehiculoId} onChange={(e) => setVehiculoId(e.target.value)}>
+                      <option value="">Elegí un vehículo…</option>
+                      {vehiculos.map((vh) => (
+                        <option key={vh.id} value={vh.id}>
+                          {vh.patente}
+                        </option>
+                      ))}
+                    </CrudSelect>
+                  </label>
+                </>
+              }
+            />
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Patente tractor
@@ -294,26 +388,54 @@ export function ViajeEditPage() {
                 onChange={(e) => setPatenteSemirremolque(e.target.value)}
               />
             </label>
-            <label className="grid gap-1.5">
+            <div className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Origen
               </span>
-              <CrudInput
-                value={origen}
-                placeholder="Ej: Rosario, Santa Fe"
-                onChange={(e) => setOrigen(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
+              <div className="flex flex-wrap gap-2 items-start">
+                <PaisUbicacionSelect
+                  value={paisOrigen}
+                  onChange={(p) => {
+                    setPaisOrigen(p);
+                    setOrigen('');
+                  }}
+                  aria-label="País de origen"
+                  className="h-10 min-w-[10rem] border border-black/15 bg-white px-3 text-sm"
+                />
+                <div className="min-w-[200px] flex-1">
+                  <CiudadCombobox
+                    pais={paisOrigen}
+                    value={origen}
+                    onChange={setOrigen}
+                    inputClassName="h-10 w-full border border-black/15 bg-white px-3 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Destino
               </span>
-              <CrudInput
-                value={destino}
-                placeholder="Ej: Cordoba Capital"
-                onChange={(e) => setDestino(e.target.value)}
-              />
-            </label>
+              <div className="flex flex-wrap gap-2 items-start">
+                <PaisUbicacionSelect
+                  value={paisDestino}
+                  onChange={(p) => {
+                    setPaisDestino(p);
+                    setDestino('');
+                  }}
+                  aria-label="País de destino"
+                  className="h-10 min-w-[10rem] border border-black/15 bg-white px-3 text-sm"
+                />
+                <div className="min-w-[200px] flex-1">
+                  <CiudadCombobox
+                    pais={paisDestino}
+                    value={destino}
+                    onChange={setDestino}
+                    inputClassName="h-10 w-full border border-black/15 bg-white px-3 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Fecha carga
@@ -379,10 +501,13 @@ export function ViajeEditPage() {
                 Monto del viaje
               </span>
               <CrudInput
-                type="number"
-                placeholder="Ej: 1500000"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="Ej: 1.500.000,50"
                 value={monto}
-                onChange={(e) => setMonto(e.target.value)}
+                onChange={(e) => setMonto(maskCurrencyArInput(e.target.value))}
+                className="text-right tabular-nums"
               />
             </label>
             <label className="grid gap-1.5">
@@ -412,21 +537,13 @@ export function ViajeEditPage() {
                 Precio cliente
               </span>
               <CrudInput
-                type="number"
-                placeholder="Ej: 1500000"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="Ej: 1.500.000,50"
                 value={precioCliente}
-                onChange={(e) => setPrecioCliente(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Precio transportista externo
-              </span>
-              <CrudInput
-                type="number"
-                placeholder="Ej: 1200000"
-                value={precioTransportistaExterno}
-                onChange={(e) => setPrecioTransportistaExterno(e.target.value)}
+                onChange={(e) => setPrecioCliente(maskCurrencyArInput(e.target.value))}
+                className="text-right tabular-nums"
               />
             </label>
             <label className="grid gap-1.5">

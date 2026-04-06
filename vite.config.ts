@@ -19,6 +19,24 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      /** Opcional: el cliente llama a Georef/Nominatim por HTTPS (CORS abierto). Útil si algo usa estas rutas a mano. */
+      '/georef-api': {
+        target: 'https://apis.datos.gob.ar/georef',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/georef-api/, ''),
+      },
+      '/nominatim': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/nominatim/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('User-Agent', 'VialtoLogistica/1.0');
+          });
+        },
+      },
     },
   },
 });
