@@ -8,15 +8,26 @@ import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
 import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
+import { flotaPropiaListaValida, normalizarIdEnLista, textoMontoFacturarListado } from '@/lib/viajesFlota';
 import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion, type PaisCodigo } from '@/lib/ciudades';
-import { estadoViajeLabel } from '@/lib/viajesEstados';
+import {
+  estadoViajeBadgeClass,
+  estadoViajeBadgeClassDefault,
+  estadoViajeLabel,
+  estadoMuestraKmLitros,
+  draftKmLitrosVacios,
+  parseKmLitrosOpcionales,
+  viajeTieneKmYLitrosEnApi,
+  VIAJE_ESTADOS_TODOS,
+} from '@/lib/viajesEstados';
 import type { Chofer, Cliente, ConEmpresa, Transportista, Vehiculo, Viaje } from '@/types/api';
 
-const ESTADOS = ['pendiente', 'en_curso', 'finalizado', 'cancelado'] as const;
+const ESTADOS = VIAJE_ESTADOS_TODOS;
 
 type ViajeInlineDraft = {
   numero: string;
@@ -34,16 +45,24 @@ type ViajeInlineDraft = {
   destino: string;
   fechaCarga: string;
   fechaDescarga: string;
-  fechaSalida: string;
-  fechaLlegada: string;
   mercaderia: string;
   observaciones: string;
   monto: string;
   kmRecorridos: string;
   litrosConsumidos: string;
-  precioCliente: string;
   precioTransportistaExterno: string;
   documentacionCsv: string;
+};
+
+type KmLitrosPrompt =
+  | { kind: 'quick'; viaje: ConEmpresa<Viaje>; nuevoEstado: string }
+  | { kind: 'save'; viajeId: string }
+  | { kind: 'estado-draft'; nextEstado: string };
+
+type SaveInlineKmOpts = {
+  skipKmLitrosPrompt?: boolean;
+  kmRecorridos?: number;
+  litrosConsumidos?: number;
 };
 
 export function ViajesSuperadminPage() {
@@ -54,11 +73,17 @@ export function ViajesSuperadminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
+  const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [choferes, setChoferes] = useState<Chofer[]>([]);
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const tenants = useTenantsList();
+  const [kmLitrosPrompt, setKmLitrosPrompt] = useState<KmLitrosPrompt | null>(null);
+  const [kmLitrosKm, setKmLitrosKm] = useState('');
+  const [kmLitrosLitros, setKmLitrosLitros] = useState('');
+  const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
 
   function toLocalDateTime(value?: string | null) {
     if (!value) return '';
@@ -131,16 +156,28 @@ export function ViajesSuperadminPage() {
     };
   }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
 
+  useEffect(() => {
+    if (!editingId || !draft || draft.operacionModo !== 'propio') return;
+    setDraft((p) => {
+      if (!p || p.operacionModo !== 'propio') return p;
+      const cid = normalizarIdEnLista(p.choferId, choferes);
+      const vid = normalizarIdEnLista(p.vehiculoId, vehiculos);
+      if (cid === p.choferId && vid === p.vehiculoId) return p;
+      return { ...p, choferId: cid, vehiculoId: vid };
+    });
+  }, [editingId, draft?.operacionModo, choferes, vehiculos]);
+
   function startEdit(v: ConEmpresa<Viaje>) {
+    setEstadoQuickId(null);
     setEditingId(v.id);
     setDraft({
       numero: v.numero ?? '',
       estado: v.estado ?? 'pendiente',
       clienteId: v.clienteId ?? '',
       operacionModo: (v.transportistaId ?? '').trim() ? 'externo' : 'propio',
-      choferId: v.choferId ?? '',
+      choferId: normalizarIdEnLista(v.choferId, choferes),
       transportistaId: v.transportistaId ?? '',
-      vehiculoId: v.vehiculoId ?? '',
+      vehiculoId: normalizarIdEnLista(v.vehiculoId, vehiculos),
       patenteTractor: v.patenteTractor ?? '',
       patenteSemirremolque: v.patenteSemirremolque ?? '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
@@ -149,14 +186,11 @@ export function ViajesSuperadminPage() {
       destino: v.destino ?? '',
       fechaCarga: toLocalDateTime(v.fechaCarga),
       fechaDescarga: toLocalDateTime(v.fechaDescarga),
-      fechaSalida: toLocalDateTime(v.fechaSalida),
-      fechaLlegada: toLocalDateTime(v.fechaLlegada),
       mercaderia: v.mercaderia ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatCurrencyArFromNumber(v.monto),
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : '',
       litrosConsumidos: v.litrosConsumidos != null ? String(v.litrosConsumidos) : '',
-      precioCliente: formatCurrencyArFromNumber(v.precioCliente),
       precioTransportistaExterno: formatCurrencyArFromNumber(v.precioTransportistaExterno),
       documentacionCsv: (v.documentacion ?? []).join(', '),
     });
@@ -165,6 +199,121 @@ export function ViajesSuperadminPage() {
   function cancelEdit() {
     setEditingId(null);
     setDraft(null);
+    setEstadoQuickId(null);
+  }
+
+  async function patchEstadoDesdeListado(v: ConEmpresa<Viaje>, nuevoEstado: string) {
+    if (!filtroEmpresa) {
+      setError('Seleccioná una empresa.');
+      setEstadoQuickId(null);
+      return;
+    }
+    if (nuevoEstado === v.estado) {
+      setEstadoQuickId(null);
+      return;
+    }
+    if (estadoMuestraKmLitros(nuevoEstado) && !viajeTieneKmYLitrosEnApi(v)) {
+      setKmLitrosKm(v.kmRecorridos != null ? String(v.kmRecorridos) : '');
+      setKmLitrosLitros(v.litrosConsumidos != null ? String(v.litrosConsumidos) : '');
+      setKmLitrosPrompt({ kind: 'quick', viaje: v, nuevoEstado });
+      setKmLitrosFieldError(null);
+      setEstadoQuickId(null);
+      return;
+    }
+    setSavingEstadoId(v.id);
+    setError(null);
+    try {
+      const updated = await apiJson<ConEmpresa<Viaje>>(
+        `/api/platform/viajes/${encodeURIComponent(v.id)}?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+        () => getToken(),
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ estado: nuevoEstado }),
+        },
+      );
+      setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
+      setEstadoQuickId(null);
+    } catch (e) {
+      setError(friendlyError(e, 'plataforma'));
+    } finally {
+      setSavingEstadoId(null);
+    }
+  }
+
+  async function patchEstadoConKmLitrosOpcional(
+    v: ConEmpresa<Viaje>,
+    nuevoEstado: string,
+    km?: number,
+    litros?: number,
+  ): Promise<boolean> {
+    if (!filtroEmpresa) return false;
+    setSavingEstadoId(v.id);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = { estado: nuevoEstado };
+      if (km !== undefined) body.kmRecorridos = km;
+      if (litros !== undefined) body.litrosConsumidos = litros;
+      const updated = await apiJson<ConEmpresa<Viaje>>(
+        `/api/platform/viajes/${encodeURIComponent(v.id)}?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+        () => getToken(),
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        },
+      );
+      setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
+      setEstadoQuickId(null);
+      return true;
+    } catch (e) {
+      setError(friendlyError(e, 'plataforma'));
+      return false;
+    } finally {
+      setSavingEstadoId(null);
+    }
+  }
+
+  function confirmKmLitrosDialog() {
+    const parsed = parseKmLitrosOpcionales(kmLitrosKm, kmLitrosLitros);
+    if (!parsed.ok) {
+      setKmLitrosFieldError(parsed.message);
+      return;
+    }
+    setKmLitrosFieldError(null);
+    if (!kmLitrosPrompt) return;
+    if (kmLitrosPrompt.kind === 'quick') {
+      const { viaje, nuevoEstado } = kmLitrosPrompt;
+      void patchEstadoConKmLitrosOpcional(viaje, nuevoEstado, parsed.km, parsed.litros).then((ok) => {
+        if (ok) setKmLitrosPrompt(null);
+      });
+      return;
+    }
+    if (kmLitrosPrompt.kind === 'estado-draft') {
+      const { nextEstado } = kmLitrosPrompt;
+      setDraft((p) =>
+        p
+          ? {
+              ...p,
+              estado: nextEstado,
+              kmRecorridos: parsed.km !== undefined ? String(parsed.km) : '',
+              litrosConsumidos: parsed.litros !== undefined ? String(parsed.litros) : '',
+            }
+          : p,
+      );
+      setKmLitrosPrompt(null);
+      return;
+    }
+    const viajeId = kmLitrosPrompt.viajeId;
+    setKmLitrosPrompt(null);
+    void saveInline(viajeId, {
+      skipKmLitrosPrompt: true,
+      kmRecorridos: parsed.km,
+      litrosConsumidos: parsed.litros,
+    });
+  }
+
+  function cancelKmLitrosDialog() {
+    setKmLitrosPrompt(null);
+    setKmLitrosFieldError(null);
   }
 
   function applyDraftModo(m: ViajeOperacionModo) {
@@ -177,15 +326,20 @@ export function ViajesSuperadminPage() {
               ? { choferId: '', vehiculoId: '' }
               : {
                   transportistaId: '',
-                  choferId: p.choferId.trim() || choferes[0]?.id || '',
+                  choferId: normalizarIdEnLista(p.choferId, choferes),
+                  vehiculoId: normalizarIdEnLista(p.vehiculoId, vehiculos),
                 }),
           }
         : p,
     );
   }
 
-  async function saveInline(viajeId: string) {
-    if (!filtroEmpresa || !draft) return;
+  async function saveInline(viajeId: string, opts?: SaveInlineKmOpts) {
+    if (!draft) return;
+    if (!filtroEmpresa) {
+      setError('Seleccioná una empresa para guardar los cambios.');
+      return;
+    }
     if (!draft.numero.trim()) {
       setError('Ingresá el número de viaje.');
       return;
@@ -195,8 +349,8 @@ export function ViajesSuperadminPage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
-    if (!externo && (!draft.choferId.trim() || !draft.vehiculoId.trim())) {
-      setError('En flota propia, indicá chofer y vehículo.');
+    if (!externo && !flotaPropiaListaValida(draft.choferId, draft.vehiculoId, choferes, vehiculos)) {
+      setError('En flota propia, elegí chofer y vehículo de las listas (si no aparecen, cargá la página).');
       return;
     }
     const o = draft.origen.trim();
@@ -211,6 +365,27 @@ export function ViajesSuperadminPage() {
         return;
       }
     }
+    if (
+      !opts?.skipKmLitrosPrompt &&
+      estadoMuestraKmLitros(draft.estado) &&
+      draftKmLitrosVacios(draft.kmRecorridos, draft.litrosConsumidos)
+    ) {
+      setKmLitrosKm(draft.kmRecorridos);
+      setKmLitrosLitros(draft.litrosConsumidos);
+      setKmLitrosPrompt({ kind: 'save', viajeId });
+      setKmLitrosFieldError(null);
+      return;
+    }
+    const kmResolved = opts?.skipKmLitrosPrompt
+      ? opts.kmRecorridos
+      : draft.kmRecorridos.trim()
+        ? Number(draft.kmRecorridos.replace(',', '.'))
+        : undefined;
+    const litResolved = opts?.skipKmLitrosPrompt
+      ? opts.litrosConsumidos
+      : draft.litrosConsumidos.trim()
+        ? Number(draft.litrosConsumidos.replace(',', '.'))
+        : undefined;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -242,14 +417,11 @@ export function ViajesSuperadminPage() {
             destino: draft.destino.trim() || undefined,
             fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
             fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
-            fechaSalida: draft.fechaSalida ? new Date(draft.fechaSalida).toISOString() : undefined,
-            fechaLlegada: draft.fechaLlegada ? new Date(draft.fechaLlegada).toISOString() : undefined,
             mercaderia: draft.mercaderia.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
             monto: parseCurrencyAr(draft.monto),
-            kmRecorridos: draft.kmRecorridos.trim() ? Number(draft.kmRecorridos) : undefined,
-            litrosConsumidos: draft.litrosConsumidos.trim() ? Number(draft.litrosConsumidos) : undefined,
-            precioCliente: parseCurrencyAr(draft.precioCliente),
+            kmRecorridos: kmResolved,
+            litrosConsumidos: litResolved,
             precioTransportistaExterno: parseCurrencyAr(draft.precioTransportistaExterno),
             documentacion: draft.documentacionCsv
               .split(',')
@@ -264,6 +436,23 @@ export function ViajesSuperadminPage() {
       setError(friendlyError(e, 'plataforma'));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  const tableColSpan = editingId ? 5 : 6;
+
+  function formatFechaCargaCelda(iso: string | null | undefined) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '—';
     }
   }
 
@@ -284,29 +473,34 @@ export function ViajesSuperadminPage() {
           onChange={setFiltroEmpresa}
         />
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-2">
         {editingId ? (
-          <button
-            type="button"
-            onClick={() => saveInline(editingId)}
-            disabled={savingId === editingId || !filtroEmpresa}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
-          >
-            {savingId === editingId ? 'Guardando…' : 'Modificar cambios'}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={savingId === editingId}
+              className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={() => saveInline(editingId)}
+              disabled={savingId === editingId}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
+            >
+              {savingId === editingId ? 'Guardando…' : 'Modificar cambios'}
+            </button>
+          </>
         ) : (
           <Link
             to={
               filtroEmpresa
                 ? `/viajes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
-                : '#'
+                : '/viajes/nuevo'
             }
-            className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
-              filtroEmpresa
-                ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
-                : 'bg-vialto-charcoal/50 pointer-events-none'
-            }`}
-            aria-disabled={!filtroEmpresa}
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
             Crear viaje
           </Link>
@@ -327,30 +521,29 @@ export function ViajesSuperadminPage() {
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Origen</th>
               <th className="px-4 py-3">Destino</th>
-              <th className="px-4 py-3 text-right">Monto</th>
-              <th className="px-4 py-3 text-right">Transportista ext.</th>
-              <th className="px-4 py-3 text-right">Margen</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
+              <th className="px-4 py-3">Fecha de carga</th>
+              <th className="px-4 py-3 text-right">Monto a facturar</th>
+              {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {!filtroEmpresa && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
                   Seleccioná una empresa para ver los viajes.
                 </td>
               </tr>
             )}
             {filtroEmpresa && rows === null && !error && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
                   No hay viajes registrados para esta empresa.
                 </td>
               </tr>
@@ -366,9 +559,21 @@ export function ViajesSuperadminPage() {
                     {editingId === v.id ? (
                       <select
                         value={draft?.estado ?? 'pendiente'}
-                        onChange={(e) =>
-                          setDraft((prev) => (prev ? { ...prev, estado: e.target.value } : prev))
-                        }
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          if (!draft) return;
+                          if (
+                            estadoMuestraKmLitros(next) &&
+                            draftKmLitrosVacios(draft.kmRecorridos, draft.litrosConsumidos)
+                          ) {
+                            setKmLitrosKm(draft.kmRecorridos);
+                            setKmLitrosLitros(draft.litrosConsumidos);
+                            setKmLitrosPrompt({ kind: 'estado-draft', nextEstado: next });
+                            setKmLitrosFieldError(null);
+                            return;
+                          }
+                          setDraft((prev) => (prev ? { ...prev, estado: next } : prev));
+                        }}
                         className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                       >
                         {ESTADOS.map((x) => (
@@ -377,10 +582,37 @@ export function ViajesSuperadminPage() {
                           </option>
                         ))}
                       </select>
+                    ) : estadoQuickId === v.id ? (
+                      <select
+                        autoFocus
+                        value={v.estado}
+                        disabled={savingEstadoId === v.id}
+                        onChange={(e) => void patchEstadoDesdeListado(v, e.target.value)}
+                        onBlur={() => setEstadoQuickId(null)}
+                        className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
+                        aria-label="Cambiar estado del viaje"
+                      >
+                        {ESTADOS.map((x) => (
+                          <option key={x} value={x}>
+                            {estadoViajeLabel[x] ?? x}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
-                      <span className="inline-block font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 bg-vialto-charcoal text-white">
-                        {estadoViajeLabel[v.estado] ?? 'Sin clasificar'}
-                      </span>
+                      <button
+                        type="button"
+                        title="Cambiar estado"
+                        disabled={savingEstadoId === v.id}
+                        onClick={() => {
+                          if (savingEstadoId) return;
+                          setEstadoQuickId(v.id);
+                        }}
+                        className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                          estadoViajeBadgeClass[v.estado] ?? estadoViajeBadgeClassDefault
+                        }`}
+                      >
+                        {savingEstadoId === v.id ? '…' : estadoViajeLabel[v.estado] ?? 'Sin clasificar'}
+                      </button>
                     )}
                   </td>
                   <td
@@ -435,104 +667,116 @@ export function ViajesSuperadminPage() {
                       (v.destino ?? '—')
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {editingId === v.id ? (
+                  <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums">
+                    {editingId === v.id && draft ? (
                       <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={draft?.monto ?? ''}
-                        onChange={(e) =>
-                          setDraft((prev) =>
-                            prev ? { ...prev, monto: maskCurrencyArInput(e.target.value) } : prev,
-                          )
-                        }
-                        className="h-9 w-[10rem] border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
+                        type="datetime-local"
+                        value={draft.fechaCarga}
+                        onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))}
+                        className="h-9 min-w-[10.5rem] border border-black/15 bg-white px-2 text-sm"
                       />
-                    ) : v.monto != null ? (
-                      `$ ${v.monto.toLocaleString('es-AR')}`
                     ) : (
-                      '—'
+                      formatFechaCargaCelda(v.fechaCarga)
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {editingId === v.id ? (
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={draft?.precioTransportistaExterno ?? ''}
-                        onChange={(e) =>
-                          setDraft((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  precioTransportistaExterno: maskCurrencyArInput(e.target.value),
-                                }
-                              : prev,
-                          )
-                        }
-                        className="h-9 w-[10rem] border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                      />
-                    ) : v.precioTransportistaExterno != null ? (
-                      `$ ${v.precioTransportistaExterno.toLocaleString('es-AR')}`
-                    ) : (
-                      '—'
-                    )}
+                    {textoMontoFacturarListado(v)}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {v.gananciaBruta != null
-                      ? `$ ${v.gananciaBruta.toLocaleString('es-AR')}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => (editingId === v.id ? cancelEdit() : startEdit(v))}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      {editingId === v.id ? 'Cerrar' : 'Edición rápida'}
-                    </button>
-                  </td>
+                  {!editingId && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(v)}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Editar
+                      </button>
+                    </td>
+                  )}
                 </tr>
                 {editingId === v.id && draft && (
                   <tr className="border-b border-black/10 bg-vialto-mist/40">
-                    <td colSpan={8} className="px-4 py-4">
+                    <td colSpan={tableColSpan} className="px-4 py-4">
                       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Cliente</span>
-                          <select value={draft.clienteId} onChange={(e) => setDraft((p) => (p ? { ...p, clienteId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
-                            {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                          </select>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Cliente</span>
+                            <select value={draft.clienteId} onChange={(e) => setDraft((p) => (p ? { ...p, clienteId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
+                              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                              Monto a facturar
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={draft.monto}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p ? { ...p, monto: maskCurrencyArInput(e.target.value) } : p,
+                                )
+                              }
+                              placeholder="Ej. 1.500.000,50"
+                              className="h-9 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
+                            />
+                          </div>
                         </div>
                         <ViajeOperacionTipoFieldset
                           modo={draft.operacionModo}
                           onModoChange={applyDraftModo}
                           groupName={`viaje-op-sa-${draft.numero || 'edit'}`}
                           externoContent={
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                Transportista externo
-                              </span>
-                              <select
-                                value={draft.transportistaId}
-                                onChange={(e) =>
-                                  setDraft((p) => (p ? { ...p, transportistaId: e.target.value } : p))
-                                }
-                                className="h-9 border border-black/15 bg-white px-2 text-sm"
-                              >
-                                <option value="">Elegí un transportista…</option>
-                                {transportistas.map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.nombre}
-                                  </option>
-                                ))}
-                              </select>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                                  Transportista externo
+                                </span>
+                                <select
+                                  value={draft.transportistaId}
+                                  onChange={(e) =>
+                                    setDraft((p) => (p ? { ...p, transportistaId: e.target.value } : p))
+                                  }
+                                  className="h-9 border border-black/15 bg-white px-2 text-sm"
+                                >
+                                  <option value="">Elegí un transportista…</option>
+                                  {transportistas.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.nombre}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                                  Precio transportista externo
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  value={draft.precioTransportistaExterno}
+                                  onChange={(e) =>
+                                    setDraft((p) =>
+                                      p
+                                        ? {
+                                            ...p,
+                                            precioTransportistaExterno: maskCurrencyArInput(e.target.value),
+                                          }
+                                        : p,
+                                    )
+                                  }
+                                  placeholder="Ej. 1.200.000,50"
+                                  className="h-9 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
+                                />
+                              </div>
                             </div>
                           }
                           propioContent={
-                            <>
-                              <div className="flex flex-col gap-1">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                              <div className="flex min-w-0 flex-col gap-1">
                                 <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                                   Chofer
                                 </span>
@@ -550,7 +794,7 @@ export function ViajesSuperadminPage() {
                                   ))}
                                 </select>
                               </div>
-                              <div className="flex flex-col gap-1 pt-2">
+                              <div className="flex min-w-0 flex-col gap-1">
                                 <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                                   Vehículo
                                 </span>
@@ -569,68 +813,52 @@ export function ViajesSuperadminPage() {
                                   ))}
                                 </select>
                               </div>
-                            </>
+                            </div>
                           }
                         />
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente tractor</span>
-                          <input value={draft.patenteTractor} onChange={(e) => setDraft((p) => (p ? { ...p, patenteTractor: e.target.value } : p))} placeholder="Ej. AA123BB" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente tractor</span>
+                            <input value={draft.patenteTractor} onChange={(e) => setDraft((p) => (p ? { ...p, patenteTractor: e.target.value } : p))} placeholder="Ej. AA123BB" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente semirremolque</span>
+                            <input value={draft.patenteSemirremolque} onChange={(e) => setDraft((p) => (p ? { ...p, patenteSemirremolque: e.target.value } : p))} placeholder="Ej. AA456CC" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente semirremolque</span>
-                          <input value={draft.patenteSemirremolque} onChange={(e) => setDraft((p) => (p ? { ...p, patenteSemirremolque: e.target.value } : p))} placeholder="Ej. AA456CC" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de carga</span>
+                            <input type="datetime-local" value={draft.fechaCarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de descarga</span>
+                            <input type="datetime-local" value={draft.fechaDescarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaDescarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de carga</span>
-                          <input type="datetime-local" value={draft.fechaCarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de descarga</span>
-                          <input type="datetime-local" value={draft.fechaDescarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaDescarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de salida</span>
-                          <input type="datetime-local" value={draft.fechaSalida} onChange={(e) => setDraft((p) => (p ? { ...p, fechaSalida: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de llegada</span>
-                          <input type="datetime-local" value={draft.fechaLlegada} onChange={(e) => setDraft((p) => (p ? { ...p, fechaLlegada: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
+                        {estadoMuestraKmLitros(draft.estado) && (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Km recorridos</span>
+                              <input type="number" value={draft.kmRecorridos} onChange={(e) => setDraft((p) => (p ? { ...p, kmRecorridos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Litros consumidos</span>
+                              <input type="number" value={draft.litrosConsumidos} onChange={(e) => setDraft((p) => (p ? { ...p, litrosConsumidos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Mercadería</span>
-                          <input value={draft.mercaderia} onChange={(e) => setDraft((p) => (p ? { ...p, mercaderia: e.target.value } : p))} placeholder="Descripción de la carga" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>
-                          <input value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Notas adicionales" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Km recorridos</span>
-                          <input type="number" value={draft.kmRecorridos} onChange={(e) => setDraft((p) => (p ? { ...p, kmRecorridos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Litros consumidos</span>
-                          <input type="number" value={draft.litrosConsumidos} onChange={(e) => setDraft((p) => (p ? { ...p, litrosConsumidos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Precio cliente</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={draft.precioCliente}
-                            onChange={(e) =>
-                              setDraft((p) =>
-                                p ? { ...p, precioCliente: maskCurrencyArInput(e.target.value) } : p,
-                              )
-                            }
-                            placeholder="Ej. 1.500.000,50"
-                            className="h-9 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                          />
+                          <textarea value={draft.mercaderia} onChange={(e) => setDraft((p) => (p ? { ...p, mercaderia: e.target.value } : p))} placeholder="Descripción de la carga" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
                         </div>
                         <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Documentación</span>
                           <textarea value={draft.documentacionCsv} onChange={(e) => setDraft((p) => (p ? { ...p, documentacionCsv: e.target.value } : p))} placeholder="URLs separadas por coma" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
+                        </div>
+                        <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>
+                          <textarea value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Notas adicionales" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
                         </div>
                       </div>
                       <div className="mt-3 inline-flex gap-2">
@@ -649,6 +877,28 @@ export function ViajesSuperadminPage() {
           </tbody>
         </table>
       </div>
+
+      <ViajeKmLitrosDialog
+        open={kmLitrosPrompt != null}
+        title={
+          kmLitrosPrompt?.kind === 'quick'
+            ? `Cambiar a «${estadoViajeLabel[kmLitrosPrompt.nuevoEstado] ?? kmLitrosPrompt.nuevoEstado}»`
+            : kmLitrosPrompt?.kind === 'estado-draft'
+              ? `Estado «${estadoViajeLabel[kmLitrosPrompt.nextEstado] ?? kmLitrosPrompt.nextEstado}»`
+              : 'Guardar viaje'
+        }
+        km={kmLitrosKm}
+        litros={kmLitrosLitros}
+        error={kmLitrosFieldError}
+        busy={
+          (kmLitrosPrompt?.kind === 'quick' && savingEstadoId === kmLitrosPrompt.viaje.id) ||
+          (kmLitrosPrompt?.kind === 'save' && savingId === kmLitrosPrompt.viajeId)
+        }
+        onKmChange={setKmLitrosKm}
+        onLitrosChange={setKmLitrosLitros}
+        onConfirm={confirmKmLitrosDialog}
+        onCancel={cancelKmLitrosDialog}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -9,19 +9,28 @@ import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { apiJson } from '@/lib/api';
 import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
+import { flotaPropiaListaValida, normalizarIdEnLista } from '@/lib/viajesFlota';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
-import { estadoViajeLabel } from '@/lib/viajesEstados';
+import {
+  estadoViajeLabel,
+  estadoMuestraKmLitros,
+  draftKmLitrosVacios,
+  parseKmLitrosOpcionales,
+  VIAJE_ESTADOS_ALTA,
+} from '@/lib/viajesEstados';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 
-const ESTADOS = ['pendiente', 'en_curso', 'finalizado', 'cancelado'] as const;
+const ESTADOS = VIAJE_ESTADOS_ALTA;
 
 const fieldLabelClass =
   'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm';
 
 export function ViajeCreatePage() {
   const { getToken } = useAuth();
@@ -46,19 +55,21 @@ export function ViajeCreatePage() {
   const [destino, setDestino] = useState('');
   const [fechaCarga, setFechaCarga] = useState('');
   const [fechaDescarga, setFechaDescarga] = useState('');
-  const [fechaSalida, setFechaSalida] = useState('');
-  const [fechaLlegada, setFechaLlegada] = useState('');
   const [mercaderia, setMercaderia] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
   const [litrosConsumidos, setLitrosConsumidos] = useState('');
   const [monto, setMonto] = useState('');
-  const [precioCliente, setPrecioCliente] = useState('');
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [documentacionCsv, setDocumentacionCsv] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingRefs, setLoadingRefs] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const submitBusyRef = useRef(false);
+  const [kmLitrosModalOpen, setKmLitrosModalOpen] = useState(false);
+  const [modalKm, setModalKm] = useState('');
+  const [modalLitros, setModalLitros] = useState('');
+  const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +112,12 @@ export function ViajeCreatePage() {
     };
   }, [getToken, tenantId]);
 
+  useEffect(() => {
+    if (modoOperacion !== 'propio') return;
+    setChoferId((prev) => normalizarIdEnLista(prev, choferes));
+    setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculos));
+  }, [modoOperacion, choferes, vehiculos]);
+
   function applyModoOperacion(m: ViajeOperacionModo) {
     setModoOperacion(m);
     if (m === 'externo') {
@@ -108,11 +125,13 @@ export function ViajeCreatePage() {
       setVehiculoId('');
     } else {
       setTransportistaId('');
-      setChoferId((prev) => prev || choferes[0]?.id || '');
+      setChoferId((prev) => normalizarIdEnLista(prev, choferes));
+      setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculos));
     }
   }
 
-  async function onSubmit() {
+  async function onSubmit(opts?: { kmLitrosFromModal?: boolean; km?: number; litros?: number }) {
+    if (submitBusyRef.current) return;
     if (!clienteId) {
       setError('Seleccioná un cliente.');
       return;
@@ -122,12 +141,8 @@ export function ViajeCreatePage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
-    if (!externo && (!choferId || !vehiculoId.trim())) {
-      setError('En flota propia, seleccioná chofer y vehículo.');
-      return;
-    }
-    if (!patenteTractor.trim() || !patenteSemirremolque.trim()) {
-      setError('Completá patente de tractor y semirremolque.');
+    if (!externo && !flotaPropiaListaValida(choferId, vehiculoId, choferes, vehiculos)) {
+      setError('En flota propia, elegí chofer y vehículo de las listas (si no aparecen, cargá la página).');
       return;
     }
     if (!origen.trim() || !destino.trim()) {
@@ -142,18 +157,33 @@ export function ViajeCreatePage() {
       setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
       return;
     }
-    if (!fechaCarga || !fechaDescarga) {
-      setError('Completá fecha de carga y fecha de descarga.');
+    const montoNum = parseCurrencyAr(monto);
+    if (montoNum == null || montoNum < 0.01) {
+      setError('Ingresá un monto a facturar mayor a 0.');
       return;
     }
-    if (!mercaderia.trim()) {
-      setError('Ingresá la descripción de mercadería.');
+    if (
+      !opts?.kmLitrosFromModal &&
+      estadoMuestraKmLitros(estado) &&
+      draftKmLitrosVacios(kmRecorridos, litrosConsumidos)
+    ) {
+      setModalKm(kmRecorridos);
+      setModalLitros(litrosConsumidos);
+      setKmLitrosFieldError(null);
+      setKmLitrosModalOpen(true);
       return;
     }
-    if (!observaciones.trim()) {
-      setError('Ingresá observaciones.');
-      return;
-    }
+    const kmNum = opts?.kmLitrosFromModal
+      ? opts.km
+      : kmRecorridos.trim()
+        ? Number(kmRecorridos.replace(',', '.'))
+        : undefined;
+    const litNum = opts?.kmLitrosFromModal
+      ? opts.litros
+      : litrosConsumidos.trim()
+        ? Number(litrosConsumidos.replace(',', '.'))
+        : undefined;
+    submitBusyRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -176,20 +206,23 @@ export function ViajeCreatePage() {
                 choferId,
                 vehiculoId: vehiculoId.trim(),
               }),
-          patenteTractor: patenteTractor.trim().toUpperCase(),
-          patenteSemirremolque: patenteSemirremolque.trim().toUpperCase(),
+          patenteTractor: patenteTractor.trim()
+            ? patenteTractor.trim().toUpperCase()
+            : undefined,
+          patenteSemirremolque: patenteSemirremolque.trim()
+            ? patenteSemirremolque.trim().toUpperCase()
+            : undefined,
           origen: origen.trim(),
           destino: destino.trim(),
-          fechaCarga: new Date(fechaCarga).toISOString(),
-          fechaDescarga: new Date(fechaDescarga).toISOString(),
-          fechaSalida: fechaSalida ? new Date(fechaSalida).toISOString() : undefined,
-          fechaLlegada: fechaLlegada ? new Date(fechaLlegada).toISOString() : undefined,
-          mercaderia: mercaderia.trim(),
-          observaciones: observaciones.trim(),
-          kmRecorridos: kmRecorridos.trim() ? Number(kmRecorridos) : undefined,
-          litrosConsumidos: litrosConsumidos.trim() ? Number(litrosConsumidos) : undefined,
-          monto: parseCurrencyAr(monto),
-          precioCliente: parseCurrencyAr(precioCliente),
+          fechaCarga: fechaCarga ? new Date(fechaCarga).toISOString() : undefined,
+          fechaDescarga: fechaDescarga ? new Date(fechaDescarga).toISOString() : undefined,
+          mercaderia: mercaderia.trim() || undefined,
+          observaciones: observaciones.trim() || undefined,
+          kmRecorridos:
+            kmNum !== undefined && Number.isFinite(kmNum) ? kmNum : undefined,
+          litrosConsumidos:
+            litNum !== undefined && Number.isFinite(litNum) ? litNum : undefined,
+          monto: montoNum,
           precioTransportistaExterno: parseCurrencyAr(precioTransportistaExterno),
           documentacion: documentacionCsv
             .split(',')
@@ -201,8 +234,22 @@ export function ViajeCreatePage() {
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
+      submitBusyRef.current = false;
       setLoading(false);
     }
+  }
+
+  function confirmKmLitrosModalCreate() {
+    const p = parseKmLitrosOpcionales(modalKm, modalLitros);
+    if (!p.ok) {
+      setKmLitrosFieldError(p.message);
+      return;
+    }
+    setKmLitrosModalOpen(false);
+    setKmLitrosFieldError(null);
+    if (p.km !== undefined) setKmRecorridos(String(p.km));
+    if (p.litros !== undefined) setLitrosConsumidos(String(p.litros));
+    void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
   return (
@@ -282,35 +329,37 @@ export function ViajeCreatePage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Monto</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={monto}
-              onChange={(e) => setMonto(maskCurrencyArInput(e.target.value))}
-              placeholder="Ej. 1.500.000,50"
-              className={`${inputClass} text-right tabular-nums`}
-            />
-          </div>
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Cliente</span>
-            <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputClass}>
-              {clientes.length === 0 && <option value="">Sin clientes</option>}
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Cliente</span>
+              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputClass}>
+                {clientes.length === 0 && <option value="">Sin clientes</option>}
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Monto a facturar</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={monto}
+                onChange={(e) => setMonto(maskCurrencyArInput(e.target.value))}
+                placeholder="Ej. 1.500.000,50"
+                className={`${inputClass} text-right tabular-nums`}
+              />
+            </div>
           </div>
           <ViajeOperacionTipoFieldset
             modo={modoOperacion}
             onModoChange={applyModoOperacion}
             externoContent={
-              <>
-                <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className={fieldLabelClass}>Transportista externo</span>
                   <select
                     value={transportistaId}
@@ -325,7 +374,7 @@ export function ViajeCreatePage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex flex-col gap-1 pt-2">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className={fieldLabelClass}>Precio transportista externo</span>
                   <input
                     type="text"
@@ -337,11 +386,11 @@ export function ViajeCreatePage() {
                     className={`${inputClass} text-right tabular-nums`}
                   />
                 </div>
-              </>
+              </div>
             }
             propioContent={
-              <>
-                <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className={fieldLabelClass}>Chofer</span>
                   <select
                     value={choferId}
@@ -356,7 +405,7 @@ export function ViajeCreatePage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex flex-col gap-1 pt-2">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className={fieldLabelClass}>Vehículo</span>
                   <select
                     value={vehiculoId}
@@ -371,111 +420,80 @@ export function ViajeCreatePage() {
                     ))}
                   </select>
                 </div>
-              </>
+              </div>
             }
           />
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Patente tractor</span>
-            <input
-              value={patenteTractor}
-              onChange={(e) => setPatenteTractor(e.target.value)}
-              placeholder="Ej. AA123BB"
-              className={inputClass}
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Patente tractor</span>
+              <input
+                value={patenteTractor}
+                onChange={(e) => setPatenteTractor(e.target.value)}
+                placeholder="Ej. AA123BB"
+                className={inputClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Patente semirremolque</span>
+              <input
+                value={patenteSemirremolque}
+                onChange={(e) => setPatenteSemirremolque(e.target.value)}
+                placeholder="Ej. AA456CC"
+                className={inputClass}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Patente semirremolque</span>
-            <input
-              value={patenteSemirremolque}
-              onChange={(e) => setPatenteSemirremolque(e.target.value)}
-              placeholder="Ej. AA456CC"
-              className={inputClass}
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Fecha de carga</span>
+              <input
+                type="datetime-local"
+                value={fechaCarga}
+                onChange={(e) => setFechaCarga(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className={fieldLabelClass}>Fecha de descarga</span>
+              <input
+                type="datetime-local"
+                value={fechaDescarga}
+                onChange={(e) => setFechaDescarga(e.target.value)}
+                className={inputClass}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Fecha de carga</span>
-            <input
-              type="datetime-local"
-              value={fechaCarga}
-              onChange={(e) => setFechaCarga(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Fecha de descarga</span>
-            <input
-              type="datetime-local"
-              value={fechaDescarga}
-              onChange={(e) => setFechaDescarga(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Fecha de salida</span>
-            <input
-              type="datetime-local"
-              value={fechaSalida}
-              onChange={(e) => setFechaSalida(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Fecha de llegada</span>
-            <input
-              type="datetime-local"
-              value={fechaLlegada}
-              onChange={(e) => setFechaLlegada(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
+          {estadoMuestraKmLitros(estado) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClass}>Km recorridos</span>
+                <input
+                  type="number"
+                  value={kmRecorridos}
+                  onChange={(e) => setKmRecorridos(e.target.value)}
+                  placeholder="0"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClass}>Litros consumidos</span>
+                <input
+                  type="number"
+                  value={litrosConsumidos}
+                  onChange={(e) => setLitrosConsumidos(e.target.value)}
+                  placeholder="0"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={fieldLabelClass}>Mercadería</span>
-            <input
+            <textarea
               value={mercaderia}
               onChange={(e) => setMercaderia(e.target.value)}
               placeholder="Descripción de la carga"
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Observaciones</span>
-            <input
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              placeholder="Notas adicionales"
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Km recorridos</span>
-            <input
-              type="number"
-              value={kmRecorridos}
-              onChange={(e) => setKmRecorridos(e.target.value)}
-              placeholder="0"
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Litros consumidos</span>
-            <input
-              type="number"
-              value={litrosConsumidos}
-              onChange={(e) => setLitrosConsumidos(e.target.value)}
-              placeholder="0"
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Precio cliente</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={precioCliente}
-              onChange={(e) => setPrecioCliente(maskCurrencyArInput(e.target.value))}
-              placeholder="Ej. 1.500.000,50"
-              className={`${inputClass} text-right tabular-nums`}
+              className={textareaLongClass}
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
@@ -484,15 +502,43 @@ export function ViajeCreatePage() {
               value={documentacionCsv}
               onChange={(e) => setDocumentacionCsv(e.target.value)}
               placeholder="URLs separadas por coma"
-              className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
+              className={textareaLongClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={fieldLabelClass}>Observaciones</span>
+            <textarea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              placeholder="Notas adicionales"
+              className={textareaLongClass}
             />
           </div>
 
           <div className="md:col-span-2 lg:col-span-3 pt-2">
-            <CrudSubmitButton loading={loading} label="Crear viaje" />
+            <CrudSubmitButton
+              loading={loading}
+              label="Crear viaje"
+              disableWhileLoading={false}
+            />
           </div>
         </form>
       )}
+      <ViajeKmLitrosDialog
+        open={kmLitrosModalOpen}
+        title="Km y litros del viaje"
+        km={modalKm}
+        litros={modalLitros}
+        error={kmLitrosFieldError}
+        busy={loading}
+        onKmChange={setModalKm}
+        onLitrosChange={setModalLitros}
+        onConfirm={confirmKmLitrosModalCreate}
+        onCancel={() => {
+          setKmLitrosModalOpen(false);
+          setKmLitrosFieldError(null);
+        }}
+      />
     </CrudPageLayout>
   );
 }

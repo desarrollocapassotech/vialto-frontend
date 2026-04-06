@@ -100,7 +100,7 @@ export function DashboardPage() {
               {tablero === null && !error ? '—' : totalInconsistencias}
             </span>
             <p className="mt-1 font-[family-name:var(--font-ui)] text-xs text-white/50 tracking-wide">
-              Viajes finalizados sin cargo
+              Finalizados sin facturar (sin cargo en CC)
             </p>
           </div>
         </div>

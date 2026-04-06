@@ -14,15 +14,11 @@ export interface Viaje {
   destino: string | null;
   fechaCarga: string | null;
   fechaDescarga: string | null;
-  fechaSalida: string | null;
-  fechaLlegada: string | null;
   mercaderia: string | null;
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
-  precioCliente: number | null;
   precioTransportistaExterno: number | null;
-  gananciaBruta: number | null;
   documentacion: string[];
   observaciones: string | null;
   fechaFinalizado: string | null;

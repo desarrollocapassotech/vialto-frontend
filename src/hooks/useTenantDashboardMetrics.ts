@@ -148,14 +148,14 @@ export function useTenantDashboardMetrics(modules: string[]) {
         const enCurso = viajes.filter((v) =>
           ['en_curso'].includes((v.estado ?? '').toLowerCase()),
         ).length;
-        const cerrados = viajes.filter(
-          (v) => (v.estado ?? '').toLowerCase() === 'finalizado',
+        const sinFacturarEstado = viajes.filter((v) =>
+          (v.estado ?? '').toLowerCase() === 'finalizado_sin_facturar',
         );
-        const cerradosIds = new Set(cerrados.map((v) => v.id));
+        const sinFacturarIds = new Set(sinFacturarEstado.map((v) => v.id));
 
         let viajesFacturadosMes = 0;
         let viajesFacturadosQuincena = 0;
-        let porFacturar = cerrados.length;
+        let porFacturar = sinFacturarEstado.length;
 
         if (facturas) {
           const facturasConViaje = facturas.filter((f) => Boolean(f.viajeId));
@@ -164,7 +164,7 @@ export function useTenantDashboardMetrics(modules: string[]) {
               .map((f) => f.viajeId)
               .filter((id): id is string => Boolean(id)),
           );
-          porFacturar = Array.from(cerradosIds).filter((id) => !viajesConFactura.has(id)).length;
+          porFacturar = Array.from(sinFacturarIds).filter((id) => !viajesConFactura.has(id)).length;
           viajesFacturadosMes = facturasConViaje.filter((f) =>
             isOnOrAfter(f.fechaEmision, monthStart),
           ).length;
@@ -178,7 +178,6 @@ export function useTenantDashboardMetrics(modules: string[]) {
             key: 'viajes-en-curso',
             title: 'Viajes en curso',
             value: String(enCurso),
-            hint: 'Estado EN_CURSO',
           },
           {
             key: 'viajes-por-facturar',
