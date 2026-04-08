@@ -103,6 +103,32 @@ export interface PaginatedTenantsResponse {
   meta: PaginatedMeta;
 }
 
+export interface Pago {
+  id: string;
+  tenantId: string;
+  facturaId: string;
+  importe: number;
+  fecha: string;
+  formaPago: string | null;
+  createdAt: string;
+}
+
+export interface Factura {
+  id: string;
+  tenantId: string;
+  numero: string;
+  tipo: 'cliente' | 'transportista_externo';
+  clienteId: string | null;
+  viajeId: string | null;
+  importe: number;
+  fechaEmision: string;
+  fechaVencimiento: string | null;
+  estado: 'pendiente' | 'cobrada' | 'vencida';
+  diferencia: number | null;
+  createdAt: string;
+  pagos: Pago[];
+}
+
 export interface PlatformUser {
   userId: string | null;
   firstName: string | null;

@@ -7,6 +7,7 @@ export type FriendlyErrorContext =
   | 'transportistas'
   | 'choferes'
   | 'vehiculos'
+  | 'facturacion'
   | 'plataforma';
 
 const fallback: Record<FriendlyErrorContext, string> = {
@@ -17,6 +18,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
     'No pudimos cargar los transportistas. Probá de nuevo en un momento.',
   choferes: 'No pudimos cargar los choferes. Probá de nuevo en un momento.',
   vehiculos: 'No pudimos cargar los vehículos. Probá de nuevo en un momento.',
+  facturacion:
+    'No pudimos cargar las facturas. Probá de nuevo en un momento.',
   plataforma:
     'No pudimos cargar el panorama de empresas. Probá de nuevo en un momento.',
 };
@@ -35,6 +38,9 @@ export function friendlyError(
     if (err.status === 403) {
       if (context === 'viajes' || context === 'tablero') {
         return 'Tu empresa todavía no tiene habilitada la gestión de viajes, o falta completar el registro. Consultá con quien administra la cuenta en tu organización.';
+      }
+      if (context === 'facturacion') {
+        return 'Tu empresa no tiene habilitado el módulo de facturación. Consultá con el administrador de tu cuenta.';
       }
       return 'No tenés permiso para ver esto. Si necesitás acceso, pedilo a un administrador.';
     }
