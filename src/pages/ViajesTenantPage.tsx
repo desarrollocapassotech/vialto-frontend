@@ -142,7 +142,7 @@ export function ViajesTenantPage() {
           setChoferes(choferesData);
           setTransportistas(transportistasData);
           setVehiculos(vehiculosData);
-          setViajesConFactura(new Set(facturasData.filter((f) => f.viajeId).map((f) => f.viajeId as string)));
+          setViajesConFactura(new Set(facturasData.flatMap((f) => f.viajeIds)));
         }
       } catch {
         if (!cancelled) {
@@ -308,8 +308,8 @@ export function ViajesTenantPage() {
 
   async function navigateToFacturacion(v: Viaje) {
     try {
-      const facturas = await apiJson<{ id: string; viajeId: string | null }[]>('/api/facturacion/facturas', () => getToken());
-      const existente = facturas.find((f) => f.viajeId === v.id);
+      const facturas = await apiJson<{ id: string; viajeIds: string[] }[]>('/api/facturacion/facturas', () => getToken());
+      const existente = facturas.find((f) => f.viajeIds.includes(v.id));
       if (existente) {
         navigate('/facturacion', { state: { expandFacturaId: existente.id } });
         return;

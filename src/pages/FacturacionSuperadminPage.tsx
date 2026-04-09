@@ -1,17 +1,17 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import type { Cliente, Factura, Pago, Viaje } from '@/types/api';
+import type { Cliente, Factura, Viaje } from '@/types/api';
 
-// ─── helpers (copiados de FacturacionTenantPage) ─────────────────────────────
+// ─── helpers ────────────────────────────────────────────────────────────────
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
-  cobrada: 'Cobrada',
-  vencida: 'Vencida',
+  pendiente: 'PENDIENTE',
+  cobrada: 'COBRADA',
+  vencida: 'VENCIDA',
 };
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -22,7 +22,7 @@ const ESTADO_BADGE: Record<string, string> = {
 
 const TIPO_LABEL: Record<string, string> = {
   cliente: 'Cliente',
-  transportista_externo: 'Fletero',
+  transportista_externo: 'Transportista externo',
 };
 
 function fmtFecha(iso: string | null) {
@@ -43,42 +43,104 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-type PagoDraft = { importe: string; fecha: string; formaPago: string };
+function isoToDate(iso: string | null | undefined) {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function computeImporteLocal(viajeIds: string[], viajes: Viaje[]) {
+  return viajeIds.reduce((sum, id) => {
+    const v = viajes.find((x) => x.id === id);
+    return sum + (v?.monto ?? 0);
+  }, 0);
+}
+
+// ─── tipos internos ──────────────────────────────────────────────────────────
 
 type FacturaDraft = {
   numero: string;
   tipo: 'cliente' | 'transportista_externo';
   clienteId: string;
-  viajeId: string;
-  importe: string;
+  viajeIds: string[];
   fechaEmision: string;
   fechaVencimiento: string;
-  estado: 'pendiente' | 'cobrada' | 'vencida';
 };
 
 type FacturaNuevaNavState = {
   tenantId?: string;
-  newFacturaDraft?: { clienteId: string; viajeId: string; importe: number };
+  newFacturaDraft?: { clienteId: string; viajeIds: string[] };
 };
 
-function emptyPagoDraft(): PagoDraft {
-  return { importe: '', fecha: todayIso(), formaPago: '' };
-}
-
-function emptyFacturaDraft(): FacturaDraft {
+function emptyDraft(): FacturaDraft {
   return {
     numero: '',
     tipo: 'cliente',
     clienteId: '',
-    viajeId: '',
-    importe: '',
+    viajeIds: [],
     fechaEmision: todayIso(),
     fechaVencimiento: '',
-    estado: 'pendiente',
   };
 }
 
-// ─── componente ──────────────────────────────────────────────────────────────
+function facturaToEditDraft(f: Factura): FacturaDraft {
+  return {
+    numero: f.numero,
+    tipo: f.tipo,
+    clienteId: f.clienteId ?? '',
+    viajeIds: f.viajeIds,
+    fechaEmision: isoToDate(f.fechaEmision),
+    fechaVencimiento: isoToDate(f.fechaVencimiento),
+  };
+}
+
+// ─── sub-componente: selector multi-viaje ─────────────────────────────────────
+
+function ViajesCheckboxList({
+  viajes,
+  selected,
+  onChange,
+}: {
+  viajes: Viaje[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+
+  if (viajes.length === 0) {
+    return <p className="text-sm text-vialto-steel py-1">No hay viajes disponibles.</p>;
+  }
+
+  return (
+    <div className="max-h-40 overflow-y-auto border border-black/15 rounded bg-white divide-y divide-black/5">
+      {viajes.map((v) => (
+        <label
+          key={v.id}
+          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-vialto-mist/60 text-sm"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(v.id)}
+            onChange={() => toggle(v.id)}
+            className="accent-vialto-charcoal"
+          />
+          <span className="font-medium">{v.numero}</span>
+          {(v.origen || v.destino) && (
+            <span className="text-vialto-steel text-xs">
+              {v.origen ?? '?'} → {v.destino ?? '?'}
+            </span>
+          )}
+          {v.monto != null && (
+            <span className="ml-auto text-xs tabular-nums text-vialto-steel">{fmtMonto(v.monto)}</span>
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// ─── componente principal ─────────────────────────────────────────────────────
 
 export function FacturacionSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -86,37 +148,37 @@ export function FacturacionSuperadminPage() {
   const tenants = useTenantsList();
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
 
-  // crear factura
-  const [creating, setCreating] = useState(false);
-  const [facturaDraft, setFacturaDraft] = useState<FacturaDraft>(emptyFacturaDraft());
-  const [facturaDraftError, setFacturaDraftError] = useState<string | null>(null);
-  const [savingFactura, setSavingFactura] = useState(false);
-
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
-  const [pagoDraftFacturaId, setPagoDraftFacturaId] = useState<string | null>(null);
-  const [pagoDraft, setPagoDraft] = useState<PagoDraft | null>(null);
-  const [savingPago, setSavingPago] = useState(false);
-  const [pagoError, setPagoError] = useState<string | null>(null);
+  // crear
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState<FacturaDraft>(emptyDraft());
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // edición inline
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<FacturaDraft | null>(null);
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchRef = useRef(0);
 
-  // ── carga al cambiar empresa ────────────────────────────────────────────────
+  // ── carga al cambiar empresa ───────────────────────────────────────────────
 
   useEffect(() => {
     setFacturas(null);
     setClientes([]);
     setViajes([]);
     setError(null);
-    setExpandedId(null);
-    setPagoDraftFacturaId(null);
-    setPagoDraft(null);
+    setEditingId(null);
+    setEditDraft(null);
 
     if (!filtroEmpresa || !isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -144,6 +206,20 @@ export function FacturacionSuperadminPage() {
     return () => { cancelled = true; };
   }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
 
+  // ── pre-fill desde navegación ──────────────────────────────────────────────
+
+  useEffect(() => {
+    const state = location.state as FacturaNuevaNavState | null;
+    if (!state?.newFacturaDraft) return;
+    const { clienteId, viajeIds } = state.newFacturaDraft;
+    if (state.tenantId) setFiltroEmpresa(state.tenantId);
+    setDraft({ ...emptyDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
+    setCreating(true);
+    window.history.replaceState({}, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── refetch ────────────────────────────────────────────────────────────────
+
   async function refetchFacturas() {
     if (!filtroEmpresa) return;
     const gen = ++fetchRef.current;
@@ -151,181 +227,118 @@ export function FacturacionSuperadminPage() {
     try {
       const data = await apiJson<Factura[]>(`/api/platform/facturas?${q}`, () => getToken());
       if (gen === fetchRef.current) setFacturas(data);
-    } catch {
-      // silencioso
-    }
+    } catch { /* silencioso */ }
   }
 
-  // ── pre-fill desde navegación (viaje → facturado sin cobrar) ───────────────
+  // ── crear ──────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const state = location.state as FacturaNuevaNavState | null;
-    if (!state?.newFacturaDraft) return;
-    const { clienteId, viajeId, importe } = state.newFacturaDraft;
-    const importeStr =
-      importe > 0
-        ? importe.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '';
-    if (state.tenantId) setFiltroEmpresa(state.tenantId);
-    setFacturaDraft({
-      ...emptyFacturaDraft(),
-      clienteId: clienteId ?? '',
-      viajeId: viajeId ?? '',
-      importe: importeStr,
-    });
-    setCreating(true);
-    window.history.replaceState({}, '');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  function setD(patch: Partial<FacturaDraft>) { setDraft((p) => ({ ...p, ...patch })); }
 
-  // ── crear factura ───────────────────────────────────────────────────────────
-
-  function setD(patch: Partial<FacturaDraft>) {
-    setFacturaDraft((prev) => ({ ...prev, ...patch }));
-  }
-
-  async function handleCreateFactura(e: React.FormEvent) {
+  async function handleCreate(e: { preventDefault(): void }) {
     e.preventDefault();
-    setFacturaDraftError(null);
-    if (!filtroEmpresa) { setFacturaDraftError('Seleccioná una empresa.'); return; }
-    const importe = parseFloat(facturaDraft.importe.replace(/\./g, '').replace(',', '.'));
-    if (!facturaDraft.numero.trim()) { setFacturaDraftError('Ingresá el número de factura.'); return; }
-    if (isNaN(importe) || importe <= 0) { setFacturaDraftError('Ingresá un importe mayor a 0.'); return; }
-    if (!facturaDraft.fechaEmision) { setFacturaDraftError('Ingresá la fecha de emisión.'); return; }
+    setDraftError(null);
+    if (!filtroEmpresa) { setDraftError('Seleccioná una empresa.'); return; }
+    if (!draft.numero.trim()) { setDraftError('Ingresá el número de factura.'); return; }
+    if (!draft.fechaEmision) { setDraftError('Ingresá la fecha de emisión.'); return; }
 
-    setSavingFactura(true);
+    setSaving(true);
     const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
     try {
       await apiJson<Factura>(`/api/platform/facturas?${q}`, () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
-          numero: facturaDraft.numero.trim(),
-          tipo: facturaDraft.tipo,
-          clienteId: facturaDraft.clienteId || undefined,
-          viajeId: facturaDraft.viajeId || undefined,
-          importe,
-          fechaEmision: facturaDraft.fechaEmision,
-          fechaVencimiento: facturaDraft.fechaVencimiento || undefined,
-          estado: facturaDraft.estado,
+          numero: draft.numero.trim(),
+          tipo: draft.tipo,
+          clienteId: draft.clienteId || undefined,
+          viajeIds: draft.viajeIds,
+          fechaEmision: draft.fechaEmision,
+          fechaVencimiento: draft.fechaVencimiento || undefined,
         }),
       });
       setCreating(false);
-      setFacturaDraft(emptyFacturaDraft());
+      setDraft(emptyDraft());
       await refetchFacturas();
     } catch (e) {
-      setFacturaDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+      setDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
     } finally {
-      setSavingFactura(false);
+      setSaving(false);
     }
   }
 
-  // ── cambiar estado ──────────────────────────────────────────────────────────
+  // ── edición inline ─────────────────────────────────────────────────────────
 
-  async function handleEstado(f: Factura, estado: Factura['estado']) {
-    if (f.estado === estado) return;
-    setSavingEstadoId(f.id);
+  function startEdit(f: Factura) {
+    setEditingId(f.id);
+    setEditDraft(facturaToEditDraft(f));
+    setEditError(null);
+    setCreating(false);
+  }
+
+  function cancelEdit() { setEditingId(null); setEditDraft(null); setEditError(null); }
+
+  function setE(patch: Partial<FacturaDraft>) { setEditDraft((p) => p ? { ...p, ...patch } : p); }
+
+  async function saveEdit() {
+    if (!editingId || !editDraft || !filtroEmpresa) return;
+    setEditError(null);
+    if (!editDraft.numero.trim()) { setEditError('Ingresá el número de factura.'); return; }
+    if (!editDraft.fechaEmision) { setEditError('Ingresá la fecha de emisión.'); return; }
+    setSavingEditId(editingId);
     const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
     try {
       const updated = await apiJson<Factura>(
-        `/api/platform/facturas/${f.id}?${q}`,
+        `/api/platform/facturas/${encodeURIComponent(editingId)}?${q}`,
         () => getToken(),
-        { method: 'PATCH', body: JSON.stringify({ estado }) },
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            numero: editDraft.numero.trim(),
+            tipo: editDraft.tipo,
+            clienteId: editDraft.clienteId || undefined,
+            viajeIds: editDraft.viajeIds,
+            fechaEmision: editDraft.fechaEmision,
+            fechaVencimiento: editDraft.fechaVencimiento || undefined,
+          }),
+        },
       );
-      setFacturas((prev) => prev?.map((r) => (r.id === f.id ? updated : r)) ?? prev);
-    } catch {
-      // silencioso
-    } finally {
-      setSavingEstadoId(null);
-    }
-  }
-
-  // ── registrar pago ──────────────────────────────────────────────────────────
-
-  function abrirPago(facturaId: string) {
-    setPagoDraftFacturaId(facturaId);
-    setPagoDraft(emptyPagoDraft());
-    setPagoError(null);
-  }
-
-  async function handleRegistrarPago(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pagoDraft || !pagoDraftFacturaId) return;
-    setPagoError(null);
-
-    const importe = parseFloat(pagoDraft.importe.replace(/\./g, '').replace(',', '.'));
-    if (isNaN(importe) || importe <= 0) { setPagoError('Ingresá un importe mayor a 0.'); return; }
-    if (!pagoDraft.fecha) { setPagoError('Ingresá la fecha del pago.'); return; }
-
-    setSavingPago(true);
-    const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
-    try {
-      await apiJson<Pago>(`/api/platform/pagos?${q}`, () => getToken(), {
-        method: 'POST',
-        body: JSON.stringify({
-          facturaId: pagoDraftFacturaId,
-          importe,
-          fecha: pagoDraft.fecha,
-          formaPago: pagoDraft.formaPago || undefined,
-        }),
-      });
-      setPagoDraft(null);
-      setPagoDraftFacturaId(null);
-      await refetchFacturas();
+      setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
+      cancelEdit();
     } catch (e) {
-      setPagoError(e instanceof Error ? e.message : 'No se pudo registrar el pago.');
+      setEditError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
     } finally {
-      setSavingPago(false);
+      setSavingEditId(null);
     }
   }
 
-  // ── eliminar pago ───────────────────────────────────────────────────────────
-
-  async function handleDeletePago(pago: Pago) {
-    if (!confirm('¿Eliminás este pago?')) return;
-    const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
-    try {
-      await apiJson(`/api/platform/pagos/${pago.id}?${q}`, () => getToken(), {
-        method: 'DELETE',
-      });
-      await refetchFacturas();
-    } catch {
-      // silencioso
-    }
-  }
-
-  // ── eliminar factura ────────────────────────────────────────────────────────
+  // ── eliminar ───────────────────────────────────────────────────────────────
 
   async function handleDelete(f: Factura) {
-    if (!confirm(`¿Eliminás la factura ${f.numero}?`)) return;
+    if (!confirm(`¿Eliminás la factura ${f.numero}? Esta acción no se puede deshacer.`)) return;
     setDeletingId(f.id);
     const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
     try {
-      await apiJson(`/api/platform/facturas/${f.id}?${q}`, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(`/api/platform/facturas/${f.id}?${q}`, () => getToken(), { method: 'DELETE' });
       setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
-      if (expandedId === f.id) setExpandedId(null);
-    } catch {
-      // silencioso
-    } finally {
-      setDeletingId(null);
-    }
+      if (editingId === f.id) cancelEdit();
+    } catch { /* silencioso */ } finally { setDeletingId(null); }
   }
 
-  // ── lookups ─────────────────────────────────────────────────────────────────
+  // ── lookups ────────────────────────────────────────────────────────────────
 
   function nombreCliente(id: string | null) {
     if (!id) return '—';
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
-  function numeroViaje(id: string | null) {
-    if (!id) return null;
-    return viajes.find((v) => v.id === id)?.numero ?? null;
+  function numerosViaje(ids: string[]) {
+    if (ids.length === 0) return '—';
+    return ids.map((id) => viajes.find((v) => v.id === id)?.numero ?? id).join(', ');
   }
 
-  // ── render ──────────────────────────────────────────────────────────────────
+  // ── render ─────────────────────────────────────────────────────────────────
 
-  const COL_SPAN = 7;
+  const isEditing = !!editingId;
+  const COL_SPAN = isEditing ? 7 : 8;
 
   return (
     <div className="w-full">
@@ -341,23 +354,60 @@ export function FacturacionSuperadminPage() {
           <EmpresaFilterBar
             tenants={tenants}
             value={filtroEmpresa}
-            onChange={(v) => { setFiltroEmpresa(v); }}
+            onChange={(v) => {
+              setFiltroEmpresa(v);
+              setCreating(false);
+              setDraft(emptyDraft());
+            }}
           />
         </div>
         {filtroEmpresa && (
-          <button
-            type="button"
-            onClick={() => {
-              setCreating((v) => !v);
-              setFacturaDraft(emptyFacturaDraft());
-              setFacturaDraftError(null);
-            }}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            {creating ? 'Cancelar' : 'Nueva factura'}
-          </button>
+          isEditing ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={savingEditId === editingId}
+                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={savingEditId === editingId}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
+              >
+                {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setCreating((v) => !v);
+                setDraft(emptyDraft());
+                setDraftError(null);
+              }}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              {creating ? 'Cancelar' : 'Nueva factura'}
+            </button>
+          )
         )}
       </div>
+
+      {/* errores */}
+      {error && filtroEmpresa && (
+        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {error}
+        </p>
+      )}
+      {editError && (
+        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {editError}
+        </p>
+      )}
 
       {/* sin empresa seleccionada */}
       {!filtroEmpresa && (
@@ -367,9 +417,9 @@ export function FacturacionSuperadminPage() {
       )}
 
       {/* formulario de creación */}
-      {creating && filtroEmpresa && (
+      {creating && filtroEmpresa && !isEditing && (
         <form
-          onSubmit={handleCreateFactura}
+          onSubmit={handleCreate}
           className="mt-4 bg-white border border-black/10 rounded shadow-sm p-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           <h2 className="col-span-full font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire">
@@ -380,7 +430,7 @@ export function FacturacionSuperadminPage() {
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Número *</label>
             <input
               type="text"
-              value={facturaDraft.numero}
+              value={draft.numero}
               onChange={(e) => setD({ numero: e.target.value })}
               placeholder="0001-00000001"
               className="h-9 border border-black/20 px-3 text-sm bg-white"
@@ -390,19 +440,19 @@ export function FacturacionSuperadminPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Tipo *</label>
             <select
-              value={facturaDraft.tipo}
+              value={draft.tipo}
               onChange={(e) => setD({ tipo: e.target.value as FacturaDraft['tipo'] })}
               className="h-9 border border-black/20 px-3 text-sm bg-white"
             >
               <option value="cliente">Factura a cliente</option>
-              <option value="transportista_externo">Factura a fletero</option>
+              <option value="transportista_externo">Factura de transportista externo</option>
             </select>
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Cliente</label>
             <select
-              value={facturaDraft.clienteId}
+              value={draft.clienteId}
               onChange={(e) => setD({ clienteId: e.target.value })}
               className="h-9 border border-black/20 px-3 text-sm bg-white"
             >
@@ -414,51 +464,10 @@ export function FacturacionSuperadminPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Viaje vinculado</label>
-            <select
-              value={facturaDraft.viajeId}
-              onChange={(e) => setD({ viajeId: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
-              <option value="">— Sin viaje —</option>
-              {viajes.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.numero} — {v.origen ?? '?'} → {v.destino ?? '?'}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe *</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={facturaDraft.importe}
-              onChange={(e) => setD({ importe: e.target.value })}
-              placeholder="0,00"
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Estado inicial</label>
-            <select
-              value={facturaDraft.estado}
-              onChange={(e) => setD({ estado: e.target.value as FacturaDraft['estado'] })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
-              <option value="pendiente">Pendiente</option>
-              <option value="cobrada">Cobrada</option>
-              <option value="vencida">Vencida</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de emisión *</label>
             <input
               type="date"
-              value={facturaDraft.fechaEmision}
+              value={draft.fechaEmision}
               onChange={(e) => setD({ fechaEmision: e.target.value })}
               className="h-9 border border-black/20 px-3 text-sm bg-white"
             />
@@ -468,42 +477,53 @@ export function FacturacionSuperadminPage() {
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de vencimiento</label>
             <input
               type="date"
-              value={facturaDraft.fechaVencimiento}
+              value={draft.fechaVencimiento}
               onChange={(e) => setD({ fechaVencimiento: e.target.value })}
               className="h-9 border border-black/20 px-3 text-sm bg-white"
             />
           </div>
 
-          {facturaDraftError && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe estimado</label>
+            <p className="h-9 flex items-center text-sm font-medium tabular-nums px-1">
+              {fmtMonto(computeImporteLocal(draft.viajeIds, viajes))}
+            </p>
+          </div>
+
+          <div className="col-span-full flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">
+              Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+            </label>
+            <ViajesCheckboxList
+              viajes={viajes}
+              selected={draft.viajeIds}
+              onChange={(ids) => setD({ viajeIds: ids })}
+            />
+          </div>
+
+          {draftError && (
             <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {facturaDraftError}
+              {draftError}
             </p>
           )}
 
           <div className="col-span-full flex gap-3 pt-1">
             <button
               type="submit"
-              disabled={savingFactura}
+              disabled={saving}
               className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50"
             >
-              {savingFactura ? 'Guardando…' : 'Guardar'}
+              {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button
               type="button"
-              onClick={() => { setCreating(false); setFacturaDraftError(null); }}
+              onClick={() => { setCreating(false); setDraftError(null); }}
               className="h-9 px-4 border border-black/20 text-sm uppercase tracking-wider hover:bg-vialto-mist"
             >
               Cancelar
             </button>
           </div>
         </form>
-      )}
-
-      {/* error */}
-      {error && filtroEmpresa && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
       )}
 
       {/* tabla */}
@@ -515,232 +535,123 @@ export function FacturacionSuperadminPage() {
                 <th className="px-4 py-3">Número</th>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Viaje</th>
+                <th className="px-4 py-3">Viajes</th>
                 <th className="px-4 py-3 text-right">Importe</th>
-                <th className="px-4 py-3">Emisión / Vencimiento</th>
+                <th className="px-4 py-3">Emisión</th>
+                <th className="px-4 py-3">Vencimiento</th>
                 <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
+                {!isEditing && <th className="px-4 py-3 text-right">Acciones</th>}
               </tr>
             </thead>
             <tbody>
               {facturas === null && !error && (
                 <tr>
-                  <td colSpan={COL_SPAN + 1} className="px-4 py-8 text-vialto-steel">
-                    Cargando…
-                  </td>
+                  <td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">Cargando…</td>
                 </tr>
               )}
               {facturas?.length === 0 && (
                 <tr>
-                  <td colSpan={COL_SPAN + 1} className="px-4 py-8 text-vialto-steel">
+                  <td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">
                     Esta empresa no tiene facturas registradas.
                   </td>
                 </tr>
               )}
 
               {facturas?.map((f) => {
-                const expanded = expandedId === f.id;
-                const totalPagado = f.pagos.reduce((s, p) => s + p.importe, 0);
-                const saldo = f.importe - totalPagado;
+                const editing = editingId === f.id;
+                const ed = editing ? editDraft : null;
 
                 return (
-                  <>
-                    <tr
-                      key={f.id}
-                      className="border-b border-black/5 hover:bg-vialto-mist/60 cursor-pointer"
-                      onClick={() => setExpandedId(expanded ? null : f.id)}
-                    >
-                      <td className="px-4 py-3 font-medium">{f.numero}</td>
+                  <Fragment key={f.id}>
+                    <tr className={['border-b border-black/5', editing ? 'bg-vialto-mist/60' : 'hover:bg-vialto-mist/40'].join(' ')}>
+
+                      {/* Número */}
+                      <td className="px-4 py-3 font-medium">
+                        {editing && ed
+                          ? <input type="text" value={ed.numero} onChange={(e) => setE({ numero: e.target.value })}
+                              className="h-9 w-full border border-black/15 bg-white px-2 text-sm" />
+                          : f.numero}
+                      </td>
+
+                      {/* Tipo */}
+                      <td className="px-4 py-3">
+                        {editing && ed
+                          ? <select value={ed.tipo} onChange={(e) => setE({ tipo: e.target.value as FacturaDraft['tipo'] })}
+                              className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
+                              <option value="cliente">Cliente</option>
+                              <option value="transportista_externo">Transportista externo</option>
+                            </select>
+                          : (TIPO_LABEL[f.tipo] ?? f.tipo)}
+                      </td>
+
+                      {/* Cliente */}
+                      <td className="px-4 py-3">
+                        {editing && ed
+                          ? <select value={ed.clienteId} onChange={(e) => setE({ clienteId: e.target.value })}
+                              className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
+                              <option value="">— Sin cliente —</option>
+                              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                          : nombreCliente(f.clienteId)}
+                      </td>
+
+                      {/* Viajes */}
                       <td className="px-4 py-3 text-vialto-steel">
-                        {TIPO_LABEL[f.tipo] ?? f.tipo}
-                      </td>
-                      <td className="px-4 py-3">{nombreCliente(f.clienteId)}</td>
-                      <td className="px-4 py-3 text-vialto-steel">
-                        {numeroViaje(f.viajeId) ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">
-                        {fmtMonto(f.importe)}
-                      </td>
-                      <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums">
-                        {fmtFecha(f.fechaEmision)}
-                        {f.fechaVencimiento && (
-                          <span className="ml-1 text-xs text-vialto-steel/70">
-                            → {fmtFecha(f.fechaVencimiento)}
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={f.estado}
-                          disabled={savingEstadoId === f.id}
-                          onChange={(e) =>
-                            handleEstado(f, e.target.value as Factura['estado'])
-                          }
-                          className={[
-                            'border rounded px-2 py-0.5 text-xs font-medium cursor-pointer',
-                            ESTADO_BADGE[f.estado] ?? '',
-                          ].join(' ')}
-                        >
-                          {(['pendiente', 'cobrada', 'vencida'] as const).map((s) => (
-                            <option key={s} value={s}>
-                              {ESTADO_LABEL[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      <td
-                        className="px-4 py-3 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="inline-flex gap-2 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => { setExpandedId(f.id); abrirPago(f.id); }}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                          >
-                            + Pago
-                          </button>
-                          <button
-                            type="button"
-                            disabled={deletingId === f.id}
-                            onClick={() => handleDelete(f)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40"
-                          >
-                            {deletingId === f.id ? '…' : 'Eliminar'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* fila expandida */}
-                    {expanded && (
-                      <tr key={`${f.id}-pagos`} className="bg-vialto-mist/40">
-                        <td colSpan={COL_SPAN + 1} className="px-6 py-4">
-                          <div className="space-y-3">
-                            <div className="flex gap-6 text-sm">
-                              <span>
-                                <span className="text-vialto-steel">Total factura:</span>{' '}
-                                <span className="font-medium tabular-nums">{fmtMonto(f.importe)}</span>
-                              </span>
-                              <span>
-                                <span className="text-vialto-steel">Pagado:</span>{' '}
-                                <span className="font-medium tabular-nums text-emerald-700">{fmtMonto(totalPagado)}</span>
-                              </span>
-                              <span>
-                                <span className="text-vialto-steel">Saldo:</span>{' '}
-                                <span className={['font-medium tabular-nums', saldo > 0 ? 'text-amber-700' : 'text-emerald-700'].join(' ')}>
-                                  {fmtMonto(saldo)}
-                                </span>
-                              </span>
+                        {editing && ed
+                          ? <div className="min-w-[16rem]">
+                              <ViajesCheckboxList viajes={viajes} selected={ed.viajeIds}
+                                onChange={(ids) => setE({ viajeIds: ids })} />
                             </div>
+                          : numerosViaje(f.viajeIds)}
+                      </td>
 
-                            {f.pagos.length === 0 ? (
-                              <p className="text-sm text-vialto-steel">Sin pagos registrados.</p>
-                            ) : (
-                              <table className="w-full text-sm border border-black/10 rounded bg-white">
-                                <thead>
-                                  <tr className="border-b border-black/10 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire bg-vialto-mist">
-                                    <th className="px-3 py-2">Fecha</th>
-                                    <th className="px-3 py-2 text-right">Importe</th>
-                                    <th className="px-3 py-2">Forma de pago</th>
-                                    <th className="px-3 py-2 text-right">Acciones</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {f.pagos.map((p) => (
-                                    <tr key={p.id} className="border-b border-black/5">
-                                      <td className="px-3 py-2 tabular-nums">{fmtFecha(p.fecha)}</td>
-                                      <td className="px-3 py-2 text-right tabular-nums font-medium">{fmtMonto(p.importe)}</td>
-                                      <td className="px-3 py-2 text-vialto-steel capitalize">{p.formaPago ?? '—'}</td>
-                                      <td className="px-3 py-2 text-right">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeletePago(p)}
-                                          className="text-xs px-2 py-0.5 border border-red-200 text-red-700 hover:bg-red-50"
-                                        >
-                                          Eliminar
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
+                      {/* Importe (solo lectura — calculado desde viajes) */}
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                        {editing && ed
+                          ? fmtMonto(computeImporteLocal(ed.viajeIds, viajes))
+                          : fmtMonto(f.importe)}
+                      </td>
 
-                            {pagoDraftFacturaId === f.id && pagoDraft ? (
-                              <form
-                                onSubmit={handleRegistrarPago}
-                                className="flex flex-wrap gap-3 items-end pt-2"
-                              >
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe *</label>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={pagoDraft.importe}
-                                    onChange={(e) => setPagoDraft((p) => p && { ...p, importe: e.target.value })}
-                                    placeholder="0,00"
-                                    className="h-9 w-36 border border-black/20 px-3 text-sm bg-white"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha *</label>
-                                  <input
-                                    type="date"
-                                    value={pagoDraft.fecha}
-                                    onChange={(e) => setPagoDraft((p) => p && { ...p, fecha: e.target.value })}
-                                    className="h-9 border border-black/20 px-3 text-sm bg-white"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-xs uppercase tracking-wider text-vialto-steel">Forma de pago</label>
-                                  <select
-                                    value={pagoDraft.formaPago}
-                                    onChange={(e) => setPagoDraft((p) => p && { ...p, formaPago: e.target.value })}
-                                    className="h-9 border border-black/20 px-3 text-sm bg-white"
-                                  >
-                                    <option value="">— —</option>
-                                    <option value="transferencia">Transferencia</option>
-                                    <option value="cheque">Cheque</option>
-                                    <option value="efectivo">Efectivo</option>
-                                  </select>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    type="submit"
-                                    disabled={savingPago}
-                                    className="h-9 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50"
-                                  >
-                                    {savingPago ? '…' : 'Registrar'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => { setPagoDraft(null); setPagoDraftFacturaId(null); setPagoError(null); }}
-                                    className="h-9 px-3 border border-black/20 text-sm hover:bg-vialto-mist"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                                {pagoError && (
-                                  <p className="w-full text-sm text-red-700">{pagoError}</p>
-                                )}
-                              </form>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => abrirPago(f.id)}
-                                className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-white"
-                              >
-                                + Registrar pago
-                              </button>
-                            )}
+                      {/* Emisión */}
+                      <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+                        {editing && ed
+                          ? <input type="date" value={ed.fechaEmision} onChange={(e) => setE({ fechaEmision: e.target.value })}
+                              className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          : fmtFecha(f.fechaEmision)}
+                      </td>
+
+                      {/* Vencimiento */}
+                      <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+                        {editing && ed
+                          ? <input type="date" value={ed.fechaVencimiento} onChange={(e) => setE({ fechaVencimiento: e.target.value })}
+                              className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                          : fmtFecha(f.fechaVencimiento)}
+                      </td>
+
+                      {/* Estado (solo lectura — computado desde viajes) */}
+                      <td className="px-4 py-3">
+                        <span className={['border rounded px-2 py-0.5 text-xs font-medium', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
+                          {ESTADO_LABEL[f.estado] ?? f.estado}
+                        </span>
+                      </td>
+
+                      {/* Acciones */}
+                      {!isEditing && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex gap-2 justify-end">
+                            <button type="button" onClick={() => startEdit(f)}
+                              className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">
+                              Editar
+                            </button>
+                            <button type="button" disabled={deletingId === f.id} onClick={() => handleDelete(f)}
+                              className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40">
+                              {deletingId === f.id ? '…' : 'Eliminar'}
+                            </button>
                           </div>
                         </td>
-                      </tr>
-                    )}
-                  </>
+                      )}
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -750,7 +661,7 @@ export function FacturacionSuperadminPage() {
 
       {filtroEmpresa && facturas && facturas.length > 0 && (
         <p className="mt-3 text-xs text-vialto-steel">
-          {facturas.length} factura{facturas.length !== 1 ? 's' : ''} · Hacé clic en una fila para ver los pagos.
+          {facturas.length} factura{facturas.length !== 1 ? 's' : ''}
         </p>
       )}
     </div>

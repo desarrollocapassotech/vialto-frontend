@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import type { Cliente, Factura, Pago, Viaje } from '@/types/api';
+import type { Cliente, Factura, Viaje } from '@/types/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -21,16 +21,12 @@ const ESTADO_BADGE: Record<string, string> = {
 
 const TIPO_LABEL: Record<string, string> = {
   cliente: 'Cliente',
-  transportista_externo: 'Fletero',
+  transportista_externo: 'Transportista externo',
 };
 
 function fmtFecha(iso: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function fmtMonto(n: number | null) {
@@ -42,50 +38,92 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isoToDate(iso: string | null | undefined) {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function computeImporteLocal(viajeIds: string[], viajes: Viaje[]) {
+  return viajeIds.reduce((sum, id) => {
+    const v = viajes.find((x) => x.id === id);
+    return sum + (v?.monto ?? 0);
+  }, 0);
+}
+
 // ─── tipos internos ──────────────────────────────────────────────────────────
 
 type FacturaDraft = {
   numero: string;
   tipo: 'cliente' | 'transportista_externo';
   clienteId: string;
-  viajeId: string;
-  importe: string;
+  viajeIds: string[];
   fechaEmision: string;
   fechaVencimiento: string;
 };
 
-type PagoDraft = {
-  importe: string;
-  fecha: string;
-  formaPago: string;
-};
-
 function emptyDraft(): FacturaDraft {
+  return { numero: '', tipo: 'cliente', clienteId: '', viajeIds: [], fechaEmision: todayIso(), fechaVencimiento: '' };
+}
+
+function facturaToEditDraft(f: Factura): FacturaDraft {
   return {
-    numero: '',
-    tipo: 'cliente',
-    clienteId: '',
-    viajeId: '',
-    importe: '',
-    fechaEmision: todayIso(),
-    fechaVencimiento: '',
+    numero: f.numero,
+    tipo: f.tipo,
+    clienteId: f.clienteId ?? '',
+    viajeIds: f.viajeIds,
+    fechaEmision: isoToDate(f.fechaEmision),
+    fechaVencimiento: isoToDate(f.fechaVencimiento),
   };
 }
-
-function emptyPagoDraft(): PagoDraft {
-  return { importe: '', fecha: todayIso(), formaPago: '' };
-}
-
-// ─── componente ─────────────────────────────────────────────────────────────
 
 type FacturaNuevaNavState = {
-  newFacturaDraft?: {
-    clienteId: string;
-    viajeId: string;
-    importe: number;
-  };
+  newFacturaDraft?: { clienteId: string; viajeIds: string[] };
   expandFacturaId?: string;
 };
+
+// ─── sub-componente: selector multi-viaje ────────────────────────────────────
+
+function ViajesCheckboxList({
+  viajes,
+  selected,
+  onChange,
+}: {
+  viajes: Viaje[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+
+  if (viajes.length === 0) {
+    return <p className="text-sm text-vialto-steel py-1">No hay viajes disponibles.</p>;
+  }
+
+  return (
+    <div className="max-h-40 overflow-y-auto border border-black/15 rounded bg-white divide-y divide-black/5">
+      {viajes.map((v) => (
+        <label key={v.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-vialto-mist/60 text-sm">
+          <input
+            type="checkbox"
+            checked={selected.includes(v.id)}
+            onChange={() => toggle(v.id)}
+            className="accent-vialto-charcoal"
+          />
+          <span className="font-medium">{v.numero}</span>
+          {(v.origen || v.destino) && (
+            <span className="text-vialto-steel text-xs">{v.origen ?? '?'} → {v.destino ?? '?'}</span>
+          )}
+          {v.monto != null && (
+            <span className="ml-auto text-xs tabular-nums text-vialto-steel">{fmtMonto(v.monto)}</span>
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// ─── componente principal ─────────────────────────────────────────────────────
 
 export function FacturacionTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -96,20 +134,17 @@ export function FacturacionTenantPage() {
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // crear factura
+  // crear
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<FacturaDraft>(emptyDraft());
   const [draftError, setDraftError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // fila expandida (ver pagos)
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  // registrar pago
-  const [pagoDraft, setPagoDraft] = useState<PagoDraft | null>(null);
-  const [pagoDraftFacturaId, setPagoDraftFacturaId] = useState<string | null>(null);
-  const [savingPago, setSavingPago] = useState(false);
-  const [pagoError, setPagoError] = useState<string | null>(null);
+  // edición inline
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<FacturaDraft | null>(null);
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -121,7 +156,6 @@ export function FacturacionTenantPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-
     (async () => {
       try {
         const [facturasData, clientesData, viajesData] = await Promise.all([
@@ -139,67 +173,41 @@ export function FacturacionTenantPage() {
         if (!cancelled) setError(friendlyError(e, 'facturacion'));
       }
     })();
-
     return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn]);
 
-  // ── pre-fill desde navegación (viaje → facturado sin cobrar) ───────────────
+  // ── pre-fill desde navegación ──────────────────────────────────────────────
 
   useEffect(() => {
     const state = location.state as FacturaNuevaNavState | null;
     if (!state) return;
-
-    if (state.expandFacturaId) {
-      setExpandedId(state.expandFacturaId);
-      window.history.replaceState({}, '');
-      return;
-    }
-
+    if (state.expandFacturaId) { window.history.replaceState({}, ''); return; }
     if (!state.newFacturaDraft) return;
-    const { clienteId, viajeId, importe } = state.newFacturaDraft;
-    const importeStr =
-      importe > 0
-        ? importe.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '';
-    setDraft({
-      ...emptyDraft(),
-      tipo: 'cliente',
-      clienteId: clienteId ?? '',
-      viajeId: viajeId ?? '',
-      importe: importeStr,
-    });
+    const { clienteId, viajeIds } = state.newFacturaDraft;
+    setDraft({ ...emptyDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
     setCreating(true);
-    // limpiar el state para no re-abrir si el usuario vuelve
     window.history.replaceState({}, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── refrescar facturas ─────────────────────────────────────────────────────
+  // ── refetch ────────────────────────────────────────────────────────────────
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
     try {
       const data = await apiJson<Factura[]>('/api/facturacion/facturas', () => getToken());
       if (gen === fetchRef.current) setFacturas(data);
-    } catch {
-      // silencioso — el estado viejo sigue visible
-    }
+    } catch { /* silencioso */ }
   }
 
-  // ── crear factura ──────────────────────────────────────────────────────────
+  // ── crear ──────────────────────────────────────────────────────────────────
 
-  function setD(patch: Partial<FacturaDraft>) {
-    setDraft((prev) => ({ ...prev, ...patch }));
-  }
+  function setD(patch: Partial<FacturaDraft>) { setDraft((p) => ({ ...p, ...patch })); }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: { preventDefault(): void }) {
     e.preventDefault();
     setDraftError(null);
-
-    const importe = parseFloat(draft.importe.replace(/\./g, '').replace(',', '.'));
     if (!draft.numero.trim()) { setDraftError('Ingresá el número de factura.'); return; }
-    if (isNaN(importe) || importe <= 0) { setDraftError('Ingresá un importe mayor a 0.'); return; }
     if (!draft.fechaEmision) { setDraftError('Ingresá la fecha de emisión.'); return; }
-
     setSaving(true);
     try {
       await apiJson<Factura>('/api/facturacion/facturas', () => getToken(), {
@@ -208,8 +216,7 @@ export function FacturacionTenantPage() {
           numero: draft.numero.trim(),
           tipo: draft.tipo,
           clienteId: draft.clienteId || undefined,
-          viajeId: draft.viajeId || undefined,
-          importe,
+          viajeIds: draft.viajeIds,
           fechaEmision: draft.fechaEmision,
           fechaVencimiento: draft.fechaVencimiento || undefined,
         }),
@@ -218,280 +225,195 @@ export function FacturacionTenantPage() {
       setDraft(emptyDraft());
       await refetchFacturas();
     } catch (e) {
-      setDraftError(
-        e instanceof Error ? e.message : 'No se pudo guardar la factura.',
-      );
+      setDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
     } finally {
       setSaving(false);
     }
   }
 
-  // ── registrar pago ─────────────────────────────────────────────────────────
+  // ── edición inline ─────────────────────────────────────────────────────────
 
-  function abrirPago(facturaId: string) {
-    setPagoDraftFacturaId(facturaId);
-    setPagoDraft(emptyPagoDraft());
-    setPagoError(null);
+  function startEdit(f: Factura) {
+    setEditingId(f.id);
+    setEditDraft(facturaToEditDraft(f));
+    setEditError(null);
+    setCreating(false);
   }
 
-  async function handleRegistrarPago(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pagoDraft || !pagoDraftFacturaId) return;
-    setPagoError(null);
+  function cancelEdit() { setEditingId(null); setEditDraft(null); setEditError(null); }
 
-    const importe = parseFloat(pagoDraft.importe.replace(/\./g, '').replace(',', '.'));
-    if (isNaN(importe) || importe <= 0) { setPagoError('Ingresá un importe mayor a 0.'); return; }
-    if (!pagoDraft.fecha) { setPagoError('Ingresá la fecha del pago.'); return; }
+  function setE(patch: Partial<FacturaDraft>) { setEditDraft((p) => p ? { ...p, ...patch } : p); }
 
-    setSavingPago(true);
+  async function saveEdit() {
+    if (!editingId || !editDraft) return;
+    setEditError(null);
+    if (!editDraft.numero.trim()) { setEditError('Ingresá el número de factura.'); return; }
+    if (!editDraft.fechaEmision) { setEditError('Ingresá la fecha de emisión.'); return; }
+    setSavingEditId(editingId);
     try {
-      await apiJson<Pago>('/api/facturacion/pagos', () => getToken(), {
-        method: 'POST',
-        body: JSON.stringify({
-          facturaId: pagoDraftFacturaId,
-          importe,
-          fecha: pagoDraft.fecha,
-          formaPago: pagoDraft.formaPago || undefined,
-        }),
-      });
-      setPagoDraft(null);
-      setPagoDraftFacturaId(null);
-      await refetchFacturas();
-    } catch (e) {
-      setPagoError(
-        e instanceof Error ? e.message : 'No se pudo registrar el pago.',
+      const updated = await apiJson<Factura>(
+        `/api/facturacion/facturas/${encodeURIComponent(editingId)}`,
+        () => getToken(),
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            numero: editDraft.numero.trim(),
+            tipo: editDraft.tipo,
+            clienteId: editDraft.clienteId || undefined,
+            viajeIds: editDraft.viajeIds,
+            fechaEmision: editDraft.fechaEmision,
+            fechaVencimiento: editDraft.fechaVencimiento || undefined,
+          }),
+        },
       );
+      setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
+      cancelEdit();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
     } finally {
-      setSavingPago(false);
+      setSavingEditId(null);
     }
   }
 
-  // ── eliminar factura ───────────────────────────────────────────────────────
+  // ── eliminar ───────────────────────────────────────────────────────────────
 
   async function handleDelete(f: Factura) {
     if (!confirm(`¿Eliminás la factura ${f.numero}? Esta acción no se puede deshacer.`)) return;
     setDeletingId(f.id);
     try {
-      await apiJson(`/api/facturacion/facturas/${f.id}`, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(`/api/facturacion/facturas/${f.id}`, () => getToken(), { method: 'DELETE' });
       setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
-      if (expandedId === f.id) setExpandedId(null);
-    } catch {
-      // sin toaster por ahora
-    } finally {
-      setDeletingId(null);
-    }
+      if (editingId === f.id) cancelEdit();
+    } catch { /* sin toaster */ } finally { setDeletingId(null); }
   }
 
-  // ── eliminar pago ──────────────────────────────────────────────────────────
-
-  async function handleDeletePago(pago: Pago) {
-    if (!confirm('¿Eliminás este pago?')) return;
-    try {
-      await apiJson(`/api/facturacion/pagos/${pago.id}`, () => getToken(), {
-        method: 'DELETE',
-      });
-      await refetchFacturas();
-    } catch {
-      // silencioso
-    }
-  }
-
-  // ── helpers de lookup ──────────────────────────────────────────────────────
+  // ── helpers ────────────────────────────────────────────────────────────────
 
   function nombreCliente(id: string | null) {
     if (!id) return '—';
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
-  function numeroViaje(id: string | null) {
-    if (!id) return null;
-    return viajes.find((v) => v.id === id)?.numero ?? null;
+  function numerosViaje(ids: string[]) {
+    if (ids.length === 0) return '—';
+    return ids.map((id) => viajes.find((v) => v.id === id)?.numero ?? id).join(', ');
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const COL_SPAN = 7;
+  const isEditing = !!editingId;
+  const COL_SPAN = isEditing ? 7 : 8;
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Facturación
-      </h1>
-      <p className="mt-2 text-vialto-steel">
-        Facturas emitidas a clientes y fleteros, con control de cobros.
-      </p>
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">Facturación</h1>
+      <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
 
-      {/* ── acciones ── */}
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => {
-            setCreating((v) => !v);
-            setDraft(emptyDraft());
-            setDraftError(null);
-          }}
-          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-        >
-          {creating ? 'Cancelar' : 'Nueva factura'}
-        </button>
+      {/* acciones */}
+      <div className="mt-4 flex justify-end gap-2">
+        {isEditing ? (
+          <>
+            <button type="button" onClick={cancelEdit} disabled={savingEditId === editingId}
+              className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60">
+              Cerrar
+            </button>
+            <button type="button" onClick={saveEdit} disabled={savingEditId === editingId}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60">
+              {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </>
+        ) : (
+          <button type="button"
+            onClick={() => { setCreating((v) => !v); setDraft(emptyDraft()); setDraftError(null); }}
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
+            {creating ? 'Cancelar' : 'Nueva factura'}
+          </button>
+        )}
       </div>
 
-      {/* ── error global ── */}
-      {error && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
+      {/* errores */}
+      {error && <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
+      {editError && <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{editError}</p>}
 
-      {/* ── formulario de creación ── */}
-      {creating && (
-        <form
-          onSubmit={handleCreate}
-          className="mt-4 bg-white border border-black/10 rounded shadow-sm p-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
+      {/* formulario de creación */}
+      {creating && !isEditing && (
+        <form onSubmit={handleCreate}
+          className="mt-4 bg-white border border-black/10 rounded shadow-sm p-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <h2 className="col-span-full font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire">
             Nueva factura
           </h2>
 
-          {/* Número */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Número *
-            </label>
-            <input
-              type="text"
-              value={draft.numero}
-              onChange={(e) => setD({ numero: e.target.value })}
-              placeholder="0001-00000001"
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            />
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Número *</label>
+            <input type="text" value={draft.numero} onChange={(e) => setD({ numero: e.target.value })}
+              placeholder="0001-00000001" className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
-          {/* Tipo */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Tipo *
-            </label>
-            <select
-              value={draft.tipo}
-              onChange={(e) =>
-                setD({ tipo: e.target.value as FacturaDraft['tipo'] })
-              }
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Tipo *</label>
+            <select value={draft.tipo} onChange={(e) => setD({ tipo: e.target.value as FacturaDraft['tipo'] })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white">
               <option value="cliente">Factura a cliente</option>
-              <option value="transportista_externo">Factura a fletero</option>
+              <option value="transportista_externo">Factura de transportista externo</option>
             </select>
           </div>
 
-          {/* Cliente */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Cliente
-            </label>
-            <select
-              value={draft.clienteId}
-              onChange={(e) => setD({ clienteId: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Cliente</label>
+            <select value={draft.clienteId} onChange={(e) => setD({ clienteId: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white">
               <option value="">— Sin cliente —</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
+              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </div>
 
-          {/* Viaje vinculado */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Viaje vinculado
-            </label>
-            <select
-              value={draft.viajeId}
-              onChange={(e) => setD({ viajeId: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
-              <option value="">— Sin viaje —</option>
-              {viajes.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.numero} — {v.origen ?? '?'} → {v.destino ?? '?'}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de emisión *</label>
+            <input type="date" value={draft.fechaEmision} onChange={(e) => setD({ fechaEmision: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
-          {/* Importe */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Importe *
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={draft.importe}
-              onChange={(e) => setD({ importe: e.target.value })}
-              placeholder="0,00"
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            />
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de vencimiento</label>
+            <input type="date" value={draft.fechaVencimiento} onChange={(e) => setD({ fechaVencimiento: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
-          {/* Fecha de emisión */}
           <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Fecha de emisión *
+              Importe estimado
             </label>
-            <input
-              type="date"
-              value={draft.fechaEmision}
-              onChange={(e) => setD({ fechaEmision: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            />
-          </div>
-
-          {/* Fecha de vencimiento */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Fecha de vencimiento
-            </label>
-            <input
-              type="date"
-              value={draft.fechaVencimiento}
-              onChange={(e) => setD({ fechaVencimiento: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            />
-          </div>
-
-          {/* error + botones */}
-          {draftError && (
-            <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {draftError}
+            <p className="h-9 flex items-center text-sm font-medium tabular-nums px-1">
+              {fmtMonto(computeImporteLocal(draft.viajeIds, viajes))}
             </p>
+          </div>
+
+          <div className="col-span-full flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">
+              Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+            </label>
+            <ViajesCheckboxList viajes={viajes} selected={draft.viajeIds}
+              onChange={(ids) => setD({ viajeIds: ids })} />
+          </div>
+
+          {draftError && (
+            <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{draftError}</p>
           )}
 
           <div className="col-span-full flex gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={saving}
-              className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50"
-            >
+            <button type="submit" disabled={saving}
+              className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50">
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-            <button
-              type="button"
-              onClick={() => { setCreating(false); setDraftError(null); }}
-              className="h-9 px-4 border border-black/20 text-sm uppercase tracking-wider hover:bg-vialto-mist"
-            >
+            <button type="button" onClick={() => { setCreating(false); setDraftError(null); }}
+              className="h-9 px-4 border border-black/20 text-sm uppercase tracking-wider hover:bg-vialto-mist">
               Cancelar
             </button>
           </div>
         </form>
       )}
 
-      {/* ── tabla ── */}
+      {/* tabla */}
       <div className="mt-6 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
@@ -499,248 +421,118 @@ export function FacturacionTenantPage() {
               <th className="px-4 py-3">Número</th>
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Viaje</th>
+              <th className="px-4 py-3">Viajes</th>
               <th className="px-4 py-3 text-right">Importe</th>
-              <th className="px-4 py-3">Emisión / Vencimiento</th>
+              <th className="px-4 py-3">Emisión</th>
+              <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
+              {!isEditing && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
-            {/* cargando */}
             {facturas === null && !error && (
-              <tr>
-                <td colSpan={COL_SPAN + 1} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
+              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">Cargando…</td></tr>
             )}
-
-            {/* sin datos */}
             {facturas?.length === 0 && (
-              <tr>
-                <td colSpan={COL_SPAN + 1} className="px-4 py-8 text-vialto-steel">
-                  Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.
-                </td>
-              </tr>
+              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">
+                Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.
+              </td></tr>
             )}
 
             {facturas?.map((f) => {
-              const expanded = expandedId === f.id;
-              const totalPagado = (f.pagos ?? []).reduce((s, p) => s + p.importe, 0);
-              const saldo = f.importe - totalPagado;
+              const editing = editingId === f.id;
+              const ed = editing ? editDraft : null;
 
               return (
                 <Fragment key={f.id}>
-                  {/* ── fila principal ── */}
-                  <tr
-                    className="border-b border-black/5 hover:bg-vialto-mist/60 cursor-pointer"
-                    onClick={() => setExpandedId(expanded ? null : f.id)}
-                  >
-                    <td className="px-4 py-3 font-medium">{f.numero}</td>
-                    <td className="px-4 py-3 text-vialto-steel">
-                      {TIPO_LABEL[f.tipo] ?? f.tipo}
-                    </td>
-                    <td className="px-4 py-3">{nombreCliente(f.clienteId)}</td>
-                    <td className="px-4 py-3 text-vialto-steel">
-                      {numeroViaje(f.viajeId) ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {fmtMonto(f.importe)}
-                    </td>
-                    <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums">
-                      {fmtFecha(f.fechaEmision)}
-                      {f.fechaVencimiento && (
-                        <span className="ml-1 text-xs text-vialto-steel/70">
-                          → {fmtFecha(f.fechaVencimiento)}
-                        </span>
-                      )}
+                  <tr className={['border-b border-black/5', editing ? 'bg-vialto-mist/60' : 'hover:bg-vialto-mist/40'].join(' ')}>
+
+                    {/* Número */}
+                    <td className="px-4 py-3 font-medium">
+                      {editing && ed
+                        ? <input type="text" value={ed.numero} onChange={(e) => setE({ numero: e.target.value })}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm" />
+                        : f.numero}
                     </td>
 
-                    {/* badge de estado (solo lectura — derivado del viaje y fecha de vencimiento) */}
+                    {/* Tipo */}
                     <td className="px-4 py-3">
-                      <span className={[
-                        'border rounded px-2 py-0.5 text-xs font-medium',
-                        ESTADO_BADGE[f.estado] ?? '',
-                      ].join(' ')}>
+                      {editing && ed
+                        ? <select value={ed.tipo} onChange={(e) => setE({ tipo: e.target.value as FacturaDraft['tipo'] })}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
+                            <option value="cliente">Cliente</option>
+                            <option value="transportista_externo">Transportista externo</option>
+                          </select>
+                        : (TIPO_LABEL[f.tipo] ?? f.tipo)}
+                    </td>
+
+                    {/* Cliente */}
+                    <td className="px-4 py-3">
+                      {editing && ed
+                        ? <select value={ed.clienteId} onChange={(e) => setE({ clienteId: e.target.value })}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
+                            <option value="">— Sin cliente —</option>
+                            {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                          </select>
+                        : nombreCliente(f.clienteId)}
+                    </td>
+
+                    {/* Viajes */}
+                    <td className="px-4 py-3 text-vialto-steel">
+                      {editing && ed
+                        ? <div className="min-w-[16rem]">
+                            <ViajesCheckboxList viajes={viajes} selected={ed.viajeIds}
+                              onChange={(ids) => setE({ viajeIds: ids })} />
+                          </div>
+                        : numerosViaje(f.viajeIds)}
+                    </td>
+
+                    {/* Importe (siempre solo lectura — calculado desde viajes) */}
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {editing && ed
+                        ? fmtMonto(computeImporteLocal(ed.viajeIds, viajes))
+                        : fmtMonto(f.importe)}
+                    </td>
+
+                    {/* Emisión */}
+                    <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+                      {editing && ed
+                        ? <input type="date" value={ed.fechaEmision} onChange={(e) => setE({ fechaEmision: e.target.value })}
+                            className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        : fmtFecha(f.fechaEmision)}
+                    </td>
+
+                    {/* Vencimiento */}
+                    <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+                      {editing && ed
+                        ? <input type="date" value={ed.fechaVencimiento} onChange={(e) => setE({ fechaVencimiento: e.target.value })}
+                            className="h-9 border border-black/15 bg-white px-2 text-sm" />
+                        : fmtFecha(f.fechaVencimiento)}
+                    </td>
+
+                    {/* Estado (solo lectura) */}
+                    <td className="px-4 py-3">
+                      <span className={['border rounded px-2 py-0.5 text-xs font-medium', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
                         {ESTADO_LABEL[f.estado] ?? f.estado}
                       </span>
                     </td>
 
-                    {/* acciones */}
-                    <td
-                      className="px-4 py-3 text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="inline-flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedId(f.id);
-                            abrirPago(f.id);
-                          }}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                        >
-                          + Pago
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingId === f.id}
-                          onClick={() => handleDelete(f)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40"
-                        >
-                          {deletingId === f.id ? '…' : 'Eliminar'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* ── fila expandida: pagos ── */}
-                  {expanded && (
-                    <tr key={`${f.id}-pagos`} className="bg-vialto-mist/40">
-                      <td colSpan={COL_SPAN + 1} className="px-6 py-4">
-                        <div className="space-y-3">
-
-                          {/* resumen saldo */}
-                          <div className="flex gap-6 text-sm">
-                            <span>
-                              <span className="text-vialto-steel">Total factura:</span>{' '}
-                              <span className="font-medium tabular-nums">{fmtMonto(f.importe)}</span>
-                            </span>
-                            <span>
-                              <span className="text-vialto-steel">Pagado:</span>{' '}
-                              <span className="font-medium tabular-nums text-emerald-700">{fmtMonto(totalPagado)}</span>
-                            </span>
-                            <span>
-                              <span className="text-vialto-steel">Saldo:</span>{' '}
-                              <span className={['font-medium tabular-nums', saldo > 0 ? 'text-amber-700' : 'text-emerald-700'].join(' ')}>
-                                {fmtMonto(saldo)}
-                              </span>
-                            </span>
-                          </div>
-
-                          {/* lista de pagos */}
-                          {f.pagos.length === 0 ? (
-                            <p className="text-sm text-vialto-steel">Sin pagos registrados.</p>
-                          ) : (
-                            <table className="w-full text-sm border border-black/10 rounded bg-white">
-                              <thead>
-                                <tr className="border-b border-black/10 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire bg-vialto-mist">
-                                  <th className="px-3 py-2">Fecha</th>
-                                  <th className="px-3 py-2 text-right">Importe</th>
-                                  <th className="px-3 py-2">Forma de pago</th>
-                                  <th className="px-3 py-2 text-right">Acciones</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {f.pagos.map((p) => (
-                                  <tr key={p.id} className="border-b border-black/5">
-                                    <td className="px-3 py-2 tabular-nums">{fmtFecha(p.fecha)}</td>
-                                    <td className="px-3 py-2 text-right tabular-nums font-medium">
-                                      {fmtMonto(p.importe)}
-                                    </td>
-                                    <td className="px-3 py-2 text-vialto-steel capitalize">
-                                      {p.formaPago ?? '—'}
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeletePago(p)}
-                                        className="text-xs px-2 py-0.5 border border-red-200 text-red-700 hover:bg-red-50"
-                                      >
-                                        Eliminar
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-
-                          {/* formulario de pago */}
-                          {pagoDraftFacturaId === f.id && pagoDraft ? (
-                            <form
-                              onSubmit={handleRegistrarPago}
-                              className="flex flex-wrap gap-3 items-end pt-2"
-                            >
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs uppercase tracking-wider text-vialto-steel">
-                                  Importe *
-                                </label>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={pagoDraft.importe}
-                                  onChange={(e) =>
-                                    setPagoDraft((p) => p && { ...p, importe: e.target.value })
-                                  }
-                                  placeholder="0,00"
-                                  className="h-9 w-36 border border-black/20 px-3 text-sm bg-white"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs uppercase tracking-wider text-vialto-steel">
-                                  Fecha *
-                                </label>
-                                <input
-                                  type="date"
-                                  value={pagoDraft.fecha}
-                                  onChange={(e) =>
-                                    setPagoDraft((p) => p && { ...p, fecha: e.target.value })
-                                  }
-                                  className="h-9 border border-black/20 px-3 text-sm bg-white"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs uppercase tracking-wider text-vialto-steel">
-                                  Forma de pago
-                                </label>
-                                <select
-                                  value={pagoDraft.formaPago}
-                                  onChange={(e) =>
-                                    setPagoDraft((p) => p && { ...p, formaPago: e.target.value })
-                                  }
-                                  className="h-9 border border-black/20 px-3 text-sm bg-white"
-                                >
-                                  <option value="">— —</option>
-                                  <option value="transferencia">Transferencia</option>
-                                  <option value="cheque">Cheque</option>
-                                  <option value="efectivo">Efectivo</option>
-                                </select>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  type="submit"
-                                  disabled={savingPago}
-                                  className="h-9 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50"
-                                >
-                                  {savingPago ? '…' : 'Registrar'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setPagoDraft(null); setPagoDraftFacturaId(null); setPagoError(null); }}
-                                  className="h-9 px-3 border border-black/20 text-sm hover:bg-vialto-mist"
-                                >
-                                  Cancelar
-                                </button>
-                              </div>
-                              {pagoError && (
-                                <p className="w-full text-sm text-red-700">{pagoError}</p>
-                              )}
-                            </form>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => abrirPago(f.id)}
-                              className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-white"
-                            >
-                              + Registrar pago
-                            </button>
-                          )}
+                    {/* Acciones */}
+                    {!isEditing && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-2 justify-end">
+                          <button type="button" onClick={() => startEdit(f)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">
+                            Editar
+                          </button>
+                          <button type="button" disabled={deletingId === f.id} onClick={() => handleDelete(f)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40">
+                            {deletingId === f.id ? '…' : 'Eliminar'}
+                          </button>
                         </div>
                       </td>
-                    </tr>
-                  )}
+                    )}
+                  </tr>
                 </Fragment>
               );
             })}
@@ -749,9 +541,7 @@ export function FacturacionTenantPage() {
       </div>
 
       {facturas && facturas.length > 0 && (
-        <p className="mt-3 text-xs text-vialto-steel">
-          {facturas.length} factura{facturas.length !== 1 ? 's' : ''} · Hacé clic en una fila para ver los pagos.
-        </p>
+        <p className="mt-3 text-xs text-vialto-steel">{facturas.length} factura{facturas.length !== 1 ? 's' : ''}</p>
       )}
     </div>
   );

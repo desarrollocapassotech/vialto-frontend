@@ -119,14 +119,13 @@ export interface Factura {
   numero: string;
   tipo: 'cliente' | 'transportista_externo';
   clienteId: string | null;
-  viajeId: string | null;
+  viajeIds: string[];
   importe: number;
   fechaEmision: string;
   fechaVencimiento: string | null;
   estado: 'pendiente' | 'cobrada' | 'vencida';
   diferencia: number | null;
   createdAt: string;
-  pagos: Pago[];
 }
 
 export interface PlatformUser {
