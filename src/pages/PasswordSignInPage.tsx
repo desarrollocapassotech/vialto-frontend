@@ -83,12 +83,9 @@ export function PasswordSignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-vialto-charcoal px-4">
       <div className="w-full max-w-md bg-vialto-graphite border border-white/10 shadow-xl p-6">
-        <h1 className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-white">
+        <h1 className="text-center font-[family-name:var(--font-display)] text-2xl tracking-wide text-white">
           Iniciar sesión
         </h1>
-        <p className="mt-2 text-sm text-white/60">
-          Primero ingresá con Google. Si preferís, también podés usar email y contraseña.
-        </p>
 
         {error && (
           <p className="mt-4 text-sm text-red-200 bg-red-900/30 border border-red-700/50 px-3 py-2">

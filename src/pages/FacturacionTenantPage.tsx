@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Cliente, Factura, Pago, Viaje } from '@/types/api';
@@ -7,9 +8,9 @@ import type { Cliente, Factura, Pago, Viaje } from '@/types/api';
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
-  cobrada: 'Cobrada',
-  vencida: 'Vencida',
+  pendiente: 'PENDIENTE',
+  cobrada: 'COBRADA',
+  vencida: 'VENCIDA',
 };
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -51,7 +52,6 @@ type FacturaDraft = {
   importe: string;
   fechaEmision: string;
   fechaVencimiento: string;
-  estado: 'pendiente' | 'cobrada' | 'vencida';
 };
 
 type PagoDraft = {
@@ -69,7 +69,6 @@ function emptyDraft(): FacturaDraft {
     importe: '',
     fechaEmision: todayIso(),
     fechaVencimiento: '',
-    estado: 'pendiente',
   };
 }
 
@@ -79,8 +78,18 @@ function emptyPagoDraft(): PagoDraft {
 
 // ─── componente ─────────────────────────────────────────────────────────────
 
+type FacturaNuevaNavState = {
+  newFacturaDraft?: {
+    clienteId: string;
+    viajeId: string;
+    importe: number;
+  };
+  expandFacturaId?: string;
+};
+
 export function FacturacionTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const location = useLocation();
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -101,9 +110,6 @@ export function FacturacionTenantPage() {
   const [pagoDraftFacturaId, setPagoDraftFacturaId] = useState<string | null>(null);
   const [savingPago, setSavingPago] = useState(false);
   const [pagoError, setPagoError] = useState<string | null>(null);
-
-  // quick estado
-  const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
 
   // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -136,6 +142,36 @@ export function FacturacionTenantPage() {
 
     return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn]);
+
+  // ── pre-fill desde navegación (viaje → facturado sin cobrar) ───────────────
+
+  useEffect(() => {
+    const state = location.state as FacturaNuevaNavState | null;
+    if (!state) return;
+
+    if (state.expandFacturaId) {
+      setExpandedId(state.expandFacturaId);
+      window.history.replaceState({}, '');
+      return;
+    }
+
+    if (!state.newFacturaDraft) return;
+    const { clienteId, viajeId, importe } = state.newFacturaDraft;
+    const importeStr =
+      importe > 0
+        ? importe.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '';
+    setDraft({
+      ...emptyDraft(),
+      tipo: 'cliente',
+      clienteId: clienteId ?? '',
+      viajeId: viajeId ?? '',
+      importe: importeStr,
+    });
+    setCreating(true);
+    // limpiar el state para no re-abrir si el usuario vuelve
+    window.history.replaceState({}, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── refrescar facturas ─────────────────────────────────────────────────────
 
@@ -176,7 +212,6 @@ export function FacturacionTenantPage() {
           importe,
           fechaEmision: draft.fechaEmision,
           fechaVencimiento: draft.fechaVencimiento || undefined,
-          estado: draft.estado,
         }),
       });
       setCreating(false);
@@ -188,25 +223,6 @@ export function FacturacionTenantPage() {
       );
     } finally {
       setSaving(false);
-    }
-  }
-
-  // ── cambiar estado rápido ──────────────────────────────────────────────────
-
-  async function handleEstado(f: Factura, estado: Factura['estado']) {
-    if (f.estado === estado) return;
-    setSavingEstadoId(f.id);
-    try {
-      const updated = await apiJson<Factura>(
-        `/api/facturacion/facturas/${f.id}`,
-        () => getToken(),
-        { method: 'PATCH', body: JSON.stringify({ estado }) },
-      );
-      setFacturas((prev) => prev?.map((r) => (r.id === f.id ? updated : r)) ?? prev);
-    } catch {
-      // sin toaster por ahora
-    } finally {
-      setSavingEstadoId(null);
     }
   }
 
@@ -423,24 +439,6 @@ export function FacturacionTenantPage() {
             />
           </div>
 
-          {/* Estado inicial */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
-              Estado inicial
-            </label>
-            <select
-              value={draft.estado}
-              onChange={(e) =>
-                setD({ estado: e.target.value as FacturaDraft['estado'] })
-              }
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
-              <option value="pendiente">Pendiente</option>
-              <option value="cobrada">Cobrada</option>
-              <option value="vencida">Vencida</option>
-            </select>
-          </div>
-
           {/* Fecha de emisión */}
           <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">
@@ -529,14 +527,13 @@ export function FacturacionTenantPage() {
 
             {facturas?.map((f) => {
               const expanded = expandedId === f.id;
-              const totalPagado = f.pagos.reduce((s, p) => s + p.importe, 0);
+              const totalPagado = (f.pagos ?? []).reduce((s, p) => s + p.importe, 0);
               const saldo = f.importe - totalPagado;
 
               return (
-                <>
+                <Fragment key={f.id}>
                   {/* ── fila principal ── */}
                   <tr
-                    key={f.id}
                     className="border-b border-black/5 hover:bg-vialto-mist/60 cursor-pointer"
                     onClick={() => setExpandedId(expanded ? null : f.id)}
                   >
@@ -560,25 +557,14 @@ export function FacturacionTenantPage() {
                       )}
                     </td>
 
-                    {/* badge de estado con selector */}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        value={f.estado}
-                        disabled={savingEstadoId === f.id}
-                        onChange={(e) =>
-                          handleEstado(f, e.target.value as Factura['estado'])
-                        }
-                        className={[
-                          'border rounded px-2 py-0.5 text-xs font-medium cursor-pointer',
-                          ESTADO_BADGE[f.estado] ?? '',
-                        ].join(' ')}
-                      >
-                        {(['pendiente', 'cobrada', 'vencida'] as const).map((s) => (
-                          <option key={s} value={s}>
-                            {ESTADO_LABEL[s]}
-                          </option>
-                        ))}
-                      </select>
+                    {/* badge de estado (solo lectura — derivado del viaje y fecha de vencimiento) */}
+                    <td className="px-4 py-3">
+                      <span className={[
+                        'border rounded px-2 py-0.5 text-xs font-medium',
+                        ESTADO_BADGE[f.estado] ?? '',
+                      ].join(' ')}>
+                        {ESTADO_LABEL[f.estado] ?? f.estado}
+                      </span>
                     </td>
 
                     {/* acciones */}
@@ -755,7 +741,7 @@ export function FacturacionTenantPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>

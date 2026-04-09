@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import {
@@ -70,6 +70,7 @@ type SaveInlineKmOpts = {
 
 export function ViajesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Viaje[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +90,8 @@ export function ViajesTenantPage() {
   const [kmLitrosKm, setKmLitrosKm] = useState('');
   const [kmLitrosLitros, setKmLitrosLitros] = useState('');
   const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
+  /** IDs de viajes que ya tienen al menos una factura asociada. */
+  const [viajesConFactura, setViajesConFactura] = useState<Set<string>>(new Set());
 
   function toLocalDateTime(value?: string | null) {
     if (!value) return '';
@@ -127,17 +130,19 @@ export function ViajesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [clientesData, choferesData, transportistasData, vehiculosData] = await Promise.all([
+        const [clientesData, choferesData, transportistasData, vehiculosData, facturasData] = await Promise.all([
           apiJson<Cliente[]>('/api/clientes', () => getToken()),
           apiJson<Chofer[]>('/api/choferes', () => getToken()),
           apiJson<Transportista[]>('/api/transportistas', () => getToken()),
           apiJson<Vehiculo[]>('/api/vehiculos', () => getToken()),
+          apiJson<{ id: string; viajeId: string | null }[]>('/api/facturacion/facturas', () => getToken()).catch(() => [] as { id: string; viajeId: string | null }[]),
         ]);
         if (!cancelled) {
           setClientes(clientesData);
           setChoferes(choferesData);
           setTransportistas(transportistasData);
           setVehiculos(vehiculosData);
+          setViajesConFactura(new Set(facturasData.filter((f) => f.viajeId).map((f) => f.viajeId as string)));
         }
       } catch {
         if (!cancelled) {
@@ -221,6 +226,7 @@ export function ViajesTenantPage() {
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
       setEstadoQuickId(null);
+      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
@@ -246,6 +252,7 @@ export function ViajesTenantPage() {
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
       setEstadoQuickId(null);
+      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
       return true;
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
@@ -297,6 +304,28 @@ export function ViajesTenantPage() {
   function cancelKmLitrosDialog() {
     setKmLitrosPrompt(null);
     setKmLitrosFieldError(null);
+  }
+
+  async function navigateToFacturacion(v: Viaje) {
+    try {
+      const facturas = await apiJson<{ id: string; viajeId: string | null }[]>('/api/facturacion/facturas', () => getToken());
+      const existente = facturas.find((f) => f.viajeId === v.id);
+      if (existente) {
+        navigate('/facturacion', { state: { expandFacturaId: existente.id } });
+        return;
+      }
+    } catch {
+      // si falla la consulta, igualmente navegamos para no bloquear al usuario
+    }
+    navigate('/facturacion', {
+      state: {
+        newFacturaDraft: {
+          clienteId: v.clienteId ?? '',
+          viajeId: v.id,
+          importe: v.monto ?? 0,
+        },
+      },
+    });
   }
 
   function applyDraftModo(m: ViajeOperacionModo) {
@@ -404,7 +433,9 @@ export function ViajesTenantPage() {
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
+      const wasFacturado = draft.estado === 'facturado_sin_cobrar';
       cancelEdit();
+      if (wasFacturado) navigateToFacturacion(updated);
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
@@ -528,7 +559,7 @@ export function ViajesTenantPage() {
                       }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     >
-                      {ESTADOS.map((x) => (
+                      {ESTADOS.filter((x) => !(x === 'finalizado_sin_facturar' && viajesConFactura.has(v.id))).map((x) => (
                         <option key={x} value={x}>
                           {estadoViajeLabel[x] ?? x}
                         </option>
@@ -544,7 +575,7 @@ export function ViajesTenantPage() {
                       className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
                       aria-label="Cambiar estado del viaje"
                     >
-                      {ESTADOS.map((x) => (
+                      {ESTADOS.filter((x) => !(x === 'finalizado_sin_facturar' && viajesConFactura.has(v.id))).map((x) => (
                         <option key={x} value={x}>
                           {estadoViajeLabel[x] ?? x}
                         </option>

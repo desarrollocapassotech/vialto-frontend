@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -50,6 +50,7 @@ function formatFechaCarga(iso: string | null | undefined) {
 
 export function ViajesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const tenants = useTenantsList();
 
   const [rows, setRows] = useState<ConEmpresa<Viaje>[] | null>(null);
@@ -135,6 +136,34 @@ export function ViajesSuperadminPage() {
     });
   }, [editingId, draft?.operacionModo, choferes, vehiculos]);
 
+  async function navigateToFacturacion(v: ConEmpresa<Viaje>) {
+    if (filtroEmpresa) {
+      try {
+        const facturas = await apiJson<{ id: string; viajeId: string | null }[]>(
+          `/api/platform/facturacion/facturas?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+          () => getToken(),
+        );
+        const existente = facturas.find((f) => f.viajeId === v.id);
+        if (existente) {
+          navigate('/facturacion', { state: { expandFacturaId: existente.id } });
+          return;
+        }
+      } catch {
+        // si falla la consulta, igualmente navegamos para no bloquear al usuario
+      }
+    }
+    navigate('/facturacion', {
+      state: {
+        tenantId: filtroEmpresa,
+        newFacturaDraft: {
+          clienteId: v.clienteId ?? '',
+          viajeId: v.id,
+          importe: v.monto ?? 0,
+        },
+      },
+    });
+  }
+
   // ── edición inline ─────────────────────────────────────────────────────────
 
   function startEdit(v: ConEmpresa<Viaje>) {
@@ -195,6 +224,7 @@ export function ViajesSuperadminPage() {
       );
       setRows((prev) => prev?.map((r) => (r.id === v.id ? updated : r)) ?? prev);
       setEstadoQuickId(null);
+      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
     } catch (e) {
       setError(friendlyError(e, 'plataforma'));
     } finally {
@@ -222,6 +252,7 @@ export function ViajesSuperadminPage() {
       );
       setRows((prev) => prev?.map((r) => (r.id === v.id ? updated : r)) ?? prev);
       setEstadoQuickId(null);
+      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
       return true;
     } catch (e) {
       setError(friendlyError(e, 'plataforma'));
@@ -346,7 +377,9 @@ export function ViajesSuperadminPage() {
         },
       );
       setRows((prev) => prev?.map((r) => (r.id === viajeId ? { ...r, ...updated } : r)) ?? prev);
+      const wasFacturado = draft.estado === 'facturado_sin_cobrar';
       cancelEdit();
+      if (wasFacturado) navigateToFacturacion(updated);
     } catch (e) {
       setError(friendlyError(e, 'plataforma'));
     } finally {

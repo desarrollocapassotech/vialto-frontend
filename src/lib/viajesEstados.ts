@@ -12,18 +12,18 @@ export const VIAJE_ESTADOS_TODOS = [
 export const VIAJE_ESTADOS_ALTA = ['pendiente', 'en_curso', 'cancelado'] as const;
 
 export const estadoViajeLabel: Record<string, string> = {
-  pendiente: 'Pendiente',
-  en_curso: 'En curso',
+  pendiente: 'PENDIENTE',
+  en_curso: 'EN CURSO',
   /** Legado si la BD aún no migró */
-  finalizado: 'Finalizado sin facturar',
-  finalizado_sin_facturar: 'Finalizado sin facturar',
+  finalizado: 'FINALIZADO SIN FACTURAR',
+  finalizado_sin_facturar: 'FINALIZADO SIN FACTURAR',
   /** Legado API/BD antes del rename */
-  finalizado_facturado: 'Facturado sin cobrar',
-  facturado_sin_cobrar: 'Facturado sin cobrar',
+  finalizado_facturado: 'FACTURADO SIN COBRAR',
+  facturado_sin_cobrar: 'FACTURADO SIN COBRAR',
   /** Legado API/BD */
-  finalizado_cobrado: 'Cobrado',
-  cobrado: 'Cobrado',
-  cancelado: 'Cancelado',
+  finalizado_cobrado: 'COBRADO',
+  cobrado: 'COBRADO',
+  cancelado: 'CANCELADO',
 };
 
 /** Ámbar sin animación (estado Pendiente). */

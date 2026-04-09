@@ -42,7 +42,7 @@ export async function apiFetch(
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(url, { ...init, headers, credentials: 'include' });
+  return fetch(url, { ...init, headers, credentials: 'include', cache: 'no-store' });
 }
 
 export async function apiJson<T>(

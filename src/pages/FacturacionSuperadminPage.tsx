@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -44,16 +45,52 @@ function todayIso() {
 
 type PagoDraft = { importe: string; fecha: string; formaPago: string };
 
+type FacturaDraft = {
+  numero: string;
+  tipo: 'cliente' | 'transportista_externo';
+  clienteId: string;
+  viajeId: string;
+  importe: string;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  estado: 'pendiente' | 'cobrada' | 'vencida';
+};
+
+type FacturaNuevaNavState = {
+  tenantId?: string;
+  newFacturaDraft?: { clienteId: string; viajeId: string; importe: number };
+};
+
 function emptyPagoDraft(): PagoDraft {
   return { importe: '', fecha: todayIso(), formaPago: '' };
+}
+
+function emptyFacturaDraft(): FacturaDraft {
+  return {
+    numero: '',
+    tipo: 'cliente',
+    clienteId: '',
+    viajeId: '',
+    importe: '',
+    fechaEmision: todayIso(),
+    fechaVencimiento: '',
+    estado: 'pendiente',
+  };
 }
 
 // ─── componente ──────────────────────────────────────────────────────────────
 
 export function FacturacionSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const location = useLocation();
   const tenants = useTenantsList();
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
+
+  // crear factura
+  const [creating, setCreating] = useState(false);
+  const [facturaDraft, setFacturaDraft] = useState<FacturaDraft>(emptyFacturaDraft());
+  const [facturaDraftError, setFacturaDraftError] = useState<string | null>(null);
+  const [savingFactura, setSavingFactura] = useState(false);
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -116,6 +153,68 @@ export function FacturacionSuperadminPage() {
       if (gen === fetchRef.current) setFacturas(data);
     } catch {
       // silencioso
+    }
+  }
+
+  // ── pre-fill desde navegación (viaje → facturado sin cobrar) ───────────────
+
+  useEffect(() => {
+    const state = location.state as FacturaNuevaNavState | null;
+    if (!state?.newFacturaDraft) return;
+    const { clienteId, viajeId, importe } = state.newFacturaDraft;
+    const importeStr =
+      importe > 0
+        ? importe.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '';
+    if (state.tenantId) setFiltroEmpresa(state.tenantId);
+    setFacturaDraft({
+      ...emptyFacturaDraft(),
+      clienteId: clienteId ?? '',
+      viajeId: viajeId ?? '',
+      importe: importeStr,
+    });
+    setCreating(true);
+    window.history.replaceState({}, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── crear factura ───────────────────────────────────────────────────────────
+
+  function setD(patch: Partial<FacturaDraft>) {
+    setFacturaDraft((prev) => ({ ...prev, ...patch }));
+  }
+
+  async function handleCreateFactura(e: React.FormEvent) {
+    e.preventDefault();
+    setFacturaDraftError(null);
+    if (!filtroEmpresa) { setFacturaDraftError('Seleccioná una empresa.'); return; }
+    const importe = parseFloat(facturaDraft.importe.replace(/\./g, '').replace(',', '.'));
+    if (!facturaDraft.numero.trim()) { setFacturaDraftError('Ingresá el número de factura.'); return; }
+    if (isNaN(importe) || importe <= 0) { setFacturaDraftError('Ingresá un importe mayor a 0.'); return; }
+    if (!facturaDraft.fechaEmision) { setFacturaDraftError('Ingresá la fecha de emisión.'); return; }
+
+    setSavingFactura(true);
+    const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
+    try {
+      await apiJson<Factura>(`/api/platform/facturas?${q}`, () => getToken(), {
+        method: 'POST',
+        body: JSON.stringify({
+          numero: facturaDraft.numero.trim(),
+          tipo: facturaDraft.tipo,
+          clienteId: facturaDraft.clienteId || undefined,
+          viajeId: facturaDraft.viajeId || undefined,
+          importe,
+          fechaEmision: facturaDraft.fechaEmision,
+          fechaVencimiento: facturaDraft.fechaVencimiento || undefined,
+          estado: facturaDraft.estado,
+        }),
+      });
+      setCreating(false);
+      setFacturaDraft(emptyFacturaDraft());
+      await refetchFacturas();
+    } catch (e) {
+      setFacturaDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+    } finally {
+      setSavingFactura(false);
     }
   }
 
@@ -237,12 +336,27 @@ export function FacturacionSuperadminPage() {
         Vista de plataforma — seleccioná una empresa para ver sus facturas.
       </p>
 
-      <div className="mt-6">
-        <EmpresaFilterBar
-          tenants={tenants}
-          value={filtroEmpresa}
-          onChange={(v) => { setFiltroEmpresa(v); }}
-        />
+      <div className="mt-6 flex flex-wrap items-end gap-4">
+        <div className="flex-1 min-w-[260px]">
+          <EmpresaFilterBar
+            tenants={tenants}
+            value={filtroEmpresa}
+            onChange={(v) => { setFiltroEmpresa(v); }}
+          />
+        </div>
+        {filtroEmpresa && (
+          <button
+            type="button"
+            onClick={() => {
+              setCreating((v) => !v);
+              setFacturaDraft(emptyFacturaDraft());
+              setFacturaDraftError(null);
+            }}
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+          >
+            {creating ? 'Cancelar' : 'Nueva factura'}
+          </button>
+        )}
       </div>
 
       {/* sin empresa seleccionada */}
@@ -250,6 +364,139 @@ export function FacturacionSuperadminPage() {
         <p className="mt-10 text-vialto-steel text-sm">
           Seleccioná una empresa para ver sus facturas.
         </p>
+      )}
+
+      {/* formulario de creación */}
+      {creating && filtroEmpresa && (
+        <form
+          onSubmit={handleCreateFactura}
+          className="mt-4 bg-white border border-black/10 rounded shadow-sm p-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          <h2 className="col-span-full font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire">
+            Nueva factura
+          </h2>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Número *</label>
+            <input
+              type="text"
+              value={facturaDraft.numero}
+              onChange={(e) => setD({ numero: e.target.value })}
+              placeholder="0001-00000001"
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Tipo *</label>
+            <select
+              value={facturaDraft.tipo}
+              onChange={(e) => setD({ tipo: e.target.value as FacturaDraft['tipo'] })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            >
+              <option value="cliente">Factura a cliente</option>
+              <option value="transportista_externo">Factura a fletero</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Cliente</label>
+            <select
+              value={facturaDraft.clienteId}
+              onChange={(e) => setD({ clienteId: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            >
+              <option value="">— Sin cliente —</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Viaje vinculado</label>
+            <select
+              value={facturaDraft.viajeId}
+              onChange={(e) => setD({ viajeId: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            >
+              <option value="">— Sin viaje —</option>
+              {viajes.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.numero} — {v.origen ?? '?'} → {v.destino ?? '?'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe *</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={facturaDraft.importe}
+              onChange={(e) => setD({ importe: e.target.value })}
+              placeholder="0,00"
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Estado inicial</label>
+            <select
+              value={facturaDraft.estado}
+              onChange={(e) => setD({ estado: e.target.value as FacturaDraft['estado'] })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            >
+              <option value="pendiente">Pendiente</option>
+              <option value="cobrada">Cobrada</option>
+              <option value="vencida">Vencida</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de emisión *</label>
+            <input
+              type="date"
+              value={facturaDraft.fechaEmision}
+              onChange={(e) => setD({ fechaEmision: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de vencimiento</label>
+            <input
+              type="date"
+              value={facturaDraft.fechaVencimiento}
+              onChange={(e) => setD({ fechaVencimiento: e.target.value })}
+              className="h-9 border border-black/20 px-3 text-sm bg-white"
+            />
+          </div>
+
+          {facturaDraftError && (
+            <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {facturaDraftError}
+            </p>
+          )}
+
+          <div className="col-span-full flex gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={savingFactura}
+              className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50"
+            >
+              {savingFactura ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCreating(false); setFacturaDraftError(null); }}
+              className="h-9 px-4 border border-black/20 text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
 
       {/* error */}
