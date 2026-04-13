@@ -108,10 +108,23 @@ export function parseKmLitrosOpcionales(
 
 /**
  * Listado de viajes: mostrar atajo «Facturar» solo si el viaje aún no está
- * en facturado sin cobrar ni cobrado (incluye alias legados de API/BD).
+ * facturado, cobrado o cancelado (incluye alias legados de API/BD).
  */
 export function viajeEstadoPermiteBotonFacturar(estado: string): boolean {
   const e = String(estado).trim().toLowerCase();
+  if (e === 'cancelado') return false;
+  if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return false;
+  if (e === 'finalizado_cobrado' || e === 'cobrado') return false;
+  return true;
+}
+
+/**
+ * Viajes que pueden elegirse al crear/editar una factura (listado de checkboxes).
+ * Excluye facturados, cobrados y cancelados (incluye alias legados de API/BD).
+ */
+export function viajeEstadoPermiteVincularAFactura(estado: string): boolean {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'cancelado') return false;
   if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return false;
   if (e === 'finalizado_cobrado' || e === 'cobrado') return false;
   return true;

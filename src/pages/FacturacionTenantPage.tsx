@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
@@ -9,6 +9,7 @@ import {
   textoImporteFacturaListado,
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
+  viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
 import type { Cliente, Factura, Viaje } from '@/types/api';
 
@@ -149,6 +150,38 @@ export function FacturacionTenantPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchRef = useRef(0);
+
+  const viajesNuevaFactura = useMemo(
+    () => viajesFiltradosParaFactura(viajes, draft.tipo, draft.clienteId),
+    [viajes, draft.tipo, draft.clienteId],
+  );
+
+  const viajesEdicionFactura = useMemo(() => {
+    if (!editDraft) return [];
+    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId);
+  }, [viajes, editDraft]);
+
+  /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
+  useEffect(() => {
+    if (!creating || viajes.length === 0) return;
+    const allowed = new Set(viajesNuevaFactura.map((v) => v.id));
+    setDraft((d) => {
+      const next = d.viajeIds.filter((id) => allowed.has(id));
+      if (next.length === d.viajeIds.length) return d;
+      return { ...d, viajeIds: next };
+    });
+  }, [creating, viajes.length, viajesNuevaFactura]);
+
+  useEffect(() => {
+    if (!editingId || !editDraft || viajes.length === 0) return;
+    const allowed = new Set(viajesEdicionFactura.map((v) => v.id));
+    setEditDraft((ed) => {
+      if (!ed) return ed;
+      const next = ed.viajeIds.filter((id) => allowed.has(id));
+      if (next.length === ed.viajeIds.length) return ed;
+      return { ...ed, viajeIds: next };
+    });
+  }, [editingId, editDraft?.clienteId, editDraft?.tipo, viajes.length, viajesEdicionFactura]);
 
   // ── carga inicial ──────────────────────────────────────────────────────────
 
@@ -399,7 +432,12 @@ export function FacturacionTenantPage() {
             <label className="text-xs uppercase tracking-wider text-vialto-steel">
               Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
             </label>
-            <ViajesCheckboxList viajes={viajes} selected={draft.viajeIds}
+            {draft.tipo === 'cliente' && !draft.clienteId.trim() && (
+              <p className="text-[11px] text-vialto-steel -mt-0.5 mb-1">
+                Elegí un cliente arriba para listar solo sus viajes.
+              </p>
+            )}
+            <ViajesCheckboxList viajes={viajesNuevaFactura} selected={draft.viajeIds}
               onChange={(ids) => setD({ viajeIds: ids })} />
           </div>
 
@@ -494,7 +532,12 @@ export function FacturacionTenantPage() {
                     <td className="px-4 py-3 text-vialto-steel">
                       {editing && ed
                         ? <div className="min-w-[16rem]">
-                            <ViajesCheckboxList viajes={viajes} selected={ed.viajeIds}
+                            {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
+                              <p className="text-[11px] text-vialto-steel mb-1">
+                                Elegí un cliente para listar solo sus viajes.
+                              </p>
+                            )}
+                            <ViajesCheckboxList viajes={viajesEdicionFactura} selected={ed.viajeIds}
                               onChange={(ids) => setE({ viajeIds: ids })} />
                           </div>
                         : numerosViaje(f.viajeIds)}

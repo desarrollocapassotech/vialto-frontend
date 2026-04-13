@@ -127,7 +127,11 @@ export function ViajesTenantPage() {
   const [filtroTransportistaDraft, setFiltroTransportistaDraft] = useState('');
   /** Filtros ya aplicados en la última búsqueda (ref + versión para forzar refetch al pulsar Buscar aunque la página siga en 1). */
   const filtrosAplicadosRef = useRef({ clienteId: '', transportistaId: '' });
+  /** Cliente del último «Buscar» (para UI: checks y facturación masiva solo con filtro por cliente). */
+  const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState('');
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
+  /** Selección para facturar varios viajes juntos (solo con filtro por cliente). */
+  const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>([]);
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
   const [kmLitrosPrompt, setKmLitrosPrompt] = useState<KmLitrosPrompt | null>(null);
@@ -180,20 +184,63 @@ export function ViajesTenantPage() {
   }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion]);
 
   function aplicarFiltrosBuscar() {
+    const cid = filtroClienteDraft.trim();
     filtrosAplicadosRef.current = {
-      clienteId: filtroClienteDraft.trim(),
+      clienteId: cid,
       transportistaId: filtroTransportistaDraft.trim(),
     };
+    setClienteIdFiltroActivo(cid);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
 
   function limpiarFiltrosListado() {
     filtrosAplicadosRef.current = { clienteId: '', transportistaId: '' };
+    setClienteIdFiltroActivo('');
     setFiltroClienteDraft('');
     setFiltroTransportistaDraft('');
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
+  }
+
+  useEffect(() => {
+    setIdsFacturarSeleccion([]);
+  }, [clienteIdFiltroActivo]);
+
+  function esElegibleFacturarLote(v: Viaje): boolean {
+    return viajeEstadoPermiteBotonFacturar(v.estado) && !viajesConFactura.has(v.id);
+  }
+
+  function toggleFacturarLote(id: string) {
+    setIdsFacturarSeleccion((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function toggleSeleccionarTodosEnPagina() {
+    const elegibles = (rows ?? []).filter(esElegibleFacturarLote).map((v) => v.id);
+    if (elegibles.length === 0) return;
+    const todosMarcados = elegibles.every((id) => idsFacturarSeleccion.includes(id));
+    if (todosMarcados) {
+      const setE = new Set(elegibles);
+      setIdsFacturarSeleccion((prev) => prev.filter((id) => !setE.has(id)));
+    } else {
+      setIdsFacturarSeleccion((prev) => [...new Set([...prev, ...elegibles])]);
+    }
+  }
+
+  function facturarSeleccionMultiple() {
+    const ids = idsFacturarSeleccion;
+    const cid = clienteIdFiltroActivo.trim();
+    if (ids.length === 0 || !cid) return;
+    navigate('/facturacion', {
+      state: {
+        newFacturaDraft: {
+          clienteId: cid,
+          viajeIds: ids,
+        },
+      },
+    });
   }
 
   useEffect(() => {
@@ -432,8 +479,7 @@ export function ViajesTenantPage() {
       state: {
         newFacturaDraft: {
           clienteId: v.clienteId ?? '',
-          viajeId: v.id,
-          importe: v.monto ?? 0,
+          viajeIds: [v.id],
         },
       },
     });
@@ -562,7 +608,14 @@ export function ViajesTenantPage() {
     }
   }
 
-  const tableColSpan = editingId ? 5 : 6;
+  const mostrarColumnaFacturarLote =
+    clienteIdFiltroActivo.trim() !== '' && !editingId;
+  const tableColSpanBase = editingId ? 5 : 6;
+  const tableColSpan = mostrarColumnaFacturarLote ? tableColSpanBase + 1 : tableColSpanBase;
+  const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
+  const todosElegiblesMarcados =
+    elegiblesEnPagina.length > 0 &&
+    elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
   function formatFechaCargaCelda(iso: string | null | undefined) {
     if (!iso) return '—';
@@ -681,10 +734,43 @@ export function ViajesTenantPage() {
         </div>
       </form>
 
+      {mostrarColumnaFacturarLote && idsFacturarSeleccion.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-black/10 bg-white px-4 py-3 shadow-sm">
+          <p className="text-sm text-vialto-steel">
+            <span className="font-medium text-vialto-charcoal">{idsFacturarSeleccion.length}</span>
+            {' '}
+            viaje{idsFacturarSeleccion.length !== 1 ? 's' : ''} seleccionado
+            {idsFacturarSeleccion.length !== 1 ? 's' : ''}
+          </p>
+          <button
+            type="button"
+            onClick={facturarSeleccionMultiple}
+            className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+          >
+            Facturar
+          </button>
+        </div>
+      )}
+
       <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
+              {mostrarColumnaFacturarLote && (
+                <th className="px-2 py-3 w-10 text-center align-middle">
+                  <span className="sr-only">Seleccionar para facturación conjunta</span>
+                  {elegiblesEnPagina.length > 0 ? (
+                    <input
+                      type="checkbox"
+                      checked={todosElegiblesMarcados}
+                      onChange={toggleSeleccionarTodosEnPagina}
+                      className="accent-vialto-charcoal"
+                      title="Marcar o desmarcar todos los viajes facturables en esta página"
+                      aria-label="Marcar o desmarcar todos los viajes facturables en esta página"
+                    />
+                  ) : null}
+                </th>
+              )}
               <th className="px-4 py-3">Número</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Origen</th>
@@ -712,6 +798,19 @@ export function ViajesTenantPage() {
             {rows?.map((v) => (
               <Fragment key={v.id}>
               <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
+                {mostrarColumnaFacturarLote && (
+                  <td className="px-2 py-3 align-middle text-center">
+                    {esElegibleFacturarLote(v) ? (
+                      <input
+                        type="checkbox"
+                        checked={idsFacturarSeleccion.includes(v.id)}
+                        onChange={() => toggleFacturarLote(v.id)}
+                        className="accent-vialto-charcoal"
+                        aria-label={`Incluir viaje ${v.numero} en facturación conjunta`}
+                      />
+                    ) : null}
+                  </td>
+                )}
                 <td className="px-4 py-3 font-medium">
                   {draft && editingId === v.id ? draft.numero : v.numero}
                 </td>
