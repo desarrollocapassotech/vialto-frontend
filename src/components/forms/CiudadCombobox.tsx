@@ -14,6 +14,11 @@ type Props = {
   disabled?: boolean;
   id?: string;
   'aria-label'?: string;
+  /**
+   * Mitiga el autocompletado del navegador (p. ej. Chrome ignora `autoComplete="off"` en campos tipo dirección).
+   * Usa nombre no semántico, atributos anti-extensiones y `readOnly` hasta el primer foco.
+   */
+  disableBrowserAutocomplete?: boolean;
 };
 
 const MIN_CHARS = 2;
@@ -28,6 +33,7 @@ export function CiudadCombobox({
   disabled,
   id: idProp,
   'aria-label': ariaLabel,
+  disableBrowserAutocomplete = false,
 }: Props) {
   const defaultPlaceholder =
     pais === 'UY' ? 'Buscá ciudad o localidad en Uruguay…' : 'Buscá ciudad o localidad en Argentina…';
@@ -35,8 +41,10 @@ export function CiudadCombobox({
   const reactId = useId();
   const listboxId = `${reactId}-listbox`;
   const inputId = idProp ?? `${reactId}-input`;
+  const inputName = `vialto-ciudad-${reactId.replace(/:/g, '')}`;
 
   const [inputValue, setInputValue] = useState(value);
+  const [browserAutofillLock, setBrowserAutofillLock] = useState(() => disableBrowserAutocomplete);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<{ id: string; label: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -173,9 +181,13 @@ export function CiudadCombobox({
       <input
         ref={inputRef}
         id={inputId}
+        name={disableBrowserAutocomplete ? inputName : undefined}
         type="text"
         autoComplete="off"
         disabled={disabled}
+        readOnly={disableBrowserAutocomplete && !disabled && browserAutofillLock}
+        data-lpignore={disableBrowserAutocomplete ? 'true' : undefined}
+        data-1p-ignore={disableBrowserAutocomplete ? 'true' : undefined}
         placeholder={placeholder ?? defaultPlaceholder}
         aria-label={ariaLabel}
         aria-expanded={open}
@@ -185,7 +197,10 @@ export function CiudadCombobox({
         className={inputClassName}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          if (browserAutofillLock) setBrowserAutofillLock(false);
+          setOpen(true);
+        }}
         onBlur={() => {
           window.setTimeout(() => {
             setOpen(false);

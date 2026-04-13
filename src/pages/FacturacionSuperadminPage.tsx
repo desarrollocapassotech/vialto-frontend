@@ -1,9 +1,15 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
+import {
+  textoImporteFacturaListado,
+  textoImporteFacturaSeleccion,
+  textoMontoFacturarListado,
+} from '@/lib/viajesFlota';
 import type { Cliente, Factura, Viaje } from '@/types/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -34,10 +40,7 @@ function fmtFecha(iso: string | null) {
   });
 }
 
-function fmtMonto(n: number | null) {
-  if (n == null) return '—';
-  return `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const clienteInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -46,13 +49,6 @@ function todayIso() {
 function isoToDate(iso: string | null | undefined) {
   if (!iso) return '';
   return iso.slice(0, 10);
-}
-
-function computeImporteLocal(viajeIds: string[], viajes: Viaje[]) {
-  return viajeIds.reduce((sum, id) => {
-    const v = viajes.find((x) => x.id === id);
-    return sum + (v?.monto ?? 0);
-  }, 0);
 }
 
 // ─── tipos internos ──────────────────────────────────────────────────────────
@@ -132,7 +128,9 @@ function ViajesCheckboxList({
             </span>
           )}
           {v.monto != null && (
-            <span className="ml-auto text-xs tabular-nums text-vialto-steel">{fmtMonto(v.monto)}</span>
+            <span className="ml-auto text-xs tabular-nums text-vialto-steel">
+              {textoMontoFacturarListado(v)}
+            </span>
           )}
         </label>
       ))}
@@ -451,16 +449,16 @@ export function FacturacionSuperadminPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-xs uppercase tracking-wider text-vialto-steel">Cliente</label>
-            <select
+            <ClienteSearchSelect
+              clientes={clientes}
               value={draft.clienteId}
-              onChange={(e) => setD({ clienteId: e.target.value })}
-              className="h-9 border border-black/20 px-3 text-sm bg-white"
-            >
-              <option value="">— Sin cliente —</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
+              onChange={(id) => setD({ clienteId: id })}
+              inputClassName={clienteInputClass}
+              allowEmptyValue
+              emptyListChoiceLabel="— Sin cliente —"
+              placeholderCerrado="— Sin cliente —"
+              aria-label="Cliente"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
@@ -484,9 +482,12 @@ export function FacturacionSuperadminPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe estimado</label>
-            <p className="h-9 flex items-center text-sm font-medium tabular-nums px-1">
-              {fmtMonto(computeImporteLocal(draft.viajeIds, viajes))}
+            <label className="text-xs uppercase tracking-wider text-vialto-steel">Importe calculado</label>
+            <p className="min-h-9 flex flex-wrap items-center text-sm font-medium tabular-nums px-1 gap-x-2">
+              {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+            </p>
+            <p className="text-[10px] text-vialto-steel">
+              Suma de los montos de los viajes (ARS y USD por separado).
             </p>
           </div>
 
@@ -585,13 +586,20 @@ export function FacturacionSuperadminPage() {
                       </td>
 
                       {/* Cliente */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 min-w-[12rem]">
                         {editing && ed
-                          ? <select value={ed.clienteId} onChange={(e) => setE({ clienteId: e.target.value })}
-                              className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
-                              <option value="">— Sin cliente —</option>
-                              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                            </select>
+                          ? (
+                              <ClienteSearchSelect
+                                clientes={clientes}
+                                value={ed.clienteId}
+                                onChange={(id) => setE({ clienteId: id })}
+                                inputClassName={clienteInputClass}
+                                allowEmptyValue
+                                emptyListChoiceLabel="— Sin cliente —"
+                                placeholderCerrado="— Sin cliente —"
+                                aria-label="Cliente"
+                              />
+                            )
                           : nombreCliente(f.clienteId)}
                       </td>
 
@@ -606,10 +614,10 @@ export function FacturacionSuperadminPage() {
                       </td>
 
                       {/* Importe (solo lectura — calculado desde viajes) */}
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
                         {editing && ed
-                          ? fmtMonto(computeImporteLocal(ed.viajeIds, viajes))
-                          : fmtMonto(f.importe)}
+                          ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
+                          : textoImporteFacturaListado(f, viajes)}
                       </td>
 
                       {/* Emisión */}

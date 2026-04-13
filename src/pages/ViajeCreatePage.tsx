@@ -9,6 +9,7 @@ import {
   TransportistaSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
+import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import {
   ViajeOperacionTipoFieldset,
@@ -16,13 +17,17 @@ import {
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { apiJson } from '@/lib/api';
-import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
+import {
+  maskCurrencyForMoneda,
+  parseCurrencyForMoneda,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
+  mantenerIdSiEnLista,
   mensajesAyudaFlotaPropia,
-  normalizarIdEnLista,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
@@ -77,7 +82,10 @@ export function ViajeCreatePage() {
   const [kmRecorridos, setKmRecorridos] = useState('');
   const [litrosConsumidos, setLitrosConsumidos] = useState('');
   const [monto, setMonto] = useState('');
+  const [monedaMonto, setMonedaMonto] = useState<ViajeMonedaCodigo>('ARS');
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
+  const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
+    useState<ViajeMonedaCodigo>('ARS');
   const [documentacionCsv, setDocumentacionCsv] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingRefs, setLoadingRefs] = useState(true);
@@ -116,9 +124,6 @@ export function ViajeCreatePage() {
           setChoferes(choferesData);
           setTransportistas(transportistasData);
           setVehiculos(vehiculosData);
-          if (clientesData.length > 0) setClienteId(clientesData[0].id);
-          const cp = choferesFlotaPropia(choferesData);
-          if (cp.length > 0) setChoferId(cp[0].id);
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'viajes'));
@@ -150,12 +155,15 @@ export function ViajeCreatePage() {
       setVehiculos(vehiculosData);
       const cp = choferesFlotaPropia(choferesData);
       const vp = vehiculosFlotaPropia(vehiculosData);
-      setChoferId((prev) => normalizarIdEnLista(prev, cp));
+      setChoferId((prev) => mantenerIdSiEnLista(prev, cp));
       setVehiculosRows((rows) =>
-        rows.map((row) => ({
-          ...row,
-          vehiculoId: normalizarIdEnLista(row.vehiculoId, vehiculosPorTipo(vp, row.tipo)),
-        })),
+        rows.map((row) => {
+          const candidatos = vehiculosPorTipo(vp, row.tipo);
+          return {
+            ...row,
+            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
+          };
+        }),
       );
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
@@ -173,7 +181,7 @@ export function ViajeCreatePage() {
 
   useEffect(() => {
     if (modoOperacion !== 'propio') return;
-    setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
+    setChoferId((prev) => mantenerIdSiEnLista(prev, choferesPropios));
   }, [modoOperacion, choferesPropios]);
 
   function applyModoOperacion(m: ViajeOperacionModo) {
@@ -183,7 +191,7 @@ export function ViajeCreatePage() {
       setVehiculosRows([]);
     } else {
       setTransportistaId('');
-      setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
+      setChoferId('');
       setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
     }
   }
@@ -223,7 +231,7 @@ export function ViajeCreatePage() {
       setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
       return;
     }
-    const montoNum = parseCurrencyAr(monto);
+    const montoNum = parseCurrencyForMoneda(monto, monedaMonto);
     if (montoNum == null || montoNum < 0.01) {
       setError('Ingresá un monto a facturar mayor a 0.');
       return;
@@ -283,7 +291,12 @@ export function ViajeCreatePage() {
           litrosConsumidos:
             litNum !== undefined && Number.isFinite(litNum) ? litNum : undefined,
           monto: montoNum,
-          precioTransportistaExterno: parseCurrencyAr(precioTransportistaExterno),
+          monedaMonto,
+          precioTransportistaExterno: parseCurrencyForMoneda(
+            precioTransportistaExterno,
+            monedaPrecioTransportista,
+          ),
+          monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           documentacion: documentacionCsv
             .split(',')
             .map((item) => item.trim())
@@ -323,6 +336,7 @@ export function ViajeCreatePage() {
         <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
       ) : (
         <form
+          autoComplete="off"
           className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3"
           onSubmit={(e) => {
             e.preventDefault();
@@ -360,6 +374,7 @@ export function ViajeCreatePage() {
                   value={origen}
                   onChange={setOrigen}
                   inputClassName={inputClass}
+                  disableBrowserAutocomplete
                 />
               </div>
             </div>
@@ -381,6 +396,7 @@ export function ViajeCreatePage() {
                   value={destino}
                   onChange={setDestino}
                   inputClassName={inputClass}
+                  disableBrowserAutocomplete
                 />
               </div>
             </div>
@@ -398,15 +414,27 @@ export function ViajeCreatePage() {
             </div>
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Monto a facturar</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={monto}
-                onChange={(e) => setMonto(maskCurrencyArInput(e.target.value))}
-                placeholder="Ej. 1.500.000,50"
-                className={`${inputClass} text-right tabular-nums`}
-              />
+              <div className="flex min-w-0 gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={monto}
+                  onChange={(e) =>
+                    setMonto(maskCurrencyForMoneda(e.target.value, monedaMonto))
+                  }
+                  placeholder={monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'}
+                  className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                />
+                <MonedaSelect
+                  value={monedaMonto}
+                  onChange={(m) => {
+                    setMonedaMonto(m);
+                    setMonto('');
+                  }}
+                  aria-label="Moneda monto a facturar"
+                />
+              </div>
             </div>
           </div>
           <ViajeOperacionTipoFieldset
@@ -427,15 +455,33 @@ export function ViajeCreatePage() {
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Precio transportista externo</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={precioTransportistaExterno}
-                      onChange={(e) => setPrecioTransportistaExterno(maskCurrencyArInput(e.target.value))}
-                      placeholder="Ej. 1.200.000,50"
-                      className={`${inputClass} text-right tabular-nums`}
-                    />
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={precioTransportistaExterno}
+                        onChange={(e) =>
+                          setPrecioTransportistaExterno(
+                            maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista),
+                          )
+                        }
+                        placeholder={
+                          monedaPrecioTransportista === 'USD'
+                            ? 'Ej. 8,500.00'
+                            : 'Ej. 1.200.000,50'
+                        }
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                      />
+                      <MonedaSelect
+                        value={monedaPrecioTransportista}
+                        onChange={(m) => {
+                          setMonedaPrecioTransportista(m);
+                          setPrecioTransportistaExterno('');
+                        }}
+                        aria-label="Moneda precio transportista externo"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -8,8 +8,9 @@ import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
-import { maskCurrencyArInput } from '@/lib/currencyMask';
+import { maskCurrencyForMoneda, type ViajeMonedaCodigo } from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
   mensajesAyudaFlotaPropia,
@@ -104,15 +105,30 @@ export function ViajeInlineEditForm({
             </div>
             <div className="flex flex-col gap-1">
               <span className={LABEL}>Monto a facturar</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={draft.monto}
-                onChange={(e) => set({ monto: maskCurrencyArInput(e.target.value) })}
-                placeholder="Ej. 1.500.000,50"
-                className={`${INPUT} text-right tabular-nums`}
-              />
+              <div className="flex min-w-0 gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={draft.monto}
+                  onChange={(e) =>
+                    set({
+                      monto: maskCurrencyForMoneda(e.target.value, draft.monedaMonto),
+                    })
+                  }
+                  placeholder={
+                    draft.monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'
+                  }
+                  className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                />
+                <MonedaSelect
+                  value={draft.monedaMonto}
+                  onChange={(m: ViajeMonedaCodigo) =>
+                    set({ monedaMonto: m, monto: '' })
+                  }
+                  aria-label="Moneda monto a facturar"
+                />
+              </div>
             </div>
           </div>
 
@@ -136,17 +152,35 @@ export function ViajeInlineEditForm({
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={LABEL}>Precio transportista externo</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={draft.precioTransportistaExterno}
-                      onChange={(e) =>
-                        set({ precioTransportistaExterno: maskCurrencyArInput(e.target.value) })
-                      }
-                      placeholder="Ej. 1.200.000,50"
-                      className={`${INPUT} text-right tabular-nums`}
-                    />
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={draft.precioTransportistaExterno}
+                        onChange={(e) =>
+                          set({
+                            precioTransportistaExterno: maskCurrencyForMoneda(
+                              e.target.value,
+                              draft.monedaPrecioTransportistaExterno,
+                            ),
+                          })
+                        }
+                        placeholder={
+                          draft.monedaPrecioTransportistaExterno === 'USD'
+                            ? 'Ej. 8,500.00'
+                            : 'Ej. 1.200.000,50'
+                        }
+                        className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                      />
+                      <MonedaSelect
+                        value={draft.monedaPrecioTransportistaExterno}
+                        onChange={(m: ViajeMonedaCodigo) =>
+                          set({ monedaPrecioTransportistaExterno: m, precioTransportistaExterno: '' })
+                        }
+                        aria-label="Moneda precio transportista externo"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

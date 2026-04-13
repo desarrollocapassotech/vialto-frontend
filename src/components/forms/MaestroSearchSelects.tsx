@@ -26,6 +26,8 @@ export function ClienteSearchSelect({
   inputClassName = INPUT,
   placeholderCerrado = 'Elegí un cliente…',
   placeholderBuscar = 'Buscar por nombre o CUIT…',
+  allowEmptyValue = false,
+  emptyListChoiceLabel = 'Sin selección',
   id,
   'aria-label': ariaLabel,
 }: BaseProps & {
@@ -34,6 +36,9 @@ export function ClienteSearchSelect({
   onChange: (id: string) => void;
   placeholderCerrado?: string;
   placeholderBuscar?: string;
+  /** Permite dejar sin cliente (`value === ''`), con fila para vaciar en el panel. */
+  allowEmptyValue?: boolean;
+  emptyListChoiceLabel?: string;
 }) {
   return (
     <SearchableEntitySelect<Cliente>
@@ -48,6 +53,8 @@ export function ClienteSearchSelect({
       getSecondaryLabel={(c) => c.cuit}
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar={placeholderBuscar}
+      allowEmptyValue={allowEmptyValue}
+      emptyListChoiceLabel={emptyListChoiceLabel}
       searchAriaLabel="Filtrar clientes"
       noItemsSlot={
         <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>

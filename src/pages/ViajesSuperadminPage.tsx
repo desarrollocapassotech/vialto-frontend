@@ -9,7 +9,11 @@ import { ViajeEstadoCelda } from '@/components/viajes/ViajeEstadoCelda';
 import { ViajeInlineEditForm } from '@/components/viajes/ViajeInlineEditForm';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import { formatCurrencyArFromNumber, parseCurrencyAr } from '@/lib/currencyMask';
+import {
+  formatNumberForMoneda,
+  normalizeViajeMoneda,
+  parseCurrencyForMoneda,
+} from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
@@ -229,10 +233,15 @@ export function ViajesSuperadminPage() {
       fechaDescarga: toLocalDateTime(v.fechaDescarga),
       mercaderia: v.mercaderia ?? '',
       observaciones: v.observaciones ?? '',
-      monto: formatCurrencyArFromNumber(v.monto),
+      monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
+      monedaMonto: normalizeViajeMoneda(v.monedaMonto),
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : '',
       litrosConsumidos: v.litrosConsumidos != null ? String(v.litrosConsumidos) : '',
-      precioTransportistaExterno: formatCurrencyArFromNumber(v.precioTransportistaExterno),
+      precioTransportistaExterno: formatNumberForMoneda(
+        v.precioTransportistaExterno,
+        normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
+      ),
+      monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       documentacionCsv: (v.documentacion ?? []).join(', '),
     });
   }
@@ -421,10 +430,15 @@ export function ViajesSuperadminPage() {
             fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
             mercaderia: draft.mercaderia.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
-            monto: parseCurrencyAr(draft.monto),
+            monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+            monedaMonto: draft.monedaMonto,
             kmRecorridos: kmResolved,
             litrosConsumidos: litResolved,
-            precioTransportistaExterno: parseCurrencyAr(draft.precioTransportistaExterno),
+            precioTransportistaExterno: parseCurrencyForMoneda(
+              draft.precioTransportistaExterno,
+              draft.monedaPrecioTransportistaExterno,
+            ),
+            monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
             documentacion: draft.documentacionCsv.split(',').map((s) => s.trim()).filter(Boolean),
           }),
         },

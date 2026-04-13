@@ -7,6 +7,7 @@ import {
   TransportistaSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
+import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import {
   ViajeOperacionTipoFieldset,
@@ -14,7 +15,13 @@ import {
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { apiJson } from '@/lib/api';
-import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
+import {
+  formatNumberForMoneda,
+  maskCurrencyForMoneda,
+  normalizeViajeMoneda,
+  parseCurrencyForMoneda,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
@@ -69,9 +76,11 @@ type ViajeInlineDraft = {
   mercaderia: string;
   observaciones: string;
   monto: string;
+  monedaMonto: ViajeMonedaCodigo;
   kmRecorridos: string;
   litrosConsumidos: string;
   precioTransportistaExterno: string;
+  monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
   documentacionCsv: string;
 };
 
@@ -253,10 +262,15 @@ export function ViajesTenantPage() {
       fechaDescarga: toLocalDateTime(v.fechaDescarga),
       mercaderia: v.mercaderia ?? '',
       observaciones: v.observaciones ?? '',
-      monto: formatCurrencyArFromNumber(v.monto),
+      monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
+      monedaMonto: normalizeViajeMoneda(v.monedaMonto),
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : '',
       litrosConsumidos: v.litrosConsumidos != null ? String(v.litrosConsumidos) : '',
-      precioTransportistaExterno: formatCurrencyArFromNumber(v.precioTransportistaExterno),
+      precioTransportistaExterno: formatNumberForMoneda(
+        v.precioTransportistaExterno,
+        normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
+      ),
+      monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       documentacionCsv: (v.documentacion ?? []).join(', '),
     });
   }
@@ -493,10 +507,15 @@ export function ViajesTenantPage() {
           fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
           mercaderia: draft.mercaderia.trim() || undefined,
           observaciones: draft.observaciones.trim() || undefined,
-          monto: parseCurrencyAr(draft.monto),
+          monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+          monedaMonto: draft.monedaMonto,
           kmRecorridos: kmResolved,
           litrosConsumidos: litResolved,
-          precioTransportistaExterno: parseCurrencyAr(draft.precioTransportistaExterno),
+          precioTransportistaExterno: parseCurrencyForMoneda(
+            draft.precioTransportistaExterno,
+            draft.monedaPrecioTransportistaExterno,
+          ),
+          monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
           documentacion: draft.documentacionCsv
             .split(',')
             .map((item) => item.trim())
@@ -769,19 +788,37 @@ export function ViajesTenantPage() {
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                             Monto a facturar
                           </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={draft.monto}
-                            onChange={(e) =>
-                              setDraft((p) =>
-                                p ? { ...p, monto: maskCurrencyArInput(e.target.value) } : p,
-                              )
-                            }
-                            placeholder="Ej. 1.500.000,50"
-                            className="h-9 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                          />
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={draft.monto}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        monto: maskCurrencyForMoneda(e.target.value, p.monedaMonto),
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder={
+                                draft.monedaMonto === 'USD'
+                                  ? 'Ej. 12,500.50'
+                                  : 'Ej. 1.500.000,50'
+                              }
+                              className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
+                            />
+                            <MonedaSelect
+                              value={draft.monedaMonto}
+                              onChange={(m: ViajeMonedaCodigo) =>
+                                setDraft((p) => (p ? { ...p, monedaMonto: m, monto: '' } : p))
+                              }
+                              aria-label="Moneda monto a facturar"
+                            />
+                          </div>
                         </div>
                       </div>
                       <ViajeOperacionTipoFieldset
@@ -809,24 +846,48 @@ export function ViajesTenantPage() {
                                 <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                                   Precio transportista externo
                                 </span>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  autoComplete="off"
-                                  value={draft.precioTransportistaExterno}
-                                  onChange={(e) =>
-                                    setDraft((p) =>
-                                      p
-                                        ? {
-                                            ...p,
-                                            precioTransportistaExterno: maskCurrencyArInput(e.target.value),
-                                          }
-                                        : p,
-                                    )
-                                  }
-                                  placeholder="Ej. 1.200.000,50"
-                                  className="h-9 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                                />
+                                <div className="flex min-w-0 gap-2">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    value={draft.precioTransportistaExterno}
+                                    onChange={(e) =>
+                                      setDraft((p) =>
+                                        p
+                                          ? {
+                                              ...p,
+                                              precioTransportistaExterno: maskCurrencyForMoneda(
+                                                e.target.value,
+                                                p.monedaPrecioTransportistaExterno,
+                                              ),
+                                            }
+                                          : p,
+                                      )
+                                    }
+                                    placeholder={
+                                      draft.monedaPrecioTransportistaExterno === 'USD'
+                                        ? 'Ej. 8,500.00'
+                                        : 'Ej. 1.200.000,50'
+                                    }
+                                    className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
+                                  />
+                                  <MonedaSelect
+                                    value={draft.monedaPrecioTransportistaExterno}
+                                    onChange={(m: ViajeMonedaCodigo) =>
+                                      setDraft((p) =>
+                                        p
+                                          ? {
+                                              ...p,
+                                              monedaPrecioTransportistaExterno: m,
+                                              precioTransportistaExterno: '',
+                                            }
+                                          : p,
+                                      )
+                                    }
+                                    aria-label="Moneda precio transportista externo"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>

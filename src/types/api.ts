@@ -22,7 +22,11 @@ export interface Viaje {
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
+  /** ARS | USD (omitido en respuestas antiguas → se trata como ARS). */
+  monedaMonto?: string;
   precioTransportistaExterno: number | null;
+  /** ARS | USD */
+  monedaPrecioTransportistaExterno?: string;
   documentacion: string[];
   observaciones: string | null;
   fechaFinalizado: string | null;

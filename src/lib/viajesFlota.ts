@@ -1,3 +1,4 @@
+import { normalizeViajeMoneda } from '@/lib/currencyMask';
 import type { Chofer, Vehiculo, Viaje } from '@/types/api';
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
@@ -42,6 +43,16 @@ export function normalizarIdEnLista(
   return lista[0]?.id ?? '';
 }
 
+/** Si `raw` está vacío o ya no está en `lista`, devuelve `''`. No elige el primer ítem por defecto. */
+export function mantenerIdSiEnLista<T extends { id: string }>(
+  raw: string | number | null | undefined,
+  lista: T[],
+): string {
+  const s = raw != null && raw !== '' ? String(raw).trim() : '';
+  if (!s) return '';
+  return lista.some((x) => x.id === s) ? s : '';
+}
+
 export function vehiculoIdsDesdeRows(rows: { vehiculoId: string }[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -72,5 +83,51 @@ export function flotaPropiaVehiculosListaValida(
 /** Celda de tabla: monto a facturar. */
 export function textoMontoFacturarListado(v: Viaje): string {
   const m = v.monto;
-  return m != null ? `$ ${m.toLocaleString('es-AR')}` : '—';
+  if (m == null) return '—';
+  const moneda = normalizeViajeMoneda(v.monedaMonto);
+  const sym = moneda === 'USD' ? 'US$' : '$';
+  const locale = moneda === 'USD' ? 'en-US' : 'es-AR';
+  return `${sym} ${m.toLocaleString(locale)}`;
+}
+
+/**
+ * Suma importes de viajes seleccionados, separando ARS y USD (no mezcla montos entre monedas).
+ */
+export function textoImporteFacturaSeleccion(viajeIds: string[], viajes: Viaje[]): string {
+  let ars = 0;
+  let usd = 0;
+  for (const id of viajeIds) {
+    const v = viajes.find((x) => x.id === id);
+    if (!v || v.monto == null) continue;
+    if (normalizeViajeMoneda(v.monedaMonto) === 'USD') usd += v.monto;
+    else ars += v.monto;
+  }
+  const parts: string[] = [];
+  if (ars > 0) {
+    parts.push(
+      `$ ${ars.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`,
+    );
+  }
+  if (usd > 0) {
+    parts.push(
+      `US$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    );
+  }
+  if (parts.length === 0) return '—';
+  return parts.join(' · ');
+}
+
+/**
+ * Importe mostrado en tabla de facturas: usa viajes cargados; si no alcanza, el total persistido (formato ARS).
+ */
+export function textoImporteFacturaListado(
+  f: { viajeIds: string[]; importe: number },
+  viajes: Viaje[],
+): string {
+  const t = textoImporteFacturaSeleccion(f.viajeIds, viajes);
+  if (t !== '—') return t;
+  if (f.importe != null && Number.isFinite(f.importe) && f.importe !== 0) {
+    return `$ ${f.importe.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return '—';
 }

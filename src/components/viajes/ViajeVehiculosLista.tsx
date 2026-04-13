@@ -100,7 +100,7 @@ export function ViajeVehiculosLista({
                 </select>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
-                <span className={LABEL}>Vehículo (maestro)</span>
+                <span className={LABEL}>Vehículo</span>
                 <VehiculoPatenteSearchSelect
                   vehiculos={opciones}
                   value={row.vehiculoId}

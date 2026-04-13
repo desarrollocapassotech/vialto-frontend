@@ -1,3 +1,4 @@
+import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import type { ViajeVehiculoRowDraft } from '@/components/viajes/ViajeVehiculosLista';
@@ -20,9 +21,11 @@ export type ViajeInlineDraft = {
   mercaderia: string;
   observaciones: string;
   monto: string;
+  monedaMonto: ViajeMonedaCodigo;
   kmRecorridos: string;
   litrosConsumidos: string;
   precioTransportistaExterno: string;
+  monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
   documentacionCsv: string;
 };
 
