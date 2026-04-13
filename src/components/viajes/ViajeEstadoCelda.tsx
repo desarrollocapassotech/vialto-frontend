@@ -27,7 +27,7 @@ type Props = {
 const ESTADOS = VIAJE_ESTADOS_TODOS;
 
 export function ViajeEstadoCelda({
-  viajeId,
+  viajeId: _viajeId,
   viajeEstado,
   isEditing,
   draft,

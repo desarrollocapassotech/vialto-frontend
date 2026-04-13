@@ -37,7 +37,7 @@ import type {
   SaveInlineKmOpts,
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
-import { estadoViajeLabel } from '@/lib/viajesEstados';
+import { estadoViajeLabel, viajeEstadoPermiteBotonFacturar } from '@/lib/viajesEstados';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -641,13 +641,25 @@ export function ViajesSuperadminPage() {
                   {/* Acciones */}
                   {!editingId && (
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(v)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </button>
+                      <div className="inline-flex flex-wrap justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(v)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                        >
+                          Editar
+                        </button>
+                        {viajeEstadoPermiteBotonFacturar(v.estado) && (
+                          <button
+                            type="button"
+                            onClick={() => void navigateToFacturacion(v)}
+                            disabled={!filtroEmpresa}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            Facturar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>

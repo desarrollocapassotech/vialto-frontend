@@ -25,6 +25,11 @@ export function ViajeKmLitrosDialog({
 }: ViajeKmLitrosDialogProps) {
   if (!open) return null;
 
+  const sinValoresKmLitros =
+    km.trim() === '' && litros.trim() === '';
+  const labelPrincipal =
+    busy ? 'Guardando…' : sinValoresKmLitros ? 'Continuar sin guardar' : 'Guardar';
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
@@ -91,7 +96,7 @@ export function ViajeKmLitrosDialog({
             onClick={onConfirm}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
-            {busy ? 'Guardando…' : 'Aceptar'}
+            {labelPrincipal}
           </button>
         </div>
       </div>

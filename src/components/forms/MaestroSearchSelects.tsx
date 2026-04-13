@@ -113,12 +113,18 @@ export function TransportistaSearchSelect({
   disabled,
   className,
   inputClassName = INPUT,
+  placeholderCerrado = 'Elegí un transportista…',
+  placeholderBuscar = 'Buscar transportista…',
+  emptyListChoiceLabel = 'Elegí un transportista…',
   id,
   'aria-label': ariaLabel,
 }: BaseProps & {
   transportistas: Transportista[];
   value: string;
   onChange: (id: string) => void;
+  placeholderCerrado?: string;
+  placeholderBuscar?: string;
+  emptyListChoiceLabel?: string;
 }) {
   return (
     <SearchableEntitySelect<Transportista>
@@ -131,11 +137,11 @@ export function TransportistaSearchSelect({
       filterItems={filtrarTransportistas}
       getPrimaryLabel={(t) => t.nombre}
       getSecondaryLabel={(t) => t.cuit}
-      placeholderCerrado="Elegí un transportista…"
-      placeholderBuscar="Buscar transportista…"
+      placeholderCerrado={placeholderCerrado}
+      placeholderBuscar={placeholderBuscar}
       searchAriaLabel="Filtrar transportistas"
       allowEmptyValue
-      emptyListChoiceLabel="Elegí un transportista…"
+      emptyListChoiceLabel={emptyListChoiceLabel}
       id={id}
       aria-label={ariaLabel}
     />
@@ -159,6 +165,7 @@ export function VehiculoPatenteSearchSelect({
   onChange: (id: string) => void;
   /** Sin candidatos para el tipo elegido */
   sinOpciones: boolean;
+  placeholderCerrado?: string;
 }) {
   if (sinOpciones) {
     return (

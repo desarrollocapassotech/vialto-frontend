@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ChoferSearchSelect,
@@ -47,6 +47,7 @@ import {
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
   viajeTieneKmYLitrosEnApi,
+  viajeEstadoPermiteBotonFacturar,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
 import type {
@@ -121,6 +122,14 @@ export function ViajesTenantPage() {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  /** Valores en los controles (hasta pulsar Buscar). */
+  const [filtroClienteDraft, setFiltroClienteDraft] = useState('');
+  const [filtroTransportistaDraft, setFiltroTransportistaDraft] = useState('');
+  /** Filtros ya aplicados en la última búsqueda (ref + versión para forzar refetch al pulsar Buscar aunque la página siga en 1). */
+  const filtrosAplicadosRef = useRef({ clienteId: '', transportistaId: '' });
+  const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   const [kmLitrosPrompt, setKmLitrosPrompt] = useState<KmLitrosPrompt | null>(null);
   const [kmLitrosKm, setKmLitrosKm] = useState('');
   const [kmLitrosLitros, setKmLitrosLitros] = useState('');
@@ -142,9 +151,15 @@ export function ViajesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('pageSize', String(pageSize));
+        const { clienteId: cid, transportistaId: tid } = filtrosAplicadosRef.current;
+        if (cid) params.set('clienteId', cid);
+        if (tid) params.set('transportistaId', tid);
         const data = await apiJson<ViajesPaginatedResponse>(
-          `/api/viajes/paginated?page=${page}&pageSize=${pageSize}`,
-          () => getToken(),
+          `/api/viajes/paginated?${params.toString()}`,
+          () => getTokenRef.current(),
         );
         if (!cancelled) {
           setRows(data.items);
@@ -162,7 +177,24 @@ export function ViajesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+  }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion]);
+
+  function aplicarFiltrosBuscar() {
+    filtrosAplicadosRef.current = {
+      clienteId: filtroClienteDraft.trim(),
+      transportistaId: filtroTransportistaDraft.trim(),
+    };
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function limpiarFiltrosListado() {
+    filtrosAplicadosRef.current = { clienteId: '', transportistaId: '' };
+    setFiltroClienteDraft('');
+    setFiltroTransportistaDraft('');
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -591,6 +623,64 @@ export function ViajesTenantPage() {
         </p>
       )}
 
+      <form
+        className="mt-6 rounded border border-black/10 bg-white shadow-sm p-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          aplicarFiltrosBuscar();
+        }}
+      >
+        <h2 className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire mb-3">
+          Filtros del listado
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
+          <div className="flex flex-col gap-1 min-w-0">
+            <label htmlFor="viajes-filtro-cliente" className="text-xs uppercase tracking-wider text-vialto-steel">
+              Cliente
+            </label>
+            <ClienteSearchSelect
+              id="viajes-filtro-cliente"
+              clientes={clientes}
+              value={filtroClienteDraft}
+              onChange={setFiltroClienteDraft}
+              allowEmptyValue
+              emptyListChoiceLabel="Todos"
+              placeholderCerrado="Todos los clientes"
+              aria-label="Filtrar por cliente"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-0">
+            <label htmlFor="viajes-filtro-transportista" className="text-xs uppercase tracking-wider text-vialto-steel">
+              Transportista externo
+            </label>
+            <TransportistaSearchSelect
+              id="viajes-filtro-transportista"
+              transportistas={transportistas}
+              value={filtroTransportistaDraft}
+              onChange={setFiltroTransportistaDraft}
+              placeholderCerrado="Todos"
+              emptyListChoiceLabel="Todos"
+              aria-label="Filtrar por transportista externo"
+            />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <button
+              type="submit"
+              className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite shrink-0"
+            >
+              Buscar
+            </button>
+            <button
+              type="button"
+              onClick={limpiarFiltrosListado}
+              className="self-start sm:self-auto text-[11px] text-vialto-steel hover:text-vialto-charcoal underline-offset-2 hover:underline py-0.5 px-0 bg-transparent border-0 cursor-pointer"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+      </form>
+
       <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
@@ -758,13 +848,24 @@ export function ViajesTenantPage() {
                 </td>
                 {!editingId && (
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(v)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Editar
-                    </button>
+                    <div className="inline-flex flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(v)}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Editar
+                      </button>
+                      {viajeEstadoPermiteBotonFacturar(v.estado) && (
+                        <button
+                          type="button"
+                          onClick={() => void navigateToFacturacion(v)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
+                        >
+                          Facturar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

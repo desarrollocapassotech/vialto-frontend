@@ -105,3 +105,14 @@ export function parseKmLitrosOpcionales(
   if (b.v !== undefined) out.litros = b.v;
   return { ok: true, ...out };
 }
+
+/**
+ * Listado de viajes: mostrar atajo «Facturar» solo si el viaje aún no está
+ * en facturado sin cobrar ni cobrado (incluye alias legados de API/BD).
+ */
+export function viajeEstadoPermiteBotonFacturar(estado: string): boolean {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return false;
+  if (e === 'finalizado_cobrado' || e === 'cobrado') return false;
+  return true;
+}
