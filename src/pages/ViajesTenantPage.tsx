@@ -77,7 +77,7 @@ type ViajeInlineDraft = {
   horaCarga: string;
   fechaDescarga: string;
   horaDescarga: string;
-  mercaderia: string;
+  detalleCarga: string;
   observaciones: string;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
@@ -262,7 +262,7 @@ export function ViajesTenantPage() {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
-      mercaderia: v.mercaderia ?? '',
+      detalleCarga: v.detalleCarga ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
       monedaMonto: normalizeViajeMoneda(v.monedaMonto),
@@ -506,7 +506,7 @@ export function ViajesTenantPage() {
           destino: draft.destino.trim() || undefined,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
-          mercaderia: draft.mercaderia.trim() || undefined,
+          detalleCarga: draft.detalleCarga.trim() || undefined,
           observaciones: draft.observaciones.trim() || undefined,
           monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
           monedaMonto: draft.monedaMonto,
@@ -950,8 +950,8 @@ export function ViajesTenantPage() {
                         </div>
                       )}
                       <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Mercadería</span>
-                        <textarea value={draft.mercaderia} onChange={(e) => setDraft((p) => (p ? { ...p, mercaderia: e.target.value } : p))} placeholder="Descripción de la carga" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
+                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Detalle de carga</span>
+                        <textarea value={draft.detalleCarga} onChange={(e) => setDraft((p) => (p ? { ...p, detalleCarga: e.target.value } : p))} placeholder="Ej. producto, bultos, temperatura, notas sobre la carga" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
                       </div>
                       <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                         <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>

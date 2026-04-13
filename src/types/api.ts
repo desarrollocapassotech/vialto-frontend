@@ -18,7 +18,7 @@ export interface Viaje {
   destino: string | null;
   fechaCarga: string | null;
   fechaDescarga: string | null;
-  mercaderia: string | null;
+  detalleCarga: string | null;
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
@@ -27,7 +27,6 @@ export interface Viaje {
   precioTransportistaExterno: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
-  documentacion: string[];
   observaciones: string | null;
   fechaFinalizado: string | null;
   createdAt: string;

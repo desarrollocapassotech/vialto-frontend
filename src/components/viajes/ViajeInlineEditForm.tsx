@@ -257,13 +257,13 @@ export function ViajeInlineEditForm({
             </div>
           )}
 
-          {/* Mercadería */}
+          {/* Detalle de carga */}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Mercadería</span>
+            <span className={LABEL}>Detalle de carga</span>
             <textarea
-              value={draft.mercaderia}
-              onChange={(e) => set({ mercaderia: e.target.value })}
-              placeholder="Descripción de la carga"
+              value={draft.detalleCarga}
+              onChange={(e) => set({ detalleCarga: e.target.value })}
+              placeholder="Ej. producto, bultos, temperatura, notas sobre la carga"
               className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
             />
           </div>

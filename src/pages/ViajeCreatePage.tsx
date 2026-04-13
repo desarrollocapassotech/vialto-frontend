@@ -81,7 +81,7 @@ export function ViajeCreatePage() {
   const [horaCarga, setHoraCarga] = useState('');
   const [fechaDescarga, setFechaDescarga] = useState('');
   const [horaDescarga, setHoraDescarga] = useState('');
-  const [mercaderia, setMercaderia] = useState('');
+  const [detalleCarga, setDetalleCarga] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
   const [litrosConsumidos, setLitrosConsumidos] = useState('');
@@ -287,7 +287,7 @@ export function ViajeCreatePage() {
           destino: destino.trim(),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
-          mercaderia: mercaderia.trim() || undefined,
+          detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           kmRecorridos:
             kmNum !== undefined && Number.isFinite(kmNum) ? kmNum : undefined,
@@ -553,11 +553,11 @@ export function ViajeCreatePage() {
             </div>
           )}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Mercadería</span>
+            <span className={fieldLabelClass}>Detalle de carga</span>
             <textarea
-              value={mercaderia}
-              onChange={(e) => setMercaderia(e.target.value)}
-              placeholder="Descripción de la carga"
+              value={detalleCarga}
+              onChange={(e) => setDetalleCarga(e.target.value)}
+              placeholder="Ej. producto, bultos, temperatura, notas sobre la carga"
               className={textareaLongClass}
             />
           </div>

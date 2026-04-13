@@ -22,7 +22,7 @@ export type ViajeInlineDraft = {
   horaCarga: string;
   fechaDescarga: string;
   horaDescarga: string;
-  mercaderia: string;
+  detalleCarga: string;
   observaciones: string;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
