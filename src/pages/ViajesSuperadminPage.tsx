@@ -6,6 +6,7 @@ import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { ViajeEstadoCelda } from '@/components/viajes/ViajeEstadoCelda';
+import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeInlineEditForm } from '@/components/viajes/ViajeInlineEditForm';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -37,13 +38,9 @@ import type {
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
 import { estadoViajeLabel } from '@/lib/viajesEstados';
+import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function toLocalDateTime(value?: string | null) {
-  if (!value) return '';
-  return new Date(value).toISOString().slice(0, 16);
-}
 
 function formatFechaCarga(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -207,6 +204,8 @@ export function ViajesSuperadminPage() {
       }
     }
     setViajeEditHint(partes.length ? partes.join(' ') : null);
+    const partesFc = isoToFechaHora(v.fechaCarga);
+    const partesFd = isoToFechaHora(v.fechaDescarga);
     setDraft({
       numero: v.numero ?? '',
       estado: v.estado ?? 'pendiente',
@@ -229,8 +228,10 @@ export function ViajesSuperadminPage() {
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
       destino: v.destino ?? '',
-      fechaCarga: toLocalDateTime(v.fechaCarga),
-      fechaDescarga: toLocalDateTime(v.fechaDescarga),
+      fechaCarga: partesFc.fecha,
+      horaCarga: partesFc.hora,
+      fechaDescarga: partesFd.fecha,
+      horaDescarga: partesFd.hora,
       mercaderia: v.mercaderia ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -242,7 +243,6 @@ export function ViajesSuperadminPage() {
         normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       ),
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
-      documentacionCsv: (v.documentacion ?? []).join(', '),
     });
   }
 
@@ -426,8 +426,8 @@ export function ViajesSuperadminPage() {
                 }),
             origen: draft.origen.trim() || undefined,
             destino: draft.destino.trim() || undefined,
-            fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
-            fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
+            fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
+            fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
             mercaderia: draft.mercaderia.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
             monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -439,7 +439,6 @@ export function ViajesSuperadminPage() {
               draft.monedaPrecioTransportistaExterno,
             ),
             monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
-            documentacion: draft.documentacionCsv.split(',').map((s) => s.trim()).filter(Boolean),
           }),
         },
       );
@@ -503,7 +502,7 @@ export function ViajesSuperadminPage() {
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <p role="alert" className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
@@ -619,13 +618,17 @@ export function ViajesSuperadminPage() {
                   </td>
 
                   {/* Fecha de carga */}
-                  <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums">
+                  <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums align-top">
                     {editingId === v.id && draft ? (
-                      <input
-                        type="datetime-local"
-                        value={draft.fechaCarga}
-                        onChange={(e) => setDraft((p) => p ? { ...p, fechaCarga: e.target.value } : p)}
-                        className="h-9 min-w-[10.5rem] border border-black/15 bg-white px-2 text-sm"
+                      <ViajeFechaHoraFields
+                        mode="cargaOnly"
+                        fechaCarga={draft.fechaCarga}
+                        horaCarga={draft.horaCarga}
+                        fechaDescarga={draft.fechaDescarga}
+                        horaDescarga={draft.horaDescarga}
+                        onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                        labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
+                        inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
                       />
                     ) : formatFechaCarga(v.fechaCarga)}
                   </td>
@@ -666,6 +669,7 @@ export function ViajesSuperadminPage() {
                     inconsistenciaHint={viajeEditHint}
                     tableColSpan={tableColSpan}
                     saving={savingId === v.id}
+                    formError={error}
                     onSave={() => saveInline(v.id)}
                     onCancel={cancelEdit}
                   />

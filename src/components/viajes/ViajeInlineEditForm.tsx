@@ -9,6 +9,7 @@ import {
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
+import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
 import { maskCurrencyForMoneda, type ViajeMonedaCodigo } from '@/lib/currencyMask';
 import {
@@ -34,6 +35,8 @@ type Props = {
   inconsistenciaHint?: string | null;
   tableColSpan: number;
   saving: boolean;
+  /** Error de validación o API; se muestra encima de los botones Guardar/Cancelar. */
+  formError?: string | null;
   onSave: () => void;
   onCancel: () => void;
 };
@@ -54,6 +57,7 @@ export function ViajeInlineEditForm({
   inconsistenciaHint,
   tableColSpan,
   saving,
+  formError,
   onSave,
   onCancel,
 }: Props) {
@@ -217,27 +221,15 @@ export function ViajeInlineEditForm({
             }
           />
 
-          {/* Fechas */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-            <div className="flex flex-col gap-1">
-              <span className={LABEL}>Fecha de carga</span>
-              <input
-                type="datetime-local"
-                value={draft.fechaCarga}
-                onChange={(e) => set({ fechaCarga: e.target.value })}
-                className={INPUT}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className={LABEL}>Fecha de descarga</span>
-              <input
-                type="datetime-local"
-                value={draft.fechaDescarga}
-                onChange={(e) => set({ fechaDescarga: e.target.value })}
-                className={INPUT}
-              />
-            </div>
-          </div>
+          <ViajeFechaHoraFields
+            fechaCarga={draft.fechaCarga}
+            horaCarga={draft.horaCarga}
+            fechaDescarga={draft.fechaDescarga}
+            horaDescarga={draft.horaDescarga}
+            onPatch={(p) => set(p)}
+            labelClassName={LABEL}
+            inputClassName={INPUT}
+          />
 
           {/* Km / Litros (solo en estados finales) */}
           {estadoMuestraKmLitros(draft.estado) && (
@@ -276,17 +268,6 @@ export function ViajeInlineEditForm({
             />
           </div>
 
-          {/* Documentación */}
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Documentación</span>
-            <textarea
-              value={draft.documentacionCsv}
-              onChange={(e) => set({ documentacionCsv: e.target.value })}
-              placeholder="URLs separadas por coma"
-              className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
-            />
-          </div>
-
           {/* Observaciones */}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={LABEL}>Observaciones</span>
@@ -298,6 +279,12 @@ export function ViajeInlineEditForm({
             />
           </div>
         </div>
+
+        {formError && (
+          <p role="alert" className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+            {formError}
+          </p>
+        )}
 
         {/* Acciones del form */}
         <div className="mt-3 inline-flex gap-2">

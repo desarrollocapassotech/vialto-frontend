@@ -72,7 +72,9 @@ export function ViajeKmLitrosDialog({
           </div>
         </div>
         {error && (
-          <p className="mt-3 text-xs text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
+          <p role="alert" className="mt-3 text-xs text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+            {error}
+          </p>
         )}
         <div className="mt-5 flex justify-end gap-2">
           <button

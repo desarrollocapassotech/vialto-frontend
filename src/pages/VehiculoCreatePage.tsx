@@ -7,6 +7,7 @@ import {
 } from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
@@ -70,7 +71,6 @@ const [loading, setLoading] = useState(false);
       title="Crear vehículo"
       backTo="/vehiculos"
       backLabel="← Volver a vehículos"
-      error={error}
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <label className="grid gap-1.5">
@@ -116,7 +116,8 @@ const [loading, setLoading] = useState(false);
           transportistas={transportistas ?? []}
           loadingTransportistas={transportistas === null}
         />
-<CrudSubmitButton loading={loading} label="Crear vehículo" />
+        <CrudFormErrorAlert message={error} />
+        <CrudSubmitButton loading={loading} label="Crear vehículo" />
       </form>
     </CrudPageLayout>
   );

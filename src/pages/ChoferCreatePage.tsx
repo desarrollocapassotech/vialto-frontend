@@ -7,6 +7,7 @@ import {
 } from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
@@ -64,7 +65,6 @@ export function ChoferCreatePage() {
       title="Crear chofer"
       backTo="/choferes"
       backLabel="← Volver a choferes"
-      error={error}
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <label className="grid gap-1.5">
@@ -96,6 +96,7 @@ export function ChoferCreatePage() {
           transportistas={transportistas ?? []}
           loadingTransportistas={transportistas === null}
         />
+        <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear chofer" />
       </form>
     </CrudPageLayout>

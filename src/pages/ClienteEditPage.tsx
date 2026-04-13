@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -114,7 +115,6 @@ export function ClienteEditPage() {
       title="Editar cliente"
       backTo="/clientes"
       backLabel="← Volver a clientes"
-      error={error}
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
@@ -177,6 +177,7 @@ export function ClienteEditPage() {
                 onChange={(e) => setDireccion(e.target.value)}
               />
             </label>
+            <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
           <CrudDangerZone

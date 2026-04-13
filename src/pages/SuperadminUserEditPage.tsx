@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
 import { CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
@@ -112,7 +113,6 @@ export function SuperadminUserEditPage() {
         title="Editar usuario"
         backTo={`/superadmin/usuarios${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`}
         backLabel="← Volver a usuarios"
-        error={error}
       >
         {initialLoading ? (
           <p className="mt-6 text-vialto-steel">Cargando…</p>
@@ -153,6 +153,7 @@ export function SuperadminUserEditPage() {
                   ))}
                 </CrudSelect>
               </label>
+              <CrudFormErrorAlert message={error} />
               <CrudSubmitButton loading={loading} label="Guardar cambios" />
             </form>
 

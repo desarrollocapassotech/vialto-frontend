@@ -8,6 +8,7 @@ import {
 } from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
@@ -134,7 +135,6 @@ const [confirmDelete, setConfirmDelete] = useState('');
       title="Editar vehículo"
       backTo="/vehiculos"
       backLabel="← Volver a vehículos"
-      error={error}
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
@@ -208,7 +208,8 @@ const [confirmDelete, setConfirmDelete] = useState('');
               transportistas={transportistas ?? []}
               loadingTransportistas={transportistas === null}
             />
-<CrudSubmitButton loading={loading} label="Guardar cambios" />
+            <CrudFormErrorAlert message={error} />
+            <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
           <CrudDangerZone
             message="Escribí la patente para eliminar este vehículo."

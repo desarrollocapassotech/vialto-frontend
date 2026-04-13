@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -123,7 +124,6 @@ export function TransportistaEditPage() {
       title="Editar transportista"
       backTo="/transportistas"
       backLabel="← Volver a transportistas"
-      error={error}
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
@@ -176,6 +176,7 @@ export function TransportistaEditPage() {
                 onChange={(e) => setTelefono(e.target.value)}
               />
             </label>
+            <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
 

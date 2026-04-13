@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
@@ -347,65 +348,57 @@ export function FacturacionSuperadminPage() {
         Vista de plataforma — seleccioná una empresa para ver sus facturas.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-end gap-4">
-        <div className="flex-1 min-w-[260px]">
-          <EmpresaFilterBar
-            tenants={tenants}
-            value={filtroEmpresa}
-            onChange={(v) => {
-              setFiltroEmpresa(v);
-              setCreating(false);
-              setDraft(emptyDraft());
-            }}
-          />
-        </div>
-        {filtroEmpresa && (
-          isEditing ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={cancelEdit}
-                disabled={savingEditId === editingId}
-                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={saveEdit}
-                disabled={savingEditId === editingId}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
-              >
-                {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setCreating((v) => !v);
+      <div className="mt-6 space-y-2">
+        {isEditing && filtroEmpresa && <CrudFormErrorAlert message={editError} />}
+        {!isEditing && filtroEmpresa && error && <CrudFormErrorAlert message={error} />}
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[260px]">
+            <EmpresaFilterBar
+              tenants={tenants}
+              value={filtroEmpresa}
+              onChange={(v) => {
+                setFiltroEmpresa(v);
+                setCreating(false);
                 setDraft(emptyDraft());
-                setDraftError(null);
               }}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              {creating ? 'Cancelar' : 'Nueva factura'}
-            </button>
-          )
-        )}
+            />
+          </div>
+          {filtroEmpresa && (
+            isEditing ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={savingEditId === editingId}
+                  className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  disabled={savingEditId === editingId}
+                  className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
+                >
+                  {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating((v) => !v);
+                  setDraft(emptyDraft());
+                  setDraftError(null);
+                }}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+              >
+                {creating ? 'Cancelar' : 'Nueva factura'}
+              </button>
+            )
+          )}
+        </div>
       </div>
-
-      {/* errores */}
-      {error && filtroEmpresa && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-      {editError && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {editError}
-        </p>
-      )}
 
       {/* sin empresa seleccionada */}
       {!filtroEmpresa && (
@@ -502,13 +495,9 @@ export function FacturacionSuperadminPage() {
             />
           </div>
 
-          {draftError && (
-            <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {draftError}
-            </p>
-          )}
-
-          <div className="col-span-full flex gap-3 pt-1">
+          <div className="col-span-full space-y-2 pt-1">
+            <CrudFormErrorAlert message={draftError} />
+            <div className="flex gap-3">
             <button
               type="submit"
               disabled={saving}
@@ -523,6 +512,7 @@ export function FacturacionSuperadminPage() {
             >
               Cancelar
             </button>
+            </div>
           </div>
         </form>
       )}

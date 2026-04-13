@@ -16,8 +16,12 @@ export type ViajeInlineDraft = {
   paisDestino: PaisCodigo;
   origen: string;
   destino: string;
+  /** `YYYY-MM-DD` */
   fechaCarga: string;
+  /** `HH:mm` o vacío (opcional). */
+  horaCarga: string;
   fechaDescarga: string;
+  horaDescarga: string;
   mercaderia: string;
   observaciones: string;
   monto: string;
@@ -26,7 +30,6 @@ export type ViajeInlineDraft = {
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
-  documentacionCsv: string;
 };
 
 export type KmLitrosPrompt =

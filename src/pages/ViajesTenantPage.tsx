@@ -36,7 +36,9 @@ import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
+import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion, type PaisCodigo } from '@/lib/ciudades';
+import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
@@ -72,7 +74,9 @@ type ViajeInlineDraft = {
   origen: string;
   destino: string;
   fechaCarga: string;
+  horaCarga: string;
   fechaDescarga: string;
+  horaDescarga: string;
   mercaderia: string;
   observaciones: string;
   monto: string;
@@ -81,7 +85,6 @@ type ViajeInlineDraft = {
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
-  documentacionCsv: string;
 };
 
 type ViajesPaginatedResponse = {
@@ -133,11 +136,6 @@ export function ViajesTenantPage() {
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
-
-  function toLocalDateTime(value?: string | null) {
-    if (!value) return '';
-    return new Date(value).toISOString().slice(0, 16);
-  }
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -236,6 +234,8 @@ export function ViajesTenantPage() {
       }
     }
     setViajeEditHint(partes.length ? partes.join(' ') : null);
+    const partesFc = isoToFechaHora(v.fechaCarga);
+    const partesFd = isoToFechaHora(v.fechaDescarga);
     setDraft({
       numero: v.numero ?? '',
       estado: v.estado ?? 'pendiente',
@@ -258,8 +258,10 @@ export function ViajesTenantPage() {
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
       destino: v.destino ?? '',
-      fechaCarga: toLocalDateTime(v.fechaCarga),
-      fechaDescarga: toLocalDateTime(v.fechaDescarga),
+      fechaCarga: partesFc.fecha,
+      horaCarga: partesFc.hora,
+      fechaDescarga: partesFd.fecha,
+      horaDescarga: partesFd.hora,
       mercaderia: v.mercaderia ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -271,7 +273,6 @@ export function ViajesTenantPage() {
         normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       ),
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
-      documentacionCsv: (v.documentacion ?? []).join(', '),
     });
   }
 
@@ -503,8 +504,8 @@ export function ViajesTenantPage() {
               }),
           origen: draft.origen.trim() || undefined,
           destino: draft.destino.trim() || undefined,
-          fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
-          fechaDescarga: draft.fechaDescarga ? new Date(draft.fechaDescarga).toISOString() : undefined,
+          fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
+          fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
           mercaderia: draft.mercaderia.trim() || undefined,
           observaciones: draft.observaciones.trim() || undefined,
           monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -516,10 +517,6 @@ export function ViajesTenantPage() {
             draft.monedaPrecioTransportistaExterno,
           ),
           monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
-          documentacion: draft.documentacionCsv
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
@@ -589,7 +586,7 @@ export function ViajesTenantPage() {
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <p role="alert" className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
@@ -740,13 +737,17 @@ export function ViajesTenantPage() {
                     (v.destino ?? '—')
                   )}
                 </td>
-                <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums">
+                <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums align-top">
                   {editingId === v.id && draft ? (
-                    <input
-                      type="datetime-local"
-                      value={draft.fechaCarga}
-                      onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))}
-                      className="h-9 min-w-[10.5rem] border border-black/15 bg-white px-2 text-sm"
+                    <ViajeFechaHoraFields
+                      mode="cargaOnly"
+                      fechaCarga={draft.fechaCarga}
+                      horaCarga={draft.horaCarga}
+                      fechaDescarga={draft.fechaDescarga}
+                      horaDescarga={draft.horaDescarga}
+                      onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                      labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
+                      inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
                     />
                   ) : (
                     formatFechaCargaCelda(v.fechaCarga)
@@ -927,16 +928,15 @@ export function ViajesTenantPage() {
                           </div>
                         }
                       />
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de carga</span>
-                          <input type="datetime-local" value={draft.fechaCarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaCarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de descarga</span>
-                          <input type="datetime-local" value={draft.fechaDescarga} onChange={(e) => setDraft((p) => (p ? { ...p, fechaDescarga: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                      </div>
+                      <ViajeFechaHoraFields
+                        fechaCarga={draft.fechaCarga}
+                        horaCarga={draft.horaCarga}
+                        fechaDescarga={draft.fechaDescarga}
+                        horaDescarga={draft.horaDescarga}
+                        onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                        labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
+                        inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                      />
                       {estadoMuestraKmLitros(draft.estado) && (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                           <div className="flex flex-col gap-1">
@@ -954,14 +954,15 @@ export function ViajesTenantPage() {
                         <textarea value={draft.mercaderia} onChange={(e) => setDraft((p) => (p ? { ...p, mercaderia: e.target.value } : p))} placeholder="Descripción de la carga" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
                       </div>
                       <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Documentación</span>
-                        <textarea value={draft.documentacionCsv} onChange={(e) => setDraft((p) => (p ? { ...p, documentacionCsv: e.target.value } : p))} placeholder="URLs separadas por coma" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
-                      </div>
-                      <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                         <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>
                         <textarea value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Notas adicionales" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
                       </div>
                     </div>
+                    {error && (
+                      <p role="alert" className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+                        {error}
+                      </p>
+                    )}
                     <div className="mt-3 inline-flex gap-2">
                       <button type="button" onClick={() => saveInline(v.id)} disabled={savingId === v.id} className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60">
                         {savingId === v.id ? 'Guardando…' : 'Guardar cambios'}

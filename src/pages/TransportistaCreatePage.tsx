@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -52,7 +53,6 @@ export function TransportistaCreatePage() {
       title="Crear transportista"
       backTo="/transportistas"
       backLabel="← Volver a transportistas"
-      error={error}
     >
       <form
         className="mt-6 grid gap-4"
@@ -101,6 +101,7 @@ export function TransportistaCreatePage() {
             onChange={(e) => setTelefono(e.target.value)}
           />
         </label>
+        <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear transportista" />
       </form>
     </CrudPageLayout>

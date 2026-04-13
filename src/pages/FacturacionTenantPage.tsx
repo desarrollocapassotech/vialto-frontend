@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -308,30 +309,30 @@ export function FacturacionTenantPage() {
       <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
 
       {/* acciones */}
-      <div className="mt-4 flex justify-end gap-2">
-        {isEditing ? (
-          <>
-            <button type="button" onClick={cancelEdit} disabled={savingEditId === editingId}
-              className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60">
-              Cerrar
+      <div className="mt-4 space-y-2">
+        {isEditing && <CrudFormErrorAlert message={editError} />}
+        {!isEditing && error && <CrudFormErrorAlert message={error} />}
+        <div className="flex justify-end gap-2">
+          {isEditing ? (
+            <>
+              <button type="button" onClick={cancelEdit} disabled={savingEditId === editingId}
+                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60">
+                Cerrar
+              </button>
+              <button type="button" onClick={saveEdit} disabled={savingEditId === editingId}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60">
+                {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </>
+          ) : (
+            <button type="button"
+              onClick={() => { setCreating((v) => !v); setDraft(emptyDraft()); setDraftError(null); }}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
+              {creating ? 'Cancelar' : 'Nueva factura'}
             </button>
-            <button type="button" onClick={saveEdit} disabled={savingEditId === editingId}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60">
-              {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
-            </button>
-          </>
-        ) : (
-          <button type="button"
-            onClick={() => { setCreating((v) => !v); setDraft(emptyDraft()); setDraftError(null); }}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
-            {creating ? 'Cancelar' : 'Nueva factura'}
-          </button>
-        )}
+          )}
+        </div>
       </div>
-
-      {/* errores */}
-      {error && <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
-      {editError && <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{editError}</p>}
 
       {/* formulario de creación */}
       {creating && !isEditing && (
@@ -402,11 +403,9 @@ export function FacturacionTenantPage() {
               onChange={(ids) => setD({ viajeIds: ids })} />
           </div>
 
-          {draftError && (
-            <p className="col-span-full text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{draftError}</p>
-          )}
-
-          <div className="col-span-full flex gap-3 pt-1">
+          <div className="col-span-full space-y-2 pt-1">
+            <CrudFormErrorAlert message={draftError} />
+            <div className="flex gap-3">
             <button type="submit" disabled={saving}
               className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50">
               {saving ? 'Guardando…' : 'Guardar'}
@@ -415,6 +414,7 @@ export function FacturacionTenantPage() {
               className="h-9 px-4 border border-black/20 text-sm uppercase tracking-wider hover:bg-vialto-mist">
               Cancelar
             </button>
+            </div>
           </div>
         </form>
       )}

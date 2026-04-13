@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
@@ -79,7 +80,6 @@ export function SuperadminUserCreatePage() {
         title="Crear usuario"
         backTo={`/superadmin/usuarios${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`}
         backLabel="← Volver a usuarios"
-        error={error}
       >
         <form
           className="mt-6 grid gap-4"
@@ -142,6 +142,7 @@ export function SuperadminUserCreatePage() {
               </button>
             </div>
           </label>
+          <CrudFormErrorAlert message={error} />
           <CrudSubmitButton loading={loading} label="Crear usuario" />
         </form>
       </CrudPageLayout>

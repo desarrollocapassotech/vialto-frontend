@@ -15,6 +15,7 @@ import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { apiJson } from '@/lib/api';
 import {
@@ -43,6 +44,7 @@ import {
   parseKmLitrosOpcionales,
   VIAJE_ESTADOS_ALTA,
 } from '@/lib/viajesEstados';
+import { fechaHoraToIso } from '@/lib/viajeFechaHora';
 import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 
@@ -76,7 +78,9 @@ export function ViajeCreatePage() {
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState('');
   const [fechaCarga, setFechaCarga] = useState('');
+  const [horaCarga, setHoraCarga] = useState('');
   const [fechaDescarga, setFechaDescarga] = useState('');
+  const [horaDescarga, setHoraDescarga] = useState('');
   const [mercaderia, setMercaderia] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
@@ -86,7 +90,6 @@ export function ViajeCreatePage() {
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>('ARS');
-  const [documentacionCsv, setDocumentacionCsv] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingRefs, setLoadingRefs] = useState(true);
   const [refreshingFlota, setRefreshingFlota] = useState(false);
@@ -282,8 +285,8 @@ export function ViajeCreatePage() {
               }),
           origen: origen.trim(),
           destino: destino.trim(),
-          fechaCarga: fechaCarga ? new Date(fechaCarga).toISOString() : undefined,
-          fechaDescarga: fechaDescarga ? new Date(fechaDescarga).toISOString() : undefined,
+          fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
+          fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
           mercaderia: mercaderia.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           kmRecorridos:
@@ -297,10 +300,6 @@ export function ViajeCreatePage() {
             monedaPrecioTransportista,
           ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-          documentacion: documentacionCsv
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
         }),
       });
       navigate('/viajes', { replace: true });
@@ -330,7 +329,6 @@ export function ViajeCreatePage() {
       title="Crear viaje"
       backTo="/viajes"
       backLabel="← Volver a viajes"
-      error={error}
     >
       {loadingRefs ? (
         <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
@@ -516,26 +514,20 @@ export function ViajeCreatePage() {
               </div>
             }
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Fecha de carga</span>
-              <input
-                type="datetime-local"
-                value={fechaCarga}
-                onChange={(e) => setFechaCarga(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Fecha de descarga</span>
-              <input
-                type="datetime-local"
-                value={fechaDescarga}
-                onChange={(e) => setFechaDescarga(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          <ViajeFechaHoraFields
+            fechaCarga={fechaCarga}
+            horaCarga={horaCarga}
+            fechaDescarga={fechaDescarga}
+            horaDescarga={horaDescarga}
+            onPatch={(p) => {
+              if (p.fechaCarga !== undefined) setFechaCarga(p.fechaCarga);
+              if (p.horaCarga !== undefined) setHoraCarga(p.horaCarga);
+              if (p.fechaDescarga !== undefined) setFechaDescarga(p.fechaDescarga);
+              if (p.horaDescarga !== undefined) setHoraDescarga(p.horaDescarga);
+            }}
+            labelClassName={fieldLabelClass}
+            inputClassName={inputClass}
+          />
           {estadoMuestraKmLitros(estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               <div className="flex flex-col gap-1">
@@ -570,15 +562,6 @@ export function ViajeCreatePage() {
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Documentación</span>
-            <textarea
-              value={documentacionCsv}
-              onChange={(e) => setDocumentacionCsv(e.target.value)}
-              placeholder="URLs separadas por coma"
-              className={textareaLongClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={fieldLabelClass}>Observaciones</span>
             <textarea
               value={observaciones}
@@ -588,6 +571,13 @@ export function ViajeCreatePage() {
             />
           </div>
 
+          {error && (
+            <div className="md:col-span-2 lg:col-span-3">
+              <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+                {error}
+              </p>
+            </div>
+          )}
           <div className="md:col-span-2 lg:col-span-3 pt-2">
             <CrudSubmitButton
               loading={loading}

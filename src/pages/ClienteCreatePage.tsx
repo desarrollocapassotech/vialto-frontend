@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -54,7 +55,6 @@ export function ClienteCreatePage() {
       title="Crear cliente"
       backTo="/clientes"
       backLabel="← Volver a clientes"
-      error={error}
     >
       <form
         className="mt-6 grid gap-4"
@@ -113,6 +113,7 @@ export function ClienteCreatePage() {
             onChange={(e) => setDireccion(e.target.value)}
           />
         </label>
+        <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear cliente" />
       </form>
     </CrudPageLayout>
