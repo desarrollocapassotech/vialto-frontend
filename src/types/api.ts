@@ -60,6 +60,8 @@ export interface Vehiculo {
   marca: string | null;
   modelo: string | null;
   año: number | null;
+  /** Respuesta JSON de Prisma/Nest usa `anio`. */
+  anio?: number | null;
   kmActual: number;
   transportistaId: string | null;
   createdAt: string;
@@ -72,6 +74,8 @@ export interface Transportista {
   cuit: string | null;
   email: string | null;
   telefono: string | null;
+  /** En API siempre `externo` para subcontratistas; flota propia = sin vínculo en chofer/vehículo. */
+  tipo?: string;
   createdAt: string;
 }
 

@@ -1,9 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 
@@ -14,18 +19,24 @@ export function VehiculoCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const transportistas = useTransportistasList(tenantId || undefined);
   const [patente, setPatente] = useState('');
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>('camion');
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState('');
-  const [kmActual, setKmActual] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
+  const [transportistaId, setTransportistaId] = useState('');
+const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
     if (!patente.trim()) {
       setError('Ingresá la patente.');
+      return;
+    }
+    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
+      setError('Seleccioná un transportista o elegí flota propia.');
       return;
     }
     setLoading(true);
@@ -42,7 +53,8 @@ export function VehiculoCreatePage() {
           marca: marca.trim() || undefined,
           modelo: modelo.trim() || undefined,
           anio: anio ? Number(anio) : undefined,
-          kmActual: kmActual ? Number(kmActual) : undefined,
+          transportistaId:
+            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       navigate('/vehiculos', { replace: true });
@@ -93,13 +105,18 @@ export function VehiculoCreatePage() {
           </span>
           <CrudInput type="number" placeholder="Ej: 2020" value={anio} onChange={(e) => setAnio(e.target.value)} />
         </label>
-        <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Km actual
-          </span>
-          <CrudInput type="number" placeholder="Ej: 120000" value={kmActual} onChange={(e) => setKmActual(e.target.value)} />
-        </label>
-        <CrudSubmitButton loading={loading} label="Crear vehículo" />
+        <TransportistaAsignacionFields
+          modo={modoAsignacion}
+          onModoChange={(m) => {
+            setModoAsignacion(m);
+            if (m === 'propio') setTransportistaId('');
+          }}
+          transportistaId={transportistaId}
+          onTransportistaIdChange={setTransportistaId}
+          transportistas={transportistas ?? []}
+          loadingTransportistas={transportistas === null}
+        />
+<CrudSubmitButton loading={loading} label="Crear vehículo" />
       </form>
     </CrudPageLayout>
   );

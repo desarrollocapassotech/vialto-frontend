@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -13,7 +13,13 @@ import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { apiJson } from '@/lib/api';
 import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
-import { flotaPropiaListaValida, normalizarIdEnLista } from '@/lib/viajesFlota';
+import {
+  choferesFlotaPropia,
+  flotaPropiaListaValida,
+  mensajesAyudaFlotaPropia,
+  normalizarIdEnLista,
+  vehiculosFlotaPropia,
+} from '@/lib/viajesFlota';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -99,7 +105,8 @@ export function ViajeCreatePage() {
           setTransportistas(transportistasData);
           setVehiculos(vehiculosData);
           if (clientesData.length > 0) setClienteId(clientesData[0].id);
-          if (choferesData.length > 0) setChoferId(choferesData[0].id);
+          const cp = choferesFlotaPropia(choferesData);
+          if (cp.length > 0) setChoferId(cp[0].id);
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'viajes'));
@@ -112,11 +119,18 @@ export function ViajeCreatePage() {
     };
   }, [getToken, tenantId]);
 
+  const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
+  const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
+  const ayudaFlota = useMemo(
+    () => mensajesAyudaFlotaPropia(choferes, vehiculos),
+    [choferes, vehiculos],
+  );
+
   useEffect(() => {
     if (modoOperacion !== 'propio') return;
-    setChoferId((prev) => normalizarIdEnLista(prev, choferes));
-    setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculos));
-  }, [modoOperacion, choferes, vehiculos]);
+    setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
+    setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculosPropios));
+  }, [modoOperacion, choferesPropios, vehiculosPropios]);
 
   function applyModoOperacion(m: ViajeOperacionModo) {
     setModoOperacion(m);
@@ -125,8 +139,8 @@ export function ViajeCreatePage() {
       setVehiculoId('');
     } else {
       setTransportistaId('');
-      setChoferId((prev) => normalizarIdEnLista(prev, choferes));
-      setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculos));
+      setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
+      setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculosPropios));
     }
   }
 
@@ -141,7 +155,7 @@ export function ViajeCreatePage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
-    if (!externo && !flotaPropiaListaValida(choferId, vehiculoId, choferes, vehiculos)) {
+    if (!externo && !flotaPropiaListaValida(choferId, vehiculoId, choferesPropios, vehiculosPropios)) {
       setError('En flota propia, elegí chofer y vehículo de las listas (si no aparecen, cargá la página).');
       return;
     }
@@ -358,68 +372,86 @@ export function ViajeCreatePage() {
             modo={modoOperacion}
             onModoChange={applyModoOperacion}
             externoContent={
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={fieldLabelClass}>Transportista externo</span>
-                  <select
-                    value={transportistaId}
-                    onChange={(e) => setTransportistaId(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Elegí un transportista…</option>
-                    {transportistas.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nombre}
-                      </option>
-                    ))}
-                  </select>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Transportista externo</span>
+                    <select
+                      value={transportistaId}
+                      onChange={(e) => setTransportistaId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Elegí un transportista…</option>
+                      {transportistas.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Precio transportista externo</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={precioTransportistaExterno}
+                      onChange={(e) => setPrecioTransportistaExterno(maskCurrencyArInput(e.target.value))}
+                      placeholder="Ej. 1.200.000,50"
+                      className={`${inputClass} text-right tabular-nums`}
+                    />
+                  </div>
                 </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={fieldLabelClass}>Precio transportista externo</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={precioTransportistaExterno}
-                    onChange={(e) => setPrecioTransportistaExterno(maskCurrencyArInput(e.target.value))}
-                    placeholder="Ej. 1.200.000,50"
-                    className={`${inputClass} text-right tabular-nums`}
-                  />
-                </div>
+                <p className="text-xs text-vialto-steel md:col-span-2">
+                  En esta modalidad el viaje queda a cargo del transportista elegido; chofer y vehículo no se
+                  guardan en el viaje (podés mantenerlos actualizados en sus fichas).
+                </p>
               </div>
             }
             propioContent={
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={fieldLabelClass}>Chofer</span>
-                  <select
-                    value={choferId}
-                    onChange={(e) => setChoferId(e.target.value)}
-                    className={inputClass}
-                  >
-                    {choferes.length === 0 && <option value="">Sin choferes</option>}
-                    {choferes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Chofer (flota propia)</span>
+                    <select
+                      value={choferId}
+                      onChange={(e) => setChoferId(e.target.value)}
+                      className={inputClass}
+                    >
+                      {choferesPropios.length === 0 && <option value="">Sin choferes de flota propia</option>}
+                      {choferesPropios.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {ayudaFlota.chofer && (
+                      <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Vehículo (flota propia)</span>
+                    <select
+                      value={vehiculoId}
+                      onChange={(e) => setVehiculoId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Elegí un vehículo…</option>
+                      {vehiculosPropios.map((vh) => (
+                        <option key={vh.id} value={vh.id}>
+                          {vh.patente}
+                        </option>
+                      ))}
+                    </select>
+                    {ayudaFlota.vehiculo && (
+                      <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={fieldLabelClass}>Vehículo</span>
-                  <select
-                    value={vehiculoId}
-                    onChange={(e) => setVehiculoId(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Elegí un vehículo…</option>
-                    {vehiculos.map((vh) => (
-                      <option key={vh.id} value={vh.id}>
-                        {vh.patente}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-xs text-vialto-steel">
+                  Solo se listan choferes y vehículos marcados como flota propia en su ficha (sin transportista
+                  externo).
+                </p>
               </div>
             }
           />

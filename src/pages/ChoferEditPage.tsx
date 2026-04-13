@@ -2,9 +2,14 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer } from '@/types/api';
@@ -15,11 +20,12 @@ export function ChoferEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const transportistas = useTransportistasList(tenantId || undefined);
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
-  const [licencia, setLicencia] = useState('');
-  const [licenciaVence, setLicenciaVence] = useState('');
-  const [telefono, setTelefono] = useState('');
+const [telefono, setTelefono] = useState('');
+  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
+  const [transportistaId, setTransportistaId] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -41,9 +47,10 @@ export function ChoferEditPage() {
         if (!cancelled) {
           setNombre(row.nombre);
           setDni(row.dni ?? '');
-          setLicencia(row.licencia ?? '');
-          setLicenciaVence(row.licenciaVence?.slice(0, 10) ?? '');
           setTelefono(row.telefono ?? '');
+          const tid = row.transportistaId;
+          setModoAsignacion(tid ? 'externo' : 'propio');
+          setTransportistaId(tid ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'choferes'));
@@ -62,6 +69,10 @@ export function ChoferEditPage() {
       setError('Ingresá el nombre del chofer.');
       return;
     }
+    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
+      setError('Seleccioná un transportista o elegí flota propia.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -75,9 +86,9 @@ export function ChoferEditPage() {
         body: JSON.stringify({
           nombre: nombre.trim(),
           dni: dni.trim() || undefined,
-          licencia: licencia.trim() || undefined,
-          licenciaVence: licenciaVence || undefined,
           telefono: telefono.trim() || undefined,
+          transportistaId:
+            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       navigate('/choferes', { replace: true });
@@ -141,27 +152,7 @@ export function ChoferEditPage() {
                 onChange={(e) => setDni(e.target.value)}
               />
             </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Licencia
-              </span>
-              <CrudInput
-                value={licencia}
-                placeholder="Ej: C3"
-                onChange={(e) => setLicencia(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Vencimiento licencia
-              </span>
-              <CrudInput
-                type="date"
-                value={licenciaVence}
-                onChange={(e) => setLicenciaVence(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
+<label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
                 Teléfono
               </span>
@@ -171,6 +162,17 @@ export function ChoferEditPage() {
                 onChange={(e) => setTelefono(e.target.value)}
               />
             </label>
+            <TransportistaAsignacionFields
+              modo={modoAsignacion}
+              onModoChange={(m) => {
+                setModoAsignacion(m);
+                if (m === 'propio') setTransportistaId('');
+              }}
+              transportistaId={transportistaId}
+              onTransportistaIdChange={setTransportistaId}
+              transportistas={transportistas ?? []}
+              loadingTransportistas={transportistas === null}
+            />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
           <CrudDangerZone

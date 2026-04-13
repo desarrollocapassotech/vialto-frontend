@@ -1,18 +1,15 @@
 /**
  * Origen del API (sin `/api` final; las rutas ya llevan `/api/...`).
  *
- * En desarrollo, por defecto se usa `http://localhost:8080` para hablar **directo**
- * con Nest (CORS ya permitido en el backend). Así se evitan 404 del proxy de Vite
- * con rutas como `/api/platform/viajes?tenantId=...` (superadmin).
+ * En desarrollo, por defecto se usa **origen relativo** (`''`) para que el fetch vaya al
+ * mismo host que Vite (p. ej. `localhost:5173`) y el proxy de Vite reenvíe a Nest.
+ * Así el `Authorization: Bearer` no depende de CORS entre puertos (evita 401 "Token requerido").
  *
- * Podés forzar con `VITE_API_URL` (p. ej. otro puerto o túnel).
+ * Para hablar directo con otro host (túnel, otro puerto), definí `VITE_API_URL`.
  */
 function baseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
   if (configured) return configured;
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8080';
-  }
   return '';
 }
 

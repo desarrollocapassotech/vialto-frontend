@@ -1,18 +1,28 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
 import { labelVehiculoTipo } from '@/lib/labels';
+import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
+import { friendlyError } from '@/lib/friendlyError';
 import type { ConEmpresa, Vehiculo } from '@/types/api';
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const transportistas = useTransportistasList(
+    filtroEmpresa || undefined,
+    !filtroEmpresa,
+  );
+  const nombresTransportistas = useMemo(
+    () => mapTransportistaNombres(transportistas ?? []),
+    [transportistas],
+  );
   const [rows, setRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -90,27 +100,28 @@ export function VehiculosSuperadminPage() {
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3">Patente</th>
               <th className="px-4 py-3">Tipo y marca</th>
+              <th className="px-4 py-3">Pertenencia</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {!filtroEmpresa && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
                   Seleccioná una empresa para ver los vehículos.
                 </td>
               </tr>
             )}
             {filtroEmpresa && rows === null && !error && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
                   No hay vehículos cargados para esta empresa.
                 </td>
               </tr>
@@ -127,6 +138,9 @@ export function VehiculosSuperadminPage() {
                   <td className="px-4 py-3 text-vialto-steel">
                     {labelVehiculoTipo(v.tipo)}
                     {v.marca ? ` · ${v.marca}` : ''}
+                  </td>
+                  <td className="px-4 py-3 text-vialto-steel">
+                    {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link

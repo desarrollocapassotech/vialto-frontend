@@ -2,9 +2,14 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Vehiculo } from '@/types/api';
@@ -17,13 +22,15 @@ export function VehiculoEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const transportistas = useTransportistasList(tenantId || undefined);
   const [patente, setPatente] = useState('');
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>('camion');
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState('');
-  const [kmActual, setKmActual] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState('');
+  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
+  const [transportistaId, setTransportistaId] = useState('');
+const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -46,8 +53,11 @@ export function VehiculoEditPage() {
           setTipo((TIPOS.includes(row.tipo as any) ? row.tipo : 'camion') as (typeof TIPOS)[number]);
           setMarca(row.marca ?? '');
           setModelo(row.modelo ?? '');
-          setAnio(row.año != null ? String(row.año) : '');
-          setKmActual(String(row.kmActual ?? 0));
+          const añoVal = row.año ?? row.anio;
+          setAnio(añoVal != null ? String(añoVal) : '');
+          const tid = row.transportistaId;
+          setModoAsignacion(tid ? 'externo' : 'propio');
+          setTransportistaId(tid ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'vehiculos'));
@@ -66,6 +76,10 @@ export function VehiculoEditPage() {
       setError('Ingresá la patente.');
       return;
     }
+    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
+      setError('Seleccioná un transportista o elegí flota propia.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -82,7 +96,8 @@ export function VehiculoEditPage() {
           marca: marca.trim() || undefined,
           modelo: modelo.trim() || undefined,
           anio: anio ? Number(anio) : undefined,
-          kmActual: kmActual ? Number(kmActual) : undefined,
+          transportistaId:
+            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       navigate('/vehiculos', { replace: true });
@@ -182,18 +197,18 @@ export function VehiculoEditPage() {
                 onChange={(e) => setAnio(e.target.value)}
               />
             </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Km actual
-              </span>
-              <CrudInput
-                type="number"
-                placeholder="Ej: 120000"
-                value={kmActual}
-                onChange={(e) => setKmActual(e.target.value)}
-              />
-            </label>
-            <CrudSubmitButton loading={loading} label="Guardar cambios" />
+            <TransportistaAsignacionFields
+              modo={modoAsignacion}
+              onModoChange={(m) => {
+                setModoAsignacion(m);
+                if (m === 'propio') setTransportistaId('');
+              }}
+              transportistaId={transportistaId}
+              onTransportistaIdChange={setTransportistaId}
+              transportistas={transportistas ?? []}
+              loadingTransportistas={transportistas === null}
+            />
+<CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
           <CrudDangerZone
             message="Escribí la patente para eliminar este vehículo."

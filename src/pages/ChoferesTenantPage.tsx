@@ -1,7 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
+import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer, PaginatedMeta } from '@/types/api';
 
@@ -12,6 +14,11 @@ type ChoferesPaginatedResponse = {
 
 export function ChoferesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const transportistas = useTransportistasList();
+  const nombresTransportistas = useMemo(
+    () => mapTransportistaNombres(transportistas ?? []),
+    [transportistas],
+  );
   const [rows, setRows] = useState<Chofer[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,20 +81,21 @@ export function ChoferesTenantPage() {
               <th className="px-4 py-3">DNI</th>
               <th className="px-4 py-3">Licencia</th>
               <th className="px-4 py-3">Teléfono</th>
+              <th className="px-4 py-3">Pertenencia</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Todavía no tenés choferes cargados.
                 </td>
               </tr>
@@ -98,6 +106,9 @@ export function ChoferesTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">{c.dni ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.licencia ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
+                <td className="px-4 py-3 text-vialto-steel">
+                  {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
+                </td>
                 <td className="px-4 py-3 text-right">
                   <Link
                     to={`/choferes/${encodeURIComponent(c.id)}/editar`}

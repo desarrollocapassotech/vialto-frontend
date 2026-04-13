@@ -10,7 +10,7 @@ import { friendlyError } from '@/lib/friendlyError';
 import type { Transportista } from '@/types/api';
 
 export function TransportistaEditPage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -27,16 +27,28 @@ export function TransportistaEditPage() {
 
   useEffect(() => {
     if (!id) return;
+    if (!isLoaded || !isSignedIn) return;
+
     let cancelled = false;
     setInitialLoading(true);
     (async () => {
       try {
-        const path = tenantId
+        const token = await getToken();
+        if (!token) {
+          if (!cancelled) {
+            setError('No hay sesión con el servidor. Recargá la página o volvé a iniciar sesión.');
+            setInitialLoading(false);
+          }
+          return;
+        }
+        const withToken = async () => token;
+
+        const detailPath = tenantId
           ? `/api/platform/transportistas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
               tenantId,
             )}`
           : `/api/transportistas/${encodeURIComponent(id)}`;
-        const row = await apiJson<Transportista>(path, () => getToken());
+        const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
           setNombre(row.nombre);
           setCuit(row.cuit ?? '');
@@ -52,7 +64,7 @@ export function TransportistaEditPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, id, tenantId]);
+  }, [getToken, id, tenantId, isLoaded, isSignedIn]);
 
   async function onSave() {
     if (!id) return;
@@ -166,6 +178,7 @@ export function TransportistaEditPage() {
             </label>
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>
+
           <CrudDangerZone
             message="Para eliminar este transportista, escribí su nombre exacto."
             confirmValue={confirmDelete}

@@ -1,9 +1,15 @@
+import { useMemo } from 'react';
 import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { maskCurrencyArInput } from '@/lib/currencyMask';
-import { normalizarIdEnLista } from '@/lib/viajesFlota';
+import {
+  choferesFlotaPropia,
+  mensajesAyudaFlotaPropia,
+  normalizarIdEnLista,
+  vehiculosFlotaPropia,
+} from '@/lib/viajesFlota';
 import { estadoMuestraKmLitros } from '@/lib/viajesEstados';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
@@ -15,6 +21,8 @@ type Props = {
   choferes: Chofer[];
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
+  /** Aviso si el viaje tenía chofer/vehículo incompatible con flota propia al abrir edición. */
+  inconsistenciaHint?: string | null;
   tableColSpan: number;
   saving: boolean;
   onSave: () => void;
@@ -33,11 +41,19 @@ export function ViajeInlineEditForm({
   choferes,
   transportistas,
   vehiculos,
+  inconsistenciaHint,
   tableColSpan,
   saving,
   onSave,
   onCancel,
 }: Props) {
+  const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
+  const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
+  const ayudaFlota = useMemo(
+    () => mensajesAyudaFlotaPropia(choferes, vehiculos),
+    [choferes, vehiculos],
+  );
+
   function set(patch: Partial<ViajeInlineDraft>) {
     setDraft((p) => (p ? { ...p, ...patch } : p));
   }
@@ -52,8 +68,8 @@ export function ViajeInlineEditForm({
           ? { choferId: '', vehiculoId: '' }
           : {
               transportistaId: '',
-              choferId: normalizarIdEnLista(p.choferId, choferes),
-              vehiculoId: normalizarIdEnLista(p.vehiculoId, vehiculos),
+              choferId: normalizarIdEnLista(p.choferId, choferesPropios),
+              vehiculoId: normalizarIdEnLista(p.vehiculoId, vehiculosPropios),
             }),
       };
     });
@@ -98,63 +114,86 @@ export function ViajeInlineEditForm({
             onModoChange={applyModo}
             groupName={`viaje-op-sa-${draft.numero || 'edit'}`}
             externoContent={
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={LABEL}>Transportista externo</span>
-                  <select
-                    value={draft.transportistaId}
-                    onChange={(e) => set({ transportistaId: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">Elegí un transportista…</option>
-                    {transportistas.map((t) => (
-                      <option key={t.id} value={t.id}>{t.nombre}</option>
-                    ))}
-                  </select>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Transportista externo</span>
+                    <select
+                      value={draft.transportistaId}
+                      onChange={(e) => set({ transportistaId: e.target.value })}
+                      className={INPUT}
+                    >
+                      <option value="">Elegí un transportista…</option>
+                      {transportistas.map((t) => (
+                        <option key={t.id} value={t.id}>{t.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Precio transportista externo</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={draft.precioTransportistaExterno}
+                      onChange={(e) =>
+                        set({ precioTransportistaExterno: maskCurrencyArInput(e.target.value) })
+                      }
+                      placeholder="Ej. 1.200.000,50"
+                      className={`${INPUT} text-right tabular-nums`}
+                    />
+                  </div>
                 </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={LABEL}>Precio transportista externo</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={draft.precioTransportistaExterno}
-                    onChange={(e) =>
-                      set({ precioTransportistaExterno: maskCurrencyArInput(e.target.value) })
-                    }
-                    placeholder="Ej. 1.200.000,50"
-                    className={`${INPUT} text-right tabular-nums`}
-                  />
-                </div>
+                <p className="text-xs text-vialto-steel">
+                  El viaje queda a cargo del transportista elegido; chofer y vehículo no se guardan en el
+                  viaje.
+                </p>
               </div>
             }
             propioContent={
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={LABEL}>Chofer</span>
-                  <select
-                    value={draft.choferId}
-                    onChange={(e) => set({ choferId: e.target.value })}
-                    className={INPUT}
-                  >
-                    {choferes.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Chofer (flota propia)</span>
+                    <select
+                      value={draft.choferId}
+                      onChange={(e) => set({ choferId: e.target.value })}
+                      className={INPUT}
+                    >
+                      {choferesPropios.length === 0 && (
+                        <option value="">Sin choferes de flota propia</option>
+                      )}
+                      {choferesPropios.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                    {ayudaFlota.chofer && (
+                      <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Vehículo (flota propia)</span>
+                    <select
+                      value={draft.vehiculoId}
+                      onChange={(e) => set({ vehiculoId: e.target.value })}
+                      className={INPUT}
+                    >
+                      <option value="">Elegí un vehículo…</option>
+                      {vehiculosPropios.map((vh) => (
+                        <option key={vh.id} value={vh.id}>{vh.patente}</option>
+                      ))}
+                    </select>
+                    {ayudaFlota.vehiculo && (
+                      <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={LABEL}>Vehículo</span>
-                  <select
-                    value={draft.vehiculoId}
-                    onChange={(e) => set({ vehiculoId: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">Elegí un vehículo…</option>
-                    {vehiculos.map((vh) => (
-                      <option key={vh.id} value={vh.id}>{vh.patente}</option>
-                    ))}
-                  </select>
-                </div>
+                {inconsistenciaHint ? (
+                  <p className="text-xs text-amber-800/90">{inconsistenciaHint}</p>
+                ) : null}
+                <p className="text-xs text-vialto-steel">
+                  Solo choferes y vehículos con «Flota propia» en su ficha (sin transportista externo).
+                </p>
               </div>
             }
           />

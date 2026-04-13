@@ -1,9 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 
@@ -12,17 +17,22 @@ export function ChoferCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const transportistas = useTransportistasList(tenantId || undefined);
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
-  const [licencia, setLicencia] = useState('');
-  const [licenciaVence, setLicenciaVence] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
+  const [transportistaId, setTransportistaId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
     if (!nombre.trim()) {
       setError('Ingresá el nombre del chofer.');
+      return;
+    }
+    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
+      setError('Seleccioná un transportista o elegí flota propia.');
       return;
     }
     setLoading(true);
@@ -36,9 +46,9 @@ export function ChoferCreatePage() {
         body: JSON.stringify({
           nombre: nombre.trim(),
           dni: dni.trim() || undefined,
-          licencia: licencia.trim() || undefined,
-          licenciaVence: licenciaVence || undefined,
           telefono: telefono.trim() || undefined,
+          transportistaId:
+            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       navigate('/choferes', { replace: true });
@@ -69,24 +79,23 @@ export function ChoferCreatePage() {
           </span>
           <CrudInput placeholder="Ej: 30123456" value={dni} onChange={(e) => setDni(e.target.value)} />
         </label>
-        <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Licencia
-          </span>
-          <CrudInput placeholder="Ej: C3" value={licencia} onChange={(e) => setLicencia(e.target.value)} />
-        </label>
-        <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Vencimiento licencia
-          </span>
-          <CrudInput type="date" value={licenciaVence} onChange={(e) => setLicenciaVence(e.target.value)} />
-        </label>
-        <label className="grid gap-1.5">
+<label className="grid gap-1.5">
           <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
             Teléfono
           </span>
           <CrudInput placeholder="Ej: +54 9 11 1234-5678" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         </label>
+        <TransportistaAsignacionFields
+          modo={modoAsignacion}
+          onModoChange={(m) => {
+            setModoAsignacion(m);
+            if (m === 'propio') setTransportistaId('');
+          }}
+          transportistaId={transportistaId}
+          onTransportistaIdChange={setTransportistaId}
+          transportistas={transportistas ?? []}
+          loadingTransportistas={transportistas === null}
+        />
         <CrudSubmitButton loading={loading} label="Crear chofer" />
       </form>
     </CrudPageLayout>

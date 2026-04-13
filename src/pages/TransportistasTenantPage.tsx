@@ -37,10 +37,10 @@ export function TransportistasTenantPage() {
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Transportistas
+        Transportistas externos
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Gestión de transportistas externos del tenant.
+        Gestión de los transportistas externos (fleteros).
       </p>
       <div className="mt-4 flex justify-end">
         <Link
