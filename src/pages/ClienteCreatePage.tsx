@@ -63,31 +63,56 @@ export function ClienteCreatePage() {
           onSubmit();
         }}
       >
-        <CrudInput
-          placeholder="Nombre *"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-        />
-        <CrudInput
-          placeholder="CUIT"
-          value={cuit}
-          onChange={(e) => setCuit(e.target.value)}
-        />
-        <CrudInput
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <CrudInput
-          placeholder="Teléfono"
-          value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
-        />
-        <CrudInput
-          placeholder="Dirección"
-          value={direccion}
-          onChange={(e) => setDireccion(e.target.value)}
-        />
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Nombre *
+          </span>
+          <CrudInput
+            placeholder="Ej: Transportes del Norte SA"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            CUIT
+          </span>
+          <CrudInput
+            placeholder="Ej: 30712345678"
+            value={cuit}
+            onChange={(e) => setCuit(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Email
+          </span>
+          <CrudInput
+            placeholder="Ej: contacto@empresa.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Teléfono
+          </span>
+          <CrudInput
+            placeholder="Ej: +54 9 11 1234-5678"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Dirección
+          </span>
+          <CrudInput
+            placeholder="Ej: Av. Corrientes 1234"
+            value={direccion}
+            onChange={(e) => setDireccion(e.target.value)}
+          />
+        </label>
         <CrudSubmitButton loading={loading} label="Crear cliente" />
       </form>
     </CrudPageLayout>

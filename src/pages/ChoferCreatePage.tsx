@@ -57,11 +57,36 @@ export function ChoferCreatePage() {
       error={error}
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-        <CrudInput placeholder="Nombre *" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        <CrudInput placeholder="DNI" value={dni} onChange={(e) => setDni(e.target.value)} />
-        <CrudInput placeholder="Licencia" value={licencia} onChange={(e) => setLicencia(e.target.value)} />
-        <CrudInput type="date" value={licenciaVence} onChange={(e) => setLicenciaVence(e.target.value)} />
-        <CrudInput placeholder="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Nombre *
+          </span>
+          <CrudInput placeholder="Ej: Juan Perez" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            DNI
+          </span>
+          <CrudInput placeholder="Ej: 30123456" value={dni} onChange={(e) => setDni(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Licencia
+          </span>
+          <CrudInput placeholder="Ej: C3" value={licencia} onChange={(e) => setLicencia(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Vencimiento licencia
+          </span>
+          <CrudInput type="date" value={licenciaVence} onChange={(e) => setLicenciaVence(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Teléfono
+          </span>
+          <CrudInput placeholder="Ej: +54 9 11 1234-5678" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        </label>
         <CrudSubmitButton loading={loading} label="Crear chofer" />
       </form>
     </CrudPageLayout>

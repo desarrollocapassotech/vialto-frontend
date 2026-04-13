@@ -61,14 +61,44 @@ export function VehiculoCreatePage() {
       error={error}
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-        <CrudInput placeholder="Patente *" value={patente} onChange={(e) => setPatente(e.target.value)} />
-        <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}>
-          {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
-        </CrudSelect>
-        <CrudInput placeholder="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} />
-        <CrudInput placeholder="Modelo" value={modelo} onChange={(e) => setModelo(e.target.value)} />
-        <CrudInput type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(e.target.value)} />
-        <CrudInput type="number" placeholder="Km actual" value={kmActual} onChange={(e) => setKmActual(e.target.value)} />
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Patente *
+          </span>
+          <CrudInput placeholder="Ej: AA123BB" value={patente} onChange={(e) => setPatente(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Tipo
+          </span>
+          <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}>
+            {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </CrudSelect>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Marca
+          </span>
+          <CrudInput placeholder="Ej: Scania" value={marca} onChange={(e) => setMarca(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Modelo
+          </span>
+          <CrudInput placeholder="Ej: R450" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Año
+          </span>
+          <CrudInput type="number" placeholder="Ej: 2020" value={anio} onChange={(e) => setAnio(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Km actual
+          </span>
+          <CrudInput type="number" placeholder="Ej: 120000" value={kmActual} onChange={(e) => setKmActual(e.target.value)} />
+        </label>
         <CrudSubmitButton loading={loading} label="Crear vehículo" />
       </form>
     </CrudPageLayout>

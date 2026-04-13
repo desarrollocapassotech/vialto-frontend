@@ -159,7 +159,7 @@ export function ClienteEditPage() {
             </label>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Telefono
+                Teléfono
               </span>
               <CrudInput
                 value={telefono}
@@ -169,7 +169,7 @@ export function ClienteEditPage() {
             </label>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Direccion
+                Dirección
               </span>
               <CrudInput
                 value={direccion}
