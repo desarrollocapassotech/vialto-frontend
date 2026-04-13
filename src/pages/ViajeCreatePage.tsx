@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import {
+  ChoferSearchSelect,
+  ClienteSearchSelect,
+  TransportistaSearchSelect,
+} from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import {
@@ -15,11 +20,16 @@ import { maskCurrencyArInput, parseCurrencyAr } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
-  flotaPropiaListaValida,
+  flotaPropiaVehiculosListaValida,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
+  vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
+import {
+  ViajeVehiculosLista,
+  type ViajeVehiculoRowDraft,
+} from '@/components/viajes/ViajeVehiculosLista';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -28,6 +38,7 @@ import {
   parseKmLitrosOpcionales,
   VIAJE_ESTADOS_ALTA,
 } from '@/lib/viajesEstados';
+import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 
 const ESTADOS = VIAJE_ESTADOS_ALTA;
@@ -52,9 +63,9 @@ export function ViajeCreatePage() {
   const [choferId, setChoferId] = useState('');
   const [transportistaId, setTransportistaId] = useState('');
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('propio');
-  const [vehiculoId, setVehiculoId] = useState('');
-  const [patenteTractor, setPatenteTractor] = useState('');
-  const [patenteSemirremolque, setPatenteSemirremolque] = useState('');
+  const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([
+    { tipo: 'tractor', vehiculoId: '' },
+  ]);
   const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
   const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
@@ -70,6 +81,7 @@ export function ViajeCreatePage() {
   const [documentacionCsv, setDocumentacionCsv] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingRefs, setLoadingRefs] = useState(true);
+  const [refreshingFlota, setRefreshingFlota] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
   const [kmLitrosModalOpen, setKmLitrosModalOpen] = useState(false);
@@ -119,6 +131,39 @@ export function ViajeCreatePage() {
     };
   }, [getToken, tenantId]);
 
+  async function refreshFlotaVehiculos() {
+    if (refreshingFlota) return;
+    const choferesPath = tenantId
+      ? `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`
+      : '/api/choferes';
+    const vehiculosPath = tenantId
+      ? `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`
+      : '/api/vehiculos';
+    setRefreshingFlota(true);
+    setError(null);
+    try {
+      const [choferesData, vehiculosData] = await Promise.all([
+        apiJson<Chofer[]>(choferesPath, () => getToken()),
+        apiJson<Vehiculo[]>(vehiculosPath, () => getToken()),
+      ]);
+      setChoferes(choferesData);
+      setVehiculos(vehiculosData);
+      const cp = choferesFlotaPropia(choferesData);
+      const vp = vehiculosFlotaPropia(vehiculosData);
+      setChoferId((prev) => normalizarIdEnLista(prev, cp));
+      setVehiculosRows((rows) =>
+        rows.map((row) => ({
+          ...row,
+          vehiculoId: normalizarIdEnLista(row.vehiculoId, vehiculosPorTipo(vp, row.tipo)),
+        })),
+      );
+    } catch (e) {
+      setError(friendlyError(e, 'viajes'));
+    } finally {
+      setRefreshingFlota(false);
+    }
+  }
+
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
   const ayudaFlota = useMemo(
@@ -129,18 +174,17 @@ export function ViajeCreatePage() {
   useEffect(() => {
     if (modoOperacion !== 'propio') return;
     setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
-    setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculosPropios));
-  }, [modoOperacion, choferesPropios, vehiculosPropios]);
+  }, [modoOperacion, choferesPropios]);
 
   function applyModoOperacion(m: ViajeOperacionModo) {
     setModoOperacion(m);
     if (m === 'externo') {
       setChoferId('');
-      setVehiculoId('');
+      setVehiculosRows([]);
     } else {
       setTransportistaId('');
       setChoferId((prev) => normalizarIdEnLista(prev, choferesPropios));
-      setVehiculoId((prev) => normalizarIdEnLista(prev, vehiculosPropios));
+      setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
     }
   }
 
@@ -155,8 +199,16 @@ export function ViajeCreatePage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
-    if (!externo && !flotaPropiaListaValida(choferId, vehiculoId, choferesPropios, vehiculosPropios)) {
-      setError('En flota propia, elegí chofer y vehículo de las listas (si no aparecen, cargá la página).');
+    const vids = vehiculoIdsDesdeRows(vehiculosRows);
+    if (!externo && vids.length === 0) {
+      setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
+      return;
+    }
+    if (
+      !externo &&
+      !flotaPropiaVehiculosListaValida(choferId, vids, choferesPropios, vehiculosPropios)
+    ) {
+      setError('En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).');
       return;
     }
     if (!origen.trim() || !destino.trim()) {
@@ -213,19 +265,13 @@ export function ViajeCreatePage() {
             ? {
                 transportistaId: transportistaId.trim(),
                 choferId: null,
-                vehiculoId: null,
+                vehiculoIds: [],
               }
             : {
                 transportistaId: null,
                 choferId,
-                vehiculoId: vehiculoId.trim(),
+                vehiculoIds: vids,
               }),
-          patenteTractor: patenteTractor.trim()
-            ? patenteTractor.trim().toUpperCase()
-            : undefined,
-          patenteSemirremolque: patenteSemirremolque.trim()
-            ? patenteSemirremolque.trim().toUpperCase()
-            : undefined,
           origen: origen.trim(),
           destino: destino.trim(),
           fechaCarga: fechaCarga ? new Date(fechaCarga).toISOString() : undefined,
@@ -283,10 +329,6 @@ export function ViajeCreatePage() {
             onSubmit();
           }}
         >
-          <p className="text-sm text-vialto-steel md:col-span-2 lg:col-span-3">
-            El número de viaje se asigna automáticamente al guardar (formato año-correlativo).
-          </p>
-
           <div className="flex flex-col gap-1">
             <span className={fieldLabelClass}>Estado</span>
             <select
@@ -346,14 +388,13 @@ export function ViajeCreatePage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Cliente</span>
-              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputClass}>
-                {clientes.length === 0 && <option value="">Sin clientes</option>}
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
+              <ClienteSearchSelect
+                clientes={clientes}
+                value={clienteId}
+                onChange={setClienteId}
+                inputClassName={inputClass}
+                aria-label="Cliente"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Monto a facturar</span>
@@ -373,21 +414,16 @@ export function ViajeCreatePage() {
             onModoChange={applyModoOperacion}
             externoContent={
               <div className="grid gap-2">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Transportista externo</span>
-                    <select
+                    <TransportistaSearchSelect
+                      transportistas={transportistas}
                       value={transportistaId}
-                      onChange={(e) => setTransportistaId(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Elegí un transportista…</option>
-                      {transportistas.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setTransportistaId}
+                      inputClassName={inputClass}
+                      aria-label="Transportista externo"
+                    />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Precio transportista externo</span>
@@ -402,79 +438,38 @@ export function ViajeCreatePage() {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-vialto-steel md:col-span-2">
-                  En esta modalidad el viaje queda a cargo del transportista elegido; chofer y vehículo no se
-                  guardan en el viaje (podés mantenerlos actualizados en sus fichas).
-                </p>
               </div>
             }
             propioContent={
-              <div className="grid gap-2">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Chofer (flota propia)</span>
-                    <select
-                      value={choferId}
-                      onChange={(e) => setChoferId(e.target.value)}
-                      className={inputClass}
-                    >
-                      {choferesPropios.length === 0 && <option value="">Sin choferes de flota propia</option>}
-                      {choferesPropios.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {ayudaFlota.chofer && (
-                      <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Vehículo (flota propia)</span>
-                    <select
-                      value={vehiculoId}
-                      onChange={(e) => setVehiculoId(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Elegí un vehículo…</option>
-                      {vehiculosPropios.map((vh) => (
-                        <option key={vh.id} value={vh.id}>
-                          {vh.patente}
-                        </option>
-                      ))}
-                    </select>
-                    {ayudaFlota.vehiculo && (
-                      <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
-                    )}
-                  </div>
+              <div className="grid gap-3">
+                <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                  <span className={fieldLabelClass}>Chofer (flota propia)</span>
+                  <ChoferSearchSelect
+                    choferes={choferesPropios}
+                    value={choferId}
+                    onChange={setChoferId}
+                    inputClassName={inputClass}
+                    aria-label="Chofer flota propia"
+                  />
+                  {ayudaFlota.chofer && (
+                    <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
+                  )}
                 </div>
-                <p className="text-xs text-vialto-steel">
-                  Solo se listan choferes y vehículos marcados como flota propia en su ficha (sin transportista
-                  externo).
-                </p>
+                <ViajeVehiculosLista
+                  groupId="viaje-create"
+                  crearVehiculoHref="/vehiculos/nuevo"
+                  rows={vehiculosRows}
+                  onChange={setVehiculosRows}
+                  vehiculos={vehiculosPropios}
+                  onRefreshVehiculos={() => void refreshFlotaVehiculos()}
+                  refreshingVehiculos={refreshingFlota}
+                />
+                {ayudaFlota.vehiculo && (
+                  <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
+                )}
               </div>
             }
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Patente tractor</span>
-              <input
-                value={patenteTractor}
-                onChange={(e) => setPatenteTractor(e.target.value)}
-                placeholder="Ej. AA123BB"
-                className={inputClass}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Patente semirremolque</span>
-              <input
-                value={patenteSemirremolque}
-                onChange={(e) => setPatenteSemirremolque(e.target.value)}
-                placeholder="Ej. AA456CC"
-                className={inputClass}
-              />
-            </div>
-          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Fecha de carga</span>

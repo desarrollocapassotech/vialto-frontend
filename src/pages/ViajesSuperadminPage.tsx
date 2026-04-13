@@ -13,9 +13,10 @@ import { formatCurrencyArFromNumber, parseCurrencyAr } from '@/lib/currencyMask'
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
-  flotaPropiaListaValida,
+  flotaPropiaVehiculosListaValida,
   normalizarIdEnLista,
   textoMontoFacturarListado,
+  vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion } from '@/lib/ciudades';
@@ -140,11 +141,10 @@ export function ViajesSuperadminPage() {
     setDraft((p) => {
       if (!p || p.operacionModo !== 'propio') return p;
       const cid = normalizarIdEnLista(p.choferId, choferesPropios);
-      const vid = normalizarIdEnLista(p.vehiculoId, vehiculosPropios);
-      if (cid === p.choferId && vid === p.vehiculoId) return p;
-      return { ...p, choferId: cid, vehiculoId: vid };
+      if (cid === p.choferId) return p;
+      return { ...p, choferId: cid };
     });
-  }, [editingId, draft?.operacionModo, choferesPropios, vehiculosPropios]);
+  }, [editingId, draft?.operacionModo, choferesPropios]);
 
   useEffect(() => {
     if (draft?.operacionModo === 'externo') setViajeEditHint(null);
@@ -185,17 +185,22 @@ export function ViajesSuperadminPage() {
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? '').trim();
     const chRow = choferes.find((c) => c.id === v.choferId);
-    const vehRow = vehiculos.find((x) => x.id === v.vehiculoId);
     const partes: string[] = [];
     if (!esExterno && v.choferId && chRow?.transportistaId) {
       partes.push(
         'El chofer asociado a este viaje figura con transportista externo en su ficha; elegí uno de flota propia o actualizá el chofer.',
       );
     }
-    if (!esExterno && v.vehiculoId && vehRow?.transportistaId) {
-      partes.push(
-        'El vehículo asociado figura con transportista externo en su ficha; elegí uno de flota propia o actualizá el vehículo.',
-      );
+    if (!esExterno && v.vehiculosViaje?.length) {
+      for (const vv of v.vehiculosViaje) {
+        const vr = vehiculos.find((x) => x.id === vv.vehiculoId);
+        if (vr?.transportistaId) {
+          partes.push(
+            'Algún vehículo del viaje figura con transportista externo en su ficha; elegí flota propia o actualizá el maestro.',
+          );
+          break;
+        }
+      }
     }
     setViajeEditHint(partes.length ? partes.join(' ') : null);
     setDraft({
@@ -205,9 +210,17 @@ export function ViajesSuperadminPage() {
       operacionModo: esExterno ? 'externo' : 'propio',
       choferId: normalizarIdEnLista(v.choferId, choferesPropios),
       transportistaId: v.transportistaId ?? '',
-      vehiculoId: normalizarIdEnLista(v.vehiculoId, vehiculosPropios),
-      patenteTractor: v.patenteTractor ?? '',
-      patenteSemirremolque: v.patenteSemirremolque ?? '',
+      vehiculosRows:
+        !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
+          ? [...v.vehiculosViaje]
+              .sort((a, b) => a.orden - b.orden)
+              .map((x) => ({
+                tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
+                vehiculoId: normalizarIdEnLista(x.vehiculoId, vehiculosPropios),
+              }))
+          : !esExterno
+            ? [{ tipo: 'tractor', vehiculoId: '' }]
+            : [],
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -338,8 +351,16 @@ export function ViajesSuperadminPage() {
 
     const externo = draft.operacionModo === 'externo';
     if (externo && !draft.transportistaId.trim()) { setError('Seleccioná un transportista externo.'); return; }
-    if (!externo && !flotaPropiaListaValida(draft.choferId, draft.vehiculoId, choferesPropios, vehiculosPropios)) {
-      setError('En flota propia, elegí chofer y vehículo de las listas.');
+    const vids = vehiculoIdsDesdeRows(draft.vehiculosRows);
+    if (!externo && vids.length === 0) {
+      setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
+      return;
+    }
+    if (
+      !externo &&
+      !flotaPropiaVehiculosListaValida(draft.choferId, vids, choferesPropios, vehiculosPropios)
+    ) {
+      setError('En flota propia, elegí chofer y vehículos de las listas.');
       return;
     }
 
@@ -388,10 +409,12 @@ export function ViajesSuperadminPage() {
             estado: draft.estado,
             clienteId: draft.clienteId || undefined,
             ...(externo
-              ? { transportistaId: draft.transportistaId.trim(), choferId: null, vehiculoId: null }
-              : { transportistaId: null, choferId: draft.choferId.trim(), vehiculoId: draft.vehiculoId.trim() }),
-            patenteTractor: draft.patenteTractor.trim() || undefined,
-            patenteSemirremolque: draft.patenteSemirremolque.trim() || undefined,
+              ? { transportistaId: draft.transportistaId.trim(), choferId: null, vehiculoIds: [] }
+              : {
+                  transportistaId: null,
+                  choferId: draft.choferId.trim(),
+                  vehiculoIds: vids,
+                }),
             origen: draft.origen.trim() || undefined,
             destino: draft.destino.trim() || undefined,
             fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
@@ -621,6 +644,11 @@ export function ViajesSuperadminPage() {
                     choferes={choferes}
                     transportistas={transportistas}
                     vehiculos={vehiculos}
+                    crearVehiculoHref={
+                      filtroEmpresa
+                        ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
+                        : '/vehiculos/nuevo'
+                    }
                     inconsistenciaHint={viajeEditHint}
                     tableColSpan={tableColSpan}
                     saving={savingId === v.id}

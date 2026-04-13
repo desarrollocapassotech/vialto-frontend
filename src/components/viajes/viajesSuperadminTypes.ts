@@ -1,5 +1,6 @@
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import type { ViajeVehiculoRowDraft } from '@/components/viajes/ViajeVehiculosLista';
 import type { ConEmpresa, Viaje } from '@/types/api';
 
 export type ViajeInlineDraft = {
@@ -9,9 +10,7 @@ export type ViajeInlineDraft = {
   operacionModo: ViajeOperacionModo;
   choferId: string;
   transportistaId: string;
-  vehiculoId: string;
-  patenteTractor: string;
-  patenteSemirremolque: string;
+  vehiculosRows: ViajeVehiculoRowDraft[];
   paisOrigen: PaisCodigo;
   paisDestino: PaisCodigo;
   origen: string;

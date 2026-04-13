@@ -7,9 +7,13 @@ export interface Viaje {
   clienteId: string;
   transportistaId: string | null;
   choferId: string | null;
-  vehiculoId: string | null;
-  patenteTractor: string | null;
-  patenteSemirremolque: string | null;
+  /** Vehículos asociados al viaje (orden = orden operativo). */
+  vehiculosViaje?: Array<{
+    id: string;
+    vehiculoId: string;
+    orden: number;
+    vehiculo: Vehiculo;
+  }>;
   origen: string | null;
   destino: string | null;
   fechaCarga: string | null;

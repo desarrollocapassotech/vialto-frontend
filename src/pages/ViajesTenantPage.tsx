@@ -1,6 +1,11 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  ChoferSearchSelect,
+  ClienteSearchSelect,
+  TransportistaSearchSelect,
+} from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import {
@@ -13,12 +18,17 @@ import { formatCurrencyArFromNumber, maskCurrencyArInput, parseCurrencyAr } from
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
-  flotaPropiaListaValida,
+  flotaPropiaVehiculosListaValida,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
   textoMontoFacturarListado,
+  vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
+import {
+  ViajeVehiculosLista,
+  type ViajeVehiculoRowDraft,
+} from '@/components/viajes/ViajeVehiculosLista';
 import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeBadgeClass,
@@ -30,7 +40,15 @@ import {
   viajeTieneKmYLitrosEnApi,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
-import type { Chofer, Cliente, PaginatedMeta, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type {
+  Chofer,
+  Cliente,
+  Factura,
+  PaginatedMeta,
+  Transportista,
+  Vehiculo,
+  Viaje,
+} from '@/types/api';
 
 const ESTADOS = VIAJE_ESTADOS_TODOS;
 
@@ -41,9 +59,7 @@ type ViajeInlineDraft = {
   operacionModo: ViajeOperacionModo;
   choferId: string;
   transportistaId: string;
-  vehiculoId: string;
-  patenteTractor: string;
-  patenteSemirremolque: string;
+  vehiculosRows: ViajeVehiculoRowDraft[];
   paisOrigen: PaisCodigo;
   paisDestino: PaisCodigo;
   origen: string;
@@ -151,7 +167,7 @@ export function ViajesTenantPage() {
           apiJson<Chofer[]>('/api/choferes', () => getToken()),
           apiJson<Transportista[]>('/api/transportistas', () => getToken()),
           apiJson<Vehiculo[]>('/api/vehiculos', () => getToken()),
-          apiJson<{ id: string; viajeId: string | null }[]>('/api/facturacion/facturas', () => getToken()).catch(() => [] as { id: string; viajeId: string | null }[]),
+          apiJson<Factura[]>('/api/facturacion/facturas', () => getToken()).catch(() => [] as Factura[]),
         ]);
         if (!cancelled) {
           setClientes(clientesData);
@@ -179,11 +195,10 @@ export function ViajesTenantPage() {
     setDraft((p) => {
       if (!p || p.operacionModo !== 'propio') return p;
       const cid = normalizarIdEnLista(p.choferId, choferesPropios);
-      const vid = normalizarIdEnLista(p.vehiculoId, vehiculosPropios);
-      if (cid === p.choferId && vid === p.vehiculoId) return p;
-      return { ...p, choferId: cid, vehiculoId: vid };
+      if (cid === p.choferId) return p;
+      return { ...p, choferId: cid };
     });
-  }, [editingId, draft?.operacionModo, choferesPropios, vehiculosPropios]);
+  }, [editingId, draft?.operacionModo, choferesPropios]);
 
   useEffect(() => {
     if (draft?.operacionModo === 'externo') setViajeEditHint(null);
@@ -194,17 +209,22 @@ export function ViajesTenantPage() {
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? '').trim();
     const chRow = choferes.find((c) => c.id === v.choferId);
-    const vehRow = vehiculos.find((x) => x.id === v.vehiculoId);
     const partes: string[] = [];
     if (!esExterno && v.choferId && chRow?.transportistaId) {
       partes.push(
         'El chofer asociado a este viaje figura con transportista externo en su ficha; elegí uno de flota propia o actualizá el chofer.',
       );
     }
-    if (!esExterno && v.vehiculoId && vehRow?.transportistaId) {
-      partes.push(
-        'El vehículo asociado figura con transportista externo en su ficha; elegí uno de flota propia o actualizá el vehículo.',
-      );
+    if (!esExterno && v.vehiculosViaje?.length) {
+      for (const vv of v.vehiculosViaje) {
+        const vr = vehiculos.find((x) => x.id === vv.vehiculoId);
+        if (vr?.transportistaId) {
+          partes.push(
+            'Algún vehículo del viaje figura con transportista externo en su ficha; elegí flota propia o actualizá el maestro.',
+          );
+          break;
+        }
+      }
     }
     setViajeEditHint(partes.length ? partes.join(' ') : null);
     setDraft({
@@ -214,9 +234,17 @@ export function ViajesTenantPage() {
       operacionModo: esExterno ? 'externo' : 'propio',
       choferId: normalizarIdEnLista(v.choferId, choferesPropios),
       transportistaId: v.transportistaId ?? '',
-      vehiculoId: normalizarIdEnLista(v.vehiculoId, vehiculosPropios),
-      patenteTractor: v.patenteTractor ?? '',
-      patenteSemirremolque: v.patenteSemirremolque ?? '',
+      vehiculosRows:
+        !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
+          ? [...v.vehiculosViaje]
+              .sort((a, b) => a.orden - b.orden)
+              .map((x) => ({
+                tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
+                vehiculoId: normalizarIdEnLista(x.vehiculoId, vehiculosPropios),
+              }))
+          : !esExterno
+            ? [{ tipo: 'tractor', vehiculoId: '' }]
+            : [],
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -371,11 +399,12 @@ export function ViajesTenantPage() {
             ...p,
             operacionModo: m,
             ...(m === 'externo'
-              ? { choferId: '', vehiculoId: '' }
+              ? { choferId: '', vehiculosRows: [] }
               : {
                   transportistaId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
-                  vehiculoId: normalizarIdEnLista(p.vehiculoId, vehiculosPropios),
+                  vehiculosRows:
+                    p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
                 }),
           }
         : p,
@@ -393,8 +422,16 @@ export function ViajesTenantPage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
-    if (!externo && !flotaPropiaListaValida(draft.choferId, draft.vehiculoId, choferesPropios, vehiculosPropios)) {
-      setError('En flota propia, elegí chofer y vehículo de las listas (si no aparecen, cargá la página).');
+    const vids = vehiculoIdsDesdeRows(draft.vehiculosRows);
+    if (!externo && vids.length === 0) {
+      setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
+      return;
+    }
+    if (
+      !externo &&
+      !flotaPropiaVehiculosListaValida(draft.choferId, vids, choferesPropios, vehiculosPropios)
+    ) {
+      setError('En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).');
       return;
     }
     const o = draft.origen.trim();
@@ -443,15 +480,13 @@ export function ViajesTenantPage() {
             ? {
                 transportistaId: draft.transportistaId.trim(),
                 choferId: null,
-                vehiculoId: null,
+                vehiculoIds: [],
               }
             : {
                 transportistaId: null,
                 choferId: draft.choferId.trim(),
-                vehiculoId: draft.vehiculoId.trim(),
+                vehiculoIds: vids,
               }),
-          patenteTractor: draft.patenteTractor.trim() || undefined,
-          patenteSemirremolque: draft.patenteSemirremolque.trim() || undefined,
           origen: draft.origen.trim() || undefined,
           destino: draft.destino.trim() || undefined,
           fechaCarga: draft.fechaCarga ? new Date(draft.fechaCarga).toISOString() : undefined,
@@ -720,9 +755,15 @@ export function ViajesTenantPage() {
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Cliente</span>
-                          <select value={draft.clienteId} onChange={(e) => setDraft((p) => (p ? { ...p, clienteId: e.target.value } : p))} className="h-9 border border-black/15 bg-white px-2 text-sm">
-                            {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                          </select>
+                          <ClienteSearchSelect
+                            clientes={clientes}
+                            value={draft.clienteId}
+                            onChange={(id) =>
+                              setDraft((p) => (p ? { ...p, clienteId: id } : p))
+                            }
+                            inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                            aria-label="Cliente"
+                          />
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
@@ -749,25 +790,20 @@ export function ViajesTenantPage() {
                         groupName={`viaje-op-${draft.numero || 'edit'}`}
                         externoContent={
                           <div className="grid gap-2">
-                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                               <div className="flex min-w-0 flex-col gap-1">
                                 <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                                   Transportista externo
                                 </span>
-                                <select
+                                <TransportistaSearchSelect
+                                  transportistas={transportistas}
                                   value={draft.transportistaId}
-                                  onChange={(e) =>
-                                    setDraft((p) => (p ? { ...p, transportistaId: e.target.value } : p))
+                                  onChange={(id) =>
+                                    setDraft((p) => (p ? { ...p, transportistaId: id } : p))
                                   }
-                                  className="h-9 border border-black/15 bg-white px-2 text-sm"
-                                >
-                                  <option value="">Elegí un transportista…</option>
-                                  {transportistas.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.nombre}
-                                    </option>
-                                  ))}
-                                </select>
+                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                                  aria-label="Transportista externo"
+                                />
                               </div>
                               <div className="flex min-w-0 flex-col gap-1">
                                 <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
@@ -793,82 +829,43 @@ export function ViajesTenantPage() {
                                 />
                               </div>
                             </div>
-                            <p className="text-xs text-vialto-steel">
-                              El viaje queda a cargo del transportista elegido; chofer y vehículo no se guardan
-                              en el viaje (actualizalos en sus fichas si hace falta).
-                            </p>
                           </div>
                         }
                         propioContent={
-                          <div className="grid gap-2">
-                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Chofer (flota propia)
-                                </span>
-                                <select
-                                  value={draft.choferId}
-                                  onChange={(e) =>
-                                    setDraft((p) => (p ? { ...p, choferId: e.target.value } : p))
-                                  }
-                                  className="h-9 border border-black/15 bg-white px-2 text-sm"
-                                >
-                                  {choferesPropios.length === 0 && (
-                                    <option value="">Sin choferes de flota propia</option>
-                                  )}
-                                  {choferesPropios.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.nombre}
-                                    </option>
-                                  ))}
-                                </select>
-                                {ayudaFlotaListado.chofer && (
-                                  <p className="text-xs text-amber-800/90">{ayudaFlotaListado.chofer}</p>
-                                )}
-                              </div>
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Vehículo (flota propia)
-                                </span>
-                                <select
-                                  value={draft.vehiculoId}
-                                  onChange={(e) =>
-                                    setDraft((p) => (p ? { ...p, vehiculoId: e.target.value } : p))
-                                  }
-                                  className="h-9 border border-black/15 bg-white px-2 text-sm"
-                                >
-                                  <option value="">Elegí un vehículo…</option>
-                                  {vehiculosPropios.map((vh) => (
-                                    <option key={vh.id} value={vh.id}>
-                                      {vh.patente}
-                                    </option>
-                                  ))}
-                                </select>
-                                {ayudaFlotaListado.vehiculo && (
-                                  <p className="text-xs text-amber-800/90">{ayudaFlotaListado.vehiculo}</p>
-                                )}
-                              </div>
+                          <div className="grid gap-3">
+                            <div className="flex min-w-0 max-w-md flex-col gap-1">
+                              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                                Chofer (flota propia)
+                              </span>
+                              <ChoferSearchSelect
+                                choferes={choferesPropios}
+                                value={draft.choferId}
+                                onChange={(id) =>
+                                  setDraft((p) => (p ? { ...p, choferId: id } : p))
+                                }
+                                inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                                aria-label="Chofer flota propia"
+                              />
+                              {ayudaFlotaListado.chofer && (
+                                <p className="text-xs text-amber-800/90">{ayudaFlotaListado.chofer}</p>
+                              )}
                             </div>
+                            <ViajeVehiculosLista
+                              groupId={`viaje-inline-${draft.numero || 'e'}`}
+                              crearVehiculoHref="/vehiculos/nuevo"
+                              rows={draft.vehiculosRows}
+                              onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
+                              vehiculos={vehiculosPropios}
+                            />
+                            {ayudaFlotaListado.vehiculo && (
+                              <p className="text-xs text-amber-800/90">{ayudaFlotaListado.vehiculo}</p>
+                            )}
                             {viajeEditHint && (
                               <p className="text-xs text-amber-800/90">{viajeEditHint}</p>
                             )}
-                            <p className="text-xs text-vialto-steel">
-                              Solo choferes y vehículos con «Flota propia» en su ficha (sin transportista
-                              externo).
-                            </p>
                           </div>
                         }
                       />
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente tractor</span>
-                          <input value={draft.patenteTractor} onChange={(e) => setDraft((p) => (p ? { ...p, patenteTractor: e.target.value } : p))} placeholder="Ej. AA123BB" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Patente semirremolque</span>
-                          <input value={draft.patenteSemirremolque} onChange={(e) => setDraft((p) => (p ? { ...p, patenteSemirremolque: e.target.value } : p))} placeholder="Ej. AA456CC" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        </div>
-                      </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Fecha de carga</span>

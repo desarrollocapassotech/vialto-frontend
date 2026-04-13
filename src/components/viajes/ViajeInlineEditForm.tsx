@@ -1,8 +1,14 @@
 import { useMemo } from 'react';
 import {
+  ChoferSearchSelect,
+  ClienteSearchSelect,
+  TransportistaSearchSelect,
+} from '@/components/forms/MaestroSearchSelects';
+import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
+import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
 import { maskCurrencyArInput } from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
@@ -21,6 +27,8 @@ type Props = {
   choferes: Chofer[];
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
+  /** Ruta para abrir alta de vehículo en nueva pestaña */
+  crearVehiculoHref?: string;
   /** Aviso si el viaje tenía chofer/vehículo incompatible con flota propia al abrir edición. */
   inconsistenciaHint?: string | null;
   tableColSpan: number;
@@ -41,6 +49,7 @@ export function ViajeInlineEditForm({
   choferes,
   transportistas,
   vehiculos,
+  crearVehiculoHref = '/vehiculos/nuevo',
   inconsistenciaHint,
   tableColSpan,
   saving,
@@ -65,11 +74,12 @@ export function ViajeInlineEditForm({
         ...p,
         operacionModo: m,
         ...(m === 'externo'
-          ? { choferId: '', vehiculoId: '' }
+          ? { choferId: '', vehiculosRows: [] }
           : {
               transportistaId: '',
               choferId: normalizarIdEnLista(p.choferId, choferesPropios),
-              vehiculoId: normalizarIdEnLista(p.vehiculoId, vehiculosPropios),
+              vehiculosRows:
+                p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
             }),
       };
     });
@@ -84,15 +94,13 @@ export function ViajeInlineEditForm({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
               <span className={LABEL}>Cliente</span>
-              <select
+              <ClienteSearchSelect
+                clientes={clientes}
                 value={draft.clienteId}
-                onChange={(e) => set({ clienteId: e.target.value })}
-                className={INPUT}
-              >
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
+                onChange={(id) => set({ clienteId: id })}
+                inputClassName={INPUT}
+                aria-label="Cliente"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span className={LABEL}>Monto a facturar</span>
@@ -115,19 +123,16 @@ export function ViajeInlineEditForm({
             groupName={`viaje-op-sa-${draft.numero || 'edit'}`}
             externoContent={
               <div className="grid gap-2">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={LABEL}>Transportista externo</span>
-                    <select
+                    <TransportistaSearchSelect
+                      transportistas={transportistas}
                       value={draft.transportistaId}
-                      onChange={(e) => set({ transportistaId: e.target.value })}
-                      className={INPUT}
-                    >
-                      <option value="">Elegí un transportista…</option>
-                      {transportistas.map((t) => (
-                        <option key={t.id} value={t.id}>{t.nombre}</option>
-                      ))}
-                    </select>
+                      onChange={(id) => set({ transportistaId: id })}
+                      inputClassName={INPUT}
+                      aria-label="Transportista externo"
+                    />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={LABEL}>Precio transportista externo</span>
@@ -144,81 +149,39 @@ export function ViajeInlineEditForm({
                     />
                   </div>
                 </div>
-                <p className="text-xs text-vialto-steel">
-                  El viaje queda a cargo del transportista elegido; chofer y vehículo no se guardan en el
-                  viaje.
-                </p>
               </div>
             }
             propioContent={
-              <div className="grid gap-2">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Chofer (flota propia)</span>
-                    <select
-                      value={draft.choferId}
-                      onChange={(e) => set({ choferId: e.target.value })}
-                      className={INPUT}
-                    >
-                      {choferesPropios.length === 0 && (
-                        <option value="">Sin choferes de flota propia</option>
-                      )}
-                      {choferesPropios.map((c) => (
-                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                      ))}
-                    </select>
-                    {ayudaFlota.chofer && (
-                      <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Vehículo (flota propia)</span>
-                    <select
-                      value={draft.vehiculoId}
-                      onChange={(e) => set({ vehiculoId: e.target.value })}
-                      className={INPUT}
-                    >
-                      <option value="">Elegí un vehículo…</option>
-                      {vehiculosPropios.map((vh) => (
-                        <option key={vh.id} value={vh.id}>{vh.patente}</option>
-                      ))}
-                    </select>
-                    {ayudaFlota.vehiculo && (
-                      <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
-                    )}
-                  </div>
+              <div className="grid gap-3">
+                <div className="flex min-w-0 max-w-md flex-col gap-1">
+                  <span className={LABEL}>Chofer (flota propia)</span>
+                  <ChoferSearchSelect
+                    choferes={choferesPropios}
+                    value={draft.choferId}
+                    onChange={(id) => set({ choferId: id })}
+                    inputClassName={INPUT}
+                    aria-label="Chofer flota propia"
+                  />
+                  {ayudaFlota.chofer && (
+                    <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
+                  )}
                 </div>
+                <ViajeVehiculosLista
+                  groupId={`viaje-sa-${draft.numero || 'e'}`}
+                  crearVehiculoHref={crearVehiculoHref}
+                  rows={draft.vehiculosRows}
+                  onChange={(rows) => set({ vehiculosRows: rows })}
+                  vehiculos={vehiculosPropios}
+                />
+                {ayudaFlota.vehiculo && (
+                  <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
+                )}
                 {inconsistenciaHint ? (
                   <p className="text-xs text-amber-800/90">{inconsistenciaHint}</p>
                 ) : null}
-                <p className="text-xs text-vialto-steel">
-                  Solo choferes y vehículos con «Flota propia» en su ficha (sin transportista externo).
-                </p>
               </div>
             }
           />
-
-          {/* Patentes */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-            <div className="flex flex-col gap-1">
-              <span className={LABEL}>Patente tractor</span>
-              <input
-                value={draft.patenteTractor}
-                onChange={(e) => set({ patenteTractor: e.target.value })}
-                placeholder="Ej. AA123BB"
-                className={INPUT}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className={LABEL}>Patente semirremolque</span>
-              <input
-                value={draft.patenteSemirremolque}
-                onChange={(e) => set({ patenteSemirremolque: e.target.value })}
-                placeholder="Ej. AA456CC"
-                className={INPUT}
-              />
-            </div>
-          </div>
 
           {/* Fechas */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">

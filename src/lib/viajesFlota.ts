@@ -42,16 +42,31 @@ export function normalizarIdEnLista(
   return lista[0]?.id ?? '';
 }
 
-export function flotaPropiaListaValida(
+export function vehiculoIdsDesdeRows(rows: { vehiculoId: string }[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of rows) {
+    const id = String(r.vehiculoId ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/** Flota propia: chofer válido y al menos un vehículo de la lista de flota propia. */
+export function flotaPropiaVehiculosListaValida(
   choferId: unknown,
-  vehiculoId: unknown,
+  vehiculoIds: string[],
   choferes: Chofer[],
   vehiculos: Vehiculo[],
 ): boolean {
   const c = String(choferId ?? '').trim();
-  const v = String(vehiculoId ?? '').trim();
-  if (!c || !v) return false;
-  return choferes.some((x) => x.id === c) && vehiculos.some((x) => x.id === v);
+  if (!c || vehiculoIds.length === 0) return false;
+  if (!choferes.some((x) => x.id === c)) return false;
+  const vp = vehiculosFlotaPropia(vehiculos);
+  const permitidos = new Set(vp.map((x) => x.id));
+  return vehiculoIds.every((id) => permitidos.has(id));
 }
 
 /** Celda de tabla: monto a facturar. */
