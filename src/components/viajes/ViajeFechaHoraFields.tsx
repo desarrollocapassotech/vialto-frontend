@@ -13,8 +13,11 @@ type Props = {
   onPatch: (p: Patch) => void;
   labelClassName: string;
   inputClassName: string;
-  /** Solo fecha/hora de carga (celda compacta en tabla). */
-  mode?: 'both' | 'cargaOnly';
+  /**
+   * `cargaOnly`: solo carga (legado).
+   * `tablaCargaDescarga`: carga + descarga apilados para celda de tabla.
+   */
+  mode?: 'both' | 'cargaOnly' | 'tablaCargaDescarga';
 };
 
 /** Misma altura de línea para sub-etiquetas (fecha / hora) y alinear inputs abajo. */
@@ -78,6 +81,9 @@ export function ViajeFechaHoraFields({
   inputClassName,
   mode = 'both',
 }: Props) {
+  const tituloSeccion =
+    'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+
   if (mode === 'cargaOnly') {
     return (
       <div className="min-w-[10rem]">
@@ -97,12 +103,47 @@ export function ViajeFechaHoraFields({
     );
   }
 
-  const titulo = 'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  if (mode === 'tablaCargaDescarga') {
+    return (
+      <div className="flex min-w-0 flex-col gap-3 min-w-[10rem]">
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className={tituloSeccion}>Carga</span>
+          {campoFechaHora({
+            labelFecha: 'Fecha',
+            labelHora: 'Hora (opcional)',
+            fecha: fechaCarga,
+            hora: horaCarga,
+            onFecha: (v) => onPatch({ fechaCarga: v }),
+            onHora: (v) => onPatch({ horaCarga: v }),
+            labelClassName,
+            inputClassName,
+            ariaFecha: 'Fecha de carga',
+            ariaHora: 'Hora de carga',
+          })}
+        </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className={tituloSeccion}>Descarga</span>
+          {campoFechaHora({
+            labelFecha: 'Fecha',
+            labelHora: 'Hora (opcional)',
+            fecha: fechaDescarga,
+            hora: horaDescarga,
+            onFecha: (v) => onPatch({ fechaDescarga: v }),
+            onHora: (v) => onPatch({ horaDescarga: v }),
+            labelClassName,
+            inputClassName,
+            ariaFecha: 'Fecha de descarga',
+            ariaHora: 'Hora de descarga',
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
       <div className="flex min-w-0 flex-col gap-2">
-        <span className={titulo}>Carga</span>
+        <span className={tituloSeccion}>Carga</span>
         {campoFechaHora({
           labelFecha: 'Fecha',
           labelHora: 'Hora (opcional)',
@@ -118,7 +159,7 @@ export function ViajeFechaHoraFields({
       </div>
 
       <div className="flex min-w-0 flex-col gap-2">
-        <span className={titulo}>Descarga</span>
+        <span className={tituloSeccion}>Descarga</span>
         {campoFechaHora({
           labelFecha: 'Fecha',
           labelHora: 'Hora (opcional)',

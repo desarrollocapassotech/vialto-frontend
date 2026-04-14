@@ -5,7 +5,10 @@ export interface Viaje {
   numero: string;
   estado: string;
   clienteId: string;
+  /** Presente en listados/detalle cuando el backend incluye la relación. */
+  cliente?: { id: string; nombre: string };
   transportistaId: string | null;
+  transportista?: { id: string; nombre: string } | null;
   choferId: string | null;
   /** Vehículos asociados al viaje (orden = orden operativo). */
   vehiculosViaje?: Array<{

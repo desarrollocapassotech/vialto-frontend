@@ -29,6 +29,8 @@ import {
   flotaPropiaVehiculosListaValida,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
+  nombreClienteListadoViaje,
+  nombreTransportistaExternoListadoViaje,
   textoMontoFacturarListado,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
@@ -38,7 +40,12 @@ import {
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion, type PaisCodigo } from '@/lib/ciudades';
+import {
+  esEtiquetaCiudadValida,
+  inferirPaisDesdeUbicacion,
+  soloCiudadDesdeEtiquetaUbicacion,
+  type PaisCodigo,
+} from '@/lib/ciudades';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import {
   estadoViajeBadgeClass,
@@ -48,6 +55,7 @@ import {
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
   viajeTieneKmYLitrosEnApi,
+  viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
   estadosDisponiblesParaViaje,
 } from '@/lib/viajesEstados';
@@ -658,7 +666,8 @@ export function ViajesTenantPage() {
 
   const mostrarColumnaFacturarLote =
     clienteIdFiltroActivo.trim() !== '' && !editingId;
-  const tableColSpanBase = editingId ? 5 : 6;
+  /** Cliente + transp. externo + estado + recorrido + fechas carga/descarga + monto [+ acciones]. */
+  const tableColSpanBase = editingId ? 6 : 7;
   const tableColSpan = mostrarColumnaFacturarLote ? tableColSpanBase + 1 : tableColSpanBase;
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
   const todosElegiblesMarcados =
@@ -686,7 +695,7 @@ export function ViajesTenantPage() {
         Viajes
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Número, estado, origen, destino, fecha de carga y monto a facturar de cada operación.
+        Cliente, transporte, estado, origen y destino, fechas de carga y descarga y monto a facturar de cada operación.
       </p>
       <div className="mt-4 flex justify-end gap-2">
         {editingId ? (
@@ -819,11 +828,15 @@ export function ViajesTenantPage() {
                   ) : null}
                 </th>
               )}
-              <th className="px-4 py-3">Número</th>
+              <th className="px-4 py-3 min-w-[8rem]">Cliente</th>
+              <th className="px-4 py-3 min-w-[8rem]">Transporte</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Origen</th>
-              <th className="px-4 py-3">Destino</th>
-              <th className="px-4 py-3">Fecha de carga</th>
+              <th className="px-4 py-3 min-w-[12rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+                Origen - Destino
+              </th>
+              <th className="px-4 py-3 min-w-[11rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+                Carga - Descarga
+              </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
               {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
@@ -843,7 +856,10 @@ export function ViajesTenantPage() {
                 </td>
               </tr>
             )}
-            {rows?.map((v) => (
+            {rows?.map((v) => {
+              const nombreCliente = nombreClienteListadoViaje(v, clientes);
+              const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
+              return (
               <Fragment key={v.id}>
               <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
                 {mostrarColumnaFacturarLote && (
@@ -859,10 +875,18 @@ export function ViajesTenantPage() {
                     ) : null}
                   </td>
                 )}
-                <td className="px-4 py-3 font-medium">
-                  {draft && editingId === v.id ? draft.numero : v.numero}
+                <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
+                  <span className="block truncate font-medium" title={nombreCliente}>
+                    {nombreCliente}
+                  </span>
+                </td>
+                <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
+                  <span className="block truncate" title={nombreTransp}>
+                    {nombreTransp}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
+                  <div className="flex flex-col gap-0.5 items-start">
                   {editingId === v.id ? (
                     <select
                       value={draft?.estado ?? 'pendiente'}
@@ -921,63 +945,77 @@ export function ViajesTenantPage() {
                       {savingEstadoId === v.id ? '…' : estadoViajeLabel[v.estado] ?? 'Sin clasificar'}
                     </button>
                   )}
+                  {viajeEstadoEsFacturadoOCobrado(v.estado) && (
+                    <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
+                      Factura: {v.nroFactura?.trim() ? v.nroFactura.trim() : '—'}
+                    </span>
+                  )}
+                  </div>
                 </td>
                 <td
                   className={`px-4 py-3 text-vialto-steel ${
-                    editingId === v.id ? 'min-w-[220px]' : 'max-w-[180px] truncate'
+                    editingId === v.id ? 'min-w-[240px]' : 'max-w-[220px]'
                   }`}
                 >
                   {editingId === v.id && draft ? (
-                    <div className="flex flex-col gap-1">
-                      <PaisUbicacionSelect
-                        value={draft.paisOrigen}
-                        onChange={(p) =>
-                          setDraft((prev) => (prev ? { ...prev, paisOrigen: p, origen: '' } : prev))
-                        }
-                        aria-label="País de origen"
-                        className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                      />
-                      <CiudadCombobox
-                        pais={draft.paisOrigen}
-                        value={draft.origen}
-                        onChange={(next) => setDraft((prev) => (prev ? { ...prev, origen: next } : prev))}
-                        inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                      />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                          Origen
+                        </span>
+                        <PaisUbicacionSelect
+                          value={draft.paisOrigen}
+                          onChange={(p) =>
+                            setDraft((prev) => (prev ? { ...prev, paisOrigen: p, origen: '' } : prev))
+                          }
+                          aria-label="País de origen"
+                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
+                        />
+                        <CiudadCombobox
+                          pais={draft.paisOrigen}
+                          value={draft.origen}
+                          onChange={(next) => setDraft((prev) => (prev ? { ...prev, origen: next } : prev))}
+                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                          Destino
+                        </span>
+                        <PaisUbicacionSelect
+                          value={draft.paisDestino}
+                          onChange={(p) =>
+                            setDraft((prev) => (prev ? { ...prev, paisDestino: p, destino: '' } : prev))
+                          }
+                          aria-label="País de destino"
+                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
+                        />
+                        <CiudadCombobox
+                          pais={draft.paisDestino}
+                          value={draft.destino}
+                          onChange={(next) => setDraft((prev) => (prev ? { ...prev, destino: next } : prev))}
+                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
+                        />
+                      </div>
                     </div>
                   ) : (
-                    (v.origen ?? '—')
-                  )}
-                </td>
-                <td
-                  className={`px-4 py-3 text-vialto-steel ${
-                    editingId === v.id ? 'min-w-[220px]' : 'max-w-[180px] truncate'
-                  }`}
-                >
-                  {editingId === v.id && draft ? (
-                    <div className="flex flex-col gap-1">
-                      <PaisUbicacionSelect
-                        value={draft.paisDestino}
-                        onChange={(p) =>
-                          setDraft((prev) => (prev ? { ...prev, paisDestino: p, destino: '' } : prev))
-                        }
-                        aria-label="País de destino"
-                        className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                      />
-                      <CiudadCombobox
-                        pais={draft.paisDestino}
-                        value={draft.destino}
-                        onChange={(next) => setDraft((prev) => (prev ? { ...prev, destino: next } : prev))}
-                        inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                      />
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="block truncate" title={v.origen?.trim() || undefined}>
+                        {soloCiudadDesdeEtiquetaUbicacion(v.origen)}
+                      </span>
+                      <span
+                        className="block truncate text-xs text-vialto-steel/90"
+                        title={v.destino?.trim() || undefined}
+                      >
+                        {soloCiudadDesdeEtiquetaUbicacion(v.destino)}
+                      </span>
                     </div>
-                  ) : (
-                    (v.destino ?? '—')
                   )}
                 </td>
-                <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums align-top">
+                <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                   {editingId === v.id && draft ? (
                     <ViajeFechaHoraFields
-                      mode="cargaOnly"
+                      mode="tablaCargaDescarga"
                       fechaCarga={draft.fechaCarga}
                       horaCarga={draft.horaCarga}
                       fechaDescarga={draft.fechaDescarga}
@@ -987,7 +1025,20 @@ export function ViajesTenantPage() {
                       inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
                     />
                   ) : (
-                    formatFechaCargaCelda(v.fechaCarga)
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span
+                        className="block whitespace-nowrap"
+                        title={v.fechaCarga ?? undefined}
+                      >
+                        {formatFechaCargaCelda(v.fechaCarga)}
+                      </span>
+                      <span
+                        className="block whitespace-nowrap text-xs text-vialto-steel/90"
+                        title={v.fechaDescarga ?? undefined}
+                      >
+                        {formatFechaCargaCelda(v.fechaDescarga)}
+                      </span>
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
@@ -1223,7 +1274,7 @@ export function ViajesTenantPage() {
                 </tr>
               )}
               </Fragment>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>

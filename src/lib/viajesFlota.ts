@@ -1,6 +1,6 @@
 import { normalizeViajeMoneda } from '@/lib/currencyMask';
 
-import type { Chofer, Vehiculo, Viaje } from '@/types/api';
+import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
@@ -115,6 +115,41 @@ export function textoMontoFacturarListado(v: Viaje): string {
   const sym = moneda === 'USD' ? 'US$' : '$';
   const locale = moneda === 'USD' ? 'en-US' : 'es-AR';
   return `${sym} ${m.toLocaleString(locale)}`;
+}
+
+/**
+ * Nombre del cliente en tablas de viajes: relación del API o búsqueda por `clienteId` en el maestro cargado.
+ */
+export function nombreClienteListadoViaje(v: Viaje, clientes?: Cliente[]): string {
+  const desdeApi = v.cliente?.nombre?.trim();
+  if (desdeApi) return desdeApi;
+  const cid = v.clienteId?.trim();
+  if (cid && clientes?.length) {
+    const c = clientes.find((x) => x.id === cid);
+    if (c?.nombre?.trim()) return c.nombre.trim();
+  }
+  return '—';
+}
+
+const FLOTA_PROPIA_LISTADO = 'Flota propia';
+
+/**
+ * Transportista externo (nombre) o «Flota propia» si el viaje no tiene `transportistaId`.
+ */
+export function nombreTransportistaExternoListadoViaje(
+  v: Viaje,
+  transportistas?: Transportista[],
+): string {
+  const tid = v.transportistaId?.trim();
+  if (!tid) return FLOTA_PROPIA_LISTADO;
+
+  const desdeApi = v.transportista?.nombre?.trim();
+  if (desdeApi) return desdeApi;
+  if (transportistas?.length) {
+    const t = transportistas.find((x) => x.id === tid);
+    if (t?.nombre?.trim()) return t.nombre.trim();
+  }
+  return '—';
 }
 
 /**

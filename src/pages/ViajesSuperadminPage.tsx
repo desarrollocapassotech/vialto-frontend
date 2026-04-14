@@ -20,11 +20,17 @@ import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
   normalizarIdEnLista,
+  nombreClienteListadoViaje,
+  nombreTransportistaExternoListadoViaje,
   textoMontoFacturarListado,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
-import { esEtiquetaCiudadValida, inferirPaisDesdeUbicacion } from '@/lib/ciudades';
+import {
+  esEtiquetaCiudadValida,
+  inferirPaisDesdeUbicacion,
+  soloCiudadDesdeEtiquetaUbicacion,
+} from '@/lib/ciudades';
 import {
   estadoMuestraKmLitros,
   draftKmLitrosVacios,
@@ -37,7 +43,11 @@ import type {
   SaveInlineKmOpts,
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
-import { estadoViajeLabel, viajeEstadoPermiteBotonFacturar } from '@/lib/viajesEstados';
+import {
+  estadoViajeLabel,
+  viajeEstadoEsFacturadoOCobrado,
+  viajeEstadoPermiteBotonFacturar,
+} from '@/lib/viajesEstados';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -455,7 +465,7 @@ export function ViajesSuperadminPage() {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const tableColSpan = editingId ? 5 : 6;
+  const tableColSpan = editingId ? 6 : 7;
 
   return (
     <div className="w-full">
@@ -512,11 +522,15 @@ export function ViajesSuperadminPage() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Número</th>
+              <th className="px-4 py-3 min-w-[8rem]">Cliente</th>
+              <th className="px-4 py-3 min-w-[8rem]">Transporte</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Origen</th>
-              <th className="px-4 py-3">Destino</th>
-              <th className="px-4 py-3">Fecha de carga</th>
+              <th className="px-4 py-3 min-w-[12rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+                Origen - Destino
+              </th>
+              <th className="px-4 py-3 min-w-[11rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+                Carga - Descarga
+              </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
               {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
@@ -542,86 +556,118 @@ export function ViajesSuperadminPage() {
               </tr>
             )}
 
-            {filtroEmpresa && rows?.map((v) => (
+            {filtroEmpresa && rows?.map((v) => {
+              const nombreCliente = nombreClienteListadoViaje(v, clientes);
+              const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
+              return (
               <Fragment key={v.id}>
                 {/* ── fila resumen ── */}
                 <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
 
-                  {/* Número */}
-                  <td className="px-4 py-3 font-medium">
-                    {draft && editingId === v.id ? draft.numero : v.numero}
+                  <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
+                    <span className="block truncate font-medium" title={nombreCliente}>
+                      {nombreCliente}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
+                    <span className="block truncate" title={nombreTransp}>
+                      {nombreTransp}
+                    </span>
                   </td>
 
                   {/* Estado */}
                   <td className="px-4 py-3">
-                    <ViajeEstadoCelda
-                      viajeId={v.id}
-                      viajeEstado={v.estado}
-                      isEditing={editingId === v.id}
-                      draft={draft}
-                      isQuickOpen={estadoQuickId === v.id}
-                      isSavingEstado={savingEstadoId === v.id}
-                      onDraftEstadoChange={(next) =>
-                        setDraft((p) => (p ? { ...p, estado: next } : p))
-                      }
-                      onRequiereKmLitrosDraft={(next) => {
-                        if (!draft) return;
-                        setKmLitrosKm(draft.kmRecorridos);
-                        setKmLitrosLitros(draft.litrosConsumidos);
-                        setKmLitrosPrompt({ kind: 'estado-draft', nextEstado: next });
-                        setKmLitrosFieldError(null);
-                      }}
-                      onQuickEstadoChange={(next) => void patchEstadoDesdeListado(v, next)}
-                      onQuickOpen={() => { if (!savingEstadoId) setEstadoQuickId(v.id); }}
-                      onQuickClose={() => setEstadoQuickId(null)}
-                    />
+                    <div className="flex flex-col gap-0.5 items-start">
+                      <ViajeEstadoCelda
+                        viajeId={v.id}
+                        viajeEstado={v.estado}
+                        isEditing={editingId === v.id}
+                        draft={draft}
+                        isQuickOpen={estadoQuickId === v.id}
+                        isSavingEstado={savingEstadoId === v.id}
+                        onDraftEstadoChange={(next) =>
+                          setDraft((p) => (p ? { ...p, estado: next } : p))
+                        }
+                        onRequiereKmLitrosDraft={(next) => {
+                          if (!draft) return;
+                          setKmLitrosKm(draft.kmRecorridos);
+                          setKmLitrosLitros(draft.litrosConsumidos);
+                          setKmLitrosPrompt({ kind: 'estado-draft', nextEstado: next });
+                          setKmLitrosFieldError(null);
+                        }}
+                        onQuickEstadoChange={(next) => void patchEstadoDesdeListado(v, next)}
+                        onQuickOpen={() => { if (!savingEstadoId) setEstadoQuickId(v.id); }}
+                        onQuickClose={() => setEstadoQuickId(null)}
+                      />
+                      {viajeEstadoEsFacturadoOCobrado(v.estado) && (
+                        <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
+                          Factura: {v.nroFactura?.trim() ? v.nroFactura.trim() : '—'}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
-                  {/* Origen */}
-                  <td className={`px-4 py-3 text-vialto-steel ${editingId === v.id ? 'min-w-[220px]' : 'max-w-[160px] truncate'}`}>
+                  <td
+                    className={`px-4 py-3 text-vialto-steel ${
+                      editingId === v.id ? 'min-w-[240px]' : 'max-w-[220px]'
+                    }`}
+                  >
                     {editingId === v.id && draft ? (
-                      <div className="flex flex-col gap-1">
-                        <PaisUbicacionSelect
-                          value={draft.paisOrigen}
-                          onChange={(p) => setDraft((prev) => prev ? { ...prev, paisOrigen: p, origen: '' } : prev)}
-                          aria-label="País de origen"
-                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                        />
-                        <CiudadCombobox
-                          pais={draft.paisOrigen}
-                          value={draft.origen}
-                          onChange={(next) => setDraft((prev) => prev ? { ...prev, origen: next } : prev)}
-                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                        />
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                            Origen
+                          </span>
+                          <PaisUbicacionSelect
+                            value={draft.paisOrigen}
+                            onChange={(p) => setDraft((prev) => prev ? { ...prev, paisOrigen: p, origen: '' } : prev)}
+                            aria-label="País de origen"
+                            className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
+                          />
+                          <CiudadCombobox
+                            pais={draft.paisOrigen}
+                            value={draft.origen}
+                            onChange={(next) => setDraft((prev) => prev ? { ...prev, origen: next } : prev)}
+                            inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                            Destino
+                          </span>
+                          <PaisUbicacionSelect
+                            value={draft.paisDestino}
+                            onChange={(p) => setDraft((prev) => prev ? { ...prev, paisDestino: p, destino: '' } : prev)}
+                            aria-label="País de destino"
+                            className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
+                          />
+                          <CiudadCombobox
+                            pais={draft.paisDestino}
+                            value={draft.destino}
+                            onChange={(next) => setDraft((prev) => prev ? { ...prev, destino: next } : prev)}
+                            inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </div>
                       </div>
-                    ) : (v.origen ?? '—')}
+                    ) : (
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="block truncate" title={v.origen?.trim() || undefined}>
+                          {soloCiudadDesdeEtiquetaUbicacion(v.origen)}
+                        </span>
+                        <span
+                          className="block truncate text-xs text-vialto-steel/90"
+                          title={v.destino?.trim() || undefined}
+                        >
+                          {soloCiudadDesdeEtiquetaUbicacion(v.destino)}
+                        </span>
+                      </div>
+                    )}
                   </td>
 
-                  {/* Destino */}
-                  <td className={`px-4 py-3 text-vialto-steel ${editingId === v.id ? 'min-w-[220px]' : 'max-w-[160px] truncate'}`}>
-                    {editingId === v.id && draft ? (
-                      <div className="flex flex-col gap-1">
-                        <PaisUbicacionSelect
-                          value={draft.paisDestino}
-                          onChange={(p) => setDraft((prev) => prev ? { ...prev, paisDestino: p, destino: '' } : prev)}
-                          aria-label="País de destino"
-                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                        />
-                        <CiudadCombobox
-                          pais={draft.paisDestino}
-                          value={draft.destino}
-                          onChange={(next) => setDraft((prev) => prev ? { ...prev, destino: next } : prev)}
-                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                        />
-                      </div>
-                    ) : (v.destino ?? '—')}
-                  </td>
-
-                  {/* Fecha de carga */}
-                  <td className="px-4 py-3 text-vialto-steel whitespace-nowrap tabular-nums align-top">
+                  <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     {editingId === v.id && draft ? (
                       <ViajeFechaHoraFields
-                        mode="cargaOnly"
+                        mode="tablaCargaDescarga"
                         fechaCarga={draft.fechaCarga}
                         horaCarga={draft.horaCarga}
                         fechaDescarga={draft.fechaDescarga}
@@ -630,7 +676,22 @@ export function ViajesSuperadminPage() {
                         labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
                         inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
                       />
-                    ) : formatFechaCarga(v.fechaCarga)}
+                    ) : (
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span
+                          className="block whitespace-nowrap"
+                          title={v.fechaCarga ?? undefined}
+                        >
+                          {formatFechaCarga(v.fechaCarga)}
+                        </span>
+                        <span
+                          className="block whitespace-nowrap text-xs text-vialto-steel/90"
+                          title={v.fechaDescarga ?? undefined}
+                        >
+                          {formatFechaCarga(v.fechaDescarga)}
+                        </span>
+                      </div>
+                    )}
                   </td>
 
                   {/* Monto */}
@@ -687,7 +748,7 @@ export function ViajesSuperadminPage() {
                   />
                 )}
               </Fragment>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>

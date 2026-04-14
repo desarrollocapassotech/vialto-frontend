@@ -7,3 +7,4 @@ export {
 } from './paises';
 export { buscarCiudades } from './buscarCiudades';
 export { esEtiquetaCiudadValida } from './validarCiudad';
+export { soloCiudadDesdeEtiquetaUbicacion } from './soloCiudadDesdeEtiqueta';

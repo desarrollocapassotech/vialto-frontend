@@ -130,6 +130,14 @@ export function viajeEstadoPermiteVincularAFactura(estado: string): boolean {
   return true;
 }
 
+/** Facturado (sin cobrar) o cobrado: el listado puede mostrar el número de factura bajo el viaje. */
+export function viajeEstadoEsFacturadoOCobrado(estado: string): boolean {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return true;
+  if (e === 'finalizado_cobrado' || e === 'cobrado') return true;
+  return false;
+}
+
 /** Estados que no deben mostrarse en el selector cuando el viaje ya tiene factura asignada. */
 const ESTADOS_OCULTOS_CON_FACTURA = new Set(['pendiente', 'en_curso', 'cancelado']);
 
