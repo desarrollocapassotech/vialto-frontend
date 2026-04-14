@@ -1,3 +1,5 @@
+import { viajeTieneFacturaAsignada } from './viajesFlota';
+
 /** Orden usado en selects de edición / listado. */
 export const VIAJE_ESTADOS_TODOS = [
   'pendiente',
@@ -144,16 +146,21 @@ const ESTADOS_OCULTOS_CON_FACTURA = new Set(['pendiente', 'en_curso', 'cancelado
 /**
  * Devuelve los estados disponibles para el selector de un viaje concreto,
  * aplicando las reglas de visibilidad según contexto:
- * - Si ya tiene factura (`nroFactura != null`): oculta pendiente, en_curso, cancelado.
+ * - Si ya tiene factura vinculada: oculta pendiente, en_curso, cancelado.
  * - Si ya está vinculado a una factura en el listado actual: oculta finalizado_sin_facturar.
  */
 export function estadosDisponiblesParaViaje(
-  viaje: { id: string; nroFactura?: string | null },
+  viaje: {
+    id: string;
+    nroFactura?: string | null;
+    facturaId?: string | null;
+    factura?: { id?: string } | null;
+  },
   viajesConFactura: Set<string>,
 ): string[] {
   return VIAJE_ESTADOS_TODOS.filter((x) => {
     if (x === 'finalizado_sin_facturar' && viajesConFactura.has(viaje.id)) return false;
-    if (viaje.nroFactura != null && ESTADOS_OCULTOS_CON_FACTURA.has(x)) return false;
+    if (viajeTieneFacturaAsignada(viaje) && ESTADOS_OCULTOS_CON_FACTURA.has(x)) return false;
     return true;
   });
 }

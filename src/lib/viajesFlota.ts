@@ -81,10 +81,31 @@ export function flotaPropiaVehiculosListaValida(
   return vehiculoIds.every((id) => permitidos.has(id));
 }
 
+/** Número a mostrar en listados: denormalizado en el viaje o el de la factura vinculada (include). */
+export function numeroFacturaVisibleViaje(
+  v: Pick<Viaje, 'nroFactura'> & { factura?: { numero?: string } | null },
+): string {
+  const a = v.nroFactura?.trim();
+  if (a) return a;
+  return (v.factura?.numero ?? '').trim();
+}
+
+/** El viaje ya está vinculado a una factura (relación o número en fila). */
+export function viajeTieneFacturaAsignada(v: {
+  nroFactura?: string | null;
+  facturaId?: string | null;
+  factura?: { id?: string } | null;
+}): boolean {
+  if (v.nroFactura != null && String(v.nroFactura).trim() !== '') return true;
+  if (v.facturaId != null && String(v.facturaId).trim() !== '') return true;
+  if (v.factura?.id != null && String(v.factura.id).trim() !== '') return true;
+  return false;
+}
+
 /**
  * Viajes que se pueden vincular a una factura según tipo y cliente.
  * Tipo «cliente»: solo viajes de ese `clienteId`. «transportista_externo»: todos (sin filtro por cliente en maestro).
- * Excluye viajes que ya tienen factura asignada (`nroFactura != null`), cobrados y cancelados.
+ * Excluye viajes que ya tienen factura asignada, cobrados y cancelados.
  */
 export function viajesFiltradosParaFactura(
   todos: Viaje[],
@@ -100,7 +121,7 @@ export function viajesFiltradosParaFactura(
     list = todos.filter((v) => v.clienteId === cid);
   }
   return list.filter((v) => {
-    if (v.nroFactura != null) return false; // ya tiene factura asignada
+    if (viajeTieneFacturaAsignada(v)) return false; // ya tiene factura asignada
     if (v.estado === 'cobrado') return false;
     if (v.estado === 'cancelado') return false;
     return true;

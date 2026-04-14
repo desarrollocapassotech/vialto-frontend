@@ -1,13 +1,11 @@
 import { useOrganization } from '@clerk/clerk-react';
-import { TenantOverviewCards } from '@/components/tenant/TenantOverviewCards';
+import { TenantOwnerDashboard } from '@/components/tenant/TenantOwnerDashboard';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { useTenantDashboardMetrics } from '@/hooks/useTenantDashboardMetrics';
 
 export function TenantHomePage() {
   const { organization } = useOrganization();
   const { tenant, loading, error } = useCurrentTenant();
   const companyName = tenant?.name?.trim() || organization?.name?.trim() || 'empresa';
-  const dashboard = useTenantDashboardMetrics(tenant?.modules ?? []);
 
   return (
     <div className="w-full">
@@ -15,7 +13,8 @@ export function TenantHomePage() {
         Panel de {companyName}
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
-        Vista adaptada a los módulos contratados por tu organización.
+        Indicadores clave para la gestión de tu empresa: cobranzas, riesgos y
+        actividad según los módulos contratados.
       </p>
 
       {!organization && (
@@ -36,10 +35,13 @@ export function TenantHomePage() {
         </div>
       )}
 
-      <TenantOverviewCards
-        loading={loading || dashboard.loading}
-        cards={dashboard.cards}
-      />
+      {organization && loading && !error && (
+        <p className="mt-6 text-sm text-vialto-steel">Cargando datos de tu empresa…</p>
+      )}
+
+      {organization && !loading && !error && tenant && (
+        <TenantOwnerDashboard modules={tenant.modules} />
+      )}
     </div>
   );
 }

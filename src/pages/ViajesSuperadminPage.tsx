@@ -22,6 +22,7 @@ import {
   normalizarIdEnLista,
   nombreClienteListadoViaje,
   nombreTransportistaExternoListadoViaje,
+  numeroFacturaVisibleViaje,
   textoMontoFacturarListado,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
@@ -601,7 +602,7 @@ export function ViajesSuperadminPage() {
                       />
                       {viajeEstadoEsFacturadoOCobrado(v.estado) && (
                         <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
-                          Factura: {v.nroFactura?.trim() ? v.nroFactura.trim() : '—'}
+                          Factura: {numeroFacturaVisibleViaje(v) || '—'}
                         </span>
                       )}
                     </div>

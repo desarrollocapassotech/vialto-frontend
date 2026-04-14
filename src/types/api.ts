@@ -32,7 +32,10 @@ export interface Viaje {
   monedaPrecioTransportistaExterno?: string;
   observaciones: string | null;
   fechaFinalizado: string | null;
+  facturaId?: string | null;
+  /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
+  factura?: { id: string; numero: string } | null;
   createdAt: string;
   createdBy: string;
 }
