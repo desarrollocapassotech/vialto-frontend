@@ -1,5 +1,5 @@
 import { normalizeViajeMoneda } from '@/lib/currencyMask';
-import { viajeEstadoPermiteVincularAFactura } from '@/lib/viajesEstados';
+
 import type { Chofer, Vehiculo, Viaje } from '@/types/api';
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
@@ -84,7 +84,7 @@ export function flotaPropiaVehiculosListaValida(
 /**
  * Viajes que se pueden vincular a una factura según tipo y cliente.
  * Tipo «cliente»: solo viajes de ese `clienteId`. «transportista_externo»: todos (sin filtro por cliente en maestro).
- * En ambos casos se excluyen estados facturado, cobrado y cancelado.
+ * Excluye viajes que ya tienen factura asignada (`nroFactura != null`), cobrados y cancelados.
  */
 export function viajesFiltradosParaFactura(
   todos: Viaje[],
@@ -99,7 +99,12 @@ export function viajesFiltradosParaFactura(
     if (!cid) return [];
     list = todos.filter((v) => v.clienteId === cid);
   }
-  return list.filter((v) => viajeEstadoPermiteVincularAFactura(v.estado));
+  return list.filter((v) => {
+    if (v.nroFactura != null) return false; // ya tiene factura asignada
+    if (v.estado === 'cobrado') return false;
+    if (v.estado === 'cancelado') return false;
+    return true;
+  });
 }
 
 /** Celda de tabla: monto a facturar. */

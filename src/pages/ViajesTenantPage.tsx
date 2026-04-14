@@ -49,7 +49,7 @@ import {
   parseKmLitrosOpcionales,
   viajeTieneKmYLitrosEnApi,
   viajeEstadoPermiteBotonFacturar,
-  VIAJE_ESTADOS_TODOS,
+  estadosDisponiblesParaViaje,
 } from '@/lib/viajesEstados';
 import type {
   Chofer,
@@ -61,7 +61,6 @@ import type {
   Viaje,
 } from '@/types/api';
 
-const ESTADOS = VIAJE_ESTADOS_TODOS;
 
 type ViajeInlineDraft = {
   numero: string;
@@ -884,7 +883,7 @@ export function ViajesTenantPage() {
                       }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     >
-                      {ESTADOS.filter((x) => !(x === 'finalizado_sin_facturar' && viajesConFactura.has(v.id))).map((x) => (
+                      {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
                         <option key={x} value={x}>
                           {estadoViajeLabel[x] ?? x}
                         </option>
@@ -900,7 +899,7 @@ export function ViajesTenantPage() {
                       className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
                       aria-label="Cambiar estado del viaje"
                     >
-                      {ESTADOS.filter((x) => !(x === 'finalizado_sin_facturar' && viajesConFactura.has(v.id))).map((x) => (
+                      {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
                         <option key={x} value={x}>
                           {estadoViajeLabel[x] ?? x}
                         </option>

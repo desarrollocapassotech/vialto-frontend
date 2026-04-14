@@ -29,6 +29,7 @@ export interface Viaje {
   monedaPrecioTransportistaExterno?: string;
   observaciones: string | null;
   fechaFinalizado: string | null;
+  nroFactura: string | null;
   createdAt: string;
   createdBy: string;
 }
