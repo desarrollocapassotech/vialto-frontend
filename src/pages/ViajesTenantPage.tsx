@@ -14,6 +14,7 @@ import {
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
+import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
@@ -138,6 +139,12 @@ export function ViajesTenantPage() {
   const [kmLitrosKm, setKmLitrosKm] = useState('');
   const [kmLitrosLitros, setKmLitrosLitros] = useState('');
   const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
+  /** Modal de elección al facturar: nueva factura o agregar a una existente del cliente. */
+  const [facturarOpcionState, setFacturarOpcionState] = useState<{
+    viaje: Viaje;
+    facturas: Factura[];
+  } | null>(null);
+  const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
   /** IDs de viajes que ya tienen al menos una factura asociada. */
   const [viajesConFactura, setViajesConFactura] = useState<Set<string>>(new Set());
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
@@ -466,10 +473,19 @@ export function ViajesTenantPage() {
 
   async function navigateToFacturacion(v: Viaje) {
     try {
-      const facturas = await apiJson<{ id: string; viajeIds: string[] }[]>('/api/facturacion/facturas', () => getToken());
-      const existente = facturas.find((f) => f.viajeIds.includes(v.id));
-      if (existente) {
-        navigate('/facturacion', { state: { expandFacturaId: existente.id } });
+      const facturasCliente = await apiJson<Factura[]>(
+        `/api/facturacion/facturas?clienteId=${encodeURIComponent(v.clienteId)}`,
+        () => getToken(),
+      );
+      // Si el viaje ya está vinculado a una factura, ir directamente a ella
+      const yaVinculada = facturasCliente.find((f) => f.viajeIds.includes(v.id));
+      if (yaVinculada) {
+        navigate('/facturacion', { state: { expandFacturaId: yaVinculada.id } });
+        return;
+      }
+      // Si el cliente tiene otras facturas, mostrar el modal de elección
+      if (facturasCliente.length > 0) {
+        setFacturarOpcionState({ viaje: v, facturas: facturasCliente });
         return;
       }
     } catch {
@@ -483,6 +499,39 @@ export function ViajesTenantPage() {
         },
       },
     });
+  }
+
+  async function handleFacturarOpcionConfirm(opcion: 'nueva' | { facturaId: string }) {
+    if (!facturarOpcionState) return;
+    const { viaje, facturas } = facturarOpcionState;
+    if (opcion === 'nueva') {
+      setFacturarOpcionState(null);
+      navigate('/facturacion', {
+        state: {
+          newFacturaDraft: {
+            clienteId: viaje.clienteId ?? '',
+            viajeIds: [viaje.id],
+          },
+        },
+      });
+      return;
+    }
+    // Agregar a factura existente
+    const facturaTarget = facturas.find((f) => f.id === opcion.facturaId);
+    if (!facturaTarget) return;
+    setFacturarOpcionBusy(true);
+    try {
+      await apiJson(`/api/facturacion/facturas/${encodeURIComponent(opcion.facturaId)}`, () => getToken(), {
+        method: 'PATCH',
+        body: JSON.stringify({ viajeIds: [...facturaTarget.viajeIds, viaje.id] }),
+      });
+      setFacturarOpcionState(null);
+      navigate('/facturacion', { state: { expandFacturaId: opcion.facturaId } });
+    } catch (e) {
+      setError(friendlyError(e, 'facturacion'));
+    } finally {
+      setFacturarOpcionBusy(false);
+    }
   }
 
   function applyDraftModo(m: ViajeOperacionModo) {
@@ -1222,6 +1271,15 @@ export function ViajesTenantPage() {
           </div>
         </div>
       )}
+
+      <FacturarOpcionModal
+        open={facturarOpcionState != null}
+        facturas={facturarOpcionState?.facturas ?? []}
+        busy={facturarOpcionBusy}
+        onNuevaFactura={() => void handleFacturarOpcionConfirm('nueva')}
+        onAgregarAExistente={(facturaId) => void handleFacturarOpcionConfirm({ facturaId })}
+        onClose={() => setFacturarOpcionState(null)}
+      />
 
       <ViajeKmLitrosDialog
         open={kmLitrosPrompt != null}
