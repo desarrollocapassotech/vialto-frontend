@@ -6,5 +6,5 @@ export {
   type PaisOpcion,
 } from './paises';
 export { buscarCiudades } from './buscarCiudades';
-export { esEtiquetaCiudadValida } from './validarCiudad';
+export { esEtiquetaCiudadValida, normalizarEtiquetaCiudad } from './validarCiudad';
 export { soloCiudadDesdeEtiquetaUbicacion } from './soloCiudadDesdeEtiqueta';

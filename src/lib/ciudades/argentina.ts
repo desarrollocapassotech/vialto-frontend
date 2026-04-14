@@ -22,7 +22,7 @@ async function buscarGeoref(query: string, signal?: AbortSignal): Promise<Ciudad
 
   const url = `${georefBaseUrl()}?${new URLSearchParams({
     nombre: q,
-    max: '20',
+    max: '50',
     campos: 'id,nombre,provincia.nombre',
   })}`;
 
@@ -118,23 +118,45 @@ async function buscarNominatimAr(query: string, signal?: AbortSignal): Promise<C
   return out;
 }
 
+function normalizarLabelClave(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
 /**
- * Primero Georef (datos oficiales); si no hay coincidencias (frecuente con pocas letras), Nominatim.
+ * Georef (oficial) + Nominatim (OpenStreetMap), sin duplicar por etiqueta.
+ * Antes solo se usaba Nominatim si Georef devolvía vacío; eso ocultaba muchas coincidencias útiles.
  */
 export async function buscarArgentina(query: string, signal?: AbortSignal): Promise<CiudadOpcion[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
-  try {
-    const geo = await buscarGeoref(q, signal);
-    if (geo.length > 0) return geo;
-  } catch {
-    /* seguir con Nominatim */
+  const [geoRes, nomRes] = await Promise.allSettled([
+    buscarGeoref(q, signal),
+    buscarNominatimAr(q, signal),
+  ]);
+
+  const geo = geoRes.status === 'fulfilled' ? geoRes.value : [];
+  const nom = nomRes.status === 'fulfilled' ? nomRes.value : [];
+
+  const seen = new Set<string>();
+  const out: CiudadOpcion[] = [];
+
+  for (const c of geo) {
+    const k = normalizarLabelClave(c.label);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  for (const c of nom) {
+    const k = normalizarLabelClave(c.label);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
   }
 
-  try {
-    return await buscarNominatimAr(q, signal);
-  } catch {
-    return [];
-  }
+  return out;
 }

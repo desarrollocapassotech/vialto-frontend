@@ -1,7 +1,8 @@
 import { buscarCiudades } from './buscarCiudades';
 import type { PaisCodigo } from './types';
 
-function norm(s: string): string {
+/** Comparación insensible a mayúsculas y tildes (misma ciudad con distinto formato). */
+export function normalizarEtiquetaCiudad(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
 }
 
@@ -17,7 +18,7 @@ export async function esEtiquetaCiudadValida(
   const trimmed = label.trim();
   if (trimmed.length < 2) return false;
 
-  const nTarget = norm(trimmed);
+  const nTarget = normalizarEtiquetaCiudad(trimmed);
   const primera = trimmed.split(',')[0]?.trim() ?? trimmed;
   const queries =
     primera.length >= 2 && primera !== trimmed ? [primera, trimmed] : [primera];
@@ -25,7 +26,7 @@ export async function esEtiquetaCiudadValida(
   for (const q of queries) {
     if (q.length < 2) continue;
     const rows = await buscarCiudades(pais, q, signal);
-    if (rows.some((r) => norm(r.label) === nTarget)) return true;
+    if (rows.some((r) => normalizarEtiquetaCiudad(r.label) === nTarget)) return true;
   }
   return false;
 }

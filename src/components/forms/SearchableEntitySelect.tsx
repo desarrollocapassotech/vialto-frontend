@@ -326,7 +326,7 @@ export function SearchableEntitySelect<T extends { id: string }>({
       >
         <span
           className={`min-w-0 flex-1 truncate ${
-            !displayLabel && (value === '' || !selected) ? 'text-vialto-steel' : ''
+            !displayLabel && (value === '' || !selected) ? 'text-vialto-charcoal' : ''
           }`}
         >
           {displayLabel || placeholderCerrado}

@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { buscarCiudades, type PaisCodigo } from '@/lib/ciudades';
+import { buscarCiudades, normalizarEtiquetaCiudad, type PaisCodigo } from '@/lib/ciudades';
 
 type Props = {
   /** País cuyo buscador se usa (Argentina, Uruguay, …). */
@@ -210,9 +210,12 @@ export function CiudadCombobox({
               setInputValue('');
               return;
             }
-            if (trimmed !== value.trim()) {
-              setInputValue(value);
+            const v = value.trim();
+            if (normalizarEtiquetaCiudad(trimmed) === normalizarEtiquetaCiudad(v)) {
+              setInputValue(v);
+              return;
             }
+            setInputValue(value);
           }, 150);
         }}
         onKeyDown={(e) => {

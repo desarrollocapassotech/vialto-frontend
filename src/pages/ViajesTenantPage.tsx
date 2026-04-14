@@ -15,6 +15,7 @@ import {
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
@@ -58,6 +59,7 @@ import {
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
   estadosDisponiblesParaViaje,
+  VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
 import type {
   Chofer,
@@ -130,14 +132,31 @@ export function ViajesTenantPage() {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  /** Valores en los controles (hasta pulsar Buscar). */
-  const [filtroClienteDraft, setFiltroClienteDraft] = useState('');
-  const [filtroTransportistaDraft, setFiltroTransportistaDraft] = useState('');
-  /** Filtros ya aplicados en la última búsqueda (ref + versión para forzar refetch al pulsar Buscar aunque la página siga en 1). */
-  const filtrosAplicadosRef = useRef({ clienteId: '', transportistaId: '' });
-  /** Cliente del último «Buscar» (para UI: checks y facturación masiva solo con filtro por cliente). */
+  /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
+  const filtrosAplicadosRef = useRef({
+    clienteId: '',
+    transportistaId: '',
+    estado: '',
+    tipoFecha: '' as '' | 'carga' | 'descarga',
+    fechaDesde: '',
+    fechaHasta: '',
+    tipoUbicacion: '' as '' | 'origen' | 'destino',
+    /** Etiqueta completa de ciudad (misma que guarda el viaje al elegir del combobox). */
+    ubicacion: '',
+  });
+  /** Cliente seleccionado en filtro de columna (checks y facturación masiva). */
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState('');
+  const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [tipoFechaFiltro, setTipoFechaFiltro] = useState<'' | 'carga' | 'descarga'>('');
+  const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState('');
+  const [fechaHastaFiltro, setFechaHastaFiltro] = useState('');
+  const [tipoUbicacionFiltro, setTipoUbicacionFiltro] = useState<'' | 'origen' | 'destino'>('');
+  const [paisUbicacionFiltro, setPaisUbicacionFiltro] = useState<PaisCodigo>('AR');
+  const [ubicacionFiltro, setUbicacionFiltro] = useState('');
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
+  /** Mientras se vuelve a pedir el listado (filtros, página, etc.). */
+  const [listadoRefetching, setListadoRefetching] = useState(false);
   /** Selección para facturar varios viajes juntos (solo con filtro por cliente). */
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>([]);
   const getTokenRef = useRef(getToken);
@@ -172,9 +191,29 @@ export function ViajesTenantPage() {
         const params = new URLSearchParams();
         params.set('page', String(page));
         params.set('pageSize', String(pageSize));
-        const { clienteId: cid, transportistaId: tid } = filtrosAplicadosRef.current;
+        const {
+          clienteId: cid,
+          transportistaId: tid,
+          estado: estF,
+          tipoFecha: tf,
+          fechaDesde: fd,
+          fechaHasta: fh,
+          tipoUbicacion: tu,
+          ubicacion: ut,
+        } = filtrosAplicadosRef.current;
         if (cid) params.set('clienteId', cid);
         if (tid) params.set('transportistaId', tid);
+        if (estF.trim()) params.set('estado', estF.trim());
+        if ((tf === 'carga' || tf === 'descarga') && (fd.trim() || fh.trim())) {
+          params.set('tipoFecha', tf);
+          if (fd.trim()) params.set('fechaDesde', fd.trim());
+          if (fh.trim()) params.set('fechaHasta', fh.trim());
+        }
+        const utTrim = ut.trim();
+        if ((tu === 'origen' || tu === 'destino') && utTrim) {
+          params.set('tipoUbicacion', tu);
+          params.set('ubicacion', utTrim);
+        }
         const data = await apiJson<ViajesPaginatedResponse>(
           `/api/viajes/paginated?${params.toString()}`,
           () => getTokenRef.current(),
@@ -183,12 +222,14 @@ export function ViajesTenantPage() {
           setRows(data.items);
           setMeta(data.meta);
           setError(null);
+          setListadoRefetching(false);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
           setError(friendlyError(e, 'viajes'));
+          setListadoRefetching(false);
         }
       }
     })();
@@ -197,25 +238,165 @@ export function ViajesTenantPage() {
     };
   }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion]);
 
-  function aplicarFiltrosBuscar() {
-    const cid = filtroClienteDraft.trim();
+  function aplicarFiltroColumnaCliente(clienteId: string) {
+    const cid = clienteId.trim();
     filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
       clienteId: cid,
-      transportistaId: filtroTransportistaDraft.trim(),
     };
+    setListadoRefetching(true);
     setClienteIdFiltroActivo(cid);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
 
-  function limpiarFiltrosListado() {
-    filtrosAplicadosRef.current = { clienteId: '', transportistaId: '' };
-    setClienteIdFiltroActivo('');
-    setFiltroClienteDraft('');
-    setFiltroTransportistaDraft('');
+  function aplicarFiltroColumnaTransportista(transportistaId: string) {
+    const tid = transportistaId.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      transportistaId: tid,
+    };
+    setListadoRefetching(true);
+    setTransportistaIdFiltroActivo(tid);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
+
+  function aplicarFiltroEstado(val: string) {
+    const e = val.trim();
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, estado: e };
+    setEstadoFiltro(e);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarTipoFechaFiltro(val: '' | 'carga' | 'descarga') {
+    if (!val) {
+      filtrosAplicadosRef.current = {
+        ...filtrosAplicadosRef.current,
+        tipoFecha: '',
+        fechaDesde: '',
+        fechaHasta: '',
+      };
+      setTipoFechaFiltro('');
+      setFechaDesdeFiltro('');
+      setFechaHastaFiltro('');
+    } else {
+      filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, tipoFecha: val };
+      setTipoFechaFiltro(val);
+    }
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFechaDesdeFiltro(val: string) {
+    const s = val.trim();
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaDesde: s };
+    setFechaDesdeFiltro(s);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFechaHastaFiltro(val: string) {
+    const s = val.trim();
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaHasta: s };
+    setFechaHastaFiltro(s);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarTipoUbicacionFiltro(val: '' | 'origen' | 'destino') {
+    const habiaCiudadEnFiltro =
+      filtrosAplicadosRef.current.ubicacion.trim() !== '';
+
+    if (!val) {
+      filtrosAplicadosRef.current = {
+        ...filtrosAplicadosRef.current,
+        tipoUbicacion: '',
+        ubicacion: '',
+      };
+      setTipoUbicacionFiltro('');
+      setUbicacionFiltro('');
+      setPaisUbicacionFiltro('AR');
+    } else {
+      filtrosAplicadosRef.current = {
+        ...filtrosAplicadosRef.current,
+        tipoUbicacion: val,
+        ubicacion: '',
+      };
+      setTipoUbicacionFiltro(val);
+      setUbicacionFiltro('');
+    }
+
+    /** Solo se pide de nuevo el listado si había ciudad aplicada (se quitó o se cambió origen/destino). */
+    if (habiaCiudadEnFiltro) {
+      setListadoRefetching(true);
+      setPage(1);
+      setListadoQueryVersion((v) => v + 1);
+    }
+  }
+
+  function aplicarPaisUbicacionFiltro(p: PaisCodigo) {
+    const habiaCiudadEnFiltro =
+      filtrosAplicadosRef.current.ubicacion.trim() !== '';
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, ubicacion: '' };
+    setUbicacionFiltro('');
+    setPaisUbicacionFiltro(p);
+    if (habiaCiudadEnFiltro) {
+      setListadoRefetching(true);
+      setPage(1);
+      setListadoQueryVersion((v) => v + 1);
+    }
+  }
+
+  /** Solo se llama desde `CiudadCombobox` al elegir una ciudad de la lista (o vaciar). */
+  function aplicarUbicacionCiudadSeleccion(val: string) {
+    const s = val.trim().slice(0, 200);
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, ubicacion: s };
+    setUbicacionFiltro(s);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function limpiarFiltrosColumnas() {
+    filtrosAplicadosRef.current = {
+      clienteId: '',
+      transportistaId: '',
+      estado: '',
+      tipoFecha: '',
+      fechaDesde: '',
+      fechaHasta: '',
+      tipoUbicacion: '',
+      ubicacion: '',
+    };
+    setListadoRefetching(true);
+    setClienteIdFiltroActivo('');
+    setTransportistaIdFiltroActivo('');
+    setEstadoFiltro('');
+    setTipoFechaFiltro('');
+    setFechaDesdeFiltro('');
+    setFechaHastaFiltro('');
+    setTipoUbicacionFiltro('');
+    setPaisUbicacionFiltro('AR');
+    setUbicacionFiltro('');
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  const hayFiltrosColumnasActivos =
+    !!clienteIdFiltroActivo.trim() ||
+    !!transportistaIdFiltroActivo.trim() ||
+    !!estadoFiltro.trim() ||
+    !!tipoFechaFiltro ||
+    !!fechaDesdeFiltro.trim() ||
+    !!fechaHastaFiltro.trim() ||
+    !!tipoUbicacionFiltro ||
+    !!ubicacionFiltro.trim();
 
   useEffect(() => {
     setIdsFacturarSeleccion([]);
@@ -669,6 +850,7 @@ export function ViajesTenantPage() {
   /** Cliente + transp. externo + estado + recorrido + fechas carga/descarga + monto [+ acciones]. */
   const tableColSpanBase = editingId ? 6 : 7;
   const tableColSpan = mostrarColumnaFacturarLote ? tableColSpanBase + 1 : tableColSpanBase;
+  const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
   const todosElegiblesMarcados =
     elegiblesEnPagina.length > 0 &&
@@ -695,36 +877,50 @@ export function ViajesTenantPage() {
         Viajes
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Cliente, transporte, estado, origen y destino, fechas de carga y descarga y monto a facturar de cada operación.
+        Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
       </p>
-      <div className="mt-4 flex justify-end gap-2">
-        {editingId ? (
-          <>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-h-10 items-center">
+          {hayFiltrosColumnasActivos && (
             <button
               type="button"
-              onClick={cancelEdit}
-              disabled={savingId === editingId}
-              className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
+              onClick={limpiarFiltrosColumnas}
+              disabled={listadoRefetching}
+              className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
-              Cerrar
+              Limpiar filtros
             </button>
-            <button
-              type="button"
-              onClick={() => saveInline(editingId)}
-              disabled={savingId === editingId}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
+          )}
+        </div>
+        <div className="flex shrink-0 justify-end gap-2">
+          {editingId ? (
+            <>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={savingId === editingId}
+                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => saveInline(editingId)}
+                disabled={savingId === editingId}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
+              >
+                {savingId === editingId ? 'Guardando…' : 'Modificar cambios'}
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/viajes/nuevo"
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
             >
-              {savingId === editingId ? 'Guardando…' : 'Modificar cambios'}
-            </button>
-          </>
-        ) : (
-          <Link
-            to="/viajes/nuevo"
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Crear viaje
-          </Link>
-        )}
+              Crear viaje
+            </Link>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -732,64 +928,6 @@ export function ViajesTenantPage() {
           {error}
         </p>
       )}
-
-      <form
-        className="mt-6 rounded border border-black/10 bg-white shadow-sm p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          aplicarFiltrosBuscar();
-        }}
-      >
-        <h2 className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire mb-3">
-          Filtros del listado
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
-          <div className="flex flex-col gap-1 min-w-0">
-            <label htmlFor="viajes-filtro-cliente" className="text-xs uppercase tracking-wider text-vialto-steel">
-              Cliente
-            </label>
-            <ClienteSearchSelect
-              id="viajes-filtro-cliente"
-              clientes={clientes}
-              value={filtroClienteDraft}
-              onChange={setFiltroClienteDraft}
-              allowEmptyValue
-              emptyListChoiceLabel="Todos"
-              placeholderCerrado="Todos los clientes"
-              aria-label="Filtrar por cliente"
-            />
-          </div>
-          <div className="flex flex-col gap-1 min-w-0">
-            <label htmlFor="viajes-filtro-transportista" className="text-xs uppercase tracking-wider text-vialto-steel">
-              Transportista externo
-            </label>
-            <TransportistaSearchSelect
-              id="viajes-filtro-transportista"
-              transportistas={transportistas}
-              value={filtroTransportistaDraft}
-              onChange={setFiltroTransportistaDraft}
-              placeholderCerrado="Todos"
-              emptyListChoiceLabel="Todos"
-              aria-label="Filtrar por transportista externo"
-            />
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <button
-              type="submit"
-              className="h-9 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite shrink-0"
-            >
-              Buscar
-            </button>
-            <button
-              type="button"
-              onClick={limpiarFiltrosListado}
-              className="self-start sm:self-auto text-[11px] text-vialto-steel hover:text-vialto-charcoal underline-offset-2 hover:underline py-0.5 px-0 bg-transparent border-0 cursor-pointer"
-            >
-              Limpiar filtros
-            </button>
-          </div>
-        </div>
-      </form>
 
       {mostrarColumnaFacturarLote && idsFacturarSeleccion.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-black/10 bg-white px-4 py-3 shadow-sm">
@@ -810,7 +948,10 @@ export function ViajesTenantPage() {
       )}
 
       <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
+        <table
+          className="w-full text-left text-sm"
+          aria-busy={mostrarCargandoListado}
+        >
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
               {mostrarColumnaFacturarLote && (
@@ -828,35 +969,190 @@ export function ViajesTenantPage() {
                   ) : null}
                 </th>
               )}
-              <th className="px-4 py-3 min-w-[8rem]">Cliente</th>
-              <th className="px-4 py-3 min-w-[8rem]">Transporte</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 min-w-[12rem] text-[11px] tracking-[0.2em] text-vialto-fire">
-                Origen - Destino
+              <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
+                <ViajesListadoHeaderFiltro title="Cliente">
+                  <ClienteSearchSelect
+                    id="viajes-col-filtro-cliente"
+                    clientes={clientes}
+                    value={clienteIdFiltroActivo}
+                    onChange={(id) => aplicarFiltroColumnaCliente(id)}
+                    allowEmptyValue
+                    emptyListChoiceLabel="Todos"
+                    placeholderCerrado="Todos"
+                    disabled={listadoRefetching}
+                    aria-label="Filtrar listado por cliente"
+                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      clienteIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                  />
+                </ViajesListadoHeaderFiltro>
               </th>
-              <th className="px-4 py-3 min-w-[11rem] text-[11px] tracking-[0.2em] text-vialto-fire">
-                Carga - Descarga
+              <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
+                <ViajesListadoHeaderFiltro title="Transporte">
+                  <TransportistaSearchSelect
+                    id="viajes-col-filtro-transporte"
+                    transportistas={transportistas}
+                    value={transportistaIdFiltroActivo}
+                    onChange={(id) => aplicarFiltroColumnaTransportista(id)}
+                    placeholderCerrado="Todos"
+                    emptyListChoiceLabel="Todos"
+                    disabled={listadoRefetching}
+                    aria-label="Filtrar listado por transporte"
+                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      transportistaIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                  />
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top min-w-[11rem]">
+                <ViajesListadoHeaderFiltro title="Estado">
+                  <select
+                    value={estadoFiltro}
+                    onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                    disabled={listadoRefetching}
+                    className={`h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm ${
+                      estadoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar listado por estado"
+                  >
+                    <option value="">Todos</option>
+                    {VIAJE_ESTADOS_TODOS.map((est) => (
+                      <option key={est} value={est}>
+                        {estadoViajeLabel[est] ?? est}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
+                <ViajesListadoHeaderFiltro title="Origen — Destino">
+                  <div className="flex flex-col gap-2">
+                    <select
+                      value={tipoUbicacionFiltro}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        aplicarTipoUbicacionFiltro(
+                          v === 'origen' || v === 'destino' ? v : '',
+                        );
+                      }}
+                      disabled={listadoRefetching}
+                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                        tipoUbicacionFiltro && ubicacionFiltro.trim()
+                          ? 'text-vialto-fire'
+                          : 'text-vialto-charcoal'
+                      }`}
+                      aria-label="Filtrar por ciudad en origen o en destino"
+                    >
+                      <option value="">Sin filtro por ubicación</option>
+                      <option value="origen">Origen</option>
+                      <option value="destino">Destino</option>
+                    </select>
+                    {tipoUbicacionFiltro ? (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                          País
+                        </span>
+                        <PaisUbicacionSelect
+                          value={paisUbicacionFiltro}
+                          onChange={(p) => aplicarPaisUbicacionFiltro(p)}
+                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
+                          aria-label="País para buscar la ciudad del filtro"
+                        />
+                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                          Ciudad
+                        </span>
+                        <div className="min-w-[200px] w-full">
+                          <CiudadCombobox
+                            pais={paisUbicacionFiltro}
+                            value={ubicacionFiltro}
+                            onChange={(next) => aplicarUbicacionCiudadSeleccion(next)}
+                            inputClassName={`h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm ${
+                              ubicacionFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                            }`}
+                            disableBrowserAutocomplete
+                            aria-label={
+                              tipoUbicacionFiltro === 'origen'
+                                ? 'Ciudad de origen (elegir de la lista)'
+                                : 'Ciudad de destino (elegir de la lista)'
+                            }
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
+                <ViajesListadoHeaderFiltro title="Carga — Descarga">
+                  <div className="flex flex-col gap-2">
+                    <select
+                      value={tipoFechaFiltro}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        aplicarTipoFechaFiltro(
+                          v === 'carga' || v === 'descarga' ? v : '',
+                        );
+                      }}
+                      disabled={listadoRefetching}
+                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                        tipoFechaFiltro &&
+                        (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
+                          ? 'text-vialto-fire'
+                          : 'text-vialto-charcoal'
+                      }`}
+                      aria-label="Filtrar por fecha de carga o de descarga"
+                    >
+                      <option value="">Sin filtro por fecha</option>
+                      <option value="carga">Fecha de carga</option>
+                      <option value="descarga">Fecha de descarga</option>
+                    </select>
+                    {tipoFechaFiltro ? (
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                        <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                          Desde
+                          <input
+                            type="date"
+                            value={fechaDesdeFiltro}
+                            onChange={(e) => aplicarFechaDesdeFiltro(e.target.value)}
+                            disabled={listadoRefetching}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </label>
+                        <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                          Hasta
+                          <input
+                            type="date"
+                            value={fechaHastaFiltro}
+                            onChange={(e) => aplicarFechaHastaFiltro(e.target.value)}
+                            disabled={listadoRefetching}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                </ViajesListadoHeaderFiltro>
               </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
               {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
-            {rows === null && !error && (
+            {mostrarCargandoListado && (
               <tr>
                 <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
-            {rows?.length === 0 && (
+            {!mostrarCargandoListado && rows?.length === 0 && (
               <tr>
                 <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
                   Todavía no hay viajes cargados.
                 </td>
               </tr>
             )}
-            {rows?.map((v) => {
+            {!mostrarCargandoListado && rows && rows.length > 0 && rows.map((v) => {
               const nombreCliente = nombreClienteListadoViaje(v, clientes);
               const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
               return (
@@ -1289,11 +1585,13 @@ export function ViajesTenantPage() {
               Mostrar
               <select
                 value={pageSize}
+                disabled={listadoRefetching}
                 onChange={(e) => {
+                  setListadoRefetching(true);
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
+                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -1304,16 +1602,22 @@ export function ViajesTenantPage() {
           <div className="inline-flex gap-2">
             <button
               type="button"
-              disabled={!meta.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!meta.hasPrev || listadoRefetching}
+              onClick={() => {
+                setListadoRefetching(true);
+                setPage((p) => Math.max(1, p - 1));
+              }}
               className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
             >
               Anterior
             </button>
             <button
               type="button"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={!meta.hasNext || listadoRefetching}
+              onClick={() => {
+                setListadoRefetching(true);
+                setPage((p) => p + 1);
+              }}
               className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
             >
               Siguiente
