@@ -8,6 +8,7 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useMaestroData } from '@/hooks/useMaestroData';
 import type { Transportista } from '@/types/api';
 
 export function TransportistaEditPage() {
@@ -16,6 +17,7 @@ export function TransportistaEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [cuit, setCuit] = useState('');
   const [email, setEmail] = useState('');
@@ -90,6 +92,7 @@ export function TransportistaEditPage() {
           telefono: telefono.trim() || undefined,
         }),
       });
+      if (!tenantId) void maestro.refreshTransportistas();
       navigate('/transportistas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'transportistas'));
@@ -111,6 +114,7 @@ export function TransportistaEditPage() {
       await apiJson(path, () => getToken(), {
         method: 'DELETE',
       });
+      if (!tenantId) void maestro.refreshTransportistas();
       navigate('/transportistas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'transportistas'));

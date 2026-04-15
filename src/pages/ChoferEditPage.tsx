@@ -13,6 +13,7 @@ import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useMaestroData } from '@/hooks/useMaestroData';
 import type { Chofer } from '@/types/api';
 
 export function ChoferEditPage() {
@@ -21,6 +22,7 @@ export function ChoferEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const maestro = useMaestroData();
   const transportistas = useTransportistasList(tenantId || undefined);
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
@@ -92,6 +94,7 @@ const [telefono, setTelefono] = useState('');
             modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
+      if (!tenantId) void maestro.refreshChoferes();
       navigate('/choferes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
@@ -113,6 +116,7 @@ const [telefono, setTelefono] = useState('');
       await apiJson(path, () => getToken(), {
         method: 'DELETE',
       });
+      if (!tenantId) void maestro.refreshChoferes();
       navigate('/choferes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));

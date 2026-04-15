@@ -12,12 +12,14 @@ import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useMaestroData } from '@/hooks/useMaestroData';
 
 export function ChoferCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const maestro = useMaestroData();
   const transportistas = useTransportistasList(tenantId || undefined);
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
@@ -52,6 +54,7 @@ export function ChoferCreatePage() {
             modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
+      if (!tenantId) void maestro.refreshChoferes();
       navigate('/choferes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));

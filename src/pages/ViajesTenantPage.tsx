@@ -1,4 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
+import { useMaestroData } from '@/hooks/useMaestroData';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -63,12 +64,8 @@ import {
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
 import type {
-  Chofer,
-  Cliente,
   Factura,
   PaginatedMeta,
-  Transportista,
-  Vehiculo,
   Viaje,
 } from '@/types/api';
 
@@ -127,10 +124,7 @@ export function ViajesTenantPage() {
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [choferes, setChoferes] = useState<Chofer[]>([]);
-  const [transportistas, setTransportistas] = useState<Transportista[]>([]);
-  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
+  const { clientes, choferes, transportistas, vehiculos } = useMaestroData();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
@@ -172,8 +166,11 @@ export function ViajesTenantPage() {
     facturas: Factura[];
   } | null>(null);
   const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
-  /** IDs de viajes que ya tienen al menos una factura asociada. */
-  const [viajesConFactura, setViajesConFactura] = useState<Set<string>>(new Set());
+  /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
+  const viajesConFactura = useMemo(
+    () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
+    [rows],
+  );
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
 
@@ -438,39 +435,6 @@ export function ViajesTenantPage() {
       },
     });
   }
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [clientesData, choferesData, transportistasData, vehiculosData, facturasData] = await Promise.all([
-          apiJson<Cliente[]>('/api/clientes', () => getToken()),
-          apiJson<Chofer[]>('/api/choferes', () => getToken()),
-          apiJson<Transportista[]>('/api/transportistas', () => getToken()),
-          apiJson<Vehiculo[]>('/api/vehiculos', () => getToken()),
-          apiJson<Factura[]>('/api/facturacion/facturas', () => getToken()).catch(() => [] as Factura[]),
-        ]);
-        if (!cancelled) {
-          setClientes(clientesData);
-          setChoferes(choferesData);
-          setTransportistas(transportistasData);
-          setVehiculos(vehiculosData);
-          setViajesConFactura(new Set(facturasData.flatMap((f) => f.viajeIds)));
-        }
-      } catch {
-        if (!cancelled) {
-          setClientes([]);
-          setChoferes([]);
-          setTransportistas([]);
-          setVehiculos([]);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!editingId || !draft || draft.operacionModo !== 'propio') return;

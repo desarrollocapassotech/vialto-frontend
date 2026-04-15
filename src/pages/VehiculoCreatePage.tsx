@@ -12,6 +12,7 @@ import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useMaestroData } from '@/hooks/useMaestroData';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
 
@@ -20,6 +21,7 @@ export function VehiculoCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const maestro = useMaestroData();
   const transportistas = useTransportistasList(tenantId || undefined);
   const [patente, setPatente] = useState('');
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>('camion');
@@ -58,6 +60,7 @@ const [loading, setLoading] = useState(false);
             modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
+      if (!tenantId) void maestro.refreshVehiculos();
       navigate('/vehiculos', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'vehiculos'));

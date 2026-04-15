@@ -9,11 +9,7 @@ export type DashboardMetricCard = {
   hint?: string;
 };
 
-type ViajeLike = {
-  id: string;
-  estado: string;
-  createdAt: string;
-};
+type ViajeStats = Record<string, number>;
 
 type FacturaLike = {
   id: string;
@@ -111,7 +107,7 @@ export function useTenantDashboardMetrics(modules: string[]) {
 
     (async () => {
       const [
-        viajes,
+        viajeStats,
         facturas,
         remitos,
         productos,
@@ -120,7 +116,7 @@ export function useTenantDashboardMetrics(modules: string[]) {
         intervenciones,
         cargas,
       ] = await Promise.all([
-        has('viajes') ? safeGet<ViajeLike[]>('/api/viajes') : Promise.resolve(null),
+        has('viajes') ? safeGet<ViajeStats>('/api/viajes/stats') : Promise.resolve(null),
         has('facturacion')
           ? safeGet<FacturaLike[]>('/api/facturacion/facturas')
           : Promise.resolve(null),
@@ -144,27 +140,15 @@ export function useTenantDashboardMetrics(modules: string[]) {
 
       const next: DashboardMetricCard[] = [];
 
-      if (viajes) {
-        const enCurso = viajes.filter((v) =>
-          ['en_curso'].includes((v.estado ?? '').toLowerCase()),
-        ).length;
-        const sinFacturarEstado = viajes.filter((v) =>
-          (v.estado ?? '').toLowerCase() === 'finalizado_sin_facturar',
-        );
-        const sinFacturarIds = new Set(sinFacturarEstado.map((v) => v.id));
+      if (viajeStats) {
+        const enCurso = viajeStats['en_curso'] ?? 0;
+        const porFacturar = viajeStats['finalizado_sin_facturar'] ?? 0;
 
         let viajesFacturadosMes = 0;
         let viajesFacturadosQuincena = 0;
-        let porFacturar = sinFacturarEstado.length;
 
         if (facturas) {
           const facturasConViaje = facturas.filter((f) => Boolean(f.viajeId));
-          const viajesConFactura = new Set(
-            facturasConViaje
-              .map((f) => f.viajeId)
-              .filter((id): id is string => Boolean(id)),
-          );
-          porFacturar = Array.from(sinFacturarIds).filter((id) => !viajesConFactura.has(id)).length;
           viajesFacturadosMes = facturasConViaje.filter((f) =>
             isOnOrAfter(f.fechaEmision, monthStart),
           ).length;

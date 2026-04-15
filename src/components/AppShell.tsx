@@ -9,6 +9,7 @@ import {
 import { useMemo } from 'react';
 import { Logo } from './Logo';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { MaestroDataProvider } from '@/hooks/useMaestroData';
 import { canAccessFacturacion, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
@@ -181,7 +182,9 @@ export function AppShell() {
       </aside>
 
       <main className="flex-1 min-w-0 p-8">
-        <Outlet />
+        <MaestroDataProvider>
+          <Outlet />
+        </MaestroDataProvider>
       </main>
     </div>
   );

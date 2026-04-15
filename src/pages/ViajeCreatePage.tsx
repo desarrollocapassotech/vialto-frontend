@@ -47,6 +47,7 @@ import {
 import { fechaHoraToIso } from '@/lib/viajeFechaHora';
 import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import { useMaestroData } from '@/hooks/useMaestroData';
 
 const ESTADOS = VIAJE_ESTADOS_ALTA;
 
@@ -61,10 +62,11 @@ export function ViajeCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [choferes, setChoferes] = useState<Chofer[]>([]);
-  const [transportistas, setTransportistas] = useState<Transportista[]>([]);
-  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
+  const maestro = useMaestroData();
+  const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
+  const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
+  const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
+  const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
   const [estado, setEstado] = useState<(typeof ESTADOS)[number]>('pendiente');
   const [clienteId, setClienteId] = useState('');
   const [choferId, setChoferId] = useState('');
@@ -90,8 +92,14 @@ export function ViajeCreatePage() {
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>('ARS');
+  const clientes = tenantId ? localClientes : maestro.clientes;
+  const choferes = tenantId ? localChoferes : maestro.choferes;
+  const transportistas = tenantId ? localTransportistas : maestro.transportistas;
+  const vehiculos = tenantId ? localVehiculos : maestro.vehiculos;
+
   const [loading, setLoading] = useState(false);
-  const [loadingRefs, setLoadingRefs] = useState(true);
+  const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
+  const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
   const [refreshingFlota, setRefreshingFlota] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
@@ -101,37 +109,27 @@ export function ViajeCreatePage() {
   const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tenant mode: master data comes from MaestroDataProvider context
+    if (!tenantId) return;
     let cancelled = false;
     (async () => {
       try {
-        const clientesPath = tenantId
-          ? `/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`
-          : '/api/clientes';
-        const choferesPath = tenantId
-          ? `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`
-          : '/api/choferes';
-        const transportistasPath = tenantId
-          ? `/api/platform/transportistas?tenantId=${encodeURIComponent(tenantId)}`
-          : '/api/transportistas';
-        const vehiculosPath = tenantId
-          ? `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`
-          : '/api/vehiculos';
         const [clientesData, choferesData, transportistasData, vehiculosData] = await Promise.all([
-          apiJson<Cliente[]>(clientesPath, () => getToken()),
-          apiJson<Chofer[]>(choferesPath, () => getToken()),
-          apiJson<Transportista[]>(transportistasPath, () => getToken()),
-          apiJson<Vehiculo[]>(vehiculosPath, () => getToken()),
+          apiJson<Cliente[]>(`/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
+          apiJson<Chofer[]>(`/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
+          apiJson<Transportista[]>(`/api/platform/transportistas?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
+          apiJson<Vehiculo[]>(`/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
         ]);
         if (!cancelled) {
-          setClientes(clientesData);
-          setChoferes(choferesData);
-          setTransportistas(transportistasData);
-          setVehiculos(vehiculosData);
+          setLocalClientes(clientesData);
+          setLocalChoferes(choferesData);
+          setLocalTransportistas(transportistasData);
+          setLocalVehiculos(vehiculosData);
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'viajes'));
       } finally {
-        if (!cancelled) setLoadingRefs(false);
+        if (!cancelled) setLocalLoadingRefs(false);
       }
     })();
     return () => {
@@ -141,21 +139,24 @@ export function ViajeCreatePage() {
 
   async function refreshFlotaVehiculos() {
     if (refreshingFlota) return;
-    const choferesPath = tenantId
-      ? `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`
-      : '/api/choferes';
-    const vehiculosPath = tenantId
-      ? `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`
-      : '/api/vehiculos';
     setRefreshingFlota(true);
     setError(null);
     try {
-      const [choferesData, vehiculosData] = await Promise.all([
-        apiJson<Chofer[]>(choferesPath, () => getToken()),
-        apiJson<Vehiculo[]>(vehiculosPath, () => getToken()),
-      ]);
-      setChoferes(choferesData);
-      setVehiculos(vehiculosData);
+      let choferesData: Chofer[];
+      let vehiculosData: Vehiculo[];
+      if (tenantId) {
+        [choferesData, vehiculosData] = await Promise.all([
+          apiJson<Chofer[]>(`/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
+          apiJson<Vehiculo[]>(`/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`, () => getToken()),
+        ]);
+        setLocalChoferes(choferesData);
+        setLocalVehiculos(vehiculosData);
+      } else {
+        [choferesData, vehiculosData] = await Promise.all([
+          maestro.refreshChoferes(),
+          maestro.refreshVehiculos(),
+        ]);
+      }
       const cp = choferesFlotaPropia(choferesData);
       const vp = vehiculosFlotaPropia(vehiculosData);
       setChoferId((prev) => mantenerIdSiEnLista(prev, cp));

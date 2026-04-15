@@ -5,13 +5,14 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useMaestroData } from '@/hooks/useMaestroData';
 import {
   textoImporteFacturaListado,
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
-import type { Cliente, Factura, Viaje } from '@/types/api';
+import type { Factura, Viaje } from '@/types/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -128,10 +129,11 @@ function ViajesCheckboxList({
 export function FacturacionTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
+  const { clientes } = useMaestroData();
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [viajes, setViajes] = useState<Viaje[]>([]);
+  const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // crear
@@ -190,15 +192,9 @@ export function FacturacionTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [facturasData, clientesData, viajesData] = await Promise.all([
-          apiJson<Factura[]>('/api/facturacion/facturas', () => getToken()),
-          apiJson<Cliente[]>('/api/clientes', () => getToken()),
-          apiJson<Viaje[]>('/api/viajes', () => getToken()),
-        ]);
+        const facturasData = await apiJson<Factura[]>('/api/facturacion/facturas', () => getToken());
         if (!cancelled) {
           setFacturas(facturasData);
-          setClientes(clientesData);
-          setViajes(viajesData);
           setError(null);
         }
       } catch (e) {
@@ -207,6 +203,16 @@ export function FacturacionTenantPage() {
     })();
     return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn]);
+
+  async function ensureViajesLoaded() {
+    if (viajes.length > 0 || viajesLoading) return;
+    setViajesLoading(true);
+    try {
+      const data = await apiJson<Viaje[]>('/api/viajes', () => getToken());
+      setViajes(data);
+    } catch { /* silencioso — el form mostrará lista vacía */ }
+    finally { setViajesLoading(false); }
+  }
 
   // ── pre-fill desde navegación ──────────────────────────────────────────────
 
@@ -218,6 +224,7 @@ export function FacturacionTenantPage() {
     const { clienteId, viajeIds } = state.newFacturaDraft;
     setDraft({ ...emptyDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
     setCreating(true);
+    void ensureViajesLoaded();
     window.history.replaceState({}, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -270,6 +277,7 @@ export function FacturacionTenantPage() {
     setEditDraft(facturaToEditDraft(f));
     setEditError(null);
     setCreating(false);
+    void ensureViajesLoaded();
   }
 
   function cancelEdit() { setEditingId(null); setEditDraft(null); setEditError(null); }
@@ -359,7 +367,7 @@ export function FacturacionTenantPage() {
             </>
           ) : (
             <button type="button"
-              onClick={() => { setCreating((v) => !v); setDraft(emptyDraft()); setDraftError(null); }}
+              onClick={() => { setCreating((v) => { if (!v) void ensureViajesLoaded(); return !v; }); setDraft(emptyDraft()); setDraftError(null); }}
               className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
               {creating ? 'Cancelar' : 'Nueva factura'}
             </button>

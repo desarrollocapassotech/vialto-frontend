@@ -15,7 +15,7 @@ export interface Viaje {
     id: string;
     vehiculoId: string;
     orden: number;
-    vehiculo: Vehiculo;
+    vehiculo: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>;
   }>;
   origen: string | null;
   destino: string | null;
