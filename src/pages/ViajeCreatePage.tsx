@@ -39,6 +39,7 @@ import {
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
+  tooltipEstadoViaje,
   estadoMuestraKmLitros,
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
@@ -350,7 +351,7 @@ export function ViajeCreatePage() {
               className={inputClass}
             >
               {ESTADOS.map((x) => (
-                <option key={x} value={x}>
+                <option key={x} value={x} title={tooltipEstadoViaje(x)}>
                   {estadoViajeLabel[x] ?? x}
                 </option>
               ))}

@@ -13,38 +13,75 @@ export const VIAJE_ESTADOS_TODOS = [
 /** Solo estados permitidos al crear un viaje (no finales). */
 export const VIAJE_ESTADOS_ALTA = ['pendiente', 'en_curso', 'cancelado'] as const;
 
+/**
+ * Texto corto en badges y listas (mayúsculas, estilo UI).
+ * Códigos legados de API/BD incluidos para que el lookup sea directo.
+ */
 export const estadoViajeLabel: Record<string, string> = {
   pendiente: 'PENDIENTE',
   en_curso: 'EN CURSO',
   /** Legado si la BD aún no migró */
-  finalizado: 'FINALIZADO SIN FACTURAR',
-  finalizado_sin_facturar: 'FINALIZADO SIN FACTURAR',
+  finalizado: 'FINALIZADO',
+  finalizado_sin_facturar: 'FINALIZADO',
   /** Legado API/BD antes del rename */
-  finalizado_facturado: 'FACTURADO SIN COBRAR',
-  facturado_sin_cobrar: 'FACTURADO SIN COBRAR',
+  finalizado_facturado: 'FACTURADO',
+  facturado_sin_cobrar: 'FACTURADO',
   /** Legado API/BD */
   finalizado_cobrado: 'COBRADO',
   cobrado: 'COBRADO',
   cancelado: 'CANCELADO',
 };
 
-/** Ámbar sin animación (estado Pendiente). */
-const BADGE_AMBAR_ESTATICO =
-  'bg-amber-100 text-amber-950 border-amber-300/90';
+/** Une alias legados al código canónico para textos de ayuda. */
+export function normalizarClaveEstadoViaje(estado: string): string {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'finalizado') return 'finalizado_sin_facturar';
+  if (e === 'finalizado_facturado') return 'facturado_sin_cobrar';
+  if (e === 'finalizado_cobrado') return 'cobrado';
+  return e;
+}
 
-/** Ámbar + titileo (sin facturar / facturado sin cobrar, etc.). */
-const BADGE_AMBAR_PENDIENTE =
-  'bg-amber-100 text-amber-950 border-amber-300/90 animate-estado-atencion motion-reduce:animate-none';
+/** Descripción para tooltip (una por estado canónico). */
+const estadoViajeAyuda: Record<string, string> = {
+  pendiente:
+    'Viaje cargado en el sistema: la operación de transporte aún no comenzó.',
+  en_curso:
+    'El servicio está en curso: carga, tránsito o descarga según la etapa.',
+  finalizado_sin_facturar:
+    'La operación ya terminó; todavía no emitiste la factura al cliente por este viaje.',
+  facturado_sin_cobrar:
+    'Ya hay factura asociada; falta registrar el cobro o el cliente aún no pagó.',
+  cobrado: 'Facturación y cobro de este viaje registrados.',
+  cancelado: 'Viaje anulado o no realizado; no corresponde facturar.',
+};
+
+/** Texto de ayuda para mostrar en `title` / tooltip según el código de estado (incluye legados). */
+export function tooltipEstadoViaje(estado: string): string {
+  const k = normalizarClaveEstadoViaje(estado);
+  return estadoViajeAyuda[k] ?? '';
+}
+
+/** Gris — pendiente (sin animación). */
+const BADGE_PENDIENTE_GRIS =
+  'bg-zinc-100 text-zinc-800 border-zinc-300/90';
+
+/** Amarillo leve — finalizado sin facturar (titileo). */
+const BADGE_AMARILLO_SIN_FACTURAR =
+  'bg-amber-50 text-amber-950 border-amber-200/95 animate-estado-atencion motion-reduce:animate-none';
+
+/** Amarillo más intenso — facturado sin cobrar (titileo). */
+const BADGE_AMARILLO_FACTURADO_SIN_COBRAR =
+  'bg-amber-200 text-amber-950 border-amber-400/90 animate-estado-atencion motion-reduce:animate-none';
 
 /** Colores de badge en tablas (Tailwind). */
 export const estadoViajeBadgeClass: Record<string, string> = {
-  pendiente: BADGE_AMBAR_ESTATICO,
+  pendiente: BADGE_PENDIENTE_GRIS,
   en_curso:
     'bg-sky-100 text-sky-950 border-sky-400/70 animate-estado-atencion-suave motion-reduce:animate-none',
-  finalizado: BADGE_AMBAR_PENDIENTE,
-  finalizado_sin_facturar: BADGE_AMBAR_PENDIENTE,
-  finalizado_facturado: BADGE_AMBAR_PENDIENTE,
-  facturado_sin_cobrar: BADGE_AMBAR_PENDIENTE,
+  finalizado: BADGE_AMARILLO_SIN_FACTURAR,
+  finalizado_sin_facturar: BADGE_AMARILLO_SIN_FACTURAR,
+  finalizado_facturado: BADGE_AMARILLO_FACTURADO_SIN_COBRAR,
+  facturado_sin_cobrar: BADGE_AMARILLO_FACTURADO_SIN_COBRAR,
   finalizado_cobrado:
     'bg-emerald-100 text-emerald-950 border-emerald-500/80',
   cobrado:

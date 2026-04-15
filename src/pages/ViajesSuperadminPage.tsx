@@ -4,6 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import {
+  ViajeGananciaBrutaCelda,
+  ViajeGananciaBrutaColumnHeader,
+} from '@/components/viajes/ViajeGananciaBruta';
+import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { ViajeEstadoCelda } from '@/components/viajes/ViajeEstadoCelda';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
@@ -30,7 +35,6 @@ import {
 import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
-  soloCiudadDesdeEtiquetaUbicacion,
 } from '@/lib/ciudades';
 import {
   estadoMuestraKmLitros,
@@ -466,7 +470,7 @@ export function ViajesSuperadminPage() {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const tableColSpan = editingId ? 6 : 7;
+  const tableColSpan = editingId ? 7 : 8;
 
   return (
     <div className="w-full">
@@ -522,17 +526,18 @@ export function ViajesSuperadminPage() {
       <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
+            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3 min-w-[8rem]">Cliente</th>
               <th className="px-4 py-3 min-w-[8rem]">Transporte</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 min-w-[12rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+              <th className="px-4 py-3 min-w-[12rem] tracking-[0.2em] text-vialto-fire">
                 Origen - Destino
               </th>
-              <th className="px-4 py-3 min-w-[11rem] text-[11px] tracking-[0.2em] text-vialto-fire">
+              <th className="px-4 py-3 min-w-[11rem] tracking-[0.2em] text-vialto-fire">
                 Carga - Descarga
               </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
+              <ViajeGananciaBrutaColumnHeader />
               {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
@@ -651,17 +656,7 @@ export function ViajesSuperadminPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="block truncate" title={v.origen?.trim() || undefined}>
-                          {soloCiudadDesdeEtiquetaUbicacion(v.origen)}
-                        </span>
-                        <span
-                          className="block truncate text-xs text-vialto-steel/90"
-                          title={v.destino?.trim() || undefined}
-                        >
-                          {soloCiudadDesdeEtiquetaUbicacion(v.destino)}
-                        </span>
-                      </div>
+                      <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
                     )}
                   </td>
 
@@ -699,6 +694,8 @@ export function ViajesSuperadminPage() {
                   <td className="px-4 py-3 text-right tabular-nums">
                     {textoMontoFacturarListado(v)}
                   </td>
+
+                  <ViajeGananciaBrutaCelda viaje={v} />
 
                   {/* Acciones */}
                   {!editingId && (

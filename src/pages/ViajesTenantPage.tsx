@@ -39,6 +39,11 @@ import {
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import {
+  ViajeGananciaBrutaCelda,
+  ViajeGananciaBrutaColumnHeader,
+} from '@/components/viajes/ViajeGananciaBruta';
+import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
+import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
@@ -46,7 +51,6 @@ import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
-  soloCiudadDesdeEtiquetaUbicacion,
   type PaisCodigo,
 } from '@/lib/ciudades';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
@@ -54,6 +58,7 @@ import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
+  tooltipEstadoViaje,
   estadoMuestraKmLitros,
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
@@ -390,11 +395,29 @@ export function ViajesTenantPage() {
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
-    !!tipoFechaFiltro ||
     !!fechaDesdeFiltro.trim() ||
     !!fechaHastaFiltro.trim() ||
-    !!tipoUbicacionFiltro ||
     !!ubicacionFiltro.trim();
+
+  /** Una unidad por columna de filtro con criterio aplicado (máx. 5). */
+  const cantidadFiltrosColumnasActivos = useMemo(() => {
+    let n = 0;
+    if (clienteIdFiltroActivo.trim()) n += 1;
+    if (transportistaIdFiltroActivo.trim()) n += 1;
+    if (estadoFiltro.trim()) n += 1;
+    if (ubicacionFiltro.trim()) n += 1;
+    if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) {
+      n += 1;
+    }
+    return n;
+  }, [
+    clienteIdFiltroActivo,
+    transportistaIdFiltroActivo,
+    estadoFiltro,
+    ubicacionFiltro,
+    fechaDesdeFiltro,
+    fechaHastaFiltro,
+  ]);
 
   useEffect(() => {
     setIdsFacturarSeleccion([]);
@@ -812,8 +835,8 @@ export function ViajesTenantPage() {
 
   const mostrarColumnaFacturarLote =
     clienteIdFiltroActivo.trim() !== '' && !editingId;
-  /** Cliente + transp. externo + estado + recorrido + fechas carga/descarga + monto [+ acciones]. */
-  const tableColSpanBase = editingId ? 6 : 7;
+  /** Cliente + transp. externo + estado + recorrido + fechas + monto + ganancia bruta [+ acciones]. */
+  const tableColSpanBase = editingId ? 7 : 8;
   const tableColSpan = mostrarColumnaFacturarLote ? tableColSpanBase + 1 : tableColSpanBase;
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
@@ -851,9 +874,16 @@ export function ViajesTenantPage() {
               type="button"
               onClick={limpiarFiltrosColumnas}
               disabled={listadoRefetching}
-              className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? 's' : ''} filtrada${cantidadFiltrosColumnasActivos !== 1 ? 's' : ''})`}
             >
               Limpiar filtros
+              <span
+                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                aria-hidden
+              >
+                {cantidadFiltrosColumnasActivos}
+              </span>
             </button>
           )}
         </div>
@@ -918,7 +948,7 @@ export function ViajesTenantPage() {
           aria-busy={mostrarCargandoListado}
         >
           <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-fire">
+            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               {mostrarColumnaFacturarLote && (
                 <th className="px-2 py-3 w-10 text-center align-middle">
                   <span className="sr-only">Seleccionar para facturación conjunta</span>
@@ -935,7 +965,11 @@ export function ViajesTenantPage() {
                 </th>
               )}
               <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
-                <ViajesListadoHeaderFiltro title="Cliente">
+                <ViajesListadoHeaderFiltro
+                  title="Cliente"
+                  filterActive={!!clienteIdFiltroActivo.trim()}
+                  filterSignature={clienteIdFiltroActivo}
+                >
                   <ClienteSearchSelect
                     id="viajes-col-filtro-cliente"
                     clientes={clientes}
@@ -953,7 +987,11 @@ export function ViajesTenantPage() {
                 </ViajesListadoHeaderFiltro>
               </th>
               <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
-                <ViajesListadoHeaderFiltro title="Transporte">
+                <ViajesListadoHeaderFiltro
+                  title="Transporte"
+                  filterActive={!!transportistaIdFiltroActivo.trim()}
+                  filterSignature={transportistaIdFiltroActivo}
+                >
                   <TransportistaSearchSelect
                     id="viajes-col-filtro-transporte"
                     transportistas={transportistas}
@@ -970,7 +1008,11 @@ export function ViajesTenantPage() {
                 </ViajesListadoHeaderFiltro>
               </th>
               <th scope="col" className="px-4 py-3 align-top min-w-[11rem]">
-                <ViajesListadoHeaderFiltro title="Estado">
+                <ViajesListadoHeaderFiltro
+                  title="Estado"
+                  filterActive={!!estadoFiltro.trim()}
+                  filterSignature={estadoFiltro}
+                >
                   <select
                     value={estadoFiltro}
                     onChange={(e) => aplicarFiltroEstado(e.target.value)}
@@ -982,7 +1024,7 @@ export function ViajesTenantPage() {
                   >
                     <option value="">Todos</option>
                     {VIAJE_ESTADOS_TODOS.map((est) => (
-                      <option key={est} value={est}>
+                      <option key={est} value={est} title={tooltipEstadoViaje(est)}>
                         {estadoViajeLabel[est] ?? est}
                       </option>
                     ))}
@@ -990,7 +1032,11 @@ export function ViajesTenantPage() {
                 </ViajesListadoHeaderFiltro>
               </th>
               <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
-                <ViajesListadoHeaderFiltro title="Origen — Destino">
+                <ViajesListadoHeaderFiltro
+                  title="Origen — Destino"
+                  filterActive={!!ubicacionFiltro.trim()}
+                  filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+                >
                   <div className="flex flex-col gap-2">
                     <select
                       value={tipoUbicacionFiltro}
@@ -1048,7 +1094,13 @@ export function ViajesTenantPage() {
                 </ViajesListadoHeaderFiltro>
               </th>
               <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
-                <ViajesListadoHeaderFiltro title="Carga — Descarga">
+                <ViajesListadoHeaderFiltro
+                  title="Carga — Descarga"
+                  filterActive={
+                    !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
+                  }
+                  filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                >
                   <div className="flex flex-col gap-2">
                     <select
                       value={tipoFechaFiltro}
@@ -1099,6 +1151,7 @@ export function ViajesTenantPage() {
                 </ViajesListadoHeaderFiltro>
               </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
+              <ViajeGananciaBrutaColumnHeader />
               {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
@@ -1169,7 +1222,7 @@ export function ViajesTenantPage() {
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     >
                       {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
-                        <option key={x} value={x}>
+                        <option key={x} value={x} title={tooltipEstadoViaje(x)}>
                           {estadoViajeLabel[x] ?? x}
                         </option>
                       ))}
@@ -1185,7 +1238,7 @@ export function ViajesTenantPage() {
                       aria-label="Cambiar estado del viaje"
                     >
                       {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
-                        <option key={x} value={x}>
+                        <option key={x} value={x} title={tooltipEstadoViaje(x)}>
                           {estadoViajeLabel[x] ?? x}
                         </option>
                       ))}
@@ -1193,7 +1246,8 @@ export function ViajesTenantPage() {
                   ) : (
                     <button
                       type="button"
-                      title="Cambiar estado"
+                      title={tooltipEstadoViaje(v.estado)}
+                      aria-label={`Estado ${estadoViajeLabel[v.estado] ?? v.estado}. Abrir selector para cambiar.`}
                       disabled={savingEstadoId === v.id}
                       onClick={() => {
                         if (savingEstadoId) return;
@@ -1260,17 +1314,7 @@ export function ViajesTenantPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="block truncate" title={v.origen?.trim() || undefined}>
-                        {soloCiudadDesdeEtiquetaUbicacion(v.origen)}
-                      </span>
-                      <span
-                        className="block truncate text-xs text-vialto-steel/90"
-                        title={v.destino?.trim() || undefined}
-                      >
-                        {soloCiudadDesdeEtiquetaUbicacion(v.destino)}
-                      </span>
-                    </div>
+                    <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
                   )}
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
@@ -1305,6 +1349,7 @@ export function ViajesTenantPage() {
                 <td className="px-4 py-3 text-right tabular-nums">
                   {textoMontoFacturarListado(v)}
                 </td>
+                <ViajeGananciaBrutaCelda viaje={v} />
                 {!editingId && (
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex flex-wrap justify-end gap-1.5">

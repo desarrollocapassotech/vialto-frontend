@@ -171,14 +171,22 @@ export function viajesFiltradosParaFactura(
   return [...base, ...extra];
 }
 
+/** Formato de importe de viaje alineado con listados (ARS / USD). */
+export function formatViajeImporteForListado(
+  m: number,
+  moneda?: string | null,
+): string {
+  const mon = normalizeViajeMoneda(moneda);
+  const sym = mon === 'USD' ? 'US$' : '$';
+  const locale = mon === 'USD' ? 'en-US' : 'es-AR';
+  return `${sym} ${m.toLocaleString(locale)}`;
+}
+
 /** Celda de tabla: monto a facturar. */
 export function textoMontoFacturarListado(v: Viaje): string {
   const m = v.monto;
   if (m == null) return '—';
-  const moneda = normalizeViajeMoneda(v.monedaMonto);
-  const sym = moneda === 'USD' ? 'US$' : '$';
-  const locale = moneda === 'USD' ? 'en-US' : 'es-AR';
-  return `${sym} ${m.toLocaleString(locale)}`;
+  return formatViajeImporteForListado(m, v.monedaMonto);
 }
 
 /**

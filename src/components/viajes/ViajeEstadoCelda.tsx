@@ -3,6 +3,7 @@ import {
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
   estadoMuestraKmLitros,
+  tooltipEstadoViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
@@ -57,7 +58,7 @@ export function ViajeEstadoCelda({
         className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
       >
         {ESTADOS.map((x) => (
-          <option key={x} value={x}>
+          <option key={x} value={x} title={tooltipEstadoViaje(x)}>
             {estadoViajeLabel[x] ?? x}
           </option>
         ))}
@@ -78,7 +79,7 @@ export function ViajeEstadoCelda({
         aria-label="Cambiar estado del viaje"
       >
         {ESTADOS.map((x) => (
-          <option key={x} value={x}>
+          <option key={x} value={x} title={tooltipEstadoViaje(x)}>
             {estadoViajeLabel[x] ?? x}
           </option>
         ))}
@@ -90,7 +91,8 @@ export function ViajeEstadoCelda({
   return (
     <button
       type="button"
-      title="Cambiar estado"
+      title={tooltipEstadoViaje(viajeEstado)}
+      aria-label={`Estado ${estadoViajeLabel[viajeEstado] ?? viajeEstado}. Abrir selector para cambiar.`}
       disabled={isSavingEstado}
       onClick={() => { if (!isSavingEstado) onQuickOpen(); }}
       className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${

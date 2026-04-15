@@ -18,7 +18,7 @@
   --font-body: Barlow, ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
 
-  /* Badge pendiente / sin facturar / facturado sin cobrar — parpadeo marcado */
+  /* Badge finalizado sin facturar / facturado sin cobrar — parpadeo marcado */
   --animate-estado-atencion: estado-atencion 0.42s linear infinite;
   /* En curso — respiración suave, un poco más visible que antes */
   --animate-estado-atencion-suave: estado-atencion-suave 2.35s ease-in-out infinite;
