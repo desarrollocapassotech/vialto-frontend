@@ -102,15 +102,38 @@ export function viajeTieneFacturaAsignada(v: {
   return false;
 }
 
+export type ViajesFiltradosParaFacturaOpciones = {
+  /**
+   * Al editar una factura, los viajes ya vinculados a esa factura no deben excluirse
+   * por `viajeTieneFacturaAsignada` (si no, la lista queda vacía y se pierde la selección).
+   */
+  facturaEdicionId?: string | null;
+  /** IDs guardados en la factura (por si el listado de viajes no trae `facturaId` en cada fila). */
+  viajeIdsFacturaEdicion?: readonly string[] | null;
+};
+
+function viajePerteneceAFacturaEnEdicion(
+  v: Viaje,
+  facturaId: string,
+  viajeIdsFacturaEdicion?: readonly string[] | null,
+): boolean {
+  if (viajeIdsFacturaEdicion?.includes(v.id)) return true;
+  if (v.facturaId === facturaId) return true;
+  if (v.factura?.id === facturaId) return true;
+  return false;
+}
+
 /**
  * Viajes que se pueden vincular a una factura según tipo y cliente.
  * Tipo «cliente»: solo viajes de ese `clienteId`. «transportista_externo»: todos (sin filtro por cliente en maestro).
  * Excluye viajes que ya tienen factura asignada, cobrados y cancelados.
+ * Con `opciones` de edición, mantiene visibles los viajes ya vinculados a esa factura.
  */
 export function viajesFiltradosParaFactura(
   todos: Viaje[],
   tipo: 'cliente' | 'transportista_externo',
   clienteId: string,
+  opciones?: ViajesFiltradosParaFacturaOpciones,
 ): Viaje[] {
   let list: Viaje[];
   if (tipo !== 'cliente') {
@@ -120,12 +143,32 @@ export function viajesFiltradosParaFactura(
     if (!cid) return [];
     list = todos.filter((v) => v.clienteId === cid);
   }
-  return list.filter((v) => {
-    if (viajeTieneFacturaAsignada(v)) return false; // ya tiene factura asignada
-    if (v.estado === 'cobrado') return false;
-    if (v.estado === 'cancelado') return false;
+
+  const fid = opciones?.facturaEdicionId?.trim() || null;
+  const idsFactura = opciones?.viajeIdsFacturaEdicion;
+
+  const base = list.filter((v) => {
+    const enEstaFactura = Boolean(fid && viajePerteneceAFacturaEnEdicion(v, fid, idsFactura));
+
+    if (viajeTieneFacturaAsignada(v) && !enEstaFactura) return false;
+    if (v.estado === 'cobrado' && !enEstaFactura) return false;
+    if (v.estado === 'cancelado' && !enEstaFactura) return false;
     return true;
   });
+
+  if (!fid || !idsFactura?.length) return base;
+
+  const seen = new Set(base.map((v) => v.id));
+  const extra: Viaje[] = [];
+  for (const id of idsFactura) {
+    if (seen.has(id)) continue;
+    const v = todos.find((x) => x.id === id);
+    if (!v) continue;
+    if (tipo === 'cliente' && v.clienteId !== clienteId.trim()) continue;
+    seen.add(id);
+    extra.push(v);
+  }
+  return [...base, ...extra];
 }
 
 /** Celda de tabla: monto a facturar. */

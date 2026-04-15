@@ -1,21 +1,39 @@
 import { useOrganization } from '@clerk/clerk-react';
-import { TenantOwnerDashboard } from '@/components/tenant/TenantOwnerDashboard';
+import { TenantOwnerDashboard, AlertsPanel } from '@/components/tenant/TenantOwnerDashboard';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
+import { canAccessFacturacion } from '@/lib/tenantModules';
 
 export function TenantHomePage() {
   const { organization } = useOrganization();
   const { tenant, loading, error } = useCurrentTenant();
+  const dash = useTenantOwnerDashboard();
+
   const companyName = tenant?.name?.trim() || organization?.name?.trim() || 'empresa';
+
+  const alertas = dash.data?.alertas;
+  const showAlertsBlock =
+    tenant != null &&
+    canAccessFacturacion(tenant.modules) &&
+    alertas != null &&
+    (alertas.facturasVencidas.cantidad > 0 || alertas.viajesSinFactura.cantidad > 0);
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
-        Panel de {companyName}
-      </h1>
-      <p className="mt-2 text-vialto-steel max-w-3xl">
-        Indicadores clave para la gestión de tu empresa: cobranzas, riesgos y
-        actividad según los módulos contratados.
-      </p>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <div>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
+            Panel de {companyName}
+          </h1>
+          <p className="mt-2 text-vialto-steel max-w-xl">
+            Indicadores clave para la gestión de tu empresa.
+          </p>
+        </div>
+
+        {showAlertsBlock && alertas && (
+          <AlertsPanel alertas={alertas} />
+        )}
+      </div>
 
       {!organization && (
         <div
@@ -40,7 +58,7 @@ export function TenantHomePage() {
       )}
 
       {organization && !loading && !error && tenant && (
-        <TenantOwnerDashboard modules={tenant.modules} />
+        <TenantOwnerDashboard modules={tenant.modules} dash={dash} />
       )}
     </div>
   );

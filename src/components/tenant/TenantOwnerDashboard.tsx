@@ -1,5 +1,5 @@
-import type { MetricCompare } from '@/types/ownerDashboard';
-import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
+import type { MetricCompare, OwnerDashboardResponse } from '@/types/ownerDashboard';
+import type { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import {
   canAccessFacturacion,
   canAccessViajes,
@@ -53,17 +53,17 @@ function MetricCard({
   formatValue = formatMoney,
   omitCompare,
   snapshotFootnote,
+  valueTone,
 }: {
   title: string;
-  /** Aclaración breve bajo el título (p. ej. cómo se calcula Cobrado). */
   caption?: string;
   metric: MetricCompare | undefined;
   loading: boolean;
   formatValue?: (n: number) => string;
-  /** Si true, no muestra % vs período (p. ej. métricas acumuladas al día). */
   omitCompare?: boolean;
-  /** Texto bajo el valor cuando `omitCompare` (ej. aclarar que no usa el selector de período). */
   snapshotFootnote?: string;
+  /** Verde si el monto actual &gt; 0 (ingreso). Rojo si &gt; 0 (egreso / obligación). */
+  valueTone?: 'default' | 'positiveCash' | 'payable';
 }) {
   const m = metric ?? {
     current: 0,
@@ -71,6 +71,14 @@ function MetricCard({
     changePct: 0,
     sentiment: 'neutral' as const,
   };
+  const valueColorClass =
+    !loading && m.current > 0
+      ? valueTone === 'positiveCash'
+        ? 'text-emerald-400'
+        : valueTone === 'payable'
+          ? 'text-rose-400'
+          : 'text-white'
+      : 'text-white';
   return (
     <div className="bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between">
       <div>
@@ -83,7 +91,9 @@ function MetricCard({
           </p>
         ) : null}
       </div>
-      <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
+      <span
+        className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}
+      >
         {loading ? '—' : formatValue(m.current)}
       </span>
       <span className="text-xs leading-snug min-h-4">
@@ -134,14 +144,77 @@ function BellIcon({ className }: { className?: string }) {
   );
 }
 
-interface TenantOwnerDashboardProps {
-  modules: string[];
+export function AlertsPanel({ alertas }: { alertas: NonNullable<OwnerDashboardResponse['alertas']> }) {
+  return (
+    <aside
+      aria-labelledby="alertas-heading"
+      className="lg:w-80 shrink-0 rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-lg ring-1 ring-vialto-fire/20"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <BellIcon className="text-vialto-fire shrink-0 w-5 h-5" />
+        <h2
+          id="alertas-heading"
+          className="font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
+        >
+          Alertas
+        </h2>
+      </div>
+      <div className="flex flex-col gap-3">
+        {alertas.facturasVencidas.cantidad > 0 && (
+          <div className="rounded-md border-2 border-rose-500/70 bg-rose-950/35 px-3 py-3 flex gap-3">
+            <AlertTriangleIcon className="text-rose-400 shrink-0 mt-0.5 w-5 h-5" />
+            <div>
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
+                {alertas.facturasVencidas.cantidad === 1
+                  ? 'Factura vencida sin cobrar'
+                  : 'Facturas vencidas sin cobrar'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {alertas.facturasVencidas.cantidad}{' '}
+                <span className="text-base text-white/70 font-body">
+                  {alertas.facturasVencidas.cantidad === 1 ? 'factura' : 'facturas'}
+                </span>
+              </p>
+              <p className="text-xs text-rose-100/90 mt-0.5">
+                Total: {formatMoney(alertas.facturasVencidas.montoTotal)}
+              </p>
+            </div>
+          </div>
+        )}
+        {alertas.viajesSinFactura.cantidad > 0 && (
+          <div className="rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3 flex gap-3">
+            <AlertTriangleIcon className="text-amber-400 shrink-0 mt-0.5 w-5 h-5" />
+            <div>
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
+                {alertas.viajesSinFactura.cantidad === 1
+                  ? 'Viaje finalizado sin factura'
+                  : 'Viajes finalizados sin factura'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {alertas.viajesSinFactura.cantidad}{' '}
+                <span className="text-base text-white/70 font-body">
+                  {alertas.viajesSinFactura.cantidad === 1 ? 'viaje' : 'viajes'}
+                </span>
+              </p>
+              <p className="text-xs text-amber-100/90 mt-0.5">
+                Monto referido: {formatMoney(alertas.viajesSinFactura.montoTotal)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
 }
 
-export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
+interface TenantOwnerDashboardProps {
+  modules: string[];
+  dash: ReturnType<typeof useTenantOwnerDashboard>;
+}
+
+export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProps) {
   const showFin = canAccessFacturacion(modules);
   const showViajes = canAccessViajes(modules);
-  const dash = useTenantOwnerDashboard();
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -152,14 +225,7 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
 
   const hasAnyBlock = showFin || showViajes;
   const fin = dash.data?.financiero;
-  const alertas = dash.data?.alertas;
   const viajes = dash.data?.viajes;
-
-  const showAlertsBlock =
-    showFin &&
-    alertas &&
-    (alertas.facturasVencidas.cantidad > 0 ||
-      alertas.viajesSinFactura.cantidad > 0);
 
   return (
     <div className="mt-8 space-y-10">
@@ -243,7 +309,18 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
           >
             Resumen financiero
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="A pagar (transportistas externos)"
+              metric={fin?.aPagarTransportistas}
+              loading={dash.loading}
+              valueTone="payable"
+            />
+            <MetricCard
+              title="Sin facturar"
+              metric={fin?.sinFacturarPeriodo}
+              loading={dash.loading}
+            />
             <MetricCard
               title="Facturado"
               metric={fin?.facturado}
@@ -253,11 +330,7 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
               title="Cobrado"
               metric={fin?.cobrado}
               loading={dash.loading}
-            />
-            <MetricCard
-              title="A pagar (transportistas externos)"
-              metric={fin?.aPagarTransportistas}
-              loading={dash.loading}
+              valueTone="positiveCash"
             />
           </div>
           {!dash.loading && fin?.mostrarDiferenciaNeta && (
@@ -276,64 +349,6 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
         </section>
       )}
 
-      {showAlertsBlock && alertas && (
-        <section
-          aria-labelledby="alertas-heading"
-          className="rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-6 shadow-lg ring-1 ring-vialto-fire/20"
-        >
-          <div className="flex items-center gap-3 mb-5">
-            <BellIcon className="text-vialto-fire shrink-0" />
-            <h2
-              id="alertas-heading"
-              className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-white"
-            >
-              Alertas
-            </h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {alertas.facturasVencidas.cantidad > 0 && (
-              <div className="rounded-md border-2 border-rose-500/70 bg-rose-950/35 px-4 py-4 flex gap-3">
-                <AlertTriangleIcon className="text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-rose-200/80">
-                    Facturas vencidas sin cobrar
-                  </p>
-                  <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-white">
-                    {alertas.facturasVencidas.cantidad}{' '}
-                    <span className="text-lg text-white/70 font-body">
-                      facturas
-                    </span>
-                  </p>
-                  <p className="text-sm text-rose-100/90 mt-1">
-                    Total: {formatMoney(alertas.facturasVencidas.montoTotal)}
-                  </p>
-                </div>
-              </div>
-            )}
-            {alertas.viajesSinFactura.cantidad > 0 && (
-              <div className="rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-4 py-4 flex gap-3">
-                <AlertTriangleIcon className="text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-amber-200/80">
-                    Viajes finalizados sin factura
-                  </p>
-                  <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-white">
-                    {alertas.viajesSinFactura.cantidad}{' '}
-                    <span className="text-lg text-white/70 font-body">
-                      viajes
-                    </span>
-                  </p>
-                  <p className="text-sm text-amber-100/90 mt-1">
-                    Monto referido:{' '}
-                    {formatMoney(alertas.viajesSinFactura.montoTotal)}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
       {showViajes && (
         <section aria-labelledby="viajes-heading">
           <h2
@@ -342,7 +357,7 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
           >
             Actividad operativa
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
             <MetricCard
               title="Viajes en curso (ahora)"
               metric={viajes?.enCurso}
@@ -354,19 +369,6 @@ export function TenantOwnerDashboard({ modules }: TenantOwnerDashboardProps) {
               metric={viajes?.completados}
               loading={dash.loading}
               formatValue={(n) => String(Math.round(n))}
-            />
-            <MetricCard
-              title="Sin facturar (monto)"
-              caption="Suma de montos: pendiente, en curso o finalizado sin facturar."
-              metric={{
-                current: viajes?.sinFacturarMonto ?? 0,
-                previous: 0,
-                changePct: 0,
-                sentiment: 'neutral',
-              }}
-              loading={dash.loading}
-              omitCompare
-              snapshotFootnote="Acumulado al día · no depende del período elegido arriba"
             />
           </div>
         </section>

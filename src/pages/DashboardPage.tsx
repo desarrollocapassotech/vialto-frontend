@@ -70,7 +70,7 @@ export function DashboardPage() {
 
       {error && (
         <div
-          className="mt-6 rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="fixed top-4 right-4 z-50 max-w-sm rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-md"
           role="alert"
         >
           {error}

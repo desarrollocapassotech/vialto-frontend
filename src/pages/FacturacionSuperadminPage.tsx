@@ -97,13 +97,19 @@ function ViajesCheckboxList({
   viajes,
   selected,
   onChange,
+  loading,
 }: {
   viajes: Viaje[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  loading?: boolean;
 }) {
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+
+  if (loading) {
+    return <p className="text-sm text-vialto-steel py-1">Cargando…</p>;
   }
 
   if (viajes.length === 0) {
@@ -151,6 +157,7 @@ export function FacturacionSuperadminPage() {
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [viajes, setViajes] = useState<Viaje[]>([]);
+  const [empresaDataLoading, setEmpresaDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // crear
@@ -176,9 +183,12 @@ export function FacturacionSuperadminPage() {
   );
 
   const viajesEdicionFactura = useMemo(() => {
-    if (!editDraft) return [];
-    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId);
-  }, [viajes, editDraft]);
+    if (!editDraft || !editingId) return [];
+    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId, {
+      facturaEdicionId: editingId,
+      viajeIdsFacturaEdicion: editDraft.viajeIds,
+    });
+  }, [viajes, editDraft, editingId]);
 
   useEffect(() => {
     if (!creating || !filtroEmpresa || viajes.length === 0) return;
@@ -211,9 +221,13 @@ export function FacturacionSuperadminPage() {
     setEditingId(null);
     setEditDraft(null);
 
-    if (!filtroEmpresa || !isLoaded || !isSignedIn) return;
+    if (!filtroEmpresa || !isLoaded || !isSignedIn) {
+      setEmpresaDataLoading(false);
+      return;
+    }
     let cancelled = false;
     const q = `tenantId=${encodeURIComponent(filtroEmpresa)}`;
+    setEmpresaDataLoading(true);
 
     (async () => {
       try {
@@ -231,6 +245,8 @@ export function FacturacionSuperadminPage() {
       } catch {
         if (!cancelled)
           setError('No pudimos cargar las facturas de esta empresa. Probá de nuevo.');
+      } finally {
+        if (!cancelled) setEmpresaDataLoading(false);
       }
     })();
 
@@ -359,11 +375,6 @@ export function FacturacionSuperadminPage() {
   function nombreCliente(id: string | null) {
     if (!id) return '—';
     return clientes.find((c) => c.id === id)?.nombre ?? id;
-  }
-
-  function numerosViaje(ids: string[]) {
-    if (ids.length === 0) return '—';
-    return ids.map((id) => viajes.find((v) => v.id === id)?.numero ?? id).join(', ');
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -529,6 +540,7 @@ export function FacturacionSuperadminPage() {
               viajes={viajesNuevaFactura}
               selected={draft.viajeIds}
               onChange={(ids) => setD({ viajeIds: ids })}
+              loading={empresaDataLoading}
             />
           </div>
 
@@ -563,11 +575,10 @@ export function FacturacionSuperadminPage() {
                 <th className="px-4 py-3">Número</th>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Viajes</th>
-                <th className="px-4 py-3 text-right">Importe</th>
                 <th className="px-4 py-3">Emisión</th>
                 <th className="px-4 py-3">Vencimiento</th>
                 <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Importe</th>
                 {!isEditing && <th className="px-4 py-3 text-right">Acciones</th>}
               </tr>
             </thead>
@@ -630,28 +641,6 @@ export function FacturacionSuperadminPage() {
                           : nombreCliente(f.clienteId)}
                       </td>
 
-                      {/* Viajes */}
-                      <td className="px-4 py-3 text-vialto-steel">
-                        {editing && ed
-                          ? <div className="min-w-[16rem]">
-                              {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
-                                <p className="text-[11px] text-vialto-steel mb-1">
-                                  Elegí un cliente para listar solo sus viajes.
-                                </p>
-                              )}
-                              <ViajesCheckboxList viajes={viajesEdicionFactura} selected={ed.viajeIds}
-                                onChange={(ids) => setE({ viajeIds: ids })} />
-                            </div>
-                          : numerosViaje(f.viajeIds)}
-                      </td>
-
-                      {/* Importe (solo lectura — calculado desde viajes) */}
-                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
-                        {editing && ed
-                          ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
-                          : textoImporteFacturaListado(f, viajes)}
-                      </td>
-
                       {/* Emisión */}
                       <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
                         {editing && ed
@@ -675,6 +664,13 @@ export function FacturacionSuperadminPage() {
                         </span>
                       </td>
 
+                      {/* Importe (solo lectura — calculado desde viajes) */}
+                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
+                        {editing && ed
+                          ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
+                          : textoImporteFacturaListado(f, viajes)}
+                      </td>
+
                       {/* Acciones */}
                       {!isEditing && (
                         <td className="px-4 py-3 text-right">
@@ -691,6 +687,28 @@ export function FacturacionSuperadminPage() {
                         </td>
                       )}
                     </tr>
+                    {editing && ed && (
+                      <tr className="border-b border-black/5 bg-vialto-mist/40">
+                        <td colSpan={7} className="px-4 py-3 text-vialto-steel">
+                          <p className="text-[11px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-fire mb-2">
+                            Viajes vinculados
+                          </p>
+                          {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
+                            <p className="text-[11px] text-vialto-steel mb-1">
+                              Elegí un cliente para listar solo sus viajes.
+                            </p>
+                          )}
+                          <div className="max-w-xl">
+                            <ViajesCheckboxList
+                              viajes={viajesEdicionFactura}
+                              selected={ed.viajeIds}
+                              onChange={(ids) => setE({ viajeIds: ids })}
+                              loading={empresaDataLoading}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}

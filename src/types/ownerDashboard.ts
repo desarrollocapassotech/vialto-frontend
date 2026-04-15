@@ -16,6 +16,7 @@ export type OwnerDashboardResponse = {
     prevEnd: string;
   };
   financiero?: {
+    sinFacturarPeriodo: MetricCompare;
     facturado: MetricCompare;
     cobrado: MetricCompare;
     aPagarTransportistas: MetricCompare;

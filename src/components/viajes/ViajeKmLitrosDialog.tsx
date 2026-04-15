@@ -28,7 +28,7 @@ export function ViajeKmLitrosDialog({
   const sinValoresKmLitros =
     km.trim() === '' && litros.trim() === '';
   const labelPrincipal =
-    busy ? 'Guardando…' : sinValoresKmLitros ? 'Continuar sin guardar' : 'Guardar';
+    busy ? 'Guardando…' : sinValoresKmLitros ? 'Continuar sin completar' : 'Guardar';
 
   return (
     <div

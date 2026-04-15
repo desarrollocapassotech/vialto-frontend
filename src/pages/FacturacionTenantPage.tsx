@@ -86,13 +86,20 @@ function ViajesCheckboxList({
   viajes,
   selected,
   onChange,
+  loading,
 }: {
   viajes: Viaje[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Mientras se obtiene el listado de viajes desde el servidor. */
+  loading?: boolean;
 }) {
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+
+  if (loading) {
+    return <p className="text-sm text-vialto-steel py-1">Cargando…</p>;
   }
 
   if (viajes.length === 0) {
@@ -159,9 +166,12 @@ export function FacturacionTenantPage() {
   );
 
   const viajesEdicionFactura = useMemo(() => {
-    if (!editDraft) return [];
-    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId);
-  }, [viajes, editDraft]);
+    if (!editDraft || !editingId) return [];
+    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId, {
+      facturaEdicionId: editingId,
+      viajeIdsFacturaEdicion: editDraft.viajeIds,
+    });
+  }, [viajes, editDraft, editingId]);
 
   /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
   useEffect(() => {
@@ -334,11 +344,6 @@ export function FacturacionTenantPage() {
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
-  function numerosViaje(ids: string[]) {
-    if (ids.length === 0) return '—';
-    return ids.map((id) => viajes.find((v) => v.id === id)?.numero ?? id).join(', ');
-  }
-
   // ── render ─────────────────────────────────────────────────────────────────
 
   const isEditing = !!editingId;
@@ -445,8 +450,12 @@ export function FacturacionTenantPage() {
                 Elegí un cliente arriba para listar solo sus viajes.
               </p>
             )}
-            <ViajesCheckboxList viajes={viajesNuevaFactura} selected={draft.viajeIds}
-              onChange={(ids) => setD({ viajeIds: ids })} />
+            <ViajesCheckboxList
+              viajes={viajesNuevaFactura}
+              selected={draft.viajeIds}
+              onChange={(ids) => setD({ viajeIds: ids })}
+              loading={viajesLoading}
+            />
           </div>
 
           <div className="col-span-full space-y-2 pt-1">
@@ -473,11 +482,10 @@ export function FacturacionTenantPage() {
               <th className="px-4 py-3">Número</th>
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Viajes</th>
-              <th className="px-4 py-3 text-right">Importe</th>
               <th className="px-4 py-3">Emisión</th>
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3 text-right">Importe</th>
               {!isEditing && <th className="px-4 py-3 text-right">Acciones</th>}
             </tr>
           </thead>
@@ -536,28 +544,6 @@ export function FacturacionTenantPage() {
                         : nombreCliente(f.clienteId)}
                     </td>
 
-                    {/* Viajes */}
-                    <td className="px-4 py-3 text-vialto-steel">
-                      {editing && ed
-                        ? <div className="min-w-[16rem]">
-                            {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
-                              <p className="text-[11px] text-vialto-steel mb-1">
-                                Elegí un cliente para listar solo sus viajes.
-                              </p>
-                            )}
-                            <ViajesCheckboxList viajes={viajesEdicionFactura} selected={ed.viajeIds}
-                              onChange={(ids) => setE({ viajeIds: ids })} />
-                          </div>
-                        : numerosViaje(f.viajeIds)}
-                    </td>
-
-                    {/* Importe (siempre solo lectura — calculado desde viajes) */}
-                    <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
-                      {editing && ed
-                        ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
-                        : textoImporteFacturaListado(f, viajes)}
-                    </td>
-
                     {/* Emisión */}
                     <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
                       {editing && ed
@@ -581,6 +567,13 @@ export function FacturacionTenantPage() {
                       </span>
                     </td>
 
+                    {/* Importe (siempre solo lectura — calculado desde viajes) */}
+                    <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
+                      {editing && ed
+                        ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
+                        : textoImporteFacturaListado(f, viajes)}
+                    </td>
+
                     {/* Acciones */}
                     {!isEditing && (
                       <td className="px-4 py-3 text-right">
@@ -597,6 +590,28 @@ export function FacturacionTenantPage() {
                       </td>
                     )}
                   </tr>
+                  {editing && ed && (
+                    <tr className="border-b border-black/5 bg-vialto-mist/40">
+                      <td colSpan={7} className="px-4 py-3 text-vialto-steel">
+                        <p className="text-[11px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-fire mb-2">
+                          Viajes vinculados
+                        </p>
+                        {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
+                          <p className="text-[11px] text-vialto-steel mb-1">
+                            Elegí un cliente para listar solo sus viajes.
+                          </p>
+                        )}
+                        <div className="max-w-xl">
+                          <ViajesCheckboxList
+                            viajes={viajesEdicionFactura}
+                            selected={ed.viajeIds}
+                            onChange={(ids) => setE({ viajeIds: ids })}
+                            loading={viajesLoading}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </Fragment>
               );
             })}
