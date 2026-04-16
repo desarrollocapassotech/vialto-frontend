@@ -26,8 +26,8 @@ export function useTenantOwnerDashboard() {
   }, [getToken]);
 
   const [period, setPeriod] = useState<DashboardPeriodKind>('month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [customFrom, setCustomFrom] = useState('2001-01-01');
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<OwnerDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

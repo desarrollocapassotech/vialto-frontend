@@ -48,6 +48,7 @@ function CompareLine({ m }: { m: MetricCompare }) {
 function MetricCard({
   title,
   caption,
+  tooltip,
   metric,
   loading,
   formatValue = formatMoney,
@@ -57,12 +58,12 @@ function MetricCard({
 }: {
   title: string;
   caption?: string;
+  tooltip?: string;
   metric: MetricCompare | undefined;
   loading: boolean;
   formatValue?: (n: number) => string;
   omitCompare?: boolean;
   snapshotFootnote?: string;
-  /** Verde si el monto actual &gt; 0 (ingreso). Rojo si &gt; 0 (egreso / obligación). */
   valueTone?: 'default' | 'positiveCash' | 'payable';
 }) {
   const m = metric ?? {
@@ -82,9 +83,16 @@ function MetricCard({
   return (
     <div className="bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between">
       <div>
-        <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
-          {title}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+            {title}
+          </span>
+          {tooltip && (
+            <span title={tooltip} className="cursor-help text-white/25 hover:text-white/50 transition-colors text-[11px] leading-none select-none">
+              ⓘ
+            </span>
+          )}
+        </div>
         {caption ? (
           <p className="mt-1.5 text-[11px] leading-snug text-white/30 normal-case tracking-normal">
             {caption}
@@ -213,8 +221,8 @@ interface TenantOwnerDashboardProps {
 }
 
 export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProps) {
-  const showFin = canAccessFacturacion(modules);
   const showViajes = canAccessViajes(modules);
+  const showFin = canAccessFacturacion(modules) || showViajes;
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -312,38 +320,53 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               title="A pagar (transportistas externos)"
+              tooltip="Suma del precio acordado con transportistas externos en viajes del período"
               metric={fin?.aPagarTransportistas}
               loading={dash.loading}
               valueTone="payable"
             />
             <MetricCard
               title="Sin facturar"
+              tooltip="Monto de viajes finalizados o en curso sin factura emitida, atribuidos al período por fecha de carga"
               metric={fin?.sinFacturarPeriodo}
               loading={dash.loading}
             />
             <MetricCard
               title="Facturado"
+              tooltip="Suma de facturas emitidas al cliente en el período, por fecha de emisión"
               metric={fin?.facturado}
               loading={dash.loading}
             />
             <MetricCard
               title="Cobrado"
+              tooltip="Pagos recibidos de clientes en el período, más viajes cobrados sin pago explícito registrado"
               metric={fin?.cobrado}
               loading={dash.loading}
               valueTone="positiveCash"
             />
           </div>
-          {!dash.loading && fin?.mostrarDiferenciaNeta && (
-            <div className="mt-2 bg-vialto-graphite border border-white/10 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/45">
-                Diferencia neta estimada
-              </span>
-              <div className="flex flex-col sm:items-end gap-1">
-                <span className="font-[family-name:var(--font-display)] text-3xl text-white tracking-wide">
-                  {formatMoney(fin.diferenciaNetaEstimada)}
-                </span>
-                <CompareLine m={fin.diferenciaNetaCompare} />
-              </div>
+          {!dash.loading && (fin?.mostrarDiferenciaNeta || fin?.margen) && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <MetricCard
+                title="Margen neto"
+                tooltip="Cobrado − a pagar transportistas externos"
+                metric={fin?.margen}
+                loading={dash.loading}
+                valueTone="positiveCash"
+              />
+              {fin?.mostrarDiferenciaNeta && (
+                <div className="bg-vialto-graphite border border-white/10 px-5 py-4 flex flex-col justify-between min-h-[120px]">
+                  <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/45">
+                    Margen bruto
+                  </span>
+                  <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
+                    {formatMoney(fin.diferenciaNetaEstimada)}
+                  </span>
+                  <span className="text-xs leading-snug min-h-4">
+                    <CompareLine m={fin.diferenciaNetaCompare} />
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -360,12 +383,14 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
             <MetricCard
               title="Viajes en curso (ahora)"
+              tooltip="Cantidad de viajes con estado en curso en este momento"
               metric={viajes?.enCurso}
               loading={dash.loading}
               formatValue={(n) => String(Math.round(n))}
             />
             <MetricCard
               title="Viajes completados (período)"
+              tooltip="Viajes finalizados, facturados o cobrados cuya fecha de cierre cae dentro del período"
               metric={viajes?.completados}
               loading={dash.loading}
               formatValue={(n) => String(Math.round(n))}

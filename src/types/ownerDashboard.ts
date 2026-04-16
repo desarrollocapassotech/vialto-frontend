@@ -20,6 +20,7 @@ export type OwnerDashboardResponse = {
     facturado: MetricCompare;
     cobrado: MetricCompare;
     aPagarTransportistas: MetricCompare;
+    margen: MetricCompare;
     mostrarDiferenciaNeta: boolean;
     diferenciaNetaEstimada: number;
     diferenciaNetaCompare: MetricCompare;
