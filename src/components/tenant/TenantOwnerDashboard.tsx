@@ -84,7 +84,7 @@ function MetricCard({
     <div className="bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between">
       <div>
         <div className="flex items-center gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wide text-white/80">
             {title}
           </span>
           {tooltip && (
@@ -345,30 +345,6 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
               valueTone="positiveCash"
             />
           </div>
-          {!dash.loading && (fin?.mostrarDiferenciaNeta || fin?.margen) && (
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <MetricCard
-                title="Margen neto"
-                tooltip="Cobrado − a pagar transportistas externos"
-                metric={fin?.margen}
-                loading={dash.loading}
-                valueTone="positiveCash"
-              />
-              {fin?.mostrarDiferenciaNeta && (
-                <div className="bg-vialto-graphite border border-white/10 px-5 py-4 flex flex-col justify-between min-h-[120px]">
-                  <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/45">
-                    Margen bruto
-                  </span>
-                  <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
-                    {formatMoney(fin.diferenciaNetaEstimada)}
-                  </span>
-                  <span className="text-xs leading-snug min-h-4">
-                    <CompareLine m={fin.diferenciaNetaCompare} />
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
         </section>
       )}
 

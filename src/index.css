@@ -18,26 +18,19 @@
   --font-body: Barlow, ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
 
-  /* Badge finalizado sin facturar / facturado sin cobrar — parpadeo marcado */
-  --animate-estado-atencion: estado-atencion 0.42s linear infinite;
-  /* En curso — respiración suave, un poco más visible que antes */
-  --animate-estado-atencion-suave: estado-atencion-suave 2.35s ease-in-out infinite;
+  /* Badge finalizado sin facturar / facturado sin cobrar — pulso muy suave */
+  --animate-estado-atencion: estado-atencion 4s ease-in-out infinite;
+  /* En curso — respiración apenas perceptible */
+  --animate-estado-atencion-suave: estado-atencion-suave 5s ease-in-out infinite;
 }
 
 @keyframes estado-atencion {
   0%,
-  45% {
-    opacity: 1;
-    filter: brightness(1);
-  }
-  50%,
-  95% {
-    opacity: 0.22;
-    filter: brightness(1.35);
-  }
   100% {
     opacity: 1;
-    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.6;
   }
 }
 
@@ -45,11 +38,9 @@
   0%,
   100% {
     opacity: 1;
-    filter: brightness(1);
   }
   50% {
-    opacity: 0.78;
-    filter: brightness(1.11);
+    opacity: 0.75;
   }
 }
 
