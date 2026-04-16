@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import {
   labelBillingStatus,
   labelModulo,
 } from '@/lib/platformLabels';
 import { Link } from 'react-router-dom';
 import type { Tenant } from '@/types/api';
+import { ImportacionModal } from './ImportacionModal';
 
 interface TenantsTableProps {
   loading: boolean;
@@ -30,10 +32,18 @@ export function TenantsTable({
   statusUpdatingByOrgId,
   onToggleEnabled,
 }: TenantsTableProps) {
+  const [importTenant, setImportTenant] = useState<Tenant | null>(null);
   const isDisabledStatus = (status: string) =>
     ['suspended', 'expired'].includes(status.toLowerCase());
 
   return (
+    <>
+    {importTenant && (
+      <ImportacionModal
+        tenant={importTenant}
+        onClose={() => setImportTenant(null)}
+      />
+    )}
     <div className="mt-10 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
       <table className="w-full text-left text-sm">
         <thead>
@@ -141,6 +151,13 @@ export function TenantsTable({
                         ].join(' ')}
                       />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportTenant(tenant)}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Importar
+                    </button>
                     <Link
                       to={`/superadmin/empresas/${encodeURIComponent(
                         tenant.clerkOrgId,
@@ -156,5 +173,6 @@ export function TenantsTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }

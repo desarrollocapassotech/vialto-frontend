@@ -146,6 +146,85 @@ export interface Factura {
   createdAt: string;
 }
 
+export interface ImportRowError {
+  fila: number;
+  campo?: string;
+  error: string;
+  valor?: unknown;
+}
+
+export interface ImportPreviewViaje {
+  fila: number;
+  cliente: string;
+  transporte: string | null;
+  origen: string | null;
+  destino: string | null;
+  fechaCarga: string | null;
+  fechaDescarga: string | null;
+  detalleCarga: string | null;
+  monto: number | null;
+  nroFactura: string | null;
+  precioTransportistaExterno: number | null;
+  nroFacturaTransporte: string | null;
+}
+
+export interface ImportPreviewFactura {
+  tipo: 'cliente' | 'transportista_externo';
+  numero: string;
+  nombre: string | null;
+  importe: number;
+  fechaEmision: string | null;
+  fechaVencimiento: string | null;
+}
+
+export interface ImportPreviewEntidad {
+  nombre: string;
+  esNuevo: boolean;
+}
+
+export interface ImportPreviewResult {
+  sessionId: string;
+  modulo: string;
+  nombreArchivo: string;
+  totalFilas: number;
+  exitosas: number;
+  errores: number;
+  detalleErrores: ImportRowError[];
+  viajes?: ImportPreviewViaje[];
+  facturas?: ImportPreviewFactura[];
+  clientes?: ImportPreviewEntidad[];
+  transportistas?: ImportPreviewEntidad[];
+}
+
+export interface ImportLogDetalle {
+  fila: number;
+  estado: 'ok' | 'error';
+  id?: string;
+  mensaje?: string;
+}
+
+export interface ImportLog {
+  id: string;
+  tenantId: string;
+  modulo: string;
+  nombreArchivo: string;
+  estado: 'completado' | 'con_errores' | 'fallido';
+  totalFilas: number;
+  exitosas: number;
+  errores: number;
+  detalles: ImportLogDetalle[];
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface ImportTemplate {
+  id: string;
+  modulo: string;
+  nombre: string;
+  activo: boolean;
+  updatedAt: string;
+}
+
 export interface PlatformUser {
   userId: string | null;
   firstName: string | null;
