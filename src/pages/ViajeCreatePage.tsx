@@ -7,6 +7,7 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
+  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
@@ -74,6 +75,8 @@ export function ViajeCreatePage() {
   const [transportistaId, setTransportistaId] = useState('');
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
+  const [choferExternoId, setChoferExternoId] = useState('');
+  const [vehiculoExternoId, setVehiculoExternoId] = useState('');
   const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
   const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
@@ -194,6 +197,8 @@ export function ViajeCreatePage() {
       setVehiculosRows([]);
     } else {
       setTransportistaId('');
+      setChoferExternoId('');
+      setVehiculoExternoId('');
       setChoferId('');
       setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
     }
@@ -275,8 +280,8 @@ export function ViajeCreatePage() {
           ...(externo
             ? {
                 transportistaId: transportistaId.trim(),
-                choferId: null,
-                vehiculoIds: [],
+                choferId: choferExternoId.trim() || null,
+                vehiculoIds: vehiculoExternoId.trim() ? [vehiculoExternoId.trim()] : [],
               }
             : {
                 transportistaId: null,
@@ -436,7 +441,7 @@ export function ViajeCreatePage() {
             modo={modoOperacion}
             onModoChange={applyModoOperacion}
             externoContent={
-              <div className="grid gap-2">
+              <div className="grid gap-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Transportista externo</span>
@@ -474,6 +479,29 @@ export function ViajeCreatePage() {
                         aria-label="Moneda precio transportista externo"
                       />
                     </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Chofer (opcional)</span>
+                    <ChoferSearchSelect
+                      choferes={choferes}
+                      value={choferExternoId}
+                      onChange={setChoferExternoId}
+                      inputClassName={inputClass}
+                      aria-label="Chofer transportista externo"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Vehículo (opcional)</span>
+                    <VehiculoPatenteSearchSelect
+                      vehiculos={vehiculos}
+                      value={vehiculoExternoId}
+                      onChange={setVehiculoExternoId}
+                      sinOpciones={vehiculos.length === 0}
+                      inputClassName={inputClass}
+                      aria-label="Vehículo transportista externo"
+                    />
                   </div>
                 </div>
               </div>

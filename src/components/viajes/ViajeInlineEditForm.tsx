@@ -3,6 +3,7 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
+  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import {
   ViajeOperacionTipoFieldset,
@@ -82,6 +83,8 @@ export function ViajeInlineEditForm({
           ? { choferId: '', vehiculosRows: [] }
           : {
               transportistaId: '',
+              choferExternoId: '',
+              vehiculoExternoId: '',
               choferId: normalizarIdEnLista(p.choferId, choferesPropios),
               vehiculosRows:
                 p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -140,7 +143,7 @@ export function ViajeInlineEditForm({
             onModoChange={applyModo}
             groupName={`viaje-op-sa-${draft.numero || 'edit'}`}
             externoContent={
-              <div className="grid gap-2">
+              <div className="grid gap-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={LABEL}>Transportista externo</span>
@@ -183,6 +186,29 @@ export function ViajeInlineEditForm({
                         aria-label="Moneda precio transportista externo"
                       />
                     </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Chofer (opcional)</span>
+                    <ChoferSearchSelect
+                      choferes={choferes}
+                      value={draft.choferExternoId}
+                      onChange={(id) => set({ choferExternoId: id })}
+                      inputClassName={INPUT}
+                      aria-label="Chofer transportista externo"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={LABEL}>Vehículo (opcional)</span>
+                    <VehiculoPatenteSearchSelect
+                      vehiculos={vehiculos}
+                      value={draft.vehiculoExternoId}
+                      onChange={(id) => set({ vehiculoExternoId: id })}
+                      sinOpciones={vehiculos.length === 0}
+                      inputClassName={INPUT}
+                      aria-label="Vehículo transportista externo"
+                    />
                   </div>
                 </div>
               </div>

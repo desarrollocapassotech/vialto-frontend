@@ -6,6 +6,7 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
+  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
@@ -83,6 +84,8 @@ type ViajeInlineDraft = {
   choferId: string;
   transportistaId: string;
   vehiculosRows: ViajeVehiculoRowDraft[];
+  choferExternoId: string;
+  vehiculoExternoId: string;
   paisOrigen: PaisCodigo;
   paisDestino: PaisCodigo;
   origen: string;
@@ -504,6 +507,7 @@ export function ViajesTenantPage() {
       clienteId: v.clienteId ?? '',
       operacionModo: esExterno ? 'externo' : 'propio',
       choferId: normalizarIdEnLista(v.choferId, choferesPropios),
+      choferExternoId: esExterno ? (v.choferId ?? '') : '',
       transportistaId: v.transportistaId ?? '',
       vehiculosRows:
         !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
@@ -516,6 +520,7 @@ export function ViajesTenantPage() {
           : !esExterno
             ? [{ tipo: 'tractor', vehiculoId: '' }]
             : [],
+      vehiculoExternoId: esExterno ? (v.vehiculosViaje?.[0]?.vehiculoId ?? '') : '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -720,6 +725,8 @@ export function ViajesTenantPage() {
               ? { choferId: '', vehiculosRows: [] }
               : {
                   transportistaId: '',
+                  choferExternoId: '',
+                  vehiculoExternoId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -797,8 +804,8 @@ export function ViajesTenantPage() {
           ...(externo
             ? {
                 transportistaId: draft.transportistaId.trim(),
-                choferId: null,
-                vehiculoIds: [],
+                choferId: draft.choferExternoId.trim() || null,
+                vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
               }
             : {
                 transportistaId: null,
@@ -1420,7 +1427,7 @@ export function ViajesTenantPage() {
                             <MonedaSelect
                               value={draft.monedaMonto}
                               onChange={(m: ViajeMonedaCodigo) =>
-                                setDraft((p) => (p ? { ...p, monedaMonto: m, monto: '' } : p))
+                                setDraft((p) => (p ? { ...p, monedaMonto: m } : p))
                               }
                               aria-label="Moneda monto a facturar"
                             />
@@ -1482,18 +1489,43 @@ export function ViajesTenantPage() {
                                     value={draft.monedaPrecioTransportistaExterno}
                                     onChange={(m: ViajeMonedaCodigo) =>
                                       setDraft((p) =>
-                                        p
-                                          ? {
-                                              ...p,
-                                              monedaPrecioTransportistaExterno: m,
-                                              precioTransportistaExterno: '',
-                                            }
-                                          : p,
+                                        p ? { ...p, monedaPrecioTransportistaExterno: m } : p,
                                       )
                                     }
                                     aria-label="Moneda precio transportista externo"
                                   />
                                 </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                                  Chofer (opcional)
+                                </span>
+                                <ChoferSearchSelect
+                                  choferes={choferes}
+                                  value={draft.choferExternoId}
+                                  onChange={(id) =>
+                                    setDraft((p) => (p ? { ...p, choferExternoId: id } : p))
+                                  }
+                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                                  aria-label="Chofer transportista externo"
+                                />
+                              </div>
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                                  Vehículo (opcional)
+                                </span>
+                                <VehiculoPatenteSearchSelect
+                                  vehiculos={vehiculos}
+                                  value={draft.vehiculoExternoId}
+                                  onChange={(id) =>
+                                    setDraft((p) => (p ? { ...p, vehiculoExternoId: id } : p))
+                                  }
+                                  sinOpciones={vehiculos.length === 0}
+                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                                  aria-label="Vehículo transportista externo"
+                                />
                               </div>
                             </div>
                           </div>

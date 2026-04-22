@@ -227,6 +227,7 @@ export function ViajesSuperadminPage() {
       clienteId: v.clienteId ?? '',
       operacionModo: esExterno ? 'externo' : 'propio',
       choferId: normalizarIdEnLista(v.choferId, choferesPropios),
+      choferExternoId: esExterno ? (v.choferId ?? '') : '',
       transportistaId: v.transportistaId ?? '',
       vehiculosRows:
         !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
@@ -239,6 +240,7 @@ export function ViajesSuperadminPage() {
           : !esExterno
             ? [{ tipo: 'tractor', vehiculoId: '' }]
             : [],
+      vehiculoExternoId: esExterno ? (v.vehiculosViaje?.[0]?.vehiculoId ?? '') : '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -433,7 +435,11 @@ export function ViajesSuperadminPage() {
             estado: draft.estado,
             clienteId: draft.clienteId || undefined,
             ...(externo
-              ? { transportistaId: draft.transportistaId.trim(), choferId: null, vehiculoIds: [] }
+              ? {
+                  transportistaId: draft.transportistaId.trim(),
+                  choferId: draft.choferExternoId.trim() || null,
+                  vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
+                }
               : {
                   transportistaId: null,
                   choferId: draft.choferId.trim(),

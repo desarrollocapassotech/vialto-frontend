@@ -2,15 +2,10 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import {
-  TransportistaAsignacionFields,
-  type AsignacionModo,
-} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -25,14 +20,11 @@ export function VehiculoEditPage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
-  const transportistas = useTransportistasList(tenantId || undefined);
   const [patente, setPatente] = useState('');
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>('camion');
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState('');
-  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
-  const [transportistaId, setTransportistaId] = useState('');
 const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -58,9 +50,6 @@ const [confirmDelete, setConfirmDelete] = useState('');
           setModelo(row.modelo ?? '');
           const añoVal = row.año ?? row.anio;
           setAnio(añoVal != null ? String(añoVal) : '');
-          const tid = row.transportistaId;
-          setModoAsignacion(tid ? 'externo' : 'propio');
-          setTransportistaId(tid ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'vehiculos'));
@@ -79,10 +68,6 @@ const [confirmDelete, setConfirmDelete] = useState('');
       setError('Ingresá la patente.');
       return;
     }
-    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
-      setError('Seleccioná un transportista o elegí flota propia.');
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -99,8 +84,6 @@ const [confirmDelete, setConfirmDelete] = useState('');
           marca: marca.trim() || undefined,
           modelo: modelo.trim() || undefined,
           anio: anio ? Number(anio) : undefined,
-          transportistaId:
-            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       if (!tenantId) void maestro.refreshVehiculos();
@@ -201,17 +184,6 @@ const [confirmDelete, setConfirmDelete] = useState('');
                 onChange={(e) => setAnio(e.target.value)}
               />
             </label>
-            <TransportistaAsignacionFields
-              modo={modoAsignacion}
-              onModoChange={(m) => {
-                setModoAsignacion(m);
-                if (m === 'propio') setTransportistaId('');
-              }}
-              transportistaId={transportistaId}
-              onTransportistaIdChange={setTransportistaId}
-              transportistas={transportistas ?? []}
-              loadingTransportistas={transportistas === null}
-            />
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>

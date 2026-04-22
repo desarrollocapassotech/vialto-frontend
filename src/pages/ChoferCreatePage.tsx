@@ -1,15 +1,10 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  TransportistaAsignacionFields,
-  type AsignacionModo,
-} from '@/components/crud/TransportistaAsignacionFields';
 import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -20,22 +15,15 @@ export function ChoferCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
-  const transportistas = useTransportistasList(tenantId || undefined);
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [modoAsignacion, setModoAsignacion] = useState<AsignacionModo>('propio');
-  const [transportistaId, setTransportistaId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
     if (!nombre.trim()) {
       setError('Ingresá el nombre del chofer.');
-      return;
-    }
-    if (modoAsignacion === 'externo' && !transportistaId.trim()) {
-      setError('Seleccioná un transportista o elegí flota propia.');
       return;
     }
     setLoading(true);
@@ -50,8 +38,6 @@ export function ChoferCreatePage() {
           nombre: nombre.trim(),
           dni: dni.trim() || undefined,
           telefono: telefono.trim() || undefined,
-          transportistaId:
-            modoAsignacion === 'externo' ? transportistaId.trim() : null,
         }),
       });
       if (!tenantId) void maestro.refreshChoferes();
@@ -88,17 +74,6 @@ export function ChoferCreatePage() {
           </span>
           <CrudInput placeholder="Ej: +54 9 11 1234-5678" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         </label>
-        <TransportistaAsignacionFields
-          modo={modoAsignacion}
-          onModoChange={(m) => {
-            setModoAsignacion(m);
-            if (m === 'propio') setTransportistaId('');
-          }}
-          transportistaId={transportistaId}
-          onTransportistaIdChange={setTransportistaId}
-          transportistas={transportistas ?? []}
-          loadingTransportistas={transportistas === null}
-        />
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear chofer" />
       </form>
