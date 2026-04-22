@@ -127,9 +127,7 @@ export function ViajeInlineEditForm({
                 />
                 <MonedaSelect
                   value={draft.monedaMonto}
-                  onChange={(m: ViajeMonedaCodigo) =>
-                    set({ monedaMonto: m, monto: '' })
-                  }
+                  onChange={(m: ViajeMonedaCodigo) => set({ monedaMonto: m })}
                   aria-label="Moneda monto a facturar"
                 />
               </div>
@@ -180,7 +178,7 @@ export function ViajeInlineEditForm({
                       <MonedaSelect
                         value={draft.monedaPrecioTransportistaExterno}
                         onChange={(m: ViajeMonedaCodigo) =>
-                          set({ monedaPrecioTransportistaExterno: m, precioTransportistaExterno: '' })
+                          set({ monedaPrecioTransportistaExterno: m })
                         }
                         aria-label="Moneda precio transportista externo"
                       />

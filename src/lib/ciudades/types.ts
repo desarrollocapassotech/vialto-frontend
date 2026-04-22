@@ -1,5 +1,5 @@
 /** Código ISO 3166-1 alpha-2 de países con buscador de ciudades implementado o previsto. */
-export type PaisCodigo = 'AR' | 'UY';
+export type PaisCodigo = 'AR' | 'UY' | 'PY' | 'CL' | 'BR';
 
 export type CiudadOpcion = {
   id: string;

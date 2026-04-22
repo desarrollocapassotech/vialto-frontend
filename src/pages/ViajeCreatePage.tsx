@@ -72,10 +72,8 @@ export function ViajeCreatePage() {
   const [clienteId, setClienteId] = useState('');
   const [choferId, setChoferId] = useState('');
   const [transportistaId, setTransportistaId] = useState('');
-  const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('propio');
-  const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([
-    { tipo: 'tractor', vehiculoId: '' },
-  ]);
+  const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
+  const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
   const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
@@ -428,10 +426,7 @@ export function ViajeCreatePage() {
                 />
                 <MonedaSelect
                   value={monedaMonto}
-                  onChange={(m) => {
-                    setMonedaMonto(m);
-                    setMonto('');
-                  }}
+                  onChange={setMonedaMonto}
                   aria-label="Moneda monto a facturar"
                 />
               </div>
@@ -475,10 +470,7 @@ export function ViajeCreatePage() {
                       />
                       <MonedaSelect
                         value={monedaPrecioTransportista}
-                        onChange={(m) => {
-                          setMonedaPrecioTransportista(m);
-                          setPrecioTransportistaExterno('');
-                        }}
+                        onChange={setMonedaPrecioTransportista}
                         aria-label="Moneda precio transportista externo"
                       />
                     </div>

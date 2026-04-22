@@ -36,20 +36,20 @@ export function ViajeOperacionTipoFieldset({
             type="radio"
             name={groupName}
             className="h-4 w-4 accent-vialto-charcoal"
-            checked={modo === 'propio'}
-            onChange={() => onModoChange('propio')}
+            checked={modo === 'externo'}
+            onChange={() => onModoChange('externo')}
           />
-          <span>Flota propia (chofer y vehículo)</span>
+          <span>Transporte externo (tercerizado)</span>
         </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
           <input
             type="radio"
             name={groupName}
             className="h-4 w-4 accent-vialto-charcoal"
-            checked={modo === 'externo'}
-            onChange={() => onModoChange('externo')}
+            checked={modo === 'propio'}
+            onChange={() => onModoChange('propio')}
           />
-          <span>Transporte externo (tercerizado)</span>
+          <span>Flota propia (chofer y vehículo)</span>
         </label>
       </div>
       <div className="pt-1">{modo === 'externo' ? externoContent : propioContent}</div>

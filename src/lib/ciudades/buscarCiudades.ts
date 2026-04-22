@@ -1,6 +1,9 @@
 import type { CiudadOpcion, PaisCodigo } from './types';
 import { buscarArgentina } from './argentina';
 import { buscarUruguay } from './uruguay';
+import { buscarParaguay } from './paraguay';
+import { buscarChile } from './chile';
+import { buscarBrasil } from './brasil';
 
 /**
  * Registro de buscadores por país. Al sumar un país nuevo, importar su módulo y asignarlo aquí.
@@ -8,6 +11,9 @@ import { buscarUruguay } from './uruguay';
 const buscadores: Record<PaisCodigo, (q: string, signal?: AbortSignal) => Promise<CiudadOpcion[]>> = {
   AR: buscarArgentina,
   UY: buscarUruguay,
+  PY: buscarParaguay,
+  CL: buscarChile,
+  BR: buscarBrasil,
 };
 
 /**
