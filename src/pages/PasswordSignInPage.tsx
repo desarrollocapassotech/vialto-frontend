@@ -25,6 +25,8 @@ export function PasswordSignInPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mfaActivo, setMfaActivo] = useState(false);
+  const [mfaCodigo, setMfaCodigo] = useState('');
 
   async function onSubmit() {
     if (!isLoaded) return;
@@ -52,11 +54,45 @@ export function PasswordSignInPage() {
       }
 
       if (result.status === 'needs_second_factor') {
-        setError('Este usuario requiere un segundo factor de autenticación para ingresar.');
+        setMfaActivo(true);
         return;
       }
 
       setError('No se pudo completar el inicio de sesión.');
+    } catch (e) {
+      setError(getClerkErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onMfaSubmit() {
+    if (!isLoaded || !signIn) return;
+    if (!mfaCodigo.trim()) {
+      setError('Ingresá el código de verificación.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const estrategias = signIn.supportedSecondFactors?.map((f) => f.strategy) ?? [];
+      const estrategia = estrategias.includes('totp')
+        ? 'totp'
+        : estrategias.includes('phone_code')
+          ? 'phone_code'
+          : estrategias.includes('email_code')
+            ? 'email_code'
+            : 'totp';
+      const result = await signIn.attemptSecondFactor({
+        strategy: estrategia as 'totp' | 'phone_code' | 'email_code',
+        code: mfaCodigo.trim(),
+      });
+      if (result.status === 'complete' && result.createdSessionId) {
+        await setActive({ session: result.createdSessionId });
+        navigate('/', { replace: true });
+      } else {
+        setError('No se pudo completar la verificación.');
+      }
     } catch (e) {
       setError(getClerkErrorMessage(e));
     } finally {
@@ -78,6 +114,64 @@ export function PasswordSignInPage() {
       setError(getClerkErrorMessage(e));
       setGoogleLoading(false);
     }
+  }
+
+  if (mfaActivo) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-vialto-charcoal px-4">
+        <div className="w-full max-w-md bg-vialto-graphite border border-white/10 shadow-xl p-6">
+          <h1 className="text-center font-[family-name:var(--font-display)] text-2xl tracking-wide text-white">
+            Verificación en dos pasos
+          </h1>
+          <p className="mt-3 text-center text-sm text-white/60">
+            Ingresá el código de tu app de autenticación o el que recibiste por SMS.
+          </p>
+
+          {error && (
+            <p className="mt-4 text-sm text-red-200 bg-red-900/30 border border-red-700/50 px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <form
+            className="mt-5 grid gap-4"
+            onSubmit={(e) => { e.preventDefault(); void onMfaSubmit(); }}
+          >
+            <label className="grid gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.22em] text-white/70">
+                Código de verificación
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                className="h-10 border border-white/15 bg-white px-3 text-sm tracking-widest"
+                value={mfaCodigo}
+                onChange={(e) => setMfaCodigo(e.target.value)}
+                placeholder="000000"
+                maxLength={8}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-10 bg-vialto-fire hover:bg-vialto-bright text-sm uppercase tracking-wider text-white disabled:opacity-60"
+            >
+              {loading ? 'Verificando…' : 'Verificar'}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => { setMfaActivo(false); setMfaCodigo(''); setError(null); }}
+            className="mt-4 w-full text-center text-sm text-white/50 hover:text-white/80"
+          >
+            ← Volver al inicio de sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
