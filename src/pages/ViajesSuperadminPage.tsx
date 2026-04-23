@@ -40,7 +40,6 @@ import type {
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
 import {
-  estadoViajeLabel,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';

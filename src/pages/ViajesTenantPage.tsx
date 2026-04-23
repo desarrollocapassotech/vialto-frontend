@@ -58,6 +58,7 @@ import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
+  estadoMuestraKmLitros,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
