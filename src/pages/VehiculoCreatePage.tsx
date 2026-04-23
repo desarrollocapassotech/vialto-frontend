@@ -11,6 +11,8 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
 
+const LABEL = 'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel';
+
 export function VehiculoCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -22,7 +24,12 @@ export function VehiculoCreatePage() {
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState('');
-const [loading, setLoading] = useState(false);
+  const [nroChasis, setNroChasis] = useState('');
+  const [poliza, setPoliza] = useState('');
+  const [vencimientoPoliza, setVencimientoPoliza] = useState('');
+  const [tara, setTara] = useState('');
+  const [precinto, setPrecinto] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
@@ -44,6 +51,11 @@ const [loading, setLoading] = useState(false);
           marca: marca.trim() || undefined,
           modelo: modelo.trim() || undefined,
           anio: anio ? Number(anio) : undefined,
+          nroChasis: nroChasis.trim() || undefined,
+          poliza: poliza.trim() || undefined,
+          vencimientoPoliza: vencimientoPoliza || undefined,
+          tara: tara ? Number(tara.replace(',', '.')) : undefined,
+          precinto: precinto.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshVehiculos();
@@ -63,36 +75,46 @@ const [loading, setLoading] = useState(false);
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Patente *
-          </span>
+          <span className={LABEL}>Patente *</span>
           <CrudInput placeholder="Ej: AA123BB" value={patente} onChange={(e) => setPatente(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Tipo
-          </span>
+          <span className={LABEL}>Tipo</span>
           <CrudSelect value={tipo} onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}>
             {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
           </CrudSelect>
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Marca
-          </span>
+          <span className={LABEL}>Marca</span>
           <CrudInput placeholder="Ej: Scania" value={marca} onChange={(e) => setMarca(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Modelo
-          </span>
+          <span className={LABEL}>Modelo</span>
           <CrudInput placeholder="Ej: R450" value={modelo} onChange={(e) => setModelo(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Año
-          </span>
+          <span className={LABEL}>Año</span>
           <CrudInput type="number" placeholder="Ej: 2020" value={anio} onChange={(e) => setAnio(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={LABEL}>Nro. de chasis</span>
+          <CrudInput placeholder="Ej: 9BM379182LB123456" value={nroChasis} onChange={(e) => setNroChasis(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={LABEL}>Póliza</span>
+          <CrudInput placeholder="Ej: POL-2024-001234" value={poliza} onChange={(e) => setPoliza(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={LABEL}>Vencimiento de póliza</span>
+          <CrudInput type="date" value={vencimientoPoliza} onChange={(e) => setVencimientoPoliza(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={LABEL}>Tara (kg)</span>
+          <CrudInput type="number" placeholder="Ej: 8500" value={tara} onChange={(e) => setTara(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={LABEL}>Precinto</span>
+          <CrudInput placeholder="Ej: 00123456" value={precinto} onChange={(e) => setPrecinto(e.target.value)} />
         </label>
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear vehículo" />

@@ -2,7 +2,6 @@ import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import type { ViajeVehiculoRowDraft } from '@/components/viajes/ViajeVehiculosLista';
-import type { ConEmpresa, Viaje } from '@/types/api';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -36,13 +35,3 @@ export type ViajeInlineDraft = {
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
 };
 
-export type KmLitrosPrompt =
-  | { kind: 'quick'; viaje: ConEmpresa<Viaje>; nuevoEstado: string }
-  | { kind: 'save'; viajeId: string }
-  | { kind: 'estado-draft'; nextEstado: string };
-
-export type SaveInlineKmOpts = {
-  skipKmLitrosPrompt?: boolean;
-  kmRecorridos?: number;
-  litrosConsumidos?: number;
-};

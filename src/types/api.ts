@@ -77,6 +77,11 @@ export interface Vehiculo {
   /** Respuesta JSON de Prisma/Nest usa `anio`. */
   anio?: number | null;
   kmActual: number;
+  nroChasis: string | null;
+  poliza: string | null;
+  vencimientoPoliza: string | null;
+  tara: number | null;
+  precinto: string | null;
   transportistaId: string | null;
   createdAt: string;
 }

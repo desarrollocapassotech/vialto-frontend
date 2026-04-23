@@ -25,6 +25,11 @@ export function VehiculoEditPage() {
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState('');
+  const [nroChasis, setNroChasis] = useState('');
+  const [poliza, setPoliza] = useState('');
+  const [vencimientoPoliza, setVencimientoPoliza] = useState('');
+  const [tara, setTara] = useState('');
+  const [precinto, setPrecinto] = useState('');
 const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -50,6 +55,13 @@ const [confirmDelete, setConfirmDelete] = useState('');
           setModelo(row.modelo ?? '');
           const añoVal = row.año ?? row.anio;
           setAnio(añoVal != null ? String(añoVal) : '');
+          setNroChasis(row.nroChasis ?? '');
+          setPoliza(row.poliza ?? '');
+          setVencimientoPoliza(
+            row.vencimientoPoliza ? row.vencimientoPoliza.slice(0, 10) : '',
+          );
+          setTara(row.tara != null ? String(row.tara) : '');
+          setPrecinto(row.precinto ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'vehiculos'));
@@ -84,6 +96,11 @@ const [confirmDelete, setConfirmDelete] = useState('');
           marca: marca.trim() || undefined,
           modelo: modelo.trim() || undefined,
           anio: anio ? Number(anio) : undefined,
+          nroChasis: nroChasis.trim() || undefined,
+          poliza: poliza.trim() || undefined,
+          vencimientoPoliza: vencimientoPoliza || undefined,
+          tara: tara ? Number(tara.toString().replace(',', '.')) : undefined,
+          precinto: precinto.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshVehiculos();
@@ -182,6 +199,57 @@ const [confirmDelete, setConfirmDelete] = useState('');
                 placeholder="Ej: 2020"
                 value={anio}
                 onChange={(e) => setAnio(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Nro. de chasis
+              </span>
+              <CrudInput
+                value={nroChasis}
+                placeholder="Ej: 9BM379182LB123456"
+                onChange={(e) => setNroChasis(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Póliza
+              </span>
+              <CrudInput
+                value={poliza}
+                placeholder="Ej: POL-2024-001234"
+                onChange={(e) => setPoliza(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Vencimiento de póliza
+              </span>
+              <CrudInput
+                type="date"
+                value={vencimientoPoliza}
+                onChange={(e) => setVencimientoPoliza(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Tara (kg)
+              </span>
+              <CrudInput
+                type="number"
+                placeholder="Ej: 8500"
+                value={tara}
+                onChange={(e) => setTara(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Precinto
+              </span>
+              <CrudInput
+                value={precinto}
+                placeholder="Ej: 00123456"
+                onChange={(e) => setPrecinto(e.target.value)}
               />
             </label>
             <CrudFormErrorAlert message={error} />

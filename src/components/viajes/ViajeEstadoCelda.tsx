@@ -2,7 +2,6 @@ import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
-  estadoMuestraKmLitros,
   tooltipEstadoViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
@@ -17,7 +16,7 @@ type Props = {
   isSavingEstado: boolean;
   /** Cambia el estado en el draft (modo edición inline). */
   onDraftEstadoChange: (next: string) => void;
-  /** Estado final requiere km/litros vacíos en el draft — abre el dialog. */
+  /** @deprecated Sin efecto; se mantiene por compatibilidad mientras se migran los callers. */
   onRequiereKmLitrosDraft: (next: string) => void;
   /** Cambio de estado desde el quick-select fuera del modo edición. */
   onQuickEstadoChange: (next: string) => void;
@@ -35,7 +34,7 @@ export function ViajeEstadoCelda({
   isQuickOpen,
   isSavingEstado,
   onDraftEstadoChange,
-  onRequiereKmLitrosDraft,
+  onRequiereKmLitrosDraft: _onRequiereKmLitrosDraft,
   onQuickEstadoChange,
   onQuickOpen,
   onQuickClose,
@@ -45,16 +44,7 @@ export function ViajeEstadoCelda({
     return (
       <select
         value={draft.estado}
-        onChange={(e) => {
-          const next = e.target.value;
-          const kmVacios =
-            !draft.kmRecorridos.trim() && !draft.litrosConsumidos.trim();
-          if (estadoMuestraKmLitros(next) && kmVacios) {
-            onRequiereKmLitrosDraft(next);
-            return;
-          }
-          onDraftEstadoChange(next);
-        }}
+        onChange={(e) => onDraftEstadoChange(e.target.value)}
         className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
       >
         {ESTADOS.map((x) => (

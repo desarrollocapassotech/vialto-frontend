@@ -15,7 +15,6 @@ import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
-import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
@@ -60,10 +59,6 @@ import {
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
   tooltipEstadoViaje,
-  estadoMuestraKmLitros,
-  draftKmLitrosVacios,
-  parseKmLitrosOpcionales,
-  viajeTieneKmYLitrosEnApi,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
   estadosDisponiblesParaViaje,
@@ -107,17 +102,6 @@ type ViajeInlineDraft = {
 type ViajesPaginatedResponse = {
   items: Viaje[];
   meta: PaginatedMeta;
-};
-
-type KmLitrosPrompt =
-  | { kind: 'quick'; viaje: Viaje; nuevoEstado: string }
-  | { kind: 'save'; viajeId: string }
-  | { kind: 'estado-draft'; nextEstado: string };
-
-type SaveInlineKmOpts = {
-  skipKmLitrosPrompt?: boolean;
-  kmRecorridos?: number;
-  litrosConsumidos?: number;
 };
 
 export function ViajesTenantPage() {
@@ -164,10 +148,6 @@ export function ViajesTenantPage() {
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>([]);
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
-  const [kmLitrosPrompt, setKmLitrosPrompt] = useState<KmLitrosPrompt | null>(null);
-  const [kmLitrosKm, setKmLitrosKm] = useState('');
-  const [kmLitrosLitros, setKmLitrosLitros] = useState('');
-  const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
   /** Modal de elección al facturar: nueva factura o agregar a una existente del cliente. */
   const [facturarOpcionState, setFacturarOpcionState] = useState<{
     viaje: Viaje;
@@ -555,14 +535,6 @@ export function ViajesTenantPage() {
       setEstadoQuickId(null);
       return;
     }
-    if (estadoMuestraKmLitros(nuevoEstado) && !viajeTieneKmYLitrosEnApi(v)) {
-      setKmLitrosKm(v.kmRecorridos != null ? String(v.kmRecorridos) : '');
-      setKmLitrosLitros(v.litrosConsumidos != null ? String(v.litrosConsumidos) : '');
-      setKmLitrosPrompt({ kind: 'quick', viaje: v, nuevoEstado });
-      setKmLitrosFieldError(null);
-      setEstadoQuickId(null);
-      return;
-    }
     setSavingEstadoId(v.id);
     setError(null);
     try {
@@ -572,84 +544,11 @@ export function ViajesTenantPage() {
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
       setEstadoQuickId(null);
-      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
       setSavingEstadoId(null);
     }
-  }
-
-  async function patchEstadoConKmLitrosOpcional(
-    v: Viaje,
-    nuevoEstado: string,
-    km?: number,
-    litros?: number,
-  ): Promise<boolean> {
-    setSavingEstadoId(v.id);
-    setError(null);
-    try {
-      const body: Record<string, unknown> = { estado: nuevoEstado };
-      if (km !== undefined) body.kmRecorridos = km;
-      if (litros !== undefined) body.litrosConsumidos = litros;
-      const updated = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(v.id)}`, () => getToken(), {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      });
-      setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
-      setEstadoQuickId(null);
-      if (nuevoEstado === 'facturado_sin_cobrar') navigateToFacturacion(v);
-      return true;
-    } catch (e) {
-      setError(friendlyError(e, 'viajes'));
-      return false;
-    } finally {
-      setSavingEstadoId(null);
-    }
-  }
-
-  function confirmKmLitrosDialog() {
-    const parsed = parseKmLitrosOpcionales(kmLitrosKm, kmLitrosLitros);
-    if (!parsed.ok) {
-      setKmLitrosFieldError(parsed.message);
-      return;
-    }
-    setKmLitrosFieldError(null);
-    if (!kmLitrosPrompt) return;
-    if (kmLitrosPrompt.kind === 'quick') {
-      const { viaje, nuevoEstado } = kmLitrosPrompt;
-      void patchEstadoConKmLitrosOpcional(viaje, nuevoEstado, parsed.km, parsed.litros).then((ok) => {
-        if (ok) setKmLitrosPrompt(null);
-      });
-      return;
-    }
-    if (kmLitrosPrompt.kind === 'estado-draft') {
-      const { nextEstado } = kmLitrosPrompt;
-      setDraft((p) =>
-        p
-          ? {
-              ...p,
-              estado: nextEstado,
-              kmRecorridos: parsed.km !== undefined ? String(parsed.km) : '',
-              litrosConsumidos: parsed.litros !== undefined ? String(parsed.litros) : '',
-            }
-          : p,
-      );
-      setKmLitrosPrompt(null);
-      return;
-    }
-    const viajeId = kmLitrosPrompt.viajeId;
-    setKmLitrosPrompt(null);
-    void saveInline(viajeId, {
-      skipKmLitrosPrompt: true,
-      kmRecorridos: parsed.km,
-      litrosConsumidos: parsed.litros,
-    });
-  }
-
-  function cancelKmLitrosDialog() {
-    setKmLitrosPrompt(null);
-    setKmLitrosFieldError(null);
   }
 
   async function navigateToFacturacion(v: Viaje) {
@@ -736,7 +635,7 @@ export function ViajesTenantPage() {
     );
   }
 
-  async function saveInline(viajeId: string, opts?: SaveInlineKmOpts) {
+  async function saveInline(viajeId: string) {
     if (!draft) return;
     if (!draft.numero.trim()) {
       setError('Ingresá el número de viaje.');
@@ -771,27 +670,12 @@ export function ViajesTenantPage() {
         return;
       }
     }
-    if (
-      !opts?.skipKmLitrosPrompt &&
-      estadoMuestraKmLitros(draft.estado) &&
-      draftKmLitrosVacios(draft.kmRecorridos, draft.litrosConsumidos)
-    ) {
-      setKmLitrosKm(draft.kmRecorridos);
-      setKmLitrosLitros(draft.litrosConsumidos);
-      setKmLitrosPrompt({ kind: 'save', viajeId });
-      setKmLitrosFieldError(null);
-      return;
-    }
-    const kmResolved = opts?.skipKmLitrosPrompt
-      ? opts.kmRecorridos
-      : draft.kmRecorridos.trim()
-        ? Number(draft.kmRecorridos.replace(',', '.'))
-        : undefined;
-    const litResolved = opts?.skipKmLitrosPrompt
-      ? opts.litrosConsumidos
-      : draft.litrosConsumidos.trim()
-        ? Number(draft.litrosConsumidos.replace(',', '.'))
-        : undefined;
+    const kmResolved = draft.kmRecorridos.trim()
+      ? Number(draft.kmRecorridos.replace(',', '.'))
+      : undefined;
+    const litResolved = draft.litrosConsumidos.trim()
+      ? Number(draft.litrosConsumidos.replace(',', '.'))
+      : undefined;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -830,9 +714,7 @@ export function ViajesTenantPage() {
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
-      const wasFacturado = draft.estado === 'facturado_sin_cobrar';
       cancelEdit();
-      if (wasFacturado) navigateToFacturacion(updated);
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
@@ -1213,17 +1095,6 @@ export function ViajesTenantPage() {
                       value={draft?.estado ?? 'pendiente'}
                       onChange={(e) => {
                         const next = e.target.value;
-                        if (!draft) return;
-                        if (
-                          estadoMuestraKmLitros(next) &&
-                          draftKmLitrosVacios(draft.kmRecorridos, draft.litrosConsumidos)
-                        ) {
-                          setKmLitrosKm(draft.kmRecorridos);
-                          setKmLitrosLitros(draft.litrosConsumidos);
-                          setKmLitrosPrompt({ kind: 'estado-draft', nextEstado: next });
-                          setKmLitrosFieldError(null);
-                          return;
-                        }
                         setDraft((prev) => (prev ? { ...prev, estado: next } : prev));
                       }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
@@ -1677,27 +1548,6 @@ export function ViajesTenantPage() {
         onClose={() => setFacturarOpcionState(null)}
       />
 
-      <ViajeKmLitrosDialog
-        open={kmLitrosPrompt != null}
-        title={
-          kmLitrosPrompt?.kind === 'quick'
-            ? `Cambiar a «${estadoViajeLabel[kmLitrosPrompt.nuevoEstado] ?? kmLitrosPrompt.nuevoEstado}»`
-            : kmLitrosPrompt?.kind === 'estado-draft'
-              ? `Estado «${estadoViajeLabel[kmLitrosPrompt.nextEstado] ?? kmLitrosPrompt.nextEstado}»`
-              : 'Guardar viaje'
-        }
-        km={kmLitrosKm}
-        litros={kmLitrosLitros}
-        error={kmLitrosFieldError}
-        busy={
-          (kmLitrosPrompt?.kind === 'quick' && savingEstadoId === kmLitrosPrompt.viaje.id) ||
-          (kmLitrosPrompt?.kind === 'save' && savingId === kmLitrosPrompt.viajeId)
-        }
-        onKmChange={setKmLitrosKm}
-        onLitrosChange={setKmLitrosLitros}
-        onConfirm={confirmKmLitrosDialog}
-        onCancel={cancelKmLitrosDialog}
-      />
     </div>
   );
 }
