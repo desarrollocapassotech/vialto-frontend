@@ -1,5 +1,5 @@
 import type { CiudadOpcion } from './types';
-import { nominatimSearchUrl } from './nominatimRequest';
+import { nominatimSearchUrl, nominatimFetch } from './nominatimRequest';
 import { sugerenciasUruguayCoincidentes } from './uruguaySugerencias';
 
 const IGNORAR_ADDRESSTYPE = new Set([
@@ -93,22 +93,24 @@ export async function buscarUruguay(query: string, signal?: AbortSignal): Promis
     q,
   });
 
-  const promesas: Promise<Response>[] = [fetch(urlLibre, { signal, credentials: 'omit' })];
-  if (q.length >= 3) {
-    promesas.push(fetch(urlBusquedaEstructuradaUY(q), { signal, credentials: 'omit' }));
-  }
-
-  const respuestas = await Promise.all(promesas);
-  for (const res of respuestas) {
-    if (!res.ok) throw new Error(`Nominatim ${res.status}`);
-  }
-
   const porId = new Map<number, NominatimItem>();
-  for (const res of respuestas) {
-    const data = (await res.json()) as NominatimItem[];
-    if (!Array.isArray(data)) continue;
-    for (const item of data) {
+
+  const libre = await nominatimFetch<NominatimItem[]>(urlLibre, signal);
+  if (Array.isArray(libre)) {
+    for (const item of libre) {
       if (!porId.has(item.place_id)) porId.set(item.place_id, item);
+    }
+  }
+
+  if (q.length >= 3) {
+    const estructurada = await nominatimFetch<NominatimItem[]>(
+      urlBusquedaEstructuradaUY(q),
+      signal,
+    );
+    if (Array.isArray(estructurada)) {
+      for (const item of estructurada) {
+        if (!porId.has(item.place_id)) porId.set(item.place_id, item);
+      }
     }
   }
 

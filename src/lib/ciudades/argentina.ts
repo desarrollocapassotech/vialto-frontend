@@ -1,5 +1,5 @@
 import type { CiudadOpcion } from './types';
-import { nominatimSearchUrl } from './nominatimRequest';
+import { nominatimSearchUrl, nominatimFetch } from './nominatimRequest';
 
 const GEOREF_PATH = '/api/localidades';
 
@@ -101,10 +101,7 @@ async function buscarNominatimAr(query: string, signal?: AbortSignal): Promise<C
     q,
   });
 
-  const res = await fetch(url, { signal, credentials: 'omit' });
-  if (!res.ok) throw new Error(`Nominatim ${res.status}`);
-
-  const data = (await res.json()) as NominatimItem[];
+  const data = await nominatimFetch<NominatimItem[]>(url, signal);
   if (!Array.isArray(data)) return [];
 
   const seen = new Set<string>();

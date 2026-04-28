@@ -12,6 +12,13 @@ function formatMoney(n: number) {
   })}`;
 }
 
+function formatMoneyUSD(n: number) {
+  return `USD ${n.toLocaleString('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 /** Sin actividad en el período anterior → no mostrar % de variación. */
 function hasPreviousPeriodData(previous: number): boolean {
   return Math.abs(previous) > 0.0005;
@@ -72,14 +79,21 @@ function MetricCard({
     changePct: 0,
     sentiment: 'neutral' as const,
   };
+  const arsAmount = m.currencies?.ARS;
+  const usdAmount = m.currencies?.USD;
+  const hasCurrencies = (arsAmount != null && arsAmount > 0) || (usdAmount != null && usdAmount > 0);
+  const primaryAmount = hasCurrencies ? (arsAmount ?? 0) : m.current;
+  const showARS = hasCurrencies ? (arsAmount != null && arsAmount > 0) : true;
+
   const valueColorClass =
-    !loading && m.current > 0
+    !loading && primaryAmount > 0
       ? valueTone === 'positiveCash'
         ? 'text-emerald-400'
         : valueTone === 'payable'
           ? 'text-rose-400'
           : 'text-white'
       : 'text-white';
+
   return (
     <div className="bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between">
       <div>
@@ -99,11 +113,30 @@ function MetricCard({
           </p>
         ) : null}
       </div>
-      <span
-        className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}
-      >
-        {loading ? '—' : formatValue(m.current)}
-      </span>
+
+      <div className="flex flex-col gap-0.5">
+        {loading ? (
+          <span className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-white">—</span>
+        ) : hasCurrencies ? (
+          <>
+            {showARS && (
+              <span className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}>
+                {formatMoney(arsAmount ?? 0)}
+              </span>
+            )}
+            {usdAmount != null && usdAmount > 0 && (
+              <span className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-sky-300">
+                {formatMoneyUSD(usdAmount)}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}>
+            {formatValue(m.current)}
+          </span>
+        )}
+      </div>
+
       <span className="text-xs leading-snug min-h-4">
         {loading ? (
           <span className="text-white/35">…</span>

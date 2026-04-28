@@ -1,5 +1,5 @@
 import type { CiudadOpcion } from './types';
-import { nominatimSearchUrl } from './nominatimRequest';
+import { nominatimSearchUrl, nominatimFetch } from './nominatimRequest';
 
 const IGNORAR_ADDRESSTYPE = new Set([
   'shop',
@@ -73,30 +73,29 @@ export async function buscarBrasil(query: string, signal?: AbortSignal): Promise
     q,
   });
 
-  const promesas: Promise<Response>[] = [fetch(urlLibre, { signal, credentials: 'omit' })];
+  const porId = new Map<number, NominatimItem>();
+
+  const libre = await nominatimFetch<NominatimItem[]>(urlLibre, signal);
+  if (Array.isArray(libre)) {
+    for (const item of libre) {
+      if (!porId.has(item.place_id)) porId.set(item.place_id, item);
+    }
+  }
+
   if (q.length >= 3) {
-    const urlEstructurada = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+    const urlEstructurada = nominatimSearchUrl({
       format: 'json',
       addressdetails: '1',
       limit: '12',
       countrycodes: 'br',
       city: q,
       country: 'Brazil',
-    })}`;
-    promesas.push(fetch(urlEstructurada, { signal, credentials: 'omit' }));
-  }
-
-  const respuestas = await Promise.all(promesas);
-  for (const res of respuestas) {
-    if (!res.ok) throw new Error(`Nominatim ${res.status}`);
-  }
-
-  const porId = new Map<number, NominatimItem>();
-  for (const res of respuestas) {
-    const data = (await res.json()) as NominatimItem[];
-    if (!Array.isArray(data)) continue;
-    for (const item of data) {
-      if (!porId.has(item.place_id)) porId.set(item.place_id, item);
+    });
+    const estructurada = await nominatimFetch<NominatimItem[]>(urlEstructurada, signal);
+    if (Array.isArray(estructurada)) {
+      for (const item of estructurada) {
+        if (!porId.has(item.place_id)) porId.set(item.place_id, item);
+      }
     }
   }
 

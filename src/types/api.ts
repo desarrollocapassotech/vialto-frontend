@@ -51,6 +51,7 @@ export interface Cliente {
   email: string | null;
   telefono: string | null;
   direccion: string | null;
+  pais: string | null;
   createdAt: string;
 }
 

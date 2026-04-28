@@ -5,6 +5,7 @@ export type MetricCompare = {
   previous: number;
   changePct: number | null;
   sentiment: 'positive' | 'negative' | 'neutral';
+  currencies?: { ARS?: number; USD?: number };
 };
 
 export type OwnerDashboardResponse = {

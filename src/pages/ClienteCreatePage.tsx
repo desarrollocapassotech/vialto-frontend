@@ -20,6 +20,7 @@ export function ClienteCreatePage() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [pais, setPais] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +43,7 @@ export function ClienteCreatePage() {
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
+          pais: pais.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -78,10 +80,10 @@ export function ClienteCreatePage() {
         </label>
         <label className="grid gap-1.5">
           <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            CUIT
+            ID Fiscal
           </span>
           <CrudInput
-            placeholder="Ej: 30712345678"
+            placeholder="Ej: 30-71234567-8 / RUT / NIF"
             value={cuit}
             onChange={(e) => setCuit(e.target.value)}
           />
@@ -114,6 +116,16 @@ export function ClienteCreatePage() {
             placeholder="Ej: Av. Corrientes 1234"
             value={direccion}
             onChange={(e) => setDireccion(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            País
+          </span>
+          <CrudInput
+            placeholder="Ej: Argentina"
+            value={pais}
+            onChange={(e) => setPais(e.target.value)}
           />
         </label>
         <CrudFormErrorAlert message={error} />

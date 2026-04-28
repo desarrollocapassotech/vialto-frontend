@@ -71,7 +71,8 @@ export function ClientesTenantPage() {
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">CUIT</th>
+              <th className="px-4 py-3">ID Fiscal</th>
+              <th className="px-4 py-3">País</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Teléfono</th>
               <th className="px-4 py-3 text-right">Acciones</th>
@@ -80,14 +81,14 @@ export function ClientesTenantPage() {
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
                   Todavía no tenés clientes cargados.
                 </td>
               </tr>
@@ -96,6 +97,7 @@ export function ClientesTenantPage() {
               <tr key={c.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
                 <td className="px-4 py-3 font-medium">{c.nombre}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.cuit ?? '—'}</td>
+                <td className="px-4 py-3 text-vialto-steel">{c.pais ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.email ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
                 <td className="px-4 py-3 text-right">

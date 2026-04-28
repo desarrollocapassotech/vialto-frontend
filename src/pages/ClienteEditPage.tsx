@@ -23,6 +23,7 @@ export function ClienteEditPage() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [pais, setPais] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -47,6 +48,7 @@ export function ClienteEditPage() {
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
           setDireccion(row.direccion ?? '');
+          setPais(row.pais ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'clientes'));
@@ -81,6 +83,7 @@ export function ClienteEditPage() {
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
+          pais: pais.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -143,11 +146,11 @@ export function ClienteEditPage() {
             </label>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                CUIT
+                ID Fiscal
               </span>
               <CrudInput
                 value={cuit}
-                placeholder="Ej: 30712345678"
+                placeholder="Ej: 30-71234567-8 / RUT / NIF"
                 onChange={(e) => setCuit(e.target.value)}
               />
             </label>
@@ -179,6 +182,16 @@ export function ClienteEditPage() {
                 value={direccion}
                 placeholder="Ej: Av. Corrientes 1234"
                 onChange={(e) => setDireccion(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                País
+              </span>
+              <CrudInput
+                value={pais}
+                placeholder="Ej: Argentina"
+                onChange={(e) => setPais(e.target.value)}
               />
             </label>
             <CrudFormErrorAlert message={error} />
