@@ -85,6 +85,8 @@ export function ViajeCreatePage() {
   const [horaCarga, setHoraCarga] = useState('');
   const [fechaDescarga, setFechaDescarga] = useState('');
   const [horaDescarga, setHoraDescarga] = useState('');
+  const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+  const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
   const [detalleCarga, setDetalleCarga] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
@@ -239,6 +241,12 @@ export function ViajeCreatePage() {
       setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
       return;
     }
+    const fcError = !fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
+    const fdError = !fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
+    setFechaCargaError(fcError);
+    setFechaDescargaError(fdError);
+    if (fcError || fdError) return;
+
     const montoNum = parseCurrencyForMoneda(monto, monedaMonto);
     if (montoNum == null || montoNum < 0.01) {
       setError('Ingresá un monto a facturar mayor a 0.');
@@ -542,13 +550,15 @@ export function ViajeCreatePage() {
             fechaDescarga={fechaDescarga}
             horaDescarga={horaDescarga}
             onPatch={(p) => {
-              if (p.fechaCarga !== undefined) setFechaCarga(p.fechaCarga);
+              if (p.fechaCarga !== undefined) { setFechaCarga(p.fechaCarga); if (p.fechaCarga) setFechaCargaError(null); }
               if (p.horaCarga !== undefined) setHoraCarga(p.horaCarga);
-              if (p.fechaDescarga !== undefined) setFechaDescarga(p.fechaDescarga);
+              if (p.fechaDescarga !== undefined) { setFechaDescarga(p.fechaDescarga); if (p.fechaDescarga) setFechaDescargaError(null); }
               if (p.horaDescarga !== undefined) setHoraDescarga(p.horaDescarga);
             }}
             labelClassName={fieldLabelClass}
             inputClassName={inputClass}
+            errorFechaCarga={fechaCargaError}
+            errorFechaDescarga={fechaDescargaError}
           />
           {estadoMuestraKmLitros(estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">

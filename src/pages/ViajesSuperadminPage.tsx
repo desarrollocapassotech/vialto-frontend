@@ -74,6 +74,8 @@ export function ViajesSuperadminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+  const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
 
   // estado quick
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
@@ -253,6 +255,8 @@ export function ViajesSuperadminPage() {
     setDraft(null);
     setEstadoQuickId(null);
     setViajeEditHint(null);
+    setFechaCargaError(null);
+    setFechaDescargaError(null);
   }
 
   // ── cambio de estado (quick, desde el badge) ───────────────────────────────
@@ -310,6 +314,12 @@ export function ViajesSuperadminPage() {
         return;
       }
     }
+
+    const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
+    const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
+    setFechaCargaError(fcError);
+    setFechaDescargaError(fdError);
+    if (fcError || fdError) return;
 
     const kmResolved = draft.kmRecorridos.trim() ? Number(draft.kmRecorridos.replace(',', '.')) : undefined;
     const litResolved = draft.litrosConsumidos.trim() ? Number(draft.litrosConsumidos.replace(',', '.')) : undefined;
@@ -560,9 +570,15 @@ export function ViajesSuperadminPage() {
                         horaCarga={draft.horaCarga}
                         fechaDescarga={draft.fechaDescarga}
                         horaDescarga={draft.horaDescarga}
-                        onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                        onPatch={(p) => {
+                          setDraft((prev) => (prev ? { ...prev, ...p } : prev));
+                          if (p.fechaCarga) setFechaCargaError(null);
+                          if (p.fechaDescarga) setFechaDescargaError(null);
+                        }}
                         labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
                         inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
+                        errorFechaCarga={fechaCargaError}
+                        errorFechaDescarga={fechaDescargaError}
                       />
                     ) : (
                       <div className="flex min-w-0 flex-col gap-0.5">
@@ -633,6 +649,8 @@ export function ViajesSuperadminPage() {
                     tableColSpan={tableColSpan}
                     saving={savingId === v.id}
                     formError={error}
+                    errorFechaCarga={fechaCargaError}
+                    errorFechaDescarga={fechaDescargaError}
                     onSave={() => saveInline(v.id)}
                     onCancel={cancelEdit}
                   />

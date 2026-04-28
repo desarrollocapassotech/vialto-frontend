@@ -38,6 +38,8 @@ type Props = {
   saving: boolean;
   /** Error de validación o API; se muestra encima de los botones Guardar/Cancelar. */
   formError?: string | null;
+  errorFechaCarga?: string | null;
+  errorFechaDescarga?: string | null;
   onSave: () => void;
   onCancel: () => void;
 };
@@ -59,6 +61,8 @@ export function ViajeInlineEditForm({
   tableColSpan,
   saving,
   formError,
+  errorFechaCarga,
+  errorFechaDescarga,
   onSave,
   onCancel,
 }: Props) {
@@ -253,6 +257,8 @@ export function ViajeInlineEditForm({
             onPatch={(p) => set(p)}
             labelClassName={LABEL}
             inputClassName={INPUT}
+            errorFechaCarga={errorFechaCarga}
+            errorFechaDescarga={errorFechaDescarga}
           />
 
           {/* Km / Litros (solo en estados finales) */}

@@ -114,6 +114,8 @@ export function ViajesTenantPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+  const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
@@ -529,6 +531,8 @@ export function ViajesTenantPage() {
     setDraft(null);
     setEstadoQuickId(null);
     setViajeEditHint(null);
+    setFechaCargaError(null);
+    setFechaDescargaError(null);
   }
 
   async function patchEstadoDesdeListado(v: Viaje, nuevoEstado: string) {
@@ -671,6 +675,12 @@ export function ViajesTenantPage() {
         return;
       }
     }
+    const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
+    const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
+    setFechaCargaError(fcError);
+    setFechaDescargaError(fdError);
+    if (fcError || fdError) return;
+
     const kmResolved = draft.kmRecorridos.trim()
       ? Number(draft.kmRecorridos.replace(',', '.'))
       : undefined;
@@ -1204,9 +1214,15 @@ export function ViajesTenantPage() {
                       horaCarga={draft.horaCarga}
                       fechaDescarga={draft.fechaDescarga}
                       horaDescarga={draft.horaDescarga}
-                      onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                      onPatch={(p) => {
+                        setDraft((prev) => (prev ? { ...prev, ...p } : prev));
+                        if (p.fechaCarga) setFechaCargaError(null);
+                        if (p.fechaDescarga) setFechaDescargaError(null);
+                      }}
                       labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
                       inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
+                      errorFechaCarga={fechaCargaError}
+                      errorFechaDescarga={fechaDescargaError}
                     />
                   ) : (
                     <div className="flex min-w-0 flex-col gap-0.5">
@@ -1442,9 +1458,15 @@ export function ViajesTenantPage() {
                         horaCarga={draft.horaCarga}
                         fechaDescarga={draft.fechaDescarga}
                         horaDescarga={draft.horaDescarga}
-                        onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+                        onPatch={(p) => {
+                          setDraft((prev) => (prev ? { ...prev, ...p } : prev));
+                          if (p.fechaCarga) setFechaCargaError(null);
+                          if (p.fechaDescarga) setFechaDescargaError(null);
+                        }}
                         labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
                         inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
+                        errorFechaCarga={fechaCargaError}
+                        errorFechaDescarga={fechaDescargaError}
                       />
                       {estadoMuestraKmLitros(draft.estado) && (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
