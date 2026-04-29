@@ -47,6 +47,8 @@ export function PasswordSignInPage() {
         password,
       });
 
+      console.log('Clerk signIn result:', result);
+
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
         navigate('/', { replace: true });
@@ -54,11 +56,37 @@ export function PasswordSignInPage() {
       }
 
       if (result.status === 'needs_second_factor') {
+        const hasEmailFactor = signIn.supportedSecondFactors?.some((factor) => factor.strategy === 'email_code');
+        if (!hasEmailFactor) {
+          setError('Se requiere un segundo factor, pero no está disponible el envío por email.');
+          return;
+        }
+
+        await signIn.prepareSecondFactor({ strategy: 'email_code' });
+        setMfaCodigo('');
         setMfaActivo(true);
+        setError('Te enviamos un código de verificación por email.');
         return;
       }
 
-      setError('No se pudo completar el inicio de sesión.');
+      // Manejar otros estados posibles de Clerk
+      if (result.status === 'needs_first_factor') {
+        setError('Se requiere información adicional para iniciar sesión.');
+        return;
+      }
+
+      if (result.status === 'needs_new_password') {
+        setError('Debes establecer una nueva contraseña.');
+        return;
+      }
+
+      if (result.status === 'needs_identifier') {
+        setError('Se requiere un identificador válido.');
+        return;
+      }
+
+      // Para cualquier otro estado desconocido, mostrar el estado
+      setError(`Estado de autenticación inesperado: ${result.status}. Revisá tus credenciales.`);
     } catch (e) {
       setError(getClerkErrorMessage(e));
     } finally {
@@ -69,30 +97,25 @@ export function PasswordSignInPage() {
   async function onMfaSubmit() {
     if (!isLoaded || !signIn) return;
     if (!mfaCodigo.trim()) {
-      setError('Ingresá el código de verificación.');
+      setError('Ingresá el código de verificación que recibiste por email.');
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
-      const estrategias = signIn.supportedSecondFactors?.map((f) => f.strategy) ?? [];
-      const estrategia = estrategias.includes('totp')
-        ? 'totp'
-        : estrategias.includes('phone_code')
-          ? 'phone_code'
-          : estrategias.includes('email_code')
-            ? 'email_code'
-            : 'totp';
       const result = await signIn.attemptSecondFactor({
-        strategy: estrategia as 'totp' | 'phone_code' | 'email_code',
+        strategy: 'email_code',
         code: mfaCodigo.trim(),
       });
+
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
         navigate('/', { replace: true });
-      } else {
-        setError('No se pudo completar la verificación.');
+        return;
       }
+
+      setError('No se pudo completar la verificación por email.');
     } catch (e) {
       setError(getClerkErrorMessage(e));
     } finally {
@@ -121,10 +144,10 @@ export function PasswordSignInPage() {
       <div className="min-h-screen flex items-center justify-center bg-vialto-charcoal px-4">
         <div className="w-full max-w-md bg-vialto-graphite border border-white/10 shadow-xl p-6">
           <h1 className="text-center font-[family-name:var(--font-display)] text-2xl tracking-wide text-white">
-            Verificación en dos pasos
+            Verificación por email
           </h1>
           <p className="mt-3 text-center text-sm text-white/60">
-            Ingresá el código de tu app de autenticación o el que recibiste por SMS.
+            Ingresá el código que te enviamos a tu correo electrónico.
           </p>
 
           {error && (
@@ -135,7 +158,10 @@ export function PasswordSignInPage() {
 
           <form
             className="mt-5 grid gap-4"
-            onSubmit={(e) => { e.preventDefault(); void onMfaSubmit(); }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void onMfaSubmit();
+            }}
           >
             <label className="grid gap-1.5">
               <span className="text-[10px] uppercase tracking-[0.22em] text-white/70">
@@ -164,7 +190,11 @@ export function PasswordSignInPage() {
 
           <button
             type="button"
-            onClick={() => { setMfaActivo(false); setMfaCodigo(''); setError(null); }}
+            onClick={() => {
+              setMfaActivo(false);
+              setMfaCodigo('');
+              setError(null);
+            }}
             className="mt-4 w-full text-center text-sm text-white/50 hover:text-white/80"
           >
             ← Volver al inicio de sesión
