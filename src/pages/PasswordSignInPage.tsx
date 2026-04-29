@@ -130,8 +130,8 @@ export function PasswordSignInPage() {
     try {
       await signIn.authenticateWithRedirect({
         strategy: 'oauth_google',
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrl: '/#/sso-callback',
+        redirectUrlComplete: '/#/',
       });
     } catch (e) {
       setError(getClerkErrorMessage(e));

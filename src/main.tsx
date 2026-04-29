@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { esUY } from '@clerk/localizations';
 import './index.css';
@@ -18,12 +18,12 @@ createRoot(document.getElementById('root')!).render(
       <ClerkProvider
         publishableKey={clerkPub}
         localization={esUY}
-        signInUrl="/sign-in"
-        signUpUrl="/sign-up"
+        signInUrl="/#/sign-in"
+        signUpUrl="/#/sign-up"
       >
-        <BrowserRouter>
+        <HashRouter>
           <App />
-        </BrowserRouter>
+        </HashRouter>
       </ClerkProvider>
     ) : (
       <MissingClerkConfig />

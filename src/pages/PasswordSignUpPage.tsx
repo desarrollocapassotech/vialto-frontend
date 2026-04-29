@@ -78,8 +78,8 @@ export function PasswordSignUpPage() {
     try {
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrl: '/#/sso-callback',
+        redirectUrlComplete: '/#/',
       });
     } catch (e) {
       setError(getClerkErrorMessage(e));
