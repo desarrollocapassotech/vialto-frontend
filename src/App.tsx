@@ -59,7 +59,7 @@ export default function App() {
         path="/sso-callback"
         element={
           <div className="min-h-screen flex items-center justify-center bg-vialto-charcoal px-4">
-            <AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/" />
+            <AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/#/" />
           </div>
         }
       />
