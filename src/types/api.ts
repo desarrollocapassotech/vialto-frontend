@@ -1,4 +1,12 @@
 /** Forma alineada con el modelo Prisma expuesto por el backend. */
+
+export interface OtroGasto {
+  descripcion: string;
+  monto: number;
+  moneda: 'ARS' | 'USD';
+  fecha?: string;
+}
+
 export interface Viaje {
   id: string;
   tenantId: string;
@@ -31,6 +39,7 @@ export interface Viaje {
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
   observaciones: string | null;
+  otrosGastos?: OtroGasto[];
   fechaFinalizado: string | null;
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */

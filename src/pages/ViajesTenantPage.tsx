@@ -49,6 +49,12 @@ import {
 } from '@/components/viajes/ViajeVehiculosLista';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import {
+  OtrosGastosFieldset,
+  type OtroGastoDraft,
+  otroGastoDraftFromApi,
+  otroGastoDraftToApi,
+} from '@/components/viajes/OtrosGastosFieldset';
+import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
   type PaisCodigo,
@@ -98,6 +104,7 @@ type ViajeInlineDraft = {
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
+  otrosGastos: OtroGastoDraft[];
 };
 
 type ViajesPaginatedResponse = {
@@ -523,6 +530,7 @@ export function ViajesTenantPage() {
         normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       ),
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
+      otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
     });
   }
 
@@ -722,6 +730,7 @@ export function ViajesTenantPage() {
             draft.monedaPrecioTransportistaExterno,
           ),
           monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
+          otrosGastos: draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
@@ -1487,6 +1496,12 @@ export function ViajesTenantPage() {
                       <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                         <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>
                         <textarea value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Notas adicionales" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
+                      </div>
+                      <div className="md:col-span-2 lg:col-span-3">
+                        <OtrosGastosFieldset
+                          rows={draft.otrosGastos}
+                          onChange={(rows) => setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))}
+                        />
                       </div>
                     </div>
                     {error && (
