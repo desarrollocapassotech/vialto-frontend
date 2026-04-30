@@ -5,6 +5,7 @@ export interface OtroGasto {
   monto: number;
   moneda: 'ARS' | 'USD';
   fecha?: string;
+  createdBy?: string;
 }
 
 export interface Viaje {

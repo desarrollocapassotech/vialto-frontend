@@ -177,9 +177,9 @@ export function formatViajeImporteForListado(
   moneda?: string | null,
 ): string {
   const mon = normalizeViajeMoneda(moneda);
-  const sym = mon === 'USD' ? 'US$' : '$';
   const locale = mon === 'USD' ? 'en-US' : 'es-AR';
-  return `${sym} ${m.toLocaleString(locale)}`;
+  const formatted = m.toLocaleString(locale);
+  return mon === 'USD' ? `US$ ${formatted}` : `ARS $ ${formatted}`;
 }
 
 /** Celda de tabla: monto a facturar. */

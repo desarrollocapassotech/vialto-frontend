@@ -24,42 +24,31 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
   const monedaIng = normalizeViajeMoneda(v.monedaMonto);
   const gastos = v.otrosGastos ?? [];
   const extraGastos = sumaOtrosGastos(gastos, monedaIng);
-  const ingresoTotal = (monto ?? 0) + extraGastos;
+  const gastosCount = gastos.filter(
+    (g) => (g.moneda === 'USD' ? 'USD' : 'ARS') === monedaIng,
+  ).length;
 
-  paragraphs.push(
-    'Imp. a facturar − Trans. ext.',
-  );
+  paragraphs.push('Imp. a facturar − Trans. ext. − Gastos extra');
 
   if (monto == null) {
     paragraphs.push('Importe a facturar sin cargar en este viaje.');
-    return {
-      display: '—',
-      tooltipParagraphs: paragraphs,
-    };
+    return { display: '—', tooltipParagraphs: paragraphs };
   }
 
   const impStr = formatViajeImporteForListado(monto, v.monedaMonto);
-
-  if (gastos.length > 0) {
-    paragraphs.push(
-      `Importe base (${monedaIng}): ${impStr}`,
-    );
-    paragraphs.push(
-      `Otros gastos (${monedaIng}): ${formatViajeImporteForListado(extraGastos, monedaIng)} (${gastos.filter((g) => (g.moneda === 'USD' ? 'USD' : 'ARS') === monedaIng).length} ítem/s)`,
-    );
-  }
+  paragraphs.push(`Importe a facturar (${monedaIng}): ${impStr}`);
 
   if (viajeUsaFlotaPropia(v)) {
-    if (gastos.length === 0) {
+    paragraphs.push('Transportista externo: sin cargo (flota propia).');
+    if (extraGastos > 0) {
       paragraphs.push(
-        'Flota propia: no aplica costo de transportista externo; la ganancia bruta es igual al importe a facturar.',
+        `Gastos extra (${monedaIng}): −${formatViajeImporteForListado(extraGastos, monedaIng)} (${gastosCount} ítem/s)`,
       );
-      paragraphs.push(`Importe a facturar (${monedaIng}): ${impStr}`);
     } else {
-      paragraphs.push('Flota propia: no aplica costo de transportista externo.');
+      paragraphs.push('Sin otros gastos.');
     }
     return {
-      display: formatViajeImporteForListado(ingresoTotal, monedaIng),
+      display: formatViajeImporteForListado(monto - extraGastos, monedaIng),
       tooltipParagraphs: paragraphs,
     };
   }
@@ -71,36 +60,41 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
     paragraphs.push(
       'El importe a facturar y el costo externo están en monedas distintas; no se restan automáticamente.',
     );
-    if (gastos.length === 0) paragraphs.push(`Importe a facturar (${monedaIng}): ${impStr}`);
     paragraphs.push(
       `Costo transportista externo (${monedaCosto}): ${formatViajeImporteForListado(
         costoNum,
         v.monedaPrecioTransportistaExterno,
       )}`,
     );
-    return {
-      display: '—',
-      tooltipParagraphs: paragraphs,
-    };
+    if (extraGastos > 0) {
+      paragraphs.push(
+        `Gastos extra (${monedaIng}): −${formatViajeImporteForListado(extraGastos, monedaIng)} (${gastosCount} ítem/s)`,
+      );
+    }
+    return { display: '—', tooltipParagraphs: paragraphs };
   }
 
-  const gan = ingresoTotal - costoNum;
-  if (gastos.length === 0) {
-    paragraphs.push(`Importe a facturar (${monedaIng}): ${impStr}`);
-  }
   if (costoNum > 0) {
     paragraphs.push(
-      `Costo transportista externo (${monedaIng}): ${formatViajeImporteForListado(
+      `Costo transportista externo (${monedaIng}): −${formatViajeImporteForListado(
         costoNum,
         v.monedaPrecioTransportistaExterno ?? v.monedaMonto,
       )}`,
     );
   } else {
-    paragraphs.push('Costo transportista externo: sin cargo (0).');
+    paragraphs.push('Transportista externo: sin cargo (0).');
+  }
+
+  if (extraGastos > 0) {
+    paragraphs.push(
+      `Gastos extra (${monedaIng}): −${formatViajeImporteForListado(extraGastos, monedaIng)} (${gastosCount} ítem/s)`,
+    );
+  } else {
+    paragraphs.push('Sin otros gastos.');
   }
 
   return {
-    display: formatViajeImporteForListado(gan, v.monedaMonto),
+    display: formatViajeImporteForListado(monto - costoNum - extraGastos, v.monedaMonto),
     tooltipParagraphs: paragraphs,
   };
 }

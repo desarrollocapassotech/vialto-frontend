@@ -177,6 +177,18 @@ export function viajeEstadoEsFacturadoOCobrado(estado: string): boolean {
   return false;
 }
 
+/**
+ * Estados que permiten agregar gastos adicionales al viaje.
+ * Bloqueado en viajes facturados, cobrados y cancelados.
+ */
+export function viajePermiteAgregarGasto(estado: string): boolean {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'facturado_sin_cobrar' || e === 'finalizado_facturado') return false;
+  if (e === 'cobrado' || e === 'finalizado_cobrado') return false;
+  if (e === 'cancelado') return false;
+  return true;
+}
+
 /** Estados que no deben mostrarse en el selector cuando el viaje ya tiene factura asignada. */
 const ESTADOS_OCULTOS_CON_FACTURA = new Set(['pendiente', 'en_curso', 'cancelado']);
 

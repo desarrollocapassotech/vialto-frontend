@@ -16,6 +16,7 @@ import {
   type ViajeOperacionModo,
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
+import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import {
@@ -68,6 +69,7 @@ import {
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
+  viajePermiteAgregarGasto,
   estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
@@ -164,6 +166,8 @@ export function ViajesTenantPage() {
     facturas: Factura[];
   } | null>(null);
   const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
+  /** Viaje sobre el que se está abriendo el modal de agregar gasto. */
+  const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(null);
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
   const viajesConFactura = useMemo(
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
@@ -1257,13 +1261,15 @@ export function ViajesTenantPage() {
                 {!editingId && (
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex flex-wrap justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(v)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </button>
+                      {viajePermiteAgregarGasto(v.estado) && (
+                        <button
+                          type="button"
+                          onClick={() => setAgregarGastoViaje(v)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                        >
+                          + Gasto
+                        </button>
+                      )}
                       {viajeEstadoPermiteBotonFacturar(v.estado) && (
                         <button
                           type="button"
@@ -1273,6 +1279,13 @@ export function ViajesTenantPage() {
                           Facturar
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => startEdit(v)}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Editar
+                      </button>
                     </div>
                   </td>
                 )}
@@ -1584,6 +1597,16 @@ export function ViajesTenantPage() {
         onNuevaFactura={() => void handleFacturarOpcionConfirm('nueva')}
         onAgregarAExistente={(facturaId) => void handleFacturarOpcionConfirm({ facturaId })}
         onClose={() => setFacturarOpcionState(null)}
+      />
+
+      <AgregarGastoModal
+        open={agregarGastoViaje != null}
+        viaje={agregarGastoViaje}
+        onSuccess={(updated) => {
+          setRows((prev) => (prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev));
+          setAgregarGastoViaje(null);
+        }}
+        onClose={() => setAgregarGastoViaje(null)}
       />
 
     </div>
