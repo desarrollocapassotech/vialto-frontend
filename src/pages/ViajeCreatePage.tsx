@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
@@ -18,6 +18,7 @@ import {
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
+import { ViajeCargasLista } from '@/components/viajes/ViajeCargasLista';
 import { apiJson } from '@/lib/api';
 import {
   maskCurrencyForMoneda,
@@ -48,8 +49,9 @@ import {
 } from '@/lib/viajesEstados';
 import { fechaHoraToIso } from '@/lib/viajeFechaHora';
 import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
-import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Carga, Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
 
 const ESTADOS = VIAJE_ESTADOS_ALTA;
 
@@ -60,7 +62,14 @@ const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm';
 
 export function ViajeCreatePage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const isSuperadminPlataforma =
+    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  const puedeCrearCarga =
+    isSuperadminPlataforma ||
+    orgRole === 'org:admin' ||
+    orgRole === 'org:supervisor';
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
@@ -87,6 +96,8 @@ export function ViajeCreatePage() {
   const [horaDescarga, setHoraDescarga] = useState('');
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
+  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
+  const [cargaIds, setCargaIds] = useState<string[]>([]);
   const [detalleCarga, setDetalleCarga] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
@@ -111,6 +122,9 @@ export function ViajeCreatePage() {
   const [modalKm, setModalKm] = useState('');
   const [modalLitros, setModalLitros] = useState('');
   const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
+  const cargaCreatePostUrl = tenantId.trim()
+    ? `/api/platform/cargas?tenantId=${encodeURIComponent(tenantId.trim())}`
+    : '/api/cargas';
 
   useEffect(() => {
     // Tenant mode: master data comes from MaestroDataProvider context
@@ -140,6 +154,25 @@ export function ViajeCreatePage() {
       cancelled = true;
     };
   }, [getToken, tenantId]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = tenantId
+          ? `/api/platform/cargas/paginated?tenantId=${encodeURIComponent(tenantId)}&page=1&pageSize=100&filtroActivo=activos`
+          : '/api/cargas/paginated?page=1&pageSize=100&filtroActivo=activos';
+        const d = await apiJson<{ items: Carga[] }>(path, () => getToken());
+        if (!cancelled) setCargasCatalogo(d.items);
+      } catch {
+        if (!cancelled) setCargasCatalogo([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   async function refreshFlotaVehiculos() {
     if (refreshingFlota) return;
@@ -300,6 +333,7 @@ export function ViajeCreatePage() {
           destino: destino.trim(),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
+          cargaIds: cargaIds.map((x) => x.trim()).filter(Boolean),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           kmRecorridos:
@@ -586,11 +620,35 @@ export function ViajeCreatePage() {
             </div>
           )}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Detalle de carga</span>
+            <span className={fieldLabelClass}>Cargas</span>
+            <ViajeCargasLista
+              groupId="viaje-create"
+              value={cargaIds}
+              onChange={setCargaIds}
+              opciones={cargasCatalogo.map((t) => ({
+                id: t.id,
+                nombre: t.nombre,
+                activo: t.activo,
+                unidadMedida: t.unidadMedida,
+              }))}
+              triggerClassName={inputClass}
+              disabled={loading}
+              puedeCrearCarga={puedeCrearCarga}
+              getToken={getToken}
+              createPostUrl={cargaCreatePostUrl}
+              onCargaCreada={(carga) => {
+                setCargasCatalogo((prev) =>
+                  prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
+                );
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={fieldLabelClass}>Detalle adicional (opcional)</span>
             <textarea
               value={detalleCarga}
               onChange={(e) => setDetalleCarga(e.target.value)}
-              placeholder="Ej. producto, bultos, temperatura, notas sobre la carga"
+              placeholder="Notas extra: bultos, temperatura, precinto, etc."
               className={textareaLongClass}
             />
           </div>

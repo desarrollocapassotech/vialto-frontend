@@ -1,3 +1,4 @@
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import {
   ChoferSearchSelect,
@@ -36,7 +37,10 @@ import {
 } from '@/lib/viajesEstados';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
-import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type { Chofer, Cliente, Carga, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type { OpcionCarga } from '@/lib/cargasOpciones';
+import { ViajeCargasLista } from '@/components/viajes/ViajeCargasLista';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -56,6 +60,7 @@ export type ViajeInlineDraft = {
   horaCarga: string;
   fechaDescarga: string;
   horaDescarga: string;
+  cargaIds: string[];
   detalleCarga: string;
   observaciones: string;
   monto: string;
@@ -74,6 +79,7 @@ export type ViajeEditModalProps = {
   setDraft: Dispatch<SetStateAction<ViajeInlineDraft | null>>;
   /** Viaje del listado (estado / factura en servidor) para opciones de estado */
   snapshotViaje: Viaje;
+  opcionesCarga: OpcionCarga[];
   clientes: Cliente[];
   choferes: Chofer[];
   transportistas: Transportista[];
@@ -93,6 +99,10 @@ export type ViajeEditModalProps = {
   onSave: () => void;
   saving: boolean;
   error: string | null;
+  /** Tras crear una carga desde el combobox, fusionar en el catálogo del listado. */
+  onCargaCreada?: (carga: Carga) => void;
+  /** Superadmin: `POST` con `tenantId` en query. */
+  cargaCreatePostUrl?: string;
 };
 
 const labelClass =
@@ -104,6 +114,7 @@ export function ViajeEditModal({
   draft,
   setDraft,
   snapshotViaje,
+  opcionesCarga,
   clientes,
   choferes,
   transportistas,
@@ -121,7 +132,18 @@ export function ViajeEditModal({
   onSave,
   saving,
   error,
+  onCargaCreada,
+  cargaCreatePostUrl = '/api/cargas',
 }: ViajeEditModalProps) {
+  const { getToken, orgRole } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const isSuperadminPlataforma =
+    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  const puedeCrearCarga =
+    isSuperadminPlataforma ||
+    orgRole === 'org:admin' ||
+    orgRole === 'org:supervisor';
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -458,13 +480,31 @@ export function ViajeEditModal({
             )}
 
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={labelClass}>Detalle de carga</span>
+              <span className={labelClass}>Cargas</span>
+              <ViajeCargasLista
+                groupId="viaje-edit"
+                value={draft.cargaIds}
+                onChange={(ids) =>
+                  setDraft((p) => (p ? { ...p, cargaIds: ids } : p))
+                }
+                opciones={opcionesCarga}
+                triggerClassName={inputClass}
+                disabled={saving}
+                puedeCrearCarga={puedeCrearCarga}
+                getToken={getToken}
+                createPostUrl={cargaCreatePostUrl}
+                onCargaCreada={onCargaCreada}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <span className={labelClass}>Detalle adicional (opcional)</span>
               <textarea
                 value={draft.detalleCarga}
                 onChange={(e) =>
                   setDraft((p) => (p ? { ...p, detalleCarga: e.target.value } : p))
                 }
-                placeholder="Ej. producto, bultos, temperatura, notas sobre la carga"
+                placeholder="Notas extra: bultos, temperatura, precinto, etc."
                 className="min-h-24 border border-black/15 bg-white px-2 py-2 text-sm"
               />
             </div>

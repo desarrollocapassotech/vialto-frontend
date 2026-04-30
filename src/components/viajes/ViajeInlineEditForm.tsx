@@ -1,3 +1,4 @@
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useMemo } from 'react';
 import {
   ChoferSearchSelect,
@@ -20,8 +21,11 @@ import {
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import { estadoMuestraKmLitros } from '@/lib/viajesEstados';
-import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, Carga, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
+import type { OpcionCarga } from '@/lib/cargasOpciones';
+import { ViajeCargasLista } from '@/components/viajes/ViajeCargasLista';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
 
 type Props = {
   draft: ViajeInlineDraft;
@@ -34,6 +38,7 @@ type Props = {
   crearVehiculoHref?: string;
   /** Aviso si el viaje tenía chofer/vehículo incompatible con flota propia al abrir edición. */
   inconsistenciaHint?: string | null;
+  opcionesCarga: OpcionCarga[];
   tableColSpan: number;
   saving: boolean;
   /** Error de validación o API; se muestra encima de los botones Guardar/Cancelar. */
@@ -42,6 +47,12 @@ type Props = {
   errorFechaDescarga?: string | null;
   onSave: () => void;
   onCancel: () => void;
+  /** Superadmin con empresa filtrada: fusionar la nueva carga en el catálogo del listado. */
+  onCargaCreada?: (carga: Carga) => void;
+  /** Si no hay empresa en contexto, dejar en false para no ofrecer alta (POST requiere tenant). */
+  puedeCrearCargaCatalogo?: boolean;
+  /** URL POST del alta; en superadmin suele ser `/api/platform/cargas?tenantId=…`. */
+  cargaCreatePostUrl?: string;
 };
 
 const LABEL =
@@ -58,6 +69,7 @@ export function ViajeInlineEditForm({
   vehiculos,
   crearVehiculoHref = '/vehiculos/nuevo',
   inconsistenciaHint,
+  opcionesCarga,
   tableColSpan,
   saving,
   formError,
@@ -65,7 +77,20 @@ export function ViajeInlineEditForm({
   errorFechaDescarga,
   onSave,
   onCancel,
+  onCargaCreada,
+  puedeCrearCargaCatalogo = false,
+  cargaCreatePostUrl = '/api/cargas',
 }: Props) {
+  const { getToken, orgRole } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const isSuperadminPlataforma =
+    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  const puedeCrearCarga =
+    puedeCrearCargaCatalogo &&
+    (isSuperadminPlataforma ||
+      orgRole === 'org:admin' ||
+      orgRole === 'org:supervisor');
+
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
   const ayudaFlota = useMemo(
@@ -98,6 +123,7 @@ export function ViajeInlineEditForm({
   }
 
   return (
+    <>
     <tr className="border-b border-black/10 bg-vialto-mist/40">
       <td colSpan={tableColSpan} className="px-4 py-4">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -287,13 +313,28 @@ export function ViajeInlineEditForm({
             </div>
           )}
 
-          {/* Detalle de carga */}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Detalle de carga</span>
+            <span className={LABEL}>Cargas</span>
+            <ViajeCargasLista
+              groupId={`viaje-inline-${draft.numero || 'e'}`}
+              value={draft.cargaIds}
+              onChange={(ids) => set({ cargaIds: ids })}
+              opciones={opcionesCarga}
+              triggerClassName={INPUT}
+              disabled={saving}
+              puedeCrearCarga={puedeCrearCarga}
+              getToken={getToken}
+              createPostUrl={cargaCreatePostUrl}
+              onCargaCreada={onCargaCreada}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={LABEL}>Detalle adicional (opcional)</span>
             <textarea
               value={draft.detalleCarga}
               onChange={(e) => set({ detalleCarga: e.target.value })}
-              placeholder="Ej. producto, bultos, temperatura, notas sobre la carga"
+              placeholder="Notas extra: bultos, temperatura, precinto, etc."
               className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
             />
           </div>
@@ -337,5 +378,6 @@ export function ViajeInlineEditForm({
         </div>
       </td>
     </tr>
+    </>
   );
 }

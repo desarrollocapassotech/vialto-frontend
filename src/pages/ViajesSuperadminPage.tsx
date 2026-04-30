@@ -35,7 +35,8 @@ import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
 } from '@/lib/ciudades';
-import type { Chofer, Cliente, ConEmpresa, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type { Chofer, Cliente, ConEmpresa, Transportista, Carga, Vehiculo, Viaje } from '@/types/api';
+import { cargaIdsOrdenadosDesdeViaje, mergeOpcionesCarga } from '@/lib/cargasOpciones';
 import type {
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
@@ -86,11 +87,17 @@ export function ViajesSuperadminPage() {
   const [choferes, setChoferes] = useState<Chofer[]>([]);
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
+  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
 
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
 
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
+
+  const opcionesCargaSuper = useMemo(
+    () => mergeOpcionesCarga(cargasCatalogo, rows?.find((r) => r.id === editingId) ?? null),
+    [cargasCatalogo, rows, editingId],
+  );
 
   // ── fetch viajes ───────────────────────────────────────────────────────────
 
@@ -136,6 +143,28 @@ export function ViajesSuperadminPage() {
       }
     })();
     return () => { cancelled = true; };
+  }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !filtroEmpresa) {
+      setCargasCatalogo([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await apiJson<{ items: Carga[] }>(
+          `/api/platform/cargas/paginated?tenantId=${encodeURIComponent(filtroEmpresa)}&page=1&pageSize=100&filtroActivo=activos`,
+          () => getToken(),
+        );
+        if (!cancelled) setCargasCatalogo(d.items);
+      } catch {
+        if (!cancelled) setCargasCatalogo([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
 
   // normalizar IDs del draft cuando cambia la lista de referencias
@@ -236,6 +265,7 @@ export function ViajesSuperadminPage() {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
+      cargaIds: cargaIdsOrdenadosDesdeViaje(v),
       detalleCarga: v.detalleCarga ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -351,6 +381,7 @@ export function ViajesSuperadminPage() {
             destino: draft.destino.trim() || undefined,
             fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
             fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
+            cargaIds: draft.cargaIds.map((x) => x.trim()).filter(Boolean),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
             monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -640,6 +671,7 @@ export function ViajesSuperadminPage() {
                     choferes={choferes}
                     transportistas={transportistas}
                     vehiculos={vehiculos}
+                    opcionesCarga={opcionesCargaSuper}
                     crearVehiculoHref={
                       filtroEmpresa
                         ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
@@ -653,6 +685,17 @@ export function ViajesSuperadminPage() {
                     errorFechaDescarga={fechaDescargaError}
                     onSave={() => saveInline(v.id)}
                     onCancel={cancelEdit}
+                    puedeCrearCargaCatalogo={Boolean(filtroEmpresa.trim())}
+                    cargaCreatePostUrl={
+                      filtroEmpresa.trim()
+                        ? `/api/platform/cargas?tenantId=${encodeURIComponent(filtroEmpresa.trim())}`
+                        : '/api/cargas'
+                    }
+                    onCargaCreada={(carga) => {
+                      setCargasCatalogo((prev) =>
+                        prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
+                      );
+                    }}
                   />
                 )}
               </Fragment>

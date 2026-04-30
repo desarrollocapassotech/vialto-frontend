@@ -3,6 +3,7 @@ import { ApiError } from './api';
 export type FriendlyErrorContext =
   | 'tablero'
   | 'viajes'
+  | 'cargas'
   | 'clientes'
   | 'transportistas'
   | 'choferes'
@@ -13,6 +14,8 @@ export type FriendlyErrorContext =
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: 'No pudimos cargar el tablero. Probá de nuevo en un momento.',
   viajes: 'No pudimos cargar los viajes. Probá de nuevo en un momento.',
+  cargas:
+    'No pudimos cargar el catálogo de cargas. Probá de nuevo en un momento.',
   clientes: 'No pudimos cargar los clientes. Probá de nuevo en un momento.',
   transportistas:
     'No pudimos cargar los transportistas. Probá de nuevo en un momento.',
@@ -36,7 +39,7 @@ export function friendlyError(
       return 'Tu sesión venció. Volvé a iniciar sesión para seguir.';
     }
     if (err.status === 403) {
-      if (context === 'viajes' || context === 'tablero') {
+      if (context === 'viajes' || context === 'tablero' || context === 'cargas') {
         return 'Tu empresa todavía no tiene habilitada la gestión de viajes, o falta completar el registro. Consultá con quien administra la cuenta en tu organización.';
       }
       if (context === 'facturacion') {

@@ -25,6 +25,7 @@ export type ViajeInlineDraft = {
   horaCarga: string;
   fechaDescarga: string;
   horaDescarga: string;
+  cargaIds: string[];
   detalleCarga: string;
   observaciones: string;
   monto: string;

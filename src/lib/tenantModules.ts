@@ -11,7 +11,7 @@ const MODULE_DESCRIPTIONS: Record<string, string> = {
   viajes: 'Planificación y seguimiento operativo de viajes.',
   facturacion: 'Gestión de emisión y control de cobranzas.',
   'cuenta-corriente': 'Seguimiento de saldo y movimientos por cliente.',
-  stock: 'Control de inventario y movimientos de mercadería.',
+  stock: 'Control de inventario y movimientos de carga.',
   combustible: 'Registro de cargas y control de consumo.',
   mantenimiento: 'Servicios de flota y alertas operativas.',
   remitos: 'Emisión y seguimiento de remitos digitales.',

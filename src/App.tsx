@@ -18,6 +18,7 @@ import { ChoferEditPage } from '@/pages/ChoferEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
+import { TiposCargaPage } from '@/pages/TiposCargaPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
 import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
@@ -69,6 +70,8 @@ export default function App() {
         <Route path="/" element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="viajes" element={<ViajesPage />} />
+          <Route path="cargas" element={<TiposCargaPage />} />
+          <Route path="tipos-carga" element={<Navigate to="/cargas" replace />} />
           <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
           <Route path="viajes/:id/editar" element={<Navigate to="/viajes" replace />} />
           <Route path="facturacion" element={<FacturacionPage />} />

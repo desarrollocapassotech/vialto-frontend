@@ -68,8 +68,10 @@ import {
 import type {
   Factura,
   PaginatedMeta,
+  Carga,
   Viaje,
 } from '@/types/api';
+import { cargaIdsOrdenadosDesdeViaje, mergeOpcionesCarga } from '@/lib/cargasOpciones';
 
 
 type ViajesPaginatedResponse = {
@@ -142,6 +144,11 @@ export function ViajesTenantPage() {
     () => (editingId && rows ? rows.find((r) => r.id === editingId) ?? null : null),
     [editingId, rows],
   );
+  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
+  const opcionesCargaModal = useMemo(
+    () => mergeOpcionesCarga(cargasCatalogo, viajeEdicionSnapshot),
+    [cargasCatalogo, viajeEdicionSnapshot],
+  );
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
 
@@ -151,6 +158,25 @@ export function ViajesTenantPage() {
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await apiJson<{ items: Carga[] }>(
+          '/api/cargas/paginated?page=1&pageSize=100&filtroActivo=activos',
+          () => getToken(),
+        );
+        if (!cancelled) setCargasCatalogo(d.items);
+      } catch {
+        if (!cancelled) setCargasCatalogo([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -493,6 +519,7 @@ export function ViajesTenantPage() {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
+      cargaIds: cargaIdsOrdenadosDesdeViaje(v),
       detalleCarga: v.detalleCarga ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -694,6 +721,7 @@ export function ViajesTenantPage() {
           destino: draft.destino.trim() || undefined,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
+          cargaIds: draft.cargaIds.map((x) => x.trim()).filter(Boolean),
           detalleCarga: draft.detalleCarga.trim() || undefined,
           observaciones: draft.observaciones.trim() || undefined,
           monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -1242,6 +1270,7 @@ export function ViajesTenantPage() {
           draft={draft}
           setDraft={setDraft}
           snapshotViaje={viajeEdicionSnapshot}
+          opcionesCarga={opcionesCargaModal}
           clientes={clientes}
           choferes={choferes}
           transportistas={transportistas}
@@ -1263,6 +1292,11 @@ export function ViajesTenantPage() {
           onSave={() => void saveInline(editingId)}
           saving={savingId === editingId}
           error={error}
+          onCargaCreada={(carga) => {
+            setCargasCatalogo((prev) =>
+              prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
+            );
+          }}
         />
       )}
 
