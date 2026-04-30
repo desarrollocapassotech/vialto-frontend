@@ -2,6 +2,14 @@ import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import {
+  emptyFacturaDraft,
+  FacturaEditModal,
+  facturaToEditDraft,
+  type FacturaDraft,
+  ViajesCheckboxList,
+} from '@/components/facturacion/FacturaEditModal';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -9,7 +17,6 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import {
   textoImporteFacturaListado,
   textoImporteFacturaSeleccion,
-  textoMontoFacturarListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
 import type { Factura, Viaje } from '@/types/api';
@@ -38,98 +45,12 @@ function fmtFecha(iso: string | null) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isoToDate(iso: string | null | undefined) {
-  if (!iso) return '';
-  return iso.slice(0, 10);
-}
-
-// ─── tipos internos ──────────────────────────────────────────────────────────
-
-type FacturaDraft = {
-  numero: string;
-  tipo: 'cliente' | 'transportista_externo';
-  clienteId: string;
-  viajeIds: string[];
-  fechaEmision: string;
-  fechaVencimiento: string;
-};
-
-function emptyDraft(): FacturaDraft {
-  return { numero: '', tipo: 'cliente', clienteId: '', viajeIds: [], fechaEmision: todayIso(), fechaVencimiento: '' };
-}
-
-function facturaToEditDraft(f: Factura): FacturaDraft {
-  return {
-    numero: f.numero,
-    tipo: f.tipo,
-    clienteId: f.clienteId ?? '',
-    viajeIds: f.viajeIds,
-    fechaEmision: isoToDate(f.fechaEmision),
-    fechaVencimiento: isoToDate(f.fechaVencimiento),
-  };
-}
-
 type FacturaNuevaNavState = {
   newFacturaDraft?: { clienteId: string; viajeIds: string[] };
   expandFacturaId?: string;
 };
 
 const clienteInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-
-// ─── sub-componente: selector multi-viaje ────────────────────────────────────
-
-function ViajesCheckboxList({
-  viajes,
-  selected,
-  onChange,
-  loading,
-}: {
-  viajes: Viaje[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-  /** Mientras se obtiene el listado de viajes desde el servidor. */
-  loading?: boolean;
-}) {
-  function toggle(id: string) {
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  }
-
-  if (loading) {
-    return <p className="text-sm text-vialto-steel py-1">Cargando…</p>;
-  }
-
-  if (viajes.length === 0) {
-    return <p className="text-sm text-vialto-steel py-1">No hay viajes disponibles.</p>;
-  }
-
-  return (
-    <div className="max-h-40 overflow-y-auto border border-black/15 rounded bg-white divide-y divide-black/5">
-      {viajes.map((v) => (
-        <label key={v.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-vialto-mist/60 text-sm">
-          <input
-            type="checkbox"
-            checked={selected.includes(v.id)}
-            onChange={() => toggle(v.id)}
-            className="accent-vialto-charcoal"
-          />
-          <span className="font-medium">{v.numero}</span>
-          {(v.origen || v.destino) && (
-            <span className="text-vialto-steel text-xs">{v.origen ?? '?'} → {v.destino ?? '?'}</span>
-          )}
-          {v.monto != null && (
-            <span className="ml-auto text-xs tabular-nums text-vialto-steel">
-              {textoMontoFacturarListado(v)}
-            </span>
-          )}
-        </label>
-      ))}
-    </div>
-  );
-}
 
 // ─── componente principal ─────────────────────────────────────────────────────
 
@@ -145,7 +66,7 @@ export function FacturacionTenantPage() {
 
   // crear
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<FacturaDraft>(emptyDraft());
+  const [draft, setDraft] = useState<FacturaDraft>(emptyFacturaDraft());
   const [draftError, setDraftError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -157,6 +78,7 @@ export function FacturacionTenantPage() {
 
   // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [facturaDeleteConfirm, setFacturaDeleteConfirm] = useState<Factura | null>(null);
 
   const fetchRef = useRef(0);
 
@@ -172,6 +94,11 @@ export function FacturacionTenantPage() {
       viajeIdsFacturaEdicion: editDraft.viajeIds,
     });
   }, [viajes, editDraft, editingId]);
+
+  const facturaEdicionSnapshot = useMemo(
+    () => (editingId && facturas ? facturas.find((r) => r.id === editingId) ?? null : null),
+    [editingId, facturas],
+  );
 
   /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
   useEffect(() => {
@@ -232,7 +159,7 @@ export function FacturacionTenantPage() {
     if (state.expandFacturaId) { window.history.replaceState({}, ''); return; }
     if (!state.newFacturaDraft) return;
     const { clienteId, viajeIds } = state.newFacturaDraft;
-    setDraft({ ...emptyDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
+    setDraft({ ...emptyFacturaDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
     setCreating(true);
     void ensureViajesLoaded();
     window.history.replaceState({}, '');
@@ -271,7 +198,7 @@ export function FacturacionTenantPage() {
         }),
       });
       setCreating(false);
-      setDraft(emptyDraft());
+      setDraft(emptyFacturaDraft());
       await refetchFacturas();
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
@@ -283,16 +210,18 @@ export function FacturacionTenantPage() {
   // ── edición inline ─────────────────────────────────────────────────────────
 
   function startEdit(f: Factura) {
+    setEditError(null);
     setEditingId(f.id);
     setEditDraft(facturaToEditDraft(f));
-    setEditError(null);
     setCreating(false);
     void ensureViajesLoaded();
   }
 
-  function cancelEdit() { setEditingId(null); setEditDraft(null); setEditError(null); }
-
-  function setE(patch: Partial<FacturaDraft>) { setEditDraft((p) => p ? { ...p, ...patch } : p); }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft(null);
+    setEditError(null);
+  }
 
   async function saveEdit() {
     if (!editingId || !editDraft) return;
@@ -327,14 +256,20 @@ export function FacturacionTenantPage() {
 
   // ── eliminar ───────────────────────────────────────────────────────────────
 
-  async function handleDelete(f: Factura) {
-    if (!confirm(`¿Eliminás la factura ${f.numero}? Esta acción no se puede deshacer.`)) return;
+  async function confirmDeleteFactura() {
+    const f = facturaDeleteConfirm;
+    if (!f || deletingId) return;
     setDeletingId(f.id);
     try {
       await apiJson(`/api/facturacion/facturas/${f.id}`, () => getToken(), { method: 'DELETE' });
       setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
       if (editingId === f.id) cancelEdit();
-    } catch { /* sin toaster */ } finally { setDeletingId(null); }
+      setFacturaDeleteConfirm(null);
+    } catch {
+      /* sin toaster */
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -346,8 +281,7 @@ export function FacturacionTenantPage() {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const isEditing = !!editingId;
-  const COL_SPAN = isEditing ? 7 : 8;
+  const COL_SPAN = 8;
 
   return (
     <div className="w-full">
@@ -356,32 +290,28 @@ export function FacturacionTenantPage() {
 
       {/* acciones */}
       <div className="mt-4 space-y-2">
-        {isEditing && <CrudFormErrorAlert message={editError} />}
-        {!isEditing && error && <CrudFormErrorAlert message={error} />}
+        {!editingId && error && <CrudFormErrorAlert message={error} />}
         <div className="flex justify-end gap-2">
-          {isEditing ? (
-            <>
-              <button type="button" onClick={cancelEdit} disabled={savingEditId === editingId}
-                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60">
-                Cerrar
-              </button>
-              <button type="button" onClick={saveEdit} disabled={savingEditId === editingId}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60">
-                {savingEditId === editingId ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-            </>
-          ) : (
-            <button type="button"
-              onClick={() => { setCreating((v) => { if (!v) void ensureViajesLoaded(); return !v; }); setDraft(emptyDraft()); setDraftError(null); }}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
-              {creating ? 'Cancelar' : 'Nueva factura'}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={!!editingId}
+            onClick={() => {
+              setCreating((v) => {
+                if (!v) void ensureViajesLoaded();
+                return !v;
+              });
+              setDraft(emptyFacturaDraft());
+              setDraftError(null);
+            }}
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {creating ? 'Cancelar' : 'Nueva factura'}
+          </button>
         </div>
       </div>
 
       {/* formulario de creación */}
-      {creating && !isEditing && (
+      {creating && !editingId && (
         <form onSubmit={handleCreate}
           className="mt-4 bg-white border border-black/10 rounded shadow-sm p-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <h2 className="col-span-full font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-fire">
@@ -486,7 +416,7 @@ export function FacturacionTenantPage() {
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Importe</th>
-              {!isEditing && <th className="px-4 py-3 text-right">Acciones</th>}
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -499,122 +429,48 @@ export function FacturacionTenantPage() {
               </td></tr>
             )}
 
-            {facturas?.map((f) => {
-              const editing = editingId === f.id;
-              const ed = editing ? editDraft : null;
-
-              return (
+            {facturas?.map((f) => (
                 <Fragment key={f.id}>
-                  <tr className={['border-b border-black/5', editing ? 'bg-vialto-mist/60' : 'hover:bg-vialto-mist/40'].join(' ')}>
-
-                    {/* Número */}
-                    <td className="px-4 py-3 font-medium">
-                      {editing && ed
-                        ? <input type="text" value={ed.numero} onChange={(e) => setE({ numero: e.target.value })}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm" />
-                        : f.numero}
-                    </td>
-
-                    {/* Tipo */}
-                    <td className="px-4 py-3">
-                      {editing && ed
-                        ? <select value={ed.tipo} onChange={(e) => setE({ tipo: e.target.value as FacturaDraft['tipo'] })}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm">
-                            <option value="cliente">Cliente</option>
-                            <option value="transportista_externo">Transportista externo</option>
-                          </select>
-                        : (TIPO_LABEL[f.tipo] ?? f.tipo)}
-                    </td>
-
-                    {/* Cliente */}
-                    <td className="px-4 py-3 min-w-[12rem]">
-                      {editing && ed
-                        ? (
-                            <ClienteSearchSelect
-                              clientes={clientes}
-                              value={ed.clienteId}
-                              onChange={(id) => setE({ clienteId: id })}
-                              inputClassName={clienteInputClass}
-                              allowEmptyValue
-                              emptyListChoiceLabel="— Sin cliente —"
-                              placeholderCerrado="— Sin cliente —"
-                              aria-label="Cliente"
-                            />
-                          )
-                        : nombreCliente(f.clienteId)}
-                    </td>
-
-                    {/* Emisión */}
+                  <tr className="border-b border-black/5 hover:bg-vialto-mist/40">
+                    <td className="px-4 py-3 font-medium">{f.numero}</td>
+                    <td className="px-4 py-3">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
+                    <td className="px-4 py-3 min-w-[12rem]">{nombreCliente(f.clienteId)}</td>
                     <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
-                      {editing && ed
-                        ? <input type="date" value={ed.fechaEmision} onChange={(e) => setE({ fechaEmision: e.target.value })}
-                            className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        : fmtFecha(f.fechaEmision)}
+                      {fmtFecha(f.fechaEmision)}
                     </td>
-
-                    {/* Vencimiento */}
                     <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
-                      {editing && ed
-                        ? <input type="date" value={ed.fechaVencimiento} onChange={(e) => setE({ fechaVencimiento: e.target.value })}
-                            className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                        : fmtFecha(f.fechaVencimiento)}
+                      {fmtFecha(f.fechaVencimiento)}
                     </td>
-
-                    {/* Estado (solo lectura) */}
                     <td className="px-4 py-3">
                       <span className={['border rounded px-2 py-0.5 text-xs font-medium', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
                         {ESTADO_LABEL[f.estado] ?? f.estado}
                       </span>
                     </td>
-
-                    {/* Importe (siempre solo lectura — calculado desde viajes) */}
                     <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
-                      {editing && ed
-                        ? textoImporteFacturaSeleccion(ed.viajeIds, viajes)
-                        : textoImporteFacturaListado(f, viajes)}
+                      {textoImporteFacturaListado(f, viajes)}
                     </td>
-
-                    {/* Acciones */}
-                    {!isEditing && (
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-2 justify-end">
-                          <button type="button" onClick={() => startEdit(f)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">
-                            Editar
-                          </button>
-                          <button type="button" disabled={deletingId === f.id} onClick={() => handleDelete(f)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40">
-                            {deletingId === f.id ? '…' : 'Eliminar'}
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(f)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === f.id}
+                          onClick={() => setFacturaDeleteConfirm(f)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          {deletingId === f.id ? '…' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                  {editing && ed && (
-                    <tr className="border-b border-black/5 bg-vialto-mist/40">
-                      <td colSpan={7} className="px-4 py-3 text-vialto-steel">
-                        <p className="text-[11px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-fire mb-2">
-                          Viajes vinculados
-                        </p>
-                        {ed.tipo === 'cliente' && !ed.clienteId.trim() && (
-                          <p className="text-[11px] text-vialto-steel mb-1">
-                            Elegí un cliente para listar solo sus viajes.
-                          </p>
-                        )}
-                        <div className="max-w-xl">
-                          <ViajesCheckboxList
-                            viajes={viajesEdicionFactura}
-                            selected={ed.viajeIds}
-                            onChange={(ids) => setE({ viajeIds: ids })}
-                            loading={viajesLoading}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
-              );
-            })}
+              ))}
           </tbody>
         </table>
       </div>
@@ -622,6 +478,40 @@ export function FacturacionTenantPage() {
       {facturas && facturas.length > 0 && (
         <p className="mt-3 text-xs text-vialto-steel">{facturas.length} factura{facturas.length !== 1 ? 's' : ''}</p>
       )}
+
+      {editingId && editDraft && facturaEdicionSnapshot && (
+        <FacturaEditModal
+          open
+          draft={editDraft}
+          setDraft={setEditDraft}
+          snapshotFactura={facturaEdicionSnapshot}
+          clientes={clientes}
+          viajes={viajes}
+          viajesEdicion={viajesEdicionFactura}
+          viajesLoading={viajesLoading}
+          onClose={cancelEdit}
+          onSave={() => void saveEdit()}
+          saving={savingEditId === editingId}
+          error={editError}
+        />
+      )}
+
+      <ConfirmDialog
+        open={facturaDeleteConfirm != null}
+        title="Eliminar factura"
+        message={
+          facturaDeleteConfirm
+            ? `¿Eliminás la factura ${facturaDeleteConfirm.numero}? Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        tone="danger"
+        busy={!!deletingId && facturaDeleteConfirm != null && deletingId === facturaDeleteConfirm.id}
+        onCancel={() => {
+          if (!deletingId) setFacturaDeleteConfirm(null);
+        }}
+        onConfirm={() => void confirmDeleteFactura()}
+      />
     </div>
   );
 }

@@ -1,5 +1,15 @@
 /** Forma alineada con el modelo Prisma expuesto por el backend. */
 
+export interface PagoTransportista {
+  monto: number;
+  moneda: 'ARS' | 'USD';
+  fecha: string;
+  observaciones?: string;
+  metodo?: string;
+  createdBy?: string;
+  createdAt?: string;
+}
+
 export interface OtroGasto {
   descripcion: string;
   monto: number;
@@ -41,6 +51,7 @@ export interface Viaje {
   monedaPrecioTransportistaExterno?: string;
   observaciones: string | null;
   otrosGastos?: OtroGasto[];
+  pagosTransportista?: PagoTransportista[];
   fechaFinalizado: string | null;
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */

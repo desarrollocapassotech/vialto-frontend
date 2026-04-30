@@ -37,11 +37,6 @@ import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
-import {
-  OtrosGastosFieldset,
-  type OtroGastoDraft,
-  otroGastoDraftToApi,
-} from '@/components/viajes/OtrosGastosFieldset';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -101,7 +96,6 @@ export function ViajeCreatePage() {
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>('ARS');
-  const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
   const clientes = tenantId ? localClientes : maestro.clientes;
   const choferes = tenantId ? localChoferes : maestro.choferes;
   const transportistas = tenantId ? localTransportistas : maestro.transportistas;
@@ -319,7 +313,7 @@ export function ViajeCreatePage() {
             monedaPrecioTransportista,
           ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-          otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+          otrosGastos: [],
         }),
       });
       navigate('/viajes', { replace: true });
@@ -609,10 +603,6 @@ export function ViajeCreatePage() {
               className={textareaLongClass}
             />
           </div>
-          <div className="md:col-span-2 lg:col-span-3">
-            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} />
-          </div>
-
           {error && (
             <div className="md:col-span-2 lg:col-span-3">
               <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">

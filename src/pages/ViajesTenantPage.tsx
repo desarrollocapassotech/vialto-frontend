@@ -2,34 +2,25 @@ import { useAuth } from '@clerk/clerk-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ChoferSearchSelect,
-  ClienteSearchSelect,
-  TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
-} from '@/components/forms/MaestroSearchSelects';
+import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
-import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
-import {
-  ViajeOperacionTipoFieldset,
-  type ViajeOperacionModo,
-} from '@/components/viajes/ViajeOperacionTipoFieldset';
+import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
 import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
+import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
-  maskCurrencyForMoneda,
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
-  type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
+  formatViajeImporteForListado,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
   nombreClienteListadoViaje,
@@ -44,17 +35,15 @@ import {
   ViajeGananciaBrutaColumnHeader,
 } from '@/components/viajes/ViajeGananciaBruta';
 import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
+import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/ViajeEditModal';
 import {
-  ViajeVehiculosLista,
-  type ViajeVehiculoRowDraft,
-} from '@/components/viajes/ViajeVehiculosLista';
-import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import {
-  OtrosGastosFieldset,
-  type OtroGastoDraft,
   otroGastoDraftFromApi,
   otroGastoDraftToApi,
 } from '@/components/viajes/OtrosGastosFieldset';
+import {
+  pagoTransportistaDraftFromApi,
+  pagoTransportistaDraftToApi,
+} from '@/components/viajes/PagosTransportistaFieldset';
 import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
@@ -65,7 +54,6 @@ import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
-  estadoMuestraKmLitros,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
@@ -73,41 +61,16 @@ import {
   estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
+import {
+  calcularSaldoTransportista,
+  viajeRequierePagosTransportista,
+} from '@/lib/viajesTransportistaPagos';
 import type {
   Factura,
   PaginatedMeta,
   Viaje,
 } from '@/types/api';
 
-
-type ViajeInlineDraft = {
-  numero: string;
-  estado: string;
-  clienteId: string;
-  operacionModo: ViajeOperacionModo;
-  choferId: string;
-  transportistaId: string;
-  vehiculosRows: ViajeVehiculoRowDraft[];
-  choferExternoId: string;
-  vehiculoExternoId: string;
-  paisOrigen: PaisCodigo;
-  paisDestino: PaisCodigo;
-  origen: string;
-  destino: string;
-  fechaCarga: string;
-  horaCarga: string;
-  fechaDescarga: string;
-  horaDescarga: string;
-  detalleCarga: string;
-  observaciones: string;
-  monto: string;
-  monedaMonto: ViajeMonedaCodigo;
-  kmRecorridos: string;
-  litrosConsumidos: string;
-  precioTransportistaExterno: string;
-  monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
-  otrosGastos: OtroGastoDraft[];
-};
 
 type ViajesPaginatedResponse = {
   items: Viaje[];
@@ -168,10 +131,16 @@ export function ViajesTenantPage() {
   const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
   /** Viaje sobre el que se está abriendo el modal de agregar gasto. */
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(null);
+  /** Viaje sobre el que se está abriendo el modal de registrar pago al transportista. */
+  const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
   const viajesConFactura = useMemo(
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
     [rows],
+  );
+  const viajeEdicionSnapshot = useMemo(
+    () => (editingId && rows ? rows.find((r) => r.id === editingId) ?? null : null),
+    [editingId, rows],
   );
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
@@ -472,6 +441,7 @@ export function ViajesTenantPage() {
 
   function startEdit(v: Viaje) {
     setEstadoQuickId(null);
+    setError(null);
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? '').trim();
     const chRow = choferes.find((c) => c.id === v.choferId);
@@ -535,6 +505,7 @@ export function ViajesTenantPage() {
       ),
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
+      pagosTransportista: (v.pagosTransportista ?? []).map(pagoTransportistaDraftFromApi),
     });
   }
 
@@ -735,6 +706,7 @@ export function ViajesTenantPage() {
           ),
           monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
           otrosGastos: draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+          pagosTransportista: draft.pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
@@ -746,10 +718,9 @@ export function ViajesTenantPage() {
     }
   }
 
-  const mostrarColumnaFacturarLote =
-    clienteIdFiltroActivo.trim() !== '' && !editingId;
+  const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== '';
   /** Cliente + transp. externo + estado + recorrido + fechas + monto + ganancia bruta [+ acciones]. */
-  const tableColSpanBase = editingId ? 7 : 8;
+  const tableColSpanBase = 8;
   const tableColSpan = mostrarColumnaFacturarLote ? tableColSpanBase + 1 : tableColSpanBase;
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
@@ -801,37 +772,16 @@ export function ViajesTenantPage() {
           )}
         </div>
         <div className="flex shrink-0 justify-end gap-2">
-          {editingId ? (
-            <>
-              <button
-                type="button"
-                onClick={cancelEdit}
-                disabled={savingId === editingId}
-                className="inline-flex h-10 items-center px-4 border border-black/20 bg-white text-vialto-charcoal text-sm uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-60"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => saveInline(editingId)}
-                disabled={savingId === editingId}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-60"
-              >
-                {savingId === editingId ? 'Guardando…' : 'Modificar cambios'}
-              </button>
-            </>
-          ) : (
-            <Link
-              to="/viajes/nuevo"
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              Crear viaje
-            </Link>
-          )}
+          <Link
+            to="/viajes/nuevo"
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+          >
+            Crear viaje
+          </Link>
         </div>
       </div>
 
-      {error && (
+      {error && !editingId && (
         <p role="alert" className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
@@ -1065,7 +1015,7 @@ export function ViajesTenantPage() {
               </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
               <ViajeGananciaBrutaColumnHeader />
-              {!editingId && <th className="px-4 py-3 text-right">Acciones</th>}
+              <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -1114,22 +1064,7 @@ export function ViajesTenantPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-0.5 items-start">
-                  {editingId === v.id ? (
-                    <select
-                      value={draft?.estado ?? 'pendiente'}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setDraft((prev) => (prev ? { ...prev, estado: next } : prev));
-                      }}
-                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                    >
-                      {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
-                        <option key={x} value={x} title={tooltipEstadoViaje(x)}>
-                          {estadoViajeLabel[x] ?? x}
-                        </option>
-                      ))}
-                    </select>
-                  ) : estadoQuickId === v.id ? (
+                  {estadoQuickId === v.id ? (
                     <select
                       autoFocus
                       value={v.estado}
@@ -1169,75 +1104,10 @@ export function ViajesTenantPage() {
                   )}
                   </div>
                 </td>
-                <td
-                  className={`px-4 py-3 text-vialto-steel ${
-                    editingId === v.id ? 'min-w-[240px]' : 'max-w-[220px]'
-                  }`}
-                >
-                  {editingId === v.id && draft ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                          Origen
-                        </span>
-                        <PaisUbicacionSelect
-                          value={draft.paisOrigen}
-                          onChange={(p) =>
-                            setDraft((prev) => (prev ? { ...prev, paisOrigen: p, origen: '' } : prev))
-                          }
-                          aria-label="País de origen"
-                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                        />
-                        <CiudadCombobox
-                          pais={draft.paisOrigen}
-                          value={draft.origen}
-                          onChange={(next) => setDraft((prev) => (prev ? { ...prev, origen: next } : prev))}
-                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                          Destino
-                        </span>
-                        <PaisUbicacionSelect
-                          value={draft.paisDestino}
-                          onChange={(p) =>
-                            setDraft((prev) => (prev ? { ...prev, paisDestino: p, destino: '' } : prev))
-                          }
-                          aria-label="País de destino"
-                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs"
-                        />
-                        <CiudadCombobox
-                          pais={draft.paisDestino}
-                          value={draft.destino}
-                          onChange={(next) => setDraft((prev) => (prev ? { ...prev, destino: next } : prev))}
-                          inputClassName="h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
-                  )}
+                <td className="px-4 py-3 text-vialto-steel max-w-[220px]">
+                  <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
-                  {editingId === v.id && draft ? (
-                    <ViajeFechaHoraFields
-                      mode="tablaCargaDescarga"
-                      fechaCarga={draft.fechaCarga}
-                      horaCarga={draft.horaCarga}
-                      fechaDescarga={draft.fechaDescarga}
-                      horaDescarga={draft.horaDescarga}
-                      onPatch={(p) => {
-                        setDraft((prev) => (prev ? { ...prev, ...p } : prev));
-                        if (p.fechaCarga) setFechaCargaError(null);
-                        if (p.fechaDescarga) setFechaDescargaError(null);
-                      }}
-                      labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
-                      inputClassName="h-8 w-full min-w-[8.5rem] border border-black/15 bg-white px-2 text-xs"
-                      errorFechaCarga={fechaCargaError}
-                      errorFechaDescarga={fechaDescargaError}
-                    />
-                  ) : (
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span
                         className="block whitespace-nowrap"
@@ -1252,287 +1122,63 @@ export function ViajesTenantPage() {
                         {formatFechaCargaCelda(v.fechaDescarga)}
                       </span>
                     </div>
-                  )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   {textoMontoFacturarListado(v)}
                 </td>
                 <ViajeGananciaBrutaCelda viaje={v} />
-                {!editingId && (
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex flex-wrap justify-end gap-1.5">
-                      {viajePermiteAgregarGasto(v.estado) && (
+                <td className="px-4 py-3 text-right">
+                    <div className="flex flex-col items-end gap-1.5">
+                      <div className="inline-flex flex-wrap justify-end gap-1.5">
+                        {viajePermiteAgregarGasto(v.estado) && (
+                          <button
+                            type="button"
+                            onClick={() => setAgregarGastoViaje(v)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                          >
+                            + Gasto
+                          </button>
+                        )}
+                        {viajeRequierePagosTransportista(v) && v.estado !== 'cancelado' && (
+                          <button
+                            type="button"
+                            onClick={() => setRegistrarPagoViaje(v)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                          >
+                            + Pago
+                          </button>
+                        )}
+                        {viajeEstadoPermiteBotonFacturar(v.estado) && (
+                          <button
+                            type="button"
+                            onClick={() => void navigateToFacturacion(v)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
+                          >
+                            Facturar
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setAgregarGastoViaje(v)}
+                          onClick={() => startEdit(v)}
                           className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                         >
-                          + Gasto
+                          Editar
                         </button>
-                      )}
-                      {viajeEstadoPermiteBotonFacturar(v.estado) && (
-                        <button
-                          type="button"
-                          onClick={() => void navigateToFacturacion(v)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-                        >
-                          Facturar
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => startEdit(v)}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-              {editingId === v.id && draft && (
-                <tr className="border-b border-black/10 bg-vialto-mist/40">
-                  <td colSpan={tableColSpan} className="px-4 py-4">
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Cliente</span>
-                          <ClienteSearchSelect
-                            clientes={clientes}
-                            value={draft.clienteId}
-                            onChange={(id) =>
-                              setDraft((p) => (p ? { ...p, clienteId: id } : p))
-                            }
-                            inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                            aria-label="Cliente"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                            Monto a facturar
+                      </div>
+                      {(() => {
+                        const s = calcularSaldoTransportista(v);
+                        if (!s || s.totalAcordado === 0) return null;
+                        return (
+                          <span className={`text-[10px] tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {s.pagado
+                              ? '✓ Transportista pagado'
+                              : `Saldo: ${formatViajeImporteForListado(s.saldo, s.moneda)}`}
                           </span>
-                          <div className="flex min-w-0 gap-2">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              value={draft.monto}
-                              onChange={(e) =>
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        monto: maskCurrencyForMoneda(e.target.value, p.monedaMonto),
-                                      }
-                                    : p,
-                                )
-                              }
-                              placeholder={
-                                draft.monedaMonto === 'USD'
-                                  ? 'Ej. 12,500.50'
-                                  : 'Ej. 1.500.000,50'
-                              }
-                              className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                            />
-                            <MonedaSelect
-                              value={draft.monedaMonto}
-                              onChange={(m: ViajeMonedaCodigo) =>
-                                setDraft((p) => (p ? { ...p, monedaMonto: m } : p))
-                              }
-                              aria-label="Moneda monto a facturar"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <ViajeOperacionTipoFieldset
-                        modo={draft.operacionModo}
-                        onModoChange={applyDraftModo}
-                        groupName={`viaje-op-${draft.numero || 'edit'}`}
-                        externoContent={
-                          <div className="grid gap-2">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Transportista externo
-                                </span>
-                                <TransportistaSearchSelect
-                                  transportistas={transportistas}
-                                  value={draft.transportistaId}
-                                  onChange={(id) =>
-                                    setDraft((p) => (p ? { ...p, transportistaId: id } : p))
-                                  }
-                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                                  aria-label="Transportista externo"
-                                />
-                              </div>
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Precio transportista externo
-                                </span>
-                                <div className="flex min-w-0 gap-2">
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    autoComplete="off"
-                                    value={draft.precioTransportistaExterno}
-                                    onChange={(e) =>
-                                      setDraft((p) =>
-                                        p
-                                          ? {
-                                              ...p,
-                                              precioTransportistaExterno: maskCurrencyForMoneda(
-                                                e.target.value,
-                                                p.monedaPrecioTransportistaExterno,
-                                              ),
-                                            }
-                                          : p,
-                                      )
-                                    }
-                                    placeholder={
-                                      draft.monedaPrecioTransportistaExterno === 'USD'
-                                        ? 'Ej. 8,500.00'
-                                        : 'Ej. 1.200.000,50'
-                                    }
-                                    className="h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm text-right tabular-nums"
-                                  />
-                                  <MonedaSelect
-                                    value={draft.monedaPrecioTransportistaExterno}
-                                    onChange={(m: ViajeMonedaCodigo) =>
-                                      setDraft((p) =>
-                                        p ? { ...p, monedaPrecioTransportistaExterno: m } : p,
-                                      )
-                                    }
-                                    aria-label="Moneda precio transportista externo"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Chofer (opcional)
-                                </span>
-                                <ChoferSearchSelect
-                                  choferes={choferes}
-                                  value={draft.choferExternoId}
-                                  onChange={(id) =>
-                                    setDraft((p) => (p ? { ...p, choferExternoId: id } : p))
-                                  }
-                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                                  aria-label="Chofer transportista externo"
-                                />
-                              </div>
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                  Vehículo (opcional)
-                                </span>
-                                <VehiculoPatenteSearchSelect
-                                  vehiculos={vehiculos}
-                                  value={draft.vehiculoExternoId}
-                                  onChange={(id) =>
-                                    setDraft((p) => (p ? { ...p, vehiculoExternoId: id } : p))
-                                  }
-                                  sinOpciones={vehiculos.length === 0}
-                                  inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                                  aria-label="Vehículo transportista externo"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        }
-                        propioContent={
-                          <div className="grid gap-3">
-                            <div className="flex min-w-0 max-w-md flex-col gap-1">
-                              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                                Chofer (flota propia)
-                              </span>
-                              <ChoferSearchSelect
-                                choferes={choferesPropios}
-                                value={draft.choferId}
-                                onChange={(id) =>
-                                  setDraft((p) => (p ? { ...p, choferId: id } : p))
-                                }
-                                inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                                aria-label="Chofer flota propia"
-                              />
-                              {ayudaFlotaListado.chofer && (
-                                <p className="text-xs text-amber-800/90">{ayudaFlotaListado.chofer}</p>
-                              )}
-                            </div>
-                            <ViajeVehiculosLista
-                              groupId={`viaje-inline-${draft.numero || 'e'}`}
-                              crearVehiculoHref="/vehiculos/nuevo"
-                              rows={draft.vehiculosRows}
-                              onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
-                              vehiculos={vehiculosPropios}
-                            />
-                            {ayudaFlotaListado.vehiculo && (
-                              <p className="text-xs text-amber-800/90">{ayudaFlotaListado.vehiculo}</p>
-                            )}
-                            {viajeEditHint && (
-                              <p className="text-xs text-amber-800/90">{viajeEditHint}</p>
-                            )}
-                          </div>
-                        }
-                      />
-                      <ViajeFechaHoraFields
-                        fechaCarga={draft.fechaCarga}
-                        horaCarga={draft.horaCarga}
-                        fechaDescarga={draft.fechaDescarga}
-                        horaDescarga={draft.horaDescarga}
-                        onPatch={(p) => {
-                          setDraft((prev) => (prev ? { ...prev, ...p } : prev));
-                          if (p.fechaCarga) setFechaCargaError(null);
-                          if (p.fechaDescarga) setFechaDescargaError(null);
-                        }}
-                        labelClassName="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel"
-                        inputClassName="h-9 border border-black/15 bg-white px-2 text-sm"
-                        errorFechaCarga={fechaCargaError}
-                        errorFechaDescarga={fechaDescargaError}
-                      />
-                      {estadoMuestraKmLitros(draft.estado) && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Km recorridos</span>
-                            <input type="number" value={draft.kmRecorridos} onChange={(e) => setDraft((p) => (p ? { ...p, kmRecorridos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Litros consumidos</span>
-                            <input type="number" value={draft.litrosConsumidos} onChange={(e) => setDraft((p) => (p ? { ...p, litrosConsumidos: e.target.value } : p))} placeholder="0" className="h-9 border border-black/15 bg-white px-2 text-sm" />
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Detalle de carga</span>
-                        <textarea value={draft.detalleCarga} onChange={(e) => setDraft((p) => (p ? { ...p, detalleCarga: e.target.value } : p))} placeholder="Ej. producto, bultos, temperatura, notas sobre la carga" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
-                      </div>
-                      <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">Observaciones</span>
-                        <textarea value={draft.observaciones} onChange={(e) => setDraft((p) => (p ? { ...p, observaciones: e.target.value } : p))} placeholder="Notas adicionales" className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm" />
-                      </div>
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <OtrosGastosFieldset
-                          rows={draft.otrosGastos}
-                          onChange={(rows) => setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))}
-                        />
-                      </div>
-                    </div>
-                    {error && (
-                      <p role="alert" className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-                        {error}
-                      </p>
-                    )}
-                    <div className="mt-3 inline-flex gap-2">
-                      <button type="button" onClick={() => saveInline(v.id)} disabled={savingId === v.id} className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60">
-                        {savingId === v.id ? 'Guardando…' : 'Guardar cambios'}
-                      </button>
-                      <button type="button" onClick={cancelEdit} disabled={savingId === v.id} className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist disabled:opacity-60">
-                        Cancelar
-                      </button>
+                        );
+                      })()}
                     </div>
                   </td>
-                </tr>
-              )}
+              </tr>
               </Fragment>
             );})}
           </tbody>
@@ -1590,6 +1236,36 @@ export function ViajesTenantPage() {
         </div>
       )}
 
+      {editingId && draft && viajeEdicionSnapshot && (
+        <ViajeEditModal
+          open
+          draft={draft}
+          setDraft={setDraft}
+          snapshotViaje={viajeEdicionSnapshot}
+          clientes={clientes}
+          choferes={choferes}
+          transportistas={transportistas}
+          vehiculos={vehiculos}
+          choferesPropios={choferesPropios}
+          vehiculosPropios={vehiculosPropios}
+          viajesConFactura={viajesConFactura}
+          onModoChange={applyDraftModo}
+          ayudaFlota={ayudaFlotaListado}
+          viajeEditHint={viajeEditHint}
+          fechaCargaError={fechaCargaError}
+          fechaDescargaError={fechaDescargaError}
+          onDraftFechasPatch={(p) => {
+            setDraft((prev) => (prev ? { ...prev, ...p } : prev));
+            if (p.fechaCarga) setFechaCargaError(null);
+            if (p.fechaDescarga) setFechaDescargaError(null);
+          }}
+          onClose={cancelEdit}
+          onSave={() => void saveInline(editingId)}
+          saving={savingId === editingId}
+          error={error}
+        />
+      )}
+
       <FacturarOpcionModal
         open={facturarOpcionState != null}
         facturas={facturarOpcionState?.facturas ?? []}
@@ -1604,9 +1280,41 @@ export function ViajesTenantPage() {
         viaje={agregarGastoViaje}
         onSuccess={(updated) => {
           setRows((prev) => (prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev));
+          if (editingId === updated.id) {
+            setDraft((d) =>
+              d
+                ? {
+                    ...d,
+                    otrosGastos: (updated.otrosGastos ?? []).map(otroGastoDraftFromApi),
+                  }
+                : d,
+            );
+          }
           setAgregarGastoViaje(null);
         }}
         onClose={() => setAgregarGastoViaje(null)}
+      />
+
+      <RegistrarPagoTransportistaModal
+        open={registrarPagoViaje != null}
+        viaje={registrarPagoViaje}
+        onSuccess={(updated) => {
+          setRows((prev) => (prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev));
+          if (editingId === updated.id) {
+            setDraft((d) =>
+              d
+                ? {
+                    ...d,
+                    pagosTransportista: (updated.pagosTransportista ?? []).map(
+                      pagoTransportistaDraftFromApi,
+                    ),
+                  }
+                : d,
+            );
+          }
+          setRegistrarPagoViaje(null);
+        }}
+        onClose={() => setRegistrarPagoViaje(null)}
       />
 
     </div>
