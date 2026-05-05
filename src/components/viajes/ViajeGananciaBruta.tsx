@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { gananciaBrutaMetaDesdeViaje } from '@/lib/viajesGananciaBruta';
 import type { Viaje } from '@/types/api';
 
@@ -9,15 +10,20 @@ export function ViajeGananciaBrutaColumnHeader() {
   return <th className="px-4 py-3 text-right">Ganancia bruta</th>;
 }
 
-type Props = { viaje: Viaje };
+type Props = { viaje: Viaje; extra?: ReactNode };
 
 /** Celda de ganancia bruta con tooltip al hover (sin subrayado). */
-export function ViajeGananciaBrutaCelda({ viaje }: Props) {
+export function ViajeGananciaBrutaCelda({ viaje, extra }: Props) {
   const meta = gananciaBrutaMetaDesdeViaje(viaje);
   return (
     <td className="px-4 py-3 text-right tabular-nums">
       <div className="group relative flex justify-end">
-        <span className="cursor-default">{meta.display}</span>
+        <span className="cursor-default">
+          {meta.display}
+          {meta.reason && (
+            <span className="block text-[10px] text-vialto-steel/70 tabular-nums">{meta.reason}</span>
+          )}
+        </span>
         <div className={tooltipPanelClass} role="tooltip">
           {meta.tooltipParagraphs.map((p, i) => (
             <p key={i} className={i === 0 ? 'font-medium text-white' : 'mt-1.5 leading-snug'}>
@@ -26,6 +32,7 @@ export function ViajeGananciaBrutaCelda({ viaje }: Props) {
           ))}
         </div>
       </div>
+      {extra}
     </td>
   );
 }

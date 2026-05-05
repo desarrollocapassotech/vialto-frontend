@@ -15,6 +15,7 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import {
+  monedaUnicaDeViajes,
   textoImporteFacturaListado,
   textoImporteFacturaSeleccion,
   viajesFiltradosParaFactura,
@@ -184,6 +185,10 @@ export function FacturacionTenantPage() {
     setDraftError(null);
     if (!draft.numero.trim()) { setDraftError('Ingresá el número de factura.'); return; }
     if (!draft.fechaEmision) { setDraftError('Ingresá la fecha de emisión.'); return; }
+    if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
+      setDraftError('Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.');
+      return;
+    }
     setSaving(true);
     try {
       await apiJson<Factura>('/api/facturacion/facturas', () => getToken(), {
@@ -228,6 +233,10 @@ export function FacturacionTenantPage() {
     setEditError(null);
     if (!editDraft.numero.trim()) { setEditError('Ingresá el número de factura.'); return; }
     if (!editDraft.fechaEmision) { setEditError('Ingresá la fecha de emisión.'); return; }
+    if (monedaUnicaDeViajes(editDraft.viajeIds, viajes) === null) {
+      setEditError('Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.');
+      return;
+    }
     setSavingEditId(editingId);
     try {
       const updated = await apiJson<Factura>(
@@ -386,6 +395,11 @@ export function FacturacionTenantPage() {
               onChange={(ids) => setD({ viajeIds: ids })}
               loading={viajesLoading}
             />
+            {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
+              <p className="mt-1 rounded border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Los viajes seleccionados tienen distintas monedas. Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.
+              </p>
+            )}
           </div>
 
           <div className="col-span-full space-y-2 pt-1">

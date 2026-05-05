@@ -279,6 +279,10 @@ export function ViajeCreatePage() {
     setFechaCargaError(fcError);
     setFechaDescargaError(fdError);
     if (fcError || fdError) return;
+    if (fechaDescarga < fechaCarga) {
+      setFechaDescargaError('La fecha de descarga no puede ser anterior a la de carga.');
+      return;
+    }
 
     const montoNum = parseCurrencyForMoneda(monto, monedaMonto);
     if (montoNum == null || montoNum < 0.01) {

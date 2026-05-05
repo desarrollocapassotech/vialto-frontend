@@ -350,6 +350,10 @@ export function ViajesSuperadminPage() {
     setFechaCargaError(fcError);
     setFechaDescargaError(fdError);
     if (fcError || fdError) return;
+    if (draft.fechaDescarga < draft.fechaCarga) {
+      setFechaDescargaError('La fecha de descarga no puede ser anterior a la de carga.');
+      return;
+    }
 
     const kmResolved = draft.kmRecorridos.trim() ? Number(draft.kmRecorridos.replace(',', '.')) : undefined;
     const litResolved = draft.litrosConsumidos.trim() ? Number(draft.litrosConsumidos.replace(',', '.')) : undefined;

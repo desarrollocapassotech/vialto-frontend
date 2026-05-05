@@ -225,6 +225,23 @@ export function nombreTransportistaExternoListadoViaje(
 }
 
 /**
+ * Devuelve la moneda única si todos los viajes seleccionados comparten la misma,
+ * null si hay mezcla, o 'ARS' si no hay viajes seleccionados.
+ */
+export function monedaUnicaDeViajes(viajeIds: string[], viajes: Viaje[]): string | null {
+  if (viajeIds.length === 0) return 'ARS';
+  const monedas = new Set<string>();
+  for (const id of viajeIds) {
+    const v = viajes.find((x) => x.id === id);
+    if (!v) continue;
+    monedas.add(normalizeViajeMoneda(v.monedaMonto));
+  }
+  if (monedas.size === 0) return 'ARS';
+  if (monedas.size > 1) return null;
+  return [...monedas][0];
+}
+
+/**
  * Suma importes de viajes seleccionados, separando ARS y USD (no mezcla montos entre monedas).
  */
 export function textoImporteFacturaSeleccion(viajeIds: string[], viajes: Viaje[]): string {

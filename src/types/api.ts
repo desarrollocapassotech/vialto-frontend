@@ -190,6 +190,7 @@ export interface Factura {
   clienteId: string | null;
   viajeIds: string[];
   importe: number;
+  moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;
   estado: 'pendiente' | 'cobrada' | 'vencida';

@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { textoImporteFacturaSeleccion, textoMontoFacturarListado } from '@/lib/viajesFlota';
+import { monedaUnicaDeViajes, textoImporteFacturaSeleccion, textoMontoFacturarListado } from '@/lib/viajesFlota';
 import type { Cliente, Factura, Viaje } from '@/types/api';
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -320,6 +320,12 @@ export function FacturaEditModal({
               />
             </div>
           </div>
+
+          {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
+            <p className="mt-3 rounded border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Los viajes seleccionados tienen distintas monedas. Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.
+            </p>
+          )}
 
           {error && (
             <div className="mt-4">

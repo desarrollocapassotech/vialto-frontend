@@ -9,6 +9,8 @@ export function viajeUsaFlotaPropia(v: Pick<Viaje, 'transportistaId'>): boolean 
 export type GananciaBrutaMeta = {
   display: string;
   tooltipParagraphs: string[];
+  /** Razón breve de por qué no se muestra el valor (solo cuando display es '—'). */
+  reason?: string;
 };
 
 /** Suma de otrosGastos filtrando por moneda. */
@@ -34,9 +36,6 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
     paragraphs.push('Importe a facturar sin cargar en este viaje.');
     return { display: '—', tooltipParagraphs: paragraphs };
   }
-
-  const impStr = formatViajeImporteForListado(monto, v.monedaMonto);
-  paragraphs.push(`Importe a facturar (${monedaIng}): ${impStr}`);
 
   if (viajeUsaFlotaPropia(v)) {
     paragraphs.push('Transportista externo: sin cargo (flota propia).');
@@ -71,7 +70,11 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
         `Gastos extra (${monedaIng}): −${formatViajeImporteForListado(extraGastos, monedaIng)} (${gastosCount} ítem/s)`,
       );
     }
-    return { display: '—', tooltipParagraphs: paragraphs };
+    return {
+      display: '',
+      reason: `${monedaIng} ≠ ${monedaCosto}`,
+      tooltipParagraphs: paragraphs,
+    };
   }
 
   if (costoNum > 0) {

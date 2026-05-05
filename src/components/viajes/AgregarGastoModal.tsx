@@ -7,7 +7,8 @@ import {
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
-import type { Viaje } from '@/types/api';
+import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import type { OtroGasto, Viaje } from '@/types/api';
 
 type Props = {
   open: boolean;
@@ -24,9 +25,11 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose }: Props) {
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showGastosAnteriores, setShowGastosAnteriores] = useState(false);
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
+  const gastos = viajeActual.otrosGastos ?? [];
 
   function resetForm() {
     setDescripcion('');
@@ -34,6 +37,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose }: Props) {
     setMoneda('ARS');
     setFecha(new Date().toISOString().slice(0, 10));
     setError(null);
+    setShowGastosAnteriores(false);
   }
 
   function handleClose() {
@@ -97,6 +101,61 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose }: Props) {
         <p className="mt-1 text-xs text-vialto-steel">
           El gasto se suma al total del viaje.
         </p>
+
+        {gastos.length > 0 && (
+          <div className="mt-2 flex items-center gap-3 rounded border border-black/10 bg-vialto-mist/60 px-3 py-2 text-xs">
+            <span className="text-vialto-steel">
+              Gastos registrados:{' '}
+              <span className="font-medium text-vialto-charcoal">{gastos.length}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowGastosAnteriores((prev) => !prev)}
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded border border-black/10 bg-white transition hover:bg-vialto-mist"
+              aria-expanded={showGastosAnteriores}
+              aria-label={showGastosAnteriores ? 'Ocultar gastos anteriores' : 'Mostrar gastos anteriores'}
+              title={showGastosAnteriores ? 'Ocultar gastos anteriores' : 'Mostrar gastos anteriores'}
+            >
+              <img
+                src="/icono-historial.png"
+                alt={showGastosAnteriores ? 'Ocultar gastos anteriores' : 'Mostrar gastos anteriores'}
+                className="h-5 w-5"
+              />
+            </button>
+          </div>
+        )}
+
+        {showGastosAnteriores && gastos.length > 0 && (
+          <div className="mt-4 rounded border border-black/10 bg-white p-3 text-sm">
+            <div className="mb-2 text-xs uppercase tracking-[0.15em] text-vialto-steel">
+              Gastos anteriores
+            </div>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs text-vialto-steel border-b border-black/10 pb-2">
+              <span>Descripción</span>
+              <span className="text-right">Monto</span>
+              <span className="text-right">Fecha</span>
+            </div>
+            <div className="mt-2 space-y-2">
+              {gastos.map((g: OtroGasto, i: number) => (
+                <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center text-sm text-vialto-charcoal">
+                  <span className="truncate">{g.descripcion}</span>
+                  <span className="font-medium tabular-nums text-right">
+                    {formatViajeImporteForListado(g.monto, g.moneda)}
+                  </span>
+                  <span className="text-right text-vialto-steel tabular-nums">
+                    {g.fecha
+                      ? new Date(g.fecha).toLocaleDateString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })
+                      : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex flex-col gap-1">

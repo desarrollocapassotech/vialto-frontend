@@ -690,6 +690,10 @@ export function ViajesTenantPage() {
     setFechaCargaError(fcError);
     setFechaDescargaError(fdError);
     if (fcError || fdError) return;
+    if (draft.fechaDescarga < draft.fechaCarga) {
+      setFechaDescargaError('La fecha de descarga no puede ser anterior a la de carga.');
+      return;
+    }
 
     const kmResolved = draft.kmRecorridos.trim()
       ? Number(draft.kmRecorridos.replace(',', '.'))
@@ -1154,7 +1158,20 @@ export function ViajesTenantPage() {
                 <td className="px-4 py-3 text-right tabular-nums">
                   {textoMontoFacturarListado(v)}
                 </td>
-                <ViajeGananciaBrutaCelda viaje={v} />
+                <ViajeGananciaBrutaCelda
+                  viaje={v}
+                  extra={(() => {
+                    const s = calcularSaldoTransportista(v);
+                    if (!s || s.totalAcordado === 0) return null;
+                    return (
+                      <span className={`block text-[10px] tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {s.pagado
+                          ? '✓ Transportista pagado'
+                          : `A pagar: ${formatViajeImporteForListado(s.saldo, s.moneda)}`}
+                      </span>
+                    );
+                  })()}
+                />
                 <td className="px-4 py-3 text-right">
                     <div className="flex flex-col items-end gap-1.5">
                       <div className="inline-flex flex-wrap justify-end gap-1.5">
@@ -1193,17 +1210,6 @@ export function ViajesTenantPage() {
                           Editar
                         </button>
                       </div>
-                      {(() => {
-                        const s = calcularSaldoTransportista(v);
-                        if (!s || s.totalAcordado === 0) return null;
-                        return (
-                          <span className={`text-[10px] tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
-                            {s.pagado
-                              ? '✓ Transportista pagado'
-                              : `Saldo: ${formatViajeImporteForListado(s.saldo, s.moneda)}`}
-                          </span>
-                        );
-                      })()}
                     </div>
                   </td>
               </tr>

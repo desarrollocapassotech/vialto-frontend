@@ -4,6 +4,7 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   maskCurrencyForMoneda,
+  normalizeViajeMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
@@ -21,28 +22,25 @@ type Props = {
 export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClose }: Props) {
   const { getToken } = useAuth();
   const [montoStr, setMontoStr] = useState('');
-  const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [observaciones, setObservaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [expandedPagoIndex, setExpandedPagoIndex] = useState<number | null>(null);
   const [showPagosAnteriores, setShowPagosAnteriores] = useState(false);
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
+  const moneda = normalizeViajeMoneda(viajeActual.monedaPrecioTransportistaExterno);
 
   const saldo = calcularSaldoTransportista(viajeActual);
   const pagos = viajeActual.pagosTransportista ?? [];
 
   function resetForm() {
     setMontoStr('');
-    setMoneda('ARS');
     setFecha(new Date().toISOString().slice(0, 10));
     setObservaciones('');
     setError(null);
     setShowPagosAnteriores(false);
-    setExpandedPagoIndex(null);
   }
 
   function handleClose() {
@@ -55,6 +53,16 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
     if (monto == null || monto <= 0) {
       setError('Ingresá un monto mayor a 0.');
       return;
+    }
+    if (saldo) {
+      if (saldo.saldo <= 0) {
+        setError('El transportista ya está pagado en su totalidad.');
+        return;
+      }
+      if (monto > saldo.saldo) {
+        setError(`El monto supera el saldo pendiente (${formatViajeImporteForListado(saldo.saldo, saldo.moneda)}).`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -136,54 +144,32 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
             <div className="mb-2 text-xs uppercase tracking-[0.15em] text-vialto-steel">
               Pagos anteriores
             </div>
-            <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs text-vialto-steel border-b border-black/10 pb-2">
+            <div className="grid grid-cols-[1fr_auto] gap-2 text-xs text-vialto-steel border-b border-black/10 pb-2">
               <span>Monto</span>
               <span className="text-right">Fecha</span>
-              <span className="sr-only">Observaciones</span>
             </div>
             <div className="mt-2 space-y-2">
               {pagos.map((p, i) => (
-                <div key={i}>
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center text-sm text-vialto-charcoal">
-                    <span className="font-medium tabular-nums">
+                <div key={i} className="grid grid-cols-[1fr_auto] gap-2 items-center text-sm text-vialto-charcoal">
+                  <div className="group relative min-w-0">
+                    <span className={`font-medium tabular-nums ${p.observaciones ? 'cursor-default underline decoration-dotted underline-offset-2' : ''}`}>
                       {formatViajeImporteForListado(p.monto, p.moneda)}
                     </span>
-                    <span className="text-right text-vialto-steel">
-                      {p.fecha
-                        ? new Date(p.fecha).toLocaleDateString('es-AR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
-                        : '—'}
-                    </span>
-                    <div className="text-right">
-                      {p.observaciones ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedPagoIndex(expandedPagoIndex === i ? null : i)
-                          }
-                          className="text-xs text-vialto-charcoal underline-offset-2 hover:text-vialto-charcoal/80"
-                          aria-expanded={expandedPagoIndex === i}
-                          aria-label={
-                            expandedPagoIndex === i
-                              ? 'Ocultar observaciones'
-                              : 'Mostrar observaciones'
-                          }
-                        >
-                          {expandedPagoIndex === i ? '−' : '+'}
-                        </button>
-                      ) : (
-                        <span className="text-vialto-steel">—</span>
-                      )}
-                    </div>
+                    {p.observaciones && (
+                      <div className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-1 w-48 rounded border border-black/10 bg-vialto-charcoal px-2 py-1.5 text-xs font-normal text-white shadow-md opacity-0 transition-[opacity,visibility] group-hover:visible group-hover:opacity-100">
+                        {p.observaciones}
+                      </div>
+                    )}
                   </div>
-                  {p.observaciones && expandedPagoIndex === i && (
-                    <div className="rounded bg-vialto-mist/70 px-3 py-2 text-xs text-vialto-steel">
-                      {p.observaciones}
-                    </div>
-                  )}
+                  <span className="text-right text-vialto-steel tabular-nums">
+                    {p.fecha
+                      ? new Date(p.fecha).toLocaleDateString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })
+                      : '—'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -210,19 +196,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
             </div>
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Moneda</span>
-              <select
-                value={moneda}
-                onChange={(e) => {
-                  setMoneda(e.target.value as ViajeMonedaCodigo);
-                  setMontoStr('');
-                }}
-                disabled={saving}
-                className="h-9 w-20 border border-black/15 bg-white px-2 text-sm"
-                aria-label="Moneda del pago"
-              >
-                <option value="ARS">ARS</option>
-                <option value="USD">USD</option>
-              </select>
+              <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal">{moneda}</span>
             </div>
           </div>
 
