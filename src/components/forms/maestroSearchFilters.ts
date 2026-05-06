@@ -5,12 +5,12 @@ export function filtrarClientesPorQuery(clientes: Cliente[], q: string): Cliente
   if (!s) return clientes;
   return clientes.filter((c) => {
     const nombre = (c.nombre ?? '').toLowerCase();
-    const cuit = (c.cuit ?? '').replace(/\D/g, '');
+    const cuit = (c.idFiscal ?? '').replace(/\D/g, '');
     const qDigits = s.replace(/\D/g, '');
     return (
       nombre.includes(s) ||
       (qDigits.length >= 3 && cuit.includes(qDigits)) ||
-      (c.cuit && c.cuit.toLowerCase().includes(s))
+      (c.idFiscal && c.idFiscal.toLowerCase().includes(s))
     );
   });
 }
@@ -36,12 +36,12 @@ export function filtrarTransportistas(transportistas: Transportista[], q: string
   if (!s) return transportistas;
   return transportistas.filter((t) => {
     const nombre = (t.nombre ?? '').toLowerCase();
-    const cuit = (t.cuit ?? '').replace(/\D/g, '');
+    const cuit = (t.idFiscal ?? '').replace(/\D/g, '');
     const qDigits = s.replace(/\D/g, '');
     return (
       nombre.includes(s) ||
       (qDigits.length >= 3 && cuit.includes(qDigits)) ||
-      (t.cuit && t.cuit.toLowerCase().includes(s))
+      (t.idFiscal && t.idFiscal.toLowerCase().includes(s))
     );
   });
 }

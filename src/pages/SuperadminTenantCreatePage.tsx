@@ -9,7 +9,7 @@ import { friendlyError } from '@/lib/friendlyError';
 const INITIAL_VALUES: TenantFormValues = {
   name: '',
   clerkOrgId: '',
-  cuit: '',
+  idFiscal: '',
   modules: [],
 };
 
@@ -44,7 +44,7 @@ export function SuperadminTenantCreatePage() {
         method: 'POST',
         body: JSON.stringify({
           name,
-          cuit: values.cuit.trim() || undefined,
+          idFiscal: values.idFiscal.trim() || undefined,
           modules: values.modules,
         }),
       });

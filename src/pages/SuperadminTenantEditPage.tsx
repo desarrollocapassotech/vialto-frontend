@@ -11,7 +11,7 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
   return {
     name: t.name,
     clerkOrgId: t.clerkOrgId,
-    cuit: t.cuit ?? '',
+    idFiscal: t.idFiscal ?? '',
     modules: t.modules ?? [],
     billingStatus: (t.billingStatus as TenantFormValues['billingStatus']) ?? 'trial',
     maxUsers: String(t.maxUsers),
@@ -69,7 +69,7 @@ export function SuperadminTenantEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           name: values.name.trim() || undefined,
-          cuit: values.cuit.trim() || null,
+          idFiscal: values.idFiscal.trim() || null,
           modules: values.modules,
           billingStatus: values.billingStatus,
           maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,

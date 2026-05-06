@@ -136,7 +136,7 @@ export function TransportistaSearchSelect({
       inputClassName={inputClassName}
       filterItems={filtrarTransportistas}
       getPrimaryLabel={(t) => t.nombre}
-      getSecondaryLabel={(t) => t.cuit}
+      getSecondaryLabel={(t) => t.idFiscal}
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar={placeholderBuscar}
       searchAriaLabel="Filtrar transportistas"

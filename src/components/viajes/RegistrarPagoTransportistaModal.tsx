@@ -6,7 +6,6 @@ import {
   maskCurrencyForMoneda,
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
-  type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';

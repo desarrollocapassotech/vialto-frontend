@@ -149,7 +149,7 @@ export interface Tenant {
   id: string;
   clerkOrgId: string;
   name: string;
-  cuit: string | null;
+  idFiscal: string | null;
   modules: string[];
   maxUsers: number;
   billingStatus: string;
