@@ -6,10 +6,12 @@ type Props = {
   className?: string;
 };
 
-/** Origen y destino en una sola línea: ciudad → ciudad. */
+/** Muestra siempre origen arriba y destino abajo con flecha. */
 export function ViajeOrigenDestinoLinea({ origen, destino, className }: Props) {
   const o = soloCiudadDesdeEtiquetaUbicacion(origen);
   const d = soloCiudadDesdeEtiquetaUbicacion(destino);
+  const origenTexto = o || '—';
+  const destinoTexto = d || '—';
   const rawO = origen?.trim();
   const rawD = destino?.trim();
   const title =
@@ -17,14 +19,18 @@ export function ViajeOrigenDestinoLinea({ origen, destino, className }: Props) {
 
   return (
     <div
-      className={`flex min-w-0 items-center gap-1.5 text-sm text-vialto-charcoal ${className ?? ''}`}
+      className={`min-w-0 text-sm text-vialto-charcoal ${className ?? ''}`}
       title={title}
     >
-      <span className="min-w-0 truncate">{o || '—'}</span>
-      <span className="shrink-0 select-none text-vialto-steel/80" aria-hidden>
-        →
-      </span>
-      <span className="min-w-0 truncate">{d || '—'}</span>
+      <div className="grid min-w-0 grid-cols-1 gap-0.5">
+        <span className="min-w-0 truncate">{origenTexto}</span>
+        <span className="min-w-0 truncate text-vialto-steel">
+          <span className="mr-1.5 select-none text-vialto-steel/80" aria-hidden>
+            ↓
+          </span>
+          {destinoTexto}
+        </span>
+      </div>
     </div>
   );
 }

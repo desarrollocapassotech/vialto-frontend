@@ -51,10 +51,20 @@ import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 function formatFechaCarga(iso: string | null | undefined) {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('es-AR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    const soloFecha = d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
     });
+    // Cuando hora/minuto vienen en 00:00, tratamos la hora como no seteada.
+    if (d.getHours() === 0 && d.getMinutes() === 0) return soloFecha;
+    const hora = d.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${soloFecha} ${hora}`;
   } catch {
     return '—';
   }
@@ -464,17 +474,17 @@ export function ViajesSuperadminPage() {
       )}
 
       {/* Tabla */}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
+      <div className="mt-8 overflow-x-hidden rounded border border-black/5 bg-white shadow-sm">
+        <table className="w-full table-fixed text-left text-base">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3 min-w-[8rem]">Cliente</th>
-              <th className="px-4 py-3 min-w-[8rem]">Transporte</th>
+              <th className="px-4 py-3">Cliente</th>
+              <th className="px-4 py-3">Transporte</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 min-w-[12rem] tracking-[0.2em] text-vialto-fire">
+              <th className="px-4 py-3 tracking-[0.2em] text-vialto-fire">
                 Origen - Destino
               </th>
-              <th className="px-4 py-3 min-w-[11rem] tracking-[0.2em] text-vialto-fire">
+              <th className="px-4 py-3 tracking-[0.2em] text-vialto-fire">
                 Carga - Descarga
               </th>
               <th className="px-4 py-3 text-right">Monto a facturar</th>
@@ -618,13 +628,13 @@ export function ViajesSuperadminPage() {
                     ) : (
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span
-                          className="block whitespace-nowrap"
+                          className="block"
                           title={v.fechaCarga ?? undefined}
                         >
                           {formatFechaCarga(v.fechaCarga)}
                         </span>
                         <span
-                          className="block whitespace-nowrap text-xs text-vialto-steel/90"
+                          className="block text-xs text-vialto-steel/90"
                           title={v.fechaDescarga ?? undefined}
                         >
                           {formatFechaCarga(v.fechaDescarga)}
@@ -647,7 +657,7 @@ export function ViajesSuperadminPage() {
                         <button
                           type="button"
                           onClick={() => startEdit(v)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                          className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
                         >
                           Editar
                         </button>
@@ -656,7 +666,7 @@ export function ViajesSuperadminPage() {
                             type="button"
                             onClick={() => void navigateToFacturacion(v)}
                             disabled={!filtroEmpresa}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50 disabled:pointer-events-none"
+                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50 disabled:pointer-events-none"
                           >
                             Facturar
                           </button>

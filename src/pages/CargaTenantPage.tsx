@@ -237,7 +237,7 @@ export function TiposCargaTenantPage() {
       </p>
 
       <div className="mt-4 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-base">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3">Nombre</th>

@@ -420,16 +420,16 @@ export function FacturacionTenantPage() {
 
       {/* tabla */}
       <div className="mt-6 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-base">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3">Número</th>
-              <th className="px-4 py-3">Tipo</th>
+              <th className="w-[9rem] px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Emisión</th>
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Importe</th>
+              <th className="w-[14rem] px-4 py-3 text-right">Importe</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
@@ -447,7 +447,7 @@ export function FacturacionTenantPage() {
                 <Fragment key={f.id}>
                   <tr className="border-b border-black/5 hover:bg-vialto-mist/40">
                     <td className="px-4 py-3 font-medium">{f.numero}</td>
-                    <td className="px-4 py-3">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
                     <td className="px-4 py-3 min-w-[12rem]">{nombreCliente(f.clienteId)}</td>
                     <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
                       {fmtFecha(f.fechaEmision)}
@@ -460,7 +460,7 @@ export function FacturacionTenantPage() {
                         {ESTADO_LABEL[f.estado] ?? f.estado}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-normal">
+                    <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
                       {textoImporteFacturaListado(f, viajes)}
                     </td>
                     <td className="px-4 py-3 text-right">

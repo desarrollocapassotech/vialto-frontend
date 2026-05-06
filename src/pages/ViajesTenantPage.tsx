@@ -763,13 +763,20 @@ export function ViajesTenantPage() {
   function formatFechaCargaCelda(iso: string | null | undefined) {
     if (!iso) return '—';
     try {
-      return new Date(iso).toLocaleString('es-AR', {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '—';
+      const soloFecha = d.toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
+      });
+      // Cuando hora/minuto vienen en 00:00, tratamos la hora como no seteada.
+      if (d.getHours() === 0 && d.getMinutes() === 0) return soloFecha;
+      const hora = d.toLocaleTimeString('es-AR', {
         hour: '2-digit',
         minute: '2-digit',
       });
+      return `${soloFecha} ${hora}`;
     } catch {
       return '—';
     }
@@ -837,9 +844,9 @@ export function ViajesTenantPage() {
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
+      <div className="mt-8 overflow-x-hidden rounded border border-black/5 bg-white shadow-sm">
         <table
-          className="w-full text-left text-sm"
+          className="w-full table-fixed text-left text-base"
           aria-busy={mostrarCargandoListado}
         >
           <thead>
@@ -859,7 +866,7 @@ export function ViajesTenantPage() {
                   ) : null}
                 </th>
               )}
-              <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
+              <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Cliente"
                   filterActive={!!clienteIdFiltroActivo.trim()}
@@ -881,7 +888,7 @@ export function ViajesTenantPage() {
                   />
                 </ViajesListadoHeaderFiltro>
               </th>
-              <th scope="col" className="px-4 py-3 align-top min-w-[10rem]">
+              <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Transporte"
                   filterActive={!!transportistaIdFiltroActivo.trim()}
@@ -902,7 +909,7 @@ export function ViajesTenantPage() {
                   />
                 </ViajesListadoHeaderFiltro>
               </th>
-              <th scope="col" className="px-4 py-3 align-top min-w-[11rem]">
+              <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Estado"
                   filterActive={!!estadoFiltro.trim()}
@@ -912,7 +919,7 @@ export function ViajesTenantPage() {
                     value={estadoFiltro}
                     onChange={(e) => aplicarFiltroEstado(e.target.value)}
                     disabled={listadoRefetching}
-                    className={`h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm ${
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                       estadoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
                     }`}
                     aria-label="Filtrar listado por estado"
@@ -926,7 +933,7 @@ export function ViajesTenantPage() {
                   </select>
                 </ViajesListadoHeaderFiltro>
               </th>
-              <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
+              <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Origen — Destino"
                   filterActive={!!ubicacionFiltro.trim()}
@@ -961,18 +968,18 @@ export function ViajesTenantPage() {
                         <PaisUbicacionSelect
                           value={paisUbicacionFiltro}
                           onChange={(p) => aplicarPaisUbicacionFiltro(p)}
-                          className="h-8 w-full min-w-[140px] border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
+                            className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
                           aria-label="País para buscar la ciudad del filtro"
                         />
                         <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
                           Ciudad
                         </span>
-                        <div className="min-w-[200px] w-full">
+                        <div className="w-full">
                           <CiudadCombobox
                             pais={paisUbicacionFiltro}
                             value={ubicacionFiltro}
                             onChange={(next) => aplicarUbicacionCiudadSeleccion(next)}
-                            inputClassName={`h-9 w-full min-w-[200px] border border-black/15 bg-white px-2 text-sm ${
+                            inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                               ubicacionFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
                             }`}
                             disableBrowserAutocomplete
@@ -988,7 +995,7 @@ export function ViajesTenantPage() {
                   </div>
                 </ViajesListadoHeaderFiltro>
               </th>
-              <th scope="col" className="px-4 py-3 align-top min-w-[14rem]">
+              <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Carga — Descarga"
                   filterActive={
@@ -1142,13 +1149,13 @@ export function ViajesTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span
-                        className="block whitespace-nowrap"
+                      className="block"
                         title={v.fechaCarga ?? undefined}
                       >
                         {formatFechaCargaCelda(v.fechaCarga)}
                       </span>
                       <span
-                        className="block whitespace-nowrap text-xs text-vialto-steel/90"
+                        className="block text-xs text-vialto-steel/90"
                         title={v.fechaDescarga ?? undefined}
                       >
                         {formatFechaCargaCelda(v.fechaDescarga)}
@@ -1164,7 +1171,7 @@ export function ViajesTenantPage() {
                     const s = calcularSaldoTransportista(v);
                     if (!s || s.totalAcordado === 0) return null;
                     return (
-                      <span className={`block text-[10px] tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
+                      <span className={`block text-xs tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
                         {s.pagado
                           ? '✓ Transportista pagado'
                           : `A pagar: ${formatViajeImporteForListado(s.saldo, s.moneda)}`}
@@ -1179,7 +1186,7 @@ export function ViajesTenantPage() {
                           <button
                             type="button"
                             onClick={() => setAgregarGastoViaje(v)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
                           >
                             + Gasto
                           </button>
@@ -1188,7 +1195,7 @@ export function ViajesTenantPage() {
                           <button
                             type="button"
                             onClick={() => setRegistrarPagoViaje(v)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
                           >
                             + Pago
                           </button>
@@ -1197,7 +1204,7 @@ export function ViajesTenantPage() {
                           <button
                             type="button"
                             onClick={() => void navigateToFacturacion(v)}
-                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
+                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
                           >
                             Facturar
                           </button>
@@ -1205,7 +1212,7 @@ export function ViajesTenantPage() {
                         <button
                           type="button"
                           onClick={() => startEdit(v)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                          className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
                         >
                           Editar
                         </button>
