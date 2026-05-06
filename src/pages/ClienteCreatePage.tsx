@@ -5,9 +5,12 @@ import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { idFiscalPorPais } from '@/lib/ciudades';
+import type { PaisCodigo } from '@/lib/ciudades';
 
 export function ClienteCreatePage() {
   const { getToken } = useAuth();
@@ -20,7 +23,7 @@ export function ClienteCreatePage() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
-  const [pais, setPais] = useState('');
+  const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +46,7 @@ export function ClienteCreatePage() {
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
-          pais: pais.trim() || undefined,
+          pais: pais || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -80,10 +83,30 @@ export function ClienteCreatePage() {
         </label>
         <label className="grid gap-1.5">
           <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            ID Fiscal
+            País
+          </span>
+          <PaisUbicacionSelect
+            value={pais}
+            onChange={setPais}
+            placeholder="Seleccioná un país"
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            Dirección
           </span>
           <CrudInput
-            placeholder="Ej: 30-71234567-8 / RUT / NIF"
+            placeholder="Ej: Av. Corrientes 1234"
+            value={direccion}
+            onChange={(e) => setDireccion(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+            {idFiscalPorPais(pais).label}
+          </span>
+          <CrudInput
+            placeholder={idFiscalPorPais(pais).placeholder}
             value={cuit}
             onChange={(e) => setCuit(e.target.value)}
           />
@@ -106,26 +129,6 @@ export function ClienteCreatePage() {
             placeholder="Ej: +54 9 11 1234-5678"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            Dirección
-          </span>
-          <CrudInput
-            placeholder="Ej: Av. Corrientes 1234"
-            value={direccion}
-            onChange={(e) => setDireccion(e.target.value)}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            País
-          </span>
-          <CrudInput
-            placeholder="Ej: Argentina"
-            value={pais}
-            onChange={(e) => setPais(e.target.value)}
           />
         </label>
         <CrudFormErrorAlert message={error} />

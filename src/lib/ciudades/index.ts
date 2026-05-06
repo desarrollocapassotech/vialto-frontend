@@ -3,6 +3,7 @@ export {
   PAISES_SOPORTADOS,
   esPaisSoportado,
   inferirPaisDesdeUbicacion,
+  idFiscalPorPais,
   type PaisOpcion,
 } from './paises';
 export { buscarCiudades } from './buscarCiudades';

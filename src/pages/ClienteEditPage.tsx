@@ -6,9 +6,12 @@ import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { esPaisSoportado, idFiscalPorPais } from '@/lib/ciudades';
+import type { PaisCodigo } from '@/lib/ciudades';
 import type { Cliente } from '@/types/api';
 
 export function ClienteEditPage() {
@@ -23,7 +26,7 @@ export function ClienteEditPage() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
-  const [pais, setPais] = useState('');
+  const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -48,7 +51,7 @@ export function ClienteEditPage() {
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
           setDireccion(row.direccion ?? '');
-          setPais(row.pais ?? '');
+          setPais(esPaisSoportado(row.pais ?? '') ? (row.pais as PaisCodigo) : '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'clientes'));
@@ -83,7 +86,7 @@ export function ClienteEditPage() {
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
-          pais: pais.trim() || undefined,
+          pais: pais || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -146,11 +149,31 @@ export function ClienteEditPage() {
             </label>
             <label className="grid gap-1.5">
               <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                ID Fiscal
+                País
+              </span>
+              <PaisUbicacionSelect
+                value={pais}
+                onChange={setPais}
+                placeholder="Seleccioná un país"
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Dirección
+              </span>
+              <CrudInput
+                value={direccion}
+                placeholder="Ej: Av. Corrientes 1234"
+                onChange={(e) => setDireccion(e.target.value)}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                {idFiscalPorPais(pais).label}
               </span>
               <CrudInput
                 value={cuit}
-                placeholder="Ej: 30-71234567-8 / RUT / NIF"
+                placeholder={idFiscalPorPais(pais).placeholder}
                 onChange={(e) => setCuit(e.target.value)}
               />
             </label>
@@ -172,26 +195,6 @@ export function ClienteEditPage() {
                 value={telefono}
                 placeholder="Ej: +54 9 11 1234-5678"
                 onChange={(e) => setTelefono(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Dirección
-              </span>
-              <CrudInput
-                value={direccion}
-                placeholder="Ej: Av. Corrientes 1234"
-                onChange={(e) => setDireccion(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                País
-              </span>
-              <CrudInput
-                value={pais}
-                placeholder="Ej: Argentina"
-                onChange={(e) => setPais(e.target.value)}
               />
             </label>
             <CrudFormErrorAlert message={error} />

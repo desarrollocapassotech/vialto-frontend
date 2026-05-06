@@ -60,7 +60,7 @@ export function TransportistasTenantPage() {
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
               <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">CUIT</th>
+              <th className="px-4 py-3">ID Fiscal</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Teléfono</th>
               <th className="px-4 py-3 text-right">Acciones</th>

@@ -82,7 +82,7 @@ export function TenantForm({
       <div>
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-wider text-vialto-steel">
-            CUIT
+            ID Fiscal
           </span>
           <input
             value={values.cuit}

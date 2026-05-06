@@ -23,6 +23,22 @@ export function esPaisSoportado(c: string): c is PaisCodigo {
   return c === 'AR' || c === 'UY' || c === 'PY' || c === 'CL' || c === 'BR';
 }
 
+type IdFiscalInfo = { label: string; placeholder: string };
+
+const ID_FISCAL_POR_PAIS: Record<PaisCodigo, IdFiscalInfo> = {
+  AR: { label: 'CUIT / CUIL', placeholder: '30-71234567-8' },
+  UY: { label: 'RUT',         placeholder: '21 234567 0001' },
+  PY: { label: 'RUC',         placeholder: '80001234-5' },
+  CL: { label: 'RUT',         placeholder: '12.345.678-9' },
+  BR: { label: 'CNPJ / CPF',  placeholder: '12.345.678/0001-90' },
+};
+
+const ID_FISCAL_DEFAULT: IdFiscalInfo = { label: 'ID Fiscal', placeholder: 'CUIT / RUT / RUC / NIF' };
+
+export function idFiscalPorPais(pais: PaisCodigo | ''): IdFiscalInfo {
+  return pais ? ID_FISCAL_POR_PAIS[pais] : ID_FISCAL_DEFAULT;
+}
+
 /** Heurística para edición de viajes ya guardados (solo texto, sin campo país en BD). */
 export function inferirPaisDesdeUbicacion(texto: string): PaisCodigo {
   const t = texto.trim().toLowerCase();

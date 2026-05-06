@@ -76,10 +76,10 @@ export function TransportistaCreatePage() {
         </label>
         <label className="grid gap-1.5">
           <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            CUIT
+            ID Fiscal
           </span>
           <CrudInput
-            placeholder="Ej: 30712345678"
+            placeholder="CUIT / RUT / RUC / NIF"
             value={cuit}
             onChange={(e) => setCuit(e.target.value)}
           />

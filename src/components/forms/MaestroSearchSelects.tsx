@@ -25,7 +25,7 @@ export function ClienteSearchSelect({
   className,
   inputClassName = INPUT,
   placeholderCerrado = 'Elegí un cliente…',
-  placeholderBuscar = 'Buscar por nombre o CUIT…',
+  placeholderBuscar = 'Buscar por nombre o ID Fiscal…',
   allowEmptyValue = false,
   emptyListChoiceLabel = 'Sin selección',
   id,
