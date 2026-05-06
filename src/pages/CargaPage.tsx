@@ -1,6 +1,6 @@
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
-import { TiposCargaTenantPage } from '@/pages/TiposCargaTenantPage';
+import { TiposCargaTenantPage } from '@/pages/CargaTenantPage';
 
 export function TiposCargaPage() {
   const { user, isLoaded } = useUser();

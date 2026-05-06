@@ -8,7 +8,7 @@ interface Props {
 }
 
 const labelClass =
-  'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 export function PagosTransportistaSummary({ viaje, onRegistrarPago }: Props) {
   const saldo = calcularSaldoTransportista(viaje);

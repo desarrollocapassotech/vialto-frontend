@@ -328,13 +328,13 @@ export function FacturacionTenantPage() {
           </h2>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Número *</label>
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">Número *</label>
             <input type="text" value={draft.numero} onChange={(e) => setD({ numero: e.target.value })}
               placeholder="0001-00000001" className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Tipo *</label>
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">Tipo *</label>
             <select value={draft.tipo} onChange={(e) => setD({ tipo: e.target.value as FacturaDraft['tipo'] })}
               className="h-9 border border-black/20 px-3 text-sm bg-white">
               <option value="cliente">Factura a cliente</option>
@@ -343,7 +343,7 @@ export function FacturacionTenantPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Cliente</label>
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">Cliente</label>
             <ClienteSearchSelect
               clientes={clientes}
               value={draft.clienteId}
@@ -357,19 +357,19 @@ export function FacturacionTenantPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de emisión *</label>
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">Fecha de emisión *</label>
             <input type="date" value={draft.fechaEmision} onChange={(e) => setD({ fechaEmision: e.target.value })}
               className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">Fecha de vencimiento</label>
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">Fecha de vencimiento</label>
             <input type="date" value={draft.fechaVencimiento} onChange={(e) => setD({ fechaVencimiento: e.target.value })}
               className="h-9 border border-black/20 px-3 text-sm bg-white" />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">
               Importe calculado
             </label>
             <p className="min-h-9 flex flex-wrap items-center text-sm font-medium tabular-nums px-1 gap-x-2">
@@ -381,7 +381,7 @@ export function FacturacionTenantPage() {
           </div>
 
           <div className="col-span-full flex flex-col gap-1">
-            <label className="text-xs uppercase tracking-wider text-vialto-steel">
+            <label className="text-sm uppercase tracking-[0.08em] text-vialto-steel">
               Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
             </label>
             {draft.tipo === 'cliente' && !draft.clienteId.trim() && (

@@ -222,7 +222,7 @@ export function FacturaEditModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Número *
               </label>
               <input
@@ -235,7 +235,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Tipo *
               </label>
               <select
@@ -251,7 +251,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Cliente
               </label>
               <ClienteSearchSelect
@@ -267,7 +267,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Fecha de emisión *
               </label>
               <input
@@ -279,7 +279,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Fecha de vencimiento
               </label>
               <input
@@ -291,7 +291,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Importe calculado
               </label>
               <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
@@ -303,7 +303,7 @@ export function FacturaEditModal({
             </div>
 
             <div className="col-span-full flex flex-col gap-1">
-              <label className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
               </label>
               {draft.tipo === 'cliente' && !draft.clienteId.trim() && (

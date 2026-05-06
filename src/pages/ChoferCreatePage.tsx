@@ -57,19 +57,19 @@ export function ChoferCreatePage() {
     >
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Nombre *
           </span>
           <CrudInput placeholder="Ej: Juan Perez" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             DNI
           </span>
           <CrudInput placeholder="Ej: 30123456" value={dni} onChange={(e) => setDni(e.target.value)} />
         </label>
 <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Teléfono
           </span>
           <CrudInput placeholder="Ej: +54 9 11 1234-5678" value={telefono} onChange={(e) => setTelefono(e.target.value)} />

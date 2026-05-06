@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { TipoCargaSearchableSelect } from '@/components/viajes/TipoCargaSearchableSelect';
-import { TipoCargaNuevoModal } from '@/components/viajes/TipoCargaNuevoModal';
+import { TipoCargaSearchableSelect } from '@/components/viajes/CargaSearchableSelect';
+import { TipoCargaNuevoModal } from '@/components/viajes/CargaNuevoModal';
 import type { OpcionCarga } from '@/lib/cargasOpciones';
 import type { Carga } from '@/types/api';
 

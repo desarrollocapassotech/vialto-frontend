@@ -11,7 +11,7 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
 
-const LABEL = 'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel';
+const LABEL = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
 
 export function VehiculoCreatePage() {
   const { getToken } = useAuth();
@@ -73,7 +73,13 @@ export function VehiculoCreatePage() {
       backTo="/vehiculos"
       backLabel="← Volver a vehículos"
     >
-      <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+      <form
+        className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
         <label className="grid gap-1.5">
           <span className={LABEL}>Patente *</span>
           <CrudInput placeholder="Ej: AA123BB" value={patente} onChange={(e) => setPatente(e.target.value)} />
@@ -116,8 +122,12 @@ export function VehiculoCreatePage() {
           <span className={LABEL}>Precinto</span>
           <CrudInput placeholder="Ej: 00123456" value={precinto} onChange={(e) => setPrecinto(e.target.value)} />
         </label>
-        <CrudFormErrorAlert message={error} />
-        <CrudSubmitButton loading={loading} label="Crear vehículo" />
+        <div className="md:col-span-2">
+          <CrudFormErrorAlert message={error} />
+        </div>
+        <div className="md:col-span-2">
+          <CrudSubmitButton loading={loading} label="Crear vehículo" />
+        </div>
       </form>
     </CrudPageLayout>
   );

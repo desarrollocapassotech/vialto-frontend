@@ -6,9 +6,12 @@ import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { esPaisSoportado, idFiscalPorPais } from '@/lib/ciudades';
+import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 
 export function TransportistaEditPage() {
@@ -20,6 +23,7 @@ export function TransportistaEditPage() {
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [idFiscal, setIdFiscal] = useState('');
+  const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
@@ -55,6 +59,7 @@ export function TransportistaEditPage() {
         if (!cancelled) {
           setNombre(row.nombre);
           setIdFiscal(row.idFiscal ?? '');
+          setPais(esPaisSoportado(row.pais ?? '') ? (row.pais as PaisCodigo) : '');
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
         }
@@ -88,6 +93,7 @@ export function TransportistaEditPage() {
         body: JSON.stringify({
           nombre: nombre.trim(),
           idFiscal: idFiscal.trim() || undefined,
+          pais: pais || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
@@ -141,7 +147,7 @@ export function TransportistaEditPage() {
             }}
           >
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Nombre
               </span>
               <CrudInput
@@ -151,17 +157,27 @@ export function TransportistaEditPage() {
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                ID Fiscal
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                País
+              </span>
+              <PaisUbicacionSelect
+                value={pais}
+                onChange={setPais}
+                placeholder="Seleccioná un país"
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                {idFiscalPorPais(pais).label}
               </span>
               <CrudInput
                 value={idFiscal}
-                placeholder="CUIT / RUT / RUC / NIF"
+                placeholder={idFiscalPorPais(pais).placeholder}
                 onChange={(e) => setIdFiscal(e.target.value)}
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Email
               </span>
               <CrudInput
@@ -171,7 +187,7 @@ export function TransportistaEditPage() {
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Teléfono
               </span>
               <CrudInput

@@ -72,7 +72,7 @@ export function ClienteCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Nombre *
           </span>
           <CrudInput
@@ -82,7 +82,7 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             País
           </span>
           <PaisUbicacionSelect
@@ -92,7 +92,7 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Dirección
           </span>
           <CrudInput
@@ -102,7 +102,7 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             {idFiscalPorPais(pais).label}
           </span>
           <CrudInput
@@ -112,7 +112,7 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Email
           </span>
           <CrudInput
@@ -122,7 +122,7 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Teléfono
           </span>
           <CrudInput

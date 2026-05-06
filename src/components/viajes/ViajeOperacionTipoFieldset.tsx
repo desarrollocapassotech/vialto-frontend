@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 export type ViajeOperacionModo = 'propio' | 'externo';
 
 const legendClass =
-  'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 type Props = {
   modo: ViajeOperacionModo;
@@ -31,7 +31,7 @@ export function ViajeOperacionTipoFieldset({
     >
       <legend className={`${legendClass} mb-2`}>¿Quién realiza el transporte?</legend>
       <div className="flex flex-wrap gap-4 sm:gap-6">
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
+        <label className="flex cursor-pointer items-center gap-2 text-base text-vialto-charcoal">
           <input
             type="radio"
             name={groupName}
@@ -39,9 +39,9 @@ export function ViajeOperacionTipoFieldset({
             checked={modo === 'externo'}
             onChange={() => onModoChange('externo')}
           />
-          <span>Transporte externo (tercerizado)</span>
+          <span>Transporte externo</span>
         </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
+        <label className="flex cursor-pointer items-center gap-2 text-base text-vialto-charcoal">
           <input
             type="radio"
             name={groupName}
@@ -49,7 +49,7 @@ export function ViajeOperacionTipoFieldset({
             checked={modo === 'propio'}
             onChange={() => onModoChange('propio')}
           />
-          <span>Flota propia (chofer y vehículo)</span>
+          <span>Flota propia</span>
         </label>
       </div>
       <div className="pt-1">{modo === 'externo' ? externoContent : propioContent}</div>

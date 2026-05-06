@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { TipoCargaNuevoModal } from '@/components/viajes/TipoCargaNuevoModal';
+import { TipoCargaNuevoModal } from '@/components/viajes/CargaNuevoModal';
 import type { Carga, PaginatedMeta } from '@/types/api';
 import {
   UNIDADES_MEDIDA_CARGA_OPCIONES,
@@ -190,7 +190,7 @@ export function TiposCargaTenantPage() {
 
       <div className="mt-6 flex flex-wrap items-end gap-3 justify-between">
         <div className="flex flex-wrap gap-3 items-end">
-          <label className="flex flex-col gap-1 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+          <label className="flex flex-col gap-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
             Buscar por nombre
             <input
               value={q}
@@ -199,7 +199,7 @@ export function TiposCargaTenantPage() {
               className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+          <label className="flex flex-col gap-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
             Estado
             <select
               value={filtroActivo}
@@ -375,7 +375,7 @@ export function TiposCargaTenantPage() {
               Editar carga
             </h2>
             <div className="mt-4 grid gap-3">
-              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Nombre
                 <input
                   value={nombre}
@@ -383,7 +383,7 @@ export function TiposCargaTenantPage() {
                   className="h-9 border border-black/15 px-2 text-sm"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Descripción (opcional)
                 <textarea
                   value={descripcion}
@@ -392,7 +392,7 @@ export function TiposCargaTenantPage() {
                   className="border border-black/15 px-2 py-2 text-sm"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+              <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Unidad de medida (opcional)
                 <select
                   value={unidadMedida}

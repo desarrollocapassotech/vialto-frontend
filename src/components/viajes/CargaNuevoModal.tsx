@@ -106,7 +106,7 @@ export function TipoCargaNuevoModal({
           Nueva carga
         </h2>
         <div className="mt-4 grid gap-3">
-          <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Nombre
             <input
               value={nombre}
@@ -114,7 +114,7 @@ export function TipoCargaNuevoModal({
               className="h-9 border border-black/15 px-2 text-sm"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Descripción (opcional)
             <textarea
               value={descripcion}
@@ -123,7 +123,7 @@ export function TipoCargaNuevoModal({
               className="border border-black/15 px-2 py-2 text-sm"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.15em] text-vialto-steel">
+          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Unidad de medida (opcional)
             <select
               value={unidadMedida}

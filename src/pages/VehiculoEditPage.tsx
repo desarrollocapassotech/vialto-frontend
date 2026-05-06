@@ -12,6 +12,7 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import type { Vehiculo } from '@/types/api';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
+const LABEL = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
 
 export function VehiculoEditPage() {
   const { getToken } = useAuth();
@@ -144,11 +145,15 @@ const [confirmDelete, setConfirmDelete] = useState('');
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
         <>
-          <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+          <form
+            className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSave();
+            }}
+          >
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Patente
-              </span>
+              <span className={LABEL}>Patente</span>
               <CrudInput
                 value={patente}
                 placeholder="Ej: AA123BB"
@@ -156,9 +161,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Tipo
-              </span>
+              <span className={LABEL}>Tipo</span>
               <CrudSelect
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}
@@ -171,9 +174,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               </CrudSelect>
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Marca
-              </span>
+              <span className={LABEL}>Marca</span>
               <CrudInput
                 value={marca}
                 placeholder="Ej: Scania"
@@ -181,9 +182,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Modelo
-              </span>
+              <span className={LABEL}>Modelo</span>
               <CrudInput
                 value={modelo}
                 placeholder="Ej: R450"
@@ -191,9 +190,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Año
-              </span>
+              <span className={LABEL}>Año</span>
               <CrudInput
                 type="number"
                 placeholder="Ej: 2020"
@@ -202,9 +199,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Nro. de chasis
-              </span>
+              <span className={LABEL}>Nro. de chasis</span>
               <CrudInput
                 value={nroChasis}
                 placeholder="Ej: 9BM379182LB123456"
@@ -212,9 +207,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Póliza
-              </span>
+              <span className={LABEL}>Póliza</span>
               <CrudInput
                 value={poliza}
                 placeholder="Ej: POL-2024-001234"
@@ -222,9 +215,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Vencimiento de póliza
-              </span>
+              <span className={LABEL}>Vencimiento de póliza</span>
               <CrudInput
                 type="date"
                 value={vencimientoPoliza}
@@ -232,9 +223,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Tara (kg)
-              </span>
+              <span className={LABEL}>Tara (kg)</span>
               <CrudInput
                 type="number"
                 placeholder="Ej: 8500"
@@ -243,17 +232,19 @@ const [confirmDelete, setConfirmDelete] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                Precinto
-              </span>
+              <span className={LABEL}>Precinto</span>
               <CrudInput
                 value={precinto}
                 placeholder="Ej: 00123456"
                 onChange={(e) => setPrecinto(e.target.value)}
               />
             </label>
-            <CrudFormErrorAlert message={error} />
-            <CrudSubmitButton loading={loading} label="Guardar cambios" />
+            <div className="md:col-span-2">
+              <CrudFormErrorAlert message={error} />
+            </div>
+            <div className="md:col-span-2">
+              <CrudSubmitButton loading={loading} label="Guardar cambios" />
+            </div>
           </form>
           <CrudDangerZone
             message="Escribí la patente para eliminar este vehículo."

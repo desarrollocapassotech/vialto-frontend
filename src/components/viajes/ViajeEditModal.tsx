@@ -106,7 +106,7 @@ export type ViajeEditModalProps = {
 };
 
 const labelClass =
-  'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const inputClass = 'h-9 border border-black/15 bg-white px-2 text-sm';
 
 export function ViajeEditModal({

@@ -5,9 +5,12 @@ import { CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
+import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { idFiscalPorPais } from '@/lib/ciudades';
+import type { PaisCodigo } from '@/lib/ciudades';
 
 export function TransportistaCreatePage() {
   const { getToken } = useAuth();
@@ -17,6 +20,7 @@ export function TransportistaCreatePage() {
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [idFiscal, setIdFiscal] = useState('');
+  const [pais, setPais] = useState<PaisCodigo | ''>('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +42,7 @@ export function TransportistaCreatePage() {
         body: JSON.stringify({
           nombre: nombre.trim(),
           idFiscal: idFiscal.trim() || undefined,
+          pais: pais || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
@@ -65,7 +70,7 @@ export function TransportistaCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Nombre *
           </span>
           <CrudInput
@@ -75,17 +80,27 @@ export function TransportistaCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-            ID Fiscal
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
+            País
+          </span>
+          <PaisUbicacionSelect
+            value={pais}
+            onChange={setPais}
+            placeholder="Seleccioná un país"
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
+            {idFiscalPorPais(pais).label}
           </span>
           <CrudInput
-            placeholder="CUIT / RUT / RUC / NIF"
+            placeholder={idFiscalPorPais(pais).placeholder}
             value={idFiscal}
             onChange={(e) => setIdFiscal(e.target.value)}
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Email
           </span>
           <CrudInput
@@ -95,7 +110,7 @@ export function TransportistaCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
             Teléfono
           </span>
           <CrudInput

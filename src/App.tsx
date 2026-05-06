@@ -18,7 +18,7 @@ import { ChoferEditPage } from '@/pages/ChoferEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
-import { TiposCargaPage } from '@/pages/TiposCargaPage';
+import { TiposCargaPage } from '@/pages/CargaPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
 import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';

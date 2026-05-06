@@ -56,7 +56,7 @@ import { isPlatformSuperadmin } from '@/lib/roleLabels';
 const ESTADOS = VIAJE_ESTADOS_ALTA;
 
 const fieldLabelClass =
-  'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
+  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm';

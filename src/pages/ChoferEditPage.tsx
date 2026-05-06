@@ -120,7 +120,7 @@ const [telefono, setTelefono] = useState('');
         <>
           <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Nombre
               </span>
               <CrudInput
@@ -130,7 +130,7 @@ const [telefono, setTelefono] = useState('');
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 DNI
               </span>
               <CrudInput
@@ -140,7 +140,7 @@ const [telefono, setTelefono] = useState('');
               />
             </label>
 <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Teléfono
               </span>
               <CrudInput
