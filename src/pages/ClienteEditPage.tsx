@@ -22,7 +22,7 @@ export function ClienteEditPage() {
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
-  const [cuit, setCuit] = useState('');
+  const [idFiscal, setIdFiscal] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
@@ -47,7 +47,7 @@ export function ClienteEditPage() {
         const row = await apiJson<Cliente>(path, () => getToken());
         if (!cancelled) {
           setNombre(row.nombre);
-          setCuit(row.cuit ?? '');
+          setIdFiscal(row.idFiscal ?? '');
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
           setDireccion(row.direccion ?? '');
@@ -82,7 +82,7 @@ export function ClienteEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          cuit: cuit.trim() || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
@@ -172,9 +172,9 @@ export function ClienteEditPage() {
                 {idFiscalPorPais(pais).label}
               </span>
               <CrudInput
-                value={cuit}
+                value={idFiscal}
                 placeholder={idFiscalPorPais(pais).placeholder}
-                onChange={(e) => setCuit(e.target.value)}
+                onChange={(e) => setIdFiscal(e.target.value)}
               />
             </label>
             <label className="grid gap-1.5">

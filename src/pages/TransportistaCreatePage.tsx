@@ -16,7 +16,7 @@ export function TransportistaCreatePage() {
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
-  const [cuit, setCuit] = useState('');
+  const [idFiscal, setIdFiscal] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,7 +37,7 @@ export function TransportistaCreatePage() {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          cuit: cuit.trim() || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
@@ -80,8 +80,8 @@ export function TransportistaCreatePage() {
           </span>
           <CrudInput
             placeholder="CUIT / RUT / RUC / NIF"
-            value={cuit}
-            onChange={(e) => setCuit(e.target.value)}
+            value={idFiscal}
+            onChange={(e) => setIdFiscal(e.target.value)}
           />
         </label>
         <label className="grid gap-1.5">

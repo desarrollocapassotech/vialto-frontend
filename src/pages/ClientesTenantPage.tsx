@@ -96,7 +96,7 @@ export function ClientesTenantPage() {
             {rows?.map((c) => (
               <tr key={c.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
                 <td className="px-4 py-3 font-medium">{c.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.cuit ?? '—'}</td>
+                <td className="px-4 py-3 text-vialto-steel">{c.idFiscal ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.pais ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.email ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>

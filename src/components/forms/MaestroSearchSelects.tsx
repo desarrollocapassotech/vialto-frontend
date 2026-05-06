@@ -50,7 +50,7 @@ export function ClienteSearchSelect({
       inputClassName={inputClassName}
       filterItems={filtrarClientesPorQuery}
       getPrimaryLabel={(c) => c.nombre}
-      getSecondaryLabel={(c) => c.cuit}
+      getSecondaryLabel={(c) => c.idFiscal}
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar={placeholderBuscar}
       allowEmptyValue={allowEmptyValue}

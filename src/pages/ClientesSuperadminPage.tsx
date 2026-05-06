@@ -122,7 +122,7 @@ export function ClientesSuperadminPage() {
                 >
                   <td className="px-4 py-3">{c.nombre}</td>
                   <td className="px-4 py-3 text-vialto-steel">
-                    {c.cuit ?? '—'}
+                    {c.idFiscal ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link

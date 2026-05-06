@@ -4,7 +4,7 @@ import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
 export interface TenantFormValues {
   name: string;
   clerkOrgId: string;
-  cuit: string;
+  idFiscal: string;
   modules: string[];
   billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
   maxUsers?: string;
@@ -85,8 +85,8 @@ export function TenantForm({
             ID Fiscal
           </span>
           <input
-            value={values.cuit}
-            onChange={(e) => onChange({ ...values, cuit: e.target.value })}
+            value={values.idFiscal}
+            onChange={(e) => onChange({ ...values, idFiscal: e.target.value })}
             placeholder="Solo números"
             className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
           />

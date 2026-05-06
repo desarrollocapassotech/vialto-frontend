@@ -113,7 +113,7 @@ export function TransportistasSuperadminPage() {
               rows?.map((t) => (
                 <tr key={t.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
                   <td className="px-4 py-3">{t.nombre}</td>
-                  <td className="px-4 py-3 text-vialto-steel">{t.cuit ?? '—'}</td>
+                  <td className="px-4 py-3 text-vialto-steel">{t.idFiscal ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={`/transportistas/${encodeURIComponent(t.id)}/editar?tenantId=${encodeURIComponent(

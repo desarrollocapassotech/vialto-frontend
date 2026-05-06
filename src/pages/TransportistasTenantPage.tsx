@@ -84,7 +84,7 @@ export function TransportistasTenantPage() {
             {rows?.map((t) => (
               <tr key={t.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
                 <td className="px-4 py-3 font-medium">{t.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{t.cuit ?? '—'}</td>
+                <td className="px-4 py-3 text-vialto-steel">{t.idFiscal ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{t.email ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{t.telefono ?? '—'}</td>
                 <td className="px-4 py-3 text-right">

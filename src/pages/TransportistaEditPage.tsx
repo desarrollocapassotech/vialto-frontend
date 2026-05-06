@@ -19,7 +19,7 @@ export function TransportistaEditPage() {
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
-  const [cuit, setCuit] = useState('');
+  const [idFiscal, setIdFiscal] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
@@ -54,7 +54,7 @@ export function TransportistaEditPage() {
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
           setNombre(row.nombre);
-          setCuit(row.cuit ?? '');
+          setIdFiscal(row.idFiscal ?? '');
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
         }
@@ -87,7 +87,7 @@ export function TransportistaEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          cuit: cuit.trim() || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
@@ -155,9 +155,9 @@ export function TransportistaEditPage() {
                 ID Fiscal
               </span>
               <CrudInput
-                value={cuit}
+                value={idFiscal}
                 placeholder="CUIT / RUT / RUC / NIF"
-                onChange={(e) => setCuit(e.target.value)}
+                onChange={(e) => setIdFiscal(e.target.value)}
               />
             </label>
             <label className="grid gap-1.5">

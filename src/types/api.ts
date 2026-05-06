@@ -92,7 +92,7 @@ export interface Cliente {
   id: string;
   tenantId: string;
   nombre: string;
-  cuit: string | null;
+  idFiscal: string | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -136,7 +136,7 @@ export interface Transportista {
   id: string;
   tenantId: string;
   nombre: string;
-  cuit: string | null;
+  idFiscal: string | null;
   email: string | null;
   telefono: string | null;
   /** En API siempre `externo` para subcontratistas; flota propia = sin vínculo en chofer/vehículo. */
