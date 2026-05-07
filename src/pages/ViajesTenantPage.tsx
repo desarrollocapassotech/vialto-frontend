@@ -36,6 +36,7 @@ import {
 } from '@/components/viajes/ViajeGananciaBruta';
 import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
 import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/ViajeEditModal';
+import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
 import {
   otroGastoDraftFromApi,
   otroGastoDraftToApi,
@@ -93,6 +94,8 @@ export function ViajesTenantPage() {
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
+  const [generandoMicCrtId, setGenerandoMicCrtId] = useState<string | null>(null);
+  const [micCrtError, setMicCrtError] = useState<string | null>(null);
   const { clientes, choferes, transportistas, vehiculos } = useMaestroData();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -596,6 +599,37 @@ export function ViajesTenantPage() {
     });
   }
 
+  async function generateMicCrt(viajeId: string, numero: string) {
+    setGenerandoMicCrtId(viajeId);
+    setMicCrtError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/viajes/${viajeId}/mic-crt`, {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { message?: string; missing?: string[] };
+        const missing = Array.isArray(data.missing) && data.missing.length > 0
+          ? `\nFaltan: ${data.missing.join(', ')}`
+          : '';
+        setMicCrtError((data.message ?? 'No se pudo generar el MIC/CRT') + missing);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MIC-CRT-${numero}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setMicCrtError('Error al generar el MIC/CRT. Revisá la conexión e intentá nuevamente.');
+    } finally {
+      setGenerandoMicCrtId(null);
+    }
+  }
+
   async function handleFacturarOpcionConfirm(opcion: 'nueva' | { facturaId: string }) {
     if (!facturarOpcionState) return;
     const { viaje, facturas } = facturarOpcionState;
@@ -787,6 +821,20 @@ export function ViajesTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Viajes
       </h1>
+      {micCrtError && (
+        <div className="mt-3 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span className="shrink-0 font-bold">MIC/CRT:</span>
+          <span className="flex-1 whitespace-pre-wrap">{micCrtError}</span>
+          <button
+            type="button"
+            onClick={() => setMicCrtError(null)}
+            className="shrink-0 text-red-600 hover:text-red-900 font-bold leading-none"
+            aria-label="Cerrar error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <p className="mt-2 text-vialto-steel">
         Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
       </p>
@@ -1180,45 +1228,16 @@ export function ViajesTenantPage() {
                   })()}
                 />
                 <td className="px-4 py-3 text-right">
-                    <div className="flex flex-col items-end gap-1.5">
-                      <div className="inline-flex flex-wrap justify-end gap-1.5">
-                        {viajePermiteAgregarGasto(v.estado) && (
-                          <button
-                            type="button"
-                            onClick={() => setAgregarGastoViaje(v)}
-                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                          >
-                            + Gasto
-                          </button>
-                        )}
-                        {viajeRequierePagosTransportista(v) && v.estado !== 'cancelado' && (
-                          <button
-                            type="button"
-                            onClick={() => setRegistrarPagoViaje(v)}
-                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                          >
-                            + Pago
-                          </button>
-                        )}
-                        {viajeEstadoPermiteBotonFacturar(v.estado) && (
-                          <button
-                            type="button"
-                            onClick={() => void navigateToFacturacion(v)}
-                            className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-                          >
-                            Facturar
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => startEdit(v)}
-                          className="inline-flex h-8 w-24 items-center justify-center text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                        >
-                          Editar
-                        </button>
-                      </div>
-                    </div>
-                  </td>
+                  <ViajeAccionesMenu
+                    viaje={v}
+                    generandoMicCrt={generandoMicCrtId === v.id}
+                    onEditar={() => startEdit(v)}
+                    onAgregarGasto={() => setAgregarGastoViaje(v)}
+                    onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                    onFacturar={() => void navigateToFacturacion(v)}
+                    onGenerarMicCrt={() => void generateMicCrt(v.id, v.numero)}
+                  />
+                </td>
               </tr>
               </Fragment>
             );})}

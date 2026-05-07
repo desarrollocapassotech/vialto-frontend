@@ -92,6 +92,16 @@ export const estadoViajeBadgeClass: Record<string, string> = {
 export const estadoViajeBadgeClassDefault = 'bg-vialto-mist text-vialto-steel border-black/15';
 
 /**
+ * Muestra el botón "Generar MIC/CRT" para viajes internacionales.
+ * Disponible a partir del estado finalizado (ya terminó operativamente).
+ */
+export function viajePermiteGenerarMicCrt(estado: string): boolean {
+  const e = String(estado).trim().toLowerCase();
+  if (e === 'pendiente' || e === 'en_curso' || e === 'cancelado') return false;
+  return true;
+}
+
+/**
  * Estados en los que la UI muestra km recorridos y litros consumidos (campos opcionales).
  */
 export function estadoMuestraKmLitros(estado: string): boolean {
