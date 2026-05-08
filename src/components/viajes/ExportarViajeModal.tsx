@@ -2,11 +2,47 @@ import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import type { Viaje } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiJson } from '@/lib/api';
 
 type Props = {
   viaje: Viaje;
   onClose: () => void;
+};
+
+type FieldDef = { key: string; type: 'text' | 'date' | 'number' };
+type MissingGroup = { fields: string[]; entityId?: string };
+type DescargaError = { message: string; groups?: Record<string, MissingGroup>; endpoint: string; filename: string };
+
+const TRANSPORTISTA_FIELDS: Record<string, FieldDef> = {
+  'CUIT':                                   { key: 'idFiscal',                type: 'text' },
+  'N° PAUT':                                { key: 'paut',                    type: 'text' },
+  'Permiso Internacional':                   { key: 'permisoInternacional',    type: 'text' },
+  'Vencimiento del Permiso Internacional':   { key: 'fechaVencimientoPermiso', type: 'date' },
+  'Domicilio':                               { key: 'domicilio',               type: 'text' },
+  'Bandera (país)':                          { key: 'bandera',                 type: 'text' },
+};
+
+const CHOFER_FIELDS: Record<string, FieldDef> = {
+  'DNI':  { key: 'dni',  type: 'text' },
+  'CUIT': { key: 'cuit', type: 'text' },
+};
+
+const VEHICULO_FIELDS: Record<string, FieldDef> = {
+  'Marca':                { key: 'marca',             type: 'text'   },
+  'Modelo':               { key: 'modelo',            type: 'text'   },
+  'Año':                  { key: 'anio',              type: 'number' },
+  'N° Chasis':            { key: 'nroChasis',         type: 'text'   },
+  'Póliza de seguro':     { key: 'poliza',            type: 'text'   },
+  'Vencimiento de póliza':{ key: 'vencimientoPoliza', type: 'date'   },
+  'Tara':                 { key: 'tara',              type: 'number' },
+  'Precinto':             { key: 'precinto',          type: 'text'   },
+};
+
+const EDITABLE_GROUPS: Record<string, { fields: Record<string, FieldDef>; apiModule: string }> = {
+  'Transportista': { fields: TRANSPORTISTA_FIELDS, apiModule: 'transportistas' },
+  'Chofer':        { fields: CHOFER_FIELDS,         apiModule: 'choferes'       },
+  'Camión':        { fields: VEHICULO_FIELDS,       apiModule: 'vehiculos'      },
+  'Semirremolque': { fields: VEHICULO_FIELDS,       apiModule: 'vehiculos'      },
 };
 
 function fmtFecha(iso: string | null | undefined): string {
@@ -20,19 +56,20 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
   const { getToken } = useAuth();
   const [generandoPaut, setGenerandoPaut] = useState(false);
   const [generandoMicCrt, setGenerandoMicCrt] = useState(false);
-  const [error, setError] = useState<{ message: string; groups?: Record<string, string[]> } | null>(null);
+  const [error, setError] = useState<DescargaError | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
-  const generando = generandoPaut || generandoMicCrt;
-
-  type DescargaError = { message: string; groups?: Record<string, string[]> };
+  const ocupado = generandoPaut || generandoMicCrt || guardando;
 
   async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
     try {
       const res = await apiFetch(endpoint, getToken, { cache: 'no-store' });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { message?: string; missingGroups?: Record<string, string[]> };
-        return { message: data.message ?? 'No se pudo generar el documento', groups: data.missingGroups };
+        const data = await res.json().catch(() => ({})) as { message?: string; missingGroups?: Record<string, MissingGroup> };
+        return { message: data.message ?? 'No se pudo generar el documento', groups: data.missingGroups, endpoint, filename };
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -43,25 +80,72 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
       URL.revokeObjectURL(url);
       return null;
     } catch (e) {
-      return { message: e instanceof Error ? e.message : 'Error de red al generar el documento.' };
+      return { message: e instanceof Error ? e.message : 'Error de red al generar el documento.', endpoint, filename };
     }
   }
 
-  async function handlePaut() {
+  async function ejecutarDescarga(endpoint: string, filename: string, setGenerando: (v: boolean) => void) {
     setError(null);
-    setGenerandoPaut(true);
-    const err = await descargarPdf(`/api/viajes/${viaje.id}/paut`, `PAUT-${viaje.numero}.pdf`);
-    setGenerandoPaut(false);
+    setFieldValues({});
+    setSaveError(null);
+    setGenerando(true);
+    const err = await descargarPdf(endpoint, filename);
+    setGenerando(false);
     if (err) setError(err);
   }
 
-  async function handleMicCrt() {
+  async function guardarYReintentar() {
+    if (!error?.groups) return;
+    const { endpoint, filename } = error;
+
+    setGuardando(true);
+    setSaveError(null);
+    let ok = false;
+
+    try {
+      for (const [group, config] of Object.entries(EDITABLE_GROUPS)) {
+        const entry = error.groups[group];
+        if (!entry?.fields.length || !entry.entityId) continue;
+        const body: Record<string, string | number> = {};
+        for (const label of entry.fields) {
+          const def = config.fields[label];
+          if (!def) continue;
+          const raw = fieldValues[`${group}/${label}`]?.trim();
+          if (!raw) continue;
+          if (def.type === 'number') {
+            const n = Number(raw);
+            if (!isNaN(n)) body[def.key] = n;
+          } else {
+            body[def.key] = raw;
+          }
+        }
+        if (Object.keys(body).length > 0) {
+          await apiJson(`/api/${config.apiModule}/${entry.entityId}`, getToken, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+          });
+        }
+      }
+      ok = true;
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Error al guardar los datos.');
+    } finally {
+      setGuardando(false);
+    }
+
+    if (!ok) return;
+
+    const setGenerando = endpoint.endsWith('/paut') ? setGenerandoPaut : setGenerandoMicCrt;
     setError(null);
-    setGenerandoMicCrt(true);
-    const err = await descargarPdf(`/api/viajes/${viaje.id}/mic-crt`, `MIC-CRT-${viaje.numero}.pdf`);
-    setGenerandoMicCrt(false);
-    if (err) setError(err);
+    setFieldValues({});
+    setGenerando(true);
+    const retryErr = await descargarPdf(endpoint, filename);
+    setGenerando(false);
+    if (retryErr) setError(retryErr);
   }
+
+  const hasEditableGroups = !!error?.groups &&
+    Object.entries(error.groups).some(([g, entry]) => g in EDITABLE_GROUPS && !!entry.entityId);
 
   return (
     <div
@@ -70,18 +154,13 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
       aria-modal="true"
       aria-labelledby="exportar-title"
     >
-      <div className="w-full max-w-sm border border-black/15 bg-white p-5 shadow-lg">
+      <div className="w-full max-w-sm border border-black/15 bg-white p-5 shadow-lg overflow-y-auto max-h-[90vh]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2
-              id="exportar-title"
-              className="text-sm font-semibold text-vialto-charcoal"
-            >
+            <h2 id="exportar-title" className="text-sm font-semibold text-vialto-charcoal">
               Exportar
             </h2>
-            <p className="mt-0.5 text-xs text-vialto-steel">
-              Viaje #{viaje.numero}
-            </p>
+            <p className="mt-0.5 text-xs text-vialto-steel">Viaje #{viaje.numero}</p>
             {(viaje.origen || viaje.destino) && (
               <p className="mt-1 text-xs text-vialto-steel">
                 {[viaje.origen, viaje.destino].filter(Boolean).join(' → ')}
@@ -98,7 +177,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            disabled={generando}
+            disabled={ocupado}
             className="shrink-0 text-vialto-steel hover:text-vialto-charcoal disabled:opacity-40"
             aria-label="Cerrar"
           >
@@ -109,22 +188,20 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
         <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
-            disabled={generando}
-            onClick={() => void handlePaut()}
+            disabled={ocupado}
+            onClick={() => void ejecutarDescarga(`/api/viajes/${viaje.id}/paut`, `PAUT-${viaje.numero}.pdf`, setGenerandoPaut)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-sm font-medium text-vialto-charcoal">
               {generandoPaut ? 'Generando…' : 'PAUT'}
             </span>
-            {!generandoPaut && (
-              <span className="text-xs text-vialto-steel">↓ PDF</span>
-            )}
+            {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
           </button>
 
           <button
             type="button"
-            disabled={generando || !permiteMicCrt}
-            onClick={() => void handleMicCrt()}
+            disabled={ocupado || !permiteMicCrt}
+            onClick={() => void ejecutarDescarga(`/api/viajes/${viaje.id}/mic-crt`, `MIC-CRT-${viaje.numero}.pdf`, setGenerandoMicCrt)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             title={!permiteMicCrt ? 'Disponible una vez que el viaje esté finalizado' : undefined}
           >
@@ -142,21 +219,69 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
         {error && (
           <div className="mt-4 border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
             <p className="font-semibold">{error.message}</p>
+
             {error.groups && Object.keys(error.groups).length > 0 && (
-              <div className="mt-2 space-y-2">
-                {Object.entries(error.groups).map(([group, fields]) => (
-                  <div key={group}>
-                    <p className="font-semibold uppercase tracking-wide text-[10px] text-red-600">{group}</p>
-                    <ul className="mt-0.5 space-y-0.5">
-                      {fields.map((f) => (
-                        <li key={f} className="flex items-start gap-1.5">
-                          <span className="mt-px shrink-0 text-red-400">·</span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
+              <div className="mt-3 space-y-3">
+                {Object.entries(error.groups).map(([group, entry]) => {
+                  const config = EDITABLE_GROUPS[group];
+                  return (
+                    <div key={group}>
+                      <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-red-600">
+                        {group}
+                      </p>
+                      {config && entry.entityId ? (
+                        <div className="space-y-1.5">
+                          {entry.fields.map((label) => {
+                            const def = config.fields[label];
+                            if (!def) return (
+                              <p key={label} className="flex items-start gap-1.5">
+                                <span className="mt-px text-red-400">·</span><span>{label}</span>
+                              </p>
+                            );
+                            return (
+                              <label key={label} className="grid gap-0.5">
+                                <span className="text-[10px] text-red-700">{label}</span>
+                                <input
+                                  type={def.type === 'number' ? 'text' : def.type}
+                                  inputMode={def.type === 'number' ? 'decimal' : undefined}
+                                  value={fieldValues[`${group}/${label}`] ?? ''}
+                                  onChange={(e) =>
+                                    setFieldValues((prev) => ({ ...prev, [`${group}/${label}`]: e.target.value }))
+                                  }
+                                  disabled={ocupado}
+                                  className="border border-red-300 bg-white px-2 py-1 text-xs text-vialto-charcoal focus:outline-none focus:border-red-500 disabled:opacity-50"
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <ul className="space-y-0.5">
+                          {entry.fields.map((f) => (
+                            <li key={f} className="flex items-start gap-1.5">
+                              <span className="mt-px text-red-400">·</span>
+                              <span>{f} — editá el viaje para asignar</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {hasEditableGroups && (
+                  <div className="pt-1">
+                    {saveError && <p className="mb-1.5 text-red-700">{saveError}</p>}
+                    <button
+                      type="button"
+                      onClick={() => void guardarYReintentar()}
+                      disabled={ocupado}
+                      className="border border-red-400 bg-red-100 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {guardando ? 'Guardando…' : 'Guardar y reintentar'}
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -165,7 +290,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
         <div className="mt-5 flex justify-end">
           <button
             type="button"
-            disabled={generando}
+            disabled={ocupado}
             onClick={onClose}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
           >
