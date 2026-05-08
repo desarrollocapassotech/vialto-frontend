@@ -3,28 +3,25 @@ import type { Viaje } from '@/types/api';
 import {
   viajePermiteAgregarGasto,
   viajeEstadoPermiteBotonFacturar,
-  viajePermiteGenerarMicCrt,
 } from '@/lib/viajesEstados';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 
 interface Props {
   viaje: Viaje;
-  generandoMicCrt: boolean;
   onEditar: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
   onFacturar: () => void;
-  onGenerarMicCrt: () => void;
+  onExportar: () => void;
 }
 
 export function ViajeAccionesMenu({
   viaje,
-  generandoMicCrt,
   onEditar,
   onAgregarGasto,
   onRegistrarPago,
   onFacturar,
-  onGenerarMicCrt,
+  onExportar,
 }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +47,7 @@ export function ViajeAccionesMenu({
   const permitePago = viajeRequierePagosTransportista(viaje) && viaje.estado !== 'cancelado';
   const permiteGasto = viajePermiteAgregarGasto(viaje.estado);
   const permiteFacturar = viajeEstadoPermiteBotonFacturar(viaje.estado);
-  const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
+  const permiteExportar = viaje.estado !== 'cancelado';
 
   function item(label: string, onClick: () => void, opts: { danger?: boolean; disabled?: boolean } = {}) {
     return (
@@ -93,11 +90,7 @@ export function ViajeAccionesMenu({
           {permiteFacturar && item('Facturar', onFacturar)}
           {permiteGasto && item('+ Gasto', onAgregarGasto)}
           {permitePago && item('+ Pago transportista', onRegistrarPago)}
-          {permiteMicCrt && item(
-            generandoMicCrt ? 'Generando…' : 'Generar MIC/CRT',
-            onGenerarMicCrt,
-            { disabled: generandoMicCrt },
-          )}
+          {permiteExportar && item('Exportar', onExportar)}
         </div>
       )}
     </div>

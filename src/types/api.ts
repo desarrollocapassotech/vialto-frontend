@@ -105,6 +105,7 @@ export interface Chofer {
   tenantId: string;
   nombre: string;
   dni: string | null;
+  cuit: string | null;
   licencia: string | null;
   licenciaVence: string | null;
   telefono: string | null;
@@ -142,6 +143,11 @@ export interface Transportista {
   telefono: string | null;
   /** En API siempre `externo` para subcontratistas; flota propia = sin vínculo en chofer/vehículo. */
   tipo?: string;
+  paut: string | null;
+  permisoInternacional: string | null;
+  fechaVencimientoPermiso: string | null;
+  domicilio: string | null;
+  bandera: string | null;
   createdAt: string;
 }
 

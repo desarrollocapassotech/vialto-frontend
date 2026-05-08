@@ -20,7 +20,8 @@ export function ChoferEditPage() {
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
-const [telefono, setTelefono] = useState('');
+  const [cuit, setCuit] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -34,14 +35,13 @@ const [telefono, setTelefono] = useState('');
     (async () => {
       try {
         const path = tenantId
-          ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-              tenantId,
-            )}`
+          ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
           : `/api/choferes/${encodeURIComponent(id)}`;
         const row = await apiJson<Chofer>(path, () => getToken());
         if (!cancelled) {
           setNombre(row.nombre);
           setDni(row.dni ?? '');
+          setCuit(row.cuit ?? '');
           setTelefono(row.telefono ?? '');
         }
       } catch (e) {
@@ -50,9 +50,7 @@ const [telefono, setTelefono] = useState('');
         if (!cancelled) setInitialLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [getToken, id, tenantId]);
 
   async function onSave() {
@@ -65,15 +63,14 @@ const [telefono, setTelefono] = useState('');
     setError(null);
     try {
       const path = tenantId
-        ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
+        ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
         : `/api/choferes/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
           dni: dni.trim() || undefined,
+          cuit: cuit.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
       });
@@ -92,13 +89,9 @@ const [telefono, setTelefono] = useState('');
     setError(null);
     try {
       const path = tenantId
-        ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
+        ? `/api/platform/choferes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
         : `/api/choferes/${encodeURIComponent(id)}`;
-      await apiJson(path, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(path, () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshChoferes();
       navigate('/choferes', { replace: true });
     } catch (e) {
@@ -108,46 +101,30 @@ const [telefono, setTelefono] = useState('');
     }
   }
 
+  const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+
   return (
-    <CrudPageLayout
-      title="Editar chofer"
-      backTo="/choferes"
-      backLabel="← Volver a choferes"
-    >
+    <CrudPageLayout title="Editar chofer" backTo="/choferes" backLabel="← Volver a choferes">
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
         <>
           <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                Nombre
-              </span>
-              <CrudInput
-                value={nombre}
-                placeholder="Ej: Juan Perez"
-                onChange={(e) => setNombre(e.target.value)}
-              />
+              <span className={labelClass}>Nombre</span>
+              <CrudInput value={nombre} placeholder="Ej: Juan Perez" onChange={(e) => setNombre(e.target.value)} />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                DNI
-              </span>
-              <CrudInput
-                value={dni}
-                placeholder="Ej: 30123456"
-                onChange={(e) => setDni(e.target.value)}
-              />
+              <span className={labelClass}>DNI</span>
+              <CrudInput value={dni} placeholder="Ej: 30123456" onChange={(e) => setDni(e.target.value)} />
             </label>
-<label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                Teléfono
-              </span>
-              <CrudInput
-                value={telefono}
-                placeholder="Ej: +54 9 11 1234-5678"
-                onChange={(e) => setTelefono(e.target.value)}
-              />
+            <label className="grid gap-1.5">
+              <span className={labelClass}>CUIT</span>
+              <CrudInput value={cuit} placeholder="Ej: 20-30123456-7" onChange={(e) => setCuit(e.target.value)} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className={labelClass}>Teléfono</span>
+              <CrudInput value={telefono} placeholder="Ej: +54 9 11 1234-5678" onChange={(e) => setTelefono(e.target.value)} />
             </label>
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />

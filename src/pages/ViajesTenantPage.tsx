@@ -9,6 +9,7 @@ import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoF
 import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
 import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
+import { ExportarViajeModal } from '@/components/viajes/ExportarViajeModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import {
@@ -58,14 +59,10 @@ import {
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
-  viajePermiteAgregarGasto,
   estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
-import {
-  calcularSaldoTransportista,
-  viajeRequierePagosTransportista,
-} from '@/lib/viajesTransportistaPagos';
+import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type {
   Factura,
   PaginatedMeta,
@@ -94,8 +91,7 @@ export function ViajesTenantPage() {
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
-  const [generandoMicCrtId, setGenerandoMicCrtId] = useState<string | null>(null);
-  const [micCrtError, setMicCrtError] = useState<string | null>(null);
+  const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const { clientes, choferes, transportistas, vehiculos } = useMaestroData();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -599,37 +595,6 @@ export function ViajesTenantPage() {
     });
   }
 
-  async function generateMicCrt(viajeId: string, numero: string) {
-    setGenerandoMicCrtId(viajeId);
-    setMicCrtError(null);
-    try {
-      const token = await getToken();
-      const res = await fetch(`/api/viajes/${viajeId}/mic-crt`, {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { message?: string; missing?: string[] };
-        const missing = Array.isArray(data.missing) && data.missing.length > 0
-          ? `\nFaltan: ${data.missing.join(', ')}`
-          : '';
-        setMicCrtError((data.message ?? 'No se pudo generar el MIC/CRT') + missing);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `MIC-CRT-${numero}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setMicCrtError('Error al generar el MIC/CRT. Revisá la conexión e intentá nuevamente.');
-    } finally {
-      setGenerandoMicCrtId(null);
-    }
-  }
-
   async function handleFacturarOpcionConfirm(opcion: 'nueva' | { facturaId: string }) {
     if (!facturarOpcionState) return;
     const { viaje, facturas } = facturarOpcionState;
@@ -821,20 +786,6 @@ export function ViajesTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Viajes
       </h1>
-      {micCrtError && (
-        <div className="mt-3 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <span className="shrink-0 font-bold">MIC/CRT:</span>
-          <span className="flex-1 whitespace-pre-wrap">{micCrtError}</span>
-          <button
-            type="button"
-            onClick={() => setMicCrtError(null)}
-            className="shrink-0 text-red-600 hover:text-red-900 font-bold leading-none"
-            aria-label="Cerrar error"
-          >
-            ✕
-          </button>
-        </div>
-      )}
       <p className="mt-2 text-vialto-steel">
         Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
       </p>
@@ -1230,12 +1181,11 @@ export function ViajesTenantPage() {
                 <td className="px-4 py-3 text-right">
                   <ViajeAccionesMenu
                     viaje={v}
-                    generandoMicCrt={generandoMicCrtId === v.id}
                     onEditar={() => startEdit(v)}
                     onAgregarGasto={() => setAgregarGastoViaje(v)}
                     onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     onFacturar={() => void navigateToFacturacion(v)}
-                    onGenerarMicCrt={() => void generateMicCrt(v.id, v.numero)}
+                    onExportar={() => setExportarViaje(v)}
                   />
                 </td>
               </tr>
@@ -1382,6 +1332,13 @@ export function ViajesTenantPage() {
         }}
         onClose={() => setRegistrarPagoViaje(null)}
       />
+
+      {exportarViaje && (
+        <ExportarViajeModal
+          viaje={exportarViaje}
+          onClose={() => setExportarViaje(null)}
+        />
+      )}
 
     </div>
   );

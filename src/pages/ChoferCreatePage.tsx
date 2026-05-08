@@ -17,6 +17,7 @@ export function ChoferCreatePage() {
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [dni, setDni] = useState('');
+  const [cuit, setCuit] = useState('');
   const [telefono, setTelefono] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function ChoferCreatePage() {
         body: JSON.stringify({
           nombre: nombre.trim(),
           dni: dni.trim() || undefined,
+          cuit: cuit.trim() || undefined,
           telefono: telefono.trim() || undefined,
         }),
       });
@@ -49,29 +51,25 @@ export function ChoferCreatePage() {
     }
   }
 
+  const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+
   return (
-    <CrudPageLayout
-      title="Crear chofer"
-      backTo="/choferes"
-      backLabel="← Volver a choferes"
-    >
+    <CrudPageLayout title="Crear chofer" backTo="/choferes" backLabel="← Volver a choferes">
       <form className="mt-6 grid gap-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Nombre *
-          </span>
+          <span className={labelClass}>Nombre *</span>
           <CrudInput placeholder="Ej: Juan Perez" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            DNI
-          </span>
+          <span className={labelClass}>DNI</span>
           <CrudInput placeholder="Ej: 30123456" value={dni} onChange={(e) => setDni(e.target.value)} />
         </label>
-<label className="grid gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Teléfono
-          </span>
+        <label className="grid gap-1.5">
+          <span className={labelClass}>CUIT</span>
+          <CrudInput placeholder="Ej: 20-30123456-7" value={cuit} onChange={(e) => setCuit(e.target.value)} />
+        </label>
+        <label className="grid gap-1.5">
+          <span className={labelClass}>Teléfono</span>
           <CrudInput placeholder="Ej: +54 9 11 1234-5678" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         </label>
         <CrudFormErrorAlert message={error} />
