@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import type { Viaje } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
+import { apiFetch } from '@/lib/api';
 
 type Props = {
   viaje: Viaje;
@@ -28,11 +29,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
 
   async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
     try {
-      const token = await getToken();
-      const res = await fetch(endpoint, {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-        cache: 'no-store',
-      });
+      const res = await apiFetch(endpoint, getToken, { cache: 'no-store' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { message?: string; missingGroups?: Record<string, string[]> };
         return { message: data.message ?? 'No se pudo generar el documento', groups: data.missingGroups };
