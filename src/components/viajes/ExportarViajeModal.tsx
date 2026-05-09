@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import type { Viaje } from '@/types/api';
+import { useState, useEffect } from 'react';
+import type { Viaje, Chofer, Vehiculo } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
 import { apiFetch, apiJson } from '@/lib/api';
 
@@ -9,7 +9,7 @@ type Props = {
   onClose: () => void;
 };
 
-type FieldDef = { key: string; type: 'text' | 'date' | 'number' };
+type FieldDef = { key: string; type: 'text' | 'date' | 'number' | 'chofer-select' | 'vehiculo-select' };
 type MissingGroup = { fields: string[]; entityId?: string };
 type DescargaError = { message: string; groups?: Record<string, MissingGroup>; endpoint: string; filename: string };
 
@@ -23,8 +23,17 @@ const TRANSPORTISTA_FIELDS: Record<string, FieldDef> = {
 };
 
 const CHOFER_FIELDS: Record<string, FieldDef> = {
-  'DNI':  { key: 'dni',  type: 'text' },
-  'CUIT': { key: 'cuit', type: 'text' },
+  'Nombre': { key: 'nombre', type: 'text' },
+  'DNI':    { key: 'dni',    type: 'text' },
+  'CUIT':   { key: 'cuit',   type: 'text' },
+};
+
+const VIAJE_FIELDS: Record<string, FieldDef> = {
+  'Origen':            { key: 'origen',       type: 'text'            },
+  'Destino':           { key: 'destino',      type: 'text'            },
+  'Detalle de carga':  { key: 'detalleCarga', type: 'text'            },
+  'Chofer asignado':   { key: 'choferId',     type: 'chofer-select'   },
+  'Vehículo asignado': { key: 'vehiculoIds',  type: 'vehiculo-select' },
 };
 
 const VEHICULO_FIELDS: Record<string, FieldDef> = {
@@ -39,7 +48,8 @@ const VEHICULO_FIELDS: Record<string, FieldDef> = {
 };
 
 const EDITABLE_GROUPS: Record<string, { fields: Record<string, FieldDef>; apiModule: string }> = {
-  'Transportista': { fields: TRANSPORTISTA_FIELDS, apiModule: 'transportistas' },
+  'Viaje':         { fields: VIAJE_FIELDS,          apiModule: 'viajes'         },
+  'Transportista': { fields: TRANSPORTISTA_FIELDS,  apiModule: 'transportistas' },
   'Chofer':        { fields: CHOFER_FIELDS,         apiModule: 'choferes'       },
   'Camión':        { fields: VEHICULO_FIELDS,       apiModule: 'vehiculos'      },
   'Semirremolque': { fields: VEHICULO_FIELDS,       apiModule: 'vehiculos'      },
@@ -60,9 +70,22 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [choferesList, setChoferesList] = useState<Chofer[]>([]);
+  const [vehiculosList, setVehiculosList] = useState<Vehiculo[]>([]);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
   const ocupado = generandoPaut || generandoMicCrt || guardando;
+
+  useEffect(() => {
+    if (!error?.groups) return;
+    const allFields = Object.values(error.groups).flatMap((g) => g.fields);
+    if (allFields.includes('Chofer asignado') && choferesList.length === 0) {
+      void apiJson<Chofer[]>('/api/choferes', getToken).then(setChoferesList).catch(() => {});
+    }
+    if (allFields.includes('Vehículo asignado') && vehiculosList.length === 0) {
+      void apiJson<Vehiculo[]>('/api/vehiculos', getToken).then(setVehiculosList).catch(() => {});
+    }
+  }, [error]);
 
   async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
     try {
@@ -106,13 +129,15 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
       for (const [group, config] of Object.entries(EDITABLE_GROUPS)) {
         const entry = error.groups[group];
         if (!entry?.fields.length || !entry.entityId) continue;
-        const body: Record<string, string | number> = {};
+        const body: Record<string, string | number | string[]> = {};
         for (const label of entry.fields) {
           const def = config.fields[label];
           if (!def) continue;
           const raw = fieldValues[`${group}/${label}`]?.trim();
           if (!raw) continue;
-          if (def.type === 'number') {
+          if (def.type === 'vehiculo-select') {
+            body[def.key] = [raw];
+          } else if (def.type === 'number') {
             const n = Number(raw);
             if (!isNaN(n)) body[def.key] = n;
           } else {
@@ -145,7 +170,74 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
   }
 
   const hasEditableGroups = !!error?.groups &&
-    Object.entries(error.groups).some(([g, entry]) => g in EDITABLE_GROUPS && !!entry.entityId);
+    Object.entries(error.groups).some(([g, entry]) => {
+      const config = EDITABLE_GROUPS[g];
+      if (!config || !entry.entityId) return false;
+      return entry.fields.some((label) => label in config.fields);
+    });
+
+  function renderField(group: string, label: string, def: FieldDef) {
+    const key = `${group}/${label}`;
+    const value = fieldValues[key] ?? '';
+    const onChange = (val: string) => setFieldValues((prev) => ({ ...prev, [key]: val }));
+    const inputClass = 'border border-red-300 bg-white px-2 py-1 text-xs text-vialto-charcoal focus:outline-none focus:border-red-500 disabled:opacity-50';
+
+    if (def.type === 'chofer-select') {
+      return (
+        <label key={label} className="grid gap-0.5">
+          <span className="text-[10px] text-red-700">{label}</span>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={ocupado}
+            className={inputClass}
+          >
+            <option value="">— Seleccionar chofer —</option>
+            {choferesList.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}{c.dni ? ` · ${c.dni}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    if (def.type === 'vehiculo-select') {
+      return (
+        <label key={label} className="grid gap-0.5">
+          <span className="text-[10px] text-red-700">{label}</span>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={ocupado}
+            className={inputClass}
+          >
+            <option value="">— Seleccionar vehículo —</option>
+            {vehiculosList.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.patente}{v.tipo ? ` (${v.tipo})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    return (
+      <label key={label} className="grid gap-0.5">
+        <span className="text-[10px] text-red-700">{label}</span>
+        <input
+          type={def.type === 'number' ? 'text' : def.type}
+          inputMode={def.type === 'number' ? 'decimal' : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={ocupado}
+          className={inputClass}
+        />
+      </label>
+    );
+  }
 
   return (
     <div
@@ -238,21 +330,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
                                 <span className="mt-px text-red-400">·</span><span>{label}</span>
                               </p>
                             );
-                            return (
-                              <label key={label} className="grid gap-0.5">
-                                <span className="text-[10px] text-red-700">{label}</span>
-                                <input
-                                  type={def.type === 'number' ? 'text' : def.type}
-                                  inputMode={def.type === 'number' ? 'decimal' : undefined}
-                                  value={fieldValues[`${group}/${label}`] ?? ''}
-                                  onChange={(e) =>
-                                    setFieldValues((prev) => ({ ...prev, [`${group}/${label}`]: e.target.value }))
-                                  }
-                                  disabled={ocupado}
-                                  className="border border-red-300 bg-white px-2 py-1 text-xs text-vialto-charcoal focus:outline-none focus:border-red-500 disabled:opacity-50"
-                                />
-                              </label>
-                            );
+                            return renderField(group, label, def);
                           })}
                         </div>
                       ) : (
