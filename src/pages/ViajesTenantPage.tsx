@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -80,6 +80,7 @@ type ViajesPaginatedResponse = {
 export function ViajesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<Viaje[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +140,14 @@ export function ViajesTenantPage() {
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
     [rows],
   );
+  /** Viaje abierto desde URL u otra pantalla: no tiene por qué estar en la página actual del listado. */
+  const [viajeSnapshotRemoto, setViajeSnapshotRemoto] = useState<Viaje | null>(null);
   const viajeEdicionSnapshot = useMemo(
-    () => (editingId && rows ? rows.find((r) => r.id === editingId) ?? null : null),
-    [editingId, rows],
+    () =>
+      editingId
+        ? (rows?.find((r) => r.id === editingId) ?? (viajeSnapshotRemoto?.id === editingId ? viajeSnapshotRemoto : null))
+        : null,
+    [editingId, rows, viajeSnapshotRemoto],
   );
   const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
   const opcionesCargaModal = useMemo(
@@ -464,7 +470,9 @@ export function ViajesTenantPage() {
     if (draft?.operacionModo === 'externo') setViajeEditHint(null);
   }, [draft?.operacionModo]);
 
-  function startEdit(v: Viaje) {
+  function startEdit(v: Viaje, origen: 'listado' | 'remoto' = 'listado') {
+    if (origen === 'listado') setViajeSnapshotRemoto(null);
+    else setViajeSnapshotRemoto(v);
     setEstadoQuickId(null);
     setError(null);
     setEditingId(v.id);
@@ -538,11 +546,46 @@ export function ViajesTenantPage() {
   function cancelEdit() {
     setEditingId(null);
     setDraft(null);
+    setViajeSnapshotRemoto(null);
     setEstadoQuickId(null);
     setViajeEditHint(null);
     setFechaCargaError(null);
     setFechaDescargaError(null);
   }
+
+  /** Abrir editor desde enlace (p. ej. panel de alertas): `?viaje=id` */
+  useEffect(() => {
+    const id = searchParams.get('viaje')?.trim();
+    if (!id || !isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        let v: Viaje | null = rows?.find((r) => r.id === id) ?? null;
+        if (!v) {
+          v = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(id)}`, () => getToken());
+        }
+        if (cancelled || !v) return;
+        startEdit(v, 'remoto');
+      } catch {
+        /* viaje inexistente o sin permiso */
+      } finally {
+        if (!cancelled) {
+          setSearchParams(
+            (p) => {
+              const next = new URLSearchParams(p);
+              next.delete('viaje');
+              return next;
+            },
+            { replace: true },
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- abrir una vez por valor de `viaje` en URL
+  }, [searchParams, isLoaded, isSignedIn, rows, getToken, setSearchParams]);
 
   async function patchEstadoDesdeListado(v: Viaje, nuevoEstado: string) {
     if (nuevoEstado === v.estado) {
@@ -1272,6 +1315,13 @@ export function ViajesTenantPage() {
           }}
           onClose={cancelEdit}
           onSave={() => void saveInline(editingId)}
+          onFacturar={() => {
+            const v = {
+              ...viajeEdicionSnapshot,
+              clienteId: draft.clienteId.trim() || viajeEdicionSnapshot.clienteId,
+            };
+            void navigateToFacturacion(v);
+          }}
           saving={savingId === editingId}
           error={error}
           onCargaCreada={(carga) => {

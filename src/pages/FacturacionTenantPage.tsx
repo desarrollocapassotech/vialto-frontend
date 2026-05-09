@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
@@ -58,6 +58,7 @@ const clienteInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-
 export function FacturacionTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { clientes } = useMaestroData();
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
@@ -141,6 +142,34 @@ export function FacturacionTenantPage() {
     })();
     return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn]);
+
+  /** Abrir factura desde enlace (p. ej. alertas): `?factura=id` */
+  useEffect(() => {
+    const id = searchParams.get('factura')?.trim();
+    if (!id || facturas === null) return;
+    const f = facturas.find((x) => x.id === id);
+    if (!f) {
+      setSearchParams(
+        (p) => {
+          const next = new URLSearchParams(p);
+          next.delete('factura');
+          return next;
+        },
+        { replace: true },
+      );
+      return;
+    }
+    startEdit(f);
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete('factura');
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, facturas, setSearchParams]);
 
   async function ensureViajesLoaded() {
     if (viajes.length > 0 || viajesLoading) return;

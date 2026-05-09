@@ -7,9 +7,20 @@ export type DashboardMetricCard = {
   title: string;
   value: string;
   hint?: string;
+  montos?: { ARS: string | null; USD: string | null };
 };
 
-type ViajeStats = Record<string, number>;
+type ViajeMontos = {
+  ingresos: { ARS: number; USD: number };
+  gastos: { ARS: number; USD: number };
+  pendiente: { ARS: number; USD: number };
+};
+
+type ViajeStats = {
+  en_curso?: number;
+  finalizado_sin_facturar?: number;
+  montos?: ViajeMontos;
+};
 
 type FacturaLike = {
   id: string;
@@ -69,6 +80,14 @@ function isOnOrAfter(value: string, threshold: Date) {
 
 function formatMoney(value: number) {
   return `$ ${value.toLocaleString('es-AR')}`;
+}
+
+function fmtARS(v: number): string | null {
+  return v > 0 ? `$ ${Math.round(v).toLocaleString('es-AR')}` : null;
+}
+
+function fmtUSD(v: number): string | null {
+  return v > 0 ? `USD ${Math.round(v).toLocaleString('es-AR')}` : null;
 }
 
 export function useTenantDashboardMetrics(modules: string[]) {
@@ -141,8 +160,8 @@ export function useTenantDashboardMetrics(modules: string[]) {
       const next: DashboardMetricCard[] = [];
 
       if (viajeStats) {
-        const enCurso = viajeStats['en_curso'] ?? 0;
-        const porFacturar = viajeStats['finalizado_sin_facturar'] ?? 0;
+        const enCurso = viajeStats.en_curso ?? 0;
+        const porFacturar = viajeStats.finalizado_sin_facturar ?? 0;
 
         let viajesFacturadosMes = 0;
         let viajesFacturadosQuincena = 0;
@@ -176,6 +195,30 @@ export function useTenantDashboardMetrics(modules: string[]) {
             hint: `Mes: ${viajesFacturadosMes} · Quincena: ${viajesFacturadosQuincena}`,
           },
         );
+
+        if (viajeStats.montos) {
+          const { ingresos, gastos, pendiente } = viajeStats.montos;
+          next.push(
+            {
+              key: 'ingresos-mes',
+              title: 'Ingresos del mes',
+              value: '',
+              montos: { ARS: fmtARS(ingresos.ARS), USD: fmtUSD(ingresos.USD) },
+            },
+            {
+              key: 'fletes-mes',
+              title: 'Fletes del mes',
+              value: '',
+              montos: { ARS: fmtARS(gastos.ARS), USD: fmtUSD(gastos.USD) },
+            },
+            {
+              key: 'pendiente-transportistas',
+              title: 'Pendiente transportistas',
+              value: '',
+              montos: { ARS: fmtARS(pendiente.ARS), USD: fmtUSD(pendiente.USD) },
+            },
+          );
+        }
       }
 
       if (facturas) {

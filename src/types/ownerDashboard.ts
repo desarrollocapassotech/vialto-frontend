@@ -5,7 +5,8 @@ export type MetricCompare = {
   previous: number;
   changePct: number | null;
   sentiment: 'positive' | 'negative' | 'neutral';
-  currencies?: { ARS?: number; USD?: number };
+  /** Totales por moneda del período actual (sin conversión). */
+  currencies?: { ARS: number; USD: number };
 };
 
 export type OwnerDashboardResponse = {
@@ -27,8 +28,19 @@ export type OwnerDashboardResponse = {
     diferenciaNetaCompare: MetricCompare;
   };
   alertas?: {
-    facturasVencidas: { cantidad: number; montoTotal: number };
-    viajesSinFactura: { cantidad: number; montoTotal: number };
+    facturasVencidas: {
+      cantidad: number;
+      montoTotal: number;
+      /** Ausente en respuestas cacheadas o API antigua; el UI usa `montoTotal` como respaldo. */
+      montosPorMoneda?: { ARS: number; USD: number };
+      items?: Array<{ id: string; numero: string }>;
+    };
+    viajesSinFactura: {
+      cantidad: number;
+      montoTotal: number;
+      montosPorMoneda?: { ARS: number; USD: number };
+      items?: Array<{ id: string; numero: string }>;
+    };
   } | null;
   viajes?: {
     enCurso: MetricCompare;

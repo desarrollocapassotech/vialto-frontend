@@ -34,9 +34,30 @@ export function TenantOverviewCards({
               <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
                 {card.title}
               </span>
-              <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
-                {card.value}
-              </span>
+              {card.montos ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-widest text-white/35 w-7 shrink-0">
+                      ARS
+                    </span>
+                    <span className="font-[family-name:var(--font-display)] text-lg text-white tabular-nums">
+                      {card.montos.ARS ?? '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-widest text-white/35 w-7 shrink-0">
+                      USD
+                    </span>
+                    <span className="font-[family-name:var(--font-display)] text-lg text-white tabular-nums">
+                      {card.montos.USD ?? '—'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <span className="font-[family-name:var(--font-display)] text-4xl text-white tracking-wide">
+                  {card.value}
+                </span>
+              )}
               <span className="text-xs text-white/55 leading-snug min-h-4">
                 {card.hint ?? ''}
               </span>

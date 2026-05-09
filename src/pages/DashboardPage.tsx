@@ -4,6 +4,19 @@ import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 
+function textoMontoPorMoneda(
+  moneda: 'ARS' | 'USD',
+  bloque: { ARS: number; USD: number } | undefined,
+  tableroListo: boolean,
+): string {
+  if (!tableroListo || !bloque) return '—';
+  const n = moneda === 'ARS' ? bloque.ARS : bloque.USD;
+  if (n === 0) return '—';
+  return moneda === 'ARS'
+    ? `$ ${n.toLocaleString('es-AR')}`
+    : `USD ${n.toLocaleString('es-AR')}`;
+}
+
 type TableroGeneralResponse = {
   deudores: Array<{
     clienteId: string;
@@ -18,8 +31,8 @@ type TableroGeneralResponse = {
     viajesEnCursoHaceMasDeXHoras: Array<{ id: string; numero: string }>;
   };
   facturacion: {
-    mesActual: number;
-    mesAnterior: number;
+    mesActual: { ARS: number; USD: number };
+    mesAnterior: { ARS: number; USD: number };
   };
 };
 
@@ -56,8 +69,9 @@ export function DashboardPage() {
   const totalDeudores = tablero?.deudores.length ?? 0;
   const totalInconsistencias = tablero?.inconsistencias.viajesFinalizadosSinCargo.length ?? 0;
   const totalViajesAtrasados = tablero?.alertasOperativas.viajesEnCursoHaceMasDeXHoras.length ?? 0;
-  const facturadoActual = tablero?.facturacion.mesActual ?? 0;
-  const facturadoAnterior = tablero?.facturacion.mesAnterior ?? 0;
+  const factActual = tablero?.facturacion.mesActual;
+  const factAnterior = tablero?.facturacion.mesAnterior;
+  const tableroListo = tablero !== null;
 
   return (
     <div className="max-w-5xl">
@@ -117,15 +131,37 @@ export function DashboardPage() {
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         <div className="bg-white border border-black/10 p-5">
           <p className="text-[11px] uppercase tracking-[0.2em] text-vialto-steel">Facturado mes actual</p>
-          <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-vialto-charcoal">
-            ${facturadoActual.toLocaleString('es-AR')}
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="font-[family-name:var(--font-display)] text-2xl text-vialto-charcoal leading-tight">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-vialto-steel block mb-0.5">
+                ARS
+              </span>
+              {textoMontoPorMoneda('ARS', factActual, tableroListo)}
+            </p>
+            <p className="font-[family-name:var(--font-display)] text-xl text-vialto-charcoal/90 leading-tight">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-vialto-steel block mb-0.5">
+                USD
+              </span>
+              {textoMontoPorMoneda('USD', factActual, tableroListo)}
+            </p>
+          </div>
         </div>
         <div className="bg-white border border-black/10 p-5">
           <p className="text-[11px] uppercase tracking-[0.2em] text-vialto-steel">Facturado mes anterior</p>
-          <p className="mt-2 font-[family-name:var(--font-display)] text-3xl text-vialto-charcoal">
-            ${facturadoAnterior.toLocaleString('es-AR')}
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="font-[family-name:var(--font-display)] text-2xl text-vialto-charcoal leading-tight">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-vialto-steel block mb-0.5">
+                ARS
+              </span>
+              {textoMontoPorMoneda('ARS', factAnterior, tableroListo)}
+            </p>
+            <p className="font-[family-name:var(--font-display)] text-xl text-vialto-charcoal/90 leading-tight">
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-vialto-steel block mb-0.5">
+                USD
+              </span>
+              {textoMontoPorMoneda('USD', factAnterior, tableroListo)}
+            </p>
+          </div>
         </div>
       </div>
 

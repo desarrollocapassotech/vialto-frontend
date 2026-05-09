@@ -34,6 +34,7 @@ import {
   estadosDisponiblesParaViaje,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
+  viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
@@ -97,6 +98,8 @@ export type ViajeEditModalProps = {
   ) => void;
   onClose: () => void;
   onSave: () => void;
+  /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
+  onFacturar?: () => void;
   saving: boolean;
   error: string | null;
   /** Tras crear una carga desde el combobox, fusionar en el catálogo del listado. */
@@ -130,6 +133,7 @@ export function ViajeEditModal({
   onDraftFechasPatch,
   onClose,
   onSave,
+  onFacturar,
   saving,
   error,
   onCargaCreada,
@@ -157,6 +161,10 @@ export function ViajeEditModal({
   }, [open, saving, onClose]);
 
   if (!open) return null;
+
+  const muestraBotonFacturar =
+    typeof onFacturar === 'function' && viajeEstadoPermiteBotonFacturar(draft.estado);
+  const facturarDeshabilitado = saving || !draft.clienteId.trim();
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId: draft.operacionModo === 'externo' ? draft.transportistaId : '',
@@ -550,7 +558,22 @@ export function ViajeEditModal({
           )}
         </div>
 
-        <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+          {muestraBotonFacturar ? (
+            <button
+              type="button"
+              onClick={onFacturar}
+              disabled={facturarDeshabilitado}
+              title={
+                !draft.clienteId.trim()
+                  ? 'Elegí un cliente para poder facturar este viaje'
+                  : undefined
+              }
+              className="mr-auto inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Facturar
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
