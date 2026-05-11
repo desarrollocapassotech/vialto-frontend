@@ -11,6 +11,8 @@ import {
   type FacturaDraft,
 } from '@/components/facturacion/FacturaEditModal';
 import { FacturaAccionesMenu } from '@/components/facturacion/FacturaAccionesMenu';
+import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -79,6 +81,17 @@ export function FacturacionTenantPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] = useState<Factura | null>(null);
 
+  // filtros de columna (client-side)
+  const [numFiltro, setNumFiltro] = useState('');
+  const [numFiltroInput, setNumFiltroInput] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('');
+  const [clienteIdFiltro, setClienteIdFiltro] = useState('');
+  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState('');
+  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState('');
+  const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState('');
+  const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState('');
+
   const fetchRef = useRef(0);
 
   const viajesNuevaFactura = useMemo(
@@ -98,6 +111,43 @@ export function FacturacionTenantPage() {
     () => (editingId && facturas ? facturas.find((r) => r.id === editingId) ?? null : null),
     [editingId, facturas],
   );
+
+  const anyFiltroActivo =
+    !!numFiltro.trim() ||
+    !!tipoFiltro ||
+    !!clienteIdFiltro ||
+    !!emisionDesdeFiltro ||
+    !!emisionHastaFiltro ||
+    !!vencimientoDesdeFiltro ||
+    !!vencimientoHastaFiltro ||
+    !!estadoFiltro;
+
+  const facturasFiltradas = useMemo(() => {
+    if (!facturas) return null;
+    return facturas.filter((f) => {
+      if (numFiltro.trim() && !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())) return false;
+      if (tipoFiltro && f.tipo !== tipoFiltro) return false;
+      if (clienteIdFiltro && f.clienteId !== clienteIdFiltro) return false;
+      const emision = f.fechaEmision ? f.fechaEmision.substring(0, 10) : '';
+      if (emisionDesdeFiltro && emision < emisionDesdeFiltro) return false;
+      if (emisionHastaFiltro && emision > emisionHastaFiltro) return false;
+      const vence = f.fechaVencimiento ? f.fechaVencimiento.substring(0, 10) : '';
+      if (vencimientoDesdeFiltro && (!vence || vence < vencimientoDesdeFiltro)) return false;
+      if (vencimientoHastaFiltro && (!vence || vence > vencimientoHastaFiltro)) return false;
+      if (estadoFiltro && f.estado !== estadoFiltro) return false;
+      return true;
+    });
+  }, [
+    facturas,
+    numFiltro,
+    tipoFiltro,
+    clienteIdFiltro,
+    emisionDesdeFiltro,
+    emisionHastaFiltro,
+    vencimientoDesdeFiltro,
+    vencimientoHastaFiltro,
+    estadoFiltro,
+  ]);
 
   /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
   useEffect(() => {
@@ -311,6 +361,18 @@ export function FacturacionTenantPage() {
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
+  function limpiarFiltros() {
+    setNumFiltro('');
+    setNumFiltroInput('');
+    setTipoFiltro('');
+    setClienteIdFiltro('');
+    setEmisionDesdeFiltro('');
+    setEmisionHastaFiltro('');
+    setVencimientoDesdeFiltro('');
+    setVencimientoHastaFiltro('');
+    setEstadoFiltro('');
+  }
+
   // ── render ─────────────────────────────────────────────────────────────────
 
   const COL_SPAN = 8;
@@ -324,6 +386,15 @@ export function FacturacionTenantPage() {
       <div className="mt-4">
         {error && <CrudFormErrorAlert message={error} />}
         <div className="flex justify-end gap-2 mt-2">
+          {anyFiltroActivo && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Limpiar filtros
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -340,26 +411,166 @@ export function FacturacionTenantPage() {
       </div>
 
       {/* tabla */}
-      <div className="mt-6 rounded border border-black/5 bg-white shadow-sm">
+      <div className="mt-6 overflow-x-hidden rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full table-fixed text-left text-base">
           <colgroup>
-            <col className="w-[14%]" />
             <col className="w-[12%]" />
-            <col className="w-[18%]" />
-            <col className="w-[10%]" />
             <col className="w-[11%]" />
-            <col className="w-[9%]" />
+            <col className="w-[17%]" />
             <col className="w-[14%]" />
-            <col className="w-[12%]" />
+            <col className="w-[14%]" />
+            <col className="w-[10%]" />
+            <col className="w-[13%]" />
+            <col className="w-[9%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Número</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Emisión</th>
-              <th className="px-4 py-3">Vencimiento</th>
-              <th className="px-4 py-3">Estado</th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Número"
+                  filterActive={!!numFiltro.trim()}
+                  filterSignature={numFiltro}
+                >
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={numFiltroInput}
+                      onChange={(e) => setNumFiltroInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
+                      placeholder="Buscar…"
+                      className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                        numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      }`}
+                      aria-label="Filtrar por número de factura"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNumFiltro(numFiltroInput)}
+                      className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Tipo"
+                  filterActive={!!tipoFiltro}
+                  filterSignature={tipoFiltro}
+                >
+                  <select
+                    value={tipoFiltro}
+                    onChange={(e) => setTipoFiltro(e.target.value)}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar por tipo de factura"
+                  >
+                    <option value="">Todos</option>
+                    <option value="cliente">Cliente</option>
+                    <option value="transportista_externo">Transportista externo</option>
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Cliente"
+                  filterActive={!!clienteIdFiltro}
+                  filterSignature={clienteIdFiltro}
+                >
+                  <ClienteSearchSelect
+                    id="facturas-col-filtro-cliente"
+                    clientes={clientes}
+                    value={clienteIdFiltro}
+                    onChange={(id) => setClienteIdFiltro(id)}
+                    allowEmptyValue
+                    emptyListChoiceLabel="Todos"
+                    placeholderCerrado="Todos"
+                    aria-label="Filtrar por cliente"
+                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                  />
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Emisión"
+                  filterActive={!!emisionDesdeFiltro || !!emisionHastaFiltro}
+                  filterSignature={`${emisionDesdeFiltro}|${emisionHastaFiltro}`}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                      Desde
+                      <input
+                        type="date"
+                        value={emisionDesdeFiltro}
+                        onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
+                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                      Hasta
+                      <input
+                        type="date"
+                        value={emisionHastaFiltro}
+                        onChange={(e) => setEmisionHastaFiltro(e.target.value)}
+                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                      />
+                    </label>
+                  </div>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Vencimiento"
+                  filterActive={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
+                  filterSignature={`${vencimientoDesdeFiltro}|${vencimientoHastaFiltro}`}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                      Desde
+                      <input
+                        type="date"
+                        value={vencimientoDesdeFiltro}
+                        onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
+                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                      Hasta
+                      <input
+                        type="date"
+                        value={vencimientoHastaFiltro}
+                        onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
+                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                      />
+                    </label>
+                  </div>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Estado"
+                  filterActive={!!estadoFiltro}
+                  filterSignature={estadoFiltro}
+                >
+                  <select
+                    value={estadoFiltro}
+                    onChange={(e) => setEstadoFiltro(e.target.value)}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar por estado"
+                  >
+                    <option value="">Todos</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="cobrada">Cobrada</option>
+                    <option value="vencida">Vencida</option>
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
               <th className="px-4 py-3 text-right">Importe</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -373,8 +584,13 @@ export function FacturacionTenantPage() {
                 Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.
               </td></tr>
             )}
+            {facturasFiltradas?.length === 0 && facturas !== null && facturas.length > 0 && (
+              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">
+                No hay facturas que coincidan con los filtros aplicados.
+              </td></tr>
+            )}
 
-            {facturas?.map((f) => (
+            {facturasFiltradas?.map((f) => (
                 <Fragment key={f.id}>
                   <tr className="border-b border-black/5 hover:bg-vialto-mist/40">
                     <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
@@ -410,7 +626,11 @@ export function FacturacionTenantPage() {
       </div>
 
       {facturas && facturas.length > 0 && (
-        <p className="mt-3 text-xs text-vialto-steel">{facturas.length} factura{facturas.length !== 1 ? 's' : ''}</p>
+        <p className="mt-3 text-xs text-vialto-steel">
+          {anyFiltroActivo && facturasFiltradas !== null
+            ? `${facturasFiltradas.length} de ${facturas.length} factura${facturas.length !== 1 ? 's' : ''}`
+            : `${facturas.length} factura${facturas.length !== 1 ? 's' : ''}`}
+        </p>
       )}
 
       <FacturaCreateModal
