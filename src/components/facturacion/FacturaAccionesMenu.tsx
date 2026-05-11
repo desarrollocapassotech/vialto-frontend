@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Factura } from '@/types/api';
 
 interface Props {
@@ -8,14 +9,17 @@ interface Props {
   onEliminar: () => void;
 }
 
+type MenuPos = { top?: number; bottom?: number; right: number };
+
 export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onEliminar }: Props) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -29,6 +33,20 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  function handleToggle() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const right = window.innerWidth - rect.right;
+      if (spaceBelow < 120) {
+        setMenuPos({ bottom: window.innerHeight - rect.top, right });
+      } else {
+        setMenuPos({ top: rect.bottom + 4, right });
+      }
+    }
+    setOpen((o) => !o);
+  }
 
   function item(
     label: string,
@@ -53,10 +71,11 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
   }
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         title="Acciones"
         className="inline-flex h-8 w-8 items-center justify-center border border-black/20 text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
         aria-haspopup="true"
@@ -69,12 +88,16 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
         </span>
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 min-w-[140px] border border-black/20 bg-white shadow-lg">
+      {open && menuPos && createPortal(
+        <div
+          style={{ position: 'fixed', ...menuPos, zIndex: 9999 }}
+          className="min-w-[140px] border border-black/20 bg-white shadow-lg"
+        >
           {item('Editar', onEditar)}
           {item('Eliminar', onEliminar, { danger: true, disabled: deleting })}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }

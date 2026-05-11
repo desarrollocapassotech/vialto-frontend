@@ -135,6 +135,8 @@ export function ViajesTenantPage() {
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(null);
   /** Viaje sobre el que se está abriendo el modal de registrar pago al transportista. */
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
+  /** Conteos globales para los chips de acceso rápido. */
+  const [resumen, setResumen] = useState<{ sinFacturar: number; sinCobrar: number } | null>(null);
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
   const viajesConFactura = useMemo(
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
@@ -181,6 +183,23 @@ export function ViajesTenantPage() {
     return () => {
       cancelled = true;
     };
+  }, [getToken, isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [rSF, rSC] = await Promise.all([
+          apiJson<ViajesPaginatedResponse>('/api/viajes/paginated?estado=finalizado_sin_facturar&page=1&pageSize=1', () => getToken()),
+          apiJson<ViajesPaginatedResponse>('/api/viajes/paginated?estado=facturado_sin_cobrar&page=1&pageSize=1', () => getToken()),
+        ]);
+        if (!cancelled) setResumen({ sinFacturar: rSF.meta.total, sinCobrar: rSC.meta.total });
+      } catch {
+        if (!cancelled) setResumen({ sinFacturar: 0, sinCobrar: 0 });
+      }
+    })();
+    return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
@@ -832,6 +851,56 @@ export function ViajesTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
       </p>
+
+      {resumen && (resumen.sinFacturar > 0 || resumen.sinCobrar > 0) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {resumen.sinFacturar > 0 && (
+            <button
+              type="button"
+              onClick={() => aplicarFiltroEstado(estadoFiltro === 'finalizado_sin_facturar' ? '' : 'finalizado_sin_facturar')}
+              className={[
+                'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+                estadoFiltro === 'finalizado_sin_facturar'
+                  ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none',
+              ].join(' ')}
+            >
+              Sin facturar
+              <span className={[
+                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
+                estadoFiltro === 'finalizado_sin_facturar'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-black/10 text-vialto-charcoal',
+              ].join(' ')}>
+                {resumen.sinFacturar}
+              </span>
+            </button>
+          )}
+          {resumen.sinCobrar > 0 && (
+            <button
+              type="button"
+              onClick={() => aplicarFiltroEstado(estadoFiltro === 'facturado_sin_cobrar' ? '' : 'facturado_sin_cobrar')}
+              className={[
+                'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+                estadoFiltro === 'facturado_sin_cobrar'
+                  ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none',
+              ].join(' ')}
+            >
+              Sin cobrar
+              <span className={[
+                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
+                estadoFiltro === 'facturado_sin_cobrar'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-black/10 text-vialto-charcoal',
+              ].join(' ')}>
+                {resumen.sinCobrar}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-h-10 items-center">
           {hayFiltrosColumnasActivos && (
