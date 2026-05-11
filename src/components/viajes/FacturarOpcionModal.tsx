@@ -20,14 +20,27 @@ export function FacturarOpcionModal({
 }: Props) {
   const [opcion, setOpcion] = useState<'nueva' | 'existente'>('nueva');
   const [facturaSeleccionadaId, setFacturaSeleccionadaId] = useState('');
+  const [filtro, setFiltro] = useState('');
 
-  // Resetear selección cada vez que el modal se abre con nuevas facturas
   useEffect(() => {
     if (open) {
       setOpcion('nueva');
+      setFiltro('');
       setFacturaSeleccionadaId(facturas[0]?.id ?? '');
     }
   }, [open, facturas]);
+
+  const facturasFiltradas = filtro.trim()
+    ? facturas.filter((f) => f.numero.toLowerCase().includes(filtro.trim().toLowerCase()))
+    : facturas;
+
+  // Si la factura seleccionada quedó fuera del filtro, pasar a la primera disponible
+  useEffect(() => {
+    if (opcion !== 'existente') return;
+    if (!facturasFiltradas.find((f) => f.id === facturaSeleccionadaId)) {
+      setFacturaSeleccionadaId(facturasFiltradas[0]?.id ?? '');
+    }
+  }, [filtro, opcion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
@@ -90,24 +103,37 @@ export function FacturarOpcionModal({
         </div>
 
         {opcion === 'existente' && (
-          <div className="mt-3 flex flex-col gap-1">
+          <div className="mt-3 flex flex-col gap-2">
             <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
               Seleccioná la factura
             </span>
+            <input
+              type="text"
+              placeholder="Filtrar por número…"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              disabled={busy}
+              className="h-9 border border-black/15 bg-white px-2 text-sm placeholder:text-vialto-steel/60"
+            />
             <select
               value={facturaSeleccionadaId}
               onChange={(e) => setFacturaSeleccionadaId(e.target.value)}
-              disabled={busy}
-              className="h-9 border border-black/15 bg-white px-2 text-sm"
+              disabled={busy || facturasFiltradas.length === 0}
+              size={Math.min(facturasFiltradas.length, 5) || 1}
+              className="border border-black/15 bg-white px-2 py-1 text-sm"
             >
-              {facturas.map((f) => (
-                <option key={f.id} value={f.id}>
-                  #{f.numero} — {f.estado}
-                  {f.viajeIds.length > 0
-                    ? ` (${f.viajeIds.length} viaje${f.viajeIds.length !== 1 ? 's' : ''})`
-                    : ''}
-                </option>
-              ))}
+              {facturasFiltradas.length === 0 ? (
+                <option value="" disabled>Sin resultados</option>
+              ) : (
+                facturasFiltradas.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    #{f.numero} — {f.estado}
+                    {f.viajeIds.length > 0
+                      ? ` (${f.viajeIds.length} viaje${f.viajeIds.length !== 1 ? 's' : ''})`
+                      : ''}
+                  </option>
+                ))
+              )}
             </select>
           </div>
         )}
@@ -123,7 +149,7 @@ export function FacturarOpcionModal({
           </button>
           <button
             type="button"
-            disabled={busy || (opcion === 'existente' && !facturaSeleccionadaId)}
+            disabled={busy || (opcion === 'existente' && (!facturaSeleccionadaId || facturasFiltradas.length === 0))}
             onClick={handleConfirm}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >

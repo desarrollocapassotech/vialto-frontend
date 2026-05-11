@@ -1,30 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Viaje } from '@/types/api';
-import {
-  viajePermiteAgregarGasto,
-  viajeEstadoPermiteBotonFacturar,
-} from '@/lib/viajesEstados';
-import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
+import type { Factura } from '@/types/api';
 
 interface Props {
-  viaje: Viaje;
+  factura: Factura;
+  deleting: boolean;
   onEditar: () => void;
-  onAgregarGasto: () => void;
-  onRegistrarPago: () => void;
-  onFacturar: () => void;
-  onExportar: () => void;
-  onVerFactura?: () => void;
+  onEliminar: () => void;
 }
 
-export function ViajeAccionesMenu({
-  viaje,
-  onEditar,
-  onAgregarGasto,
-  onRegistrarPago,
-  onFacturar,
-  onExportar,
-  onVerFactura,
-}: Props) {
+export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onEliminar }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,12 +30,11 @@ export function ViajeAccionesMenu({
     };
   }, [open]);
 
-  const permitePago = viajeRequierePagosTransportista(viaje) && viaje.estado !== 'cancelado';
-  const permiteGasto = viajePermiteAgregarGasto(viaje.estado);
-  const permiteFacturar = viajeEstadoPermiteBotonFacturar(viaje.estado);
-  const permiteExportar = viaje.estado !== 'cancelado';
-
-  function item(label: string, onClick: () => void, opts: { danger?: boolean; disabled?: boolean } = {}) {
+  function item(
+    label: string,
+    onClick: () => void,
+    opts: { danger?: boolean; disabled?: boolean } = {},
+  ) {
     return (
       <button
         key={label}
@@ -87,13 +70,9 @@ export function ViajeAccionesMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-1 min-w-[160px] border border-black/20 bg-white shadow-lg">
+        <div className="absolute right-0 z-50 mt-1 min-w-[140px] border border-black/20 bg-white shadow-lg">
           {item('Editar', onEditar)}
-          {viaje.facturaId && onVerFactura && item('Ver factura', onVerFactura)}
-          {permiteFacturar && item('Facturar', onFacturar)}
-          {permiteGasto && item('+ Gasto', onAgregarGasto)}
-          {permitePago && item('+ Pago transportista', onRegistrarPago)}
-          {permiteExportar && item('Exportar', onExportar)}
+          {item('Eliminar', onEliminar, { danger: true, disabled: deleting })}
         </div>
       )}
     </div>

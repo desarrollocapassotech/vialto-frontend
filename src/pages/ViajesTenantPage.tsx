@@ -1229,6 +1229,7 @@ export function ViajesTenantPage() {
                     onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     onFacturar={() => void navigateToFacturacion(v)}
                     onExportar={() => setExportarViaje(v)}
+                    onVerFactura={v.facturaId ? () => navigate(`/facturacion?factura=${v.facturaId}`) : undefined}
                   />
                 </td>
               </tr>
