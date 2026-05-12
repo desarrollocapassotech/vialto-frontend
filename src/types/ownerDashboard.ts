@@ -46,5 +46,8 @@ export type OwnerDashboardResponse = {
     enCurso: MetricCompare;
     completados: MetricCompare;
     sinFacturarMonto: number;
+    sinFacturar: number;
+    sinCobrar: number;
+    cobrados: number;
   };
 };

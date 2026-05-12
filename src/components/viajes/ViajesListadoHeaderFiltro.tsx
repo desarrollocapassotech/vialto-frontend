@@ -72,10 +72,7 @@ export function ViajesListadoHeaderFiltro({
 
   return (
     <div className="flex min-w-[9rem] flex-col gap-1.5">
-      <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 flex-1 text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
-          {title}
-        </span>
+      <div className="flex items-start gap-2">
         <div className="relative inline-flex shrink-0">
           <button
             type="button"
@@ -99,6 +96,9 @@ export function ViajesListadoHeaderFiltro({
             </span>
           ) : null}
         </div>
+        <span className="min-w-0 flex-1 text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
+          {title}
+        </span>
       </div>
       {abierto ? (
         <div

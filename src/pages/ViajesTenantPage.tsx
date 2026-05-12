@@ -96,11 +96,12 @@ export function ViajesTenantPage() {
   const { clientes, choferes, transportistas, vehiculos } = useMaestroData();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
   /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
   const filtrosAplicadosRef = useRef({
     clienteId: '',
     transportistaId: '',
-    estado: '',
+    estado: initialEstadoFromUrl,
     tipoFecha: '' as '' | 'carga' | 'descarga',
     fechaDesde: '',
     fechaHasta: '',
@@ -111,7 +112,7 @@ export function ViajesTenantPage() {
   /** Cliente seleccionado en filtro de columna (checks y facturación masiva). */
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState('');
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<'' | 'carga' | 'descarga'>('');
   const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState('');
   const [fechaHastaFiltro, setFechaHastaFiltro] = useState('');
@@ -571,6 +572,13 @@ export function ViajesTenantPage() {
     setFechaCargaError(null);
     setFechaDescargaError(null);
   }
+
+  /** Limpiar ?estado= de la URL una vez aplicado al filtro inicial. */
+  useEffect(() => {
+    if (!searchParams.has('estado')) return;
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('estado'); return n; }, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
+  }, []);
 
   /** Abrir editor desde enlace (p. ej. panel de alertas): `?viaje=id` */
   useEffect(() => {

@@ -21,38 +21,6 @@ function formatMoneyUSD(n: number) {
   })}`;
 }
 
-/** Sin actividad en el período anterior → no mostrar % de variación. */
-function hasPreviousPeriodData(previous: number): boolean {
-  return Math.abs(previous) > 0.0005;
-}
-
-function CompareLine({ m }: { m: MetricCompare }) {
-  if (!hasPreviousPeriodData(m.previous)) {
-    return (
-      <span
-        className="text-xs text-white/35 min-h-4 block"
-        title="Sin datos en el período anterior para comparar"
-      />
-    );
-  }
-  const color =
-    m.sentiment === 'positive'
-      ? 'text-emerald-400'
-      : m.sentiment === 'negative'
-        ? 'text-rose-400'
-        : 'text-white/50';
-  const pct =
-    m.changePct === null
-      ? '—'
-      : `${m.changePct > 0 ? '+' : ''}${m.changePct.toLocaleString('es-AR', {
-          maximumFractionDigits: 1,
-        })}%`;
-  return (
-    <span className={`text-xs font-medium ${color}`}>
-      {pct} vs período anterior
-    </span>
-  );
-}
 
 function MetricCard({
   title,
@@ -61,19 +29,20 @@ function MetricCard({
   metric,
   loading,
   formatValue = formatMoney,
-  omitCompare,
-  snapshotFootnote,
   valueTone,
+  linkTo,
+  simpleCount,
 }: {
   title: string;
   caption?: string;
   tooltip?: string;
-  metric: MetricCompare | undefined;
+  metric?: MetricCompare;
   loading: boolean;
   formatValue?: (n: number) => string;
-  omitCompare?: boolean;
-  snapshotFootnote?: string;
-  valueTone?: 'default' | 'positiveCash' | 'payable';
+  valueTone?: 'default' | 'positiveCash' | 'payable' | 'warn';
+  linkTo?: string;
+  /** Muestra un conteo simple en lugar de la métrica comparativa. */
+  simpleCount?: number;
 }) {
   const m = metric ?? {
     current: 0,
@@ -84,7 +53,7 @@ function MetricCard({
   const dual = m.currencies != null;
   const arsAmount = m.currencies?.ARS ?? 0;
   const usdAmount = m.currencies?.USD ?? 0;
-  const primaryAmount = dual ? arsAmount + usdAmount : m.current;
+  const primaryAmount = dual ? arsAmount + usdAmount : (simpleCount ?? m.current);
 
   const valueColorClass =
     !loading && primaryAmount > 0
@@ -92,11 +61,16 @@ function MetricCard({
         ? 'text-emerald-400'
         : valueTone === 'payable'
           ? 'text-rose-400'
-          : 'text-white'
+          : valueTone === 'warn'
+            ? 'text-amber-400'
+            : 'text-white'
       : 'text-white';
 
-  return (
-    <div className="bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between">
+  const effectiveCount = simpleCount !== undefined ? simpleCount : m.current;
+  const showLink = !!linkTo && !loading && effectiveCount > 0;
+  const cardClass = `group bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between${showLink ? ' hover:bg-vialto-graphite transition-colors cursor-pointer' : ''}`;
+  const inner = (
+    <>
       <div>
         <div className="flex items-center gap-1.5">
           <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wide text-white/80">
@@ -118,6 +92,10 @@ function MetricCard({
       <div className="flex flex-col gap-0.5">
         {loading ? (
           <span className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-white">—</span>
+        ) : simpleCount !== undefined ? (
+          <span className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}>
+            {String(Math.round(simpleCount))}
+          </span>
         ) : dual ? (
           <div className="flex flex-col gap-1.5">
             <div>
@@ -144,17 +122,18 @@ function MetricCard({
         )}
       </div>
 
-      <span className="text-xs leading-snug min-h-4">
-        {loading ? (
-          <span className="text-white/35">…</span>
-        ) : omitCompare ? (
-          <span className="text-white/35">{snapshotFootnote ?? ''}</span>
-        ) : (
-          <CompareLine m={m} />
-        )}
-      </span>
-    </div>
+      {showLink && (
+        <span className="flex justify-end font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-white/40 group-hover:text-white/80 transition-colors">
+          Ver →
+        </span>
+      )}
+    </>
   );
+
+  if (showLink) {
+    return <Link to={linkTo!} className={cardClass}>{inner}</Link>;
+  }
+  return <div className={cardClass}>{inner}</div>;
 }
 
 function AlertTriangleIcon({ className }: { className?: string }) {
@@ -551,20 +530,38 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
           >
             Actividad operativa
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              title="Viajes en curso (ahora)"
-              tooltip="Cantidad de viajes con estado en curso en este momento"
+              title="En curso"
+              tooltip="Viajes del período actualmente en curso"
               metric={viajes?.enCurso}
               loading={dash.loading}
               formatValue={(n) => String(Math.round(n))}
+              linkTo="/viajes?estado=en_curso"
             />
             <MetricCard
-              title="Viajes completados (período)"
-              tooltip="Viajes finalizados, facturados o cobrados cuya fecha de cierre cae dentro del período"
-              metric={viajes?.completados}
+              title="Sin facturar"
+              tooltip="Viajes del período finalizados sin factura emitida"
+              simpleCount={viajes?.sinFacturar}
               loading={dash.loading}
-              formatValue={(n) => String(Math.round(n))}
+              valueTone="warn"
+              linkTo="/viajes?estado=finalizado_sin_facturar"
+            />
+            <MetricCard
+              title="Sin cobrar"
+              tooltip="Viajes del período con factura emitida aún no cobrada"
+              simpleCount={viajes?.sinCobrar}
+              loading={dash.loading}
+              valueTone="payable"
+              linkTo="/viajes?estado=facturado_sin_cobrar"
+            />
+            <MetricCard
+              title="Cobrados"
+              tooltip="Viajes del período ya cobrados"
+              simpleCount={viajes?.cobrados}
+              loading={dash.loading}
+              valueTone="positiveCash"
+              linkTo="/viajes?estado=cobrado"
             />
           </div>
         </section>
