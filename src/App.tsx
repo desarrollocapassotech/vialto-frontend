@@ -19,6 +19,7 @@ import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
 import { TiposCargaPage } from '@/pages/CargaPage';
+import { ProductosPage } from '@/pages/ProductosPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
 import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
           <Route path="viajes/:id/editar" element={<Navigate to="/viajes" replace />} />
           <Route path="facturacion" element={<FacturacionPage />} />
+          <Route path="stock/productos" element={<ProductosPage />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
           <Route path="clientes/:id/editar" element={<ClienteEditPage />} />

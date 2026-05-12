@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { Logo } from './Logo';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { MaestroDataProvider } from '@/hooks/useMaestroData';
-import { canAccessFacturacion, canAccessViajes } from '@/lib/tenantModules';
+import { canAccessFacturacion, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
   orgSwitcherSidebarAppearance,
@@ -37,13 +37,15 @@ export function AppShell() {
 
     if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
       items.push({ to: '/viajes', label: 'Viajes' });
-      if (!superadmin) {
-        items.push({ to: '/cargas', label: 'Cargas' });
-      }
+      items.push({ to: '/cargas', label: 'Cargas' });
     }
 
     if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
       items.push({ to: '/facturacion', label: 'Facturación' });
+    }
+
+    if (superadmin || canAccessStock(tenant?.modules ?? [])) {
+      items.push({ to: '/stock/productos', label: 'Productos' });
     }
 
     // Entidades core: disponibles para toda empresa.

@@ -42,3 +42,7 @@ export function canAccessViajes(modules: string[]): boolean {
 export function canAccessFacturacion(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'facturacion');
 }
+
+export function canAccessStock(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'stock');
+}

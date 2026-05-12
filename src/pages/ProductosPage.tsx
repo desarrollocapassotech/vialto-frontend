@@ -1,9 +1,9 @@
 import { useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
-import { TiposCargaTenantPage } from '@/pages/CargaTenantPage';
-import { CargaSuperadminPage } from '@/pages/CargaSuperadminPage';
+import { ProductosTenantPage } from '@/pages/ProductosTenantPage';
+import { ProductosSuperadminPage } from '@/pages/ProductosSuperadminPage';
 
-export function TiposCargaPage() {
+export function ProductosPage() {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
@@ -11,8 +11,8 @@ export function TiposCargaPage() {
   }
 
   if (isPlatformSuperadmin(user?.publicMetadata)) {
-    return <CargaSuperadminPage />;
+    return <ProductosSuperadminPage />;
   }
 
-  return <TiposCargaTenantPage />;
+  return <ProductosTenantPage />;
 }

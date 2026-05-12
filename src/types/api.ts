@@ -284,6 +284,30 @@ export interface ImportTemplate {
   updatedAt: string;
 }
 
+export interface Presentacion {
+  id: string;
+  tenantId: string;
+  productoId: string;
+  nombre: string;
+  cantidadEquivalente: number;
+  unidadEquivalente: string;
+  pesoKg: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Producto {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  descripcion: string | null;
+  unidadMedida: string | null;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  presentaciones?: Presentacion[];
+}
+
 export interface PlatformUser {
   userId: string | null;
   firstName: string | null;
