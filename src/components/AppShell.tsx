@@ -47,13 +47,15 @@ export function AppShell() {
       items.push({ to: '/stock/productos', label: 'Productos' });
     }
 
-    // Entidades core: disponibles para toda empresa.
-    items.push(
-      { to: '/clientes', label: 'Clientes' },
-      { to: '/transportistas', label: 'Transportistas' },
-      { to: '/choferes', label: 'Choferes' },
-      { to: '/vehiculos', label: 'Vehículos' },
-    );
+    items.push({ to: '/clientes', label: 'Clientes' });
+
+    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
+      items.push(
+        { to: '/transportistas', label: 'Transportistas' },
+        { to: '/choferes', label: 'Choferes' },
+        { to: '/vehiculos', label: 'Vehículos' },
+      );
+    }
 
     return items;
   }, [superadmin, tenant?.modules]);
