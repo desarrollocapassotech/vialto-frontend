@@ -1,4 +1,3 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
 import { useMemo } from 'react';
 import {
   ChoferSearchSelect,
@@ -21,11 +20,10 @@ import {
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
 import { estadoMuestraKmLitros } from '@/lib/viajesEstados';
-import type { Chofer, Cliente, Carga, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
-import type { OpcionCarga } from '@/lib/cargasOpciones';
-import { ViajeCargasLista } from '@/components/viajes/ViajeCargasLista';
-import { isPlatformSuperadmin } from '@/lib/roleLabels';
+import type { OpcionProducto } from '@/lib/productosViaje';
+import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 
 type Props = {
   draft: ViajeInlineDraft;
@@ -38,7 +36,7 @@ type Props = {
   crearVehiculoHref?: string;
   /** Aviso si el viaje tenía chofer/vehículo incompatible con flota propia al abrir edición. */
   inconsistenciaHint?: string | null;
-  opcionesCarga: OpcionCarga[];
+  opcionesProducto: OpcionProducto[];
   tableColSpan: number;
   saving: boolean;
   /** Error de validación o API; se muestra encima de los botones Guardar/Cancelar. */
@@ -47,12 +45,6 @@ type Props = {
   errorFechaDescarga?: string | null;
   onSave: () => void;
   onCancel: () => void;
-  /** Superadmin con empresa filtrada: fusionar la nueva carga en el catálogo del listado. */
-  onCargaCreada?: (carga: Carga) => void;
-  /** Si no hay empresa en contexto, dejar en false para no ofrecer alta (POST requiere tenant). */
-  puedeCrearCargaCatalogo?: boolean;
-  /** URL POST del alta; en superadmin suele ser `/api/platform/cargas?tenantId=…`. */
-  cargaCreatePostUrl?: string;
 };
 
 const LABEL =
@@ -69,7 +61,7 @@ export function ViajeInlineEditForm({
   vehiculos,
   crearVehiculoHref = '/vehiculos/nuevo',
   inconsistenciaHint,
-  opcionesCarga,
+  opcionesProducto,
   tableColSpan,
   saving,
   formError,
@@ -77,20 +69,7 @@ export function ViajeInlineEditForm({
   errorFechaDescarga,
   onSave,
   onCancel,
-  onCargaCreada,
-  puedeCrearCargaCatalogo = false,
-  cargaCreatePostUrl = '/api/cargas',
 }: Props) {
-  const { getToken, orgRole } = useAuth();
-  const { user, isLoaded: userLoaded } = useUser();
-  const isSuperadminPlataforma =
-    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
-  const puedeCrearCarga =
-    puedeCrearCargaCatalogo &&
-    (isSuperadminPlataforma ||
-      orgRole === 'org:admin' ||
-      orgRole === 'org:supervisor');
-
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
   const ayudaFlota = useMemo(
@@ -314,18 +293,15 @@ export function ViajeInlineEditForm({
           )}
 
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Cargas</span>
-            <ViajeCargasLista
+            <span className={LABEL}>Productos</span>
+            <ViajeProductosLista
               groupId={`viaje-inline-${draft.numero || 'e'}`}
-              value={draft.cargaIds}
-              onChange={(ids) => set({ cargaIds: ids })}
-              opciones={opcionesCarga}
+              value={draft.productoItems}
+              onChange={(items) => set({ productoItems: items })}
+              opciones={opcionesProducto}
               triggerClassName={INPUT}
+              inputClassName={INPUT}
               disabled={saving}
-              puedeCrearCarga={puedeCrearCarga}
-              getToken={getToken}
-              createPostUrl={cargaCreatePostUrl}
-              onCargaCreada={onCargaCreada}
             />
           </div>
 

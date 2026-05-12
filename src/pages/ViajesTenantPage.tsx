@@ -66,10 +66,10 @@ import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type {
   Factura,
   PaginatedMeta,
-  Carga,
+  Producto,
   Viaje,
 } from '@/types/api';
-import { cargaIdsOrdenadosDesdeViaje, mergeOpcionesCarga } from '@/lib/cargasOpciones';
+import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
 
 
 type ViajesPaginatedResponse = {
@@ -152,10 +152,10 @@ export function ViajesTenantPage() {
         : null,
     [editingId, rows, viajeSnapshotRemoto],
   );
-  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
-  const opcionesCargaModal = useMemo(
-    () => mergeOpcionesCarga(cargasCatalogo, viajeEdicionSnapshot),
-    [cargasCatalogo, viajeEdicionSnapshot],
+  const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([]);
+  const opcionesProductoModal = useMemo(
+    () => mergeOpcionesProducto(productosCatalogo, viajeEdicionSnapshot),
+    [productosCatalogo, viajeEdicionSnapshot],
   );
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
@@ -172,13 +172,13 @@ export function ViajesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        const d = await apiJson<{ items: Carga[] }>(
-          '/api/cargas/paginated?page=1&pageSize=100&filtroActivo=activos',
+        const d = await apiJson<{ items: Producto[] }>(
+          '/api/stock/productos/paginated?page=1&pageSize=100&filtroActivo=activos',
           () => getToken(),
         );
-        if (!cancelled) setCargasCatalogo(d.items);
+        if (!cancelled) setProductosCatalogo(d.items);
       } catch {
-        if (!cancelled) setCargasCatalogo([]);
+        if (!cancelled) setProductosCatalogo([]);
       }
     })();
     return () => {
@@ -546,7 +546,7 @@ export function ViajesTenantPage() {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
-      cargaIds: cargaIdsOrdenadosDesdeViaje(v),
+      productoItems: productoItemsDesdeViaje(v),
       detalleCarga: v.detalleCarga ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -794,7 +794,7 @@ export function ViajesTenantPage() {
           destino: draft.destino.trim() || undefined,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
-          cargaIds: draft.cargaIds.map((x) => x.trim()).filter(Boolean),
+          productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
           detalleCarga: draft.detalleCarga.trim() || undefined,
           observaciones: draft.observaciones.trim() || undefined,
           monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -1373,7 +1373,7 @@ export function ViajesTenantPage() {
           draft={draft}
           setDraft={setDraft}
           snapshotViaje={viajeEdicionSnapshot}
-          opcionesCarga={opcionesCargaModal}
+          opcionesProducto={opcionesProductoModal}
           clientes={clientes}
           choferes={choferes}
           transportistas={transportistas}
@@ -1402,11 +1402,6 @@ export function ViajesTenantPage() {
           }}
           saving={savingId === editingId}
           error={error}
-          onCargaCreada={(carga) => {
-            setCargasCatalogo((prev) =>
-              prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
-            );
-          }}
         />
       )}
 

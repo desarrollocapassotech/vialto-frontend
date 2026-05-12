@@ -37,7 +37,6 @@ export function AppShell() {
 
     if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
       items.push({ to: '/viajes', label: 'Viajes' });
-      items.push({ to: '/cargas', label: 'Cargas' });
     }
 
     if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {

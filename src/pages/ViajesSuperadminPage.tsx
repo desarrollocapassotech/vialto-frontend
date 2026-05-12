@@ -35,8 +35,8 @@ import {
   esEtiquetaCiudadValida,
   inferirPaisDesdeUbicacion,
 } from '@/lib/ciudades';
-import type { Chofer, Cliente, ConEmpresa, Transportista, Carga, Vehiculo, Viaje } from '@/types/api';
-import { cargaIdsOrdenadosDesdeViaje, mergeOpcionesCarga } from '@/lib/cargasOpciones';
+import type { Chofer, Cliente, ConEmpresa, Transportista, Producto, Vehiculo, Viaje } from '@/types/api';
+import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
 import type {
   ViajeInlineDraft,
 } from '@/components/viajes/viajesSuperadminTypes';
@@ -97,16 +97,16 @@ export function ViajesSuperadminPage() {
   const [choferes, setChoferes] = useState<Chofer[]>([]);
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
-  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
+  const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([]);
 
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
 
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
 
-  const opcionesCargaSuper = useMemo(
-    () => mergeOpcionesCarga(cargasCatalogo, rows?.find((r) => r.id === editingId) ?? null),
-    [cargasCatalogo, rows, editingId],
+  const opcionesProductoSuper = useMemo(
+    () => mergeOpcionesProducto(productosCatalogo, rows?.find((r) => r.id === editingId) ?? null),
+    [productosCatalogo, rows, editingId],
   );
 
   // ── fetch viajes ───────────────────────────────────────────────────────────
@@ -157,19 +157,19 @@ export function ViajesSuperadminPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) {
-      setCargasCatalogo([]);
+      setProductosCatalogo([]);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const d = await apiJson<{ items: Carga[] }>(
-          `/api/platform/cargas/paginated?tenantId=${encodeURIComponent(filtroEmpresa)}&page=1&pageSize=100&filtroActivo=activos`,
+        const d = await apiJson<{ items: Producto[] }>(
+          `/api/platform/stock/productos/paginated?tenantId=${encodeURIComponent(filtroEmpresa)}&page=1&pageSize=100&filtroActivo=activos`,
           () => getToken(),
         );
-        if (!cancelled) setCargasCatalogo(d.items);
+        if (!cancelled) setProductosCatalogo(d.items);
       } catch {
-        if (!cancelled) setCargasCatalogo([]);
+        if (!cancelled) setProductosCatalogo([]);
       }
     })();
     return () => {
@@ -275,7 +275,7 @@ export function ViajesSuperadminPage() {
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
       horaDescarga: partesFd.hora,
-      cargaIds: cargaIdsOrdenadosDesdeViaje(v),
+      productoItems: productoItemsDesdeViaje(v),
       detalleCarga: v.detalleCarga ?? '',
       observaciones: v.observaciones ?? '',
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
@@ -395,7 +395,7 @@ export function ViajesSuperadminPage() {
             destino: draft.destino.trim() || undefined,
             fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
             fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
-            cargaIds: draft.cargaIds.map((x) => x.trim()).filter(Boolean),
+            productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
             monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
@@ -685,7 +685,7 @@ export function ViajesSuperadminPage() {
                     choferes={choferes}
                     transportistas={transportistas}
                     vehiculos={vehiculos}
-                    opcionesCarga={opcionesCargaSuper}
+                    opcionesProducto={opcionesProductoSuper}
                     crearVehiculoHref={
                       filtroEmpresa
                         ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
@@ -699,17 +699,6 @@ export function ViajesSuperadminPage() {
                     errorFechaDescarga={fechaDescargaError}
                     onSave={() => saveInline(v.id)}
                     onCancel={cancelEdit}
-                    puedeCrearCargaCatalogo={Boolean(filtroEmpresa.trim())}
-                    cargaCreatePostUrl={
-                      filtroEmpresa.trim()
-                        ? `/api/platform/cargas?tenantId=${encodeURIComponent(filtroEmpresa.trim())}`
-                        : '/api/cargas'
-                    }
-                    onCargaCreada={(carga) => {
-                      setCargasCatalogo((prev) =>
-                        prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
-                      );
-                    }}
                   />
                 )}
               </Fragment>

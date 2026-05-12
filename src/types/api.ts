@@ -18,18 +18,6 @@ export interface OtroGasto {
   createdBy?: string;
 }
 
-export interface Carga {
-  id: string;
-  tenantId: string;
-  nombre: string;
-  descripcion: string | null;
-  unidadMedida: string | null;
-  activo: boolean;
-  metadata?: unknown;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Viaje {
   id: string;
   tenantId: string;
@@ -52,12 +40,14 @@ export interface Viaje {
   destino: string | null;
   fechaCarga: string | null;
   fechaDescarga: string | null;
-  /** Cargas del catálogo vinculadas al viaje (orden operativo). */
-  cargasViaje?: Array<{
+  /** Productos vinculados al viaje (orden operativo). */
+  productosViaje?: Array<{
     id: string;
-    cargaId: string;
+    productoId: string;
     orden: number;
-    carga: {
+    cantidad: number | null;
+    pesoKg: number | null;
+    producto: {
       id: string;
       nombre: string;
       activo: boolean;

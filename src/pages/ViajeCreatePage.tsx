@@ -1,4 +1,4 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
@@ -18,7 +18,7 @@ import {
 } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
-import { ViajeCargasLista } from '@/components/viajes/ViajeCargasLista';
+import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { apiJson } from '@/lib/api';
 import {
   maskCurrencyForMoneda,
@@ -49,9 +49,9 @@ import {
 } from '@/lib/viajesEstados';
 import { fechaHoraToIso } from '@/lib/viajeFechaHora';
 import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
-import type { Carga, Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, Producto, Transportista, Vehiculo } from '@/types/api';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { isPlatformSuperadmin } from '@/lib/roleLabels';
+import { type OpcionProducto, type ViajeProductoItem } from '@/lib/productosViaje';
 
 const ESTADOS = VIAJE_ESTADOS_ALTA;
 
@@ -62,14 +62,7 @@ const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm';
 
 export function ViajeCreatePage() {
-  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
-  const { user, isLoaded: userLoaded } = useUser();
-  const isSuperadminPlataforma =
-    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
-  const puedeCrearCarga =
-    isSuperadminPlataforma ||
-    orgRole === 'org:admin' ||
-    orgRole === 'org:supervisor';
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
@@ -96,8 +89,8 @@ export function ViajeCreatePage() {
   const [horaDescarga, setHoraDescarga] = useState('');
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
-  const [cargasCatalogo, setCargasCatalogo] = useState<Carga[]>([]);
-  const [cargaIds, setCargaIds] = useState<string[]>([]);
+  const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([]);
+  const [productoItems, setProductoItems] = useState<ViajeProductoItem[]>([]);
   const [detalleCarga, setDetalleCarga] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [kmRecorridos, setKmRecorridos] = useState('');
@@ -122,9 +115,6 @@ export function ViajeCreatePage() {
   const [modalKm, setModalKm] = useState('');
   const [modalLitros, setModalLitros] = useState('');
   const [kmLitrosFieldError, setKmLitrosFieldError] = useState<string | null>(null);
-  const cargaCreatePostUrl = tenantId.trim()
-    ? `/api/platform/cargas?tenantId=${encodeURIComponent(tenantId.trim())}`
-    : '/api/cargas';
 
   useEffect(() => {
     // Tenant mode: master data comes from MaestroDataProvider context
@@ -161,12 +151,12 @@ export function ViajeCreatePage() {
     (async () => {
       try {
         const path = tenantId
-          ? `/api/platform/cargas/paginated?tenantId=${encodeURIComponent(tenantId)}&page=1&pageSize=100&filtroActivo=activos`
-          : '/api/cargas/paginated?page=1&pageSize=100&filtroActivo=activos';
-        const d = await apiJson<{ items: Carga[] }>(path, () => getToken());
-        if (!cancelled) setCargasCatalogo(d.items);
+          ? `/api/platform/stock/productos/paginated?tenantId=${encodeURIComponent(tenantId)}&page=1&pageSize=100&filtroActivo=activos`
+          : '/api/stock/productos/paginated?page=1&pageSize=100&filtroActivo=activos';
+        const d = await apiJson<{ items: Producto[] }>(path, () => getToken());
+        if (!cancelled) setProductosCatalogo(d.items);
       } catch {
-        if (!cancelled) setCargasCatalogo([]);
+        if (!cancelled) setProductosCatalogo([]);
       }
     })();
     return () => {
@@ -337,7 +327,7 @@ export function ViajeCreatePage() {
           destino: destino.trim(),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
-          cargaIds: cargaIds.map((x) => x.trim()).filter(Boolean),
+          productoItems: productoItems.filter((x) => x.productoId.trim()),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           kmRecorridos:
@@ -624,27 +614,20 @@ export function ViajeCreatePage() {
             </div>
           )}
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Cargas</span>
-            <ViajeCargasLista
+            <span className={fieldLabelClass}>Productos</span>
+            <ViajeProductosLista
               groupId="viaje-create"
-              value={cargaIds}
-              onChange={setCargaIds}
-              opciones={cargasCatalogo.map((t) => ({
-                id: t.id,
-                nombre: t.nombre,
-                activo: t.activo,
-                unidadMedida: t.unidadMedida,
+              value={productoItems}
+              onChange={setProductoItems}
+              opciones={productosCatalogo.map<OpcionProducto>((p) => ({
+                id: p.id,
+                nombre: p.nombre,
+                activo: p.activo,
+                unidadMedida: p.unidadMedida ?? null,
               }))}
               triggerClassName={inputClass}
+              inputClassName={inputClass}
               disabled={loading}
-              puedeCrearCarga={puedeCrearCarga}
-              getToken={getToken}
-              createPostUrl={cargaCreatePostUrl}
-              onCargaCreada={(carga) => {
-                setCargasCatalogo((prev) =>
-                  prev.some((x) => x.id === carga.id) ? prev : [...prev, carga],
-                );
-              }}
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">

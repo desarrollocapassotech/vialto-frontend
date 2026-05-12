@@ -2,6 +2,7 @@ import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import type { ViajeVehiculoRowDraft } from '@/components/viajes/ViajeVehiculosLista';
+import type { ViajeProductoItem } from '@/lib/productosViaje';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -25,7 +26,7 @@ export type ViajeInlineDraft = {
   horaCarga: string;
   fechaDescarga: string;
   horaDescarga: string;
-  cargaIds: string[];
+  productoItems: ViajeProductoItem[];
   detalleCarga: string;
   observaciones: string;
   monto: string;

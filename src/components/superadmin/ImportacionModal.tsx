@@ -56,7 +56,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   }
 
   const modulosDisponibles = tenant.modules.filter((m) =>
-    ['viajes', 'clientes', 'choferes', 'vehiculos', 'stock'].includes(m),
+    ['viajes', 'clientes', 'choferes', 'vehiculos'].includes(m),
   );
 
   const { step, modulo, setModulo, file, setFile, loading, error, preview, log, submitPreview, confirm, reset } = importacion;
