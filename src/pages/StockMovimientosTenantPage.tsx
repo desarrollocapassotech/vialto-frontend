@@ -14,6 +14,11 @@ import {
   listadoTablaThClass,
   listadoTablaWrapperClass,
 } from '@/lib/listadoTabla';
+import {
+  movimientoStockTipoBadgeClass,
+  movimientoStockTipoLabel,
+  movimientoStockTipoNumeroClass,
+} from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 function buildQs(params: Record<string, string>, tenantId?: string): string {
@@ -117,15 +122,21 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                   <td className={`${listadoTablaTdClass} whitespace-nowrap`}>
                     {formatMovimientoStockFechaFromIso(m.fecha)}
                   </td>
-                  <td className={`${listadoTablaTdClass} capitalize`}>{m.tipo}</td>
+                  <td className={listadoTablaTdClass}>
+                    <span className={movimientoStockTipoBadgeClass(m.tipo)}>
+                      {movimientoStockTipoLabel(m.tipo)}
+                    </span>
+                  </td>
                   <td className={`${listadoTablaTdClass} font-mono`}>{m.numeroRemito ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
                   <td className={listadoTablaTdClass}>{m.presentacion?.nombre ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
-                  <td className={`${listadoTablaTdClass} text-right tabular-nums`}>{m.cantidad}</td>
+                  <td className={`${listadoTablaTdClass} text-right`}>
+                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad}</span>
+                  </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link
-                      to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQs({}, tenantId)}`}
+                      to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQs({ from: 'movimientos' }, tenantId)}`}
                       className={listadoTablaLinkClass}
                     >
                       Ver detalle

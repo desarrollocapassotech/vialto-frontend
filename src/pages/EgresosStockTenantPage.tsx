@@ -28,18 +28,20 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
 export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
+  clientesExternosLoading,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
+  clientesExternosLoading?: boolean;
 }) {
   const { getToken, orgRole } = useAuth();
   const { user } = useUser();
   const maestro = useMaestroData();
   const clientes = clientesExternos ?? maestro.clientes;
+  const platform = Boolean(tenantId);
+  const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
   const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
   const puedeEditarFormatoRemito = Boolean(tenantId) || puedeGestionar;
-
-  const platform = Boolean(tenantId);
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
@@ -52,6 +54,7 @@ export function EgresosStockTenantPage({
   const [productos, setProductos] = useState<Producto[]>([]);
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
   const [presentacionId, setPresentacionId] = useState('');
@@ -77,12 +80,16 @@ export function EgresosStockTenantPage({
   const [showConfig, setShowConfig] = useState(false);
 
   const loadProductos = useCallback(async () => {
+    setProductosLoading(true);
+    setLoadError(null);
     try {
       const url = `${productosBase}/paginated${buildQs({ page: 1, pageSize: 100, filtroActivo: 'activos' }, tenantId)}`;
       const data = await apiJson<PaginatedProductos>(url, () => getToken());
       setProductos(data.items);
     } catch (e) {
       setLoadError(friendlyError(e, 'stock'));
+    } finally {
+      setProductosLoading(false);
     }
   }, [productosBase, tenantId, getToken]);
 
@@ -319,7 +326,8 @@ export function EgresosStockTenantPage({
               <button
                 type="button"
                 onClick={() => setModalProducto(true)}
-                className="text-xs text-vialto-fire hover:underline font-medium"
+                disabled={productosLoading}
+                className="text-xs text-vialto-fire hover:underline font-medium disabled:opacity-40 disabled:pointer-events-none"
               >
                 + Agregar producto
               </button>
@@ -328,6 +336,7 @@ export function EgresosStockTenantPage({
               items={productos}
               value={productoId}
               onChange={setProductoId}
+              loading={productosLoading}
               filterItems={(items, q) =>
                 items.filter((p) => p.nombre.toLowerCase().includes(q.toLowerCase()))
               }
@@ -392,6 +401,7 @@ export function EgresosStockTenantPage({
                 clientes={clientes}
                 value={clienteId}
                 onChange={setClienteId}
+                loading={clientesSelectLoading}
                 inputClassName={INPUT}
               />
             </div>
@@ -467,12 +477,13 @@ export function EgresosStockTenantPage({
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         {success && (
-          <p className="text-sm text-emerald-600">
+          <p className="text-sm text-red-800">
             Egreso registrado correctamente
             {ultimoRemito ? (
               <>
                 {' '}
-                — remito <span className="font-mono font-semibold">{ultimoRemito}</span>
+                — remito{' '}
+                <span className="font-mono font-semibold text-vialto-charcoal">{ultimoRemito}</span>
               </>
             ) : null}
             .

@@ -27,15 +27,18 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
 export function IngresosStockTenantPage({
   tenantId,
   clientesExternos,
+  clientesExternosLoading,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
+  /** Solo con `tenantId` (plataforma): true mientras llegan los clientes de la empresa. */
+  clientesExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
   const maestro = useMaestroData();
   const clientes = clientesExternos ?? maestro.clientes;
-
   const platform = Boolean(tenantId);
+  const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const ingresosUrl = platform
     ? `/api/platform/stock/ingresos${buildQs({}, tenantId)}`
@@ -44,6 +47,7 @@ export function IngresosStockTenantPage({
   const [productos, setProductos] = useState<Producto[]>([]);
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
   const [presentacionId, setPresentacionId] = useState('');
@@ -61,12 +65,16 @@ export function IngresosStockTenantPage({
   const [success, setSuccess] = useState(false);
 
   const loadProductos = useCallback(async () => {
+    setProductosLoading(true);
+    setLoadError(null);
     try {
       const url = `${productosBase}/paginated${buildQs({ page: 1, pageSize: 100, filtroActivo: 'activos' }, tenantId)}`;
       const data = await apiJson<PaginatedProductos>(url, () => getToken());
       setProductos(data.items);
     } catch (e) {
       setLoadError(friendlyError(e, 'stock'));
+    } finally {
+      setProductosLoading(false);
     }
   }, [productosBase, tenantId, getToken]);
 
@@ -185,7 +193,8 @@ export function IngresosStockTenantPage({
               <button
                 type="button"
                 onClick={() => setModalProducto(true)}
-                className="text-xs text-vialto-fire hover:underline font-medium"
+                disabled={productosLoading}
+                className="text-xs text-vialto-fire hover:underline font-medium disabled:opacity-40 disabled:pointer-events-none"
               >
                 + Agregar producto
               </button>
@@ -194,6 +203,7 @@ export function IngresosStockTenantPage({
               items={productos}
               value={productoId}
               onChange={setProductoId}
+              loading={productosLoading}
               filterItems={(items, q) =>
                 items.filter((p) => p.nombre.toLowerCase().includes(q.toLowerCase()))
               }
@@ -262,6 +272,7 @@ export function IngresosStockTenantPage({
                 clientes={clientes}
                 value={clienteId}
                 onChange={setClienteId}
+                loading={clientesSelectLoading}
                 inputClassName={INPUT}
               />
             </div>

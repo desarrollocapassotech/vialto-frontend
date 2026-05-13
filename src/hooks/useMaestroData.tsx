@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
 import type { Cliente, Chofer, Transportista, Vehiculo } from '@/types/api';
@@ -30,10 +30,26 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  /** Evita un frame con listas vacías y `loading: false` antes del fetch. */
+  useLayoutEffect(() => {
     if (!isLoaded || !isSignedIn || !orgId) return;
-    let cancelled = false;
     setLoading(true);
+  }, [isLoaded, isSignedIn, orgId]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setLoading(false);
+      return;
+    }
+    if (!orgId) {
+      setLoading(false);
+      setClientes([]);
+      setChoferes([]);
+      setTransportistas([]);
+      setVehiculos([]);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
         const [c, ch, t, v] = await Promise.all([
@@ -49,9 +65,13 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
           setVehiculos(v);
         }
       } catch { /* silencioso — las páginas muestran listas vacías */ }
-      finally { if (!cancelled) setLoading(false); }
+      finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isLoaded, isSignedIn, orgId]);
 
   const refreshClientes = async (): Promise<Cliente[]> => {

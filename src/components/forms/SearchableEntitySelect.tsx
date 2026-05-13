@@ -18,6 +18,8 @@ export type SearchableEntitySelectProps<T extends { id: string }> = {
   placeholderBuscar?: string;
   /** Contenido cuando `items.length === 0` (ej. «Sin choferes…»). */
   noItemsSlot?: ReactNode;
+  /** Mientras es true se muestra «Cargando…» en lugar del listado vacío. */
+  loading?: boolean;
   /** Permite `value === ''` y una fila inicial en el panel para volver a vacío. */
   allowEmptyValue?: boolean;
   /** Texto de la opción vacía dentro del panel (solo si `allowEmptyValue`). */
@@ -41,6 +43,7 @@ export function SearchableEntitySelect<T extends { id: string }>({
   placeholderCerrado = 'Elegí…',
   placeholderBuscar = 'Buscar…',
   noItemsSlot,
+  loading = false,
   allowEmptyValue = false,
   emptyListChoiceLabel = 'Sin selección',
   searchAriaLabel = 'Filtrar lista',
@@ -282,6 +285,20 @@ export function SearchableEntitySelect<T extends { id: string }>({
         </ul>
       </div>
     ) : null;
+
+  if (loading) {
+    return (
+      <div className={className}>
+        <div
+          className={`${inputClassName} flex items-center text-vialto-steel`}
+          aria-busy="true"
+          aria-label={ariaLabel}
+        >
+          Cargando…
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0 && !allowEmptyValue) {
     return (
