@@ -5,6 +5,19 @@ export function isPlatformSuperadmin(
   return publicMetadata?.vialtoRole === 'superadmin';
 }
 
+/**
+ * Misma capacidad de gestión en UI que un admin u operador de la organización.
+ * El superadmin de plataforma suele no tener `org:admin` en la sesión activa de Clerk
+ * (p. ej. vista embebida con `tenantId`), pero debe poder hacer todo lo que haría un admin.
+ */
+export function puedeGestionarComoAdminEmpresa(
+  orgRole: string | null | undefined,
+  publicMetadata: { vialtoRole?: unknown } | null | undefined,
+): boolean {
+  if (isPlatformSuperadmin(publicMetadata)) return true;
+  return orgRole === 'org:admin' || orgRole === 'org:supervisor';
+}
+
 type RoleSource = {
   orgRole: string | null | undefined;
   /** Coincide con `public_metadata.vialtoRole` en Clerk (backend Vialto). */

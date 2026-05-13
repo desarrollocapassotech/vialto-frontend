@@ -16,9 +16,10 @@ type Props = {
   viaje: Viaje | null;
   onSuccess: (updated: Viaje) => void;
   onClose: () => void;
+  tenantId?: string;
 };
 
-export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClose }: Props) {
+export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClose, tenantId }: Props) {
   const { getToken } = useAuth();
   const [montoStr, setMontoStr] = useState('');
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
@@ -70,8 +71,15 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
       const body: Record<string, unknown> = { monto, moneda, fecha };
       if (observaciones.trim()) body.observaciones = observaciones.trim();
 
+      const q = tenantId?.trim()
+        ? `?tenantId=${encodeURIComponent(tenantId.trim())}`
+        : '';
+      const base = tenantId?.trim()
+        ? `/api/platform/viajes/${encodeURIComponent(viajeActual.id)}/pagos-transportista${q}`
+        : `/api/viajes/${encodeURIComponent(viajeActual.id)}/pagos-transportista`;
+
       const updated = await apiJson<Viaje>(
-        `/api/viajes/${encodeURIComponent(viajeActual.id)}/pagos-transportista`,
+        base,
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );

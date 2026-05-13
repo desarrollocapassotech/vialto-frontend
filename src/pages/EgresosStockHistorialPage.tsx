@@ -1,0 +1,18 @@
+import { useUser } from '@clerk/clerk-react';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
+import { EgresosStockHistorialSuperadminPage } from './EgresosStockHistorialSuperadminPage';
+import { EgresosStockHistorialTenantPage } from './EgresosStockHistorialTenantPage';
+
+export function EgresosStockHistorialPage() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) {
+    return <div className="text-vialto-steel py-12 text-center">Un momento…</div>;
+  }
+
+  if (isPlatformSuperadmin(user?.publicMetadata)) {
+    return <EgresosStockHistorialSuperadminPage />;
+  }
+
+  return <EgresosStockHistorialTenantPage />;
+}

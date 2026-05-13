@@ -31,13 +31,17 @@ export function ViajeAccionesMenu({
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Panel en portal (body); sin esto, mousedown en un ítem cierra antes del click y rompe las acciones. */
+  const menuPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (triggerRef.current?.contains(t)) return;
+      if (menuPanelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -107,6 +111,7 @@ export function ViajeAccionesMenu({
 
       {open && menuPos && createPortal(
         <div
+          ref={menuPanelRef}
           style={{ position: 'fixed', ...menuPos, zIndex: 9999 }}
           className="min-w-[160px] border border-black/20 bg-white shadow-lg"
         >

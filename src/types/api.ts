@@ -318,11 +318,19 @@ export interface MovimientoStock {
   cliente?: { id: string; nombre: string };
   tipo: 'ingreso' | 'egreso' | 'division';
   cantidad: number;
+  numeroRemito?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
   createdBy: string;
+  /** Nombre o correo resuelto vía Clerk (solo en detalle). */
+  createdByLabel?: string | null;
   fecha: string;
   createdAt: string;
+}
+
+export interface StockEgresoRemitoConfig {
+  remitoPrefix: string;
+  remitoDigitos: number;
 }
 
 export interface StockItem {

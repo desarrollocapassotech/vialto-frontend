@@ -20,6 +20,11 @@ import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
 import { ProductosPage } from '@/pages/ProductosPage';
 import { IngresosStockPage } from '@/pages/IngresosStockPage';
+import { IngresosStockHistorialPage } from '@/pages/IngresosStockHistorialPage';
+import { EgresosStockPage } from '@/pages/EgresosStockPage';
+import { EgresosStockHistorialPage } from '@/pages/EgresosStockHistorialPage';
+import { MovimientoStockDetallePage } from '@/pages/MovimientoStockDetallePage';
+import { StockMovimientosPage } from '@/pages/StockMovimientosPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
 import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
@@ -76,6 +81,11 @@ export default function App() {
           <Route path="facturacion" element={<FacturacionPage />} />
           <Route path="stock/productos" element={<ProductosPage />} />
           <Route path="stock/ingresos" element={<IngresosStockPage />} />
+          <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
+          <Route path="stock/egresos" element={<EgresosStockPage />} />
+          <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
+          <Route path="stock/movimientos" element={<StockMovimientosPage />} />
+          <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
           <Route path="clientes/:id/editar" element={<ClienteEditPage />} />

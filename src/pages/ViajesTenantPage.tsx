@@ -51,7 +51,7 @@ import {
   inferirPaisDesdeUbicacion,
   type PaisCodigo,
 } from '@/lib/ciudades';
-import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import { fechaHoraToIso, formatIsoFechaHoraListadoEsAr, isoToFechaHora } from '@/lib/viajeFechaHora';
 import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
@@ -64,9 +64,13 @@ import {
 } from '@/lib/viajesEstados';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type {
+  Chofer,
+  Cliente,
   Factura,
   PaginatedMeta,
   Producto,
+  Transportista,
+  Vehiculo,
   Viaje,
 } from '@/types/api';
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
@@ -77,10 +81,46 @@ type ViajesPaginatedResponse = {
   meta: PaginatedMeta;
 };
 
-export function ViajesTenantPage() {
+export function ViajesTenantPage({
+  tenantId,
+  embeddedInSuperadmin,
+}: {
+  tenantId?: string;
+  embeddedInSuperadmin?: boolean;
+} = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const maestro = useMaestroData();
+  const platform = Boolean(tenantId?.trim());
+  const tid = tenantId?.trim() ?? '';
+  const [clientesP, setClientesP] = useState<Cliente[]>([]);
+  const [choferesP, setChoferesP] = useState<Chofer[]>([]);
+  const [transportistasP, setTransportistasP] = useState<Transportista[]>([]);
+  const [vehiculosP, setVehiculosP] = useState<Vehiculo[]>([]);
+  const clientes = platform ? clientesP : maestro.clientes;
+  const choferes = platform ? choferesP : maestro.choferes;
+  const transportistas = platform ? transportistasP : maestro.transportistas;
+  const vehiculos = platform ? vehiculosP : maestro.vehiculos;
+
+  function viajeApiUrl(id: string) {
+    if (!platform) return `/api/viajes/${encodeURIComponent(id)}`;
+    return `/api/platform/viajes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+  }
+
+  function facturasPorClienteUrl(clienteId: string) {
+    if (!platform) {
+      return `/api/facturacion/facturas?clienteId=${encodeURIComponent(clienteId)}`;
+    }
+    return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}&clienteId=${encodeURIComponent(clienteId)}`;
+  }
+
+  function facturaPatchUrl(facturaId: string) {
+    if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(facturaId)}`;
+    return `/api/platform/facturas/${encodeURIComponent(facturaId)}?tenantId=${encodeURIComponent(tid)}`;
+  }
+
+  const facturacionNavExtras = () => (platform ? { tenantId: tid } : {});
   const [rows, setRows] = useState<Viaje[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +133,6 @@ export function ViajesTenantPage() {
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
-  const { clientes, choferes, transportistas, vehiculos } = useMaestroData();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
@@ -168,14 +207,52 @@ export function ViajesTenantPage() {
   );
 
   useEffect(() => {
+    if (!platform || !tid || !isLoaded || !isSignedIn) {
+      setClientesP([]);
+      setChoferesP([]);
+      setTransportistasP([]);
+      setVehiculosP([]);
+      return;
+    }
+    let cancelled = false;
+    const q = `tenantId=${encodeURIComponent(tid)}`;
+    void (async () => {
+      try {
+        const [c, ch, tr, vh] = await Promise.all([
+          apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
+          apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
+          apiJson<Transportista[]>(`/api/platform/transportistas?${q}`, () => getToken()),
+          apiJson<Vehiculo[]>(`/api/platform/vehiculos?${q}`, () => getToken()),
+        ]);
+        if (!cancelled) {
+          setClientesP(c);
+          setChoferesP(ch);
+          setTransportistasP(tr);
+          setVehiculosP(vh);
+        }
+      } catch {
+        if (!cancelled) {
+          setClientesP([]);
+          setChoferesP([]);
+          setTransportistasP([]);
+          setVehiculosP([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [platform, tid, isLoaded, isSignedIn, getToken]);
+
+  useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const d = await apiJson<{ items: Producto[] }>(
-          '/api/stock/productos/paginated?page=1&pageSize=100&filtroActivo=activos',
-          () => getToken(),
-        );
+        const url = platform
+          ? `/api/platform/stock/productos/paginated?tenantId=${encodeURIComponent(tid)}&page=1&pageSize=100&filtroActivo=activos`
+          : '/api/stock/productos/paginated?page=1&pageSize=100&filtroActivo=activos';
+        const d = await apiJson<{ items: Producto[] }>(url, () => getToken());
         if (!cancelled) setProductosCatalogo(d.items);
       } catch {
         if (!cancelled) setProductosCatalogo([]);
@@ -184,16 +261,20 @@ export function ViajesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, platform, tid]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    if (platform && !tid) return;
     let cancelled = false;
     (async () => {
       try {
+        const base = platform
+          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
+          : '/api/viajes/paginated?';
         const [rSF, rSC] = await Promise.all([
-          apiJson<ViajesPaginatedResponse>('/api/viajes/paginated?estado=finalizado_sin_facturar&page=1&pageSize=1', () => getToken()),
-          apiJson<ViajesPaginatedResponse>('/api/viajes/paginated?estado=facturado_sin_cobrar&page=1&pageSize=1', () => getToken()),
+          apiJson<ViajesPaginatedResponse>(`${base}estado=finalizado_sin_facturar&page=1&pageSize=1`, () => getToken()),
+          apiJson<ViajesPaginatedResponse>(`${base}estado=facturado_sin_cobrar&page=1&pageSize=1`, () => getToken()),
         ]);
         if (!cancelled) setResumen({ sinFacturar: rSF.meta.total, sinCobrar: rSC.meta.total });
       } catch {
@@ -201,10 +282,11 @@ export function ViajesTenantPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, platform, tid]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    if (platform && !tid) return;
     let cancelled = false;
     (async () => {
       try {
@@ -213,7 +295,7 @@ export function ViajesTenantPage() {
         params.set('pageSize', String(pageSize));
         const {
           clienteId: cid,
-          transportistaId: tid,
+          transportistaId: transpFiltro,
           estado: estF,
           tipoFecha: tf,
           fechaDesde: fd,
@@ -222,7 +304,7 @@ export function ViajesTenantPage() {
           ubicacion: ut,
         } = filtrosAplicadosRef.current;
         if (cid) params.set('clienteId', cid);
-        if (tid) params.set('transportistaId', tid);
+        if (transpFiltro) params.set('transportistaId', transpFiltro);
         if (estF.trim()) params.set('estado', estF.trim());
         if ((tf === 'carga' || tf === 'descarga') && (fd.trim() || fh.trim())) {
           params.set('tipoFecha', tf);
@@ -234,8 +316,11 @@ export function ViajesTenantPage() {
           params.set('tipoUbicacion', tu);
           params.set('ubicacion', utTrim);
         }
+        const listUrl = platform
+          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&${params.toString()}`
+          : `/api/viajes/paginated?${params.toString()}`;
         const data = await apiJson<ViajesPaginatedResponse>(
-          `/api/viajes/paginated?${params.toString()}`,
+          listUrl,
           () => getTokenRef.current(),
         );
         if (!cancelled) {
@@ -248,7 +333,7 @@ export function ViajesTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'viajes'));
+          setError(friendlyError(e, platform ? 'plataforma' : 'viajes'));
           setListadoRefetching(false);
         }
       }
@@ -256,7 +341,7 @@ export function ViajesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion]);
+  }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion, platform, tid]);
 
   function aplicarFiltroColumnaCliente(clienteId: string) {
     const cid = clienteId.trim();
@@ -468,6 +553,7 @@ export function ViajesTenantPage() {
     if (ids.length === 0 || !cid) return;
     navigate('/facturacion', {
       state: {
+        ...facturacionNavExtras(),
         newFacturaDraft: {
           clienteId: cid,
           viajeIds: ids,
@@ -589,7 +675,7 @@ export function ViajesTenantPage() {
       try {
         let v: Viaje | null = rows?.find((r) => r.id === id) ?? null;
         if (!v) {
-          v = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(id)}`, () => getToken());
+          v = await apiJson<Viaje>(viajeApiUrl(id), () => getToken());
         }
         if (cancelled || !v) return;
         startEdit(v, 'remoto');
@@ -622,7 +708,7 @@ export function ViajesTenantPage() {
     setSavingEstadoId(v.id);
     setError(null);
     try {
-      const updated = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(v.id)}`, () => getToken(), {
+      const updated = await apiJson<Viaje>(viajeApiUrl(v.id), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({ estado: nuevoEstado }),
       });
@@ -638,13 +724,13 @@ export function ViajesTenantPage() {
   async function navigateToFacturacion(v: Viaje) {
     try {
       const facturasCliente = await apiJson<Factura[]>(
-        `/api/facturacion/facturas?clienteId=${encodeURIComponent(v.clienteId)}`,
+        facturasPorClienteUrl(v.clienteId ?? ''),
         () => getToken(),
       );
       // Si el viaje ya está vinculado a una factura, ir directamente a ella
       const yaVinculada = facturasCliente.find((f) => f.viajeIds.includes(v.id));
       if (yaVinculada) {
-        navigate('/facturacion', { state: { expandFacturaId: yaVinculada.id } });
+        navigate('/facturacion', { state: { ...facturacionNavExtras(), expandFacturaId: yaVinculada.id } });
         return;
       }
       // Si el cliente tiene otras facturas, mostrar el modal de elección
@@ -657,6 +743,7 @@ export function ViajesTenantPage() {
     }
     navigate('/facturacion', {
       state: {
+        ...facturacionNavExtras(),
         newFacturaDraft: {
           clienteId: v.clienteId ?? '',
           viajeIds: [v.id],
@@ -672,6 +759,7 @@ export function ViajesTenantPage() {
       setFacturarOpcionState(null);
       navigate('/facturacion', {
         state: {
+          ...facturacionNavExtras(),
           newFacturaDraft: {
             clienteId: viaje.clienteId ?? '',
             viajeIds: [viaje.id],
@@ -685,12 +773,12 @@ export function ViajesTenantPage() {
     if (!facturaTarget) return;
     setFacturarOpcionBusy(true);
     try {
-      await apiJson(`/api/facturacion/facturas/${encodeURIComponent(opcion.facturaId)}`, () => getToken(), {
+      await apiJson(facturaPatchUrl(opcion.facturaId), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({ viajeIds: [...facturaTarget.viajeIds, viaje.id] }),
       });
       setFacturarOpcionState(null);
-      navigate('/facturacion', { state: { expandFacturaId: opcion.facturaId } });
+      navigate('/facturacion', { state: { ...facturacionNavExtras(), expandFacturaId: opcion.facturaId } });
     } catch (e) {
       setError(friendlyError(e, 'facturacion'));
     } finally {
@@ -773,7 +861,7 @@ export function ViajesTenantPage() {
     setSavingId(viajeId);
     setError(null);
     try {
-      const updated = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(viajeId)}`, () => getToken(), {
+      const updated = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({
           numero: draft.numero.trim(),
@@ -829,36 +917,18 @@ export function ViajesTenantPage() {
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
-  function formatFechaCargaCelda(iso: string | null | undefined) {
-    if (!iso) return '—';
-    try {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return '—';
-      const soloFecha = d.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-      // Cuando hora/minuto vienen en 00:00, tratamos la hora como no seteada.
-      if (d.getHours() === 0 && d.getMinutes() === 0) return soloFecha;
-      const hora = d.toLocaleTimeString('es-AR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      return `${soloFecha} ${hora}`;
-    } catch {
-      return '—';
-    }
-  }
-
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Viajes
-      </h1>
-      <p className="mt-2 text-vialto-steel">
-        Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
-      </p>
+      {!embeddedInSuperadmin && (
+        <>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+            Viajes
+          </h1>
+          <p className="mt-2 text-vialto-steel">
+            Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
+          </p>
+        </>
+      )}
 
       {resumen && (resumen.sinFacturar > 0 || resumen.sinCobrar > 0) && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -931,7 +1001,7 @@ export function ViajesTenantPage() {
         </div>
         <div className="flex shrink-0 justify-end gap-2">
           <Link
-            to="/viajes/nuevo"
+            to={platform ? `/viajes/nuevo?tenantId=${encodeURIComponent(tid)}` : '/viajes/nuevo'}
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
             Crear viaje
@@ -1271,13 +1341,13 @@ export function ViajesTenantPage() {
                       className="block"
                         title={v.fechaCarga ?? undefined}
                       >
-                        {formatFechaCargaCelda(v.fechaCarga)}
+                        {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
                       <span
                         className="block text-xs text-vialto-steel/90"
                         title={v.fechaDescarga ?? undefined}
                       >
-                        {formatFechaCargaCelda(v.fechaDescarga)}
+                        {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                       </span>
                     </div>
                 </td>
@@ -1306,7 +1376,19 @@ export function ViajesTenantPage() {
                     onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     onFacturar={() => void navigateToFacturacion(v)}
                     onExportar={() => setExportarViaje(v)}
-                    onVerFactura={v.facturaId ? () => navigate(`/facturacion?factura=${v.facturaId}`) : undefined}
+                    onVerFactura={
+                      v.facturaId
+                        ? () =>
+                            navigate(
+                              platform
+                                ? '/facturacion'
+                                : `/facturacion?factura=${v.facturaId}`,
+                              platform
+                                ? { state: { ...facturacionNavExtras(), expandFacturaId: v.facturaId } }
+                                : undefined,
+                            )
+                        : undefined
+                    }
                   />
                 </td>
               </tr>
@@ -1402,6 +1484,9 @@ export function ViajesTenantPage() {
           }}
           saving={savingId === editingId}
           error={error}
+          crearVehiculoHref={
+            platform ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}` : undefined
+          }
         />
       )}
 
@@ -1417,6 +1502,7 @@ export function ViajesTenantPage() {
       <AgregarGastoModal
         open={agregarGastoViaje != null}
         viaje={agregarGastoViaje}
+        tenantId={platform ? tid : undefined}
         onSuccess={(updated) => {
           setRows((prev) => (prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev));
           if (editingId === updated.id) {
@@ -1437,6 +1523,7 @@ export function ViajesTenantPage() {
       <RegistrarPagoTransportistaModal
         open={registrarPagoViaje != null}
         viaje={registrarPagoViaje}
+        tenantId={platform ? tid : undefined}
         onSuccess={(updated) => {
           setRows((prev) => (prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev));
           if (editingId === updated.id) {
@@ -1460,6 +1547,7 @@ export function ViajesTenantPage() {
         <ExportarViajeModal
           viaje={exportarViaje}
           onClose={() => setExportarViaje(null)}
+          tenantId={platform ? tid : undefined}
         />
       )}
 

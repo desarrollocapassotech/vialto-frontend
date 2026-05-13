@@ -1,15 +1,15 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Producto, PaginatedMeta } from '@/types/api';
-import { etiquetaUnidadProducto } from '@/lib/unidadesProducto';
+import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
-
-// ─── Modal modes ─────────────────────────────────────────────────────────────
 
 type ModalState =
   | { mode: 'closed' }
@@ -17,26 +17,21 @@ type ModalState =
   | { mode: 'edit'; producto: Producto }
   | { mode: 'presentaciones'; producto: Producto };
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-
 export function ProductosTenantPage() {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
-  const puedeGestionar = orgRole === 'org:admin' || orgRole === 'org:supervisor';
+  const { user } = useUser();
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
 
   const [rows, setRows] = useState<Producto[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
+  const [nombreFiltroInput, setNombreFiltroInput] = useState('');
+  const [nombreFiltro, setNombreFiltro] = useState('');
+  const [unidadFiltro, setUnidadFiltro] = useState('');
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('activos');
   const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
-
-  useEffect(() => {
-    const t = setTimeout(() => setQDebounced(q.trim()), 300);
-    return () => clearTimeout(t);
-  }, [q]);
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -45,19 +40,20 @@ export function ProductosTenantPage() {
       pageSize: String(pageSize),
       filtroActivo,
     });
-    if (qDebounced) params.set('q', qDebounced);
+    if (nombreFiltro) params.set('q', nombreFiltro);
+    if (unidadFiltro) params.set('unidadMedida', unidadFiltro);
     const data = await apiJson<Paginated>(
       `/api/stock/productos/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
     setMeta(data.meta);
-  }, [getToken, isLoaded, isSignedIn, page, pageSize, qDebounced, filtroActivo]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize, nombreFiltro, unidadFiltro, filtroActivo]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         await load();
         if (!cancelled) setError(null);
@@ -69,12 +65,14 @@ export function ProductosTenantPage() {
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isLoaded, isSignedIn, load]);
 
   useEffect(() => {
     setPage(1);
-  }, [qDebounced, filtroActivo]);
+  }, [nombreFiltro, unidadFiltro, filtroActivo]);
 
   async function toggleActivo(row: Producto) {
     const mensaje = row.activo
@@ -94,15 +92,20 @@ export function ProductosTenantPage() {
     }
   }
 
-  const filtroLabel = useMemo(
+  const anyFiltroActivo = useMemo(
     () =>
-      ({
-        todos: 'Todos',
-        activos: 'Solo activos',
-        inactivos: 'Solo inactivos',
-      })[filtroActivo],
-    [filtroActivo],
+      Boolean(nombreFiltro.trim()) ||
+      Boolean(unidadFiltro) ||
+      filtroActivo !== 'activos',
+    [nombreFiltro, unidadFiltro, filtroActivo],
   );
+
+  function limpiarFiltros() {
+    setNombreFiltroInput('');
+    setNombreFiltro('');
+    setUnidadFiltro('');
+    setFiltroActivo('activos');
+  }
 
   return (
     <div className="w-full">
@@ -110,39 +113,24 @@ export function ProductosTenantPage() {
         Productos
       </h1>
       <p className="mt-2 text-vialto-steel max-w-2xl">
-        Catálogo único de productos del depósito. Se reutiliza en ingresos, egresos, divisiones
-        de bultos y el panel de stock.
+        Catálogo de productos del depósito.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3 justify-between">
-        <div className="flex flex-wrap gap-3 items-end">
-          <label className="flex flex-col gap-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Buscar por nombre
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Ej. rollo kraft, palet…"
-              className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Estado
-            <select
-              value={filtroActivo}
-              onChange={(e) => setFiltroActivo(e.target.value as 'todos' | 'activos' | 'inactivos')}
-              className="h-9 border border-black/15 bg-white px-2 text-sm min-w-[10rem]"
-            >
-              <option value="todos">Todos</option>
-              <option value="activos">Solo activos</option>
-              <option value="inactivos">Solo inactivos</option>
-            </select>
-          </label>
-        </div>
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         {puedeGestionar && (
           <button
             type="button"
             onClick={() => setModal({ mode: 'create' })}
-            className="h-10 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
             Nuevo producto
           </button>
@@ -155,26 +143,99 @@ export function ProductosTenantPage() {
         </p>
       )}
 
-      <p className="mt-2 text-xs text-vialto-steel">
-        Filtro: {filtroLabel}
-        {qDebounced ? ` · búsqueda: "${qDebounced}"` : ''}
-      </p>
-
       <div className="mt-4 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
         <table className="w-full text-left text-base">
           <thead>
             <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Unidad</th>
-              <th className="px-4 py-3">Presentaciones</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Nombre"
+                  filterActive={!!nombreFiltro.trim()}
+                  filterSignature={nombreFiltro}
+                >
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={nombreFiltroInput}
+                      onChange={(e) => setNombreFiltroInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setNombreFiltro(nombreFiltroInput.trim());
+                      }}
+                      placeholder="Buscar…"
+                      className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                        nombreFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      }`}
+                      aria-label="Filtrar por nombre de producto"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
+                      className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Unidad"
+                  filterActive={!!unidadFiltro}
+                  filterSignature={unidadFiltro}
+                >
+                  <select
+                    value={unidadFiltro}
+                    onChange={(e) => setUnidadFiltro(e.target.value)}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      unidadFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar por unidad de medida"
+                  >
+                    <option value="">Todas</option>
+                    {UNIDADES_PRODUCTO_OPCIONES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                Presentaciones
+              </th>
+              <th scope="col" className="px-4 py-3 align-top">
+                <ViajesListadoHeaderFiltro
+                  title="Estado"
+                  filterActive={filtroActivo !== 'todos'}
+                  filterSignature={filtroActivo}
+                >
+                  <select
+                    value={filtroActivo}
+                    onChange={(e) =>
+                      setFiltroActivo(e.target.value as 'todos' | 'activos' | 'inactivos')
+                    }
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroActivo !== 'todos' ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar por estado del producto"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="activos">Solo activos</option>
+                    <option value="inactivos">Solo inactivos</option>
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className="px-4 py-3 text-right align-top">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">Cargando…</td>
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                  Cargando…
+                </td>
               </tr>
             )}
             {rows?.length === 0 && (
@@ -301,7 +362,7 @@ export function ProductosTenantPage() {
           modo="create"
           getToken={getToken}
           onClose={() => setModal({ mode: 'closed' })}
-          onSaved={async (_p) => {
+          onSaved={async () => {
             setModal({ mode: 'closed' });
             await load();
           }}
@@ -314,7 +375,7 @@ export function ProductosTenantPage() {
           productoInicial={modal.producto}
           getToken={getToken}
           onClose={() => setModal({ mode: 'closed' })}
-          onSaved={async (_p) => {
+          onSaved={async () => {
             setModal({ mode: 'closed' });
             await load();
           }}

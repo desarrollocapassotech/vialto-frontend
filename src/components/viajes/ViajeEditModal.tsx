@@ -100,6 +100,8 @@ export type ViajeEditModalProps = {
   onFacturar?: () => void;
   saving: boolean;
   error: string | null;
+  /** Enlace «nuevo vehículo» en flota propia (p. ej. con `?tenantId=` para superadmin). */
+  crearVehiculoHref?: string;
 };
 
 const labelClass =
@@ -130,6 +132,7 @@ export function ViajeEditModal({
   onFacturar,
   saving,
   error,
+  crearVehiculoHref = '/vehiculos/nuevo',
 }: ViajeEditModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -414,7 +417,7 @@ export function ViajeEditModal({
                   </div>
                   <ViajeVehiculosLista
                     groupId={`viaje-modal-${draft.numero || 'e'}`}
-                    crearVehiculoHref="/vehiculos/nuevo"
+                    crearVehiculoHref={crearVehiculoHref}
                     rows={draft.vehiculosRows}
                     onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
                     vehiculos={vehiculosPropios}

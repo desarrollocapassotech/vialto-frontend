@@ -21,7 +21,7 @@ import {
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
-import type { Factura, Viaje } from '@/types/api';
+import type { Cliente, Factura, Viaje } from '@/types/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -48,17 +48,49 @@ function fmtFecha(iso: string | null) {
 }
 
 type FacturaNuevaNavState = {
+  tenantId?: string;
   newFacturaDraft?: { clienteId: string; viajeIds: string[] };
   expandFacturaId?: string;
 };
 
 // ─── componente principal ─────────────────────────────────────────────────────
 
-export function FacturacionTenantPage() {
+export function FacturacionTenantPage({
+  tenantId,
+  embeddedInSuperadmin,
+}: {
+  tenantId?: string;
+  /** Cuando true, el padre (superadmin) ya muestra título y barra de empresa. */
+  embeddedInSuperadmin?: boolean;
+} = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { clientes } = useMaestroData();
+  const maestro = useMaestroData();
+  const platform = Boolean(tenantId?.trim());
+  const tid = tenantId?.trim() ?? '';
+  const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
+  const clientes = platform ? clientesPlatform : maestro.clientes;
+
+  const facturasListUrl = useMemo(() => {
+    if (!platform) return '/api/facturacion/facturas';
+    return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}`;
+  }, [platform, tid]);
+
+  const viajesListUrl = useMemo(() => {
+    if (!platform) return '/api/viajes';
+    return `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`;
+  }, [platform, tid]);
+
+  function facturaUrl(id: string) {
+    if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
+    return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+  }
+
+  function facturasCreateUrl() {
+    if (!platform) return '/api/facturacion/facturas';
+    return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}`;
+  }
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [viajes, setViajes] = useState<Viaje[]>([]);
@@ -93,6 +125,7 @@ export function FacturacionTenantPage() {
   const [estadoFiltro, setEstadoFiltro] = useState('');
 
   const fetchRef = useRef(0);
+  const expandFacturaHandledRef = useRef(false);
 
   const viajesNuevaFactura = useMemo(
     () => viajesFiltradosParaFactura(viajes, draft.tipo, draft.clienteId),
@@ -111,6 +144,28 @@ export function FacturacionTenantPage() {
     () => (editingId && facturas ? facturas.find((r) => r.id === editingId) ?? null : null),
     [editingId, facturas],
   );
+
+  useEffect(() => {
+    if (!platform || !tid || !isLoaded || !isSignedIn) {
+      setClientesPlatform([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const c = await apiJson<Cliente[]>(
+          `/api/platform/clientes?tenantId=${encodeURIComponent(tid)}`,
+          () => getToken(),
+        );
+        if (!cancelled) setClientesPlatform(c);
+      } catch {
+        if (!cancelled) setClientesPlatform([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [platform, tid, isLoaded, isSignedIn, getToken]);
 
   const anyFiltroActivo =
     !!numFiltro.trim() ||
@@ -175,20 +230,23 @@ export function FacturacionTenantPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    if (platform && !tid) return;
     let cancelled = false;
     (async () => {
       try {
-        const facturasData = await apiJson<Factura[]>('/api/facturacion/facturas', () => getToken());
+        const facturasData = await apiJson<Factura[]>(facturasListUrl, () => getToken());
         if (!cancelled) {
           setFacturas(facturasData);
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'facturacion'));
+        if (!cancelled) setError(friendlyError(e, platform ? 'plataforma' : 'facturacion'));
       }
     })();
-    return () => { cancelled = true; };
-  }, [getToken, isLoaded, isSignedIn]);
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, facturasListUrl, platform, tid]);
 
   /** Abrir factura desde enlace (p. ej. alertas): `?factura=id` */
   useEffect(() => {
@@ -222,7 +280,7 @@ export function FacturacionTenantPage() {
     if (viajes.length > 0 || viajesLoading) return;
     setViajesLoading(true);
     try {
-      const data = await apiJson<Viaje[]>('/api/viajes', () => getToken());
+      const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
       setViajes(data);
     } catch { /* silencioso — el form mostrará lista vacía */ }
     finally { setViajesLoading(false); }
@@ -233,7 +291,7 @@ export function FacturacionTenantPage() {
   useEffect(() => {
     const state = location.state as FacturaNuevaNavState | null;
     if (!state) return;
-    if (state.expandFacturaId) { window.history.replaceState({}, ''); return; }
+    if (state.expandFacturaId?.trim()) return;
     if (!state.newFacturaDraft) return;
     const { clienteId, viajeIds } = state.newFacturaDraft;
     setDraft({ ...emptyFacturaDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
@@ -242,12 +300,23 @@ export function FacturacionTenantPage() {
     window.history.replaceState({}, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const expand = (location.state as FacturaNuevaNavState | null)?.expandFacturaId?.trim();
+    if (!expand || facturas === null || expandFacturaHandledRef.current) return;
+    const f = facturas.find((x) => x.id === expand);
+    if (!f) return;
+    expandFacturaHandledRef.current = true;
+    window.history.replaceState({}, '');
+    startEdit(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facturas]);
+
   // ── refetch ────────────────────────────────────────────────────────────────
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
     try {
-      const data = await apiJson<Factura[]>('/api/facturacion/facturas', () => getToken());
+      const data = await apiJson<Factura[]>(facturasListUrl, () => getToken());
       if (gen === fetchRef.current) setFacturas(data);
     } catch { /* silencioso */ }
   }
@@ -264,7 +333,7 @@ export function FacturacionTenantPage() {
     }
     setSaving(true);
     try {
-      await apiJson<Factura>('/api/facturacion/facturas', () => getToken(), {
+      await apiJson<Factura>(facturasCreateUrl(), () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
           numero: draft.numero.trim(),
@@ -313,7 +382,7 @@ export function FacturacionTenantPage() {
     setSavingEditId(editingId);
     try {
       const updated = await apiJson<Factura>(
-        `/api/facturacion/facturas/${encodeURIComponent(editingId)}`,
+        facturaUrl(editingId),
         () => getToken(),
         {
           method: 'PATCH',
@@ -343,7 +412,7 @@ export function FacturacionTenantPage() {
     if (!f || deletingId) return;
     setDeletingId(f.id);
     try {
-      await apiJson(`/api/facturacion/facturas/${f.id}`, () => getToken(), { method: 'DELETE' });
+      await apiJson(facturaUrl(f.id), () => getToken(), { method: 'DELETE' });
       setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
       if (editingId === f.id) cancelEdit();
       setFacturaDeleteConfirm(null);
@@ -379,8 +448,12 @@ export function FacturacionTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">Facturación</h1>
-      <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
+      {!embeddedInSuperadmin && (
+        <>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">Facturación</h1>
+          <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
+        </>
+      )}
 
       {/* acciones */}
       <div className="mt-4">
