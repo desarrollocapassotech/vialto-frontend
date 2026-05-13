@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
@@ -11,6 +11,7 @@ import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import type { Cliente, MovimientoStock, Presentacion, Producto, StockEgresoRemitoConfig, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 
@@ -32,9 +33,10 @@ export function EgresosStockTenantPage({
   clientesExternos?: Cliente[];
 }) {
   const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const maestro = useMaestroData();
   const clientes = clientesExternos ?? maestro.clientes;
-  const puedeGestionar = orgRole === 'org:admin' || orgRole === 'org:supervisor';
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
   const puedeEditarFormatoRemito = Boolean(tenantId) || puedeGestionar;
 
   const platform = Boolean(tenantId);

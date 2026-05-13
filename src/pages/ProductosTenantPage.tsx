@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -7,6 +7,7 @@ import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidad
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -18,7 +19,8 @@ type ModalState =
 
 export function ProductosTenantPage() {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
-  const puedeGestionar = orgRole === 'org:admin' || orgRole === 'org:supervisor';
+  const { user } = useUser();
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
 
   const [rows, setRows] = useState<Producto[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);

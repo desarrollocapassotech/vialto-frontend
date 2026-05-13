@@ -7,6 +7,7 @@ import { apiFetch, apiJson } from '@/lib/api';
 type Props = {
   viaje: Viaje;
   onClose: () => void;
+  tenantId?: string;
 };
 
 type FieldDef = { key: string; type: 'text' | 'date' | 'number' | 'chofer-select' | 'vehiculo-select' };
@@ -62,8 +63,29 @@ function fmtFecha(iso: string | null | undefined): string {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function ExportarViajeModal({ viaje, onClose }: Props) {
+export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
   const { getToken } = useAuth();
+  const tid = tenantId?.trim() ?? '';
+  const platform = Boolean(tid);
+
+  function maestroListUrl(kind: 'choferes' | 'vehiculos') {
+    if (platform) return `/api/platform/${kind}?tenantId=${encodeURIComponent(tid)}`;
+    return `/api/${kind}`;
+  }
+
+  function patchEntityUrl(apiModule: string, entityId: string) {
+    if (platform) {
+      return `/api/platform/${apiModule}/${encodeURIComponent(entityId)}?tenantId=${encodeURIComponent(tid)}`;
+    }
+    return `/api/${apiModule}/${encodeURIComponent(entityId)}`;
+  }
+
+  function viajePdfUrl(suffix: 'paut' | 'mic-crt') {
+    if (platform) {
+      return `/api/platform/viajes/${encodeURIComponent(viaje.id)}/${suffix}?tenantId=${encodeURIComponent(tid)}`;
+    }
+    return `/api/viajes/${encodeURIComponent(viaje.id)}/${suffix}`;
+  }
   const [generandoPaut, setGenerandoPaut] = useState(false);
   const [generandoMicCrt, setGenerandoMicCrt] = useState(false);
   const [error, setError] = useState<DescargaError | null>(null);
@@ -80,12 +102,12 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
     if (!error?.groups) return;
     const allFields = Object.values(error.groups).flatMap((g) => g.fields);
     if (allFields.includes('Chofer asignado') && choferesList.length === 0) {
-      void apiJson<Chofer[]>('/api/choferes', getToken).then(setChoferesList).catch(() => {});
+      void apiJson<Chofer[]>(maestroListUrl('choferes'), getToken).then(setChoferesList).catch(() => {});
     }
     if (allFields.includes('Vehículo asignado') && vehiculosList.length === 0) {
-      void apiJson<Vehiculo[]>('/api/vehiculos', getToken).then(setVehiculosList).catch(() => {});
+      void apiJson<Vehiculo[]>(maestroListUrl('vehiculos'), getToken).then(setVehiculosList).catch(() => {});
     }
-  }, [error]);
+  }, [error, tid]);
 
   async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
     try {
@@ -145,7 +167,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
           }
         }
         if (Object.keys(body).length > 0) {
-          await apiJson(`/api/${config.apiModule}/${entry.entityId}`, getToken, {
+          await apiJson(patchEntityUrl(config.apiModule, entry.entityId), getToken, {
             method: 'PATCH',
             body: JSON.stringify(body),
           });
@@ -281,7 +303,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
           <button
             type="button"
             disabled={ocupado}
-            onClick={() => void ejecutarDescarga(`/api/viajes/${viaje.id}/paut`, `PAUT-${viaje.numero}.pdf`, setGenerandoPaut)}
+            onClick={() => void ejecutarDescarga(viajePdfUrl('paut'), `PAUT-${viaje.numero}.pdf`, setGenerandoPaut)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-sm font-medium text-vialto-charcoal">
@@ -293,7 +315,7 @@ export function ExportarViajeModal({ viaje, onClose }: Props) {
           <button
             type="button"
             disabled={ocupado || !permiteMicCrt}
-            onClick={() => void ejecutarDescarga(`/api/viajes/${viaje.id}/mic-crt`, `MIC-CRT-${viaje.numero}.pdf`, setGenerandoMicCrt)}
+            onClick={() => void ejecutarDescarga(viajePdfUrl('mic-crt'), `MIC-CRT-${viaje.numero}.pdf`, setGenerandoMicCrt)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             title={!permiteMicCrt ? 'Disponible una vez que el viaje esté finalizado' : undefined}
           >

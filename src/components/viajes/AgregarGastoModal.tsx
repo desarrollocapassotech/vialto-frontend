@@ -15,9 +15,11 @@ type Props = {
   viaje: Viaje | null;
   onSuccess: (updated: Viaje) => void;
   onClose: () => void;
+  /** Clerk org id (empresa) para rutas `/api/platform/...` en vista superadmin. */
+  tenantId?: string;
 };
 
-export function AgregarGastoModal({ open, viaje, onSuccess, onClose }: Props) {
+export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }: Props) {
   const { getToken } = useAuth();
   const [descripcion, setDescripcion] = useState('');
   const [montoStr, setMontoStr] = useState('');
@@ -66,8 +68,15 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose }: Props) {
       };
       if (fecha.trim()) body.fecha = fecha.trim();
 
+      const q = tenantId?.trim()
+        ? `?tenantId=${encodeURIComponent(tenantId.trim())}`
+        : '';
+      const base = tenantId?.trim()
+        ? `/api/platform/viajes/${encodeURIComponent(viajeActual.id)}/gastos${q}`
+        : `/api/viajes/${encodeURIComponent(viajeActual.id)}/gastos`;
+
       const updated = await apiJson<Viaje>(
-        `/api/viajes/${encodeURIComponent(viajeActual.id)}/gastos`,
+        base,
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );
