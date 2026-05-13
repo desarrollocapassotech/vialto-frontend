@@ -13,6 +13,7 @@ export function EgresosStockSuperadminPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tenantId, setTenantId] = useState(() => searchParams.get('tenantId') ?? '');
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientesLoading, setClientesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
 
   useEffect(() => {
     const t = searchParams.get('tenantId') ?? '';
@@ -22,8 +23,15 @@ export function EgresosStockSuperadminPage() {
   const handleTenantChange = useCallback(
     (v: string) => {
       setTenantId(v);
-      if (v) setSearchParams({ tenantId: v });
-      else setSearchParams({});
+      if (v) {
+        setSearchParams({ tenantId: v });
+        setClientes([]);
+        setClientesLoading(true);
+      } else {
+        setSearchParams({});
+        setClientes([]);
+        setClientesLoading(false);
+      }
     },
     [setSearchParams],
   );
@@ -31,14 +39,28 @@ export function EgresosStockSuperadminPage() {
   useEffect(() => {
     if (!tenantId) {
       setClientes([]);
+      setClientesLoading(false);
       return;
     }
+    setClientes([]);
+    setClientesLoading(true);
+    let cancelled = false;
     void apiJson<Cliente[]>(
       `/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`,
       () => getToken(),
     )
-      .then(setClientes)
-      .catch(() => setClientes([]));
+      .then((data) => {
+        if (!cancelled) setClientes(data);
+      })
+      .catch(() => {
+        if (!cancelled) setClientes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setClientesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tenantId, getToken]);
 
   return (
@@ -53,7 +75,11 @@ export function EgresosStockSuperadminPage() {
       {!tenantId ? (
         <p className="text-sm text-vialto-steel">Seleccioná una empresa para registrar egresos.</p>
       ) : (
-        <EgresosStockTenantPage tenantId={tenantId} clientesExternos={clientes} />
+        <EgresosStockTenantPage
+          tenantId={tenantId}
+          clientesExternos={clientes}
+          clientesExternosLoading={clientesLoading}
+        />
       )}
     </div>
   );

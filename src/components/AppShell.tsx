@@ -17,6 +17,14 @@ import {
   userButtonSidebarAppearance,
 } from './clerkSidebarAppearance';
 
+type NavItem = { to: string; label: string; end?: boolean };
+
+type NavGroup = {
+  /** `null` = sin rótulo (p. ej. solo inicio). */
+  title: string | null;
+  items: NavItem[];
+};
+
 export function AppShell() {
   const { organization } = useOrganization();
   const { orgRole } = useAuth();
@@ -26,41 +34,58 @@ export function AppShell() {
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
 
-  const nav = useMemo(() => {
+  const navGroups = useMemo((): NavGroup[] => {
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
-    const items: { to: string; label: string; end?: boolean }[] = [{ to: '/', label: homeLabel, end: true }];
+    const groups: NavGroup[] = [
+      { title: null, items: [{ to: '/', label: homeLabel, end: true }] },
+    ];
 
     if (superadmin) {
-      items.push({ to: '/superadmin/empresas', label: 'Empresas' });
-      items.push({ to: '/superadmin/usuarios', label: 'Usuarios' });
+      groups.push({
+        title: 'Plataforma',
+        items: [
+          { to: '/superadmin/empresas', label: 'Empresas' },
+          { to: '/superadmin/usuarios', label: 'Usuarios' },
+        ],
+      });
     }
 
-    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
-      items.push({ to: '/viajes', label: 'Viajes' });
-    }
-
-    if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
-      items.push({ to: '/facturacion', label: 'Facturación' });
-    }
-
-    if (superadmin || canAccessStock(tenant?.modules ?? [])) {
-      items.push({ to: '/stock/productos', label: 'Productos' });
-      items.push({ to: '/stock/ingresos', label: 'Ingresos' });
-      items.push({ to: '/stock/egresos', label: 'Egresos' });
-      items.push({ to: '/stock/movimientos', label: 'Movimientos', end: true });
-    }
-
-    items.push({ to: '/clientes', label: 'Clientes' });
-
-    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
+    const viajesModule = superadmin || canAccessViajes(tenant?.modules ?? []);
+    if (viajesModule) {
+      const items: NavItem[] = [{ to: '/viajes', label: 'Viajes' }];
       items.push(
         { to: '/transportistas', label: 'Transportistas' },
         { to: '/choferes', label: 'Choferes' },
         { to: '/vehiculos', label: 'Vehículos' },
       );
+      groups.push({ title: 'Viajes y flota', items });
     }
 
-    return items;
+    if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
+      groups.push({
+        title: 'Facturación',
+        items: [{ to: '/facturacion', label: 'Facturación' }],
+      });
+    }
+
+    if (superadmin || canAccessStock(tenant?.modules ?? [])) {
+      groups.push({
+        title: 'Stock',
+        items: [
+          { to: '/stock/productos', label: 'Productos' },
+          { to: '/stock/ingresos', label: 'Ingresos' },
+          { to: '/stock/egresos', label: 'Egresos' },
+          { to: '/stock/movimientos', label: 'Movimientos', end: true },
+        ],
+      });
+    }
+
+    groups.push({
+      title: 'Comercial',
+      items: [{ to: '/clientes', label: 'Clientes' }],
+    });
+
+    return groups;
   }, [superadmin, tenant?.modules]);
 
   const platformRole =
@@ -114,23 +139,42 @@ export function AppShell() {
           </p>
         </div>
 
-        <nav className="flex flex-col gap-1">
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end === true}
-              className={({ isActive }) =>
-                [
-                  'rounded px-3 py-2 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider transition-colors',
-                  isActive
-                    ? 'bg-vialto-fire text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white',
-                ].join(' ')
-              }
-            >
-              {item.label}
-            </NavLink>
+        <nav className="flex flex-col gap-5">
+          {navGroups.map((group, gi) => (
+            <div key={group.title ?? `g-${gi}`} className="flex flex-col gap-0.5">
+              {group.title &&
+              (group.items.length > 1 ||
+                group.items[0].label.toLowerCase() !== group.title.toLowerCase()) ? (
+                <div className="mb-1.5 px-2">
+                  <div className="flex items-center gap-2 border-b border-white/20 pb-2">
+                    <span
+                      className="h-4 w-1 shrink-0 rounded-sm bg-vialto-fire/90"
+                      aria-hidden
+                    />
+                    <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.2em] text-white/95">
+                      {group.title}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end === true}
+                  className={({ isActive }) =>
+                    [
+                      'rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
+                      isActive
+                        ? 'border-vialto-fire bg-vialto-fire text-white shadow-sm'
+                        : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white',
+                    ].join(' ')
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 

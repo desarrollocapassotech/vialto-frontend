@@ -22,6 +22,7 @@ export function ClienteSearchSelect({
   value,
   onChange,
   disabled,
+  loading = false,
   className,
   inputClassName = INPUT,
   placeholderCerrado = 'Elegí un cliente…',
@@ -39,6 +40,8 @@ export function ClienteSearchSelect({
   /** Permite dejar sin cliente (`value === ''`), con fila para vaciar en el panel. */
   allowEmptyValue?: boolean;
   emptyListChoiceLabel?: string;
+  /** Mientras carga el listado de clientes (evita mostrar «sin clientes»). */
+  loading?: boolean;
 }) {
   return (
     <SearchableEntitySelect<Cliente>
@@ -46,6 +49,7 @@ export function ClienteSearchSelect({
       value={value}
       onChange={onChange}
       disabled={disabled}
+      loading={loading}
       className={className}
       inputClassName={inputClassName}
       filterItems={filtrarClientesPorQuery}

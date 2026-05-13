@@ -14,6 +14,7 @@ import {
   listadoTablaThClass,
   listadoTablaWrapperClass,
 } from '@/lib/listadoTabla';
+import { movimientoStockTipoNumeroClass } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 function buildQsTenant(tenantId?: string): string {
@@ -141,7 +142,9 @@ export function IngresosStockHistorialTenantPage({
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
                   <td className={listadoTablaTdClass}>{m.presentacion?.nombre ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
-                  <td className={`${listadoTablaTdClass} text-right tabular-nums`}>{m.cantidad}</td>
+                  <td className={`${listadoTablaTdClass} text-right`}>
+                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad}</span>
+                  </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link
                       to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQsTenant(tenantId)}`}

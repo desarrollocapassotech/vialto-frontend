@@ -5,12 +5,18 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import {
+  movimientoStockTipoBadgeClass,
+  movimientoStockTipoLabel,
+  movimientoStockTipoNumeroClass,
+} from '@/lib/stockMovimientoTipo';
 import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetallePage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const tenantIdParam = searchParams.get('tenantId');
+  const fromMovimientosList = searchParams.get('from') === 'movimientos';
   const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
@@ -61,18 +67,37 @@ export function MovimientoStockDetallePage() {
     return <p className="text-vialto-steel py-8 text-center">Cargando…</p>;
   }
 
+  const volverMovimientosHref = (() => {
+    const q = new URLSearchParams();
+    if (tenantIdParam?.trim()) q.set('tenantId', tenantIdParam.trim());
+    const s = q.toString();
+    return `/stock/movimientos${s ? `?${s}` : ''}`;
+  })();
+
+  const volverHref = fromMovimientosList
+    ? volverMovimientosHref
+    : row.tipo === 'egreso'
+      ? '/stock/egresos'
+      : '/stock/ingresos';
+  const volverLabel = fromMovimientosList
+    ? 'Volver a movimientos'
+    : row.tipo === 'egreso'
+      ? 'Volver a egresos'
+      : 'Volver a ingresos';
+
   return (
     <div className="max-w-xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimiento de stock</h1>
-          <p className="mt-1 text-sm text-vialto-steel capitalize">{row.tipo}</p>
+          <p className="mt-1">
+            <span className={movimientoStockTipoBadgeClass(row.tipo)}>
+              {movimientoStockTipoLabel(row.tipo)}
+            </span>
+          </p>
         </div>
-        <Link
-          to={row.tipo === 'egreso' ? '/stock/egresos' : '/stock/ingresos'}
-          className="text-sm text-vialto-fire hover:underline shrink-0"
-        >
-          {row.tipo === 'egreso' ? 'Volver a egresos' : 'Volver a ingresos'}
+        <Link to={volverHref} className="text-sm text-vialto-fire hover:underline shrink-0">
+          {volverLabel}
         </Link>
       </div>
 
@@ -113,7 +138,9 @@ export function MovimientoStockDetallePage() {
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
             Cantidad
           </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{row.cantidad}</dd>
+          <dd className="sm:col-span-2 text-vialto-charcoal">
+            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad}</span>
+          </dd>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">

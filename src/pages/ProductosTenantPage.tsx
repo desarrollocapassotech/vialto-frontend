@@ -30,7 +30,7 @@ export function ProductosTenantPage() {
   const [nombreFiltroInput, setNombreFiltroInput] = useState('');
   const [nombreFiltro, setNombreFiltro] = useState('');
   const [unidadFiltro, setUnidadFiltro] = useState('');
-  const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('activos');
+  const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
   const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
 
   const load = useCallback(async () => {
@@ -96,7 +96,7 @@ export function ProductosTenantPage() {
     () =>
       Boolean(nombreFiltro.trim()) ||
       Boolean(unidadFiltro) ||
-      filtroActivo !== 'activos',
+      filtroActivo !== 'todos',
     [nombreFiltro, unidadFiltro, filtroActivo],
   );
 
@@ -104,7 +104,7 @@ export function ProductosTenantPage() {
     setNombreFiltroInput('');
     setNombreFiltro('');
     setUnidadFiltro('');
-    setFiltroActivo('activos');
+    setFiltroActivo('todos');
   }
 
   return (
