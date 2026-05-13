@@ -281,7 +281,6 @@ export interface Presentacion {
   nombre: string;
   cantidadEquivalente: number;
   unidadEquivalente: string;
-  pesoKg: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -306,4 +305,35 @@ export interface PlatformUser {
   role: string;
   platformRole?: string | null;
   createdAt: number | string;
+}
+
+export interface MovimientoStock {
+  id: string;
+  tenantId: string;
+  productoId: string;
+  producto?: { id: string; nombre: string; unidadMedida: string };
+  presentacionId: string | null;
+  presentacion?: { id: string; nombre: string } | null;
+  clienteId: string;
+  cliente?: { id: string; nombre: string };
+  tipo: 'ingreso' | 'egreso' | 'division';
+  cantidad: number;
+  observaciones: string | null;
+  remitoUrl: string | null;
+  createdBy: string;
+  fecha: string;
+  createdAt: string;
+}
+
+export interface StockItem {
+  id: string;
+  tenantId: string;
+  productoId: string;
+  producto?: { id: string; nombre: string; unidadMedida: string };
+  presentacionId: string;
+  presentacion?: { id: string; nombre: string };
+  clienteId: string;
+  cliente?: { id: string; nombre: string };
+  cantidad: number;
+  updatedAt: string;
 }

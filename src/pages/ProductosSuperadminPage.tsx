@@ -2,13 +2,12 @@ import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
-import { ApiError, apiJson } from '@/lib/api';
+import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import type { Producto, Presentacion, PaginatedMeta } from '@/types/api';
-import {
-  UNIDADES_PRODUCTO_OPCIONES,
-  etiquetaUnidadProducto,
-} from '@/lib/unidadesProducto';
+import type { Producto, PaginatedMeta } from '@/types/api';
+import { etiquetaUnidadProducto } from '@/lib/unidadesProducto';
+import { ProductoModal } from '@/components/stock/ProductoModal';
+import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
@@ -17,252 +16,6 @@ type ModalState =
   | { mode: 'create' }
   | { mode: 'edit'; producto: Producto }
   | { mode: 'presentaciones'; producto: Producto };
-
-// ─── Presentaciones panel (superadmin) ───────────────────────────────────────
-
-function PresentacionesPanel({
-  producto,
-  tenantId,
-  getToken,
-  onClose,
-}: {
-  producto: Producto;
-  tenantId: string;
-  getToken: () => Promise<string | null>;
-  onClose: () => void;
-}) {
-  const [rows, setRows] = useState<Presentacion[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editRow, setEditRow] = useState<Presentacion | null>(null);
-  const [nombre, setNombre] = useState('');
-  const [cantidad, setCantidad] = useState('');
-  const [unidad, setUnidad] = useState('');
-  const [pesoKg, setPesoKg] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const base = `/api/platform/stock/productos/${encodeURIComponent(producto.id)}/presentaciones?tenantId=${encodeURIComponent(tenantId)}`;
-
-  const load = useCallback(async () => {
-    try {
-      const data = await apiJson<Presentacion[]>(base, () => getToken());
-      setRows(data);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(friendlyError(e, 'plataforma'));
-    }
-  }, [base, getToken]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  function openCreate() {
-    setEditRow(null); setNombre(''); setCantidad(''); setUnidad(''); setPesoKg('');
-    setFormError(null); setFormOpen(true);
-  }
-
-  function openEdit(p: Presentacion) {
-    setEditRow(p); setNombre(p.nombre); setCantidad(String(p.cantidadEquivalente));
-    setUnidad(p.unidadEquivalente); setPesoKg(p.pesoKg !== null ? String(p.pesoKg) : '');
-    setFormError(null); setFormOpen(true);
-  }
-
-  async function submitForm() {
-    if (!nombre.trim()) { setFormError('El nombre es obligatorio.'); return; }
-    const cantidadNum = parseFloat(cantidad);
-    if (isNaN(cantidadNum) || cantidadNum <= 0) { setFormError('La cantidad debe ser un número positivo.'); return; }
-    if (!unidad.trim()) { setFormError('La unidad equivalente es obligatoria.'); return; }
-    const pesoNum = pesoKg.trim() ? parseFloat(pesoKg) : undefined;
-    if (pesoKg.trim() && (isNaN(pesoNum!) || pesoNum! < 0)) { setFormError('El peso debe ser ≥ 0.'); return; }
-
-    setSaving(true); setFormError(null);
-    try {
-      const body = { nombre: nombre.trim(), cantidadEquivalente: cantidadNum, unidadEquivalente: unidad.trim(), ...(pesoNum !== undefined ? { pesoKg: pesoNum } : {}) };
-      if (editRow) {
-        await apiJson(`/api/platform/stock/productos/${encodeURIComponent(producto.id)}/presentaciones/${encodeURIComponent(editRow.id)}?tenantId=${encodeURIComponent(tenantId)}`, () => getToken(), { method: 'PATCH', body: JSON.stringify(body) });
-      } else {
-        await apiJson(base, () => getToken(), { method: 'POST', body: JSON.stringify(body) });
-      }
-      setFormOpen(false); await load();
-    } catch (e) { setFormError(friendlyError(e, 'plataforma')); }
-    finally { setSaving(false); }
-  }
-
-  async function eliminar(p: Presentacion) {
-    if (!window.confirm(`¿Eliminar "${p.nombre}"?`)) return;
-    try {
-      await apiJson(`/api/platform/stock/productos/${encodeURIComponent(producto.id)}/presentaciones/${encodeURIComponent(p.id)}?tenantId=${encodeURIComponent(tenantId)}`, () => getToken(), { method: 'DELETE' });
-      await load();
-    } catch (e) { setLoadError(friendlyError(e, 'plataforma')); }
-  }
-
-  const opcionesSelect = useMemo(() => {
-    const out: { value: string; label: string }[] = UNIDADES_PRODUCTO_OPCIONES.map((o) => ({ value: o.value, label: o.label }));
-    if (formOpen && unidad.trim() && !out.some((o) => o.value === unidad)) out.push({ value: unidad, label: `${unidad} (valor previo)` });
-    return out;
-  }, [formOpen, unidad]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div role="dialog" aria-modal="true" className="w-full max-w-xl rounded border border-black/10 bg-white p-5 shadow-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">Presentaciones</h2>
-            <p className="text-sm text-vialto-steel mt-0.5">{producto.nombre}</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-vialto-steel hover:text-vialto-charcoal text-lg leading-none">✕</button>
-        </div>
-        {loadError && <p className="mb-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">{loadError}</p>}
-        <div className="overflow-y-auto flex-1 min-h-0">
-          {rows.length === 0 ? (
-            <p className="text-sm text-vialto-steel py-4">Sin presentaciones.</p>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-black/10 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.18em] text-vialto-fire">
-                  <th className="pb-2 pr-3">Nombre</th>
-                  <th className="pb-2 pr-3">Equivale a</th>
-                  <th className="pb-2 pr-3">Peso (kg)</th>
-                  <th className="pb-2 text-right">Acc.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <tr key={p.id} className="border-b border-black/5 hover:bg-vialto-mist/70">
-                    <td className="py-2 pr-3 font-medium">{p.nombre}</td>
-                    <td className="py-2 pr-3 text-vialto-steel">{p.cantidadEquivalente} {p.unidadEquivalente}</td>
-                    <td className="py-2 pr-3 text-vialto-steel">{p.pesoKg !== null ? `${p.pesoKg} kg` : '—'}</td>
-                    <td className="py-2 text-right space-x-2">
-                      <button type="button" onClick={() => openEdit(p)} className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">Editar</button>
-                      <button type="button" onClick={() => void eliminar(p)} className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 text-red-900 hover:bg-red-50">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        {!formOpen && (
-          <div className="mt-4 pt-4 border-t border-black/10">
-            <button type="button" onClick={openCreate} className="h-9 px-4 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-graphite">+ Agregar presentación</button>
-          </div>
-        )}
-        {formOpen && (
-          <div className="mt-4 pt-4 border-t border-black/10 grid gap-3">
-            <h3 className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.12em] text-vialto-charcoal">{editRow ? 'Editar presentación' : 'Nueva presentación'}</h3>
-            <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Nombre
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} className="h-9 border border-black/15 px-2 text-sm" />
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Cantidad equivalente
-                <input type="number" min="0.001" step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="h-9 border border-black/15 px-2 text-sm" />
-              </label>
-              <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Unidad equivalente
-                <select value={unidad} onChange={(e) => setUnidad(e.target.value)} className="h-9 border border-black/15 bg-white px-2 text-sm">
-                  <option value="">Seleccionar…</option>
-                  {opcionesSelect.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-            </div>
-            <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Peso kg (opcional)
-              <input type="number" min="0" step="any" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} className="h-9 border border-black/15 px-2 text-sm" />
-            </label>
-            {formError && <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">{formError}</p>}
-            <div className="flex justify-end gap-2">
-              <button type="button" disabled={saving} onClick={() => setFormOpen(false)} className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50">Cancelar</button>
-              <button type="button" disabled={saving} onClick={() => void submitForm()} className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Producto modal ───────────────────────────────────────────────────────────
-
-function ProductoModal({
-  modo,
-  productoInicial,
-  tenantId,
-  getToken,
-  onClose,
-  onSaved,
-}: {
-  modo: 'create' | 'edit';
-  productoInicial?: Producto;
-  tenantId: string;
-  getToken: () => Promise<string | null>;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [nombre, setNombre] = useState(productoInicial?.nombre ?? '');
-  const [descripcion, setDescripcion] = useState(productoInicial?.descripcion ?? '');
-  const [unidadMedida, setUnidadMedida] = useState(productoInicial?.unidadMedida ?? '');
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const opcionesSelect = useMemo(() => {
-    const out: { value: string; label: string }[] = UNIDADES_PRODUCTO_OPCIONES.map((o) => ({ value: o.value, label: o.label }));
-    if (unidadMedida.trim() && !out.some((o) => o.value === unidadMedida)) out.push({ value: unidadMedida, label: `${unidadMedida} (valor previo)` });
-    return out;
-  }, [unidadMedida]);
-
-  async function submit() {
-    if (!nombre.trim()) { setError('El nombre es obligatorio.'); return; }
-    setSaving(true); setError(null);
-    try {
-      const body = { nombre: nombre.trim(), descripcion: descripcion.trim() || undefined, unidadMedida: unidadMedida.trim() || undefined };
-      const qs = `?tenantId=${encodeURIComponent(tenantId)}`;
-      if (modo === 'create') {
-        await apiJson<Producto>(`/api/platform/stock/productos${qs}`, () => getToken(), { method: 'POST', body: JSON.stringify(body) });
-      } else {
-        await apiJson<Producto>(`/api/platform/stock/productos/${encodeURIComponent(productoInicial!.id)}${qs}`, () => getToken(), { method: 'PATCH', body: JSON.stringify(body) });
-      }
-      onSaved();
-    } catch (e) {
-      setError(
-        e instanceof ApiError && e.status === 409
-          ? 'Ya existe un producto con ese nombre (sin distinguir mayúsculas).'
-          : friendlyError(e, 'plataforma'),
-      );
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded border border-black/10 bg-white p-5 shadow-lg">
-        <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">{modo === 'create' ? 'Nuevo producto' : 'Editar producto'}</h2>
-        <div className="mt-4 grid gap-3">
-          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Nombre *
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className="h-9 border border-black/15 px-2 text-sm" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Descripción (opcional)
-            <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} className="border border-black/15 px-2 py-2 text-sm" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Unidad de medida (opcional)
-            <select value={unidadMedida} onChange={(e) => setUnidadMedida(e.target.value)} className="h-9 border border-black/15 bg-white px-2 text-sm">
-              <option value="">Sin unidad</option>
-              {opcionesSelect.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </label>
-        </div>
-        {error && <p className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">{error}</p>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" disabled={saving} onClick={onClose} className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50">Cancelar</button>
-          <button type="button" disabled={saving} onClick={() => void submit()} className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -443,13 +196,34 @@ export function ProductosSuperadminPage() {
       )}
 
       {modal.mode === 'create' && filtroEmpresa && (
-        <ProductoModal modo="create" tenantId={filtroEmpresa} getToken={getToken} onClose={() => setModal({ mode: 'closed' })} onSaved={async () => { setModal({ mode: 'closed' }); await load(); }} />
+        <ProductoModal
+          modo="create"
+          baseUrl="/api/platform/stock/productos"
+          tenantId={filtroEmpresa}
+          getToken={getToken}
+          onClose={() => setModal({ mode: 'closed' })}
+          onSaved={async (_p) => { setModal({ mode: 'closed' }); await load(); }}
+        />
       )}
       {modal.mode === 'edit' && filtroEmpresa && (
-        <ProductoModal modo="edit" productoInicial={modal.producto} tenantId={filtroEmpresa} getToken={getToken} onClose={() => setModal({ mode: 'closed' })} onSaved={async () => { setModal({ mode: 'closed' }); await load(); }} />
+        <ProductoModal
+          modo="edit"
+          productoInicial={modal.producto}
+          baseUrl="/api/platform/stock/productos"
+          tenantId={filtroEmpresa}
+          getToken={getToken}
+          onClose={() => setModal({ mode: 'closed' })}
+          onSaved={async (_p) => { setModal({ mode: 'closed' }); await load(); }}
+        />
       )}
       {modal.mode === 'presentaciones' && filtroEmpresa && (
-        <PresentacionesPanel producto={modal.producto} tenantId={filtroEmpresa} getToken={getToken} onClose={() => setModal({ mode: 'closed' })} />
+        <PresentacionesModal
+          producto={modal.producto}
+          baseUrl="/api/platform/stock/productos"
+          tenantId={filtroEmpresa}
+          getToken={getToken}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
       )}
     </div>
   );

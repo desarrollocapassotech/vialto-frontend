@@ -45,6 +45,7 @@ export function AppShell() {
 
     if (superadmin || canAccessStock(tenant?.modules ?? [])) {
       items.push({ to: '/stock/productos', label: 'Productos' });
+      items.push({ to: '/stock/ingresos', label: 'Ingresos' });
     }
 
     items.push({ to: '/clientes', label: 'Clientes' });
