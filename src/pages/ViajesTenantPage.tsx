@@ -51,7 +51,7 @@ import {
   inferirPaisDesdeUbicacion,
   type PaisCodigo,
 } from '@/lib/ciudades';
-import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import { fechaHoraToIso, formatIsoFechaHoraListadoEsAr, isoToFechaHora } from '@/lib/viajeFechaHora';
 import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
@@ -829,28 +829,6 @@ export function ViajesTenantPage() {
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
-  function formatFechaCargaCelda(iso: string | null | undefined) {
-    if (!iso) return '—';
-    try {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return '—';
-      const soloFecha = d.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-      // Cuando hora/minuto vienen en 00:00, tratamos la hora como no seteada.
-      if (d.getHours() === 0 && d.getMinutes() === 0) return soloFecha;
-      const hora = d.toLocaleTimeString('es-AR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      return `${soloFecha} ${hora}`;
-    } catch {
-      return '—';
-    }
-  }
-
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
@@ -1271,13 +1249,13 @@ export function ViajesTenantPage() {
                       className="block"
                         title={v.fechaCarga ?? undefined}
                       >
-                        {formatFechaCargaCelda(v.fechaCarga)}
+                        {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
                       <span
                         className="block text-xs text-vialto-steel/90"
                         title={v.fechaDescarga ?? undefined}
                       >
-                        {formatFechaCargaCelda(v.fechaDescarga)}
+                        {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                       </span>
                     </div>
                 </td>

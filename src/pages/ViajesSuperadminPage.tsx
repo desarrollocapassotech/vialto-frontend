@@ -44,31 +44,7 @@ import {
   viajeEstadoEsFacturadoOCobrado,
   viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
-import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function formatFechaCarga(iso: string | null | undefined) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    const soloFecha = d.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    // Cuando hora/minuto vienen en 00:00, tratamos la hora como no seteada.
-    if (d.getHours() === 0 && d.getMinutes() === 0) return soloFecha;
-    const hora = d.toLocaleTimeString('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    return `${soloFecha} ${hora}`;
-  } catch {
-    return '—';
-  }
-}
+import { fechaHoraToIso, formatIsoFechaHoraListadoEsAr, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 // ─── componente ─────────────────────────────────────────────────────────────
 
@@ -631,13 +607,13 @@ export function ViajesSuperadminPage() {
                           className="block"
                           title={v.fechaCarga ?? undefined}
                         >
-                          {formatFechaCarga(v.fechaCarga)}
+                          {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                         </span>
                         <span
                           className="block text-xs text-vialto-steel/90"
                           title={v.fechaDescarga ?? undefined}
                         >
-                          {formatFechaCarga(v.fechaDescarga)}
+                          {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                         </span>
                       </div>
                     )}

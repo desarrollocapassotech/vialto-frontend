@@ -9,7 +9,7 @@ import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelec
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Presentacion, Producto } from '@/types/api';
+import type { Cliente, MovimientoStock, Presentacion, Producto, StockEgresoRemitoConfig, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -24,22 +24,28 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
   return parts.length ? `?${parts.join('&')}` : '';
 }
 
-export function IngresosStockTenantPage({
+export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
 }) {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
   const maestro = useMaestroData();
   const clientes = clientesExternos ?? maestro.clientes;
+  const puedeGestionar = orgRole === 'org:admin' || orgRole === 'org:supervisor';
+  const puedeEditarFormatoRemito = Boolean(tenantId) || puedeGestionar;
 
   const platform = Boolean(tenantId);
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
-  const ingresosUrl = platform
-    ? `/api/platform/stock/ingresos${buildQs({}, tenantId)}`
-    : '/api/stock/ingresos';
+  const egresosUrl = platform
+    ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
+    : '/api/stock/egresos';
+  const disponibleBase = platform ? '/api/platform/stock/disponible' : '/api/stock/disponible';
+  const remitoConfigUrl = platform
+    ? `/api/platform/stock/egresos/remito-config${buildQs({}, tenantId)}`
+    : '/api/stock/egresos/remito-config';
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
@@ -54,11 +60,19 @@ export function IngresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [remitoEscaneadoUrl, setRemitoEscaneadoUrl] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
   const [modalPresentacion, setModalPresentacion] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ultimoRemito, setUltimoRemito] = useState<string | null>(null);
+  const [stockDisponible, setStockDisponible] = useState<number | null>(null);
+  const [remitoConfig, setRemitoConfig] = useState<StockEgresoRemitoConfig | null>(null);
+  const [configDraft, setConfigDraft] = useState({ remitoPrefix: 'R', remitoDigitos: 5 });
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configMsg, setConfigMsg] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
   const loadProductos = useCallback(async () => {
     try {
@@ -70,9 +84,20 @@ export function IngresosStockTenantPage({
     }
   }, [productosBase, tenantId, getToken]);
 
+  const loadRemitoConfig = useCallback(async () => {
+    try {
+      const c = await apiJson<StockEgresoRemitoConfig>(remitoConfigUrl, () => getToken());
+      setRemitoConfig(c);
+      setConfigDraft({ remitoPrefix: c.remitoPrefix, remitoDigitos: c.remitoDigitos });
+    } catch {
+      setRemitoConfig(null);
+    }
+  }, [remitoConfigUrl, getToken]);
+
   useEffect(() => {
     void loadProductos();
-  }, [loadProductos]);
+    void loadRemitoConfig();
+  }, [loadProductos, loadRemitoConfig]);
 
   useEffect(() => {
     if (!productoId) {
@@ -93,10 +118,48 @@ export function IngresosStockTenantPage({
     })();
   }, [productoId, productosBase, tenantId, getToken]);
 
+  useEffect(() => {
+    if (!productoId || !presentacionId || !clienteId) {
+      setStockDisponible(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const qs = buildQs({ clienteId, productoId }, tenantId);
+        const data = await apiJson<StockItem[]>(`${disponibleBase}${qs}`, () => getToken());
+        const row = data.find((s) => s.presentacionId === presentacionId);
+        setStockDisponible(row ? row.cantidad : 0);
+      } catch {
+        setStockDisponible(null);
+      }
+    })();
+  }, [productoId, presentacionId, clienteId, disponibleBase, tenantId, getToken]);
+
+  async function guardarRemitoConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setConfigMsg(null);
+    setConfigSaving(true);
+    try {
+      const method = 'PATCH';
+      const body = JSON.stringify({
+        remitoPrefix: configDraft.remitoPrefix.trim(),
+        remitoDigitos: Number(configDraft.remitoDigitos),
+      });
+      const c = await apiJson<StockEgresoRemitoConfig>(remitoConfigUrl, () => getToken(), { method, body });
+      setRemitoConfig(c);
+      setConfigMsg('Formato actualizado.');
+    } catch (e) {
+      setConfigMsg(friendlyError(e, 'stock'));
+    } finally {
+      setConfigSaving(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     setSuccess(false);
+    setUltimoRemito(null);
 
     if (!productoId) return setFormError('Seleccioná un producto.');
     if (!presentacionId) return setFormError('Seleccioná una presentación.');
@@ -111,20 +174,30 @@ export function IngresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    if (stockDisponible !== null && cantNum > stockDisponible) {
+      return setFormError(
+        `No podés egresar más de lo disponible para esta combinación. Stock disponible: ${stockDisponible}.`,
+      );
+    }
+
     setSaving(true);
     try {
-      await apiJson(ingresosUrl, () => getToken(), {
+      const payload: Record<string, unknown> = {
+        productoId,
+        presentacionId,
+        clienteId,
+        cantidad: cantNum,
+        fecha: fechaIso,
+      };
+      if (observaciones.trim()) payload.observaciones = observaciones.trim();
+      if (remitoEscaneadoUrl.trim()) payload.remitoEscaneadoUrl = remitoEscaneadoUrl.trim();
+
+      const created = await apiJson<MovimientoStock>(egresosUrl, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify({
-          productoId,
-          presentacionId,
-          clienteId,
-          cantidad: cantNum,
-          fecha: fechaIso,
-          ...(observaciones.trim() ? { observaciones: observaciones.trim() } : {}),
-        }),
+        body: JSON.stringify(payload),
       });
       setSuccess(true);
+      setUltimoRemito(created.numeroRemito ?? null);
       setProductoId('');
       setPresentacionId('');
       setClienteId('');
@@ -134,6 +207,7 @@ export function IngresosStockTenantPage({
       setHoraMov(p.hora);
       setFechaMovError(null);
       setObservaciones('');
+      setRemitoEscaneadoUrl('');
     } catch (e) {
       setFormError(friendlyError(e, 'stock'));
     } finally {
@@ -142,26 +216,31 @@ export function IngresosStockTenantPage({
   }
 
   const productoActual = productos.find((p) => p.id === productoId) ?? null;
+  const ejemploYear =
+    fechaMov.trim().length >= 4 ? parseInt(fechaMov.slice(0, 4), 10) : new Date().getFullYear();
+  const formatoEjemplo =
+    remitoConfig != null && !Number.isNaN(ejemploYear)
+      ? `${remitoConfig.remitoPrefix}-${ejemploYear}-${String(1).padStart(remitoConfig.remitoDigitos, '0')}`
+      : null;
 
   const historialHref = platform
-    ? `/stock/ingresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
-    : '/stock/ingresos/historial';
+    ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
+    : '/stock/egresos/historial';
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       {!platform && (
         <div>
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">Ingresos al depósito</h1>
+          <h1 className="text-2xl font-semibold text-vialto-charcoal">Egresos / despacho</h1>
           <p className="mt-1 text-sm text-vialto-steel">
-            Registrá mercadería entrante. El stock se actualiza de forma automática al guardar.
+            Registrá salida de mercadería. Se asigna un número de remito interno y el stock se descuenta de forma
+            atómica al guardar.
           </p>
         </div>
       )}
 
       {loadError && (
-        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {loadError}
-        </div>
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -175,8 +254,61 @@ export function IngresosStockTenantPage({
         </Link>
       </div>
 
+      {puedeEditarFormatoRemito && (
+        <div className="rounded-lg border border-black/10 bg-white p-4">
+          <button
+            type="button"
+            onClick={() => setShowConfig((v) => !v)}
+            className="text-sm font-medium text-vialto-fire hover:underline"
+          >
+            {showConfig ? 'Ocultar formato del remito' : 'Formato del número de remito (prefijo y dígitos)'}
+          </button>
+          {showConfig && (
+            <form onSubmit={guardarRemitoConfig} className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className={LABEL}>Prefijo</label>
+                <input
+                  className={INPUT}
+                  value={configDraft.remitoPrefix}
+                  onChange={(e) => setConfigDraft((d) => ({ ...d, remitoPrefix: e.target.value }))}
+                  maxLength={20}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={LABEL}>Dígitos del correlativo</label>
+                <input
+                  type="number"
+                  min={3}
+                  max={12}
+                  className={INPUT}
+                  value={configDraft.remitoDigitos}
+                  onChange={(e) =>
+                    setConfigDraft((d) => ({ ...d, remitoDigitos: Number(e.target.value) || 5 }))
+                  }
+                />
+              </div>
+              {configMsg && <p className="sm:col-span-2 text-sm text-vialto-steel">{configMsg}</p>}
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={configSaving}
+                  className="px-4 py-2 text-sm font-semibold bg-vialto-charcoal text-white rounded hover:bg-vialto-graphite disabled:opacity-50"
+                >
+                  {configSaving ? 'Guardando…' : 'Guardar formato'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-black/10 p-6 space-y-5">
-        <h2 className="text-base font-semibold text-vialto-charcoal">Nuevo ingreso</h2>
+        <h2 className="text-base font-semibold text-vialto-charcoal">Nuevo egreso</h2>
+        {formatoEjemplo && (
+          <p className="text-xs text-vialto-steel">
+            Ejemplo con el próximo correlativo: <span className="font-mono text-vialto-charcoal">{formatoEjemplo}</span>
+          </p>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
@@ -204,9 +336,7 @@ export function IngresosStockTenantPage({
               inputClassName={INPUT}
               noItemsSlot={
                 <div className="space-y-2">
-                  <div className={`${INPUT} flex items-center text-vialto-steel`}>
-                    Sin productos en el catálogo
-                  </div>
+                  <div className={`${INPUT} flex items-center text-vialto-steel`}>Sin productos en el catálogo</div>
                   <button
                     type="button"
                     onClick={() => setModalProducto(true)}
@@ -227,9 +357,7 @@ export function IngresosStockTenantPage({
               </div>
             ) : presentaciones.length === 0 ? (
               <div className="space-y-2">
-                <div className={`${INPUT} flex items-center text-amber-700`}>
-                  Este producto no tiene presentaciones
-                </div>
+                <div className={`${INPUT} flex items-center text-amber-700`}>Este producto no tiene presentaciones</div>
                 <button
                   type="button"
                   onClick={() => setModalPresentacion(true)}
@@ -278,6 +406,12 @@ export function IngresosStockTenantPage({
                 className={INPUT}
                 placeholder="0"
               />
+              {stockDisponible !== null && productoId && presentacionId && clienteId && (
+                <p className="text-xs text-vialto-steel mt-1">
+                  Stock disponible (misma empresa, producto y presentación):{' '}
+                  <span className="font-semibold text-vialto-charcoal">{stockDisponible}</span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -314,9 +448,33 @@ export function IngresosStockTenantPage({
           />
         </div>
 
+        <div className="space-y-1">
+          <label className={LABEL}>Remito escaneado (URL) — opcional</label>
+          <input
+            type="url"
+            value={remitoEscaneadoUrl}
+            onChange={(e) => setRemitoEscaneadoUrl(e.target.value)}
+            className={INPUT}
+            placeholder="https://… (se completará con subida a almacenamiento en una próxima tarea)"
+          />
+          <p className="text-xs text-vialto-steel">
+            Por ahora podés pegar una URL pública si ya tenés el archivo hospedado. La subida directa desde acá se
+            agregará después.
+          </p>
+        </div>
+
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         {success && (
-          <p className="text-sm text-emerald-600">Ingreso registrado correctamente.</p>
+          <p className="text-sm text-emerald-600">
+            Egreso registrado correctamente
+            {ultimoRemito ? (
+              <>
+                {' '}
+                — remito <span className="font-mono font-semibold">{ultimoRemito}</span>
+              </>
+            ) : null}
+            .
+          </p>
         )}
 
         <div className="flex justify-end">
@@ -325,7 +483,7 @@ export function IngresosStockTenantPage({
             disabled={saving}
             className="px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
           >
-            {saving ? 'Guardando…' : 'Registrar ingreso'}
+            {saving ? 'Guardando…' : 'Registrar egreso'}
           </button>
         </div>
       </form>
@@ -354,12 +512,13 @@ export function IngresosStockTenantPage({
           onClose={() => setModalPresentacion(false)}
           onPresentacionCreada={async (nueva) => {
             setModalPresentacion(false);
-            // recargar presentaciones del producto actual
             const url = `${productosBase}/${encodeURIComponent(productoActual.id)}/presentaciones${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`;
             try {
               const data = await apiJson<Presentacion[]>(url, () => getToken());
               setPresentaciones(data);
-            } catch { /* no-op */ }
+            } catch {
+              /* no-op */
+            }
             setPresentacionId(nueva.id);
           }}
         />

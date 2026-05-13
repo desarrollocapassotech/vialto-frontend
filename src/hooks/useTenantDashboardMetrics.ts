@@ -38,6 +38,7 @@ type MovimientoStockLike = {
   id: string;
   tipo: string;
   fecha: string;
+  numeroRemito?: string | null;
 };
 
 type MovimientoCcLike = {
