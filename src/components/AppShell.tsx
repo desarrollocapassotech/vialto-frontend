@@ -46,6 +46,7 @@ export function AppShell() {
         items: [
           { to: '/superadmin/empresas', label: 'Empresas' },
           { to: '/superadmin/usuarios', label: 'Usuarios' },
+          { to: '/superadmin/arca', label: 'ARCA / AFIP' },
         ],
       });
     }

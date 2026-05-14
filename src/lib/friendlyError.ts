@@ -10,7 +10,8 @@ export type FriendlyErrorContext =
   | 'vehiculos'
   | 'facturacion'
   | 'stock'
-  | 'plataforma';
+  | 'plataforma'
+  | 'arca';
 
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: 'No pudimos cargar el tablero. Probá de nuevo en un momento.',
@@ -28,6 +29,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
     'No pudimos cargar el catálogo de productos. Probá de nuevo en un momento.',
   plataforma:
     'No pudimos cargar el panorama de empresas. Probá de nuevo en un momento.',
+  arca:
+    'No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo.',
 };
 
 /**
@@ -54,6 +57,8 @@ export function friendlyError(
       return 'No encontramos lo que buscás.';
     }
     if (err.status === 400) {
+      // Devolver el mensaje del backend si existe (ARCA incluye mensajes útiles como errores AFIP)
+      if (err.message && err.message !== 'Bad Request') return err.message;
       return 'Algunos datos no son válidos. Revisá la información e intentá de nuevo.';
     }
     if (err.status >= 500) {
