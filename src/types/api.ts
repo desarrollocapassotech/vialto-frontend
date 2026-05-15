@@ -333,6 +333,62 @@ export interface StockEgresoRemitoConfig {
   remitoDigitos: number;
 }
 
+// ── ARCA / Liquidaciones ──────────────────────────────────────────────────────
+
+export interface ArcaConfig {
+  cuitEmisor: string;
+  ptoVentaCvlp: number;
+  ptoVentaFactura: number;
+  ambiente: 'homologacion' | 'produccion';
+  comisionPctDefault: number;
+  comisionPctAlt: number;
+  gastosAdminPorViaje: number;
+  ivaGastosAdmin: number;
+  updatedAt: string;
+}
+
+export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
+
+export interface Liquidacion {
+  id: string;
+  tenantId: string;
+  transportistaId: string;
+  periodoDesde: string;
+  periodoHasta: string;
+  cantViajes: number;
+  bruto: number;
+  comisionPct: number;
+  comision: number;
+  gastosAdmin: number;
+  gastosAdminIva: number;
+  liquido: number;
+  cbteTipo: number;
+  cbteNro: number | null;
+  ptoVenta: number | null;
+  cae: string | null;
+  caeFechaVto: string | null;
+  estado: LiquidacionEstado;
+  arcaError: string | null;
+  reintentos: number;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface ArcaLog {
+  id: string;
+  tenantId: string;
+  liquidacionId: string | null;
+  facturaId: string | null;
+  method: string;
+  ambiente: string;
+  cuit: string;
+  httpStatus: number | null;
+  durationMs: number;
+  exitoso: boolean;
+  error: string | null;
+  createdAt: string;
+}
+
 export interface StockItem {
   id: string;
   tenantId: string;

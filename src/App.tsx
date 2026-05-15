@@ -30,6 +30,7 @@ import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
 import { SuperadminUserCreatePage } from '@/pages/SuperadminUserCreatePage';
 import { SuperadminUserEditPage } from '@/pages/SuperadminUserEditPage';
+import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
 import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
 import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
 
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
           <Route path="superadmin/empresas" element={<SuperadminEmpresasPage />} />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
+          <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
           <Route path="superadmin/usuarios/nuevo" element={<SuperadminUserCreatePage />} />
           <Route path="superadmin/usuarios/:userId/editar" element={<SuperadminUserEditPage />} />
           <Route path="superadmin/empresas/nueva" element={<SuperadminTenantCreatePage />} />
