@@ -15,11 +15,14 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+      const inTrigger = triggerRef.current?.contains(e.target as Node);
+      const inMenu = menuRef.current?.contains(e.target as Node);
+      if (!inTrigger && !inMenu) {
         setOpen(false);
       }
     }
@@ -90,6 +93,7 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
 
       {open && menuPos && createPortal(
         <div
+          ref={menuRef}
           style={{ position: 'fixed', ...menuPos, zIndex: 9999 }}
           className="min-w-[140px] border border-black/20 bg-white shadow-lg"
         >
