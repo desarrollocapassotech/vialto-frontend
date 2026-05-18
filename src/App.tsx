@@ -31,6 +31,7 @@ import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
 import { SuperadminUserCreatePage } from '@/pages/SuperadminUserCreatePage';
 import { SuperadminUserEditPage } from '@/pages/SuperadminUserEditPage';
 import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
+import { LiquidacionesTenantPage } from '@/pages/LiquidacionesTenantPage';
 import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
 import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
 
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
           <Route path="viajes/:id/editar" element={<Navigate to="/viajes" replace />} />
           <Route path="facturacion" element={<FacturacionPage />} />
+          <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
           <Route path="stock/productos" element={<ProductosPage />} />
           <Route path="stock/ingresos" element={<IngresosStockPage />} />
           <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />

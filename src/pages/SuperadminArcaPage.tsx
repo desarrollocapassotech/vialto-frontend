@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
-import { apiJson } from '@/lib/api';
+import { apiJson, apiFetch } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { ArcaConfig, ArcaLog, Liquidacion } from '@/types/api';
 
@@ -35,39 +35,78 @@ const fmtDate = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/')
 const fmtTs = (iso: string) =>
   new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
+// ── Condición IVA emisor (AFIP standard codes) ───────────────────────────────
+
+const CONDICION_IVA_EMISOR = [
+  { value: '1', label: 'IVA Responsable Inscripto' },
+  { value: '6', label: 'Responsable Monotributo' },
+  { value: '4', label: 'IVA Sujeto Exento' },
+  { value: '5', label: 'Consumidor Final' },
+  { value: '3', label: 'IVA no Responsable' },
+  { value: '7', label: 'Sujeto no Categorizado' },
+];
+
+// Helpers para la fecha (UI ↔ ARCA format)
+function isoToArcaDate(iso: string): string {
+  // "YYYY-MM-DD" → "DD/MM/YYYY"
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function arcaDateToIso(arca: string): string {
+  // "DD/MM/YYYY" → "YYYY-MM-DD"
+  if (!arca) return '';
+  const [d, m, y] = arca.split('/');
+  if (!y) return '';
+  return `${y}-${m}-${d}`;
+}
+
 // ── ConfigTab ────────────────────────────────────────────────────────────────
 
 type ConfigFormValues = {
   cuitEmisor: string;
+  razonSocial: string;
+  domicilioEmisor: string;
+  condicionIvaEmisor: string;
+  ingBrutos: string;
+  inicActEmisor: string;
   ptoVentaCvlp: string;
   ptoVentaFactura: string;
   ambiente: 'homologacion' | 'produccion';
   comisionPctDefault: string;
   comisionPctAlt: string;
-  gastosAdminPorViaje: string;
   ivaGastosAdmin: string;
 };
 
 const EMPTY_FORM: ConfigFormValues = {
   cuitEmisor: '',
+  razonSocial: '',
+  domicilioEmisor: '',
+  condicionIvaEmisor: '',
+  ingBrutos: '',
+  inicActEmisor: '',
   ptoVentaCvlp: '1',
   ptoVentaFactura: '1',
   ambiente: 'homologacion',
   comisionPctDefault: '8',
   comisionPctAlt: '7',
-  gastosAdminPorViaje: '0',
   ivaGastosAdmin: '21',
 };
 
 function configToForm(c: ArcaConfig): ConfigFormValues {
   return {
     cuitEmisor: c.cuitEmisor,
+    razonSocial: c.razonSocial ?? '',
+    domicilioEmisor: c.domicilioEmisor ?? '',
+    condicionIvaEmisor: c.condicionIvaEmisor ?? '',
+    ingBrutos: c.ingBrutos ?? '',
+    inicActEmisor: arcaDateToIso(c.inicActEmisor ?? ''),
     ptoVentaCvlp: String(c.ptoVentaCvlp),
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
     comisionPctAlt: String(c.comisionPctAlt),
-    gastosAdminPorViaje: String(c.gastosAdminPorViaje),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
   };
 }
@@ -168,12 +207,16 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
     try {
       const body = {
         cuitEmisor: values.cuitEmisor.trim(),
+        razonSocial: values.razonSocial.trim() || undefined,
+        domicilioEmisor: values.domicilioEmisor.trim() || undefined,
+        condicionIvaEmisor: values.condicionIvaEmisor.trim() || undefined,
+        ingBrutos: values.ingBrutos.trim() || undefined,
+        inicActEmisor: values.inicActEmisor ? isoToArcaDate(values.inicActEmisor) : undefined,
         ptoVentaCvlp: Number(values.ptoVentaCvlp),
         ptoVentaFactura: Number(values.ptoVentaFactura),
         ambiente: values.ambiente,
         comisionPctDefault: Number(values.comisionPctDefault),
         comisionPctAlt: Number(values.comisionPctAlt),
-        gastosAdminPorViaje: Number(values.gastosAdminPorViaje),
         ivaGastosAdmin: Number(values.ivaGastosAdmin),
       };
 
@@ -227,15 +270,75 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
-      {/* CUIT */}
+      {/* Datos del emisor */}
       <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="cuitEmisor">CUIT Emisor</FieldLabel>
+        <FieldLabel htmlFor="razonSocial">Razón Social</FieldLabel>
         <TextInput
-          id="cuitEmisor"
-          value={values.cuitEmisor}
-          onChange={(v) => set('cuitEmisor', v)}
-          placeholder="20XXXXXXXXXXX"
+          id="razonSocial"
+          value={values.razonSocial}
+          onChange={(v) => set('razonSocial', v)}
+          placeholder="Ej: NyM Logística S.R.L."
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor="domicilioEmisor">Domicilio del Emisor</FieldLabel>
+        <TextInput
+          id="domicilioEmisor"
+          value={values.domicilioEmisor}
+          onChange={(v) => set('domicilioEmisor', v)}
+          placeholder="Ej: Av. Siempreviva 742, CABA"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor</FieldLabel>
+          <TextInput
+            id="cuitEmisor"
+            value={values.cuitEmisor}
+            onChange={(v) => set('cuitEmisor', v)}
+            placeholder="20XXXXXXXXXXX"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="condicionIvaEmisor">Condición frente al IVA</FieldLabel>
+          <select
+            id="condicionIvaEmisor"
+            value={values.condicionIvaEmisor}
+            onChange={(e) => set('condicionIvaEmisor', e.target.value)}
+            className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
+          >
+            <option value="">— Sin especificar —</option>
+            {CONDICION_IVA_EMISOR.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="ingBrutos">Ing. Brutos</FieldLabel>
+          <TextInput
+            id="ingBrutos"
+            value={values.ingBrutos}
+            onChange={(v) => set('ingBrutos', v)}
+            placeholder="Ej: CM 20XXXXXXXXX3"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="inicActEmisor">Inicio de Actividades</FieldLabel>
+          <input
+            id="inicActEmisor"
+            type="date"
+            value={values.inicActEmisor}
+            onChange={(e) => set('inicActEmisor', e.target.value)}
+            className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
+          />
+        </div>
       </div>
 
       {/* Puntos de venta */}
@@ -301,25 +404,14 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       </div>
 
       {/* Gastos administrativos */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="gastosAdminPorViaje">Gastos admin por viaje ($)</FieldLabel>
-          <TextInput
-            id="gastosAdminPorViaje"
-            type="number"
-            value={values.gastosAdminPorViaje}
-            onChange={(v) => set('gastosAdminPorViaje', v)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
-          <TextInput
-            id="ivaGastosAdmin"
-            type="number"
-            value={values.ivaGastosAdmin}
-            onChange={(v) => set('ivaGastosAdmin', v)}
-          />
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
+        <TextInput
+          id="ivaGastosAdmin"
+          type="number"
+          value={values.ivaGastosAdmin}
+          onChange={(v) => set('ivaGastosAdmin', v)}
+        />
       </div>
 
       <button
@@ -341,6 +433,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [emitting, setEmitting] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   function load() {
@@ -376,6 +469,29 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
     }
   }
 
+  async function descargarPdf(id: string) {
+    setDownloading(id);
+    setActionError(null);
+    try {
+      const res = await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}/pdf?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+      );
+      if (!res.ok) throw new Error('Error al descargar el PDF');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `liquidacion-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setActionError(friendlyError(e, 'arca'));
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   if (loading) return <p className="mt-6 text-sm text-vialto-steel">Cargando liquidaciones…</p>;
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
 
@@ -407,6 +523,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                     </th>
                   ),
                 )}
+                <th className="px-3 py-2.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel text-right">
+                  PDF
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -458,6 +577,16 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                         {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
                       </button>
                     )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <button
+                      type="button"
+                      disabled={downloading === liq.id}
+                      onClick={() => descargarPdf(liq.id)}
+                      className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50"
+                    >
+                      {downloading === liq.id ? '…' : 'PDF'}
+                    </button>
                   </td>
                 </tr>
               ))}

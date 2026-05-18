@@ -15,6 +15,8 @@ interface Props {
   onFacturar: () => void;
   onExportar: () => void;
   onVerFactura?: () => void;
+  /** Si se provee, reemplaza "Facturar" con "Emitir CVLP" cuando el módulo liquidaciones-arca está activo. */
+  onEmitirCvlp?: () => void;
 }
 
 type MenuPos = { top?: number; bottom?: number; right: number };
@@ -27,6 +29,7 @@ export function ViajeAccionesMenu({
   onFacturar,
   onExportar,
   onVerFactura,
+  onEmitirCvlp,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
@@ -117,7 +120,8 @@ export function ViajeAccionesMenu({
         >
           {item('Editar', onEditar)}
           {viaje.facturaId && onVerFactura && item('Ver factura', onVerFactura)}
-          {permiteFacturar && item('Facturar', onFacturar)}
+          {permiteFacturar && onEmitirCvlp && item('Emitir comprobante', onEmitirCvlp)}
+          {permiteFacturar && !onEmitirCvlp && item('Facturar', onFacturar)}
           {permiteGasto && item('+ Gasto', onAgregarGasto)}
           {permitePago && item('+ Pago transportista', onRegistrarPago)}
           {permiteExportar && item('Exportar', onExportar)}

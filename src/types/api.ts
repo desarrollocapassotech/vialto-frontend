@@ -338,12 +338,16 @@ export interface StockEgresoRemitoConfig {
 
 export interface ArcaConfig {
   cuitEmisor: string;
+  razonSocial: string | null;
+  domicilioEmisor: string | null;
+  condicionIvaEmisor: string | null;
+  ingBrutos: string | null;
+  inicActEmisor: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: 'homologacion' | 'produccion';
   comisionPctDefault: number;
   comisionPctAlt: number;
-  gastosAdminPorViaje: number;
   ivaGastosAdmin: number;
   updatedAt: string;
 }
