@@ -57,9 +57,12 @@ export function friendlyError(
       return 'No encontramos lo que buscás.';
     }
     if (err.status === 400) {
-      // Devolver el mensaje del backend si existe (ARCA incluye mensajes útiles como errores AFIP)
       if (err.message && err.message !== 'Bad Request') return err.message;
       return 'Algunos datos no son válidos. Revisá la información e intentá de nuevo.';
+    }
+    if (err.status === 422) {
+      // Errores de ARCA/AFIP SDK — el backend incluye el mensaje real
+      if (err.message && err.message !== 'Unprocessable Entity') return err.message;
     }
     if (err.status >= 500) {
       return 'Tuvimos un problema del nuestro. Intentá de nuevo más tarde.';

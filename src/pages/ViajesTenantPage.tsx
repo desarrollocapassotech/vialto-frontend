@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
@@ -10,6 +11,7 @@ import { FacturarOpcionModal } from '@/components/viajes/FacturarOpcionModal';
 import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
 import { ExportarViajeModal } from '@/components/viajes/ExportarViajeModal';
+import { EmitirCvlpModal } from '@/components/viajes/EmitirCvlpModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import {
@@ -63,10 +65,12 @@ import {
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
+import { canAccessLiquidacionesArca } from '@/lib/tenantModules';
 import type {
   Chofer,
   Cliente,
   Factura,
+  Liquidacion,
   PaginatedMeta,
   Producto,
   Transportista,
@@ -92,7 +96,10 @@ export function ViajesTenantPage({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
+  const { tenant: currentTenant } = useCurrentTenant();
   const platform = Boolean(tenantId?.trim());
+  const hasLiquidacionesArca =
+    !platform && canAccessLiquidacionesArca(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? '';
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -175,6 +182,8 @@ export function ViajesTenantPage({
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(null);
   /** Viaje sobre el que se está abriendo el modal de registrar pago al transportista. */
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
+  /** Viaje para el que se quiere emitir un CVLP. */
+  const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
   /** Conteos globales para los chips de acceso rápido. */
   const [resumen, setResumen] = useState<{ sinFacturar: number; sinCobrar: number } | null>(null);
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
@@ -1389,6 +1398,11 @@ export function ViajesTenantPage({
                             )
                         : undefined
                     }
+                    onEmitirCvlp={
+                      hasLiquidacionesArca && v.transportistaId
+                        ? () => setEmitirCvlpViaje(v)
+                        : undefined
+                    }
                   />
                 </td>
               </tr>
@@ -1548,6 +1562,17 @@ export function ViajesTenantPage({
           viaje={exportarViaje}
           onClose={() => setExportarViaje(null)}
           tenantId={platform ? tid : undefined}
+        />
+      )}
+
+      {emitirCvlpViaje && (
+        <EmitirCvlpModal
+          viaje={emitirCvlpViaje}
+          onClose={() => setEmitirCvlpViaje(null)}
+          onEmitido={(_liq: Liquidacion) => {
+            // La liquidación se creó; refrescar listado para reflejar el nuevo estado si corresponde
+            setListadoQueryVersion((v) => v + 1);
+          }}
         />
       )}
 

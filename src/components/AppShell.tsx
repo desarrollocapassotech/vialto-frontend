@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { Logo } from './Logo';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { MaestroDataProvider } from '@/hooks/useMaestroData';
-import { canAccessFacturacion, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
+import { canAccessFacturacion, canAccessLiquidacionesArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
   orgSwitcherSidebarAppearance,
@@ -66,6 +66,13 @@ export function AppShell() {
       groups.push({
         title: 'Facturación',
         items: [{ to: '/facturacion', label: 'Facturación' }],
+      });
+    }
+
+    if (canAccessLiquidacionesArca(tenant?.modules ?? [])) {
+      groups.push({
+        title: 'Liquidaciones',
+        items: [{ to: '/liquidaciones', label: 'Liquidaciones CVLP' }],
       });
     }
 

@@ -170,33 +170,35 @@ export function TransportistaEditPage() {
               <span className={labelClass}>País</span>
               <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
             </label>
-            <label className="grid gap-1.5">
-              <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
-              <CrudInput value={idFiscal} placeholder={idFiscalPorPais(pais).placeholder} onChange={(e) => setIdFiscal(e.target.value)} />
-            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="grid gap-1.5">
+                <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
+                <CrudInput value={idFiscal} placeholder={idFiscalPorPais(pais).placeholder} onChange={(e) => setIdFiscal(e.target.value)} />
+              </label>
+              <label className="grid gap-1.5">
+                <span className={labelClass}>{condInfo.label}</span>
+                {condInfo.type === 'select' ? (
+                  <CrudSelect
+                    value={condicionIva ?? ''}
+                    onChange={(e) => setCondicionIva(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">Seleccioná una opción</option>
+                    {condInfo.options.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </CrudSelect>
+                ) : (
+                  <CrudInput
+                    value={condicionTributaria}
+                    placeholder={condInfo.placeholder}
+                    onChange={(e) => setCondicionTributaria(e.target.value)}
+                  />
+                )}
+              </label>
+            </div>
             <label className="grid gap-1.5">
               <span className={labelClass}>Domicilio</span>
               <CrudInput value={domicilio} placeholder="Ej: Av. Libertador 1234, Buenos Aires" onChange={(e) => setDomicilio(e.target.value)} />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={labelClass}>{condInfo.label}</span>
-              {condInfo.type === 'select' ? (
-                <CrudSelect
-                  value={condicionIva ?? ''}
-                  onChange={(e) => setCondicionIva(e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="">Seleccioná una opción</option>
-                  {condInfo.options.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </CrudSelect>
-              ) : (
-                <CrudInput
-                  value={condicionTributaria}
-                  placeholder={condInfo.placeholder}
-                  onChange={(e) => setCondicionTributaria(e.target.value)}
-                />
-              )}
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>Email</span>
