@@ -4,7 +4,11 @@ export {
   esPaisSoportado,
   inferirPaisDesdeUbicacion,
   idFiscalPorPais,
+  condicionTributariaPorPais,
   type PaisOpcion,
+  type CondicionInfo,
+  type CondicionSelectInfo,
+  type CondicionTextInfo,
 } from './paises';
 export { buscarCiudades } from './buscarCiudades';
 export { esEtiquetaCiudadValida, normalizarEtiquetaCiudad } from './validarCiudad';

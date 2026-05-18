@@ -39,6 +39,38 @@ export function idFiscalPorPais(pais: PaisCodigo | ''): IdFiscalInfo {
   return pais ? ID_FISCAL_POR_PAIS[pais] : ID_FISCAL_DEFAULT;
 }
 
+// ── Condición tributaria ──────────────────────────────────────────────────────
+
+export type CondicionSelectInfo = {
+  type: 'select';
+  label: string;
+  options: readonly { value: number; label: string }[];
+};
+export type CondicionTextInfo = { type: 'text'; label: string; placeholder: string };
+export type CondicionInfo = CondicionSelectInfo | CondicionTextInfo;
+
+const CONDICION_IVA_AR: CondicionSelectInfo = {
+  type: 'select',
+  label: 'Condición frente al IVA',
+  options: [
+    { value: 1, label: 'IVA Responsable Inscripto' },
+    { value: 6, label: 'Responsable Monotributo' },
+    { value: 4, label: 'IVA Sujeto Exento' },
+    { value: 5, label: 'Consumidor Final' },
+  ],
+};
+
+const CONDICION_DEFAULT: CondicionTextInfo = {
+  type: 'text',
+  label: 'Condición tributaria',
+  placeholder: 'Ej: Régimen General, Monotributo, etc.',
+};
+
+export function condicionTributariaPorPais(pais: PaisCodigo | ''): CondicionInfo {
+  if (pais === 'AR') return CONDICION_IVA_AR;
+  return CONDICION_DEFAULT;
+}
+
 /** Heurística para edición de viajes ya guardados (solo texto, sin campo país en BD). */
 export function inferirPaisDesdeUbicacion(texto: string): PaisCodigo {
   const t = texto.trim().toLowerCase();

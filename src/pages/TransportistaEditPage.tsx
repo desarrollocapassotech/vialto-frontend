@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import { CrudInput } from '@/components/crud/CrudFields';
+import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -10,7 +10,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { esPaisSoportado, idFiscalPorPais } from '@/lib/ciudades';
+import { esPaisSoportado, idFiscalPorPais, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 
@@ -22,15 +22,16 @@ export function TransportistaEditPage() {
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
-  const [idFiscal, setIdFiscal] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
+  const [idFiscal, setIdFiscal] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [domicilio, setDomicilio] = useState('');
+  const [condicionIva, setCondicionIva] = useState<number | null>(null);
+  const [condicionTributaria, setCondicionTributaria] = useState('');
   const [paut, setPaut] = useState('');
   const [permisoInternacional, setPermisoInternacional] = useState('');
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState('');
-  const [domicilio, setDomicilio] = useState('');
-  const [bandera, setBandera] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -60,17 +61,18 @@ export function TransportistaEditPage() {
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
           setNombre(row.nombre);
-          setIdFiscal(row.idFiscal ?? '');
           setPais(esPaisSoportado(row.pais ?? '') ? (row.pais as PaisCodigo) : '');
+          setIdFiscal(row.idFiscal ?? '');
           setEmail(row.email ?? '');
           setTelefono(row.telefono ?? '');
+          setDomicilio(row.domicilio ?? '');
+          setCondicionIva(row.condicionIva ?? null);
+          setCondicionTributaria(row.condicionTributaria ?? '');
           setPaut(row.paut ?? '');
           setPermisoInternacional(row.permisoInternacional ?? '');
           setFechaVencimientoPermiso(
             row.fechaVencimientoPermiso ? row.fechaVencimientoPermiso.slice(0, 10) : '',
           );
-          setDomicilio(row.domicilio ?? '');
-          setBandera(row.bandera ?? '');
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'transportistas'));
@@ -80,6 +82,12 @@ export function TransportistaEditPage() {
     })();
     return () => { cancelled = true; };
   }, [getToken, id, tenantId, isLoaded, isSignedIn]);
+
+  function handlePaisChange(newPais: PaisCodigo | '') {
+    setPais(newPais);
+    setCondicionIva(null);
+    setCondicionTributaria('');
+  }
 
   async function onSave() {
     if (!id) return;
@@ -97,15 +105,16 @@ export function TransportistaEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          idFiscal: idFiscal.trim() || undefined,
           pais: pais || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
+          domicilio: domicilio.trim() || undefined,
+          condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
+          condicionTributaria: pais !== 'AR' ? (condicionTributaria.trim() || undefined) : undefined,
           paut: paut.trim() || undefined,
           permisoInternacional: permisoInternacional.trim() || undefined,
           fechaVencimientoPermiso: fechaVencimientoPermiso || undefined,
-          domicilio: domicilio.trim() || undefined,
-          bandera: bandera.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
@@ -137,6 +146,7 @@ export function TransportistaEditPage() {
 
   const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
   const sectionClass = 'mt-2 border-t border-black/10 pt-4';
+  const condInfo = condicionTributariaPorPais(pais);
 
   return (
     <CrudPageLayout
@@ -158,11 +168,35 @@ export function TransportistaEditPage() {
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>País</span>
-              <PaisUbicacionSelect value={pais} onChange={setPais} placeholder="Seleccioná un país" />
+              <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
               <CrudInput value={idFiscal} placeholder={idFiscalPorPais(pais).placeholder} onChange={(e) => setIdFiscal(e.target.value)} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className={labelClass}>Domicilio</span>
+              <CrudInput value={domicilio} placeholder="Ej: Av. Libertador 1234, Buenos Aires" onChange={(e) => setDomicilio(e.target.value)} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className={labelClass}>{condInfo.label}</span>
+              {condInfo.type === 'select' ? (
+                <CrudSelect
+                  value={condicionIva ?? ''}
+                  onChange={(e) => setCondicionIva(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Seleccioná una opción</option>
+                  {condInfo.options.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </CrudSelect>
+              ) : (
+                <CrudInput
+                  value={condicionTributaria}
+                  placeholder={condInfo.placeholder}
+                  onChange={(e) => setCondicionTributaria(e.target.value)}
+                />
+              )}
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>Email</span>
@@ -181,20 +215,12 @@ export function TransportistaEditPage() {
                   <CrudInput placeholder="Ej: 17597" value={paut} onChange={(e) => setPaut(e.target.value)} />
                 </label>
                 <label className="grid gap-1.5">
-                  <span className={labelClass}>Domicilio</span>
-                  <CrudInput placeholder="Ej: Av. Libertador 1234" value={domicilio} onChange={(e) => setDomicilio(e.target.value)} />
-                </label>
-                <label className="grid gap-1.5">
                   <span className={labelClass}>Permiso Internacional</span>
                   <CrudInput placeholder="Ej: 20113C19113" value={permisoInternacional} onChange={(e) => setPermisoInternacional(e.target.value)} />
                 </label>
                 <label className="grid gap-1.5">
                   <span className={labelClass}>Vencimiento Permiso Internacional</span>
                   <CrudInput type="date" value={fechaVencimientoPermiso} onChange={(e) => setFechaVencimientoPermiso(e.target.value)} />
-                </label>
-                <label className="grid gap-1.5">
-                  <span className={labelClass}>Bandera (país de registro)</span>
-                  <CrudInput placeholder="Ej: ARGENTINA" value={bandera} onChange={(e) => setBandera(e.target.value)} />
                 </label>
               </div>
             </div>
