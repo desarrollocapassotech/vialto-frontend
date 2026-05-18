@@ -127,17 +127,18 @@ export interface Transportista {
   id: string;
   tenantId: string;
   nombre: string;
-  idFiscal: string | null;
   pais: string | null;
+  idFiscal: string | null;
   email: string | null;
   telefono: string | null;
+  domicilio: string | null;
+  condicionIva: number | null;
+  condicionTributaria: string | null;
   /** En API siempre `externo` para subcontratistas; flota propia = sin vínculo en chofer/vehículo. */
   tipo?: string;
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;
-  domicilio: string | null;
-  bandera: string | null;
   createdAt: string;
 }
 

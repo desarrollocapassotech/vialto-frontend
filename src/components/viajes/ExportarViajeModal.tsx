@@ -20,7 +20,7 @@ const TRANSPORTISTA_FIELDS: Record<string, FieldDef> = {
   'Permiso Internacional':                   { key: 'permisoInternacional',    type: 'text' },
   'Vencimiento del Permiso Internacional':   { key: 'fechaVencimientoPermiso', type: 'date' },
   'Domicilio':                               { key: 'domicilio',               type: 'text' },
-  'Bandera (país)':                          { key: 'bandera',                 type: 'text' },
+  'País':                                    { key: 'pais',                    type: 'text' },
 };
 
 const CHOFER_FIELDS: Record<string, FieldDef> = {
