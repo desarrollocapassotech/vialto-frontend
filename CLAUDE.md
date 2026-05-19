@@ -158,6 +158,97 @@ VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
 
 ---
 
+## Patrón de grilla: VER + modal read-only → EDITAR
+
+**Regla global para todos los módulos actuales y futuros.**
+
+La columna de acciones de cualquier listado debe exponer **únicamente el botón "Ver"** por fila. Al hacer clic se abre un modal en modo solo lectura (read-only). Dentro del modal hay un botón "Editar" que transiciona al formulario de edición.
+
+### Dos patrones según el tipo de edición
+
+| Tipo de edición | Patrón |
+|---|---|
+| Edición en página separada (`/entidad/:id/editar`) | Crear `EntidadViewModal.tsx` con `editTo: string` (Link interno). |
+| Edición en modal existente | Agregar `modo: 'view'` al modal; `onEdit?: () => void` que cambia al modo edit. |
+
+### Estructura de un ViewModal
+
+```tsx
+// src/components/<dominio>/<Entidad>ViewModal.tsx
+export function EntidadViewModal({ entidad, onClose, editTo }: {
+  entidad: Entidad;
+  onClose: () => void;
+  editTo: string;   // URL de edición, incluye ?tenantId= en superadmin
+}) {
+  // Escape key → onClose
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div role="dialog" aria-modal="true" className="w-full max-w-xl rounded border border-black/10 bg-white shadow-lg">
+        {/* header: título + botón × */}
+        {/* body: campos en grid grid-cols-2 usando patrón Campo */}
+        {/* footer: botón Cerrar + Link/button Editar (bg-vialto-charcoal) */}
+      </div>
+    </div>
+  );
+}
+```
+
+### Campo helper (read-only)
+
+```tsx
+function Campo({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{label}</p>
+      <p className="mt-1 text-sm">{value ?? '—'}</p>
+    </div>
+  );
+}
+```
+
+### Aplicación en páginas
+
+```tsx
+// Estado
+const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
+
+// Botón en la grilla
+<button onClick={() => setViewingEntidad(e)} className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist">
+  Ver
+</button>
+
+// Modal al final del JSX
+{viewingEntidad && (
+  <EntidadViewModal
+    entidad={viewingEntidad}
+    onClose={() => setViewingEntidad(null)}
+    editTo={`/entidades/${viewingEntidad.id}/editar`}
+  />
+)}
+```
+
+### Para modales con `modo: 'view'` (Productos)
+
+```tsx
+// Estado
+| { mode: 'view'; producto: Producto }
+
+// Botón en grilla
+<button onClick={() => setModal({ mode: 'view', producto: r })}>Ver</button>
+
+// Modal
+{modal.mode === 'view' && (
+  <ProductoModal
+    modo="view"
+    productoInicial={modal.producto}
+    onEdit={() => setModal({ mode: 'edit', producto: modal.producto })}
+    ...
+  />
+)}
+```
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -166,7 +257,8 @@ VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
 - Extraer componentes y hooks para evitar páginas extensas.
 - Verificar estados de carga, error y vacío.
 - Mantener textos y UX consistentes con el resto del producto.
+- **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
 
 ---
 
-*Última actualización: marzo 2026*
+*Última actualización: mayo 2026*

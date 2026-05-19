@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
@@ -23,6 +24,7 @@ export function VehiculosSuperadminPage() {
   );
   const [rows, setRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewingVehiculo, setViewingVehiculo] = useState<Vehiculo | null>(null);
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -143,20 +145,28 @@ export function VehiculosSuperadminPage() {
                     {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(
-                        filtroEmpresa,
-                      )}`}
+                    <button
+                      type="button"
+                      onClick={() => setViewingVehiculo(v)}
                       className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      Editar
-                    </Link>
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {viewingVehiculo && (
+        <VehiculoViewModal
+          vehiculo={viewingVehiculo}
+          nombresTransportistas={nombresTransportistas}
+          onClose={() => setViewingVehiculo(null)}
+          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculo.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+        />
+      )}
     </div>
   );
 }

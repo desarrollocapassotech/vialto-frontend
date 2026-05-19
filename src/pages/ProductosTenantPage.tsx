@@ -14,6 +14,7 @@ type Paginated = { items: Producto[]; meta: PaginatedMeta };
 type ModalState =
   | { mode: 'closed' }
   | { mode: 'create' }
+  | { mode: 'view'; producto: Producto }
   | { mode: 'edit'; producto: Producto }
   | { mode: 'presentaciones'; producto: Producto };
 
@@ -279,15 +280,15 @@ export function ProductosTenantPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ mode: 'view', producto: r })}
+                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                  >
+                    Ver
+                  </button>
                   {puedeGestionar && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setModal({ mode: 'edit', producto: r })}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </button>
                       {r.activo ? (
                         <button
                           type="button"
@@ -366,6 +367,17 @@ export function ProductosTenantPage() {
             setModal({ mode: 'closed' });
             await load();
           }}
+        />
+      )}
+
+      {modal.mode === 'view' && (
+        <ProductoModal
+          modo="view"
+          productoInicial={modal.producto}
+          getToken={getToken}
+          onClose={() => setModal({ mode: 'closed' })}
+          onSaved={() => {}}
+          onEdit={puedeGestionar ? () => setModal({ mode: 'edit', producto: modal.producto }) : undefined}
         />
       )}
 

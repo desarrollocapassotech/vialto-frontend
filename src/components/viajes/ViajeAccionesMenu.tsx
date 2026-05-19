@@ -9,7 +9,7 @@ import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos'
 
 interface Props {
   viaje: Viaje;
-  onEditar: () => void;
+  onVer: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
   onFacturar: () => void;
@@ -23,7 +23,7 @@ type MenuPos = { top?: number; bottom?: number; right: number };
 
 export function ViajeAccionesMenu({
   viaje,
-  onEditar,
+  onVer,
   onAgregarGasto,
   onRegistrarPago,
   onFacturar,
@@ -118,7 +118,7 @@ export function ViajeAccionesMenu({
           style={{ position: 'fixed', ...menuPos, zIndex: 9999 }}
           className="min-w-[160px] border border-black/20 bg-white shadow-lg"
         >
-          {item('Editar', onEditar)}
+          {item('Ver', onVer)}
           {viaje.facturaId && onVerFactura && item('Ver factura', onVerFactura)}
           {permiteFacturar && onEmitirCvlp && item('Emitir comprobante', onEmitirCvlp)}
           {permiteFacturar && !onEmitirCvlp && item('Facturar', onFacturar)}

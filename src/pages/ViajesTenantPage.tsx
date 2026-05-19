@@ -39,6 +39,7 @@ import {
 } from '@/components/viajes/ViajeGananciaBruta';
 import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
 import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/ViajeEditModal';
+import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
 import {
   otroGastoDraftFromApi,
@@ -140,6 +141,7 @@ export function ViajesTenantPage({
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
+  const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
@@ -1380,7 +1382,7 @@ export function ViajesTenantPage({
                 <td className="px-4 py-3 text-right">
                   <ViajeAccionesMenu
                     viaje={v}
-                    onEditar={() => startEdit(v)}
+                    onVer={() => setViewingViaje(v)}
                     onAgregarGasto={() => setAgregarGastoViaje(v)}
                     onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     onFacturar={() => void navigateToFacturacion(v)}
@@ -1461,6 +1463,18 @@ export function ViajesTenantPage({
             </button>
           </div>
         </div>
+      )}
+
+      {viewingViaje && (
+        <ViajeViewModal
+          viaje={viewingViaje}
+          onClose={() => setViewingViaje(null)}
+          onEditar={() => {
+            const v = viewingViaje;
+            setViewingViaje(null);
+            startEdit(v);
+          }}
+        />
       )}
 
       {editingId && draft && viajeEdicionSnapshot && (

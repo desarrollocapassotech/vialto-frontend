@@ -11,6 +11,7 @@ import {
   type FacturaDraft,
 } from '@/components/facturacion/FacturaEditModal';
 import { FacturaAccionesMenu } from '@/components/facturacion/FacturaAccionesMenu';
+import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
@@ -112,6 +113,7 @@ export function FacturacionTenantPage({
   // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] = useState<Factura | null>(null);
+  const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
 
   // filtros de columna (client-side)
   const [numFiltro, setNumFiltro] = useState('');
@@ -687,7 +689,7 @@ export function FacturacionTenantPage({
                       <FacturaAccionesMenu
                         factura={f}
                         deleting={deletingId === f.id}
-                        onEditar={() => startEdit(f)}
+                        onVer={() => setViewingFactura(f)}
                         onEliminar={() => setFacturaDeleteConfirm(f)}
                       />
                     </td>
@@ -719,6 +721,19 @@ export function FacturacionTenantPage({
         saving={saving}
         error={draftError}
       />
+
+      {viewingFactura && (
+        <FacturaViewModal
+          factura={viewingFactura}
+          clienteNombre={nombreCliente(viewingFactura.clienteId)}
+          onClose={() => setViewingFactura(null)}
+          onEditar={() => {
+            const f = viewingFactura;
+            setViewingFactura(null);
+            startEdit(f);
+          }}
+        />
+      )}
 
       {editingId && editDraft && facturaEdicionSnapshot && (
         <FacturaEditModal

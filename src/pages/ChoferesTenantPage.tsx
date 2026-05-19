@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
@@ -24,6 +25,7 @@ export function ChoferesTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [viewingChofer, setViewingChofer] = useState<Chofer | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -110,12 +112,13 @@ export function ChoferesTenantPage() {
                   {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    to={`/choferes/${encodeURIComponent(c.id)}/editar`}
+                  <button
+                    type="button"
+                    onClick={() => setViewingChofer(c)}
                     className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                   >
-                    Editar
-                  </Link>
+                    Ver
+                  </button>
                 </td>
               </tr>
             ))}
@@ -164,6 +167,15 @@ export function ChoferesTenantPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {viewingChofer && (
+        <ChoferViewModal
+          chofer={viewingChofer}
+          nombresTransportistas={nombresTransportistas}
+          onClose={() => setViewingChofer(null)}
+          editTo={`/choferes/${encodeURIComponent(viewingChofer.id)}/editar`}
+        />
       )}
     </div>
   );

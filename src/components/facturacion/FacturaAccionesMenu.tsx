@@ -5,13 +5,13 @@ import type { Factura } from '@/types/api';
 interface Props {
   factura: Factura;
   deleting: boolean;
-  onEditar: () => void;
+  onVer: () => void;
   onEliminar: () => void;
 }
 
 type MenuPos = { top?: number; bottom?: number; right: number };
 
-export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onEliminar }: Props) {
+export function FacturaAccionesMenu({ factura: _factura, deleting, onVer, onEliminar }: Props) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -97,7 +97,7 @@ export function FacturaAccionesMenu({ factura: _factura, deleting, onEditar, onE
           style={{ position: 'fixed', ...menuPos, zIndex: 9999 }}
           className="min-w-[140px] border border-black/20 bg-white shadow-lg"
         >
-          {item('Editar', onEditar)}
+          {item('Ver', onVer)}
           {item('Eliminar', onEliminar, { danger: true, disabled: deleting })}
         </div>,
         document.body,

@@ -6,6 +6,7 @@ import {
 import { Link } from 'react-router-dom';
 import type { Tenant } from '@/types/api';
 import { ImportacionModal } from './ImportacionModal';
+import { TenantViewModal } from './TenantViewModal';
 
 interface TenantsTableProps {
   loading: boolean;
@@ -33,6 +34,7 @@ export function TenantsTable({
   onToggleEnabled,
 }: TenantsTableProps) {
   const [importTenant, setImportTenant] = useState<Tenant | null>(null);
+  const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
   const isDisabledStatus = (status: string) =>
     ['suspended', 'expired'].includes(status.toLowerCase());
 
@@ -42,6 +44,12 @@ export function TenantsTable({
       <ImportacionModal
         tenant={importTenant}
         onClose={() => setImportTenant(null)}
+      />
+    )}
+    {viewingTenant && (
+      <TenantViewModal
+        tenant={viewingTenant}
+        onClose={() => setViewingTenant(null)}
       />
     )}
     <div className="mt-10 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
@@ -158,14 +166,13 @@ export function TenantsTable({
                     >
                       Importar
                     </button>
-                    <Link
-                      to={`/superadmin/empresas/${encodeURIComponent(
-                        tenant.clerkOrgId,
-                      )}/editar`}
+                    <button
+                      type="button"
+                      onClick={() => setViewingTenant(tenant)}
                       className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      Editar
-                    </Link>
+                      Ver
+                    </button>
                   </div>
                 </td>
               </tr>
