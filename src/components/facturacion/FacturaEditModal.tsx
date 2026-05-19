@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction, useCallback } from 'react';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import {
+  ClienteSearchSelect,
+  TransportistaSearchSelect,
+} from '@/components/forms/MaestroSearchSelects';
 import { monedaUnicaDeViajes, textoImporteFacturaSeleccion, textoMontoFacturarListado } from '@/lib/viajesFlota';
-import type { Cliente, Factura, Viaje } from '@/types/api';
+import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: 'PENDIENTE',
@@ -20,6 +23,7 @@ export type FacturaDraft = {
   numero: string;
   tipo: 'cliente' | 'transportista_externo';
   clienteId: string;
+  transportistaId: string;
   viajeIds: string[];
   fechaEmision: string;
   fechaVencimiento: string;
@@ -39,6 +43,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     numero: '',
     tipo: 'cliente',
     clienteId: '',
+    transportistaId: '',
     viajeIds: [],
     fechaEmision: todayIso(),
     fechaVencimiento: '',
@@ -50,10 +55,68 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     numero: f.numero,
     tipo: f.tipo,
     clienteId: f.clienteId ?? '',
+    transportistaId: f.transportistaId ?? '',
     viajeIds: f.viajeIds,
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
   };
+}
+
+/** Al cambiar el tipo de factura, limpiar contraparte y viajes vinculados. */
+export function patchFacturaTipo(
+  tipo: FacturaDraft['tipo'],
+): Pick<FacturaDraft, 'tipo' | 'clienteId' | 'transportistaId' | 'viajeIds'> {
+  return { tipo, clienteId: '', transportistaId: '', viajeIds: [] };
+}
+
+function FacturaContraparteField({
+  tipo,
+  clienteId,
+  transportistaId,
+  clientes,
+  transportistas,
+  onClienteChange,
+  onTransportistaChange,
+}: {
+  tipo: FacturaDraft['tipo'];
+  clienteId: string;
+  transportistaId: string;
+  clientes: Cliente[];
+  transportistas: Transportista[];
+  onClienteChange: (id: string) => void;
+  onTransportistaChange: (id: string) => void;
+}) {
+  const esTransportista = tipo === 'transportista_externo';
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+        {esTransportista ? 'Transportista' : 'Cliente'}
+      </label>
+      {esTransportista ? (
+        <TransportistaSearchSelect
+          transportistas={transportistas}
+          value={transportistaId}
+          onChange={onTransportistaChange}
+          inputClassName={clienteInputClass}
+          emptyListChoiceLabel="— Sin transportista —"
+          placeholderCerrado="— Sin transportista —"
+          aria-label="Transportista"
+        />
+      ) : (
+        <ClienteSearchSelect
+          clientes={clientes}
+          value={clienteId}
+          onChange={onClienteChange}
+          inputClassName={clienteInputClass}
+          allowEmptyValue
+          emptyListChoiceLabel="— Sin cliente —"
+          placeholderCerrado="— Sin cliente —"
+          aria-label="Cliente"
+        />
+      )}
+    </div>
+  );
 }
 
 const clienteInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
@@ -126,6 +189,7 @@ export function ViajesVinculadosEditor({
   loading,
   tipo,
   clienteId,
+  transportistaId,
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -134,6 +198,7 @@ export function ViajesVinculadosEditor({
   loading?: boolean;
   tipo: FacturaDraft['tipo'];
   clienteId: string;
+  transportistaId: string;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -162,6 +227,8 @@ export function ViajesVinculadosEditor({
 
   const available = disponibles.filter((v) => !selected.includes(v.id));
   const showClienteHint = tipo === 'cliente' && !clienteId.trim();
+  const showTransportistaHint = tipo === 'transportista_externo' && !transportistaId.trim();
+  const showContraparteHint = showClienteHint || showTransportistaHint;
 
   function remove(id: string) {
     onChange(selected.filter((x) => x !== id));
@@ -204,9 +271,11 @@ export function ViajesVinculadosEditor({
       )}
 
       <div ref={pickerRef} className="relative">
-        {showClienteHint ? (
+        {showContraparteHint ? (
           <p className="text-[11px] text-vialto-steel">
-            Elegí un cliente para poder vincular viajes.
+            {showTransportistaHint
+              ? 'Elegí un transportista para poder vincular viajes.'
+              : 'Elegí un cliente para poder vincular viajes.'}
           </p>
         ) : (loading || available.length > 0) ? (
           <button
@@ -219,7 +288,7 @@ export function ViajesVinculadosEditor({
           </button>
         ) : null}
 
-        {pickerOpen && !showClienteHint && available.length > 0 && (
+        {pickerOpen && !showContraparteHint && available.length > 0 && (
           <div className="absolute left-0 top-full z-50 mt-1 min-w-[22rem] max-w-full border border-black/20 bg-white shadow-lg">
             <div className="max-h-52 overflow-y-auto divide-y divide-black/5">
               {available.map((v) => (
@@ -276,6 +345,7 @@ export type FacturaCreateModalProps = {
   draft: FacturaDraft;
   setDraft: Dispatch<SetStateAction<FacturaDraft>>;
   clientes: Cliente[];
+  transportistas: Transportista[];
   viajes: Viaje[];
   viajesNueva: Viaje[];
   viajesLoading: boolean;
@@ -290,6 +360,7 @@ export function FacturaCreateModal({
   draft,
   setDraft,
   clientes,
+  transportistas,
   viajes,
   viajesNueva,
   viajesLoading,
@@ -369,7 +440,9 @@ export function FacturaCreateModal({
               </label>
               <select
                 value={draft.tipo}
-                onChange={(e) => patch({ tipo: e.target.value as FacturaDraft['tipo'] })}
+                onChange={(e) =>
+                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
+                }
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
                 <option value="cliente">Factura a cliente</option>
@@ -377,21 +450,15 @@ export function FacturaCreateModal({
               </select>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Cliente
-              </label>
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={draft.clienteId}
-                onChange={(id) => patch({ clienteId: id })}
-                inputClassName={clienteInputClass}
-                allowEmptyValue
-                emptyListChoiceLabel="— Sin cliente —"
-                placeholderCerrado="— Sin cliente —"
-                aria-label="Cliente"
-              />
-            </div>
+            <FacturaContraparteField
+              tipo={draft.tipo}
+              clienteId={draft.clienteId}
+              transportistaId={draft.transportistaId}
+              clientes={clientes}
+              transportistas={transportistas}
+              onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
+              onTransportistaChange={(id) => patch({ transportistaId: id, viajeIds: [] })}
+            />
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
@@ -441,6 +508,7 @@ export function FacturaCreateModal({
                 loading={viajesLoading}
                 tipo={draft.tipo}
                 clienteId={draft.clienteId}
+                transportistaId={draft.transportistaId}
               />
             </div>
           </div>
@@ -489,6 +557,7 @@ export type FacturaEditModalProps = {
   setDraft: Dispatch<SetStateAction<FacturaDraft | null>>;
   snapshotFactura: Factura;
   clientes: Cliente[];
+  transportistas: Transportista[];
   /** Listado completo de viajes (para sumar importes de los seleccionados). */
   viajes: Viaje[];
   /** Viajes mostrados en los checkboxes (filtrados por cliente/tipo/edición). */
@@ -506,6 +575,7 @@ export function FacturaEditModal({
   setDraft,
   snapshotFactura,
   clientes,
+  transportistas,
   viajes,
   viajesEdicion,
   viajesLoading,
@@ -598,7 +668,7 @@ export function FacturaEditModal({
               <select
                 value={draft.tipo}
                 onChange={(e) =>
-                  patch({ tipo: e.target.value as FacturaDraft['tipo'] })
+                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
                 }
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
@@ -607,21 +677,15 @@ export function FacturaEditModal({
               </select>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Cliente
-              </label>
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={draft.clienteId}
-                onChange={(id) => patch({ clienteId: id })}
-                inputClassName={clienteInputClass}
-                allowEmptyValue
-                emptyListChoiceLabel="— Sin cliente —"
-                placeholderCerrado="— Sin cliente —"
-                aria-label="Cliente"
-              />
-            </div>
+            <FacturaContraparteField
+              tipo={draft.tipo}
+              clienteId={draft.clienteId}
+              transportistaId={draft.transportistaId}
+              clientes={clientes}
+              transportistas={transportistas}
+              onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
+              onTransportistaChange={(id) => patch({ transportistaId: id, viajeIds: [] })}
+            />
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
@@ -671,6 +735,7 @@ export function FacturaEditModal({
                 loading={viajesLoading}
                 tipo={draft.tipo}
                 clienteId={draft.clienteId}
+                transportistaId={draft.transportistaId}
               />
             </div>
           </div>

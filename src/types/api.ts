@@ -186,6 +186,7 @@ export interface Factura {
   numero: string;
   tipo: 'cliente' | 'transportista_externo';
   clienteId: string | null;
+  transportistaId: string | null;
   viajeIds: string[];
   importe: number;
   moneda: string;

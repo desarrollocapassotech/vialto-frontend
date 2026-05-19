@@ -124,8 +124,9 @@ function viajePerteneceAFacturaEnEdicion(
 }
 
 /**
- * Viajes que se pueden vincular a una factura según tipo y cliente.
- * Tipo «cliente»: solo viajes de ese `clienteId`. «transportista_externo»: todos (sin filtro por cliente en maestro).
+ * Viajes que se pueden vincular a una factura según tipo y contraparte.
+ * Tipo «cliente»: viajes del `clienteId` elegido.
+ * «transportista_externo»: viajes del `transportistaId` elegido (operación externa).
  * Excluye viajes que ya tienen factura asignada, cobrados y cancelados.
  * Con `opciones` de edición, mantiene visibles los viajes ya vinculados a esa factura.
  */
@@ -133,15 +134,18 @@ export function viajesFiltradosParaFactura(
   todos: Viaje[],
   tipo: 'cliente' | 'transportista_externo',
   clienteId: string,
+  transportistaId: string,
   opciones?: ViajesFiltradosParaFacturaOpciones,
 ): Viaje[] {
   let list: Viaje[];
-  if (tipo !== 'cliente') {
-    list = todos;
-  } else {
+  if (tipo === 'cliente') {
     const cid = clienteId.trim();
     if (!cid) return [];
     list = todos.filter((v) => v.clienteId === cid);
+  } else {
+    const tid = transportistaId.trim();
+    if (!tid) return [];
+    list = todos.filter((v) => v.transportistaId === tid);
   }
 
   const fid = opciones?.facturaEdicionId?.trim() || null;
@@ -165,6 +169,7 @@ export function viajesFiltradosParaFactura(
     const v = todos.find((x) => x.id === id);
     if (!v) continue;
     if (tipo === 'cliente' && v.clienteId !== clienteId.trim()) continue;
+    if (tipo !== 'cliente' && v.transportistaId !== transportistaId.trim()) continue;
     seen.add(id);
     extra.push(v);
   }
