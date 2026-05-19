@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import { CrudInput } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -10,6 +10,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { validateClienteForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Cliente } from '@/types/api';
@@ -66,8 +67,9 @@ export function ClienteEditPage() {
 
   async function onSave() {
     if (!id) return;
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del cliente.');
+    const validationError = validateClienteForm(nombre, pais, idFiscal);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setLoading(true);
@@ -82,11 +84,11 @@ export function ClienteEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          idFiscal: idFiscal.trim() || undefined,
+          idFiscal: idFiscal.trim(),
+          pais,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
-          pais: pais || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -138,9 +140,7 @@ export function ClienteEditPage() {
             }}
           >
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                Nombre
-              </span>
+              <CrudFieldLabel required>Nombre</CrudFieldLabel>
               <CrudInput
                 value={nombre}
                 placeholder="Ej: Transportes del Norte SA"
@@ -148,9 +148,7 @@ export function ClienteEditPage() {
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                País
-              </span>
+              <CrudFieldLabel required>País</CrudFieldLabel>
               <PaisUbicacionSelect
                 value={pais}
                 onChange={setPais}
@@ -168,9 +166,7 @@ export function ClienteEditPage() {
               />
             </label>
             <label className="grid gap-1.5">
-              <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                {idFiscalPorPais(pais).label}
-              </span>
+              <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
               <CrudInput
                 value={idFiscal}
                 placeholder={idFiscalPorPais(pais).placeholder}
