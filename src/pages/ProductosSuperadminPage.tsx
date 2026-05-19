@@ -15,6 +15,7 @@ type Paginated = { items: Producto[]; meta: PaginatedMeta };
 type ModalState =
   | { mode: 'closed' }
   | { mode: 'create' }
+  | { mode: 'view'; producto: Producto }
   | { mode: 'edit'; producto: Producto }
   | { mode: 'presentaciones'; producto: Producto };
 
@@ -298,10 +299,10 @@ export function ProductosSuperadminPage() {
                     <td className="px-4 py-3 text-right space-x-2">
                       <button
                         type="button"
-                        onClick={() => setModal({ mode: 'edit', producto: r })}
+                        onClick={() => setModal({ mode: 'view', producto: r })}
                         className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                       >
-                        Editar
+                        Ver
                       </button>
                       {r.activo ? (
                         <button
@@ -376,6 +377,18 @@ export function ProductosSuperadminPage() {
         <p className="mt-8 text-vialto-steel">Seleccioná una empresa para ver y gestionar su catálogo de productos.</p>
       )}
 
+      {modal.mode === 'view' && filtroEmpresa && (
+        <ProductoModal
+          modo="view"
+          productoInicial={modal.producto}
+          baseUrl="/api/platform/stock/productos"
+          tenantId={filtroEmpresa}
+          getToken={getToken}
+          onClose={() => setModal({ mode: 'closed' })}
+          onSaved={() => {}}
+          onEdit={() => setModal({ mode: 'edit', producto: modal.producto })}
+        />
+      )}
       {modal.mode === 'create' && filtroEmpresa && (
         <ProductoModal
           modo="create"

@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -12,6 +13,7 @@ export function TransportistasSuperadminPage() {
   const [rows, setRows] = useState<ConEmpresa<Transportista>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -115,20 +117,27 @@ export function TransportistasSuperadminPage() {
                   <td className="px-4 py-3">{t.nombre}</td>
                   <td className="px-4 py-3 text-vialto-steel">{t.idFiscal ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/transportistas/${encodeURIComponent(t.id)}/editar?tenantId=${encodeURIComponent(
-                        filtroEmpresa,
-                      )}`}
+                    <button
+                      type="button"
+                      onClick={() => setViewingTransportista(t)}
                       className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      Editar
-                    </Link>
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {viewingTransportista && (
+        <TransportistaViewModal
+          transportista={viewingTransportista}
+          onClose={() => setViewingTransportista(null)}
+          editTo={`/transportistas/${encodeURIComponent(viewingTransportista.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+        />
+      )}
     </div>
   );
 }

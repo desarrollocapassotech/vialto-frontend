@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
@@ -25,6 +26,7 @@ export function VehiculosTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [viewingVehiculo, setViewingVehiculo] = useState<Vehiculo | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -113,12 +115,13 @@ export function VehiculosTenantPage() {
                   {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
+                  <button
+                    type="button"
+                    onClick={() => setViewingVehiculo(v)}
                     className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                   >
-                    Editar
-                  </Link>
+                    Ver
+                  </button>
                 </td>
               </tr>
             ))}
@@ -167,6 +170,15 @@ export function VehiculosTenantPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {viewingVehiculo && (
+        <VehiculoViewModal
+          vehiculo={viewingVehiculo}
+          nombresTransportistas={nombresTransportistas}
+          onClose={() => setViewingVehiculo(null)}
+          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculo.id)}/editar`}
+        />
       )}
     </div>
   );

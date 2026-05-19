@@ -139,6 +139,15 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                     )}
                   </div>
 
+                  {modulo === 'viajes' && (
+                    <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
+                      <span className="mt-0.5 shrink-0 text-base leading-none">💡</span>
+                      <span>
+                        El módulo Viajes requiere las columnas <code className="font-mono bg-blue-100 px-0.5">MONEDA MONTO</code> y <code className="font-mono bg-blue-100 px-0.5">MONEDA FLETE</code> con valores <strong>ARS</strong> o <strong>USD</strong>. Si el campo está vacío o tiene un valor distinto, la fila será rechazada.
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="space-y-1">
                     <label className="block text-xs uppercase tracking-wider text-vialto-steel">Archivo Excel (.xlsx / .xls) *</label>
                     <div onClick={() => fileInputRef.current?.click()}
@@ -432,8 +441,10 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
             <th className="px-3 py-2 whitespace-nowrap">F. Descarga</th>
             <th className="px-3 py-2 whitespace-nowrap">Carga</th>
             <th className="px-3 py-2 whitespace-nowrap">Monto</th>
+            <th className="px-3 py-2 whitespace-nowrap">Moneda</th>
             <th className="px-3 py-2 whitespace-nowrap">Nro FC</th>
             <th className="px-3 py-2 whitespace-nowrap">Flete</th>
+            <th className="px-3 py-2 whitespace-nowrap">Moneda Flete</th>
             <th className="px-3 py-2 whitespace-nowrap">FC Flete</th>
           </tr>
         </thead>
@@ -449,8 +460,10 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
               <Td>{fmt(v.fechaDescarga)}</Td>
               <Td>{fmt(v.detalleCarga)}</Td>
               <Td>{money(v.monto)}</Td>
+              <Td>{fmt(v.monedaMonto)}</Td>
               <Td>{fmt(v.nroFactura)}</Td>
               <Td>{money(v.precioTransportistaExterno)}</Td>
+              <Td>{fmt(v.monedaPrecioTransportistaExterno)}</Td>
               <Td>{fmt(v.nroFacturaTransporte)}</Td>
             </tr>
           ))}

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
+import { UserViewModal } from '@/components/superadmin/UserViewModal';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -37,6 +38,7 @@ export function SuperadminUsersPage() {
   const filtroEmpresa = searchParams.get('tenantId')?.trim() ?? '';
   const [rows, setRows] = useState<PlatformUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -173,14 +175,13 @@ export function SuperadminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {u.userId ? (
-                        <Link
-                          to={`/superadmin/usuarios/${encodeURIComponent(u.userId)}/editar?tenantId=${encodeURIComponent(
-                            filtroEmpresa,
-                          )}`}
+                        <button
+                          type="button"
+                          onClick={() => setViewingUser(u)}
                           className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                         >
-                          Editar
-                        </Link>
+                          Ver
+                        </button>
                       ) : (
                         <span className="text-xs text-vialto-steel">—</span>
                       )}
@@ -191,6 +192,13 @@ export function SuperadminUsersPage() {
           </table>
         </div>
       </div>
+      {viewingUser && (
+        <UserViewModal
+          user={viewingUser}
+          tenantId={filtroEmpresa}
+          onClose={() => setViewingUser(null)}
+        />
+      )}
     </SuperadminOnly>
   );
 }

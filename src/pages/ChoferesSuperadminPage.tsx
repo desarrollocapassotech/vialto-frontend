@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
@@ -22,6 +23,7 @@ export function ChoferesSuperadminPage() {
   );
   const [rows, setRows] = useState<ConEmpresa<Chofer>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewingChofer, setViewingChofer] = useState<Chofer | null>(null);
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -138,20 +140,28 @@ export function ChoferesSuperadminPage() {
                     {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(
-                        filtroEmpresa,
-                      )}`}
+                    <button
+                      type="button"
+                      onClick={() => setViewingChofer(c)}
                       className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      Editar
-                    </Link>
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {viewingChofer && (
+        <ChoferViewModal
+          chofer={viewingChofer}
+          nombresTransportistas={nombresTransportistas}
+          onClose={() => setViewingChofer(null)}
+          editTo={`/choferes/${encodeURIComponent(viewingChofer.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+        />
+      )}
     </div>
   );
 }

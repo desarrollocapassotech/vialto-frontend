@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Cliente, PaginatedMeta } from '@/types/api';
@@ -17,6 +18,7 @@ export function ClientesTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -101,12 +103,13 @@ export function ClientesTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">{c.email ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    to={`/clientes/${encodeURIComponent(c.id)}/editar`}
+                  <button
+                    type="button"
+                    onClick={() => setViewingCliente(c)}
                     className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                   >
-                    Editar
-                  </Link>
+                    Ver
+                  </button>
                 </td>
               </tr>
             ))}
@@ -155,6 +158,14 @@ export function ClientesTenantPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {viewingCliente && (
+        <ClienteViewModal
+          cliente={viewingCliente}
+          onClose={() => setViewingCliente(null)}
+          editTo={`/clientes/${encodeURIComponent(viewingCliente.id)}/editar`}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Transportista } from '@/types/api';
@@ -9,6 +10,7 @@ export function TransportistasTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Transportista[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -88,18 +90,27 @@ export function TransportistasTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">{t.email ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{t.telefono ?? '—'}</td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    to={`/transportistas/${encodeURIComponent(t.id)}/editar`}
+                  <button
+                    type="button"
+                    onClick={() => setViewingTransportista(t)}
                     className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                   >
-                    Editar
-                  </Link>
+                    Ver
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {viewingTransportista && (
+        <TransportistaViewModal
+          transportista={viewingTransportista}
+          onClose={() => setViewingTransportista(null)}
+          editTo={`/transportistas/${encodeURIComponent(viewingTransportista.id)}/editar`}
+        />
+      )}
     </div>
   );
 }

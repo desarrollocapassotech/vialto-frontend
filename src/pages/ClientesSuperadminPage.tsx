@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
@@ -12,6 +13,7 @@ export function ClientesSuperadminPage() {
   const [rows, setRows] = useState<ConEmpresa<Cliente>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -125,20 +127,27 @@ export function ClientesSuperadminPage() {
                     {c.idFiscal ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/clientes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(
-                        filtroEmpresa,
-                      )}`}
+                    <button
+                      type="button"
+                      onClick={() => setViewingCliente(c)}
                       className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
                     >
-                      Editar
-                    </Link>
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {viewingCliente && (
+        <ClienteViewModal
+          cliente={viewingCliente}
+          onClose={() => setViewingCliente(null)}
+          editTo={`/clientes/${encodeURIComponent(viewingCliente.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+        />
+      )}
     </div>
   );
 }
