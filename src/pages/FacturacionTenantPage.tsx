@@ -21,7 +21,29 @@ import {
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
-import type { Cliente, Factura, Viaje } from '@/types/api';
+import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
+
+function facturaPayloadFromDraft(draft: FacturaDraft) {
+  const base = {
+    numero: draft.numero.trim(),
+    tipo: draft.tipo,
+    viajeIds: draft.viajeIds,
+    fechaEmision: draft.fechaEmision,
+    fechaVencimiento: draft.fechaVencimiento || undefined,
+  };
+  if (draft.tipo === 'transportista_externo') {
+    return {
+      ...base,
+      transportistaId: draft.transportistaId || undefined,
+      clienteId: undefined,
+    };
+  }
+  return {
+    ...base,
+    clienteId: draft.clienteId || undefined,
+    transportistaId: undefined,
+  };
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -70,7 +92,9 @@ export function FacturacionTenantPage({
   const platform = Boolean(tenantId?.trim());
   const tid = tenantId?.trim() ?? '';
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
+  const [transportistasPlatform, setTransportistasPlatform] = useState<Transportista[]>([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
+  const transportistas = platform ? transportistasPlatform : maestro.transportistas;
 
   const facturasListUrl = useMemo(() => {
     if (!platform) return '/api/facturacion/facturas';
@@ -128,16 +152,28 @@ export function FacturacionTenantPage({
   const expandFacturaHandledRef = useRef(false);
 
   const viajesNuevaFactura = useMemo(
-    () => viajesFiltradosParaFactura(viajes, draft.tipo, draft.clienteId),
-    [viajes, draft.tipo, draft.clienteId],
+    () =>
+      viajesFiltradosParaFactura(
+        viajes,
+        draft.tipo,
+        draft.clienteId,
+        draft.transportistaId,
+      ),
+    [viajes, draft.tipo, draft.clienteId, draft.transportistaId],
   );
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];
-    return viajesFiltradosParaFactura(viajes, editDraft.tipo, editDraft.clienteId, {
-      facturaEdicionId: editingId,
-      viajeIdsFacturaEdicion: editDraft.viajeIds,
-    });
+    return viajesFiltradosParaFactura(
+      viajes,
+      editDraft.tipo,
+      editDraft.clienteId,
+      editDraft.transportistaId,
+      {
+        facturaEdicionId: editingId,
+        viajeIdsFacturaEdicion: editDraft.viajeIds,
+      },
+    );
   }, [viajes, editDraft, editingId]);
 
   const facturaEdicionSnapshot = useMemo(
@@ -148,18 +184,31 @@ export function FacturacionTenantPage({
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
       setClientesPlatform([]);
+      setTransportistasPlatform([]);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const c = await apiJson<Cliente[]>(
-          `/api/platform/clientes?tenantId=${encodeURIComponent(tid)}`,
-          () => getToken(),
-        );
-        if (!cancelled) setClientesPlatform(c);
+        const [c, t] = await Promise.all([
+          apiJson<Cliente[]>(
+            `/api/platform/clientes?tenantId=${encodeURIComponent(tid)}`,
+            () => getToken(),
+          ),
+          apiJson<Transportista[]>(
+            `/api/platform/transportistas?tenantId=${encodeURIComponent(tid)}`,
+            () => getToken(),
+          ),
+        ]);
+        if (!cancelled) {
+          setClientesPlatform(c);
+          setTransportistasPlatform(t);
+        }
       } catch {
-        if (!cancelled) setClientesPlatform([]);
+        if (!cancelled) {
+          setClientesPlatform([]);
+          setTransportistasPlatform([]);
+        }
       }
     })();
     return () => {
@@ -224,7 +273,14 @@ export function FacturacionTenantPage({
       if (next.length === ed.viajeIds.length) return ed;
       return { ...ed, viajeIds: next };
     });
-  }, [editingId, editDraft?.clienteId, editDraft?.tipo, viajes.length, viajesEdicionFactura]);
+  }, [
+    editingId,
+    editDraft?.clienteId,
+    editDraft?.transportistaId,
+    editDraft?.tipo,
+    viajes.length,
+    viajesEdicionFactura,
+  ]);
 
   // ── carga inicial ──────────────────────────────────────────────────────────
 
@@ -335,14 +391,7 @@ export function FacturacionTenantPage({
     try {
       await apiJson<Factura>(facturasCreateUrl(), () => getToken(), {
         method: 'POST',
-        body: JSON.stringify({
-          numero: draft.numero.trim(),
-          tipo: draft.tipo,
-          clienteId: draft.clienteId || undefined,
-          viajeIds: draft.viajeIds,
-          fechaEmision: draft.fechaEmision,
-          fechaVencimiento: draft.fechaVencimiento || undefined,
-        }),
+        body: JSON.stringify(facturaPayloadFromDraft(draft)),
       });
       setCreating(false);
       setDraft(emptyFacturaDraft());
@@ -386,14 +435,7 @@ export function FacturacionTenantPage({
         () => getToken(),
         {
           method: 'PATCH',
-          body: JSON.stringify({
-            numero: editDraft.numero.trim(),
-            tipo: editDraft.tipo,
-            clienteId: editDraft.clienteId || undefined,
-            viajeIds: editDraft.viajeIds,
-            fechaEmision: editDraft.fechaEmision,
-            fechaVencimiento: editDraft.fechaVencimiento || undefined,
-          }),
+          body: JSON.stringify(facturaPayloadFromDraft(editDraft)),
         },
       );
       setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
@@ -425,7 +467,13 @@ export function FacturacionTenantPage({
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  function nombreCliente(id: string | null) {
+  function nombreContraparte(f: Factura) {
+    if (f.tipo === 'transportista_externo') {
+      const id = f.transportistaId;
+      if (!id) return '—';
+      return transportistas.find((t) => t.id === id)?.nombre ?? id;
+    }
+    const id = f.clienteId;
     if (!id) return '—';
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
@@ -668,7 +716,7 @@ export function FacturacionTenantPage({
                   <tr className="border-b border-black/5 hover:bg-vialto-mist/40">
                     <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
                     <td className="px-4 py-3 leading-snug">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
-                    <td className="px-4 py-3 truncate" title={nombreCliente(f.clienteId)}>{nombreCliente(f.clienteId)}</td>
+                    <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>{nombreContraparte(f)}</td>
                     <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
                       {fmtFecha(f.fechaEmision)}
                     </td>
@@ -711,6 +759,7 @@ export function FacturacionTenantPage({
         draft={draft}
         setDraft={setDraft}
         clientes={clientes}
+        transportistas={transportistas}
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
@@ -727,6 +776,7 @@ export function FacturacionTenantPage({
           setDraft={setEditDraft}
           snapshotFactura={facturaEdicionSnapshot}
           clientes={clientes}
+          transportistas={transportistas}
           viajes={viajes}
           viajesEdicion={viajesEdicionFactura}
           viajesLoading={viajesLoading}
