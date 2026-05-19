@@ -213,8 +213,10 @@ export interface ImportPreviewViaje {
   fechaDescarga: string | null;
   detalleCarga: string | null;
   monto: number | null;
+  monedaMonto: string | null;
   nroFactura: string | null;
   precioTransportistaExterno: number | null;
+  monedaPrecioTransportistaExterno: string | null;
   nroFacturaTransporte: string | null;
 }
 
