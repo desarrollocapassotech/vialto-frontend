@@ -507,7 +507,7 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
             />
             <MetricCard
               title="Facturado"
-              tooltip="Suma de facturas emitidas al cliente en el período, por fecha de emisión"
+              tooltip="Suma de montos de viajes facturados sin cobrar del período (ARS y USD por separado)"
               metric={fin?.facturado}
               loading={dash.loading}
             />
