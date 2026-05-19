@@ -19,15 +19,6 @@ function formatDate(value: number | string) {
   }
 }
 
-function Campo({ label, value }: { label: string; value: string | null | undefined }) {
-  if (value == null || value === '') return null;
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{label}</p>
-      <p className="mt-1 text-sm">{value}</p>
-    </div>
-  );
-}
 
 export function UserViewModal({
   user,
