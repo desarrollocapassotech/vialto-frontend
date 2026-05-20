@@ -12,17 +12,6 @@ function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
   return `${prefix}${monto.toLocaleString('es-AR')}`;
 }
 
-function Campo({ label, value }: { label: string; value: string | number | null | undefined }) {
-  if (value == null || value === '') return null;
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{label}</p>
-      <p className="mt-1 text-sm">{value}</p>
-    </div>
-  );
-}
-
-
 const ESTADO_LABEL: Record<string, string> = {
   borrador: 'Borrador',
   en_curso: 'En curso',

@@ -25,6 +25,7 @@ export function PasswordSignInPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [mfaActivo, setMfaActivo] = useState(false);
   const [mfaCodigo, setMfaCodigo] = useState('');
 
@@ -65,7 +66,8 @@ export function PasswordSignInPage() {
         await signIn.prepareSecondFactor({ strategy: 'email_code' });
         setMfaCodigo('');
         setMfaActivo(true);
-        setError('Te enviamos un código de verificación por email.');
+        setInfo('Te enviamos un código de verificación por email.');
+        setError(null);
         return;
       }
 
@@ -150,6 +152,11 @@ export function PasswordSignInPage() {
             Ingresá el código que te enviamos a tu correo electrónico.
           </p>
 
+          {info && (
+            <p className="mt-4 text-sm text-amber-200 bg-amber-900/30 border border-amber-600/50 px-3 py-2">
+              {info}
+            </p>
+          )}
           {error && (
             <p className="mt-4 text-sm text-red-200 bg-red-900/30 border border-red-700/50 px-3 py-2">
               {error}
@@ -194,6 +201,7 @@ export function PasswordSignInPage() {
               setMfaActivo(false);
               setMfaCodigo('');
               setError(null);
+              setInfo(null);
             }}
             className="mt-4 w-full text-center text-sm text-white/50 hover:text-white/80"
           >
