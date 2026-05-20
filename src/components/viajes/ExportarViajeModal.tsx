@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { Viaje, Chofer, Vehiculo } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
 import { apiFetch, apiJson } from '@/lib/api';
+import { MicCrtExportModal } from '@/components/viajes/MicCrtExportModal';
 
 type Props = {
   viaje: Viaje;
@@ -87,7 +88,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
     return `/api/viajes/${encodeURIComponent(viaje.id)}/${suffix}`;
   }
   const [generandoPaut, setGenerandoPaut] = useState(false);
-  const [generandoMicCrt, setGenerandoMicCrt] = useState(false);
+  const [micCrtAbierto, setMicCrtAbierto] = useState(false);
   const [error, setError] = useState<DescargaError | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
@@ -96,7 +97,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
   const [vehiculosList, setVehiculosList] = useState<Vehiculo[]>([]);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
-  const ocupado = generandoPaut || generandoMicCrt || guardando;
+  const ocupado = generandoPaut || guardando;
 
   useEffect(() => {
     if (!error?.groups) return;
@@ -182,7 +183,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
 
     if (!ok) return;
 
-    const setGenerando = endpoint.endsWith('/paut') ? setGenerandoPaut : setGenerandoMicCrt;
+    const setGenerando = setGenerandoPaut;
     setError(null);
     setFieldValues({});
     setGenerando(true);
@@ -262,6 +263,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
   }
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
       role="dialog"
@@ -315,18 +317,14 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
           <button
             type="button"
             disabled={ocupado || !permiteMicCrt}
-            onClick={() => void ejecutarDescarga(viajePdfUrl('mic-crt'), `MIC-CRT-${viaje.numero}.pdf`, setGenerandoMicCrt)}
+            onClick={() => setMicCrtAbierto(true)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             title={!permiteMicCrt ? 'Disponible una vez que el viaje esté finalizado' : undefined}
           >
-            <span className="text-sm font-medium text-vialto-charcoal">
-              {generandoMicCrt ? 'Generando…' : 'MIC/CRT'}
+            <span className="text-sm font-medium text-vialto-charcoal">MIC/CRT</span>
+            <span className="text-xs text-vialto-steel">
+              {permiteMicCrt ? 'Formulario' : 'No disponible'}
             </span>
-            {!generandoMicCrt && (
-              <span className="text-xs text-vialto-steel">
-                {permiteMicCrt ? '↓ PDF' : 'No disponible'}
-              </span>
-            )}
           </button>
         </div>
 
@@ -399,5 +397,14 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
         </div>
       </div>
     </div>
+
+    {micCrtAbierto && (
+      <MicCrtExportModal
+        viaje={viaje}
+        tenantId={tenantId}
+        onClose={() => setMicCrtAbierto(false)}
+      />
+    )}
+    </>
   );
 }
