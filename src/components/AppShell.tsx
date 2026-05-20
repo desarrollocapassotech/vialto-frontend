@@ -137,14 +137,19 @@ export function AppShell() {
     },
   } as const;
 
-  const isNonProd = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
+  const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
+  const envBadge = isTestKey
+    ? import.meta.env.DEV
+      ? { label: 'LOCAL', cls: 'text-sky-900 bg-sky-400 border-sky-500' }
+      : { label: 'QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
+    : null;
 
   return (
     <div className="min-h-screen flex bg-vialto-mist">
-      {isNonProd && (
+      {envBadge && (
         <div className="fixed top-2 right-3 z-50 pointer-events-none">
-          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.2em] text-amber-400/60 bg-amber-950/30 border border-amber-400/20 px-2 py-0.5 rounded-sm">
-            QA
+          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.2em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
+            {envBadge.label}
           </span>
         </div>
       )}
