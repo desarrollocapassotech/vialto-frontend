@@ -3,7 +3,6 @@ import {
   labelBillingStatus,
   labelModulo,
 } from '@/lib/platformLabels';
-import { Link } from 'react-router-dom';
 import type { Tenant } from '@/types/api';
 import { ImportacionModal } from './ImportacionModal';
 import { TenantViewModal } from './TenantViewModal';
