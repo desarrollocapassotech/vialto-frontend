@@ -71,6 +71,63 @@ export function condicionTributariaPorPais(pais: PaisCodigo | ''): CondicionInfo
   return CONDICION_DEFAULT;
 }
 
+/**
+ * Valida el formato del identificador fiscal según el país.
+ * Retorna un mensaje de error o null si el valor es válido (o vacío).
+ */
+export function validarIdFiscal(pais: PaisCodigo | '', valor: string): string | null {
+  if (!valor) return null;
+
+  switch (pais) {
+    case 'AR': {
+      // Solo dígitos y guiones: XX-XXXXXXXX-X o XXXXXXXXXXX
+      if (!/^[\d-]+$/.test(valor))
+        return 'El CUIT/CUIL solo puede contener dígitos y guiones.';
+      const d = valor.replace(/-/g, '');
+      if (d.length !== 11)
+        return `El CUIT/CUIL debe tener 11 dígitos (se ingresaron ${d.length}).`;
+      break;
+    }
+    case 'UY': {
+      // Solo dígitos y espacios: XX XXXXXX XXXX
+      if (!/^[\d\s]+$/.test(valor))
+        return 'El RUT solo puede contener dígitos y espacios.';
+      const d = valor.replace(/\s/g, '');
+      if (d.length !== 12)
+        return `El RUT debe tener 12 dígitos (se ingresaron ${d.length}).`;
+      break;
+    }
+    case 'PY': {
+      // Solo dígitos y guiones: XXXXXXXX-X
+      if (!/^[\d-]+$/.test(valor))
+        return 'El RUC solo puede contener dígitos y guiones.';
+      const d = valor.replace(/-/g, '');
+      if (d.length < 5 || d.length > 10)
+        return `El RUC debe tener entre 5 y 10 dígitos (se ingresaron ${d.length}).`;
+      break;
+    }
+    case 'CL': {
+      // Dígitos, puntos y guión: 12.345.678-9 o 12345678-9
+      const rut = valor.replace(/[.\s]/g, '').toUpperCase();
+      if (!/^\d{7,8}-[\dK]$/.test(rut))
+        return 'El RUT debe tener el formato 12.345.678-9 (7 u 8 dígitos más dígito verificador).';
+      break;
+    }
+    case 'BR': {
+      // Solo dígitos y separadores estándar: . / -
+      if (!/^[\d./-]+$/.test(valor))
+        return 'El CNPJ/CPF solo puede contener dígitos y separadores (., /, -).';
+      const d = valor.replace(/\D/g, '');
+      if (d.length !== 11 && d.length !== 14)
+        return `El CNPJ/CPF debe tener 11 dígitos (CPF) o 14 dígitos (CNPJ) (se ingresaron ${d.length}).`;
+      break;
+    }
+    default:
+      break;
+  }
+  return null;
+}
+
 /** Heurística para edición de viajes ya guardados (solo texto, sin campo país en BD). */
 export function inferirPaisDesdeUbicacion(texto: string): PaisCodigo {
   const t = texto.trim().toLowerCase();

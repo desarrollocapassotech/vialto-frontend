@@ -10,7 +10,7 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { validateTransportistaForm } from '@/lib/clienteForm';
-import { idFiscalPorPais, condicionTributariaPorPais } from '@/lib/ciudades';
+import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 
 export function TransportistaCreatePage() {
@@ -43,6 +43,11 @@ export function TransportistaCreatePage() {
     const validationError = validateTransportistaForm(nombre, pais, idFiscal);
     if (validationError) {
       setError(validationError);
+      return;
+    }
+    const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
+    if (errorFiscal) {
+      setError(errorFiscal);
       return;
     }
     setLoading(true);
@@ -79,6 +84,7 @@ export function TransportistaCreatePage() {
   const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
   const sectionClass = 'mt-2 border-t border-black/10 pt-4';
   const condInfo = condicionTributariaPorPais(pais);
+  const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
 
   return (
     <CrudPageLayout
@@ -101,7 +107,13 @@ export function TransportistaCreatePage() {
         <div className="grid grid-cols-2 gap-4">
           <label className="grid gap-1.5">
             <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
-            <CrudInput placeholder={idFiscalPorPais(pais).placeholder} value={idFiscal} onChange={(e) => setIdFiscal(e.target.value)} />
+            <CrudInput
+              placeholder={idFiscalPorPais(pais).placeholder}
+              value={idFiscal}
+              onChange={(e) => setIdFiscal(e.target.value)}
+              className={errorFiscal ? 'border-red-400' : undefined}
+            />
+            {errorFiscal && <p className="text-xs text-red-600">{errorFiscal}</p>}
           </label>
           <label className="grid gap-1.5">
             <span className={labelClass}>{condInfo.label}</span>
@@ -156,7 +168,7 @@ export function TransportistaCreatePage() {
         </div>
 
         <CrudFormErrorAlert message={error} />
-        <CrudSubmitButton loading={loading} label="Crear transportista" />
+        <CrudSubmitButton loading={loading} label="Crear transportista" disabled={!!errorFiscal} />
       </form>
     </CrudPageLayout>
   );

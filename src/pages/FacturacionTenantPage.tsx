@@ -469,6 +469,11 @@ export function FacturacionTenantPage({
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
+  function nombreCliente(id: string | null | undefined) {
+    if (!id) return '—';
+    return clientes.find((c) => c.id === id)?.nombre ?? id;
+  }
+
   function nombreContraparte(f: Factura) {
     if (f.tipo === 'transportista_externo') {
       const id = f.transportistaId;

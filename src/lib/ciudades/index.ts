@@ -4,6 +4,7 @@ export {
   esPaisSoportado,
   inferirPaisDesdeUbicacion,
   idFiscalPorPais,
+  validarIdFiscal,
   condicionTributariaPorPais,
   type PaisOpcion,
   type CondicionInfo,

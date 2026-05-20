@@ -19,6 +19,18 @@ import {
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
+import {
+  OtrosGastosFieldset,
+  emptyOtroGasto,
+  otroGastoDraftToApi,
+  type OtroGastoDraft,
+} from '@/components/viajes/OtrosGastosFieldset';
+import {
+  PagosTransportistaFieldset,
+  emptyPagoTransportista,
+  pagoTransportistaDraftToApi,
+  type PagoTransportistaDraft,
+} from '@/components/viajes/PagosTransportistaFieldset';
 import { apiJson } from '@/lib/api';
 import {
   maskCurrencyForMoneda,
@@ -100,6 +112,8 @@ export function ViajeCreatePage() {
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>('ARS');
+  const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
+  const [pagosTransportista, setPagosTransportista] = useState<PagoTransportistaDraft[]>([]);
   const clientes = tenantId ? localClientes : maestro.clientes;
   const choferes = tenantId ? localChoferes : maestro.choferes;
   const transportistas = tenantId ? localTransportistas : maestro.transportistas;
@@ -226,6 +240,7 @@ export function ViajeCreatePage() {
       setVehiculoExternoId('');
       setChoferId('');
       setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
+      setPagosTransportista([]);
     }
   }
 
@@ -341,7 +356,8 @@ export function ViajeCreatePage() {
             monedaPrecioTransportista,
           ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-          otrosGastos: [],
+          otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+          pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
       navigate('/viajes', { replace: true });
@@ -648,6 +664,28 @@ export function ViajeCreatePage() {
               className={textareaLongClass}
             />
           </div>
+          <div className="md:col-span-2 lg:col-span-3">
+            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} />
+            <button
+              type="button"
+              onClick={() => setOtrosGastos((prev) => [...prev, emptyOtroGasto()])}
+              className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+            >
+              + Agregar gasto
+            </button>
+          </div>
+          {modoOperacion === 'externo' && (
+            <div className="md:col-span-2 lg:col-span-3">
+              <PagosTransportistaFieldset rows={pagosTransportista} onChange={setPagosTransportista} />
+              <button
+                type="button"
+                onClick={() => setPagosTransportista((prev) => [...prev, emptyPagoTransportista()])}
+                className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+              >
+                + Agregar pago al transportista
+              </button>
+            </div>
+          )}
           {error && (
             <div className="md:col-span-2 lg:col-span-3">
               <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">

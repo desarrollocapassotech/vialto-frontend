@@ -19,10 +19,12 @@ import {
 } from '@/components/viajes/ViajeVehiculosLista';
 import {
   OtrosGastosFieldset,
+  emptyOtroGasto,
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
 import {
   PagosTransportistaFieldset,
+  emptyPagoTransportista,
   type PagoTransportistaDraft,
 } from '@/components/viajes/PagosTransportistaFieldset';
 import { maskCurrencyForMoneda, type ViajeMonedaCodigo } from '@/lib/currencyMask';
@@ -517,6 +519,17 @@ export function ViajeEditModal({
                 rows={draft.otrosGastos}
                 onChange={(rows) => setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))}
               />
+              <button
+                type="button"
+                onClick={() =>
+                  setDraft((p) =>
+                    p ? { ...p, otrosGastos: [...p.otrosGastos, emptyOtroGasto()] } : p,
+                  )
+                }
+                className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+              >
+                + Agregar gasto
+              </button>
             </div>
 
             {muestraPagosTransportista && (
@@ -527,6 +540,19 @@ export function ViajeEditModal({
                     setDraft((p) => (p ? { ...p, pagosTransportista: rows } : p))
                   }
                 />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((p) =>
+                      p
+                        ? { ...p, pagosTransportista: [...p.pagosTransportista, emptyPagoTransportista()] }
+                        : p,
+                    )
+                  }
+                  className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+                >
+                  + Agregar pago al transportista
+                </button>
               </div>
             )}
           </div>
