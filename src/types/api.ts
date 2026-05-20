@@ -87,6 +87,8 @@ export interface Cliente {
   telefono: string | null;
   direccion: string | null;
   pais: string | null;
+  condicionIva: number | null;
+  condicionTributaria: string | null;
   createdAt: string;
 }
 
