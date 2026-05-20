@@ -138,8 +138,12 @@ export function AppShell() {
   } as const;
 
   const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
+  const isLocal = import.meta.env.DEV;
+  const neonBranch = import.meta.env.VITE_NEON_BRANCH as string | undefined;
+  const clerkEnv = isTestKey ? 'Clerk Dev' : 'Clerk Prod';
+
   const envBadge = isTestKey
-    ? import.meta.env.DEV
+    ? isLocal
       ? { label: 'LOCAL', cls: 'text-sky-900 bg-sky-400 border-sky-500' }
       : { label: 'QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
     : null;
@@ -147,8 +151,16 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex bg-vialto-mist">
       {envBadge && (
-        <div className="fixed top-2 right-3 z-50 pointer-events-none">
-          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.2em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
+        <div className="fixed top-2 right-3 z-50 pointer-events-none flex items-center gap-1.5">
+          {neonBranch && (
+            <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
+              Neon: {neonBranch}
+            </span>
+          )}
+          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
+            {clerkEnv}
+          </span>
+          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
             {envBadge.label}
           </span>
         </div>
