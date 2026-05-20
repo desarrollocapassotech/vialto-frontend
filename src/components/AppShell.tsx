@@ -137,8 +137,17 @@ export function AppShell() {
     },
   } as const;
 
+  const isNonProd = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
+
   return (
     <div className="min-h-screen flex bg-vialto-mist">
+      {isNonProd && (
+        <div className="fixed top-2 right-3 z-50 pointer-events-none">
+          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.2em] text-amber-400/60 bg-amber-950/30 border border-amber-400/20 px-2 py-0.5 rounded-sm">
+            QA
+          </span>
+        </div>
+      )}
       <aside className="w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6">
         <div className="px-1">
           <Logo heightClass="h-14 max-w-[11rem]" />
