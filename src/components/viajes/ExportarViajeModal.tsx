@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useState, useEffect } from 'react';
 import type { Viaje, Chofer, Vehiculo } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
+import { viajeUsaFlotaPropia } from '@/lib/viajesGananciaBruta';
 import { apiFetch, apiJson } from '@/lib/api';
 import { MicCrtExportModal } from '@/components/viajes/MicCrtExportModal';
 
@@ -97,6 +98,8 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
   const [vehiculosList, setVehiculosList] = useState<Vehiculo[]>([]);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
+  /** PAUT solo aplica a viajes con transportista externo (no flota propia). */
+  const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando;
 
   useEffect(() => {
@@ -302,17 +305,25 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
         </div>
 
         <div className="mt-5 flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={ocupado}
-            onClick={() => void ejecutarDescarga(viajePdfUrl('paut'), `PAUT-${viaje.numero}.pdf`, setGenerandoPaut)}
-            className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="text-sm font-medium text-vialto-charcoal">
-              {generandoPaut ? 'Generando…' : 'PAUT'}
-            </span>
-            {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
-          </button>
+          {permitePaut ? (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() =>
+                void ejecutarDescarga(
+                  viajePdfUrl('paut'),
+                  `PAUT-${viaje.numero}.pdf`,
+                  setGenerandoPaut,
+                )
+              }
+              className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-sm font-medium text-vialto-charcoal">
+                {generandoPaut ? 'Generando…' : 'PAUT'}
+              </span>
+              {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
+            </button>
+          ) : null}
 
           <button
             type="button"
