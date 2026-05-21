@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ViajePagoTransportistaIndicador } from '@/components/viajes/ViajePagoTransportistaIndicador';
 import { gananciaBrutaMetaDesdeViaje } from '@/lib/viajesGananciaBruta';
 import type { Viaje } from '@/types/api';
 
@@ -15,24 +16,27 @@ type Props = { viaje: Viaje; extra?: ReactNode };
 /** Celda de ganancia bruta con tooltip al hover (sin subrayado). */
 export function ViajeGananciaBrutaCelda({ viaje, extra }: Props) {
   const meta = gananciaBrutaMetaDesdeViaje(viaje);
+  const indicadorPago = extra ?? <ViajePagoTransportistaIndicador viaje={viaje} />;
   return (
     <td className="px-4 py-3 text-right tabular-nums">
-      <div className="group relative flex justify-end">
-        <span className="cursor-default">
-          {meta.display}
-          {meta.reason && (
-            <span className="block text-[10px] text-vialto-steel/70 tabular-nums">{meta.reason}</span>
-          )}
-        </span>
-        <div className={tooltipPanelClass} role="tooltip">
-          {meta.tooltipParagraphs.map((p, i) => (
-            <p key={i} className={i === 0 ? 'font-medium text-white' : 'mt-1.5 leading-snug'}>
-              {p}
-            </p>
-          ))}
+      <div className="group relative flex flex-col items-end gap-0.5">
+        <div className="relative">
+          <span className="cursor-default">
+            {meta.display}
+            {meta.reason && (
+              <span className="block text-[10px] text-vialto-steel/70 tabular-nums">{meta.reason}</span>
+            )}
+          </span>
+          <div className={tooltipPanelClass} role="tooltip">
+            {meta.tooltipParagraphs.map((p, i) => (
+              <p key={i} className={i === 0 ? 'font-medium text-white' : 'mt-1.5 leading-snug'}>
+                {p}
+              </p>
+            ))}
+          </div>
         </div>
+        {indicadorPago}
       </div>
-      {extra}
     </td>
   );
 }

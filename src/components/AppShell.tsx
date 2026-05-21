@@ -138,14 +138,15 @@ export function AppShell() {
   } as const;
 
   const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
-  const isLocal = import.meta.env.DEV;
+  const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+  const isLocal = !apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
   const neonBranch = import.meta.env.VITE_NEON_BRANCH as string | undefined;
   const clerkEnv = isTestKey ? 'Clerk Dev' : 'Clerk Prod';
 
   const envBadge = isTestKey
     ? isLocal
-      ? { label: 'LOCAL', cls: 'text-sky-900 bg-sky-400 border-sky-500' }
-      : { label: 'QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
+      ? { label: 'Backend: LOCAL', cls: 'text-sky-900 bg-sky-400 border-sky-500' }
+      : { label: 'Backend: QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
     : null;
 
   return (
