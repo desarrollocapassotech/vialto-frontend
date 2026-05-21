@@ -23,7 +23,8 @@ export function ChoferesSuperadminPage() {
   );
   const [rows, setRows] = useState<ConEmpresa<Chofer>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [viewingChofer, setViewingChofer] = useState<Chofer | null>(null);
+  const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
+  const [viewingChoferNombre, setViewingChoferNombre] = useState('');
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -140,13 +141,24 @@ export function ChoferesSuperadminPage() {
                     {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setViewingChofer(c)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
+                    <div className="inline-flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewingChoferId(c.id);
+                          setViewingChoferNombre(c.nombre);
+                        }}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Ver
+                      </button>
+                      <Link
+                        to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Editar
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -154,12 +166,17 @@ export function ChoferesSuperadminPage() {
         </table>
       </div>
 
-      {viewingChofer && (
+      {viewingChoferId && (
         <ChoferViewModal
-          chofer={viewingChofer}
+          choferId={viewingChoferId}
+          nombreTitulo={viewingChoferNombre}
+          tenantId={filtroEmpresa}
           nombresTransportistas={nombresTransportistas}
-          onClose={() => setViewingChofer(null)}
-          editTo={`/choferes/${encodeURIComponent(viewingChofer.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+          onClose={() => {
+            setViewingChoferId(null);
+            setViewingChoferNombre('');
+          }}
+          editTo={`/choferes/${encodeURIComponent(viewingChoferId)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
         />
       )}
     </div>
