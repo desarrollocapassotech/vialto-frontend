@@ -23,7 +23,6 @@ import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
-  formatViajeImporteForListado,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
   nombreClienteListadoViaje,
@@ -65,7 +64,15 @@ import {
   estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from '@/lib/viajesEstados';
-import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
+import {
+  contarViajesPagoTransportistaDesdeApi,
+  esFiltroPagoTransportistaValido,
+  filtrarViajesPorPagoTransportista,
+  metaPaginacionAjustada,
+  pageSizeApiValido,
+  VIAJE_PAGO_TRANSPORTISTA_QUERY,
+  type ViajePagoTransportistaFiltro,
+} from '@/lib/viajesFiltroPagoTransportista';
 import { canAccessLiquidacionesArca } from '@/lib/tenantModules';
 import type {
   Chofer,
@@ -145,11 +152,16 @@ export function ViajesTenantPage({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
+  const initialPagoTransportistaFromUrl = (() => {
+    const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? '';
+    return esFiltroPagoTransportistaValido(p) ? p : '';
+  })();
   /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
   const filtrosAplicadosRef = useRef({
     clienteId: '',
     transportistaId: '',
     estado: initialEstadoFromUrl,
+    pagoTransportista: initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro,
     tipoFecha: '' as '' | 'carga' | 'descarga',
     fechaDesde: '',
     fechaHasta: '',
@@ -161,6 +173,9 @@ export function ViajesTenantPage({
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState('');
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
+  const [pagoTransportistaFiltro, setPagoTransportistaFiltro] = useState<ViajePagoTransportistaFiltro>(
+    initialPagoTransportistaFromUrl,
+  );
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<'' | 'carga' | 'descarga'>('');
   const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState('');
   const [fechaHastaFiltro, setFechaHastaFiltro] = useState('');
@@ -187,7 +202,12 @@ export function ViajesTenantPage({
   /** Viaje para el que se quiere emitir un CVLP. */
   const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
   /** Conteos globales para los chips de acceso rápido. */
-  const [resumen, setResumen] = useState<{ sinFacturar: number; sinCobrar: number } | null>(null);
+  const [resumen, setResumen] = useState<{
+    sinFacturar: number;
+    sinCobrar: number;
+    sinPagar: number;
+    pagados: number;
+  } | null>(null);
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
   const viajesConFactura = useMemo(
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
@@ -279,18 +299,22 @@ export function ViajesTenantPage({
     if (platform && !tid) return;
     let cancelled = false;
     (async () => {
-      try {
-        const base = platform
-          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
-          : '/api/viajes/paginated?';
-        const [rSF, rSC] = await Promise.all([
-          apiJson<ViajesPaginatedResponse>(`${base}estado=finalizado_sin_facturar&page=1&pageSize=1`, () => getToken()),
-          apiJson<ViajesPaginatedResponse>(`${base}estado=facturado_sin_cobrar&page=1&pageSize=1`, () => getToken()),
-        ]);
-        if (!cancelled) setResumen({ sinFacturar: rSF.meta.total, sinCobrar: rSC.meta.total });
-      } catch {
-        if (!cancelled) setResumen({ sinFacturar: 0, sinCobrar: 0 });
-      }
+      const base = platform
+        ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
+        : '/api/viajes/paginated?';
+      const [estadoSF, estadoSC, pagoSP, pagoPag] = await Promise.allSettled([
+        apiJson<ViajesPaginatedResponse>(`${base}estado=finalizado_sin_facturar&page=1&pageSize=1`, () => getToken()),
+        apiJson<ViajesPaginatedResponse>(`${base}estado=facturado_sin_cobrar&page=1&pageSize=1`, () => getToken()),
+        contarViajesPagoTransportistaDesdeApi(`${base}pagoTransportista=sin_pagar&`, 'sin_pagar', () => getToken()),
+        contarViajesPagoTransportistaDesdeApi(`${base}pagoTransportista=pagado&`, 'pagado', () => getToken()),
+      ]);
+      if (cancelled) return;
+      setResumen({
+        sinFacturar: estadoSF.status === 'fulfilled' ? estadoSF.value.meta.total : 0,
+        sinCobrar: estadoSC.status === 'fulfilled' ? estadoSC.value.meta.total : 0,
+        sinPagar: pagoSP.status === 'fulfilled' ? pagoSP.value : 0,
+        pagados: pagoPag.status === 'fulfilled' ? pagoPag.value : 0,
+      });
     })();
     return () => { cancelled = true; };
   }, [getToken, isLoaded, isSignedIn, platform, tid]);
@@ -301,42 +325,72 @@ export function ViajesTenantPage({
     let cancelled = false;
     (async () => {
       try {
-        const params = new URLSearchParams();
-        params.set('page', String(page));
-        params.set('pageSize', String(pageSize));
+        const filtros = new URLSearchParams();
         const {
           clienteId: cid,
           transportistaId: transpFiltro,
           estado: estF,
+          pagoTransportista: pagoTranspF,
           tipoFecha: tf,
           fechaDesde: fd,
           fechaHasta: fh,
           tipoUbicacion: tu,
           ubicacion: ut,
         } = filtrosAplicadosRef.current;
-        if (cid) params.set('clienteId', cid);
-        if (transpFiltro) params.set('transportistaId', transpFiltro);
-        if (estF.trim()) params.set('estado', estF.trim());
+        if (cid) filtros.set('clienteId', cid);
+        if (transpFiltro) filtros.set('transportistaId', transpFiltro);
+        if (estF.trim()) filtros.set('estado', estF.trim());
+        if (pagoTranspF === 'sin_pagar' || pagoTranspF === 'pagado') {
+          filtros.set('pagoTransportista', pagoTranspF);
+        }
         if ((tf === 'carga' || tf === 'descarga') && (fd.trim() || fh.trim())) {
-          params.set('tipoFecha', tf);
-          if (fd.trim()) params.set('fechaDesde', fd.trim());
-          if (fh.trim()) params.set('fechaHasta', fh.trim());
+          filtros.set('tipoFecha', tf);
+          if (fd.trim()) filtros.set('fechaDesde', fd.trim());
+          if (fh.trim()) filtros.set('fechaHasta', fh.trim());
         }
         const utTrim = ut.trim();
         if ((tu === 'origen' || tu === 'destino') && utTrim) {
-          params.set('tipoUbicacion', tu);
-          params.set('ubicacion', utTrim);
+          filtros.set('tipoUbicacion', tu);
+          filtros.set('ubicacion', utTrim);
         }
-        const listUrl = platform
-          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&${params.toString()}`
-          : `/api/viajes/paginated?${params.toString()}`;
+        const filtrosQs = filtros.toString();
+        const listBase = platform
+          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : '&'}`
+          : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : '?'}`;
+        const pageApi = Math.max(1, Math.floor(page));
+        const pageSizeApi = pageSizeApiValido(pageSize);
         const data = await apiJson<ViajesPaginatedResponse>(
-          listUrl,
+          `${listBase}page=${pageApi}&pageSize=${pageSizeApi}`,
           () => getTokenRef.current(),
         );
+        const pagoFiltroActivo =
+          pagoTranspF === 'sin_pagar' || pagoTranspF === 'pagado' ? pagoTranspF : null;
+        const items = pagoFiltroActivo
+          ? filtrarViajesPorPagoTransportista(data.items, pagoFiltroActivo)
+          : data.items;
+        let meta = data.meta;
+        if (pagoFiltroActivo && pageApi === 1) {
+          const totalReal = await contarViajesPagoTransportistaDesdeApi(
+            listBase,
+            pagoFiltroActivo,
+            () => getTokenRef.current(),
+          );
+          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
+          if (!cancelled) {
+            setResumen((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    sinPagar: pagoFiltroActivo === 'sin_pagar' ? totalReal : prev.sinPagar,
+                    pagados: pagoFiltroActivo === 'pagado' ? totalReal : prev.pagados,
+                  }
+                : prev,
+            );
+          }
+        }
         if (!cancelled) {
-          setRows(data.items);
-          setMeta(data.meta);
+          setRows(items);
+          setMeta(meta);
           setError(null);
           setListadoRefetching(false);
         }
@@ -380,8 +434,27 @@ export function ViajesTenantPage({
 
   function aplicarFiltroEstado(val: string) {
     const e = val.trim();
-    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, estado: e };
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      estado: e,
+      ...(e ? { pagoTransportista: '' as ViajePagoTransportistaFiltro } : {}),
+    };
     setEstadoFiltro(e);
+    if (e) setPagoTransportistaFiltro('');
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroPagoTransportista(val: ViajePagoTransportistaFiltro) {
+    const p = val.trim() as ViajePagoTransportistaFiltro;
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      pagoTransportista: p,
+      ...(p ? { estado: '' } : {}),
+    };
+    setPagoTransportistaFiltro(p);
+    if (p) setEstadoFiltro('');
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -484,6 +557,7 @@ export function ViajesTenantPage({
       clienteId: '',
       transportistaId: '',
       estado: '',
+      pagoTransportista: '',
       tipoFecha: '',
       fechaDesde: '',
       fechaHasta: '',
@@ -494,6 +568,7 @@ export function ViajesTenantPage({
     setClienteIdFiltroActivo('');
     setTransportistaIdFiltroActivo('');
     setEstadoFiltro('');
+    setPagoTransportistaFiltro('');
     setTipoFechaFiltro('');
     setFechaDesdeFiltro('');
     setFechaHastaFiltro('');
@@ -508,6 +583,7 @@ export function ViajesTenantPage({
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
+    !!pagoTransportistaFiltro.trim() ||
     !!fechaDesdeFiltro.trim() ||
     !!fechaHastaFiltro.trim() ||
     !!ubicacionFiltro.trim();
@@ -518,6 +594,7 @@ export function ViajesTenantPage({
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (estadoFiltro.trim()) n += 1;
+    if (pagoTransportistaFiltro.trim()) n += 1;
     if (ubicacionFiltro.trim()) n += 1;
     if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) {
       n += 1;
@@ -527,6 +604,7 @@ export function ViajesTenantPage({
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
     estadoFiltro,
+    pagoTransportistaFiltro,
     ubicacionFiltro,
     fechaDesdeFiltro,
     fechaHastaFiltro,
@@ -670,10 +748,15 @@ export function ViajesTenantPage({
     setFechaDescargaError(null);
   }
 
-  /** Limpiar ?estado= de la URL una vez aplicado al filtro inicial. */
+  /** Limpiar query de filtros rápidos de la URL una vez aplicados al listado. */
   useEffect(() => {
-    if (!searchParams.has('estado')) return;
-    setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('estado'); return n; }, { replace: true });
+    if (!searchParams.has('estado') && !searchParams.has(VIAJE_PAGO_TRANSPORTISTA_QUERY)) return;
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p);
+      n.delete('estado');
+      n.delete(VIAJE_PAGO_TRANSPORTISTA_QUERY);
+      return n;
+    }, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
@@ -941,52 +1024,112 @@ export function ViajesTenantPage({
         </>
       )}
 
-      {resumen && (resumen.sinFacturar > 0 || resumen.sinCobrar > 0) && (
+      {resumen && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {resumen.sinFacturar > 0 && (
-            <button
-              type="button"
-              onClick={() => aplicarFiltroEstado(estadoFiltro === 'finalizado_sin_facturar' ? '' : 'finalizado_sin_facturar')}
+          <button
+            type="button"
+            onClick={() => aplicarFiltroEstado(estadoFiltro === 'finalizado_sin_facturar' ? '' : 'finalizado_sin_facturar')}
+            className={[
+              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+              estadoFiltro === 'finalizado_sin_facturar'
+                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                : resumen.sinFacturar > 0
+                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
+            ].join(' ')}
+          >
+            Sin facturar
+            <span
               className={[
-                'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-                estadoFiltro === 'finalizado_sin_facturar'
-                  ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none',
-              ].join(' ')}
-            >
-              Sin facturar
-              <span className={[
                 'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
                 estadoFiltro === 'finalizado_sin_facturar'
                   ? 'bg-white/20 text-white'
                   : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}>
-                {resumen.sinFacturar}
-              </span>
-            </button>
-          )}
-          {resumen.sinCobrar > 0 && (
-            <button
-              type="button"
-              onClick={() => aplicarFiltroEstado(estadoFiltro === 'facturado_sin_cobrar' ? '' : 'facturado_sin_cobrar')}
-              className={[
-                'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-                estadoFiltro === 'facturado_sin_cobrar'
-                  ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none',
               ].join(' ')}
             >
-              Sin cobrar
-              <span className={[
+              {resumen.sinFacturar}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarFiltroEstado(estadoFiltro === 'facturado_sin_cobrar' ? '' : 'facturado_sin_cobrar')}
+            className={[
+              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+              estadoFiltro === 'facturado_sin_cobrar'
+                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                : resumen.sinCobrar > 0
+                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
+            ].join(' ')}
+          >
+            Sin cobrar
+            <span
+              className={[
                 'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
                 estadoFiltro === 'facturado_sin_cobrar'
                   ? 'bg-white/20 text-white'
                   : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}>
-                {resumen.sinCobrar}
-              </span>
-            </button>
-          )}
+              ].join(' ')}
+            >
+              {resumen.sinCobrar}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              aplicarFiltroPagoTransportista(
+                pagoTransportistaFiltro === 'sin_pagar' ? '' : 'sin_pagar',
+              )
+            }
+            className={[
+              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+              pagoTransportistaFiltro === 'sin_pagar'
+                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                : resumen.sinPagar > 0
+                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
+            ].join(' ')}
+          >
+            Sin pagar
+            <span
+              className={[
+                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
+                pagoTransportistaFiltro === 'sin_pagar'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-black/10 text-vialto-charcoal',
+              ].join(' ')}
+            >
+              {resumen.sinPagar}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              aplicarFiltroPagoTransportista(
+                pagoTransportistaFiltro === 'pagado' ? '' : 'pagado',
+              )
+            }
+            className={[
+              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
+              pagoTransportistaFiltro === 'pagado'
+                ? 'border-emerald-700 bg-emerald-700 text-white'
+                : resumen.pagados > 0
+                  ? 'border-emerald-600/40 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
+                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
+            ].join(' ')}
+          >
+            Pagados
+            <span
+              className={[
+                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
+                pagoTransportistaFiltro === 'pagado'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-black/10 text-vialto-charcoal',
+              ].join(' ')}
+            >
+              {resumen.pagados}
+            </span>
+          </button>
         </div>
       )}
 
@@ -1365,20 +1508,7 @@ export function ViajesTenantPage({
                 <td className="px-4 py-3 text-right tabular-nums">
                   {textoMontoFacturarListado(v)}
                 </td>
-                <ViajeGananciaBrutaCelda
-                  viaje={v}
-                  extra={(() => {
-                    const s = calcularSaldoTransportista(v);
-                    if (!s || s.totalAcordado === 0) return null;
-                    return (
-                      <span className={`block text-xs tabular-nums ${s.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {s.pagado
-                          ? '✓ Transportista pagado'
-                          : `A pagar: ${formatViajeImporteForListado(s.saldo, s.moneda)}`}
-                      </span>
-                    );
-                  })()}
-                />
+                <ViajeGananciaBrutaCelda viaje={v} />
                 <td className="px-4 py-3 text-right">
                   <ViajeAccionesMenu
                     viaje={v}
