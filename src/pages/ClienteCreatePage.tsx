@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -9,6 +9,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { validateClienteForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 
@@ -36,8 +37,9 @@ export function ClienteCreatePage() {
   }
 
   async function onSubmit() {
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del cliente.');
+    const validationError = validateClienteForm(nombre, pais, idFiscal);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
@@ -55,8 +57,8 @@ export function ClienteCreatePage() {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais: pais || undefined,
-          idFiscal: idFiscal.trim() || undefined,
+          pais,
+          idFiscal: idFiscal.trim(),
           condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
           condicionTributaria: pais !== 'AR' ? (condicionTributaria.trim() || undefined) : undefined,
           email: email.trim() || undefined,
@@ -88,7 +90,7 @@ export function ClienteCreatePage() {
         onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
       >
         <label className="grid gap-1.5">
-          <span className={labelClass}>Nombre *</span>
+          <CrudFieldLabel required>Nombre</CrudFieldLabel>
           <CrudInput
             placeholder="Ej: Transportes del Norte SA"
             value={nombre}
@@ -96,12 +98,16 @@ export function ClienteCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className={labelClass}>País</span>
-          <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
+          <CrudFieldLabel required>País</CrudFieldLabel>
+          <PaisUbicacionSelect
+            value={pais}
+            onChange={handlePaisChange}
+            placeholder="Seleccioná un país"
+          />
         </label>
         <div className="grid grid-cols-2 gap-4">
           <label className="grid gap-1.5">
-            <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
+            <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
             <CrudInput
               placeholder={idFiscalPorPais(pais).placeholder}
               value={idFiscal}

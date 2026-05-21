@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -10,6 +10,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { validateClienteForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Cliente } from '@/types/api';
@@ -76,8 +77,9 @@ export function ClienteEditPage() {
 
   async function onSave() {
     if (!id) return;
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del cliente.');
+    const validationError = validateClienteForm(nombre, pais, idFiscal);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
@@ -97,8 +99,8 @@ export function ClienteEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais: pais || undefined,
-          idFiscal: idFiscal.trim() || undefined,
+          pais,
+          idFiscal: idFiscal.trim(),
           condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
           condicionTributaria: pais !== 'AR' ? (condicionTributaria.trim() || undefined) : undefined,
           email: email.trim() || undefined,
@@ -156,16 +158,24 @@ export function ClienteEditPage() {
             onSubmit={(e) => { e.preventDefault(); onSave(); }}
           >
             <label className="grid gap-1.5">
-              <span className={labelClass}>Nombre</span>
-              <CrudInput value={nombre} placeholder="Ej: Transportes del Norte SA" onChange={(e) => setNombre(e.target.value)} />
+              <CrudFieldLabel required>Nombre</CrudFieldLabel>
+              <CrudInput
+                value={nombre}
+                placeholder="Ej: Transportes del Norte SA"
+                onChange={(e) => setNombre(e.target.value)}
+              />
             </label>
             <label className="grid gap-1.5">
-              <span className={labelClass}>País</span>
-              <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
+              <CrudFieldLabel required>País</CrudFieldLabel>
+              <PaisUbicacionSelect
+                value={pais}
+                onChange={handlePaisChange}
+                placeholder="Seleccioná un país"
+              />
             </label>
             <div className="grid grid-cols-2 gap-4">
               <label className="grid gap-1.5">
-                <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
+                <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
                 <CrudInput
                   value={idFiscal}
                   placeholder={idFiscalPorPais(pais).placeholder}
@@ -187,21 +197,37 @@ export function ClienteEditPage() {
                     ))}
                   </CrudSelect>
                 ) : (
-                  <CrudInput value={condicionTributaria} placeholder={condInfo.placeholder} onChange={(e) => setCondicionTributaria(e.target.value)} />
+                  <CrudInput
+                    value={condicionTributaria}
+                    placeholder={condInfo.placeholder}
+                    onChange={(e) => setCondicionTributaria(e.target.value)}
+                  />
                 )}
               </label>
             </div>
             <label className="grid gap-1.5">
               <span className={labelClass}>Dirección</span>
-              <CrudInput value={direccion} placeholder="Ej: Av. Corrientes 1234" onChange={(e) => setDireccion(e.target.value)} />
+              <CrudInput
+                value={direccion}
+                placeholder="Ej: Av. Corrientes 1234"
+                onChange={(e) => setDireccion(e.target.value)}
+              />
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>Email</span>
-              <CrudInput value={email} placeholder="Ej: contacto@empresa.com" onChange={(e) => setEmail(e.target.value)} />
+              <CrudInput
+                value={email}
+                placeholder="Ej: contacto@empresa.com"
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </label>
             <label className="grid gap-1.5">
               <span className={labelClass}>Teléfono</span>
-              <CrudInput value={telefono} placeholder="Ej: +54 9 11 1234-5678" onChange={(e) => setTelefono(e.target.value)} />
+              <CrudInput
+                value={telefono}
+                placeholder="Ej: +54 9 11 1234-5678"
+                onChange={(e) => setTelefono(e.target.value)}
+              />
             </label>
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" disabled={!!errorFiscal} />
