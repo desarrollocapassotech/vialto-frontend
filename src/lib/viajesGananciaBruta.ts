@@ -1,5 +1,6 @@
 import { normalizeViajeMoneda } from '@/lib/currencyMask';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type { OtroGasto, Viaje } from '@/types/api';
 
 export function viajeUsaFlotaPropia(v: Pick<Viaje, 'transportistaId'>): boolean {
@@ -94,6 +95,25 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
     );
   } else {
     paragraphs.push('Sin otros gastos.');
+  }
+
+  const saldoTransp = calcularSaldoTransportista(v);
+  if (saldoTransp && saldoTransp.totalAcordado > 0) {
+    if (saldoTransp.pagado) {
+      paragraphs.push(
+        `Pago al transportista (${saldoTransp.moneda}): liquidado (${formatViajeImporteForListado(
+          saldoTransp.totalPagado,
+          saldoTransp.moneda,
+        )} de ${formatViajeImporteForListado(saldoTransp.totalAcordado, saldoTransp.moneda)}).`,
+      );
+    } else {
+      paragraphs.push(
+        `Pago al transportista (${saldoTransp.moneda}): pendiente ${formatViajeImporteForListado(
+          saldoTransp.saldo,
+          saldoTransp.moneda,
+        )} (pagado ${formatViajeImporteForListado(saldoTransp.totalPagado, saldoTransp.moneda)}).`,
+      );
+    }
   }
 
   return {
