@@ -100,6 +100,7 @@ export type ViajeEditModalProps = {
   onSave: () => void;
   /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
   onFacturar?: () => void;
+  onEliminar?: () => void;
   saving: boolean;
   error: string | null;
   /** Enlace «nuevo vehículo» en flota propia (p. ej. con `?tenantId=` para superadmin). */
@@ -132,6 +133,7 @@ export function ViajeEditModal({
   onClose,
   onSave,
   onFacturar,
+  onEliminar,
   saving,
   error,
   crearVehiculoHref = '/vehiculos/nuevo',
@@ -567,38 +569,52 @@ export function ViajeEditModal({
           )}
         </div>
 
-        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
-          {muestraBotonFacturar ? (
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {muestraBotonFacturar ? (
+              <button
+                type="button"
+                onClick={onFacturar}
+                disabled={facturarDeshabilitado}
+                title={
+                  !draft.clienteId.trim()
+                    ? 'Elegí un cliente para poder facturar este viaje'
+                    : undefined
+                }
+                className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Facturar
+              </button>
+            ) : null}
+            {onEliminar ? (
+              <button
+                type="button"
+                onClick={onEliminar}
+                disabled={saving}
+                className="inline-flex h-10 items-center px-4 text-xs uppercase tracking-wider border border-red-300 bg-white text-red-800 hover:bg-red-50 disabled:opacity-50"
+              >
+                Eliminar viaje
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={onFacturar}
-              disabled={facturarDeshabilitado}
-              title={
-                !draft.clienteId.trim()
-                  ? 'Elegí un cliente para poder facturar este viaje'
-                  : undefined
-              }
-              className="mr-auto inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onClose}
+              disabled={saving}
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
             >
-              Facturar
+              Cancelar
             </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-60"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
-          >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            >
+              {saving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

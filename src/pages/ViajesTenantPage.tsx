@@ -40,6 +40,7 @@ import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoL
 import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/ViajeEditModal';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   otroGastoDraftFromApi,
   otroGastoDraftToApi,
@@ -149,6 +150,8 @@ export function ViajesTenantPage({
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  const [viajeDeleteConfirm, setViajeDeleteConfirm] = useState<Viaje | null>(null);
+  const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
@@ -748,7 +751,36 @@ export function ViajesTenantPage({
     setFechaDescargaError(null);
   }
 
-  /** Limpiar query de filtros rápidos de la URL una vez aplicados al listado. */
+  function requestDeleteViaje(v: Viaje) {
+    setError(null);
+    setViajeDeleteConfirm(v);
+  }
+
+  async function confirmDeleteViaje() {
+    const v = viajeDeleteConfirm;
+    if (!v || deletingViajeId) return;
+    setDeletingViajeId(v.id);
+    try {
+      await apiJson(viajeApiUrl(v.id), () => getToken(), { method: 'DELETE' });
+      setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
+      setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
+      setIdsFacturarSeleccion((ids) => ids.filter((id) => id !== v.id));
+      if (editingId === v.id) cancelEdit();
+      if (viewingViaje?.id === v.id) setViewingViaje(null);
+      if (exportarViaje?.id === v.id) setExportarViaje(null);
+      if (agregarGastoViaje?.id === v.id) setAgregarGastoViaje(null);
+      if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
+      if (emitirCvlpViaje?.id === v.id) setEmitirCvlpViaje(null);
+      if (facturarOpcionState?.viaje.id === v.id) setFacturarOpcionState(null);
+      setViajeDeleteConfirm(null);
+    } catch (e) {
+      setError(friendlyError(e, platform ? 'plataforma' : 'viajes'));
+    } finally {
+      setDeletingViajeId(null);
+    }
+  }
+
+  /** Limpiar ?estado= de la URL una vez aplicado al filtro inicial. */
   useEffect(() => {
     if (!searchParams.has('estado') && !searchParams.has(VIAJE_PAGO_TRANSPORTISTA_QUERY)) return;
     setSearchParams((p) => {
@@ -1535,6 +1567,7 @@ export function ViajesTenantPage({
                         ? () => setEmitirCvlpViaje(v)
                         : undefined
                     }
+                    onEliminar={() => requestDeleteViaje(v)}
                   />
                 </td>
               </tr>
@@ -1640,6 +1673,7 @@ export function ViajesTenantPage({
             };
             void navigateToFacturacion(v);
           }}
+          onEliminar={() => requestDeleteViaje(viajeEdicionSnapshot)}
           saving={savingId === editingId}
           error={error}
           crearVehiculoHref={
@@ -1719,6 +1753,27 @@ export function ViajesTenantPage({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={viajeDeleteConfirm != null}
+        title="Eliminar viaje"
+        message={
+          viajeDeleteConfirm
+            ? `¿Eliminás el viaje ${viajeDeleteConfirm.numero}? Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        tone="danger"
+        busy={
+          !!deletingViajeId &&
+          viajeDeleteConfirm != null &&
+          deletingViajeId === viajeDeleteConfirm.id
+        }
+        onCancel={() => {
+          if (!deletingViajeId) setViajeDeleteConfirm(null);
+        }}
+        onConfirm={() => void confirmDeleteViaje()}
+      />
 
     </div>
   );

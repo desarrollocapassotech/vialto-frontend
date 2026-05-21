@@ -22,7 +22,17 @@ export function ViajeGananciaBrutaCelda({ viaje, extra }: Props) {
       <div className="group relative flex flex-col items-end gap-0.5">
         <div className="relative">
           <span className="cursor-default">
-            {meta.display}
+            {meta.lineasBalance && meta.lineasBalance.length > 1 ? (
+              <span className="flex flex-col items-end gap-0.5 leading-tight">
+                {meta.lineasBalance.map((l) => (
+                  <span key={l.moneda} className="tabular-nums">
+                    {l.formatted}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              meta.display
+            )}
             {meta.reason && (
               <span className="block text-[10px] text-vialto-steel/70 tabular-nums">{meta.reason}</span>
             )}
