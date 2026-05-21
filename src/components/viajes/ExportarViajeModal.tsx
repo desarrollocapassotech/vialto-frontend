@@ -161,8 +161,8 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
           if (def.type === 'vehiculo-select') {
             body[def.key] = [raw];
           } else if (def.type === 'number') {
-            const n = Number(raw);
-            if (!isNaN(n)) body[def.key] = n;
+            const n = Number(raw.replace(',', '.'));
+            if (Number.isFinite(n)) body[def.key] = n;
           } else {
             body[def.key] = raw;
           }
