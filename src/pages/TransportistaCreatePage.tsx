@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -9,6 +9,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { validateTransportistaForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 
@@ -39,8 +40,9 @@ export function TransportistaCreatePage() {
   }
 
   async function onSubmit() {
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del transportista.');
+    const validationError = validateTransportistaForm(nombre, pais, idFiscal);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
@@ -58,8 +60,8 @@ export function TransportistaCreatePage() {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais: pais || undefined,
-          idFiscal: idFiscal.trim() || undefined,
+          pais,
+          idFiscal: idFiscal.trim(),
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           domicilio: domicilio.trim() || undefined,
@@ -95,16 +97,16 @@ export function TransportistaCreatePage() {
         onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
       >
         <label className="grid gap-1.5">
-          <span className={labelClass}>Nombre *</span>
+          <CrudFieldLabel required>Nombre</CrudFieldLabel>
           <CrudInput placeholder="Ej: Transportes del Norte SA" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="grid gap-1.5">
-          <span className={labelClass}>País</span>
+          <CrudFieldLabel required>País</CrudFieldLabel>
           <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
         </label>
         <div className="grid grid-cols-2 gap-4">
           <label className="grid gap-1.5">
-            <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
+            <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
             <CrudInput
               placeholder={idFiscalPorPais(pais).placeholder}
               value={idFiscal}

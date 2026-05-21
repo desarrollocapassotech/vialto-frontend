@@ -5,6 +5,7 @@ const baseClassName = 'h-10 border border-black/15 bg-white px-3 text-sm';
 export const crudFieldLabelClass =
   'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
 
+/** Etiqueta de campo CRUD; con `required` muestra asterisco rojo como en Nombre. */
 export function CrudFieldLabel({
   children,
   required,

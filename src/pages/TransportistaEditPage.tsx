@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
+import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -10,6 +10,7 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { validateTransportistaForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
@@ -91,8 +92,9 @@ export function TransportistaEditPage() {
 
   async function onSave() {
     if (!id) return;
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del transportista.');
+    const validationError = validateTransportistaForm(nombre, pais, idFiscal);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
@@ -110,8 +112,8 @@ export function TransportistaEditPage() {
         method: 'PATCH',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais: pais || undefined,
-          idFiscal: idFiscal.trim() || undefined,
+          pais,
+          idFiscal: idFiscal.trim(),
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           domicilio: domicilio.trim() || undefined,
@@ -169,16 +171,16 @@ export function TransportistaEditPage() {
             onSubmit={(e) => { e.preventDefault(); onSave(); }}
           >
             <label className="grid gap-1.5">
-              <span className={labelClass}>Nombre</span>
+              <CrudFieldLabel required>Nombre</CrudFieldLabel>
               <CrudInput value={nombre} placeholder="Ej: Transportes del Norte SA" onChange={(e) => setNombre(e.target.value)} />
             </label>
             <label className="grid gap-1.5">
-              <span className={labelClass}>País</span>
+              <CrudFieldLabel required>País</CrudFieldLabel>
               <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
             </label>
             <div className="grid grid-cols-2 gap-4">
               <label className="grid gap-1.5">
-                <span className={labelClass}>{idFiscalPorPais(pais).label}</span>
+                <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
                 <CrudInput
                   value={idFiscal}
                   placeholder={idFiscalPorPais(pais).placeholder}
