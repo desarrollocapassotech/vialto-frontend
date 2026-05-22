@@ -42,6 +42,7 @@ import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos'
 import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
+import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -72,6 +73,8 @@ export type ViajeInlineDraft = {
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
   otrosGastos: OtroGastoDraft[];
   pagosTransportista: PagoTransportistaDraft[];
+  gananciaBrutaManual: string;
+  monedaGananciaBrutaManual: ViajeMonedaCodigo;
 };
 
 export type ViajeEditModalProps = {
@@ -434,6 +437,13 @@ export function ViajeEditModal({
                   )}
                 </div>
               }
+            />
+
+            <ViajeGananciaBrutaManualFieldset
+              draft={draft}
+              onPatch={(p) => setDraft((prev) => (prev ? { ...prev, ...p } : prev))}
+              labelClassName={labelClass}
+              inputClassName={inputClass}
             />
 
             <ViajeFechaHoraFields
