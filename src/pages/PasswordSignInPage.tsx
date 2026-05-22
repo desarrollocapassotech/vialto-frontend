@@ -1,9 +1,9 @@
-import { useSignIn } from '@clerk/clerk-react';
-import { useState } from 'react';
+import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 type ClerkLikeError = {
-  errors?: Array<{ longMessage?: string; message?: string }>;
+  errors?: Array<{ code?: string; longMessage?: string; message?: string }>;
 };
 
 function getClerkErrorMessage(error: unknown): string {
@@ -16,9 +16,17 @@ function getClerkErrorMessage(error: unknown): string {
   return 'No se pudo iniciar sesión. Revisá las credenciales e intentá de nuevo.';
 }
 
+function isAlreadySignedInError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const code = (error as ClerkLikeError).errors?.[0]?.code ?? '';
+  return code.includes('session') || code.includes('signed_in');
+}
+
 export function PasswordSignInPage() {
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
+  const clerk = useClerk();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,68 +37,132 @@ export function PasswordSignInPage() {
   const [mfaActivo, setMfaActivo] = useState(false);
   const [mfaCodigo, setMfaCodigo] = useState('');
 
+  // Si ya está autenticado, ir al home
+  useEffect(() => {
+    if (authLoaded && isSignedIn) {
+      navigate('/', { replace: true });
+    }
+  }, [authLoaded, isSignedIn]);
+
+  // Detectar sesiones pendientes con tarea al cargar
+  useEffect(() => {
+    if (!isLoaded) return;
+    const allSessions: any[] = (clerk.client as any)?.sessions ?? [];
+    const pending = allSessions.find((s) => s.status === 'pending' && s.currentTask?.key);
+    if (pending) {
+      const taskRoutes: Record<string, string> = {
+        'setup-mfa': '/tasks/setup-mfa',
+        'choose-organization': '/tasks/choose-organization',
+        'reset-password': '/tasks/reset-password',
+      };
+      const path = taskRoutes[pending.currentTask.key];
+      if (path) navigate(path, { replace: true });
+    }
+  }, [isLoaded]);
+
+  // Si hay un sign-in previo en estado needs_second_factor (MFA pendiente), retomarlo
+  useEffect(() => {
+    if (!isLoaded || !signIn) return;
+    if (signIn.status === 'needs_second_factor') {
+      setMfaActivo(true);
+      setInfo('Hay un inicio de sesión pendiente. Ingresá el código de verificación.');
+    }
+  }, [isLoaded, signIn?.status]);
+
+  async function attemptSignIn() {
+    const result = await signIn!.create({
+      identifier: email.trim(),
+      password,
+    });
+
+    if (result.status === 'complete') {
+      if (result.createdSessionId) {
+        await setActive!({ session: result.createdSessionId });
+      }
+      navigate('/', { replace: true });
+      return;
+    }
+
+    if (result.status === 'needs_second_factor') {
+      const hasEmailFactor = signIn!.supportedSecondFactors?.some((f) => f.strategy === 'email_code');
+      if (!hasEmailFactor) {
+        setError('Se requiere un segundo factor, pero no está disponible el envío por email.');
+        return;
+      }
+      await signIn!.prepareSecondFactor({ strategy: 'email_code' });
+      setMfaCodigo('');
+      setMfaActivo(true);
+      setInfo('Te enviamos un código de verificación por email.');
+      setError(null);
+      return;
+    }
+
+    if (result.status === 'needs_first_factor') {
+      setError('Se requiere información adicional para iniciar sesión.');
+      return;
+    }
+    if (result.status === 'needs_new_password') {
+      setError('Debes establecer una nueva contraseña.');
+      return;
+    }
+    if (result.status === 'needs_identifier') {
+      setError('Se requiere un identificador válido.');
+      return;
+    }
+
+    setError(`Estado de autenticación inesperado: ${result.status}. Revisá tus credenciales.`);
+  }
+
   async function onSubmit() {
     if (!isLoaded) return;
-    if (!email.trim()) {
-      setError('Ingresá un email.');
-      return;
-    }
-    if (!password) {
-      setError('Ingresá una contraseña.');
-      return;
-    }
+    if (authLoaded && isSignedIn) { navigate('/', { replace: true }); return; }
+    if (!email.trim()) { setError('Ingresá un email.'); return; }
+    if (!password) { setError('Ingresá una contraseña.'); return; }
 
     setLoading(true);
     setError(null);
     try {
-      const result = await signIn.create({
-        identifier: email.trim(),
-        password,
-      });
-
-      console.log('Clerk signIn result:', result);
-
-      if (result.status === 'complete' && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
-        navigate('/', { replace: true });
-        return;
-      }
-
-      if (result.status === 'needs_second_factor') {
-        const hasEmailFactor = signIn.supportedSecondFactors?.some((factor) => factor.strategy === 'email_code');
-        if (!hasEmailFactor) {
-          setError('Se requiere un segundo factor, pero no está disponible el envío por email.');
-          return;
-        }
-
-        await signIn.prepareSecondFactor({ strategy: 'email_code' });
-        setMfaCodigo('');
-        setMfaActivo(true);
-        setInfo('Te enviamos un código de verificación por email.');
-        setError(null);
-        return;
-      }
-
-      // Manejar otros estados posibles de Clerk
-      if (result.status === 'needs_first_factor') {
-        setError('Se requiere información adicional para iniciar sesión.');
-        return;
-      }
-
-      if (result.status === 'needs_new_password') {
-        setError('Debes establecer una nueva contraseña.');
-        return;
-      }
-
-      if (result.status === 'needs_identifier') {
-        setError('Se requiere un identificador válido.');
-        return;
-      }
-
-      // Para cualquier otro estado desconocido, mostrar el estado
-      setError(`Estado de autenticación inesperado: ${result.status}. Revisá tus credenciales.`);
+      await attemptSignIn();
     } catch (e) {
-      setError(getClerkErrorMessage(e));
+      if (isAlreadySignedInError(e)) {
+        // activeSessions está en el clerk instance, no en clerk.client
+        const existing =
+          (clerk as any).activeSessions?.[0] ??
+          clerk.client?.signedInSessions?.[0];
+        if (existing && setActive) {
+          try {
+            await setActive({ session: existing.id });
+            navigate('/', { replace: true });
+            return;
+          } catch { /* fall through */ }
+        }
+        // Destruir todas las sesiones del cliente y reintentar
+        try {
+          await clerk.client?.removeSessions();
+          await attemptSignIn();
+        } catch (retryErr) {
+          if (isAlreadySignedInError(retryErr)) {
+            // Hay una sesión pending con tarea que no se puede limpiar — redirigir a la tarea
+            const allSessions: any[] = (clerk.client as any)?.sessions ?? [];
+            const pending = allSessions.find((s) => s.status === 'pending' && s.currentTask?.key);
+            const taskRoutes: Record<string, string> = {
+              'setup-mfa': '/tasks/setup-mfa',
+              'choose-organization': '/tasks/choose-organization',
+              'reset-password': '/tasks/reset-password',
+            };
+            const path = pending ? taskRoutes[pending.currentTask.key] : null;
+            if (path) {
+              navigate(path, { replace: true });
+            } else {
+              setError('Hay una sesión activa que no se puede limpiar. Borrá las cookies del sitio (DevTools → Application → Cookies → obliging-sunfish-91.clerk.accounts.dev) e intentá de nuevo.');
+            }
+          } else {
+            setError(getClerkErrorMessage(retryErr));
+          }
+        }
+      } else {
+        setError(getClerkErrorMessage(e));
+      }
     } finally {
       setLoading(false);
     }
@@ -111,8 +183,10 @@ export function PasswordSignInPage() {
         code: mfaCodigo.trim(),
       });
 
-      if (result.status === 'complete' && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
+      if (result.status === 'complete') {
+        if (result.createdSessionId) {
+          await setActive({ session: result.createdSessionId });
+        }
         navigate('/', { replace: true });
         return;
       }
