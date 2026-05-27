@@ -221,9 +221,13 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   {loading ? 'Procesando…' : 'Ver previsualización'}
                 </button>
               )}
-              {step === 'preview' && preview && preview.exitosas > 0 && (
-                <button type="button" disabled={loading} onClick={confirm}
-                  className="inline-flex h-10 items-center px-5 bg-vialto-fire text-white text-sm uppercase tracking-wider hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+              {step === 'preview' && preview && (
+                <button
+                  type="button"
+                  disabled={loading || preview.exitosas === 0}
+                  onClick={confirm}
+                  className="inline-flex h-10 items-center px-5 bg-vialto-fire text-white text-sm uppercase tracking-wider hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                   {loading ? 'Importando…' : `Confirmar importación (${preview.exitosas} filas)`}
                 </button>
               )}
