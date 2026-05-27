@@ -63,6 +63,9 @@ export interface Viaje {
   precioTransportistaExterno: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
+  /** Solo cuando monedaMonto ≠ monedaPrecioTransportistaExterno (transporte externo). */
+  gananciaBrutaManual?: number | null;
+  monedaGananciaBrutaManual?: string | null;
   observaciones: string | null;
   otrosGastos?: OtroGasto[];
   pagosTransportista?: PagoTransportista[];

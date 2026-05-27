@@ -1,10 +1,99 @@
 import { normalizeViajeMoneda } from '@/lib/currencyMask';
+import {
+  buildGananciaBrutaResumen,
+  monedasFacturacionYPagoDistintas,
+  type GananciaBrutaResumen,
+} from '@/lib/viajeGananciaBrutaResumen';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type { OtroGasto, Viaje } from '@/types/api';
 
 export function viajeUsaFlotaPropia(v: Pick<Viaje, 'transportistaId'>): boolean {
   return !String(v.transportistaId ?? '').trim();
+}
+
+/** Ganancia manual solo con transportista externo y monedas de facturación vs pago distintas. */
+export function viajeRequiereGananciaBrutaManual(
+  v: Pick<Viaje, 'transportistaId' | 'monedaMonto' | 'monedaPrecioTransportistaExterno'>,
+): boolean {
+  if (viajeUsaFlotaPropia(v)) return false;
+  return monedasFacturacionYPagoDistintas(v);
+}
+
+export function draftRequiereGananciaBrutaManual(draft: {
+  operacionModo: 'externo' | 'propio';
+  monedaMonto: string;
+  monedaPrecioTransportistaExterno: string;
+}): boolean {
+  if (draft.operacionModo !== 'externo') return false;
+  return draft.monedaMonto !== draft.monedaPrecioTransportistaExterno;
+}
+
+function resumenDesdeViaje(v: Viaje): GananciaBrutaResumen {
+  return buildGananciaBrutaResumen({
+    monto: v.monto,
+    monedaMonto: v.monedaMonto,
+    precioTransportistaExterno: v.precioTransportistaExterno,
+    monedaPrecioTransportistaExterno: v.monedaPrecioTransportistaExterno,
+    otrosGastos: v.otrosGastos,
+    gananciaBrutaManual: v.gananciaBrutaManual,
+    monedaGananciaBrutaManual: v.monedaGananciaBrutaManual,
+  });
+}
+
+function gananciaBrutaMetaDesdeResumen(
+  resumen: GananciaBrutaResumen,
+  v: Viaje,
+): GananciaBrutaMeta {
+  const paragraphs: string[] = [];
+  const flotaPropia = viajeUsaFlotaPropia(v);
+
+  if (resumen.requiereGananciaManual) {
+    paragraphs.push(
+      'Monedas distintas: importe a facturar y pago al transportista no se convierten. Ingresá la ganancia bruta manual.',
+    );
+    if (resumen.gananciaBrutaManual != null) {
+      paragraphs.push(
+        `Ganancia manual (${resumen.monedaGananciaBrutaManual}): ${formatViajeImporteForListado(
+          resumen.gananciaBrutaManual,
+          resumen.monedaGananciaBrutaManual!,
+        )}`,
+      );
+    }
+    for (const linea of resumen.balance) {
+      const label =
+        linea.tipo === 'gasto_extra'
+          ? `Gastos extra (${linea.moneda})`
+          : `Resultado (${linea.moneda})`;
+      paragraphs.push(`${label}: ${formatViajeImporteForListado(linea.monto, linea.moneda)}`);
+    }
+    if (resumen.mensaje) paragraphs.push(resumen.mensaje);
+    paragraphs.push(...parrafosPagoTransportista(v));
+
+    if (resumen.balance.length === 0) {
+      return {
+        display: '—',
+        reason: 'Pendiente',
+        tooltipParagraphs: paragraphs,
+      };
+    }
+
+    const lineas: BalanceMonedaLinea[] = resumen.balance.map((l) => ({
+      moneda: l.moneda,
+      balance: l.monto,
+      formatted: formatViajeImporteForListado(l.monto, l.moneda),
+    }));
+    const bimonetario = lineas.length > 1;
+    return {
+      display: bimonetario
+        ? lineas.map((l) => l.formatted).join(' | ')
+        : lineas[0]!.formatted,
+      lineasBalance: bimonetario ? lineas : undefined,
+      tooltipParagraphs: paragraphs,
+    };
+  }
+
+  return gananciaBrutaMetaAutomatica(v, paragraphs, flotaPropia);
 }
 
 export type MonedaBalance = 'ARS' | 'USD';
@@ -157,10 +246,11 @@ function parrafosPagoTransportista(v: Viaje): string[] {
   ];
 }
 
-export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
-  const paragraphs: string[] = [];
-  const flotaPropia = viajeUsaFlotaPropia(v);
-
+function gananciaBrutaMetaAutomatica(
+  v: Viaje,
+  paragraphs: string[],
+  flotaPropia: boolean,
+): GananciaBrutaMeta {
   if (v.monto == null) {
     paragraphs.push('Imp. a facturar − Trans. ext. − Gastos extra');
     paragraphs.push('Importe a facturar sin cargar en este viaje.');
@@ -202,4 +292,11 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
     display: formatViajeImporteForListado(balance, moneda),
     tooltipParagraphs: paragraphs,
   };
+}
+
+export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
+  if (viajeRequiereGananciaBrutaManual(v)) {
+    return gananciaBrutaMetaDesdeResumen(resumenDesdeViaje(v), v);
+  }
+  return gananciaBrutaMetaAutomatica(v, [], viajeUsaFlotaPropia(v));
 }

@@ -20,6 +20,11 @@ import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import {
+  ViajeGananciaBrutaManualFieldset,
+  gananciaBrutaManualPayloadFromDraft,
+} from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
+import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
+import {
   OtrosGastosFieldset,
   emptyOtroGasto,
   otroGastoDraftToApi,
@@ -111,6 +116,9 @@ export function ViajeCreatePage() {
   const [monedaMonto, setMonedaMonto] = useState<ViajeMonedaCodigo>('ARS');
   const [precioTransportistaExterno, setPrecioTransportistaExterno] = useState('');
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
+    useState<ViajeMonedaCodigo>('ARS');
+  const [gananciaBrutaManual, setGananciaBrutaManual] = useState('');
+  const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>('ARS');
   const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
   const [pagosTransportista, setPagosTransportista] = useState<PagoTransportistaDraft[]>([]);
@@ -294,6 +302,25 @@ export function ViajeCreatePage() {
       setError('Ingresá un monto a facturar mayor a 0.');
       return;
     }
+    const gananciaDraft = {
+      operacionModo: modoOperacion,
+      monto,
+      monedaMonto,
+      precioTransportistaExterno,
+      monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+      gananciaBrutaManual,
+      monedaGananciaBrutaManual,
+      otrosGastos,
+    };
+    if (draftRequiereGananciaBrutaManual(gananciaDraft)) {
+      const manualPayload = gananciaBrutaManualPayloadFromDraft(gananciaDraft);
+      if (manualPayload.gananciaBrutaManual == null) {
+        setError(
+          'Ingresá la ganancia bruta manual: las monedas de facturación y del transportista son distintas.',
+        );
+        return;
+      }
+    }
     if (
       !opts?.kmLitrosFromModal &&
       estadoMuestraKmLitros(estado) &&
@@ -356,6 +383,7 @@ export function ViajeCreatePage() {
             monedaPrecioTransportista,
           ),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
@@ -588,6 +616,27 @@ export function ViajeCreatePage() {
                 )}
               </div>
             }
+          />
+
+          <ViajeGananciaBrutaManualFieldset
+            draft={{
+              operacionModo: modoOperacion,
+              monto,
+              monedaMonto,
+              precioTransportistaExterno,
+              monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+              gananciaBrutaManual,
+              monedaGananciaBrutaManual,
+              otrosGastos,
+            }}
+            onPatch={(p) => {
+              if (p.gananciaBrutaManual !== undefined) setGananciaBrutaManual(p.gananciaBrutaManual);
+              if (p.monedaGananciaBrutaManual !== undefined) {
+                setMonedaGananciaBrutaManual(p.monedaGananciaBrutaManual);
+              }
+            }}
+            labelClassName={fieldLabelClass}
+            inputClassName={inputClass}
           />
           <ViajeFechaHoraFields
             fechaCarga={fechaCarga}

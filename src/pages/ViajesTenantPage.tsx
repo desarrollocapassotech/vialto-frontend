@@ -38,6 +38,10 @@ import {
 } from '@/components/viajes/ViajeGananciaBruta';
 import { ViajeOrigenDestinoLinea } from '@/components/viajes/ViajeOrigenDestinoLinea';
 import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/ViajeEditModal';
+import {
+  gananciaBrutaManualPayloadFromDraft,
+} from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
+import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -736,6 +740,13 @@ export function ViajesTenantPage({
         normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
       ),
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(v.monedaPrecioTransportistaExterno),
+      gananciaBrutaManual: formatNumberForMoneda(
+        v.gananciaBrutaManual,
+        normalizeViajeMoneda(v.monedaGananciaBrutaManual ?? v.monedaMonto),
+      ),
+      monedaGananciaBrutaManual: normalizeViajeMoneda(
+        v.monedaGananciaBrutaManual ?? v.monedaMonto,
+      ),
       otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
       pagosTransportista: (v.pagosTransportista ?? []).map(pagoTransportistaDraftFromApi),
     });
@@ -977,6 +988,15 @@ export function ViajesTenantPage({
       setFechaDescargaError('La fecha de descarga no puede ser anterior a la de carga.');
       return;
     }
+    if (draftRequiereGananciaBrutaManual(draft)) {
+      const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
+      if (manualPayload.gananciaBrutaManual == null) {
+        setError(
+          'Ingresá la ganancia bruta manual: las monedas de facturación y del transportista son distintas.',
+        );
+        return;
+      }
+    }
 
     const kmResolved = draft.kmRecorridos.trim()
       ? Number(draft.kmRecorridos.replace(',', '.'))
@@ -1020,6 +1040,7 @@ export function ViajesTenantPage({
             draft.monedaPrecioTransportistaExterno,
           ),
           monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
+          ...gananciaBrutaManualPayloadFromDraft(draft),
           otrosGastos: draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: draft.pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
