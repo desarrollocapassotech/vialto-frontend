@@ -253,7 +253,7 @@ export function AppShell() {
                   )}
                 </div>
                 <UserButton
-                  afterSignOutUrl="/#/sign-in"
+                  afterSignOutUrl="/sign-in"
                   appearance={clickableAvatarUserButtonAppearance}
                 />
               </div>

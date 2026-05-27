@@ -24,7 +24,8 @@ export function VehiculosSuperadminPage() {
   );
   const [rows, setRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [viewingVehiculo, setViewingVehiculo] = useState<Vehiculo | null>(null);
+  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(null);
+  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState('');
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -145,13 +146,24 @@ export function VehiculosSuperadminPage() {
                     {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setViewingVehiculo(v)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
+                    <div className="inline-flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewingVehiculoId(v.id);
+                          setViewingVehiculoPatente(v.patente);
+                        }}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Ver
+                      </button>
+                      <Link
+                        to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Editar
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -159,12 +171,17 @@ export function VehiculosSuperadminPage() {
         </table>
       </div>
 
-      {viewingVehiculo && (
+      {viewingVehiculoId && (
         <VehiculoViewModal
-          vehiculo={viewingVehiculo}
+          vehiculoId={viewingVehiculoId}
+          patenteTitulo={viewingVehiculoPatente}
+          tenantId={filtroEmpresa}
           nombresTransportistas={nombresTransportistas}
-          onClose={() => setViewingVehiculo(null)}
-          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculo.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+          onClose={() => {
+            setViewingVehiculoId(null);
+            setViewingVehiculoPatente('');
+          }}
+          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculoId)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
         />
       )}
     </div>

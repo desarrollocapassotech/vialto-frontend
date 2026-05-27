@@ -34,6 +34,8 @@ import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
 import { LiquidacionesTenantPage } from '@/pages/LiquidacionesTenantPage';
 import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
 import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
+import { TaskSetupMFAPage } from '@/pages/TaskSetupMFAPage';
+import { TaskChooseOrganizationPage } from '@/pages/TaskChooseOrganizationPage';
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -73,6 +75,8 @@ export default function App() {
         }
       />
       <Route path="/sign-up/*" element={<PasswordSignUpPage />} />
+      <Route path="/tasks/setup-mfa" element={<TaskSetupMFAPage />} />
+      <Route path="/tasks/choose-organization" element={<TaskChooseOrganizationPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/" element={<AppShell />}>

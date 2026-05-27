@@ -26,7 +26,8 @@ export function VehiculosTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [viewingVehiculo, setViewingVehiculo] = useState<Vehiculo | null>(null);
+  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(null);
+  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState('');
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -115,13 +116,24 @@ export function VehiculosTenantPage() {
                   {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setViewingVehiculo(v)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Ver
-                  </button>
+                  <div className="inline-flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewingVehiculoId(v.id);
+                        setViewingVehiculoPatente(v.patente);
+                      }}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Ver
+                    </button>
+                    <Link
+                      to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Editar
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -172,12 +184,16 @@ export function VehiculosTenantPage() {
         </div>
       )}
 
-      {viewingVehiculo && (
+      {viewingVehiculoId && (
         <VehiculoViewModal
-          vehiculo={viewingVehiculo}
+          vehiculoId={viewingVehiculoId}
+          patenteTitulo={viewingVehiculoPatente}
           nombresTransportistas={nombresTransportistas}
-          onClose={() => setViewingVehiculo(null)}
-          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculo.id)}/editar`}
+          onClose={() => {
+            setViewingVehiculoId(null);
+            setViewingVehiculoPatente('');
+          }}
+          editTo={`/vehiculos/${encodeURIComponent(viewingVehiculoId)}/editar`}
         />
       )}
     </div>

@@ -9,10 +9,22 @@ import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import {
+  vehiculoFormStateFromApi,
+  vehiculoWritePayloadFromForm,
+  type VehiculoFormState,
+} from '@/lib/vehiculoForm';
 import type { Vehiculo } from '@/types/api';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
 const LABEL = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+
+function vehiculoDetailUrl(id: string, tenantId: string): string {
+  if (tenantId) {
+    return `/api/platform/vehiculos/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`;
+  }
+  return `/api/vehiculos/${encodeURIComponent(id)}`;
+}
 
 export function VehiculoEditPage() {
   const { getToken } = useAuth();
@@ -21,21 +33,16 @@ export function VehiculoEditPage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
-  const [patente, setPatente] = useState('');
-  const [tipo, setTipo] = useState<(typeof TIPOS)[number]>('camion');
-  const [marca, setMarca] = useState('');
-  const [modelo, setModelo] = useState('');
-  const [anio, setAnio] = useState('');
-  const [nroChasis, setNroChasis] = useState('');
-  const [poliza, setPoliza] = useState('');
-  const [vencimientoPoliza, setVencimientoPoliza] = useState('');
-  const [tara, setTara] = useState('');
-  const [precinto, setPrecinto] = useState('');
-const [confirmDelete, setConfirmDelete] = useState('');
+  const [form, setForm] = useState<VehiculoFormState | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  function patch(p: Partial<VehiculoFormState>) {
+    setForm((prev) => (prev ? { ...prev, ...p } : prev));
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -43,26 +50,10 @@ const [confirmDelete, setConfirmDelete] = useState('');
     setInitialLoading(true);
     (async () => {
       try {
-        const path = tenantId
-          ? `/api/platform/vehiculos/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-              tenantId,
-            )}`
-          : `/api/vehiculos/${encodeURIComponent(id)}`;
-        const row = await apiJson<Vehiculo>(path, () => getToken());
+        const row = await apiJson<Vehiculo>(vehiculoDetailUrl(id, tenantId), () => getToken());
         if (!cancelled) {
-          setPatente(row.patente);
-          setTipo((TIPOS.includes(row.tipo as any) ? row.tipo : 'camion') as (typeof TIPOS)[number]);
-          setMarca(row.marca ?? '');
-          setModelo(row.modelo ?? '');
-          const añoVal = row.año ?? row.anio;
-          setAnio(añoVal != null ? String(añoVal) : '');
-          setNroChasis(row.nroChasis ?? '');
-          setPoliza(row.poliza ?? '');
-          setVencimientoPoliza(
-            row.vencimientoPoliza ? row.vencimientoPoliza.slice(0, 10) : '',
-          );
-          setTara(row.tara != null ? String(row.tara) : '');
-          setPrecinto(row.precinto ?? '');
+          setForm(vehiculoFormStateFromApi(row));
+          setError(null);
         }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'vehiculos'));
@@ -76,33 +67,22 @@ const [confirmDelete, setConfirmDelete] = useState('');
   }, [getToken, id, tenantId]);
 
   async function onSave() {
-    if (!id) return;
-    if (!patente.trim()) {
+    if (!id || !form) return;
+    if (!form.patente.trim()) {
       setError('Ingresá la patente.');
+      return;
+    }
+    const taraRaw = form.tara.trim();
+    if (taraRaw && vehiculoWritePayloadFromForm(form).tara == null) {
+      setError('La tara debe ser un número válido.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const path = tenantId
-        ? `/api/platform/vehiculos/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
-        : `/api/vehiculos/${encodeURIComponent(id)}`;
-      await apiJson(path, () => getToken(), {
+      await apiJson<Vehiculo>(vehiculoDetailUrl(id, tenantId), () => getToken(), {
         method: 'PATCH',
-        body: JSON.stringify({
-          patente: patente.trim().toUpperCase(),
-          tipo,
-          marca: marca.trim() || undefined,
-          modelo: modelo.trim() || undefined,
-          anio: anio ? Number(anio) : undefined,
-          nroChasis: nroChasis.trim() || undefined,
-          poliza: poliza.trim() || undefined,
-          vencimientoPoliza: vencimientoPoliza || undefined,
-          tara: tara ? Number(tara.toString().replace(',', '.')) : undefined,
-          precinto: precinto.trim() || undefined,
-        }),
+        body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
       navigate('/vehiculos', { replace: true });
@@ -114,16 +94,13 @@ const [confirmDelete, setConfirmDelete] = useState('');
   }
 
   async function onDelete() {
-    if (!id || confirmDelete.trim().toUpperCase() !== patente.trim().toUpperCase()) return;
+    if (!id || !form || confirmDelete.trim().toUpperCase() !== form.patente.trim().toUpperCase()) {
+      return;
+    }
     setDeleting(true);
     setError(null);
     try {
-      const path = tenantId
-        ? `/api/platform/vehiculos/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
-        : `/api/vehiculos/${encodeURIComponent(id)}`;
-      await apiJson(path, () => getToken(), {
+      await apiJson(vehiculoDetailUrl(id, tenantId), () => getToken(), {
         method: 'DELETE',
       });
       if (!tenantId) void maestro.refreshVehiculos();
@@ -143,7 +120,7 @@ const [confirmDelete, setConfirmDelete] = useState('');
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
-      ) : (
+      ) : form ? (
         <>
           <form
             className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2"
@@ -155,16 +132,16 @@ const [confirmDelete, setConfirmDelete] = useState('');
             <label className="grid gap-1.5">
               <span className={LABEL}>Patente</span>
               <CrudInput
-                value={patente}
+                value={form.patente}
                 placeholder="Ej: AA123BB"
-                onChange={(e) => setPatente(e.target.value)}
+                onChange={(e) => patch({ patente: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Tipo</span>
               <CrudSelect
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}
+                value={form.tipo}
+                onChange={(e) => patch({ tipo: e.target.value })}
               >
                 {TIPOS.map((t) => (
                   <option key={t} value={t}>
@@ -176,17 +153,17 @@ const [confirmDelete, setConfirmDelete] = useState('');
             <label className="grid gap-1.5">
               <span className={LABEL}>Marca</span>
               <CrudInput
-                value={marca}
+                value={form.marca}
                 placeholder="Ej: Scania"
-                onChange={(e) => setMarca(e.target.value)}
+                onChange={(e) => patch({ marca: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Modelo</span>
               <CrudInput
-                value={modelo}
+                value={form.modelo}
                 placeholder="Ej: R450"
-                onChange={(e) => setModelo(e.target.value)}
+                onChange={(e) => patch({ modelo: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
@@ -194,32 +171,32 @@ const [confirmDelete, setConfirmDelete] = useState('');
               <CrudInput
                 type="number"
                 placeholder="Ej: 2020"
-                value={anio}
-                onChange={(e) => setAnio(e.target.value)}
+                value={form.anio}
+                onChange={(e) => patch({ anio: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Nro. de chasis</span>
               <CrudInput
-                value={nroChasis}
+                value={form.nroChasis}
                 placeholder="Ej: 9BM379182LB123456"
-                onChange={(e) => setNroChasis(e.target.value)}
+                onChange={(e) => patch({ nroChasis: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Póliza</span>
               <CrudInput
-                value={poliza}
+                value={form.poliza}
                 placeholder="Ej: POL-2024-001234"
-                onChange={(e) => setPoliza(e.target.value)}
+                onChange={(e) => patch({ poliza: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Vencimiento de póliza</span>
               <CrudInput
                 type="date"
-                value={vencimientoPoliza}
-                onChange={(e) => setVencimientoPoliza(e.target.value)}
+                value={form.vencimientoPoliza}
+                onChange={(e) => patch({ vencimientoPoliza: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
@@ -227,16 +204,16 @@ const [confirmDelete, setConfirmDelete] = useState('');
               <CrudInput
                 type="number"
                 placeholder="Ej: 8500"
-                value={tara}
-                onChange={(e) => setTara(e.target.value)}
+                value={form.tara}
+                onChange={(e) => patch({ tara: e.target.value })}
               />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Precinto</span>
               <CrudInput
-                value={precinto}
+                value={form.precinto}
                 placeholder="Ej: 00123456"
-                onChange={(e) => setPrecinto(e.target.value)}
+                onChange={(e) => patch({ precinto: e.target.value })}
               />
             </label>
             <div className="md:col-span-2">
@@ -251,13 +228,15 @@ const [confirmDelete, setConfirmDelete] = useState('');
             confirmValue={confirmDelete}
             onConfirmValueChange={setConfirmDelete}
             canDelete={
-              confirmDelete.trim().toUpperCase() === patente.trim().toUpperCase()
+              confirmDelete.trim().toUpperCase() === form.patente.trim().toUpperCase()
             }
             deleting={deleting}
             onDelete={onDelete}
             deleteLabel="Eliminar vehículo"
           />
         </>
+      ) : (
+        <CrudFormErrorAlert message={error ?? 'No se pudo cargar el vehículo.'} />
       )}
     </CrudPageLayout>
   );

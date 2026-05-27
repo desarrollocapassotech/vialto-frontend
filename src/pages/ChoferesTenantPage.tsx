@@ -25,7 +25,8 @@ export function ChoferesTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [viewingChofer, setViewingChofer] = useState<Chofer | null>(null);
+  const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
+  const [viewingChoferNombre, setViewingChoferNombre] = useState('');
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -112,13 +113,24 @@ export function ChoferesTenantPage() {
                   {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setViewingChofer(c)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Ver
-                  </button>
+                  <div className="inline-flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewingChoferId(c.id);
+                        setViewingChoferNombre(c.nombre);
+                      }}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Ver
+                    </button>
+                    <Link
+                      to={`/choferes/${encodeURIComponent(c.id)}/editar`}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Editar
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -169,12 +181,16 @@ export function ChoferesTenantPage() {
         </div>
       )}
 
-      {viewingChofer && (
+      {viewingChoferId && (
         <ChoferViewModal
-          chofer={viewingChofer}
+          choferId={viewingChoferId}
+          nombreTitulo={viewingChoferNombre}
           nombresTransportistas={nombresTransportistas}
-          onClose={() => setViewingChofer(null)}
-          editTo={`/choferes/${encodeURIComponent(viewingChofer.id)}/editar`}
+          onClose={() => {
+            setViewingChoferId(null);
+            setViewingChoferNombre('');
+          }}
+          editTo={`/choferes/${encodeURIComponent(viewingChoferId)}/editar`}
         />
       )}
     </div>
