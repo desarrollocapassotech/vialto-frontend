@@ -32,15 +32,16 @@ export function validarDniForm(dni: string): string | null {
 
 /**
  * Cuerpo POST/PATCH alineado con CreateChoferDto / UpdateChoferDto.
- * `cuit` y demás opcionales van siempre en el JSON (null si vacíos).
+ * Opcionales vacíos van como `null` (el backend debe preservar `null` en PATCH para borrar el valor).
  */
 export function choferWritePayloadFromForm(form: ChoferFormState): Record<string, unknown> {
   const dni = dniSoloDigitos(form.dni);
   const cuit = form.cuit.trim();
+  const telefono = form.telefono.trim();
   return {
     nombre: form.nombre.trim(),
     dni: dni || null,
     cuit: cuit || null,
-    telefono: form.telefono.trim() || null,
+    telefono: telefono || null,
   };
 }
