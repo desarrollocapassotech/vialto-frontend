@@ -1,20 +1,37 @@
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TenantOwnerDashboard, AlertsPanel } from '@/components/tenant/TenantOwnerDashboard';
+import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import { apiJson } from '@/lib/api';
 import { canAccessFacturacion } from '@/lib/tenantModules';
-import type { Viaje } from '@/types/api';
+import type { Factura, Viaje } from '@/types/api';
 
 export function TenantHomePage() {
   const { getToken } = useAuth();
   const { organization } = useOrganization();
+  const navigate = useNavigate();
   const { tenant, loading, error } = useCurrentTenant();
   const dash = useTenantOwnerDashboard();
+  const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [loadingFacturaId, setLoadingFacturaId] = useState<string | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+
+  async function handleViewFactura(id: string) {
+    setLoadingFacturaId(id);
+    try {
+      const factura = await apiJson<Factura>(`/api/facturacion/facturas/${encodeURIComponent(id)}`, () => getToken());
+      setViewingFactura(factura);
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingFacturaId(null);
+    }
+  }
 
   async function handleViewViaje(id: string) {
     setLoadingViajeId(id);
@@ -44,13 +61,17 @@ export function TenantHomePage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
             Panel de {companyName}
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-xl">
-            Indicadores clave para la gestión de tu empresa.
-          </p>
         </div>
 
         {showAlertsBlock && alertas && (
-          <AlertsPanel alertas={alertas} onViewViaje={(id) => void handleViewViaje(id)} loadingViajeId={loadingViajeId} shouldClose={viewingViaje !== null} />
+          <AlertsPanel
+            alertas={alertas}
+            onViewFactura={(id) => void handleViewFactura(id)}
+            loadingFacturaId={loadingFacturaId}
+            onViewViaje={(id) => void handleViewViaje(id)}
+            loadingViajeId={loadingViajeId}
+            shouldClose={viewingFactura !== null || viewingViaje !== null}
+          />
         )}
       </div>
 
@@ -80,11 +101,27 @@ export function TenantHomePage() {
         <TenantOwnerDashboard modules={tenant.modules} dash={dash} />
       )}
 
+      {viewingFactura && (
+        <FacturaViewModal
+          factura={viewingFactura}
+          onClose={() => setViewingFactura(null)}
+          onEditar={() => {
+            const id = viewingFactura.id;
+            setViewingFactura(null);
+            navigate('/facturacion', { state: { expandFacturaId: id } });
+          }}
+        />
+      )}
+
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
           onClose={() => setViewingViaje(null)}
-          onEditar={() => setViewingViaje(null)}
+          onEditar={() => {
+            const id = viewingViaje.id;
+            setViewingViaje(null);
+            navigate(`/viajes?viaje=${encodeURIComponent(id)}`);
+          }}
         />
       )}
     </div>

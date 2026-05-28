@@ -181,7 +181,7 @@ function montosPorMonedaCompat(
   return { ARS: bloque.montoTotal, USD: 0 };
 }
 
-export function AlertsPanel({ alertas, onViewViaje, loadingViajeId, shouldClose }: { alertas: NonNullable<OwnerDashboardResponse['alertas']>; onViewViaje?: (id: string) => void; loadingViajeId?: string | null; shouldClose?: boolean }) {
+export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewViaje, loadingViajeId, shouldClose }: { alertas: NonNullable<OwnerDashboardResponse['alertas']>; onViewFactura?: (id: string) => void; loadingFacturaId?: string | null; onViewViaje?: (id: string) => void; loadingViajeId?: string | null; shouldClose?: boolean }) {
   const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
@@ -241,16 +241,35 @@ export function AlertsPanel({ alertas, onViewViaje, loadingViajeId, shouldClose 
             </div>
             <div className="mt-2.5 flex flex-col gap-1.5">
               {itemsFacturasVencidas.length > 0 ? (
-                itemsFacturasVencidas.map((it) => (
-                  <Link
-                    key={it.id}
-                    to={`/facturacion?factura=${encodeURIComponent(it.id)}`}
-                    className={linkFacturaClass}
-                    onClick={() => setAbierto(false)}
-                  >
-                    Factura {it.numero.trim() || it.id.slice(0, 8)} →
-                  </Link>
-                ))
+                itemsFacturasVencidas.map((it) =>
+                  onViewFactura ? (
+                    <button
+                      key={it.id}
+                      type="button"
+                      disabled={loadingFacturaId === it.id}
+                      className={`${linkFacturaClass} disabled:opacity-60 disabled:cursor-wait`}
+                      onClick={() => onViewFactura(it.id)}
+                    >
+                      {loadingFacturaId === it.id ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-rose-300 border-t-transparent" />
+                          Cargando…
+                        </span>
+                      ) : (
+                        <>Factura {it.numero.trim() || it.id.slice(0, 8)} →</>
+                      )}
+                    </button>
+                  ) : (
+                    <Link
+                      key={it.id}
+                      to={`/facturacion?factura=${encodeURIComponent(it.id)}`}
+                      className={linkFacturaClass}
+                      onClick={() => setAbierto(false)}
+                    >
+                      Factura {it.numero.trim() || it.id.slice(0, 8)} →
+                    </Link>
+                  )
+                )
               ) : (
                 <Link
                   to="/facturacion"
