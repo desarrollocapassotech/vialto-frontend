@@ -27,7 +27,7 @@ import {
   emptyPagoTransportista,
   type PagoTransportistaDraft,
 } from '@/components/viajes/PagosTransportistaFieldset';
-import { maskCurrencyForMoneda, type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import {
   estadoMuestraKmLitros,
@@ -39,7 +39,7 @@ import {
 } from '@/lib/viajesEstados';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
-import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
@@ -108,6 +108,8 @@ export type ViajeEditModalProps = {
   error: string | null;
   /** Enlace «nuevo vehículo» en flota propia (p. ej. con `?tenantId=` para superadmin). */
   crearVehiculoHref?: string;
+  getToken?: () => Promise<string | null>;
+  onProductoCreado?: (p: Producto) => void;
 };
 
 const labelClass =
@@ -140,6 +142,8 @@ export function ViajeEditModal({
   saving,
   error,
   crearVehiculoHref = '/vehiculos/nuevo',
+  getToken,
+  onProductoCreado,
 }: ViajeEditModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -295,18 +299,9 @@ export function ViajeEditModal({
                   autoComplete="off"
                   value={draft.monto}
                   onChange={(e) =>
-                    setDraft((p) =>
-                      p
-                        ? {
-                            ...p,
-                            monto: maskCurrencyForMoneda(e.target.value, p.monedaMonto),
-                          }
-                        : p,
-                    )
+                    setDraft((p) => (p ? { ...p, monto: e.target.value } : p))
                   }
-                  placeholder={
-                    draft.monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'
-                  }
+                  placeholder="0.00"
                   className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
                 />
                 <MonedaSelect
@@ -348,22 +343,10 @@ export function ViajeEditModal({
                           value={draft.precioTransportistaExterno}
                           onChange={(e) =>
                             setDraft((p) =>
-                              p
-                                ? {
-                                    ...p,
-                                    precioTransportistaExterno: maskCurrencyForMoneda(
-                                      e.target.value,
-                                      p.monedaPrecioTransportistaExterno,
-                                    ),
-                                  }
-                                : p,
+                              p ? { ...p, precioTransportistaExterno: e.target.value } : p,
                             )
                           }
-                          placeholder={
-                            draft.monedaPrecioTransportistaExterno === 'USD'
-                              ? 'Ej. 8,500.00'
-                              : 'Ej. 1.200.000,50'
-                          }
+                          placeholder="0.00"
                           className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
                         />
                         <MonedaSelect
@@ -499,6 +482,8 @@ export function ViajeEditModal({
                 triggerClassName={inputClass}
                 inputClassName={inputClass}
                 disabled={saving}
+                getToken={getToken}
+                onProductoCreado={onProductoCreado}
               />
             </div>
 

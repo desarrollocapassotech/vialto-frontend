@@ -1,11 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
-import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
 import type { PaginatedMeta, Vehiculo } from '@/types/api';
 
@@ -16,11 +14,6 @@ type VehiculosPaginatedResponse = {
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const transportistas = useTransportistasList();
-  const nombresTransportistas = useMemo(
-    () => mapTransportistaNombres(transportistas ?? []),
-    [transportistas],
-  );
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,21 +78,20 @@ export function VehiculosTenantPage() {
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Marca</th>
               <th className="px-4 py-3">Modelo</th>
-              <th className="px-4 py-3">Pertenencia</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   Todavía no tenés vehículos cargados.
                 </td>
               </tr>
@@ -112,9 +104,6 @@ export function VehiculosTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">{labelVehiculoTipo(v.tipo)}</td>
                 <td className="px-4 py-3 text-vialto-steel">{v.marca ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{v.modelo ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">
-                  {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
-                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex gap-2">
                     <button
@@ -188,7 +177,6 @@ export function VehiculosTenantPage() {
         <VehiculoViewModal
           vehiculoId={viewingVehiculoId}
           patenteTitulo={viewingVehiculoPatente}
-          nombresTransportistas={nombresTransportistas}
           onClose={() => {
             setViewingVehiculoId(null);
             setViewingVehiculoPatente('');

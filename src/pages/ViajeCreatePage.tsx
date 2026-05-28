@@ -38,7 +38,6 @@ import {
 } from '@/components/viajes/PagosTransportistaFieldset';
 import { apiJson } from '@/lib/api';
 import {
-  maskCurrencyForMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
@@ -504,10 +503,8 @@ export function ViajeCreatePage() {
                   inputMode="decimal"
                   autoComplete="off"
                   value={monto}
-                  onChange={(e) =>
-                    setMonto(maskCurrencyForMoneda(e.target.value, monedaMonto))
-                  }
-                  placeholder={monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'}
+                  onChange={(e) => setMonto(e.target.value)}
+                  placeholder="0.00"
                   className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                 />
                 <MonedaSelect
@@ -542,16 +539,8 @@ export function ViajeCreatePage() {
                         inputMode="decimal"
                         autoComplete="off"
                         value={precioTransportistaExterno}
-                        onChange={(e) =>
-                          setPrecioTransportistaExterno(
-                            maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista),
-                          )
-                        }
-                        placeholder={
-                          monedaPrecioTransportista === 'USD'
-                            ? 'Ej. 8,500.00'
-                            : 'Ej. 1.200.000,50'
-                        }
+                        onChange={(e) => setPrecioTransportistaExterno(e.target.value)}
+                        placeholder="0.00"
                         className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                       />
                       <MonedaSelect
@@ -693,6 +682,8 @@ export function ViajeCreatePage() {
               triggerClassName={inputClass}
               inputClassName={inputClass}
               disabled={loading}
+              getToken={getToken}
+              onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">

@@ -150,7 +150,7 @@ export function TransportistaCreatePage() {
         </label>
 
         <div className={sectionClass}>
-          <p className={`${labelClass} mb-3`}>Datos para PAUT</p>
+          <p className={`${labelClass} mb-3`}>Datos para Nómina</p>
           <div className="grid gap-4">
             <label className="grid gap-1.5">
               <span className={labelClass}>N° PAUT</span>

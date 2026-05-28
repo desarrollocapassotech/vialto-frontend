@@ -176,7 +176,6 @@ export function VehiculosSuperadminPage() {
           vehiculoId={viewingVehiculoId}
           patenteTitulo={viewingVehiculoPatente}
           tenantId={filtroEmpresa}
-          nombresTransportistas={nombresTransportistas}
           onClose={() => {
             setViewingVehiculoId(null);
             setViewingVehiculoPatente('');

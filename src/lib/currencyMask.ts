@@ -40,7 +40,25 @@ export function formatCurrencyArFromNumber(value: number | null | undefined): st
 export function parseCurrencyAr(value: string): number | undefined {
   const t = value.trim().replace(/\$/g, '').replace(/\s/g, '');
   if (!t) return undefined;
-  const normalized = t.replace(/\./g, '').replace(',', '.');
+  let normalized: string;
+  if (t.includes(',')) {
+    // formato ARS: puntos = miles, coma = decimal → "1.500.000,50"
+    normalized = t.replace(/\./g, '').replace(',', '.');
+  } else {
+    const dots = (t.match(/\./g) || []).length;
+    if (dots === 0) {
+      normalized = t; // entero plano: "1500000"
+    } else if (dots === 1) {
+      const afterDot = t.split('.')[1] ?? '';
+      // punto seguido de exactamente 3 dígitos = separador de miles
+      normalized = afterDot.length === 3 && /^\d{3}$/.test(afterDot)
+        ? t.replace('.', '')
+        : t; // "1500000.50" → decimal plano
+    } else {
+      // múltiples puntos sin coma = todos son miles: "1.500.000"
+      normalized = t.replace(/\./g, '');
+    }
+  }
   const n = Number(normalized);
   if (!Number.isFinite(n)) return undefined;
   return n;
