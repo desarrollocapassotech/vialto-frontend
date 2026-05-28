@@ -3,7 +3,6 @@ import { useAuth } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
-  maskCurrencyForMoneda,
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
 } from '@/lib/currencyMask';
@@ -191,10 +190,8 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
-                onChange={(e) =>
-                  setMontoStr(maskCurrencyForMoneda(e.target.value, moneda))
-                }
-                placeholder={moneda === 'USD' ? 'Ej. 1,500.00' : 'Ej. 150.000,00'}
+                onChange={(e) => setMontoStr(e.target.value)}
+                placeholder="0.00"
                 className={`${inputClass} text-right tabular-nums`}
                 autoFocus
                 disabled={saving}

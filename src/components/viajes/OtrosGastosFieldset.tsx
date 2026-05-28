@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  maskCurrencyForMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
@@ -103,12 +102,8 @@ export function OtrosGastosFieldset({ rows, onChange, className }: Props) {
               type="text"
               inputMode="decimal"
               value={row.montoStr}
-              onChange={(e) =>
-                update(i, {
-                  montoStr: maskCurrencyForMoneda(e.target.value, row.moneda),
-                })
-              }
-              placeholder={row.moneda === 'USD' ? '0.00' : '0,00'}
+              onChange={(e) => update(i, { montoStr: e.target.value })}
+              placeholder="0.00"
               className={`${smallInputClass} w-36 text-right tabular-nums`}
               aria-label={`Monto gasto ${i + 1}`}
             />

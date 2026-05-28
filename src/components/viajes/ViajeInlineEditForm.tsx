@@ -12,7 +12,7 @@ import {
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
-import { maskCurrencyForMoneda, type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
   mensajesAyudaFlotaPropia,
@@ -127,14 +127,8 @@ export function ViajeInlineEditForm({
                   inputMode="decimal"
                   autoComplete="off"
                   value={draft.monto}
-                  onChange={(e) =>
-                    set({
-                      monto: maskCurrencyForMoneda(e.target.value, draft.monedaMonto),
-                    })
-                  }
-                  placeholder={
-                    draft.monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'
-                  }
+                  onChange={(e) => set({ monto: e.target.value })}
+                  placeholder="0.00"
                   className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
                 />
                 <MonedaSelect
@@ -172,19 +166,8 @@ export function ViajeInlineEditForm({
                         inputMode="decimal"
                         autoComplete="off"
                         value={draft.precioTransportistaExterno}
-                        onChange={(e) =>
-                          set({
-                            precioTransportistaExterno: maskCurrencyForMoneda(
-                              e.target.value,
-                              draft.monedaPrecioTransportistaExterno,
-                            ),
-                          })
-                        }
-                        placeholder={
-                          draft.monedaPrecioTransportistaExterno === 'USD'
-                            ? 'Ej. 8,500.00'
-                            : 'Ej. 1.200.000,50'
-                        }
+                        onChange={(e) => set({ precioTransportistaExterno: e.target.value })}
+                        placeholder="0.00"
                         className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
                       />
                       <MonedaSelect

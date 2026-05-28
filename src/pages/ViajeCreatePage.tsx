@@ -1,6 +1,4 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { canAccessStock } from '@/lib/tenantModules';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
@@ -40,7 +38,6 @@ import {
 } from '@/components/viajes/PagosTransportistaFieldset';
 import { apiJson } from '@/lib/api';
 import {
-  maskCurrencyForMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
@@ -82,11 +79,9 @@ const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 
 
 export function ViajeCreatePage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const { tenant } = useCurrentTenant();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
-  const hasStock = tenantId ? true : canAccessStock(tenant?.modules ?? []);
   const maestro = useMaestroData();
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
@@ -508,10 +503,8 @@ export function ViajeCreatePage() {
                   inputMode="decimal"
                   autoComplete="off"
                   value={monto}
-                  onChange={(e) =>
-                    setMonto(maskCurrencyForMoneda(e.target.value, monedaMonto))
-                  }
-                  placeholder={monedaMonto === 'USD' ? 'Ej. 12,500.50' : 'Ej. 1.500.000,50'}
+                  onChange={(e) => setMonto(e.target.value)}
+                  placeholder="0.00"
                   className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                 />
                 <MonedaSelect
@@ -546,16 +539,8 @@ export function ViajeCreatePage() {
                         inputMode="decimal"
                         autoComplete="off"
                         value={precioTransportistaExterno}
-                        onChange={(e) =>
-                          setPrecioTransportistaExterno(
-                            maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista),
-                          )
-                        }
-                        placeholder={
-                          monedaPrecioTransportista === 'USD'
-                            ? 'Ej. 8,500.00'
-                            : 'Ej. 1.200.000,50'
-                        }
+                        onChange={(e) => setPrecioTransportistaExterno(e.target.value)}
+                        placeholder="0.00"
                         className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                       />
                       <MonedaSelect

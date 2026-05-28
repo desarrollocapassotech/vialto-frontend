@@ -4,7 +4,6 @@ import {
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
 import {
-  maskCurrencyForMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
@@ -113,30 +112,14 @@ export function ViajeGananciaBrutaManualFieldset({
               inputMode="decimal"
               autoComplete="off"
               value={draft.gananciaBrutaManual}
-              onChange={(e) =>
-                onPatch({
-                  gananciaBrutaManual: maskCurrencyForMoneda(
-                    e.target.value,
-                    draft.monedaGananciaBrutaManual,
-                  ),
-                })
-              }
-              placeholder={
-                draft.monedaGananciaBrutaManual === 'USD'
-                  ? 'Ej. 1,000.00'
-                  : 'Ej. 1.000.000,00'
-              }
+              onChange={(e) => onPatch({ gananciaBrutaManual: e.target.value })}
+              placeholder="0.00"
               className={`min-w-0 flex-1 ${inputClassName} text-right tabular-nums`}
             />
             <MonedaSelect
               value={draft.monedaGananciaBrutaManual}
               onChange={(m: ViajeMonedaCodigo) =>
-                onPatch({
-                  monedaGananciaBrutaManual: m,
-                  gananciaBrutaManual: draft.gananciaBrutaManual
-                    ? maskCurrencyForMoneda(draft.gananciaBrutaManual, m)
-                    : '',
-                })
+                onPatch({ monedaGananciaBrutaManual: m })
               }
               aria-label="Moneda ganancia bruta manual"
             />
