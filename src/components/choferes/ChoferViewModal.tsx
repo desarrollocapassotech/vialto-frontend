@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { labelAsignacionTransportista } from '@/lib/transportistas';
 import type { Chofer } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -26,14 +25,12 @@ export function ChoferViewModal({
   choferId,
   nombreTitulo,
   tenantId,
-  nombresTransportistas,
   onClose,
   editTo,
 }: {
   choferId: string;
   nombreTitulo?: string;
   tenantId?: string;
-  nombresTransportistas: Map<string, string>;
   onClose: () => void;
   editTo: string;
 }) {
@@ -118,10 +115,6 @@ export function ChoferViewModal({
                 value: chofer.licenciaVence ? fmtDate(chofer.licenciaVence) : null,
               },
               { label: 'Teléfono', value: chofer.telefono },
-              {
-                label: 'Pertenencia',
-                value: labelAsignacionTransportista(chofer.transportistaId, nombresTransportistas),
-              },
               { label: 'Alta', value: fmtDate(chofer.createdAt) },
             ]
               .filter((c) => c.value != null && c.value !== '')

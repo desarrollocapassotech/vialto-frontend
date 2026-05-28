@@ -171,7 +171,6 @@ export function ChoferesSuperadminPage() {
           choferId={viewingChoferId}
           nombreTitulo={viewingChoferNombre}
           tenantId={filtroEmpresa}
-          nombresTransportistas={nombresTransportistas}
           onClose={() => {
             setViewingChoferId(null);
             setViewingChoferNombre('');

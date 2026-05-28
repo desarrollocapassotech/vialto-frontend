@@ -1,10 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
-import { mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer, PaginatedMeta } from '@/types/api';
 
@@ -15,11 +13,6 @@ type ChoferesPaginatedResponse = {
 
 export function ChoferesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const transportistas = useTransportistasList();
-  const nombresTransportistas = useMemo(
-    () => mapTransportistaNombres(transportistas ?? []),
-    [transportistas],
-  );
   const [rows, setRows] = useState<Chofer[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -181,7 +174,6 @@ export function ChoferesTenantPage() {
         <ChoferViewModal
           choferId={viewingChoferId}
           nombreTitulo={viewingChoferNombre}
-          nombresTransportistas={nombresTransportistas}
           onClose={() => {
             setViewingChoferId(null);
             setViewingChoferNombre('');

@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { labelVehiculoTipo } from '@/lib/labels';
-import { labelAsignacionTransportista } from '@/lib/transportistas';
 import type { Vehiculo } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -27,7 +26,6 @@ export function VehiculoViewModal({
   vehiculoId,
   patenteTitulo,
   tenantId,
-  nombresTransportistas,
   onClose,
   editTo,
 }: {
@@ -35,7 +33,6 @@ export function VehiculoViewModal({
   /** Mientras carga el detalle (p. ej. patente del listado). */
   patenteTitulo?: string;
   tenantId?: string;
-  nombresTransportistas: Map<string, string>;
   onClose: () => void;
   editTo: string;
 }) {
@@ -126,10 +123,6 @@ export function VehiculoViewModal({
               },
               { label: 'Tara (kg)', value: vehiculo.tara },
               { label: 'Precinto', value: vehiculo.precinto },
-              {
-                label: 'Pertenencia',
-                value: labelAsignacionTransportista(vehiculo.transportistaId, nombresTransportistas),
-              },
               { label: 'Alta', value: fmtDate(vehiculo.createdAt) },
             ]
               .filter((c) => c.value != null && c.value !== '')

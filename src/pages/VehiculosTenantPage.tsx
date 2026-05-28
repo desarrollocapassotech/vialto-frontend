@@ -1,11 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
-import { mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
 import type { PaginatedMeta, Vehiculo } from '@/types/api';
 
@@ -16,11 +14,6 @@ type VehiculosPaginatedResponse = {
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const transportistas = useTransportistasList();
-  const nombresTransportistas = useMemo(
-    () => mapTransportistaNombres(transportistas ?? []),
-    [transportistas],
-  );
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +177,6 @@ export function VehiculosTenantPage() {
         <VehiculoViewModal
           vehiculoId={viewingVehiculoId}
           patenteTitulo={viewingVehiculoPatente}
-          nombresTransportistas={nombresTransportistas}
           onClose={() => {
             setViewingVehiculoId(null);
             setViewingVehiculoPatente('');
