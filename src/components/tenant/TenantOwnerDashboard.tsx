@@ -181,8 +181,12 @@ function montosPorMonedaCompat(
   return { ARS: bloque.montoTotal, USD: 0 };
 }
 
-export function AlertsPanel({ alertas }: { alertas: NonNullable<OwnerDashboardResponse['alertas']> }) {
+export function AlertsPanel({ alertas, onViewViaje, loadingViajeId, shouldClose }: { alertas: NonNullable<OwnerDashboardResponse['alertas']>; onViewViaje?: (id: string) => void; loadingViajeId?: string | null; shouldClose?: boolean }) {
   const [abierto, setAbierto] = useState(false);
+
+  useEffect(() => {
+    if (shouldClose) setAbierto(false);
+  }, [shouldClose]);
   const headingId = useId();
   const panelId = `${headingId}-panel`;
   const vencMon = montosPorMonedaCompat(alertas.facturasVencidas);
@@ -287,16 +291,35 @@ export function AlertsPanel({ alertas }: { alertas: NonNullable<OwnerDashboardRe
             </div>
             <div className="mt-2.5 flex flex-col gap-1.5">
               {itemsViajesSinFactura.length > 0 ? (
-                itemsViajesSinFactura.map((it) => (
-                  <Link
-                    key={it.id}
-                    to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
-                    className={linkViajeClass}
-                    onClick={() => setAbierto(false)}
-                  >
-                    Viaje {it.numero.trim() || it.id.slice(0, 8)} →
-                  </Link>
-                ))
+                itemsViajesSinFactura.map((it) =>
+                  onViewViaje ? (
+                    <button
+                      key={it.id}
+                      type="button"
+                      disabled={loadingViajeId === it.id}
+                      className={`${linkViajeClass} disabled:opacity-60 disabled:cursor-wait`}
+                      onClick={() => onViewViaje(it.id)}
+                    >
+                      {loadingViajeId === it.id ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
+                          Cargando…
+                        </span>
+                      ) : (
+                        <>Viaje {it.numero.trim() || it.id.slice(0, 8)} →</>
+                      )}
+                    </button>
+                  ) : (
+                    <Link
+                      key={it.id}
+                      to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
+                      className={linkViajeClass}
+                      onClick={() => setAbierto(false)}
+                    >
+                      Viaje {it.numero.trim() || it.id.slice(0, 8)} →
+                    </Link>
+                  )
+                )
               ) : (
                 <Link to="/viajes" className={linkViajeClass} onClick={() => setAbierto(false)}>
                   Ir a viajes →

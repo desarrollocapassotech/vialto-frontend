@@ -1,13 +1,32 @@
-import { useOrganization } from '@clerk/clerk-react';
+import { useAuth, useOrganization } from '@clerk/clerk-react';
+import { useState } from 'react';
 import { TenantOwnerDashboard, AlertsPanel } from '@/components/tenant/TenantOwnerDashboard';
+import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
+import { apiJson } from '@/lib/api';
 import { canAccessFacturacion } from '@/lib/tenantModules';
+import type { Viaje } from '@/types/api';
 
 export function TenantHomePage() {
+  const { getToken } = useAuth();
   const { organization } = useOrganization();
   const { tenant, loading, error } = useCurrentTenant();
   const dash = useTenantOwnerDashboard();
+  const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+
+  async function handleViewViaje(id: string) {
+    setLoadingViajeId(id);
+    try {
+      const viaje = await apiJson<Viaje>(`/api/viajes/${encodeURIComponent(id)}`, () => getToken());
+      setViewingViaje(viaje);
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingViajeId(null);
+    }
+  }
 
   const companyName = tenant?.name?.trim() || organization?.name?.trim() || 'empresa';
 
@@ -31,7 +50,7 @@ export function TenantHomePage() {
         </div>
 
         {showAlertsBlock && alertas && (
-          <AlertsPanel alertas={alertas} />
+          <AlertsPanel alertas={alertas} onViewViaje={(id) => void handleViewViaje(id)} loadingViajeId={loadingViajeId} shouldClose={viewingViaje !== null} />
         )}
       </div>
 
@@ -59,6 +78,14 @@ export function TenantHomePage() {
 
       {organization && !loading && !error && tenant && (
         <TenantOwnerDashboard modules={tenant.modules} dash={dash} />
+      )}
+
+      {viewingViaje && (
+        <ViajeViewModal
+          viaje={viewingViaje}
+          onClose={() => setViewingViaje(null)}
+          onEditar={() => setViewingViaje(null)}
+        />
       )}
     </div>
   );

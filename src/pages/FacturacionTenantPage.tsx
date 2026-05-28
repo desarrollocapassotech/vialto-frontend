@@ -322,7 +322,7 @@ export function FacturacionTenantPage({
       );
       return;
     }
-    startEdit(f);
+    setViewingFactura(f);
     setSearchParams(
       (p) => {
         const next = new URLSearchParams(p);
