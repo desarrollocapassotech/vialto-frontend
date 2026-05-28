@@ -1,5 +1,8 @@
+import { useMemo, useState } from 'react';
 import { ProductoSearchableSelect } from '@/components/viajes/ProductoSearchableSelect';
+import { ProductoModal } from '@/components/stock/ProductoModal';
 import type { OpcionProducto, ViajeProductoItem } from '@/lib/productosViaje';
+import type { Producto } from '@/types/api';
 
 export type ViajeProductosListaProps = {
   groupId: string;
@@ -7,8 +10,10 @@ export type ViajeProductosListaProps = {
   onChange: (items: ViajeProductoItem[]) => void;
   opciones: OpcionProducto[];
   triggerClassName: string;
-  inputClassName: string;
+  inputClassName?: string;
   disabled?: boolean;
+  getToken?: () => Promise<string | null>;
+  onProductoCreado?: (p: Producto) => void;
 };
 
 export function ViajeProductosLista({
@@ -17,9 +22,17 @@ export function ViajeProductosLista({
   onChange,
   opciones,
   triggerClassName,
-  inputClassName,
   disabled,
+  getToken,
+  onProductoCreado,
 }: ViajeProductosListaProps) {
+  const [showNuevo, setShowNuevo] = useState(false);
+  const [nuevoParaIndex, setNuevoParaIndex] = useState<number | null>(null);
+  const [localOpciones, setLocalOpciones] = useState<OpcionProducto[]>([]);
+  const todasLasOpciones = useMemo(() => {
+    const ids = new Set(opciones.map((o) => o.id));
+    return [...opciones, ...localOpciones.filter((o) => !ids.has(o.id))];
+  }, [opciones, localOpciones]);
   function patchRow(i: number, patch: Partial<ViajeProductoItem>) {
     const next = [...value];
     next[i] = { ...next[i], ...patch };
@@ -46,35 +59,12 @@ export function ViajeProductosLista({
               id={`${groupId}-prod-${i}`}
               value={item.productoId}
               onChange={(id) => patchRow(i, { productoId: id })}
-              opciones={opciones}
+              opciones={todasLasOpciones}
               triggerClassName={triggerClassName}
               disabled={disabled}
+              onNuevoProducto={getToken ? () => { setNuevoParaIndex(i); setShowNuevo(true); } : undefined}
             />
           </div>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Cant."
-            value={item.cantidad ?? ''}
-            onChange={(e) =>
-              patchRow(i, { cantidad: e.target.value !== '' ? Number(e.target.value) : null })
-            }
-            disabled={disabled}
-            className={`h-9 w-24 shrink-0 border border-black/15 px-2 text-sm ${inputClassName}`}
-          />
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Peso kg"
-            value={item.pesoKg ?? ''}
-            onChange={(e) =>
-              patchRow(i, { pesoKg: e.target.value !== '' ? Number(e.target.value) : null })
-            }
-            disabled={disabled}
-            className={`h-9 w-28 shrink-0 border border-black/15 px-2 text-sm ${inputClassName}`}
-          />
           <button
             type="button"
             disabled={disabled}
@@ -93,6 +83,27 @@ export function ViajeProductosLista({
       >
         + Agregar producto
       </button>
+      {showNuevo && getToken && (
+        <ProductoModal
+          modo="create"
+          getToken={getToken}
+          onClose={() => { setShowNuevo(false); setNuevoParaIndex(null); }}
+          onSaved={(p) => {
+            setLocalOpciones((prev) => [
+              ...prev,
+              { id: p.id, nombre: p.nombre, activo: p.activo, unidadMedida: p.unidadMedida ?? null },
+            ]);
+            onProductoCreado?.(p);
+            if (nuevoParaIndex !== null) {
+              patchRow(nuevoParaIndex, { productoId: p.id });
+            } else {
+              onChange([...value, { productoId: p.id }]);
+            }
+            setShowNuevo(false);
+            setNuevoParaIndex(null);
+          }}
+        />
+      )}
     </div>
   );
 }

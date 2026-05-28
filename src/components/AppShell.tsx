@@ -59,6 +59,9 @@ export function AppShell() {
         { to: '/choferes', label: 'Choferes' },
         { to: '/vehiculos', label: 'Vehículos' },
       );
+      if (!superadmin && !canAccessStock(tenant?.modules ?? [])) {
+        items.push({ to: '/stock/productos', label: 'Productos' });
+      }
       groups.push({ title: 'Viajes y flota', items });
     }
 

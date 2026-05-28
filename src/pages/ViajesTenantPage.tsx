@@ -1071,9 +1071,6 @@ export function ViajesTenantPage({
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
             Viajes
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Cliente, transporte, estado, origen, destino, y por rango de fecha de carga o descarga.
-          </p>
         </>
       )}
 
@@ -1700,6 +1697,8 @@ export function ViajesTenantPage({
           crearVehiculoHref={
             platform ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}` : undefined
           }
+          getToken={getToken}
+          onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
         />
       )}
 

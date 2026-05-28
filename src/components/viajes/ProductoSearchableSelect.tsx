@@ -19,6 +19,7 @@ export type ProductoSearchableSelectProps = {
   triggerClassName: string;
   disabled?: boolean;
   id?: string;
+  onNuevoProducto?: () => void;
 };
 
 const MENU_Z = 300;
@@ -30,6 +31,7 @@ export function ProductoSearchableSelect({
   triggerClassName,
   disabled = false,
   id,
+  onNuevoProducto,
 }: ProductoSearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -167,6 +169,17 @@ export function ProductoSearchableSelect({
             ))
           )}
         </ul>
+        {onNuevoProducto && (
+          <div className="border-t border-black/10 px-2 py-2">
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-1 border border-black/20 bg-vialto-mist/60 px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              onClick={() => { setOpen(false); setSearch(''); setRect(null); onNuevoProducto(); }}
+            >
+              + Nuevo producto
+            </button>
+          </div>
+        )}
       </div>,
       document.body,
     );

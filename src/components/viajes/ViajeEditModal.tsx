@@ -39,7 +39,7 @@ import {
 } from '@/lib/viajesEstados';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
-import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
+import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
@@ -108,6 +108,8 @@ export type ViajeEditModalProps = {
   error: string | null;
   /** Enlace «nuevo vehículo» en flota propia (p. ej. con `?tenantId=` para superadmin). */
   crearVehiculoHref?: string;
+  getToken?: () => Promise<string | null>;
+  onProductoCreado?: (p: Producto) => void;
 };
 
 const labelClass =
@@ -140,6 +142,8 @@ export function ViajeEditModal({
   saving,
   error,
   crearVehiculoHref = '/vehiculos/nuevo',
+  getToken,
+  onProductoCreado,
 }: ViajeEditModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -499,6 +503,8 @@ export function ViajeEditModal({
                 triggerClassName={inputClass}
                 inputClassName={inputClass}
                 disabled={saving}
+                getToken={getToken}
+                onProductoCreado={onProductoCreado}
               />
             </div>
 
