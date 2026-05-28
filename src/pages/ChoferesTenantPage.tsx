@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
 import { apiJson } from '@/lib/api';
-import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
+import { mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer, PaginatedMeta } from '@/types/api';
 
@@ -84,21 +84,20 @@ export function ChoferesTenantPage() {
               <th className="px-4 py-3">DNI</th>
               <th className="px-4 py-3">Licencia</th>
               <th className="px-4 py-3">Teléfono</th>
-              <th className="px-4 py-3">Pertenencia</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   Todavía no tenés choferes cargados.
                 </td>
               </tr>
@@ -109,9 +108,6 @@ export function ChoferesTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">{c.dni ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.licencia ?? '—'}</td>
                 <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">
-                  {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
-                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex gap-2">
                     <button
