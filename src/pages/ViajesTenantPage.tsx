@@ -1575,7 +1575,7 @@ export function ViajesTenantPage({
                                 ? '/facturacion'
                                 : `/facturacion?factura=${v.facturaId}`,
                               platform
-                                ? { state: { ...facturacionNavExtras(), expandFacturaId: v.facturaId } }
+                                ? { state: { ...facturacionNavExtras(), viewFacturaId: v.facturaId } }
                                 : undefined,
                             )
                         : undefined
