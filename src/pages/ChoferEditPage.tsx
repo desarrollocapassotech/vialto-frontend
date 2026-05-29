@@ -82,7 +82,7 @@ export function ChoferEditPage() {
         method: 'PATCH',
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
-      if (!tenantId) void maestro.refreshChoferes();
+      if (!tenantId) await maestro.refreshChoferes();
       navigate('/choferes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
