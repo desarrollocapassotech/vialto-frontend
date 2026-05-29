@@ -319,7 +319,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
               className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-sm font-medium text-vialto-charcoal">
-                {generandoPaut ? 'Generando…' : 'Nómina'}
+                {generandoPaut ? 'Generando…' : 'PAUT'}
               </span>
               {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
             </button>
@@ -330,7 +330,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
             disabled={ocupado || !permiteMicCrt}
             onClick={() => setMicCrtAbierto(true)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!permiteMicCrt ? 'Disponible una vez que el viaje esté finalizado' : undefined}
+            title={!permiteMicCrt ? 'No disponible para viajes cancelados' : undefined}
           >
             <span className="text-sm font-medium text-vialto-charcoal">MIC/CRT</span>
             <span className="text-xs text-vialto-steel">
