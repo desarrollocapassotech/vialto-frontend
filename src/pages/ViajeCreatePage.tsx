@@ -54,6 +54,10 @@ import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
+import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { TransportistaModal } from '@/components/viajes/TransportistaModal';
+import { ChoferModal } from '@/components/viajes/ChoferModal';
+import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -121,10 +125,37 @@ export function ViajeCreatePage() {
     useState<ViajeMonedaCodigo>('ARS');
   const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
   const [pagosTransportista, setPagosTransportista] = useState<PagoTransportistaDraft[]>([]);
-  const clientes = tenantId ? localClientes : maestro.clientes;
-  const choferes = tenantId ? localChoferes : maestro.choferes;
-  const transportistas = tenantId ? localTransportistas : maestro.transportistas;
-  const vehiculos = tenantId ? localVehiculos : maestro.vehiculos;
+
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
+  const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
+  const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
+  const [sessionChoferes, setSessionChoferes] = useState<Chofer[]>([]);
+  const [sessionVehiculos, setSessionVehiculos] = useState<Vehiculo[]>([]);
+
+  const clientes = useMemo(() => {
+    const base = tenantId ? localClientes : maestro.clientes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
+  }, [tenantId, localClientes, maestro.clientes, sessionClientes]);
+
+  const choferes = useMemo(() => {
+    const base = tenantId ? localChoferes : maestro.choferes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionChoferes.filter((c) => !ids.has(c.id))];
+  }, [tenantId, localChoferes, maestro.choferes, sessionChoferes]);
+
+  const transportistas = useMemo(() => {
+    const base = tenantId ? localTransportistas : maestro.transportistas;
+    const ids = new Set(base.map((t) => t.id));
+    return [...base, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
+  }, [tenantId, localTransportistas, maestro.transportistas, sessionTransportistas]);
+
+  const vehiculos = useMemo(() => {
+    const base = tenantId ? localVehiculos : maestro.vehiculos;
+    const ids = new Set(base.map((v) => v.id));
+    return [...base, ...sessionVehiculos.filter((v) => !ids.has(v.id))];
+  }, [tenantId, localVehiculos, maestro.vehiculos, sessionVehiculos]);
 
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
@@ -410,6 +441,7 @@ export function ViajeCreatePage() {
   }
 
   return (
+    <>
     <CrudPageLayout
       title="Crear viaje"
       backTo="/viajes"
@@ -493,6 +525,7 @@ export function ViajeCreatePage() {
                 onChange={setClienteId}
                 inputClassName={inputClass}
                 aria-label="Cliente"
+                onNuevo={() => setQuickCreate('cliente')}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -529,6 +562,7 @@ export function ViajeCreatePage() {
                       onChange={setTransportistaId}
                       inputClassName={inputClass}
                       aria-label="Transportista externo"
+                      onNuevo={() => setQuickCreate('transportista')}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
@@ -560,6 +594,7 @@ export function ViajeCreatePage() {
                       onChange={setChoferExternoId}
                       inputClassName={inputClass}
                       aria-label="Chofer transportista externo"
+                      onNuevo={() => setQuickCreate('chofer-ext')}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
@@ -571,6 +606,7 @@ export function ViajeCreatePage() {
                       sinOpciones={vehiculos.length === 0}
                       inputClassName={inputClass}
                       aria-label="Vehículo transportista externo"
+                      onNuevo={() => setQuickCreate('vehiculo-ext')}
                     />
                   </div>
                 </div>
@@ -586,6 +622,7 @@ export function ViajeCreatePage() {
                     onChange={setChoferId}
                     inputClassName={inputClass}
                     aria-label="Chofer flota propia"
+                    onNuevo={() => setQuickCreate('chofer-prop')}
                   />
                   {ayudaFlota.chofer && (
                     <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
@@ -599,6 +636,9 @@ export function ViajeCreatePage() {
                   vehiculos={vehiculosPropios}
                   onRefreshVehiculos={() => void refreshFlotaVehiculos()}
                   refreshingVehiculos={refreshingFlota}
+                  getToken={getToken}
+                  tenantId={tenantId || undefined}
+                  onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}
                 />
                 {ayudaFlota.vehiculo && (
                   <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
@@ -758,5 +798,59 @@ export function ViajeCreatePage() {
         }}
       />
     </CrudPageLayout>
+
+    {quickCreate === 'cliente' && (
+      <ClienteModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setSessionClientes((prev) => [...prev, c]);
+          setClienteId(c.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'transportista' && (
+      <TransportistaModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(t) => {
+          setSessionTransportistas((prev) => [...prev, t]);
+          setTransportistaId(t.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {(quickCreate === 'chofer-ext' || quickCreate === 'chofer-prop') && (
+      <ChoferModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setSessionChoferes((prev) => [...prev, c]);
+          if (quickCreate === 'chofer-ext') {
+            setChoferExternoId(c.id);
+          } else {
+            setChoferId(c.id);
+          }
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'vehiculo-ext' && (
+      <VehiculoModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(v) => {
+          setSessionVehiculos((prev) => [...prev, v]);
+          setVehiculoExternoId(v.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    </>
   );
 }

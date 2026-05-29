@@ -27,6 +27,10 @@ export type SearchableEntitySelectProps<T extends { id: string }> = {
   searchAriaLabel?: string;
   id?: string;
   'aria-label'?: string;
+  /** Cuando se provee, muestra un botón «+ Nuevo» al pie del panel desplegable. */
+  onNuevo?: () => void;
+  /** Etiqueta del botón de creación rápida (default: «+ Nuevo»). */
+  onNuevoLabel?: string;
 };
 
 export function SearchableEntitySelect<T extends { id: string }>({
@@ -49,6 +53,8 @@ export function SearchableEntitySelect<T extends { id: string }>({
   searchAriaLabel = 'Filtrar lista',
   id: idProp,
   'aria-label': ariaLabel,
+  onNuevo,
+  onNuevoLabel = '+ Nuevo',
 }: SearchableEntitySelectProps<T>) {
   const reactId = useId();
   const listboxId = `${reactId}-listbox`;
@@ -186,7 +192,7 @@ export function SearchableEntitySelect<T extends { id: string }>({
     }
   }
 
-  const canOpenPanel = items.length > 0 || allowEmptyValue;
+  const canOpenPanel = items.length > 0 || allowEmptyValue || !!onNuevo;
   const showPanel = open && menuStyle && canOpenPanel;
 
   function focusOptionIndex(i: number) {
@@ -283,6 +289,18 @@ export function SearchableEntitySelect<T extends { id: string }>({
             })
           )}
         </ul>
+        {onNuevo && (
+          <div className="shrink-0 border-t border-black/10 px-2 py-2">
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-1 border border-black/20 bg-vialto-mist/60 px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setOpen(false); onNuevo(); }}
+            >
+              {onNuevoLabel}
+            </button>
+          </div>
+        )}
       </div>
     ) : null;
 
@@ -300,7 +318,7 @@ export function SearchableEntitySelect<T extends { id: string }>({
     );
   }
 
-  if (items.length === 0 && !allowEmptyValue) {
+  if (items.length === 0 && !allowEmptyValue && !onNuevo) {
     return (
       <div className={className}>
         {noItemsSlot ?? (

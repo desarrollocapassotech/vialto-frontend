@@ -1,4 +1,6 @@
+import { useMemo, useState } from 'react';
 import { VehiculoPatenteSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { VEHICULO_TIPO_VALORES, labelTipoVehiculo, vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Vehiculo } from '@/types/api';
 
@@ -19,6 +21,11 @@ type Props = {
   /** Recargar maestro de vehículos sin refrescar la página (p. ej. tras crear un vehículo en otra pestaña). */
   onRefreshVehiculos?: () => void;
   refreshingVehiculos?: boolean;
+  /** Cuando se provee, habilita la creación rápida de vehículos desde el selector de patente. */
+  getToken?: () => Promise<string | null>;
+  tenantId?: string;
+  /** Callback cuando se crea un vehículo nuevo (para que el padre refresque su maestro). */
+  onVehiculoCreado?: (v: Vehiculo) => void;
 };
 
 export function ViajeVehiculosLista({
@@ -29,7 +36,19 @@ export function ViajeVehiculosLista({
   groupId,
   onRefreshVehiculos,
   refreshingVehiculos,
+  getToken,
+  tenantId,
+  onVehiculoCreado,
 }: Props) {
+  const [showNuevoVehiculo, setShowNuevoVehiculo] = useState(false);
+  const [nuevoParaRowIndex, setNuevoParaRowIndex] = useState<number | null>(null);
+  const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
+
+  const todosLosVehiculos = useMemo(() => {
+    const ids = new Set(vehiculos.map((v) => v.id));
+    return [...vehiculos, ...localVehiculos.filter((v) => !ids.has(v.id))];
+  }, [vehiculos, localVehiculos]);
+
   function setRow(i: number, patch: Partial<ViajeVehiculoRowDraft>) {
     const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r));
     onChange(next);
@@ -45,6 +64,7 @@ export function ViajeVehiculosLista({
   }
 
   return (
+    <>
     <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <span className={LABEL}>Vehículos del viaje (al menos uno)</span>
@@ -70,7 +90,7 @@ export function ViajeVehiculosLista({
       </div>
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
-          const candidatos = vehiculosPorTipo<Vehiculo>(vehiculos, row.tipo);
+          const candidatos = vehiculosPorTipo<Vehiculo>(todosLosVehiculos, row.tipo);
           const idsUsados = new Set(
             rows.map((r, j) => (j !== i && r.vehiculoId ? r.vehiculoId : null)).filter(Boolean) as string[],
           );
@@ -108,8 +128,9 @@ export function ViajeVehiculosLista({
                   sinOpciones={sinOpciones}
                   inputClassName={INPUT}
                   aria-label={`Vehículo ${i + 1}`}
+                  onNuevo={getToken ? () => { setNuevoParaRowIndex(i); setShowNuevoVehiculo(true); } : undefined}
                 />
-                {sinOpciones ? (
+                {sinOpciones && !getToken ? (
                   <p className="text-xs text-amber-800/90">
                     No hay vehículos de tipo «{labelTipoVehiculo(row.tipo)}» en flota propia.{' '}
                     <a
@@ -140,5 +161,22 @@ export function ViajeVehiculosLista({
         })}
       </div>
     </div>
+    {showNuevoVehiculo && getToken && (
+      <VehiculoModal
+        getToken={getToken}
+        tenantId={tenantId}
+        onClose={() => { setShowNuevoVehiculo(false); setNuevoParaRowIndex(null); }}
+        onSaved={(v) => {
+          setLocalVehiculos((prev) => [...prev, v]);
+          onVehiculoCreado?.(v);
+          if (nuevoParaRowIndex !== null) {
+            setRow(nuevoParaRowIndex, { vehiculoId: v.id });
+          }
+          setShowNuevoVehiculo(false);
+          setNuevoParaRowIndex(null);
+        }}
+      />
+    )}
+    </>
   );
 }

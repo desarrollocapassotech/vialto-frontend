@@ -31,6 +31,7 @@ export function ClienteSearchSelect({
   emptyListChoiceLabel = 'Sin selección',
   id,
   'aria-label': ariaLabel,
+  onNuevo,
 }: BaseProps & {
   clientes: Cliente[];
   value: string;
@@ -42,6 +43,7 @@ export function ClienteSearchSelect({
   emptyListChoiceLabel?: string;
   /** Mientras carga el listado de clientes (evita mostrar «sin clientes»). */
   loading?: boolean;
+  onNuevo?: () => void;
 }) {
   return (
     <SearchableEntitySelect<Cliente>
@@ -61,12 +63,16 @@ export function ClienteSearchSelect({
       emptyListChoiceLabel={emptyListChoiceLabel}
       searchAriaLabel="Filtrar clientes"
       noItemsSlot={
-        <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
-          Sin clientes cargados
-        </div>
+        !onNuevo ? (
+          <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
+            Sin clientes cargados
+          </div>
+        ) : undefined
       }
       id={id}
       aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nuevo cliente"
     />
   );
 }
@@ -80,17 +86,19 @@ export function ChoferSearchSelect({
   inputClassName = INPUT,
   id,
   'aria-label': ariaLabel,
+  onNuevo,
 }: BaseProps & {
   choferes: Chofer[];
   value: string;
   onChange: (id: string) => void;
+  onNuevo?: () => void;
 }) {
   return (
     <SearchableEntitySelect<Chofer>
       items={choferes}
       value={value}
       onChange={onChange}
-      disabled={disabled || choferes.length === 0}
+      disabled={disabled || (choferes.length === 0 && !onNuevo)}
       className={className}
       inputClassName={inputClassName}
       filterItems={filtrarChoferes}
@@ -100,12 +108,16 @@ export function ChoferSearchSelect({
       placeholderBuscar="Buscar chofer…"
       searchAriaLabel="Filtrar choferes"
       noItemsSlot={
-        <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
-          Sin choferes de flota propia
-        </div>
+        !onNuevo ? (
+          <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
+            Sin choferes de flota propia
+          </div>
+        ) : undefined
       }
       id={id}
       aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nuevo chofer"
     />
   );
 }
@@ -122,6 +134,7 @@ export function TransportistaSearchSelect({
   emptyListChoiceLabel = 'Elegí un transportista…',
   id,
   'aria-label': ariaLabel,
+  onNuevo,
 }: BaseProps & {
   transportistas: Transportista[];
   value: string;
@@ -129,6 +142,7 @@ export function TransportistaSearchSelect({
   placeholderCerrado?: string;
   placeholderBuscar?: string;
   emptyListChoiceLabel?: string;
+  onNuevo?: () => void;
 }) {
   return (
     <SearchableEntitySelect<Transportista>
@@ -148,6 +162,8 @@ export function TransportistaSearchSelect({
       emptyListChoiceLabel={emptyListChoiceLabel}
       id={id}
       aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nuevo transportista"
     />
   );
 }
@@ -163,6 +179,7 @@ export function VehiculoPatenteSearchSelect({
   placeholderCerrado = 'Elegí patente…',
   id,
   'aria-label': ariaLabel,
+  onNuevo,
 }: BaseProps & {
   vehiculos: Vehiculo[];
   value: string;
@@ -170,8 +187,9 @@ export function VehiculoPatenteSearchSelect({
   /** Sin candidatos para el tipo elegido */
   sinOpciones: boolean;
   placeholderCerrado?: string;
+  onNuevo?: () => void;
 }) {
-  if (sinOpciones) {
+  if (sinOpciones && !onNuevo) {
     return (
       <div className={className}>
         <div
@@ -202,6 +220,8 @@ export function VehiculoPatenteSearchSelect({
       emptyListChoiceLabel="Elegí patente…"
       id={id}
       aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nuevo vehículo"
     />
   );
 }
