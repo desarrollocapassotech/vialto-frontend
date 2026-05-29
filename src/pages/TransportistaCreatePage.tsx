@@ -6,6 +6,7 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import { TransportistaPautHelperNotice } from '@/components/transportistas/TransportistaPautHelperNotice';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -140,6 +141,7 @@ export function TransportistaCreatePage() {
           <span className={labelClass}>Domicilio</span>
           <CrudInput placeholder="Ej: Av. Libertador 1234, Buenos Aires" value={domicilio} onChange={(e) => setDomicilio(e.target.value)} />
         </label>
+        <TransportistaPautHelperNotice />
         <label className="grid gap-1.5">
           <span className={labelClass}>Email</span>
           <CrudInput placeholder="Ej: contacto@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} />
