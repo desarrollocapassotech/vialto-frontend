@@ -27,6 +27,7 @@ import {
   normalizarIdEnLista,
   nombreClienteListadoViaje,
   nombreTransportistaExternoListadoViaje,
+  nombreTransportistaEfectivoListadoViaje,
   numeroFacturaVisibleViaje,
   textoMontoFacturarListado,
   vehiculoIdsDesdeRows,
@@ -749,6 +750,8 @@ export function ViajesTenantPage({
       ),
       otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
       pagosTransportista: (v.pagosTransportista ?? []).map(pagoTransportistaDraftFromApi),
+      realizaFlete: !v.transportistaEfectivoId,
+      transportistaEfectivoId: v.transportistaEfectivoId ?? '',
     });
   }
 
@@ -933,6 +936,8 @@ export function ViajesTenantPage({
               ? { choferId: '', vehiculosRows: [] }
               : {
                   transportistaId: '',
+                  realizaFlete: true,
+                  transportistaEfectivoId: '',
                   choferExternoId: '',
                   vehiculoExternoId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
@@ -1016,11 +1021,15 @@ export function ViajesTenantPage({
           ...(externo
             ? {
                 transportistaId: draft.transportistaId.trim(),
+                transportistaEfectivoId: draft.realizaFlete
+                  ? null
+                  : (draft.transportistaEfectivoId.trim() || null),
                 choferId: draft.choferExternoId.trim() || null,
                 vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
               }
             : {
                 transportistaId: null,
+                transportistaEfectivoId: null,
                 choferId: draft.choferId.trim(),
                 vehiculoIds: vids,
               }),
@@ -1468,6 +1477,7 @@ export function ViajesTenantPage({
             {!mostrarCargandoListado && rows && rows.length > 0 && rows.map((v) => {
               const nombreCliente = nombreClienteListadoViaje(v, clientes);
               const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
+              const nombreTranspEfectivo = nombreTransportistaEfectivoListadoViaje(v, transportistas);
               return (
               <Fragment key={v.id}>
               <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
@@ -1493,6 +1503,14 @@ export function ViajesTenantPage({
                   <span className="block truncate" title={nombreTransp}>
                     {nombreTransp}
                   </span>
+                  {nombreTranspEfectivo && (
+                    <span
+                      className="block truncate text-[11px] text-vialto-steel/70"
+                      title={`Ejecuta: ${nombreTranspEfectivo}`}
+                    >
+                      Ejecuta: {nombreTranspEfectivo}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-0.5 items-start">

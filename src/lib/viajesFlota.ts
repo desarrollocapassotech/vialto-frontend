@@ -230,6 +230,26 @@ export function nombreTransportistaExternoListadoViaje(
 }
 
 /**
+ * Transportista que efectivamente realiza el flete (si difiere del contratante).
+ * Devuelve null si el transportista contratante es el mismo que realiza el flete.
+ */
+export function nombreTransportistaEfectivoListadoViaje(
+  v: Viaje,
+  transportistas?: Transportista[],
+): string | null {
+  const eid = v.transportistaEfectivoId?.trim();
+  if (!eid) return null;
+
+  const desdeApi = v.transportistaEfectivo?.nombre?.trim();
+  if (desdeApi) return desdeApi;
+  if (transportistas?.length) {
+    const t = transportistas.find((x) => x.id === eid);
+    if (t?.nombre?.trim()) return t.nombre.trim();
+  }
+  return null;
+}
+
+/**
  * Devuelve la moneda única si todos los viajes seleccionados comparten la misma,
  * null si hay mezcla, o 'ARS' si no hay viajes seleccionados.
  */

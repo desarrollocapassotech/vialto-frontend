@@ -79,6 +79,8 @@ export type ViajeInlineDraft = {
   pagosTransportista: PagoTransportistaDraft[];
   gananciaBrutaManual: string;
   monedaGananciaBrutaManual: ViajeMonedaCodigo;
+  realizaFlete: boolean;
+  transportistaEfectivoId: string;
 };
 
 export type ViajeEditModalProps = {
@@ -370,7 +372,9 @@ export function ViajeEditModal({
                         transportistas={todosTransportistas}
                         value={draft.transportistaId}
                         onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, transportistaId: id } : p))
+                          setDraft((p) =>
+                            p ? { ...p, transportistaId: id, realizaFlete: true, transportistaEfectivoId: '' } : p,
+                          )
                         }
                         inputClassName={inputClass}
                         aria-label="Transportista externo"
@@ -378,7 +382,7 @@ export function ViajeEditModal({
                       />
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Precio transportista externo</span>
+                      <span className={labelClass}>Precio transporte</span>
                       <div className="flex min-w-0 gap-2">
                         <input
                           type="text"
@@ -405,6 +409,58 @@ export function ViajeEditModal({
                       </div>
                     </div>
                   </div>
+                  {draft.transportistaId && (
+                    <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                      <span className={labelClass}>¿El transportista seleccionado realiza el flete?</span>
+                      <div className="flex gap-5">
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name={`realiza-flete-edit-${draft.numero || 'e'}`}
+                            checked={draft.realizaFlete}
+                            onChange={() =>
+                              setDraft((p) =>
+                                p ? { ...p, realizaFlete: true, transportistaEfectivoId: '' } : p,
+                              )
+                            }
+                            className="accent-vialto-charcoal"
+                          />
+                          Sí
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name={`realiza-flete-edit-${draft.numero || 'e'}`}
+                            checked={!draft.realizaFlete}
+                            onChange={() =>
+                              setDraft((p) => (p ? { ...p, realizaFlete: false } : p))
+                            }
+                            className="accent-vialto-charcoal"
+                          />
+                          No
+                        </label>
+                      </div>
+                      {!draft.realizaFlete && (
+                        <div className="flex min-w-0 flex-col gap-1 mt-1">
+                          <span className={labelClass}>Transportista que realiza el flete</span>
+                          <TransportistaSearchSelect
+                            transportistas={todosTransportistas.filter(
+                              (t) => t.id !== draft.transportistaId,
+                            )}
+                            value={draft.transportistaEfectivoId}
+                            onChange={(id) =>
+                              setDraft((p) =>
+                                p ? { ...p, transportistaEfectivoId: id } : p,
+                              )
+                            }
+                            inputClassName={inputClass}
+                            aria-label="Transportista que realiza el flete"
+                            onNuevo={getToken ? () => setQuickCreate('transportista') : undefined}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Chofer (opcional)</span>

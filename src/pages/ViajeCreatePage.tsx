@@ -95,6 +95,8 @@ export function ViajeCreatePage() {
   const [clienteId, setClienteId] = useState('');
   const [choferId, setChoferId] = useState('');
   const [transportistaId, setTransportistaId] = useState('');
+  const [realizaFlete, setRealizaFlete] = useState(true);
+  const [transportistaEfectivoId, setTransportistaEfectivoId] = useState('');
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [choferExternoId, setChoferExternoId] = useState('');
@@ -274,6 +276,8 @@ export function ViajeCreatePage() {
       setVehiculosRows([]);
     } else {
       setTransportistaId('');
+      setRealizaFlete(true);
+      setTransportistaEfectivoId('');
       setChoferExternoId('');
       setVehiculoExternoId('');
       setChoferId('');
@@ -387,11 +391,13 @@ export function ViajeCreatePage() {
           ...(externo
             ? {
                 transportistaId: transportistaId.trim(),
+                transportistaEfectivoId: realizaFlete ? null : (transportistaEfectivoId.trim() || null),
                 choferId: choferExternoId.trim() || null,
                 vehiculoIds: vehiculoExternoId.trim() ? [vehiculoExternoId.trim()] : [],
               }
             : {
                 transportistaId: null,
+                transportistaEfectivoId: null,
                 choferId,
                 vehiculoIds: vids,
               }),
@@ -559,14 +565,18 @@ export function ViajeCreatePage() {
                     <TransportistaSearchSelect
                       transportistas={transportistas}
                       value={transportistaId}
-                      onChange={setTransportistaId}
+                      onChange={(id) => {
+                        setTransportistaId(id);
+                        setRealizaFlete(true);
+                        setTransportistaEfectivoId('');
+                      }}
                       inputClassName={inputClass}
                       aria-label="Transportista externo"
                       onNuevo={() => setQuickCreate('transportista')}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio transportista externo</span>
+                    <span className={fieldLabelClass}>Precio transporte</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -585,6 +595,49 @@ export function ViajeCreatePage() {
                     </div>
                   </div>
                 </div>
+                {transportistaId && (
+                  <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                    <span className={fieldLabelClass}>¿El transportista seleccionado realiza el flete?</span>
+                    <div className="flex gap-5">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="realiza-flete-create"
+                          checked={realizaFlete}
+                          onChange={() => {
+                            setRealizaFlete(true);
+                            setTransportistaEfectivoId('');
+                          }}
+                          className="accent-vialto-charcoal"
+                        />
+                        Sí
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="realiza-flete-create"
+                          checked={!realizaFlete}
+                          onChange={() => setRealizaFlete(false)}
+                          className="accent-vialto-charcoal"
+                        />
+                        No
+                      </label>
+                    </div>
+                    {!realizaFlete && (
+                      <div className="flex min-w-0 flex-col gap-1 mt-1">
+                        <span className={fieldLabelClass}>Transportista que realiza el flete</span>
+                        <TransportistaSearchSelect
+                          transportistas={transportistas.filter((t) => t.id !== transportistaId)}
+                          value={transportistaEfectivoId}
+                          onChange={setTransportistaEfectivoId}
+                          inputClassName={inputClass}
+                          aria-label="Transportista que realiza el flete"
+                          onNuevo={() => setQuickCreate('transportista')}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Chofer (opcional)</span>
