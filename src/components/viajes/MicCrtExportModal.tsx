@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
-import { normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from '@/types/micCrtDocumento';
+import { micCrtExportBodyForApi, normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from '@/types/micCrtDocumento';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiFetch, apiJson } from '@/lib/api';
@@ -170,7 +170,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       const res = await apiFetch(pdfUrl(), getToken, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(normalized),
+        body: JSON.stringify(micCrtExportBodyForApi(normalized)),
         cache: 'no-store',
       });
       if (!res.ok) {
@@ -290,6 +290,15 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                     <textarea className={`${inputClass} min-h-[60px]`} value={form.descripcionMercaderias ?? ''} disabled={ocupado}
                       onChange={(e) => patch('descripcionMercaderias', e.target.value)} />
                   </Field>
+                  <Field label="Origen comercial">
+                    <input
+                      className={inputClass}
+                      value={form.origenComercial ?? ''}
+                      disabled={ocupado}
+                      placeholder="Ej: Planta Rosario, depósito central..."
+                      onChange={(e) => patch('origenComercial', e.target.value)}
+                    />
+                  </Field>
                 </FormGrid>
               </section>
 
@@ -329,11 +338,50 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
 
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">5 · Anexos y aduanas</h3>
+                <fieldset className="mb-3 border border-black/10 p-3">
+                  <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
+                    Partida (MIC · campo 7)
+                  </legend>
+                  <FormGrid>
+                    <Field label="Ciudad / lugar de partida *">
+                      <input
+                        className={inputClass}
+                        value={form.aduanaPartida}
+                        disabled={ocupado}
+                        placeholder="Ej. Buenos Aires"
+                        onChange={(e) => patch('aduanaPartida', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="País">
+                      <PaisUbicacionSelect
+                        value={(form.partidaPais?.trim() || '') as PaisCodigo | ''}
+                        onChange={(p) => patch('partidaPais', p)}
+                        placeholder="Seleccioná un país"
+                        disabled={ocupado}
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="Aduana específica">
+                      <input
+                        className={inputClass}
+                        value={form.aduanaEspecificaPartida ?? ''}
+                        disabled={ocupado}
+                        placeholder="Ej. AFIP Puerto Seco"
+                        onChange={(e) => patch('aduanaEspecificaPartida', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Código / lugar operativo">
+                      <input
+                        className={inputClass}
+                        value={form.codigoLugarOperativoPartida ?? ''}
+                        disabled={ocupado}
+                        placeholder="Ej. 1234"
+                        onChange={(e) => patch('codigoLugarOperativoPartida', e.target.value)}
+                      />
+                    </Field>
+                  </FormGrid>
+                </fieldset>
                 <FormGrid>
-                  <Field label="Aduana / lugar partida *">
-                    <input className={inputClass} value={form.aduanaPartida} disabled={ocupado}
-                      onChange={(e) => patch('aduanaPartida', e.target.value)} />
-                  </Field>
                   <Field label="Aduana destino *">
                     <input className={inputClass} value={form.aduanaDestino} disabled={ocupado}
                       onChange={(e) => patch('aduanaDestino', e.target.value)} />

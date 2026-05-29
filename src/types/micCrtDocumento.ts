@@ -50,6 +50,7 @@ export function normalizeMicCrtPayload(
   payload: MicCrtExportPayload,
   operativo?: MicCrtPrefillResponse['operativo'],
 ): MicCrtExportPayload {
+  const partidaPaisRaw = payload.partidaPais?.trim() ?? '';
   return {
     ...payload,
     remitente: normalizeMicCrtActor(payload.remitente, operativo?.origen),
@@ -58,6 +59,27 @@ export function normalizeMicCrtPayload(
     porteadorPais: payload.porteadorPais?.trim()
       ? normalizePaisCodigo(payload.porteadorPais)
       : PAIS_DEFAULT,
+    aduanaPartida: payload.aduanaPartida?.trim() ?? '',
+    partidaPais: partidaPaisRaw ? normalizePaisCodigo(partidaPaisRaw) : '',
+    aduanaEspecificaPartida: payload.aduanaEspecificaPartida?.trim() ?? '',
+    codigoLugarOperativoPartida: payload.codigoLugarOperativoPartida?.trim() ?? '',
+    aduanaDestino: payload.aduanaDestino?.trim() ?? '',
+    origenComercial:
+      payload.origenComercial?.trim() ?? operativo?.origen?.trim() ?? '',
+  };
+}
+
+/** Body POST/PDF: siempre incluye los cuatro campos de partida (MIC campo 7), aunque estén vacíos. */
+export function micCrtExportBodyForApi(payload: MicCrtExportPayload): MicCrtExportPayload {
+  const n = normalizeMicCrtPayload(payload);
+  return {
+    ...n,
+    aduanaPartida: n.aduanaPartida ?? '',
+    partidaPais: n.partidaPais ?? '',
+    aduanaEspecificaPartida: n.aduanaEspecificaPartida ?? '',
+    codigoLugarOperativoPartida: n.codigoLugarOperativoPartida ?? '',
+    aduanaDestino: n.aduanaDestino ?? '',
+    origenComercial: n.origenComercial ?? '',
   };
 }
 
@@ -89,8 +111,17 @@ export type MicCrtExportPayload = {
   monedaFlete: 'ARS' | 'USD';
   seguroUsd?: number;
   condicionPago: 'origen' | 'destino';
+  /** Ciudad / lugar de partida (MIC campo 7). */
   aduanaPartida: string;
+  /** País de partida (código ISO, ej. AR). */
+  partidaPais?: string;
+  /** Nombre o código de la aduana de partida. */
+  aduanaEspecificaPartida?: string;
+  /** Código o lugar operativo de partida. */
+  codigoLugarOperativoPartida?: string;
   aduanaDestino: string;
+  /** Origen comercial de la mercadería (MIC campo 26). */
+  origenComercial?: string;
   documentosAnexos?: string;
   precintos?: string;
   cartaPorte?: string;
