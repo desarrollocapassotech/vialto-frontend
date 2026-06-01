@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
 import { micCrtExportBodyForApi, normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from '@/types/micCrtDocumento';
@@ -21,6 +21,80 @@ type MissingGroup = { fields: string[]; entityId?: string };
 const inputClass =
   'w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
 const labelClass = 'text-[10px] uppercase tracking-wide text-vialto-steel';
+
+/** Solo dígitos y un separador decimal (`.` o `,`), máx. 2 decimales. */
+function sanitizeMicCrtMontoInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, '');
+  const sepIdx = cleaned.search(/[.,]/);
+  if (sepIdx === -1) return cleaned;
+  const intPart = cleaned.slice(0, sepIdx).replace(/[.,]/g, '');
+  const sep = cleaned[sepIdx] ?? '.';
+  const decPart = cleaned.slice(sepIdx + 1).replace(/[.,]/g, '').slice(0, 2);
+  return `${intPart}${sep}${decPart}`;
+}
+
+function parseMicCrtMontoInput(raw: string): number | undefined {
+  const s = sanitizeMicCrtMontoInput(raw).trim();
+  if (!s || s === '.' || s === ',') return undefined;
+  if (/[.,]$/.test(s)) return undefined;
+  const n = Number(s.replace(',', '.'));
+  return Number.isFinite(n) ? Math.max(0, n) : undefined;
+}
+
+function micCrtMontoInputText(value: number | undefined): string {
+  return value != null && !Number.isNaN(value) ? String(value) : '';
+}
+
+function MicCrtMontoInput({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const externalRef = useRef(value);
+  const [text, setText] = useState(() => micCrtMontoInputText(value));
+
+  useEffect(() => {
+    if (externalRef.current !== value) {
+      externalRef.current = value;
+      setText(micCrtMontoInputText(value));
+    }
+  }, [value]);
+
+  function applyInput(next: string) {
+    setText(next);
+    const parsed = parseMicCrtMontoInput(next);
+    externalRef.current = parsed;
+    onChange(parsed);
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      className={`${inputClass} tabular-nums`}
+      value={text}
+      disabled={disabled}
+      placeholder={placeholder}
+      onKeyDown={(e) => {
+        if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) e.preventDefault();
+        if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-') e.preventDefault();
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const pasted = sanitizeMicCrtMontoInput(e.clipboardData.getData('text'));
+        applyInput(sanitizeMicCrtMontoInput(text + pasted));
+      }}
+      onChange={(e) => applyInput(sanitizeMicCrtMontoInput(e.target.value))}
+    />
+  );
+}
 
 function FormGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-2 sm:grid-cols-2">{children}</div>;
@@ -340,7 +414,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">5 · Anexos y aduanas</h3>
                 <fieldset className="mb-3 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
-                    Partida (MIC · campo 7)
+                    Partida 
                   </legend>
                   <FormGrid>
                     <Field label="Ciudad / lugar de partida *">
@@ -415,6 +489,77 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                     />
                   </Field>
                 </FormGrid>
+
+                <fieldset className="mt-3 border border-black/10 p-3">
+                  <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
+                    CRT · 2.ª hoja
+                  </legend>
+                  <div className="grid gap-3">
+                    <Field label="Porteadores sucesivos (campo 10)">
+                      <textarea
+                        className={`${inputClass} min-h-[72px]`}
+                        value={form.porteadoresSucesivos ?? ''}
+                        disabled={ocupado}
+                        placeholder="Ej: Transportes XYZ S.A. — CUIT 30-12345678-9, domicilio..."
+                        onChange={(e) => patch('porteadoresSucesivos', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Instrucciones sobre formalidades de aduana (campo 18)">
+                      <textarea
+                        className={`${inputClass} min-h-[56px]`}
+                        value={form.instruccionesFormalidadesAduana ?? ''}
+                        disabled={ocupado}
+                        placeholder="Ej: N, S, o detalle de formalidades aduaneras..."
+                        onChange={(e) => patch('instruccionesFormalidadesAduana', e.target.value)}
+                      />
+                    </Field>
+                    <FormGrid>
+                      <Field label="Monto flete externo">
+                        <MicCrtMontoInput
+                          value={form.montoFleteExterno}
+                          disabled={ocupado}
+                          placeholder="Ej. mismo valor que flete internacional"
+                          onChange={(v) => patch('montoFleteExterno', v)}
+                        />
+                      </Field>
+                      <Field label="Moneda flete externo">
+                        <MonedaSelect
+                          value={(form.monedaFleteExterno ?? form.monedaFlete) as ViajeMonedaCodigo}
+                          onChange={(m) => patch('monedaFleteExterno', m)}
+                          disabled={ocupado}
+                        />
+                      </Field>
+                    </FormGrid>
+                    <FormGrid>
+                      <Field label="Reembolso contra entrega">
+                        <MicCrtMontoInput
+                          value={form.montoReembolsoContraEntrega}
+                          disabled={ocupado}
+                          placeholder="Ej. 0 si no aplica"
+                          onChange={(v) => patch('montoReembolsoContraEntrega', v)}
+                        />
+                      </Field>
+                      <Field label="Moneda reembolso">
+                        <MonedaSelect
+                          value={
+                            (form.monedaReembolsoContraEntrega ?? form.monedaFot) as ViajeMonedaCodigo
+                          }
+                          onChange={(m) => patch('monedaReembolsoContraEntrega', m)}
+                          disabled={ocupado}
+                        />
+                      </Field>
+                    </FormGrid>
+                    <Field label="Declaraciones y observaciones">
+                      <textarea
+                        className={`${inputClass} min-h-[72px]`}
+                        value={form.declaracionesObservaciones ?? ''}
+                        disabled={ocupado}
+                        placeholder="Ej. declaraciones del remitente, observaciones del viaje..."
+                        onChange={(e) => patch('declaracionesObservaciones', e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                </fieldset>
 
                 <fieldset className="mt-3 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">Semirremolque (opcional)</legend>

@@ -66,6 +66,27 @@ export function normalizeMicCrtPayload(
     aduanaDestino: payload.aduanaDestino?.trim() ?? '',
     origenComercial:
       payload.origenComercial?.trim() ?? operativo?.origen?.trim() ?? '',
+    porteadoresSucesivos: payload.porteadoresSucesivos?.trim() ?? '',
+    instruccionesFormalidadesAduana: payload.instruccionesFormalidadesAduana?.trim() ?? '',
+    montoFleteExterno:
+      typeof payload.montoFleteExterno === 'number' && !Number.isNaN(payload.montoFleteExterno)
+        ? Math.max(0, payload.montoFleteExterno)
+        : undefined,
+    monedaFleteExterno:
+      payload.monedaFleteExterno === 'USD' || payload.monedaFleteExterno === 'ARS'
+        ? payload.monedaFleteExterno
+        : undefined,
+    montoReembolsoContraEntrega:
+      typeof payload.montoReembolsoContraEntrega === 'number' &&
+      !Number.isNaN(payload.montoReembolsoContraEntrega)
+        ? Math.max(0, payload.montoReembolsoContraEntrega)
+        : undefined,
+    monedaReembolsoContraEntrega:
+      payload.monedaReembolsoContraEntrega === 'USD' ||
+      payload.monedaReembolsoContraEntrega === 'ARS'
+        ? payload.monedaReembolsoContraEntrega
+        : undefined,
+    declaracionesObservaciones: payload.declaracionesObservaciones?.trim() ?? '',
   };
 }
 
@@ -80,6 +101,13 @@ export function micCrtExportBodyForApi(payload: MicCrtExportPayload): MicCrtExpo
     codigoLugarOperativoPartida: n.codigoLugarOperativoPartida ?? '',
     aduanaDestino: n.aduanaDestino ?? '',
     origenComercial: n.origenComercial ?? '',
+    porteadoresSucesivos: n.porteadoresSucesivos ?? '',
+    instruccionesFormalidadesAduana: n.instruccionesFormalidadesAduana ?? '',
+    montoFleteExterno: n.montoFleteExterno,
+    monedaFleteExterno: n.monedaFleteExterno,
+    montoReembolsoContraEntrega: n.montoReembolsoContraEntrega,
+    monedaReembolsoContraEntrega: n.monedaReembolsoContraEntrega,
+    declaracionesObservaciones: n.declaracionesObservaciones ?? '',
   };
 }
 
@@ -122,6 +150,20 @@ export type MicCrtExportPayload = {
   aduanaDestino: string;
   /** Origen comercial de la mercadería (MIC campo 26). */
   origenComercial?: string;
+  /** Porteadores sucesivos (CRT campo 10, 2.ª hoja). */
+  porteadoresSucesivos?: string;
+  /** Instrucciones formalidades aduana (CRT campo 18, 2.ª hoja; ej. N / S). */
+  instruccionesFormalidadesAduana?: string;
+  /** Monto flete externo (CRT campo 19, 2.ª hoja). */
+  montoFleteExterno?: number;
+  /** Moneda del flete externo (campo 19). */
+  monedaFleteExterno?: 'ARS' | 'USD';
+  /** Reembolso contra entrega (CRT campo 20, 2.ª hoja). */
+  montoReembolsoContraEntrega?: number;
+  /** Moneda del reembolso contra entrega (campo 20). */
+  monedaReembolsoContraEntrega?: 'ARS' | 'USD';
+  /** Declaraciones y observaciones (CRT campo 22, 2.ª hoja). */
+  declaracionesObservaciones?: string;
   documentosAnexos?: string;
   precintos?: string;
   cartaPorte?: string;
