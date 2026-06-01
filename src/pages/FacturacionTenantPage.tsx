@@ -74,6 +74,7 @@ type FacturaNuevaNavState = {
   tenantId?: string;
   newFacturaDraft?: { clienteId: string; viajeIds: string[] };
   expandFacturaId?: string;
+  viewFacturaId?: string;
 };
 
 // ─── componente principal ─────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ export function FacturacionTenantPage({
 
   const fetchRef = useRef(0);
   const expandFacturaHandledRef = useRef(false);
+  const viewFacturaHandledRef = useRef(false);
 
   const viajesNuevaFactura = useMemo(
     () =>
@@ -367,6 +369,17 @@ export function FacturacionTenantPage({
     window.history.replaceState({}, '');
     startEdit(f);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facturas]);
+
+
+  useEffect(() => {
+    const viewId = (location.state as FacturaNuevaNavState | null)?.viewFacturaId?.trim();
+    if (!viewId || facturas === null || viewFacturaHandledRef.current) return;
+    const f = facturas.find((x) => x.id === viewId);
+    if (!f) return;
+    viewFacturaHandledRef.current = true;
+    window.history.replaceState({}, '');
+    setViewingFactura(f);
   }, [facturas]);
 
   // ── refetch ────────────────────────────────────────────────────────────────

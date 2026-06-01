@@ -28,6 +28,8 @@ export interface Viaje {
   cliente?: { id: string; nombre: string };
   transportistaId: string | null;
   transportista?: { id: string; nombre: string } | null;
+  transportistaEfectivoId?: string | null;
+  transportistaEfectivo?: { id: string; nombre: string } | null;
   choferId: string | null;
   /** Vehículos asociados al viaje (orden = orden operativo). */
   vehiculosViaje?: Array<{

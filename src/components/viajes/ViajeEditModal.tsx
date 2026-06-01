@@ -1,10 +1,14 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
   VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
+import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { TransportistaModal } from '@/components/viajes/TransportistaModal';
+import { ChoferModal } from '@/components/viajes/ChoferModal';
+import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -75,6 +79,8 @@ export type ViajeInlineDraft = {
   pagosTransportista: PagoTransportistaDraft[];
   gananciaBrutaManual: string;
   monedaGananciaBrutaManual: ViajeMonedaCodigo;
+  realizaFlete: boolean;
+  transportistaEfectivoId: string;
 };
 
 export type ViajeEditModalProps = {
@@ -109,7 +115,12 @@ export type ViajeEditModalProps = {
   /** Enlace «nuevo vehículo» en flota propia (p. ej. con `?tenantId=` para superadmin). */
   crearVehiculoHref?: string;
   getToken?: () => Promise<string | null>;
+  tenantId?: string;
   onProductoCreado?: (p: Producto) => void;
+  onClienteCreado?: (c: Cliente) => void;
+  onTransportistaCreado?: (t: Transportista) => void;
+  onChoferCreado?: (c: Chofer) => void;
+  onVehiculoCreado?: (v: Vehiculo) => void;
 };
 
 const labelClass =
@@ -143,8 +154,40 @@ export function ViajeEditModal({
   error,
   crearVehiculoHref = '/vehiculos/nuevo',
   getToken,
+  tenantId,
   onProductoCreado,
+  onClienteCreado,
+  onTransportistaCreado,
+  onChoferCreado,
+  onVehiculoCreado,
 }: ViajeEditModalProps) {
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
+  const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
+  const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
+  const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
+  const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
+
+  const todosClientes = useMemo(() => {
+    const ids = new Set(clientes.map((c) => c.id));
+    return [...clientes, ...localClientes.filter((c) => !ids.has(c.id))];
+  }, [clientes, localClientes]);
+
+  const todosTransportistas = useMemo(() => {
+    const ids = new Set(transportistas.map((t) => t.id));
+    return [...transportistas, ...localTransportistas.filter((t) => !ids.has(t.id))];
+  }, [transportistas, localTransportistas]);
+
+  const todosChoferes = useMemo(() => {
+    const ids = new Set(choferes.map((c) => c.id));
+    return [...choferes, ...localChoferes.filter((c) => !ids.has(c.id))];
+  }, [choferes, localChoferes]);
+
+  const todosVehiculos = useMemo(() => {
+    const ids = new Set(vehiculos.map((v) => v.id));
+    return [...vehiculos, ...localVehiculos.filter((v) => !ids.has(v.id))];
+  }, [vehiculos, localVehiculos]);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -168,6 +211,7 @@ export function ViajeEditModal({
   });
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
       role="presentation"
@@ -282,11 +326,12 @@ export function ViajeEditModal({
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Cliente</span>
               <ClienteSearchSelect
-                clientes={clientes}
+                clientes={todosClientes}
                 value={draft.clienteId}
                 onChange={(id) => setDraft((p) => (p ? { ...p, clienteId: id } : p))}
                 inputClassName={inputClass}
                 aria-label="Cliente"
+                onNuevo={getToken ? () => setQuickCreate('cliente') : undefined}
               />
             </div>
 
@@ -324,17 +369,20 @@ export function ViajeEditModal({
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Transportista externo</span>
                       <TransportistaSearchSelect
-                        transportistas={transportistas}
+                        transportistas={todosTransportistas}
                         value={draft.transportistaId}
                         onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, transportistaId: id } : p))
+                          setDraft((p) =>
+                            p ? { ...p, transportistaId: id, realizaFlete: true, transportistaEfectivoId: '' } : p,
+                          )
                         }
                         inputClassName={inputClass}
                         aria-label="Transportista externo"
+                        onNuevo={getToken ? () => setQuickCreate('transportista') : undefined}
                       />
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Precio transportista externo</span>
+                      <span className={labelClass}>Precio transporte</span>
                       <div className="flex min-w-0 gap-2">
                         <input
                           type="text"
@@ -361,30 +409,84 @@ export function ViajeEditModal({
                       </div>
                     </div>
                   </div>
+                  {draft.transportistaId && (
+                    <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                      <span className={labelClass}>¿El transportista seleccionado realiza el flete?</span>
+                      <div className="flex gap-5">
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name={`realiza-flete-edit-${draft.numero || 'e'}`}
+                            checked={draft.realizaFlete}
+                            onChange={() =>
+                              setDraft((p) =>
+                                p ? { ...p, realizaFlete: true, transportistaEfectivoId: '' } : p,
+                              )
+                            }
+                            className="accent-vialto-charcoal"
+                          />
+                          Sí
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name={`realiza-flete-edit-${draft.numero || 'e'}`}
+                            checked={!draft.realizaFlete}
+                            onChange={() =>
+                              setDraft((p) => (p ? { ...p, realizaFlete: false } : p))
+                            }
+                            className="accent-vialto-charcoal"
+                          />
+                          No
+                        </label>
+                      </div>
+                      {!draft.realizaFlete && (
+                        <div className="flex min-w-0 flex-col gap-1 mt-1">
+                          <span className={labelClass}>Transportista que realiza el flete</span>
+                          <TransportistaSearchSelect
+                            transportistas={todosTransportistas.filter(
+                              (t) => t.id !== draft.transportistaId,
+                            )}
+                            value={draft.transportistaEfectivoId}
+                            onChange={(id) =>
+                              setDraft((p) =>
+                                p ? { ...p, transportistaEfectivoId: id } : p,
+                              )
+                            }
+                            inputClassName={inputClass}
+                            aria-label="Transportista que realiza el flete"
+                            onNuevo={getToken ? () => setQuickCreate('transportista') : undefined}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Chofer (opcional)</span>
                       <ChoferSearchSelect
-                        choferes={choferes}
+                        choferes={todosChoferes}
                         value={draft.choferExternoId}
                         onChange={(id) =>
                           setDraft((p) => (p ? { ...p, choferExternoId: id } : p))
                         }
                         inputClassName={inputClass}
                         aria-label="Chofer transportista externo"
+                        onNuevo={getToken ? () => setQuickCreate('chofer-ext') : undefined}
                       />
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Vehículo (opcional)</span>
                       <VehiculoPatenteSearchSelect
-                        vehiculos={vehiculos}
+                        vehiculos={todosVehiculos}
                         value={draft.vehiculoExternoId}
                         onChange={(id) =>
                           setDraft((p) => (p ? { ...p, vehiculoExternoId: id } : p))
                         }
-                        sinOpciones={vehiculos.length === 0}
+                        sinOpciones={todosVehiculos.length === 0}
                         inputClassName={inputClass}
                         aria-label="Vehículo transportista externo"
+                        onNuevo={getToken ? () => setQuickCreate('vehiculo-ext') : undefined}
                       />
                     </div>
                   </div>
@@ -400,6 +502,7 @@ export function ViajeEditModal({
                       onChange={(id) => setDraft((p) => (p ? { ...p, choferId: id } : p))}
                       inputClassName={inputClass}
                       aria-label="Chofer flota propia"
+                      onNuevo={getToken ? () => setQuickCreate('chofer-prop') : undefined}
                     />
                     {ayudaFlota.chofer && (
                       <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
@@ -411,6 +514,9 @@ export function ViajeEditModal({
                     rows={draft.vehiculosRows}
                     onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
                     vehiculos={vehiculosPropios}
+                    getToken={getToken}
+                    tenantId={tenantId}
+                    onVehiculoCreado={onVehiculoCreado}
                   />
                   {ayudaFlota.vehiculo && (
                     <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
@@ -613,5 +719,63 @@ export function ViajeEditModal({
         </footer>
       </div>
     </div>
+
+    {quickCreate === 'cliente' && getToken && (
+      <ClienteModal
+        getToken={getToken}
+        tenantId={tenantId}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setLocalClientes((prev) => [...prev, c]);
+          onClienteCreado?.(c);
+          setDraft((p) => (p ? { ...p, clienteId: c.id } : p));
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'transportista' && getToken && (
+      <TransportistaModal
+        getToken={getToken}
+        tenantId={tenantId}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(t) => {
+          setLocalTransportistas((prev) => [...prev, t]);
+          onTransportistaCreado?.(t);
+          setDraft((p) => (p ? { ...p, transportistaId: t.id } : p));
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {(quickCreate === 'chofer-ext' || quickCreate === 'chofer-prop') && getToken && (
+      <ChoferModal
+        getToken={getToken}
+        tenantId={tenantId}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setLocalChoferes((prev) => [...prev, c]);
+          onChoferCreado?.(c);
+          if (quickCreate === 'chofer-ext') {
+            setDraft((p) => (p ? { ...p, choferExternoId: c.id } : p));
+          } else {
+            setDraft((p) => (p ? { ...p, choferId: c.id } : p));
+          }
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'vehiculo-ext' && getToken && (
+      <VehiculoModal
+        getToken={getToken}
+        tenantId={tenantId}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(v) => {
+          setLocalVehiculos((prev) => [...prev, v]);
+          onVehiculoCreado?.(v);
+          setDraft((p) => (p ? { ...p, vehiculoExternoId: v.id } : p));
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    </>
   );
 }

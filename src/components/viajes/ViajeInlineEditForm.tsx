@@ -159,7 +159,7 @@ export function ViajeInlineEditForm({
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Precio transportista externo</span>
+                    <span className={LABEL}>Precio transporte</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"

@@ -58,6 +58,17 @@ const EDITABLE_GROUPS: Record<string, { fields: Record<string, FieldDef>; apiMod
   'Semirremolque': { fields: VEHICULO_FIELDS,       apiModule: 'vehiculos'      },
 };
 
+function entityNameFromViaje(viaje: Viaje, group: string, entityId: string): string | null {
+  if (group === 'Transportista' && viaje.transportista?.id === entityId) {
+    return viaje.transportista.nombre.trim() || null;
+  }
+  const vehiculo = viaje.vehiculosViaje?.find((vv) => vv.vehiculoId === entityId)?.vehiculo;
+  if ((group === 'Camión' || group === 'Semirremolque') && vehiculo?.patente) {
+    return vehiculo.patente.trim();
+  }
+  return null;
+}
+
 function fmtFecha(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -96,6 +107,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [choferesList, setChoferesList] = useState<Chofer[]>([]);
   const [vehiculosList, setVehiculosList] = useState<Vehiculo[]>([]);
+  const [entityNames, setEntityNames] = useState<Record<string, string>>({});
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
   /** PAUT solo aplica a viajes con transportista externo (no flota propia). */
@@ -112,6 +124,58 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
       void apiJson<Vehiculo[]>(maestroListUrl('vehiculos'), getToken).then(setVehiculosList).catch(() => {});
     }
   }, [error, tid]);
+
+  useEffect(() => {
+    if (!error?.groups) {
+      setEntityNames({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const names: Record<string, string> = {};
+      for (const [group, entry] of Object.entries(error.groups!)) {
+        if (!entry.entityId) continue;
+        const entityId = entry.entityId;
+        if (names[entityId]) continue;
+
+        const fromViaje = entityNameFromViaje(viaje, group, entityId);
+        if (fromViaje) {
+          names[entityId] = fromViaje;
+          continue;
+        }
+
+        const chofer = choferesList.find((c) => c.id === entityId);
+        if (chofer?.nombre?.trim()) {
+          names[entityId] = chofer.nombre.trim();
+          continue;
+        }
+
+        const vehiculo = vehiculosList.find((v) => v.id === entityId);
+        if (vehiculo?.patente?.trim()) {
+          names[entityId] = vehiculo.patente.trim();
+          continue;
+        }
+
+        const config = EDITABLE_GROUPS[group];
+        if (!config || group === 'Viaje') continue;
+
+        try {
+          const row = await apiJson<{ nombre?: string; patente?: string }>(
+            patchEntityUrl(config.apiModule, entityId),
+            getToken,
+          );
+          const label = row.nombre?.trim() || row.patente?.trim();
+          if (label) names[entityId] = label;
+        } catch {
+          /* silencioso — se muestra solo el nombre del grupo */
+        }
+      }
+      if (!cancelled) setEntityNames(names);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [error?.groups, viaje, choferesList, vehiculosList, tid]);
 
   async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
     try {
@@ -319,7 +383,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
               className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-sm font-medium text-vialto-charcoal">
-                {generandoPaut ? 'Generando…' : 'Nómina'}
+                {generandoPaut ? 'Generando…' : 'PAUT'}
               </span>
               {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
             </button>
@@ -330,7 +394,7 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
             disabled={ocupado || !permiteMicCrt}
             onClick={() => setMicCrtAbierto(true)}
             className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!permiteMicCrt ? 'Disponible una vez que el viaje esté finalizado' : undefined}
+            title={!permiteMicCrt ? 'No disponible para viajes cancelados' : undefined}
           >
             <span className="text-sm font-medium text-vialto-charcoal">MIC/CRT</span>
             <span className="text-xs text-vialto-steel">
@@ -347,11 +411,17 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
               <div className="mt-3 space-y-3">
                 {Object.entries(error.groups).map(([group, entry]) => {
                   const config = EDITABLE_GROUPS[group];
+                  const entityLabel = entry.entityId ? entityNames[entry.entityId] : undefined;
                   return (
                     <div key={group}>
                       <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-red-600">
                         {group}
                       </p>
+                      {entityLabel && (
+                        <p className="mb-2 text-xs font-medium text-red-900">
+                          Completar datos faltantes para: {entityLabel}
+                        </p>
+                      )}
                       {config && entry.entityId ? (
                         <div className="space-y-1.5">
                           {entry.fields.map((label) => {

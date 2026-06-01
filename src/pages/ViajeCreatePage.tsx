@@ -54,6 +54,10 @@ import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
+import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { TransportistaModal } from '@/components/viajes/TransportistaModal';
+import { ChoferModal } from '@/components/viajes/ChoferModal';
+import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -91,6 +95,8 @@ export function ViajeCreatePage() {
   const [clienteId, setClienteId] = useState('');
   const [choferId, setChoferId] = useState('');
   const [transportistaId, setTransportistaId] = useState('');
+  const [realizaFlete, setRealizaFlete] = useState(true);
+  const [transportistaEfectivoId, setTransportistaEfectivoId] = useState('');
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [choferExternoId, setChoferExternoId] = useState('');
@@ -121,10 +127,37 @@ export function ViajeCreatePage() {
     useState<ViajeMonedaCodigo>('ARS');
   const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
   const [pagosTransportista, setPagosTransportista] = useState<PagoTransportistaDraft[]>([]);
-  const clientes = tenantId ? localClientes : maestro.clientes;
-  const choferes = tenantId ? localChoferes : maestro.choferes;
-  const transportistas = tenantId ? localTransportistas : maestro.transportistas;
-  const vehiculos = tenantId ? localVehiculos : maestro.vehiculos;
+
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
+  const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
+  const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
+  const [sessionChoferes, setSessionChoferes] = useState<Chofer[]>([]);
+  const [sessionVehiculos, setSessionVehiculos] = useState<Vehiculo[]>([]);
+
+  const clientes = useMemo(() => {
+    const base = tenantId ? localClientes : maestro.clientes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
+  }, [tenantId, localClientes, maestro.clientes, sessionClientes]);
+
+  const choferes = useMemo(() => {
+    const base = tenantId ? localChoferes : maestro.choferes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionChoferes.filter((c) => !ids.has(c.id))];
+  }, [tenantId, localChoferes, maestro.choferes, sessionChoferes]);
+
+  const transportistas = useMemo(() => {
+    const base = tenantId ? localTransportistas : maestro.transportistas;
+    const ids = new Set(base.map((t) => t.id));
+    return [...base, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
+  }, [tenantId, localTransportistas, maestro.transportistas, sessionTransportistas]);
+
+  const vehiculos = useMemo(() => {
+    const base = tenantId ? localVehiculos : maestro.vehiculos;
+    const ids = new Set(base.map((v) => v.id));
+    return [...base, ...sessionVehiculos.filter((v) => !ids.has(v.id))];
+  }, [tenantId, localVehiculos, maestro.vehiculos, sessionVehiculos]);
 
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
@@ -243,6 +276,8 @@ export function ViajeCreatePage() {
       setVehiculosRows([]);
     } else {
       setTransportistaId('');
+      setRealizaFlete(true);
+      setTransportistaEfectivoId('');
       setChoferExternoId('');
       setVehiculoExternoId('');
       setChoferId('');
@@ -356,11 +391,13 @@ export function ViajeCreatePage() {
           ...(externo
             ? {
                 transportistaId: transportistaId.trim(),
+                transportistaEfectivoId: realizaFlete ? null : (transportistaEfectivoId.trim() || null),
                 choferId: choferExternoId.trim() || null,
                 vehiculoIds: vehiculoExternoId.trim() ? [vehiculoExternoId.trim()] : [],
               }
             : {
                 transportistaId: null,
+                transportistaEfectivoId: null,
                 choferId,
                 vehiculoIds: vids,
               }),
@@ -410,6 +447,7 @@ export function ViajeCreatePage() {
   }
 
   return (
+    <>
     <CrudPageLayout
       title="Crear viaje"
       backTo="/viajes"
@@ -493,6 +531,7 @@ export function ViajeCreatePage() {
                 onChange={setClienteId}
                 inputClassName={inputClass}
                 aria-label="Cliente"
+                onNuevo={() => setQuickCreate('cliente')}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -526,13 +565,18 @@ export function ViajeCreatePage() {
                     <TransportistaSearchSelect
                       transportistas={transportistas}
                       value={transportistaId}
-                      onChange={setTransportistaId}
+                      onChange={(id) => {
+                        setTransportistaId(id);
+                        setRealizaFlete(true);
+                        setTransportistaEfectivoId('');
+                      }}
                       inputClassName={inputClass}
                       aria-label="Transportista externo"
+                      onNuevo={() => setQuickCreate('transportista')}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio transportista externo</span>
+                    <span className={fieldLabelClass}>Precio transporte</span>
                     <div className="flex min-w-0 gap-2">
                       <input
                         type="text"
@@ -551,6 +595,49 @@ export function ViajeCreatePage() {
                     </div>
                   </div>
                 </div>
+                {transportistaId && (
+                  <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
+                    <span className={fieldLabelClass}>¿El transportista seleccionado realiza el flete?</span>
+                    <div className="flex gap-5">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="realiza-flete-create"
+                          checked={realizaFlete}
+                          onChange={() => {
+                            setRealizaFlete(true);
+                            setTransportistaEfectivoId('');
+                          }}
+                          className="accent-vialto-charcoal"
+                        />
+                        Sí
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="realiza-flete-create"
+                          checked={!realizaFlete}
+                          onChange={() => setRealizaFlete(false)}
+                          className="accent-vialto-charcoal"
+                        />
+                        No
+                      </label>
+                    </div>
+                    {!realizaFlete && (
+                      <div className="flex min-w-0 flex-col gap-1 mt-1">
+                        <span className={fieldLabelClass}>Transportista que realiza el flete</span>
+                        <TransportistaSearchSelect
+                          transportistas={transportistas.filter((t) => t.id !== transportistaId)}
+                          value={transportistaEfectivoId}
+                          onChange={setTransportistaEfectivoId}
+                          inputClassName={inputClass}
+                          aria-label="Transportista que realiza el flete"
+                          onNuevo={() => setQuickCreate('transportista')}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Chofer (opcional)</span>
@@ -560,6 +647,7 @@ export function ViajeCreatePage() {
                       onChange={setChoferExternoId}
                       inputClassName={inputClass}
                       aria-label="Chofer transportista externo"
+                      onNuevo={() => setQuickCreate('chofer-ext')}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
@@ -571,6 +659,7 @@ export function ViajeCreatePage() {
                       sinOpciones={vehiculos.length === 0}
                       inputClassName={inputClass}
                       aria-label="Vehículo transportista externo"
+                      onNuevo={() => setQuickCreate('vehiculo-ext')}
                     />
                   </div>
                 </div>
@@ -586,6 +675,7 @@ export function ViajeCreatePage() {
                     onChange={setChoferId}
                     inputClassName={inputClass}
                     aria-label="Chofer flota propia"
+                    onNuevo={() => setQuickCreate('chofer-prop')}
                   />
                   {ayudaFlota.chofer && (
                     <p className="text-xs text-amber-800/90">{ayudaFlota.chofer}</p>
@@ -599,6 +689,9 @@ export function ViajeCreatePage() {
                   vehiculos={vehiculosPropios}
                   onRefreshVehiculos={() => void refreshFlotaVehiculos()}
                   refreshingVehiculos={refreshingFlota}
+                  getToken={getToken}
+                  tenantId={tenantId || undefined}
+                  onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}
                 />
                 {ayudaFlota.vehiculo && (
                   <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
@@ -758,5 +851,59 @@ export function ViajeCreatePage() {
         }}
       />
     </CrudPageLayout>
+
+    {quickCreate === 'cliente' && (
+      <ClienteModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setSessionClientes((prev) => [...prev, c]);
+          setClienteId(c.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'transportista' && (
+      <TransportistaModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(t) => {
+          setSessionTransportistas((prev) => [...prev, t]);
+          setTransportistaId(t.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {(quickCreate === 'chofer-ext' || quickCreate === 'chofer-prop') && (
+      <ChoferModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(c) => {
+          setSessionChoferes((prev) => [...prev, c]);
+          if (quickCreate === 'chofer-ext') {
+            setChoferExternoId(c.id);
+          } else {
+            setChoferId(c.id);
+          }
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    {quickCreate === 'vehiculo-ext' && (
+      <VehiculoModal
+        getToken={getToken}
+        tenantId={tenantId || undefined}
+        onClose={() => setQuickCreate(null)}
+        onSaved={(v) => {
+          setSessionVehiculos((prev) => [...prev, v]);
+          setVehiculoExternoId(v.id);
+          setQuickCreate(null);
+        }}
+      />
+    )}
+    </>
   );
 }
