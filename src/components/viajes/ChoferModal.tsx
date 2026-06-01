@@ -3,17 +3,20 @@ import { ApiError, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { choferWritePayloadFromForm, validarDniForm, type ChoferFormState } from '@/lib/choferForm';
 import type { Chofer } from '@/types/api';
+import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 
 export function ChoferModal({
   getToken,
   onClose,
   onSaved,
   tenantId,
+  stacked,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (chofer: Chofer) => void;
   tenantId?: string;
+  stacked?: boolean;
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
   const [form, setForm] = useState<ChoferFormState>({ nombre: '', dni: '', cuit: '', telefono: '' });
@@ -52,7 +55,7 @@ export function ChoferModal({
   const I = 'h-9 w-full border border-black/15 px-2 text-sm';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className={modalQuickCreateOverlayClass(stacked)}>
       <div
         role="dialog"
         aria-modal="true"
