@@ -431,6 +431,8 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
 function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
   const fmt = (v: unknown) => v != null ? String(v) : null;
   const money = (v: number | null) => v != null ? `$${v.toLocaleString('es-AR')}` : null;
+  const hasChofer = viajes.some((v) => v.chofer);
+  const hasVehiculo = viajes.some((v) => v.vehiculo);
   return (
     <div className="overflow-x-auto rounded border border-black/10">
       <table className="w-full text-xs">
@@ -441,6 +443,8 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
             <th className="px-3 py-2 whitespace-nowrap">Transporte</th>
             <th className="px-3 py-2 whitespace-nowrap">Origen</th>
             <th className="px-3 py-2 whitespace-nowrap">Destino</th>
+            {hasChofer && <th className="px-3 py-2 whitespace-nowrap">Chofer</th>}
+            {hasVehiculo && <th className="px-3 py-2 whitespace-nowrap">Vehículo</th>}
             <th className="px-3 py-2 whitespace-nowrap">F. Carga</th>
             <th className="px-3 py-2 whitespace-nowrap">F. Descarga</th>
             <th className="px-3 py-2 whitespace-nowrap">Carga</th>
@@ -460,6 +464,8 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
               <Td>{fmt(v.transporte)}</Td>
               <Td>{fmt(v.origen)}</Td>
               <Td>{fmt(v.destino)}</Td>
+              {hasChofer && <Td>{fmt(v.chofer)}</Td>}
+              {hasVehiculo && <Td>{fmt(v.vehiculo)}</Td>}
               <Td>{fmt(v.fechaCarga)}</Td>
               <Td>{fmt(v.fechaDescarga)}</Td>
               <Td>{fmt(v.detalleCarga)}</Td>

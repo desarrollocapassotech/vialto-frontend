@@ -102,6 +102,8 @@ export type ViajeEditModalProps = {
   viajeEditHint: string | null;
   fechaCargaError: string | null;
   fechaDescargaError: string | null;
+  transportistaEfectivoError?: string | null;
+  onClearTransportistaEfectivoError?: () => void;
   onDraftFechasPatch: (
     p: Partial<Pick<ViajeInlineDraft, 'fechaCarga' | 'horaCarga' | 'fechaDescarga' | 'horaDescarga'>>,
   ) => void;
@@ -145,6 +147,8 @@ export function ViajeEditModal({
   viajeEditHint,
   fechaCargaError,
   fechaDescargaError,
+  transportistaEfectivoError,
+  onClearTransportistaEfectivoError,
   onDraftFechasPatch,
   onClose,
   onSave,
@@ -373,7 +377,14 @@ export function ViajeEditModal({
                         value={draft.transportistaId}
                         onChange={(id) =>
                           setDraft((p) =>
-                            p ? { ...p, transportistaId: id, realizaFlete: true, transportistaEfectivoId: '' } : p,
+                            p
+                              ? {
+                                  ...p,
+                                  transportistaId: id,
+                                  transportistaEfectivoId:
+                                    p.transportistaEfectivoId === id ? '' : p.transportistaEfectivoId,
+                                }
+                              : p,
                           )
                         }
                         inputClassName={inputClass}
@@ -418,11 +429,12 @@ export function ViajeEditModal({
                             type="radio"
                             name={`realiza-flete-edit-${draft.numero || 'e'}`}
                             checked={draft.realizaFlete}
-                            onChange={() =>
+                            onChange={() => {
+                              onClearTransportistaEfectivoError?.();
                               setDraft((p) =>
                                 p ? { ...p, realizaFlete: true, transportistaEfectivoId: '' } : p,
-                              )
-                            }
+                              );
+                            }}
                             className="accent-vialto-charcoal"
                           />
                           Sí
@@ -432,9 +444,10 @@ export function ViajeEditModal({
                             type="radio"
                             name={`realiza-flete-edit-${draft.numero || 'e'}`}
                             checked={!draft.realizaFlete}
-                            onChange={() =>
-                              setDraft((p) => (p ? { ...p, realizaFlete: false } : p))
-                            }
+                            onChange={() => {
+                              onClearTransportistaEfectivoError?.();
+                              setDraft((p) => (p ? { ...p, realizaFlete: false } : p));
+                            }}
                             className="accent-vialto-charcoal"
                           />
                           No
@@ -442,21 +455,30 @@ export function ViajeEditModal({
                       </div>
                       {!draft.realizaFlete && (
                         <div className="flex min-w-0 flex-col gap-1 mt-1">
-                          <span className={labelClass}>Transportista que realiza el flete</span>
+                          <span className={labelClass}>
+                            Transportista que realiza el flete{' '}
+                            <span className="text-red-500">*</span>
+                          </span>
                           <TransportistaSearchSelect
                             transportistas={todosTransportistas.filter(
                               (t) => t.id !== draft.transportistaId,
                             )}
                             value={draft.transportistaEfectivoId}
-                            onChange={(id) =>
+                            onChange={(id) => {
+                              onClearTransportistaEfectivoError?.();
                               setDraft((p) =>
                                 p ? { ...p, transportistaEfectivoId: id } : p,
-                              )
-                            }
-                            inputClassName={inputClass}
+                              );
+                            }}
+                            inputClassName={`${inputClass}${
+                              transportistaEfectivoError ? ' border-red-400' : ''
+                            }`}
                             aria-label="Transportista que realiza el flete"
                             onNuevo={getToken ? () => setQuickCreate('transportista') : undefined}
                           />
+                          {transportistaEfectivoError && (
+                            <span className="text-xs text-red-600">{transportistaEfectivoError}</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -517,6 +539,7 @@ export function ViajeEditModal({
                     getToken={getToken}
                     tenantId={tenantId}
                     onVehiculoCreado={onVehiculoCreado}
+                    quickCreateStacked
                   />
                   {ayudaFlota.vehiculo && (
                     <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
@@ -722,6 +745,7 @@ export function ViajeEditModal({
 
     {quickCreate === 'cliente' && getToken && (
       <ClienteModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -735,6 +759,7 @@ export function ViajeEditModal({
     )}
     {quickCreate === 'transportista' && getToken && (
       <TransportistaModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -748,6 +773,7 @@ export function ViajeEditModal({
     )}
     {(quickCreate === 'chofer-ext' || quickCreate === 'chofer-prop') && getToken && (
       <ChoferModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -765,6 +791,7 @@ export function ViajeEditModal({
     )}
     {quickCreate === 'vehiculo-ext' && getToken && (
       <VehiculoModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}

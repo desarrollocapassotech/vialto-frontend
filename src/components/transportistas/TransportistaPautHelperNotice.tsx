@@ -1,6 +1,6 @@
 /** Aviso en alta/edición: campos opcionales en BD pero necesarios para exportar PAUT. */
 export const TRANSPORTISTA_PAUT_NOTA =
-  'Nota: Los campos Dirección, C.P., Ciudad, Provincia y Tipo de transporte son requeridos para emitir documentos PAUT.';
+  'Nota: Los campos Domicilio, N° PAUT, Permiso Internacional, Vencimiento del Permiso Internacional son requeridos para emitir documentos PAUT.';
 
 export function TransportistaPautHelperNotice() {
   return (

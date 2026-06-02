@@ -229,6 +229,34 @@ export function nombreTransportistaExternoListadoViaje(
   return '—';
 }
 
+/** Id del transportista que realiza el flete (scalar API o relación incluida). */
+export function transportistaEfectivoIdDesdeViaje(v: Viaje): string {
+  return (v.transportistaEfectivoId ?? v.transportistaEfectivo?.id ?? '').trim();
+}
+
+export type ViajeTransportistaExternoDraft = {
+  operacionModo: 'externo' | 'propio';
+  transportistaId: string;
+  realizaFlete: boolean;
+  transportistaEfectivoId: string;
+};
+
+/** Validación cuando el contratante no realiza el flete (subcontratación). */
+export function mensajeErrorTransportistaEfectivoExterno(
+  slice: ViajeTransportistaExternoDraft,
+): string | null {
+  if (slice.operacionModo !== 'externo') return null;
+  if (!slice.transportistaId.trim()) return null;
+  if (slice.realizaFlete) return null;
+  if (!slice.transportistaEfectivoId.trim()) {
+    return 'Campo obligatorio';
+  }
+  if (slice.transportistaEfectivoId.trim() === slice.transportistaId.trim()) {
+    return 'El transportista que realiza el flete debe ser distinto del contratante.';
+  }
+  return null;
+}
+
 /**
  * Transportista que efectivamente realiza el flete (si difiere del contratante).
  * Devuelve null si el transportista contratante es el mismo que realiza el flete.
@@ -237,7 +265,7 @@ export function nombreTransportistaEfectivoListadoViaje(
   v: Viaje,
   transportistas?: Transportista[],
 ): string | null {
-  const eid = v.transportistaEfectivoId?.trim();
+  const eid = transportistaEfectivoIdDesdeViaje(v);
   if (!eid) return null;
 
   const desdeApi = v.transportistaEfectivo?.nombre?.trim();

@@ -26,6 +26,8 @@ const TEMPLATE_EXAMPLES: Record<string, object> = {
       { excelHeader: 'EMISION FLETERO', field: 'fechaEmisionFacturaTransp', type: 'date', format: 'DD/MM/YYYY' },
       { excelHeader: 'VENCIMIENTO', field: 'fechaVencimientoFacturaTransp', type: 'date', format: 'DD/MM/YYYY' },
       { excelHeader: 'OBSERVACIONES', field: 'observaciones', type: 'string' },
+      { excelHeader: 'CHOFER', field: 'choferId', type: 'lookup', lookupModel: 'choferes', lookupField: 'dni', required: false, createIfNotFound: false },
+      { excelHeader: 'VEHICULO', field: 'vehiculoId', type: 'lookup', lookupModel: 'vehiculos', lookupField: 'patente', required: false, createIfNotFound: false },
     ],
   },
   clientes: {

@@ -6,17 +6,21 @@ import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Cliente } from '@/types/api';
+import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 
 export function ClienteModal({
   getToken,
   onClose,
   onSaved,
   tenantId,
+  stacked,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (cliente: Cliente) => void;
   tenantId?: string;
+  /** true cuando se abre sobre ViajeEditModal u otro modal z-[110] */
+  stacked?: boolean;
 }) {
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
@@ -76,7 +80,7 @@ export function ClienteModal({
   const I = 'h-9 w-full border border-black/15 px-2 text-sm';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className={modalQuickCreateOverlayClass(stacked)}>
       <div
         role="dialog"
         aria-modal="true"

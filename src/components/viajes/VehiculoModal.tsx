@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
+import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import type { Vehiculo } from '@/types/api';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
@@ -24,11 +25,13 @@ export function VehiculoModal({
   onClose,
   onSaved,
   tenantId,
+  stacked,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (vehiculo: Vehiculo) => void;
   tenantId?: string;
+  stacked?: boolean;
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
@@ -65,7 +68,7 @@ export function VehiculoModal({
   const I = 'h-9 w-full border border-black/15 px-2 text-sm';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className={modalQuickCreateOverlayClass(stacked)}>
       <div
         role="dialog"
         aria-modal="true"
