@@ -32,6 +32,8 @@ import {
   textoMontoFacturarListado,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
+  mensajeErrorTransportistaEfectivoExterno,
+  transportistaEfectivoIdDesdeViaje,
 } from '@/lib/viajesFlota';
 import {
   ViajeGananciaBrutaCelda,
@@ -152,6 +154,7 @@ export function ViajesTenantPage({
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+  const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<string | null>(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
@@ -676,6 +679,20 @@ export function ViajesTenantPage({
     if (draft?.operacionModo === 'externo') setViajeEditHint(null);
   }, [draft?.operacionModo]);
 
+  /** Carga el viaje desde la API antes de abrir el editor (evita datos viejos en el listado). */
+  async function beginEditViaje(v: Viaje, origen: 'listado' | 'remoto' = 'listado') {
+    let viaje = v;
+    if (origen === 'listado') {
+      try {
+        viaje = await apiJson<Viaje>(viajeApiUrl(v.id), () => getToken());
+        setRows((prev) => (prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev));
+      } catch {
+        /* usar fila del listado */
+      }
+    }
+    startEdit(viaje, origen);
+  }
+
   function startEdit(v: Viaje, origen: 'listado' | 'remoto' = 'listado') {
     if (origen === 'listado') setViajeSnapshotRemoto(null);
     else setViajeSnapshotRemoto(v);
@@ -753,8 +770,8 @@ export function ViajesTenantPage({
       ),
       otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
       pagosTransportista: (v.pagosTransportista ?? []).map(pagoTransportistaDraftFromApi),
-      realizaFlete: !v.transportistaEfectivoId,
-      transportistaEfectivoId: v.transportistaEfectivoId ?? '',
+      realizaFlete: !transportistaEfectivoIdDesdeViaje(v),
+      transportistaEfectivoId: transportistaEfectivoIdDesdeViaje(v),
     });
   }
 
@@ -766,6 +783,7 @@ export function ViajesTenantPage({
     setViajeEditHint(null);
     setFechaCargaError(null);
     setFechaDescargaError(null);
+    setTransportistaEfectivoError(null);
   }
 
   function requestDeleteViaje(v: Viaje) {
@@ -966,6 +984,13 @@ export function ViajesTenantPage({
       setError('Seleccioná un transportista externo.');
       return;
     }
+    const teErr = mensajeErrorTransportistaEfectivoExterno(draft);
+    if (teErr) {
+      setTransportistaEfectivoError(teErr);
+      setError(teErr);
+      return;
+    }
+    setTransportistaEfectivoError(null);
     const vids = vehiculoIdsDesdeRows(draft.vehiculosRows);
     if (!externo && vids.length === 0) {
       setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
@@ -1027,9 +1052,10 @@ export function ViajesTenantPage({
           ...(externo
             ? {
                 transportistaId: draft.transportistaId.trim(),
+                contratanteRealizaFlete: draft.realizaFlete,
                 transportistaEfectivoId: draft.realizaFlete
                   ? null
-                  : (draft.transportistaEfectivoId.trim() || null),
+                  : draft.transportistaEfectivoId.trim() || null,
                 choferId: draft.choferExternoId.trim() || null,
                 vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
               }
@@ -1677,7 +1703,7 @@ export function ViajesTenantPage({
           onEditar={() => {
             const v = viewingViaje;
             setViewingViaje(null);
-            startEdit(v);
+            void beginEditViaje(v);
           }}
         />
       )}
@@ -1701,6 +1727,8 @@ export function ViajesTenantPage({
           viajeEditHint={viajeEditHint}
           fechaCargaError={fechaCargaError}
           fechaDescargaError={fechaDescargaError}
+          transportistaEfectivoError={transportistaEfectivoError}
+          onClearTransportistaEfectivoError={() => setTransportistaEfectivoError(null)}
           onDraftFechasPatch={(p) => {
             setDraft((prev) => (prev ? { ...prev, ...p } : prev));
             if (p.fechaCarga) setFechaCargaError(null);

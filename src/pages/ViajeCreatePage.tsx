@@ -49,6 +49,7 @@ import {
   mensajesAyudaFlotaPropia,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
+  mensajeErrorTransportistaEfectivoExterno,
 } from '@/lib/viajesFlota';
 import {
   ViajeVehiculosLista,
@@ -97,6 +98,7 @@ export function ViajeCreatePage() {
   const [transportistaId, setTransportistaId] = useState('');
   const [realizaFlete, setRealizaFlete] = useState(true);
   const [transportistaEfectivoId, setTransportistaEfectivoId] = useState('');
+  const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<string | null>(null);
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [choferExternoId, setChoferExternoId] = useState('');
@@ -297,6 +299,18 @@ export function ViajeCreatePage() {
       setError('Seleccioná un transportista externo.');
       return;
     }
+    const teErr = mensajeErrorTransportistaEfectivoExterno({
+      operacionModo: modoOperacion,
+      transportistaId,
+      realizaFlete,
+      transportistaEfectivoId,
+    });
+    if (teErr) {
+      setTransportistaEfectivoError(teErr);
+      setError(teErr);
+      return;
+    }
+    setTransportistaEfectivoError(null);
     const vids = vehiculoIdsDesdeRows(vehiculosRows);
     if (!externo && vids.length === 0) {
       setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
@@ -391,7 +405,8 @@ export function ViajeCreatePage() {
           ...(externo
             ? {
                 transportistaId: transportistaId.trim(),
-                transportistaEfectivoId: realizaFlete ? null : (transportistaEfectivoId.trim() || null),
+                contratanteRealizaFlete: realizaFlete,
+                transportistaEfectivoId: realizaFlete ? null : transportistaEfectivoId.trim() || null,
                 choferId: choferExternoId.trim() || null,
                 vehiculoIds: vehiculoExternoId.trim() ? [vehiculoExternoId.trim()] : [],
               }
@@ -605,6 +620,7 @@ export function ViajeCreatePage() {
                           name="realiza-flete-create"
                           checked={realizaFlete}
                           onChange={() => {
+                            setTransportistaEfectivoError(null);
                             setRealizaFlete(true);
                             setTransportistaEfectivoId('');
                           }}
@@ -617,7 +633,10 @@ export function ViajeCreatePage() {
                           type="radio"
                           name="realiza-flete-create"
                           checked={!realizaFlete}
-                          onChange={() => setRealizaFlete(false)}
+                          onChange={() => {
+                            setTransportistaEfectivoError(null);
+                            setRealizaFlete(false);
+                          }}
                           className="accent-vialto-charcoal"
                         />
                         No
@@ -625,15 +644,26 @@ export function ViajeCreatePage() {
                     </div>
                     {!realizaFlete && (
                       <div className="flex min-w-0 flex-col gap-1 mt-1">
-                        <span className={fieldLabelClass}>Transportista que realiza el flete</span>
+                        <span className={fieldLabelClass}>
+                          Transportista que realiza el flete{' '}
+                          <span className="text-red-500">*</span>
+                        </span>
                         <TransportistaSearchSelect
                           transportistas={transportistas.filter((t) => t.id !== transportistaId)}
                           value={transportistaEfectivoId}
-                          onChange={setTransportistaEfectivoId}
-                          inputClassName={inputClass}
+                          onChange={(id) => {
+                            setTransportistaEfectivoError(null);
+                            setTransportistaEfectivoId(id);
+                          }}
+                          inputClassName={`${inputClass}${
+                            transportistaEfectivoError ? ' border-red-400' : ''
+                          }`}
                           aria-label="Transportista que realiza el flete"
                           onNuevo={() => setQuickCreate('transportista')}
                         />
+                        {transportistaEfectivoError && (
+                          <span className="text-xs text-red-600">{transportistaEfectivoError}</span>
+                        )}
                       </div>
                     )}
                   </div>
