@@ -29,6 +29,22 @@ export function draftRequiereGananciaBrutaManual(draft: {
   return draft.monedaMonto !== draft.monedaPrecioTransportistaExterno;
 }
 
+/** Reenvía ganancia manual en PATCH parciales (p. ej. solo cambio de estado). */
+export function gananciaBrutaManualEnPatchParcial(
+  v: Pick<Viaje, 'gananciaBrutaManual' | 'monedaGananciaBrutaManual' | 'monedaMonto'>,
+): Pick<Viaje, 'gananciaBrutaManual' | 'monedaGananciaBrutaManual'> {
+  const manual = v.gananciaBrutaManual;
+  if (manual == null || Number.isNaN(Number(manual))) {
+    return {};
+  }
+  return {
+    gananciaBrutaManual: manual,
+    monedaGananciaBrutaManual: normalizeViajeMoneda(
+      v.monedaGananciaBrutaManual ?? v.monedaMonto,
+    ),
+  };
+}
+
 function resumenDesdeViaje(v: Viaje): GananciaBrutaResumen {
   return buildGananciaBrutaResumen({
     monto: v.monto,

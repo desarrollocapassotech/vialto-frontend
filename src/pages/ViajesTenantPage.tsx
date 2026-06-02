@@ -42,7 +42,10 @@ import { ViajeEditModal, type ViajeInlineDraft } from '@/components/viajes/Viaje
 import {
   gananciaBrutaManualPayloadFromDraft,
 } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
-import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
+import {
+  draftRequiereGananciaBrutaManual,
+  gananciaBrutaManualEnPatchParcial,
+} from '@/lib/viajesGananciaBruta';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -850,7 +853,10 @@ export function ViajesTenantPage({
     try {
       const updated = await apiJson<Viaje>(viajeApiUrl(v.id), () => getToken(), {
         method: 'PATCH',
-        body: JSON.stringify({ estado: nuevoEstado }),
+        body: JSON.stringify({
+          estado: nuevoEstado,
+          ...gananciaBrutaManualEnPatchParcial(v),
+        }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
       setEstadoQuickId(null);
