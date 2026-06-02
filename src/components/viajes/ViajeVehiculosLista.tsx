@@ -26,6 +26,8 @@ type Props = {
   tenantId?: string;
   /** Callback cuando se crea un vehículo nuevo (para que el padre refresque su maestro). */
   onVehiculoCreado?: (v: Vehiculo) => void;
+  /** Modal de creación rápida sobre ViajeEditModal (z-index superior). */
+  quickCreateStacked?: boolean;
 };
 
 export function ViajeVehiculosLista({
@@ -39,6 +41,7 @@ export function ViajeVehiculosLista({
   getToken,
   tenantId,
   onVehiculoCreado,
+  quickCreateStacked,
 }: Props) {
   const [showNuevoVehiculo, setShowNuevoVehiculo] = useState(false);
   const [nuevoParaRowIndex, setNuevoParaRowIndex] = useState<number | null>(null);
@@ -165,6 +168,7 @@ export function ViajeVehiculosLista({
       <VehiculoModal
         getToken={getToken}
         tenantId={tenantId}
+        stacked={quickCreateStacked}
         onClose={() => { setShowNuevoVehiculo(false); setNuevoParaRowIndex(null); }}
         onSaved={(v) => {
           setLocalVehiculos((prev) => [...prev, v]);

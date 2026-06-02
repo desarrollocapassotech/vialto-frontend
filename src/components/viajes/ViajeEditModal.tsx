@@ -539,6 +539,7 @@ export function ViajeEditModal({
                     getToken={getToken}
                     tenantId={tenantId}
                     onVehiculoCreado={onVehiculoCreado}
+                    quickCreateStacked
                   />
                   {ayudaFlota.vehiculo && (
                     <p className="text-xs text-amber-800/90">{ayudaFlota.vehiculo}</p>
@@ -744,6 +745,7 @@ export function ViajeEditModal({
 
     {quickCreate === 'cliente' && getToken && (
       <ClienteModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -757,6 +759,7 @@ export function ViajeEditModal({
     )}
     {quickCreate === 'transportista' && getToken && (
       <TransportistaModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -770,6 +773,7 @@ export function ViajeEditModal({
     )}
     {(quickCreate === 'chofer-ext' || quickCreate === 'chofer-prop') && getToken && (
       <ChoferModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
@@ -787,6 +791,7 @@ export function ViajeEditModal({
     )}
     {quickCreate === 'vehiculo-ext' && getToken && (
       <VehiculoModal
+        stacked
         getToken={getToken}
         tenantId={tenantId}
         onClose={() => setQuickCreate(null)}
