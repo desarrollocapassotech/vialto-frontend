@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -7,6 +7,7 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
+import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import type { Cliente, Producto } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
@@ -35,8 +36,13 @@ export function IngresosStockTenantPage({
 }) {
   const { getToken } = useAuth();
   const maestro = useMaestroData();
-  const clientes = clientesExternos ?? maestro.clientes;
   const platform = Boolean(tenantId);
+  const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
+  const clientes = useMemo(() => {
+    const base = clientesExternos ?? maestro.clientes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
+  }, [clientesExternos, maestro.clientes, sessionClientes]);
   const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const ingresosUrl = platform
@@ -59,6 +65,7 @@ export function IngresosStockTenantPage({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
+  const [modalCliente, setModalCliente] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const loadProductos = useCallback(async () => {
@@ -206,6 +213,7 @@ export function IngresosStockTenantPage({
               onChange={setClienteId}
               loading={clientesSelectLoading}
               inputClassName={INPUT}
+              onNuevo={() => setModalCliente(true)}
             />
           </div>
 
@@ -282,6 +290,19 @@ export function IngresosStockTenantPage({
           </button>
         </div>
       </form>
+
+      {modalCliente && (
+        <ClienteModal
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => setModalCliente(false)}
+          onSaved={(c) => {
+            setSessionClientes((prev) => [...prev, c]);
+            setClienteId(c.id);
+            setModalCliente(false);
+          }}
+        />
+      )}
 
       {modalProducto && (
         <ProductoModal
