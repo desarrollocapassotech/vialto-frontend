@@ -39,6 +39,7 @@ import {
 import { apiJson } from '@/lib/api';
 import {
   parseCurrencyForMoneda,
+  preserveAmountOnMonedaChange,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
@@ -563,7 +564,10 @@ export function ViajeCreatePage() {
                 />
                 <MonedaSelect
                   value={monedaMonto}
-                  onChange={setMonedaMonto}
+                  onChange={(m) => {
+                    setMonto((prev) => preserveAmountOnMonedaChange(prev, monedaMonto, m));
+                    setMonedaMonto(m);
+                  }}
                   aria-label="Moneda monto a facturar"
                 />
               </div>
@@ -604,7 +608,12 @@ export function ViajeCreatePage() {
                       />
                       <MonedaSelect
                         value={monedaPrecioTransportista}
-                        onChange={setMonedaPrecioTransportista}
+                        onChange={(m) => {
+                          setPrecioTransportistaExterno((prev) =>
+                            preserveAmountOnMonedaChange(prev, monedaPrecioTransportista, m),
+                          );
+                          setMonedaPrecioTransportista(m);
+                        }}
                         aria-label="Moneda precio transportista externo"
                       />
                     </div>
