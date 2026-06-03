@@ -309,6 +309,17 @@ export interface PlatformUser {
   createdAt: number | string;
 }
 
+export interface Presentacion {
+  id: string;
+  tenantId: string;
+  productoId: string;
+  nombre: string;
+  cantidadEquivalente: number;
+  unidadEquivalente: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MovimientoStock {
   id: string;
   tenantId: string;

@@ -315,17 +315,7 @@ export function EgresosStockTenantPage({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className={LABEL}>Producto</label>
-              <button
-                type="button"
-                onClick={() => setModalProducto(true)}
-                disabled={productosLoading}
-                className="text-xs text-vialto-fire hover:underline font-medium disabled:opacity-40 disabled:pointer-events-none"
-              >
-                + Agregar producto
-              </button>
-            </div>
+            <label className={LABEL}>Producto</label>
             <SearchableEntitySelect<Producto>
               items={productos}
               value={productoId}
@@ -346,18 +336,8 @@ export function EgresosStockTenantPage({
               placeholderCerrado="Elegí un producto…"
               placeholderBuscar="Buscar por nombre o código…"
               inputClassName={INPUT}
-              noItemsSlot={
-                <div className="space-y-2">
-                  <div className={`${INPUT} flex items-center text-vialto-steel`}>Sin productos en el catálogo</div>
-                  <button
-                    type="button"
-                    onClick={() => setModalProducto(true)}
-                    className="h-8 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-                  >
-                    Crear primer producto
-                  </button>
-                </div>
-              }
+              onNuevo={() => setModalProducto(true)}
+              onNuevoLabel="+ Agregar producto"
             />
           </div>
 
