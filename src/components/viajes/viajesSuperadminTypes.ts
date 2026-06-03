@@ -14,8 +14,6 @@ export type ViajeInlineDraft = {
   vehiculosRows: ViajeVehiculoRowDraft[];
   /** Solo en modo externo: chofer del transportista tercero (opcional). */
   choferExternoId: string;
-  /** Solo en modo externo: vehículo del transportista tercero (opcional). */
-  vehiculoExternoId: string;
   paisOrigen: PaisCodigo;
   paisDestino: PaisCodigo;
   origen: string;

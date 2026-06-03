@@ -28,6 +28,10 @@ type Props = {
   onVehiculoCreado?: (v: Vehiculo) => void;
   /** Modal de creación rápida sobre ViajeEditModal (z-index superior). */
   quickCreateStacked?: boolean;
+  /** Si es false, se pueden quitar todas las filas (vehículos opcionales, p. ej. transportista externo). */
+  alMenosUno?: boolean;
+  /** Etiqueta de la sección; por defecto según `alMenosUno`. */
+  labelVehiculos?: string;
 };
 
 export function ViajeVehiculosLista({
@@ -42,7 +46,12 @@ export function ViajeVehiculosLista({
   tenantId,
   onVehiculoCreado,
   quickCreateStacked,
+  alMenosUno = true,
+  labelVehiculos,
 }: Props) {
+  const titulo =
+    labelVehiculos ??
+    (alMenosUno ? 'Vehículos del viaje (al menos uno)' : 'Vehículos del viaje (opcional)');
   const [showNuevoVehiculo, setShowNuevoVehiculo] = useState(false);
   const [nuevoParaRowIndex, setNuevoParaRowIndex] = useState<number | null>(null);
   const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
@@ -62,7 +71,7 @@ export function ViajeVehiculosLista({
   }
 
   function removeRow(i: number) {
-    if (rows.length <= 1) return;
+    if (alMenosUno && rows.length <= 1) return;
     onChange(rows.filter((_, j) => j !== i));
   }
 
@@ -70,7 +79,7 @@ export function ViajeVehiculosLista({
     <>
     <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <span className={LABEL}>Vehículos del viaje (al menos uno)</span>
+        <span className={LABEL}>{titulo}</span>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {onRefreshVehiculos && (
             <button
@@ -135,7 +144,8 @@ export function ViajeVehiculosLista({
                 />
                 {sinOpciones && !getToken ? (
                   <p className="text-xs text-amber-800/90">
-                    No hay vehículos de tipo «{labelTipoVehiculo(row.tipo)}» en flota propia.{' '}
+                    No hay vehículos de tipo «{labelTipoVehiculo(row.tipo)}»
+                    {alMenosUno ? ' en flota propia' : ' en el maestro'}.{' '}
                     <a
                       href={crearVehiculoHref}
                       target="_blank"
@@ -151,10 +161,14 @@ export function ViajeVehiculosLista({
               <div className="flex items-end justify-end sm:pb-0">
                 <button
                   type="button"
-                  disabled={rows.length <= 1}
+                  disabled={alMenosUno && rows.length <= 1}
                   onClick={() => removeRow(i)}
                   className="text-xs uppercase tracking-wider px-2 py-1 border border-black/15 text-vialto-steel hover:bg-red-50 disabled:opacity-40"
-                  title={rows.length <= 1 ? 'Debe haber al menos un vehículo' : 'Quitar fila'}
+                  title={
+                    alMenosUno && rows.length <= 1
+                      ? 'Debe haber al menos un vehículo'
+                      : 'Quitar fila'
+                  }
                 >
                   Quitar
                 </button>

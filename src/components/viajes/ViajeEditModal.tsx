@@ -3,12 +3,10 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
-import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -57,7 +55,6 @@ export type ViajeInlineDraft = {
   transportistaId: string;
   vehiculosRows: ViajeVehiculoRowDraft[];
   choferExternoId: string;
-  vehiculoExternoId: string;
   paisOrigen: PaisCodigo;
   paisDestino: PaisCodigo;
   origen: string;
@@ -165,7 +162,7 @@ export function ViajeEditModal({
   onChoferCreado,
   onVehiculoCreado,
 }: ViajeEditModalProps) {
-  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop';
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
@@ -368,7 +365,7 @@ export function ViajeEditModal({
               onModoChange={onModoChange}
               groupName={`viaje-edit-${draft.numero || 'e'}`}
               externoContent={
-                <div className="grid gap-2">
+                <div className="grid gap-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Transportista externo</span>
@@ -483,8 +480,8 @@ export function ViajeEditModal({
                       )}
                     </div>
                   )}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-1">
+                  <div className="grid gap-3">
+                    <div className="flex min-w-0 flex-col gap-1 max-w-md">
                       <span className={labelClass}>Chofer (opcional)</span>
                       <ChoferSearchSelect
                         choferes={todosChoferes}
@@ -497,26 +494,24 @@ export function ViajeEditModal({
                         onNuevo={getToken ? () => setQuickCreate('chofer-ext') : undefined}
                       />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Vehículo (opcional)</span>
-                      <VehiculoPatenteSearchSelect
-                        vehiculos={todosVehiculos}
-                        value={draft.vehiculoExternoId}
-                        onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, vehiculoExternoId: id } : p))
-                        }
-                        sinOpciones={todosVehiculos.length === 0}
-                        inputClassName={inputClass}
-                        aria-label="Vehículo transportista externo"
-                        onNuevo={getToken ? () => setQuickCreate('vehiculo-ext') : undefined}
-                      />
-                    </div>
+                    <ViajeVehiculosLista
+                      groupId={`viaje-modal-ext-${draft.numero || 'e'}`}
+                      crearVehiculoHref={crearVehiculoHref}
+                      rows={draft.vehiculosRows}
+                      onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
+                      vehiculos={todosVehiculos}
+                      alMenosUno={false}
+                      getToken={getToken}
+                      tenantId={tenantId}
+                      onVehiculoCreado={onVehiculoCreado}
+                      quickCreateStacked
+                    />
                   </div>
                 </div>
               }
               propioContent={
                 <div className="grid gap-3">
-                  <div className="flex min-w-0 max-w-md flex-col gap-1">
+                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={labelClass}>Chofer (flota propia)</span>
                     <ChoferSearchSelect
                       choferes={choferesPropios}
@@ -785,20 +780,6 @@ export function ViajeEditModal({
           } else {
             setDraft((p) => (p ? { ...p, choferId: c.id } : p));
           }
-          setQuickCreate(null);
-        }}
-      />
-    )}
-    {quickCreate === 'vehiculo-ext' && getToken && (
-      <VehiculoModal
-        stacked
-        getToken={getToken}
-        tenantId={tenantId}
-        onClose={() => setQuickCreate(null)}
-        onSaved={(v) => {
-          setLocalVehiculos((prev) => [...prev, v]);
-          onVehiculoCreado?.(v);
-          setDraft((p) => (p ? { ...p, vehiculoExternoId: v.id } : p));
           setQuickCreate(null);
         }}
       />

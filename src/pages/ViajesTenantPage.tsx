@@ -730,17 +730,18 @@ export function ViajesTenantPage({
       choferExternoId: esExterno ? (v.choferId ?? '') : '',
       transportistaId: v.transportistaId ?? '',
       vehiculosRows:
-        !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
+        v.vehiculosViaje && v.vehiculosViaje.length > 0
           ? [...v.vehiculosViaje]
               .sort((a, b) => a.orden - b.orden)
               .map((x) => ({
                 tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
-                vehiculoId: normalizarIdEnLista(x.vehiculoId, vehiculosPropios),
+                vehiculoId: esExterno
+                  ? String(x.vehiculoId ?? '').trim()
+                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropios),
               }))
-          : !esExterno
-            ? [{ tipo: 'tractor', vehiculoId: '' }]
-            : [],
-      vehiculoExternoId: esExterno ? (v.vehiculosViaje?.[0]?.vehiculoId ?? '') : '',
+          : esExterno
+            ? []
+            : [{ tipo: 'tractor', vehiculoId: '' }],
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -963,7 +964,6 @@ export function ViajesTenantPage({
                   realizaFlete: true,
                   transportistaEfectivoId: '',
                   choferExternoId: '',
-                  vehiculoExternoId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -1057,7 +1057,7 @@ export function ViajesTenantPage({
                   ? null
                   : draft.transportistaEfectivoId.trim() || null,
                 choferId: draft.choferExternoId.trim() || null,
-                vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
+                vehiculoIds: vids,
               }
             : {
                 transportistaId: null,
