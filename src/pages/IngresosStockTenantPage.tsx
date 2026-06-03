@@ -7,9 +7,8 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Presentacion, Producto } from '@/types/api';
+import type { Cliente, Producto } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -45,14 +44,13 @@ export function IngresosStockTenantPage({
     : '/api/stock/ingresos';
 
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
-  const [presentacionId, setPresentacionId] = useState('');
   const [clienteId, setClienteId] = useState('');
-  const [cantidad, setCantidad] = useState('');
+  const [cantidadPallets, setCantidadPallets] = useState('');
+  const [cantidadSuelto, setCantidadSuelto] = useState('');
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -61,7 +59,6 @@ export function IngresosStockTenantPage({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
-  const [modalPresentacion, setModalPresentacion] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const loadProductos = useCallback(async () => {
@@ -82,36 +79,23 @@ export function IngresosStockTenantPage({
     void loadProductos();
   }, [loadProductos]);
 
-  useEffect(() => {
-    if (!productoId) {
-      setPresentaciones([]);
-      setPresentacionId('');
-      return;
-    }
-    void (async () => {
-      try {
-        const url = `${productosBase}/${encodeURIComponent(productoId)}/presentaciones${buildQs({}, tenantId)}`;
-        const data = await apiJson<Presentacion[]>(url, () => getToken());
-        setPresentaciones(data);
-        setPresentacionId('');
-      } catch {
-        setPresentaciones([]);
-        setPresentacionId('');
-      }
-    })();
-  }, [productoId, productosBase, tenantId, getToken]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     setSuccess(false);
 
     if (!productoId) return setFormError('Seleccioná un producto.');
-    if (!presentacionId) return setFormError('Seleccioná una presentación.');
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
-    const cantNum = parseFloat(cantidad);
-    if (!cantidad || isNaN(cantNum) || cantNum <= 0)
-      return setFormError('La cantidad debe ser mayor a 0.');
+
+    const pallets = parseFloat(cantidadPallets) || 0;
+    const suelto = parseFloat(cantidadSuelto) || 0;
+    if (pallets <= 0 && suelto <= 0) {
+      return setFormError('Ingresá al menos una cantidad (Pallets o Suelto) mayor a 0.');
+    }
+    if (pallets < 0 || suelto < 0) {
+      return setFormError('Las cantidades no pueden ser negativas.');
+    }
+
     const fmError = !fechaMov.trim() ? 'Ingresá la fecha del movimiento.' : null;
     setFechaMovError(fmError);
     if (fmError) return setFormError(fmError);
@@ -121,22 +105,24 @@ export function IngresosStockTenantPage({
 
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        productoId,
+        clienteId,
+        fecha: fechaIso,
+      };
+      if (pallets > 0) body.cantidadPallets = pallets;
+      if (suelto > 0) body.cantidadSuelto = suelto;
+      if (observaciones.trim()) body.observaciones = observaciones.trim();
+
       await apiJson(ingresosUrl, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify({
-          productoId,
-          presentacionId,
-          clienteId,
-          cantidad: cantNum,
-          fecha: fechaIso,
-          ...(observaciones.trim() ? { observaciones: observaciones.trim() } : {}),
-        }),
+        body: JSON.stringify(body),
       });
       setSuccess(true);
       setProductoId('');
-      setPresentacionId('');
       setClienteId('');
-      setCantidad('');
+      setCantidadPallets('');
+      setCantidadSuelto('');
       const p = isoToFechaHora(new Date().toISOString());
       setFechaMov(p.fecha);
       setHoraMov(p.hora);
@@ -148,8 +134,6 @@ export function IngresosStockTenantPage({
       setSaving(false);
     }
   }
-
-  const productoActual = productos.find((p) => p.id === productoId) ?? null;
 
   const historialHref = platform
     ? `/stock/ingresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
@@ -236,67 +220,41 @@ export function IngresosStockTenantPage({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className={LABEL}>Presentación</label>
-            {!productoId ? (
-              <div className={`${INPUT} flex items-center text-vialto-steel/60 cursor-not-allowed`}>
-                Primero elegí un producto
-              </div>
-            ) : presentaciones.length === 0 ? (
-              <div className="space-y-2">
-                <div className={`${INPUT} flex items-center text-amber-700`}>
-                  Este producto no tiene presentaciones
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setModalPresentacion(true)}
-                  className="h-8 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-                >
-                  + Agregar presentación
-                </button>
-              </div>
-            ) : (
-              <SearchableEntitySelect<Presentacion>
-                items={presentaciones}
-                value={presentacionId}
-                onChange={setPresentacionId}
-                filterItems={(items, q) =>
-                  items.filter((p) => p.nombre.toLowerCase().includes(q.toLowerCase()))
-                }
-                getPrimaryLabel={(p) => p.nombre}
-                placeholderCerrado="Elegí una presentación…"
-                placeholderBuscar="Buscar presentación…"
-                inputClassName={INPUT}
-                noItemsSlot={<div className={INPUT} />}
-              />
-            )}
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Empresa / Cliente</label>
+            <ClienteSearchSelect
+              clientes={clientes}
+              value={clienteId}
+              onChange={setClienteId}
+              loading={clientesSelectLoading}
+              inputClassName={INPUT}
+            />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:col-span-2">
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>Empresa / Cliente</label>
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={clienteId}
-                onChange={setClienteId}
-                loading={clientesSelectLoading}
-                inputClassName={INPUT}
-              />
-            </div>
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>
-                Cantidad{productoActual ? ` (${productoActual.unidadMedida ?? ''})` : ''}
-              </label>
-              <input
-                type="number"
-                min="0.001"
-                step="any"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                className={INPUT}
-                placeholder="0"
-              />
-            </div>
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Pallets</label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={cantidadPallets}
+              onChange={(e) => setCantidadPallets(e.target.value)}
+              className={INPUT}
+              placeholder="0"
+            />
+          </div>
+
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Suelto</label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={cantidadSuelto}
+              onChange={(e) => setCantidadSuelto(e.target.value)}
+              className={INPUT}
+              placeholder="0"
+            />
           </div>
 
           <div className="space-y-1 sm:col-span-2">
@@ -318,7 +276,6 @@ export function IngresosStockTenantPage({
               errorFechaCarga={fechaMovError}
             />
           </div>
-
         </div>
 
         <div className="space-y-1">
@@ -359,26 +316,6 @@ export function IngresosStockTenantPage({
             setModalProducto(false);
             await loadProductos();
             setProductoId(nuevo.id);
-          }}
-        />
-      )}
-
-      {modalPresentacion && productoActual && (
-        <PresentacionesModal
-          producto={productoActual}
-          baseUrl={productosBase}
-          tenantId={tenantId}
-          getToken={getToken}
-          onClose={() => setModalPresentacion(false)}
-          onPresentacionCreada={async (nueva) => {
-            setModalPresentacion(false);
-            // recargar presentaciones del producto actual
-            const url = `${productosBase}/${encodeURIComponent(productoActual.id)}/presentaciones${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`;
-            try {
-              const data = await apiJson<Presentacion[]>(url, () => getToken());
-              setPresentaciones(data);
-            } catch { /* no-op */ }
-            setPresentacionId(nueva.id);
           }}
         />
       )}

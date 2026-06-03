@@ -7,9 +7,8 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, MovimientoStock, Presentacion, Producto, StockEgresoRemitoConfig, StockItem } from '@/types/api';
+import type { Cliente, MovimientoStock, Producto, StockEgresoRemitoConfig, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
@@ -52,14 +51,13 @@ export function EgresosStockTenantPage({
     : '/api/stock/egresos/remito-config';
 
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [presentaciones, setPresentaciones] = useState<Presentacion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
-  const [presentacionId, setPresentacionId] = useState('');
   const [clienteId, setClienteId] = useState('');
-  const [cantidad, setCantidad] = useState('');
+  const [cantidadPallets, setCantidadPallets] = useState('');
+  const [cantidadSuelto, setCantidadSuelto] = useState('');
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -69,10 +67,9 @@ export function EgresosStockTenantPage({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
-  const [modalPresentacion, setModalPresentacion] = useState(false);
   const [success, setSuccess] = useState(false);
   const [ultimoRemito, setUltimoRemito] = useState<string | null>(null);
-  const [stockDisponible, setStockDisponible] = useState<number | null>(null);
+  const [stockDisponible, setStockDisponible] = useState<{ pallets: number; suelto: number } | null>(null);
   const [remitoConfig, setRemitoConfig] = useState<StockEgresoRemitoConfig | null>(null);
   const [configDraft, setConfigDraft] = useState({ remitoPrefix: 'R', remitoDigitos: 5 });
   const [configSaving, setConfigSaving] = useState(false);
@@ -109,26 +106,7 @@ export function EgresosStockTenantPage({
   }, [loadProductos, loadRemitoConfig]);
 
   useEffect(() => {
-    if (!productoId) {
-      setPresentaciones([]);
-      setPresentacionId('');
-      return;
-    }
-    void (async () => {
-      try {
-        const url = `${productosBase}/${encodeURIComponent(productoId)}/presentaciones${buildQs({}, tenantId)}`;
-        const data = await apiJson<Presentacion[]>(url, () => getToken());
-        setPresentaciones(data);
-        setPresentacionId('');
-      } catch {
-        setPresentaciones([]);
-        setPresentacionId('');
-      }
-    })();
-  }, [productoId, productosBase, tenantId, getToken]);
-
-  useEffect(() => {
-    if (!productoId || !presentacionId || !clienteId) {
+    if (!productoId || !clienteId) {
       setStockDisponible(null);
       return;
     }
@@ -136,13 +114,17 @@ export function EgresosStockTenantPage({
       try {
         const qs = buildQs({ clienteId, productoId }, tenantId);
         const data = await apiJson<StockItem[]>(`${disponibleBase}${qs}`, () => getToken());
-        const row = data.find((s) => s.presentacionId === presentacionId);
-        setStockDisponible(row ? row.cantidad : 0);
+        const row = data.find((s) => s.productoId === productoId && s.clienteId === clienteId);
+        setStockDisponible(
+          row
+            ? { pallets: row.cantidadPallets, suelto: row.cantidadSuelto }
+            : { pallets: 0, suelto: 0 },
+        );
       } catch {
         setStockDisponible(null);
       }
     })();
-  }, [productoId, presentacionId, clienteId, disponibleBase, tenantId, getToken]);
+  }, [productoId, clienteId, disponibleBase, tenantId, getToken]);
 
   async function guardarRemitoConfig(e: React.FormEvent) {
     e.preventDefault();
@@ -171,11 +153,30 @@ export function EgresosStockTenantPage({
     setUltimoRemito(null);
 
     if (!productoId) return setFormError('Seleccioná un producto.');
-    if (!presentacionId) return setFormError('Seleccioná una presentación.');
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
-    const cantNum = parseFloat(cantidad);
-    if (!cantidad || isNaN(cantNum) || cantNum <= 0)
-      return setFormError('La cantidad debe ser mayor a 0.');
+
+    const pallets = parseFloat(cantidadPallets) || 0;
+    const suelto = parseFloat(cantidadSuelto) || 0;
+    if (pallets <= 0 && suelto <= 0) {
+      return setFormError('Ingresá al menos una cantidad (Pallets o Suelto) mayor a 0.');
+    }
+    if (pallets < 0 || suelto < 0) {
+      return setFormError('Las cantidades no pueden ser negativas.');
+    }
+
+    if (stockDisponible !== null) {
+      if (pallets > 0 && pallets > stockDisponible.pallets) {
+        return setFormError(
+          `No podés egresar más pallets de los disponibles. Stock disponible: ${stockDisponible.pallets} pallets.`,
+        );
+      }
+      if (suelto > 0 && suelto > stockDisponible.suelto) {
+        return setFormError(
+          `No podés egresar más suelto del disponible. Stock disponible: ${stockDisponible.suelto} unidades sueltas.`,
+        );
+      }
+    }
+
     const fmError = !fechaMov.trim() ? 'Ingresá la fecha del movimiento.' : null;
     setFechaMovError(fmError);
     if (fmError) return setFormError(fmError);
@@ -183,21 +184,15 @@ export function EgresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
-    if (stockDisponible !== null && cantNum > stockDisponible) {
-      return setFormError(
-        `No podés egresar más de lo disponible para esta combinación. Stock disponible: ${stockDisponible}.`,
-      );
-    }
-
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
         productoId,
-        presentacionId,
         clienteId,
-        cantidad: cantNum,
         fecha: fechaIso,
       };
+      if (pallets > 0) payload.cantidadPallets = pallets;
+      if (suelto > 0) payload.cantidadSuelto = suelto;
       if (observaciones.trim()) payload.observaciones = observaciones.trim();
       if (remitoEscaneadoUrl.trim()) payload.remitoEscaneadoUrl = remitoEscaneadoUrl.trim();
 
@@ -208,9 +203,9 @@ export function EgresosStockTenantPage({
       setSuccess(true);
       setUltimoRemito(created.numeroRemito ?? null);
       setProductoId('');
-      setPresentacionId('');
       setClienteId('');
-      setCantidad('');
+      setCantidadPallets('');
+      setCantidadSuelto('');
       const p = isoToFechaHora(new Date().toISOString());
       setFechaMov(p.fecha);
       setHoraMov(p.hora);
@@ -224,7 +219,6 @@ export function EgresosStockTenantPage({
     }
   }
 
-  const productoActual = productos.find((p) => p.id === productoId) ?? null;
   const ejemploYear =
     fechaMov.trim().length >= 4 ? parseInt(fechaMov.slice(0, 4), 10) : new Date().getFullYear();
   const formatoEjemplo =
@@ -367,71 +361,51 @@ export function EgresosStockTenantPage({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className={LABEL}>Presentación</label>
-            {!productoId ? (
-              <div className={`${INPUT} flex items-center text-vialto-steel/60 cursor-not-allowed`}>
-                Primero elegí un producto
-              </div>
-            ) : presentaciones.length === 0 ? (
-              <div className="space-y-2">
-                <div className={`${INPUT} flex items-center text-amber-700`}>Este producto no tiene presentaciones</div>
-                <button
-                  type="button"
-                  onClick={() => setModalPresentacion(true)}
-                  className="h-8 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-                >
-                  + Agregar presentación
-                </button>
-              </div>
-            ) : (
-              <SearchableEntitySelect<Presentacion>
-                items={presentaciones}
-                value={presentacionId}
-                onChange={setPresentacionId}
-                filterItems={(items, q) =>
-                  items.filter((p) => p.nombre.toLowerCase().includes(q.toLowerCase()))
-                }
-                getPrimaryLabel={(p) => p.nombre}
-                placeholderCerrado="Elegí una presentación…"
-                placeholderBuscar="Buscar presentación…"
-                inputClassName={INPUT}
-                noItemsSlot={<div className={INPUT} />}
-              />
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Empresa / Cliente</label>
+            <ClienteSearchSelect
+              clientes={clientes}
+              value={clienteId}
+              onChange={setClienteId}
+              loading={clientesSelectLoading}
+              inputClassName={INPUT}
+            />
+          </div>
+
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Pallets</label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={cantidadPallets}
+              onChange={(e) => setCantidadPallets(e.target.value)}
+              className={INPUT}
+              placeholder="0"
+            />
+            {stockDisponible !== null && productoId && clienteId && (
+              <p className="text-xs text-vialto-steel mt-1">
+                Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.pallets}</span> pallets
+              </p>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:col-span-2">
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>Empresa / Cliente</label>
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={clienteId}
-                onChange={setClienteId}
-                loading={clientesSelectLoading}
-                inputClassName={INPUT}
-              />
-            </div>
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>
-                Cantidad{productoActual ? ` (${productoActual.unidadMedida ?? ''})` : ''}
-              </label>
-              <input
-                type="number"
-                min="0.001"
-                step="any"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                className={INPUT}
-                placeholder="0"
-              />
-              {stockDisponible !== null && productoId && presentacionId && clienteId && (
-                <p className="text-xs text-vialto-steel mt-1">
-                  Stock disponible (misma empresa, producto y presentación):{' '}
-                  <span className="font-semibold text-vialto-charcoal">{stockDisponible}</span>
-                </p>
-              )}
-            </div>
+          <div className="space-y-1 min-w-0">
+            <label className={LABEL}>Suelto</label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={cantidadSuelto}
+              onChange={(e) => setCantidadSuelto(e.target.value)}
+              className={INPUT}
+              placeholder="0"
+            />
+            {stockDisponible !== null && productoId && clienteId && (
+              <p className="text-xs text-vialto-steel mt-1">
+                Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.suelto}</span> unidades
+              </p>
+            )}
           </div>
 
           <div className="space-y-1 sm:col-span-2">
@@ -453,7 +427,6 @@ export function EgresosStockTenantPage({
               errorFechaCarga={fechaMovError}
             />
           </div>
-
         </div>
 
         <div className="space-y-1">
@@ -519,27 +492,6 @@ export function EgresosStockTenantPage({
             setModalProducto(false);
             await loadProductos();
             setProductoId(nuevo.id);
-          }}
-        />
-      )}
-
-      {modalPresentacion && productoActual && (
-        <PresentacionesModal
-          producto={productoActual}
-          baseUrl={productosBase}
-          tenantId={tenantId}
-          getToken={getToken}
-          onClose={() => setModalPresentacion(false)}
-          onPresentacionCreada={async (nueva) => {
-            setModalPresentacion(false);
-            const url = `${productosBase}/${encodeURIComponent(productoActual.id)}/presentaciones${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`;
-            try {
-              const data = await apiJson<Presentacion[]>(url, () => getToken());
-              setPresentaciones(data);
-            } catch {
-              /* no-op */
-            }
-            setPresentacionId(nueva.id);
           }}
         />
       )}

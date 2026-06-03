@@ -105,13 +105,13 @@ export function IngresosStockHistorialTenantPage({
                 Producto
               </th>
               <th scope="col" className={listadoTablaThClass}>
-                Presentación
-              </th>
-              <th scope="col" className={listadoTablaThClass}>
                 Cliente
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Cantidad
+                Pallets
+              </th>
+              <th scope="col" className={`${listadoTablaThClass} text-right`}>
+                Suelto
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
                 Detalle
@@ -140,10 +140,12 @@ export function IngresosStockHistorialTenantPage({
                     {formatMovimientoStockFechaFromIso(m.fecha)}
                   </td>
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
-                  <td className={listadoTablaTdClass}>{m.presentacion?.nombre ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad}</span>
+                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadPallets}</span>
+                  </td>
+                  <td className={`${listadoTablaTdClass} text-right`}>
+                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadSuelto}</span>
                   </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link

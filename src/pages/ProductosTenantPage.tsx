@@ -2,13 +2,10 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import type { Producto, PaginatedMeta } from '@/types/api';
 import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { canAccessStock } from '@/lib/tenantModules';
 import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
@@ -17,15 +14,12 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'create' }
   | { mode: 'view'; producto: Producto }
-  | { mode: 'edit'; producto: Producto }
-  | { mode: 'presentaciones'; producto: Producto };
+  | { mode: 'edit'; producto: Producto };
 
 export function ProductosTenantPage() {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
   const { user } = useUser();
-  const { tenant } = useCurrentTenant();
   const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
-  const hasStock = canAccessStock(tenant?.modules ?? []);
 
   const [rows, setRows] = useState<Producto[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
@@ -124,7 +118,7 @@ export function ProductosTenantPage() {
         Productos
       </h1>
       <p className="mt-2 text-vialto-steel max-w-2xl">
-        {hasStock ? 'Catálogo de productos del depósito.' : 'Productos disponibles para asignar en viajes.'}
+        {'Catálogo de productos del depósito.'}
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
@@ -241,11 +235,6 @@ export function ProductosTenantPage() {
                   </select>
                 </ViajesListadoHeaderFiltro>
               </th>
-              {hasStock && (
-                <th scope="col" className="px-4 py-3 align-top">
-                  Presentaciones
-                </th>
-              )}
               <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
                   title="Estado"
@@ -276,14 +265,14 @@ export function ProductosTenantPage() {
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={hasStock ? 6 : 5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={hasStock ? 6 : 5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                   No hay productos que coincidan con el criterio.
                 </td>
               </tr>
@@ -304,17 +293,6 @@ export function ProductosTenantPage() {
                 <td className="px-4 py-3 text-vialto-steel">
                   {etiquetaUnidadProducto(r.unidadMedida)}
                 </td>
-                {hasStock && (
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setModal({ mode: 'presentaciones', producto: r })}
-                      className="text-xs uppercase tracking-wider text-vialto-fire hover:underline"
-                    >
-                      Ver / gestionar
-                    </button>
-                  </td>
-                )}
                 <td className="px-4 py-3">
                   <span
                     className={
@@ -441,14 +419,6 @@ export function ProductosTenantPage() {
         />
       )}
 
-      {modal.mode === 'presentaciones' && hasStock && (
-        <PresentacionesModal
-          producto={modal.producto}
-          getToken={getToken}
-          puedeGestionar={puedeGestionar}
-          onClose={() => setModal({ mode: 'closed' })}
-        />
-      )}
     </div>
   );
 }

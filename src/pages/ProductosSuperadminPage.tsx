@@ -7,7 +7,6 @@ import { friendlyError } from '@/lib/friendlyError';
 import type { Producto, PaginatedMeta } from '@/types/api';
 import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
@@ -16,8 +15,7 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'create' }
   | { mode: 'view'; producto: Producto }
-  | { mode: 'edit'; producto: Producto }
-  | { mode: 'presentaciones'; producto: Producto };
+  | { mode: 'edit'; producto: Producto };
 
 export function ProductosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -257,9 +255,6 @@ export function ProductosSuperadminPage() {
                     </ViajesListadoHeaderFiltro>
                   </th>
                   <th scope="col" className="px-4 py-3 align-top">
-                    Presentaciones
-                  </th>
-                  <th scope="col" className="px-4 py-3 align-top">
                     <ViajesListadoHeaderFiltro
                       title="Estado"
                       filterActive={filtroActivo !== 'todos'}
@@ -289,14 +284,14 @@ export function ProductosSuperadminPage() {
               <tbody>
                 {rows === null && !error && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                    <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                       Cargando…
                     </td>
                   </tr>
                 )}
                 {rows?.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-vialto-steel">
+                    <td colSpan={5} className="px-4 py-8 text-vialto-steel">
                       No hay productos que coincidan.
                     </td>
                   </tr>
@@ -315,15 +310,6 @@ export function ProductosSuperadminPage() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-vialto-steel">{etiquetaUnidadProducto(r.unidadMedida)}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setModal({ mode: 'presentaciones', producto: r })}
-                        className="text-xs uppercase tracking-wider text-vialto-fire hover:underline"
-                      >
-                        Ver / gestionar
-                      </button>
-                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={
@@ -453,15 +439,6 @@ export function ProductosSuperadminPage() {
             setModal({ mode: 'closed' });
             await load();
           }}
-        />
-      )}
-      {modal.mode === 'presentaciones' && filtroEmpresa && (
-        <PresentacionesModal
-          producto={modal.producto}
-          baseUrl="/api/platform/stock/productos"
-          tenantId={filtroEmpresa}
-          getToken={getToken}
-          onClose={() => setModal({ mode: 'closed' })}
         />
       )}
     </div>
