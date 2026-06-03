@@ -337,13 +337,20 @@ export function EgresosStockTenantPage({
               value={productoId}
               onChange={setProductoId}
               loading={productosLoading}
-              filterItems={(items, q) =>
-                items.filter((p) => p.nombre.toLowerCase().includes(q.toLowerCase()))
+              filterItems={(items, q) => {
+                const lq = q.toLowerCase();
+                return items.filter(
+                  (p) =>
+                    p.nombre.toLowerCase().includes(lq) ||
+                    (p.codigo?.toLowerCase().includes(lq) ?? false),
+                );
+              }}
+              getPrimaryLabel={(p) =>
+                p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
               }
-              getPrimaryLabel={(p) => p.nombre}
               getSecondaryLabel={(p) => p.unidadMedida ?? undefined}
               placeholderCerrado="Elegí un producto…"
-              placeholderBuscar="Buscar producto…"
+              placeholderBuscar="Buscar por nombre o código…"
               inputClassName={INPUT}
               noItemsSlot={
                 <div className="space-y-2">

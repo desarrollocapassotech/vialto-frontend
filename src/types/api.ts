@@ -302,6 +302,7 @@ export interface Producto {
   id: string;
   tenantId: string;
   nombre: string;
+  codigo: string | null;
   descripcion: string | null;
   unidadMedida: string | null;
   activo: boolean;
