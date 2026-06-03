@@ -54,6 +54,108 @@ export function mantenerIdSiEnLista<T extends { id: string }>(
   return lista.some((x) => x.id === s) ? s : '';
 }
 
+/** Une listas de maestro sin duplicar por `id` (p. ej. entidades creadas en la sesión). */
+export function mergeMaestroPorId<T extends { id: string }>(base: T[], extras: T[]): T[] {
+  if (extras.length === 0) return base;
+  const ids = new Set(base.map((x) => x.id));
+  return [...base, ...extras.filter((x) => !ids.has(x.id))];
+}
+
+function stubCliente(v: Viaje, c: { id: string; nombre: string }): Cliente {
+  return {
+    id: c.id,
+    tenantId: v.tenantId,
+    nombre: c.nombre,
+    pais: null,
+    idFiscal: null,
+    condicionIva: null,
+    condicionTributaria: null,
+    createdAt: '',
+  };
+}
+
+function stubTransportista(v: Viaje, t: { id: string; nombre: string }): Transportista {
+  return {
+    id: t.id,
+    tenantId: v.tenantId,
+    nombre: t.nombre,
+    pais: null,
+    idFiscal: null,
+    email: null,
+    telefono: null,
+    domicilio: null,
+    condicionIva: null,
+    condicionTributaria: null,
+    createdAt: '',
+  };
+}
+
+function stubVehiculo(
+  v: Viaje,
+  veh: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>,
+): Vehiculo {
+  return {
+    id: veh.id,
+    tenantId: v.tenantId,
+    patente: veh.patente,
+    tipo: veh.tipo,
+    marca: null,
+    modelo: null,
+    anio: null,
+    kmActual: 0,
+    nroChasis: null,
+    poliza: null,
+    vencimientoPoliza: null,
+    tara: null,
+    precinto: null,
+    transportistaId: null,
+    createdAt: '',
+  };
+}
+
+/** Stubs mínimos desde relaciones del viaje (para que los selectores muestren la etiqueta). */
+export function entidadesMaestroStubsDesdeViaje(v: Viaje): {
+  clientes: Cliente[];
+  transportistas: Transportista[];
+  vehiculos: Vehiculo[];
+} {
+  const clientes: Cliente[] = [];
+  const transportistas: Transportista[] = [];
+  const vehiculos: Vehiculo[] = [];
+
+  if (v.cliente) clientes.push(stubCliente(v, v.cliente));
+  if (v.transportista) transportistas.push(stubTransportista(v, v.transportista));
+  if (v.transportistaEfectivo) {
+    transportistas.push(stubTransportista(v, v.transportistaEfectivo));
+  }
+  for (const vv of v.vehiculosViaje ?? []) {
+    if (vv.vehiculo) vehiculos.push(stubVehiculo(v, vv.vehiculo));
+  }
+
+  return { clientes, transportistas, vehiculos };
+}
+
+export type MaestroListasViaje = {
+  clientes: Cliente[];
+  choferes: Chofer[];
+  transportistas: Transportista[];
+  vehiculos: Vehiculo[];
+};
+
+/** Listas de maestro para edición: catálogo + stubs del viaje. */
+export function maestroListasParaEdicionViaje(
+  v: Viaje,
+  base: MaestroListasViaje,
+): MaestroListasViaje {
+  const stubs = entidadesMaestroStubsDesdeViaje(v);
+  return {
+    clientes: mergeMaestroPorId(base.clientes, stubs.clientes),
+    transportistas: mergeMaestroPorId(base.transportistas, stubs.transportistas),
+    choferes: base.choferes,
+    vehiculos: mergeMaestroPorId(base.vehiculos, stubs.vehiculos),
+  };
+}
+
 export function vehiculoIdsDesdeRows(rows: { vehiculoId: string }[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
