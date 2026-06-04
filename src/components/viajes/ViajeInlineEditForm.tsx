@@ -4,7 +4,6 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import {
   ViajeOperacionTipoFieldset,
@@ -96,7 +95,6 @@ export function ViajeInlineEditForm({
           : {
               transportistaId: '',
               choferExternoId: '',
-              vehiculoExternoId: '',
               choferId: normalizarIdEnLista(p.choferId, choferesPropios),
               vehiculosRows:
                 p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -196,8 +194,8 @@ export function ViajeInlineEditForm({
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex min-w-0 flex-col gap-1">
+                <div className="grid gap-3">
+                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={LABEL}>Chofer (opcional)</span>
                     <ChoferSearchSelect
                       choferes={choferes}
@@ -207,23 +205,20 @@ export function ViajeInlineEditForm({
                       aria-label="Chofer transportista externo"
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Vehículo (opcional)</span>
-                    <VehiculoPatenteSearchSelect
-                      vehiculos={vehiculos}
-                      value={draft.vehiculoExternoId}
-                      onChange={(id) => set({ vehiculoExternoId: id })}
-                      sinOpciones={vehiculos.length === 0}
-                      inputClassName={INPUT}
-                      aria-label="Vehículo transportista externo"
-                    />
-                  </div>
+                  <ViajeVehiculosLista
+                    groupId={`viaje-sa-ext-${draft.numero || 'e'}`}
+                    crearVehiculoHref={crearVehiculoHref ?? '/vehiculos/nuevo'}
+                    rows={draft.vehiculosRows}
+                    onChange={(rows) => set({ vehiculosRows: rows })}
+                    vehiculos={vehiculos}
+                    alMenosUno={false}
+                  />
                 </div>
               </div>
             }
             propioContent={
               <div className="grid gap-3">
-                <div className="flex min-w-0 max-w-md flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 max-w-md">
                   <span className={LABEL}>Chofer (flota propia)</span>
                   <ChoferSearchSelect
                     choferes={choferesPropios}

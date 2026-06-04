@@ -828,19 +828,18 @@ export function ViajesTenantPage({
       choferExternoId: esExterno ? mantenerIdSiEnLista(v.choferId, listas.choferes) : '',
       transportistaId: mantenerIdSiEnLista(v.transportistaId, listas.transportistas),
       vehiculosRows:
-        !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
+        v.vehiculosViaje && v.vehiculosViaje.length > 0
           ? [...v.vehiculosViaje]
               .sort((a, b) => a.orden - b.orden)
               .map((x) => ({
                 tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
-                vehiculoId: mantenerIdSiEnLista(x.vehiculoId, vehiculosPropiosEdit),
+                vehiculoId: esExterno
+                  ? String(x.vehiculoId ?? '').trim()
+                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropiosEdit),
               }))
           : !esExterno
             ? [{ tipo: 'tractor', vehiculoId: '' }]
             : [],
-      vehiculoExternoId: esExterno
-        ? mantenerIdSiEnLista(v.vehiculosViaje?.[0]?.vehiculoId, listas.vehiculos)
-        : '',
       clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
@@ -1068,7 +1067,6 @@ export function ViajesTenantPage({
                   realizaFlete: true,
                   transportistaEfectivoId: '',
                   choferExternoId: '',
-                  vehiculoExternoId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -1162,7 +1160,7 @@ export function ViajesTenantPage({
                   ? null
                   : draft.transportistaEfectivoId.trim() || null,
                 choferId: draft.choferExternoId.trim() || null,
-                vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
+                vehiculoIds: vids,
               }
             : {
                 transportistaId: null,

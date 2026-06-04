@@ -7,7 +7,6 @@ import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
@@ -56,10 +55,10 @@ import {
   ViajeVehiculosLista,
   type ViajeVehiculoRowDraft,
 } from '@/components/viajes/ViajeVehiculosLista';
+import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
-import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   estadoViajeLabel,
@@ -70,7 +69,6 @@ import {
   VIAJE_ESTADOS_ALTA,
 } from '@/lib/viajesEstados';
 import { fechaHoraToIso } from '@/lib/viajeFechaHora';
-import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo } from '@/types/api';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { type OpcionProducto, type ViajeProductoItem } from '@/lib/productosViaje';
@@ -102,8 +100,8 @@ export function ViajeCreatePage() {
   const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<string | null>(null);
   const [modoOperacion, setModoOperacion] = useState<ViajeOperacionModo>('externo');
   const [vehiculosRows, setVehiculosRows] = useState<ViajeVehiculoRowDraft[]>([]);
+  const [vehiculosExternosRows, setVehiculosExternosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [choferExternoId, setChoferExternoId] = useState('');
-  const [vehiculoExternoId, setVehiculoExternoId] = useState('');
   const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
   const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
@@ -131,7 +129,7 @@ export function ViajeCreatePage() {
   const [otrosGastos, setOtrosGastos] = useState<OtroGastoDraft[]>([]);
   const [pagosTransportista, setPagosTransportista] = useState<PagoTransportistaDraft[]>([]);
 
-  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop';
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
@@ -221,6 +219,37 @@ export function ViajeCreatePage() {
     };
   }, [getToken, isLoaded, isSignedIn, tenantId]);
 
+  async function refreshVehiculosMaestro() {
+    if (refreshingFlota) return;
+    setRefreshingFlota(true);
+    setError(null);
+    try {
+      let vehiculosData: Vehiculo[];
+      if (tenantId) {
+        vehiculosData = await apiJson<Vehiculo[]>(
+          `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`,
+          () => getToken(),
+        );
+        setLocalVehiculos(vehiculosData);
+      } else {
+        vehiculosData = await maestro.refreshVehiculos();
+      }
+      setVehiculosExternosRows((rows) =>
+        rows.map((row) => {
+          const candidatos = vehiculosPorTipo(vehiculosData, row.tipo);
+          return {
+            ...row,
+            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
+          };
+        }),
+      );
+    } catch (e) {
+      setError(friendlyError(e, 'viajes'));
+    } finally {
+      setRefreshingFlota(false);
+    }
+  }
+
   async function refreshFlotaVehiculos() {
     if (refreshingFlota) return;
     setRefreshingFlota(true);
@@ -277,12 +306,13 @@ export function ViajeCreatePage() {
     if (m === 'externo') {
       setChoferId('');
       setVehiculosRows([]);
+      setVehiculosExternosRows([]);
     } else {
       setTransportistaId('');
       setRealizaFlete(true);
       setTransportistaEfectivoId('');
       setChoferExternoId('');
-      setVehiculoExternoId('');
+      setVehiculosExternosRows([]);
       setChoferId('');
       setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
       setPagosTransportista([]);
@@ -312,7 +342,9 @@ export function ViajeCreatePage() {
       return;
     }
     setTransportistaEfectivoError(null);
-    const vids = vehiculoIdsDesdeRows(vehiculosRows);
+    const vids = externo
+      ? vehiculoIdsDesdeRows(vehiculosExternosRows)
+      : vehiculoIdsDesdeRows(vehiculosRows);
     if (!externo && vids.length === 0) {
       setError('Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).');
       return;
@@ -409,7 +441,7 @@ export function ViajeCreatePage() {
                 contratanteRealizaFlete: realizaFlete,
                 transportistaEfectivoId: realizaFlete ? null : transportistaEfectivoId.trim() || null,
                 choferId: choferExternoId.trim() || null,
-                vehiculoIds: vehiculoExternoId.trim() ? [vehiculoExternoId.trim()] : [],
+                vehiculoIds: vids,
               }
             : {
                 transportistaId: null,
@@ -677,8 +709,8 @@ export function ViajeCreatePage() {
                     )}
                   </div>
                 )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex min-w-0 flex-col gap-1">
+                <div className="grid gap-3">
+                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={fieldLabelClass}>Chofer (opcional)</span>
                     <ChoferSearchSelect
                       choferes={choferes}
@@ -689,18 +721,23 @@ export function ViajeCreatePage() {
                       onNuevo={() => setQuickCreate('chofer-ext')}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Vehículo (opcional)</span>
-                    <VehiculoPatenteSearchSelect
-                      vehiculos={vehiculos}
-                      value={vehiculoExternoId}
-                      onChange={setVehiculoExternoId}
-                      sinOpciones={vehiculos.length === 0}
-                      inputClassName={inputClass}
-                      aria-label="Vehículo transportista externo"
-                      onNuevo={() => setQuickCreate('vehiculo-ext')}
-                    />
-                  </div>
+                  <ViajeVehiculosLista
+                    groupId="viaje-create-ext"
+                    crearVehiculoHref={
+                      tenantId
+                        ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tenantId)}`
+                        : '/vehiculos/nuevo'
+                    }
+                    rows={vehiculosExternosRows}
+                    onChange={setVehiculosExternosRows}
+                    vehiculos={vehiculos}
+                    alMenosUno={false}
+                    onRefreshVehiculos={() => void refreshVehiculosMaestro()}
+                    refreshingVehiculos={refreshingFlota}
+                    getToken={getToken}
+                    tenantId={tenantId || undefined}
+                    onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}
+                  />
                 </div>
               </div>
             }
@@ -927,18 +964,6 @@ export function ViajeCreatePage() {
           } else {
             setChoferId(c.id);
           }
-          setQuickCreate(null);
-        }}
-      />
-    )}
-    {quickCreate === 'vehiculo-ext' && (
-      <VehiculoModal
-        getToken={getToken}
-        tenantId={tenantId || undefined}
-        onClose={() => setQuickCreate(null)}
-        onSaved={(v) => {
-          setSessionVehiculos((prev) => [...prev, v]);
-          setVehiculoExternoId(v.id);
           setQuickCreate(null);
         }}
       />
