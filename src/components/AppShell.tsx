@@ -3,6 +3,7 @@ import {
   OrganizationSwitcher,
   UserButton,
   useAuth,
+  useClerk,
   useOrganization,
   useUser,
 } from '@clerk/clerk-react';
@@ -20,6 +21,7 @@ import {
   Receipt,
   Truck,
   Users,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from './Logo';
@@ -43,12 +45,17 @@ type NavGroup = {
 export function AppShell() {
   const { organization } = useOrganization();
   const { orgRole } = useAuth();
+  const { signOut } = useClerk();
   const { user, isLoaded: userLoaded } = useUser();
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const location = useLocation();
 
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+
+  async function handleSignOut() {
+    await signOut();
+  }
 
   const navLoading = !userLoaded || tenantLoading;
 
@@ -193,7 +200,7 @@ export function AppShell() {
           </span>
         </div>
       )}
-      <aside className="w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6">
+      <aside className="w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 sticky top-0 h-screen overflow-y-auto">
         <div className="px-1">
           <Logo heightClass="h-14 max-w-[11rem]" />
           <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
@@ -250,16 +257,24 @@ export function AppShell() {
               Empresa
             </p>
             <div className="w-full min-w-0">
-              <OrganizationSwitcher
-                hidePersonal
-                afterCreateOrganizationUrl="/"
-                afterSelectOrganizationUrl="/"
-                appearance={orgSwitcherSidebarAppearance}
-              />
+              {superadmin ? (
+                <OrganizationSwitcher
+                  hidePersonal
+                  afterCreateOrganizationUrl="/"
+                  afterSelectOrganizationUrl="/"
+                  appearance={orgSwitcherSidebarAppearance}
+                />
+              ) : (
+                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80">
+                  {organization?.name ?? 'Empresa no disponible'}
+                </div>
+              )}
             </div>
             {!organization && (
               <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
-                Elegí o creá una empresa para ver los datos de tu equipo.
+                {superadmin
+                  ? 'Elegí o creá una empresa para ver los datos de tu equipo.'
+                  : 'No podés cambiar la empresa con este rol.'}
               </p>
             )}
           </div>
@@ -283,13 +298,25 @@ export function AppShell() {
                     </div>
                   )}
                 </div>
-                <UserButton
-                  afterSignOutUrl="/sign-in"
-                  appearance={clickableAvatarUserButtonAppearance}
-                />
+                {superadmin && (
+                  <UserButton
+                    afterSignOutUrl="/sign-in"
+                    appearance={clickableAvatarUserButtonAppearance}
+                  />
+                )}
               </div>
               <p className="text-sm text-white/90 truncate flex-1">{accountName}</p>
             </div>
+            {!superadmin && (
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                className="mt-2 flex w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Cerrar sesión</span>
+              </button>
+            )}
             <div className="pl-0.5 pt-1 space-y-0.5">
               <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
                 Rol
