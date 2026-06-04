@@ -3,6 +3,7 @@ import type { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import {
   canAccessFacturacion,
   canAccessViajes,
+  canAccessStock,
 } from '@/lib/tenantModules';
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -31,6 +32,7 @@ function MetricCard({
   formatValue = formatMoney,
   valueTone,
   linkTo,
+  alwaysLink,
   simpleCount,
 }: {
   title: string;
@@ -41,6 +43,7 @@ function MetricCard({
   formatValue?: (n: number) => string;
   valueTone?: 'default' | 'positiveCash' | 'payable' | 'warn';
   linkTo?: string;
+  alwaysLink?: boolean;
   /** Muestra un conteo simple en lugar de la métrica comparativa. */
   simpleCount?: number;
 }) {
@@ -67,7 +70,7 @@ function MetricCard({
       : 'text-white';
 
   const effectiveCount = simpleCount !== undefined ? simpleCount : m.current;
-  const showLink = !!linkTo && !loading && effectiveCount > 0;
+  const showLink = !!linkTo && !loading && (alwaysLink || effectiveCount > 0);
   const cardClass = `group bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between${showLink ? ' hover:bg-vialto-graphite transition-colors cursor-pointer' : ''}`;
   const inner = (
     <>
@@ -439,6 +442,7 @@ interface TenantOwnerDashboardProps {
 export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProps) {
   const showViajes = canAccessViajes(modules);
   const showFin = canAccessFacturacion(modules) || showViajes;
+  const showStock = canAccessStock(modules);
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -447,7 +451,6 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
     { id: 'custom', label: 'Personalizado' },
   ];
 
-  const hasAnyBlock = showFin || showViajes;
   const fin = dash.data?.financiero;
   const viajes = dash.data?.viajes;
 
@@ -516,13 +519,6 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         >
           {dash.error}
         </div>
-      )}
-
-      {!hasAnyBlock && (
-        <p className="text-vialto-steel text-sm max-w-xl">
-          Los resúmenes de negocio aparecen cuando tenés activos los módulos de
-          facturación y/o viajes.
-        </p>
       )}
 
       {showFin && (
@@ -604,6 +600,51 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
               loading={dash.loading}
               valueTone="positiveCash"
               linkTo="/viajes?estado=cobrado"
+            />
+          </div>
+        </section>
+      )}
+
+      {showStock && (
+        <section aria-labelledby="stock-heading">
+          <h2
+            id="stock-heading"
+            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel mb-3"
+          >
+            Stock
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="Productos en catálogo"
+              tooltip="Productos activos registrados en el catálogo"
+              simpleCount={dash.data?.stock?.totalProductos ?? 0}
+              loading={dash.loading}
+              linkTo="/base-de-datos?tab=productos"
+              alwaysLink
+            />
+            <MetricCard
+              title="Clientes"
+              tooltip="Clientes registrados"
+              simpleCount={dash.data?.stock?.totalClientes ?? 0}
+              loading={dash.loading}
+              linkTo="/base-de-datos?tab=clientes"
+              alwaysLink
+            />
+            <MetricCard
+              title="Ingresos"
+              tooltip="Ingresos de mercadería registrados en el período seleccionado"
+              simpleCount={dash.data?.stock?.ingresosHoy ?? 0}
+              loading={dash.loading}
+              valueTone="positiveCash"
+              linkTo="/stock/ingresos"
+            />
+            <MetricCard
+              title="Egresos"
+              tooltip="Egresos / despachos registrados en el período seleccionado"
+              simpleCount={dash.data?.stock?.egresosHoy ?? 0}
+              loading={dash.loading}
+              valueTone="payable"
+              linkTo="/stock/egresos"
             />
           </div>
         </section>
