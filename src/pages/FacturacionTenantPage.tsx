@@ -15,7 +15,8 @@ import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import {
   monedaUnicaDeViajes,
@@ -88,6 +89,7 @@ export function FacturacionTenantPage({
   embeddedInSuperadmin?: boolean;
 } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const abm = useAbmToast();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
@@ -300,7 +302,7 @@ export function FacturacionTenantPage({
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, platform ? 'plataforma' : 'facturacion'));
+        if (!cancelled) setError(abm.fail(e, platform ? 'plataforma' : 'facturacion'));
       }
     })();
     return () => {
@@ -408,11 +410,12 @@ export function FacturacionTenantPage({
         method: 'POST',
         body: JSON.stringify(facturaPayloadFromDraft(draft)),
       });
+      abm.success(abmToast.created(EL.factura));
       setCreating(false);
       setDraft(emptyFacturaDraft());
       await refetchFacturas();
     } catch (e) {
-      setDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+      setDraftError(abm.fail(e, 'facturacion'));
     } finally {
       setSaving(false);
     }
@@ -454,9 +457,10 @@ export function FacturacionTenantPage({
         },
       );
       setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
+      abm.success(abmToast.updated(EL.factura));
       cancelEdit();
     } catch (e) {
-      setEditError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+      setEditError(abm.fail(e, 'facturacion'));
     } finally {
       setSavingEditId(null);
     }
@@ -471,10 +475,11 @@ export function FacturacionTenantPage({
     try {
       await apiJson(facturaUrl(f.id), () => getToken(), { method: 'DELETE' });
       setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
+      abm.success(abmToast.deleted(EL.factura));
       if (editingId === f.id) cancelEdit();
       setFacturaDeleteConfirm(null);
-    } catch {
-      /* sin toaster */
+    } catch (e) {
+      setError(abm.fail(e, 'facturacion'));
     } finally {
       setDeletingId(null);
     }

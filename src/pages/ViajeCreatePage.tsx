@@ -42,7 +42,8 @@ import {
   preserveAmountOnMonedaChange,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
@@ -88,6 +89,7 @@ export function ViajeCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
@@ -192,7 +194,7 @@ export function ViajeCreatePage() {
           setLocalVehiculos(vehiculosData);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'viajes'));
+        if (!cancelled) setError(abm.fail(e, 'viajes'));
       } finally {
         if (!cancelled) setLocalLoadingRefs(false);
       }
@@ -254,7 +256,7 @@ export function ViajeCreatePage() {
         }),
       );
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       setRefreshingFlota(false);
     }
@@ -440,9 +442,10 @@ export function ViajeCreatePage() {
           pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
+      abm.success(abmToast.created(EL.viaje));
       navigate('/viajes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       submitBusyRef.current = false;
       setLoading(false);

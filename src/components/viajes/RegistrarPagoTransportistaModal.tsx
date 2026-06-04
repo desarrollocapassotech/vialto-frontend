@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import {
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
@@ -26,6 +27,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showPagosAnteriores, setShowPagosAnteriores] = useState(false);
+  const abm = useAbmToast();
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
@@ -82,10 +84,11 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );
+      abm.success(abmToast.saved(EL.pago));
       resetForm();
       onSuccess(updated);
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       setSaving(false);
     }

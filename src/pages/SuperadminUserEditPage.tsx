@@ -8,7 +8,8 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import type { PlatformUser } from '@/types/api';
 
 const ROLE_OPTIONS = [
@@ -35,6 +36,7 @@ export function SuperadminUserEditPage() {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abm = useAbmToast();
 
   useEffect(() => {
     if (!userId || !tenantId) {
@@ -55,7 +57,7 @@ export function SuperadminUserEditPage() {
           setDisplayName([data.firstName, data.lastName].filter(Boolean).join(' ') || 'Sin nombre');
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'plataforma'));
+        if (!cancelled) setError(abm.fail(e, 'plataforma'));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -75,11 +77,12 @@ export function SuperadminUserEditPage() {
         () => getToken(),
         { method: 'PATCH', body: JSON.stringify({ role }) },
       );
+      abm.success(abmToast.updated(EL.usuario));
       navigate(`/superadmin/usuarios?tenantId=${encodeURIComponent(tenantId)}`, {
         replace: true,
       });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setLoading(false);
     }
@@ -97,11 +100,12 @@ export function SuperadminUserEditPage() {
         () => getToken(),
         { method: 'DELETE' },
       );
+      abm.success(abmToast.deleted(EL.usuario));
       navigate(`/superadmin/usuarios?tenantId=${encodeURIComponent(tenantId)}`, {
         replace: true,
       });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setDeleting(false);
     }

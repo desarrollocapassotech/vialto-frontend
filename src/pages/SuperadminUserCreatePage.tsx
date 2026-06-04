@@ -7,7 +7,8 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast } from '@/lib/toastAbm';
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -26,6 +27,7 @@ export function SuperadminUserCreatePage() {
   const [role, setRole] = useState<(typeof ROLES)[number]['value']>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abm = useAbmToast();
 
   async function onSubmit() {
     if (!tenantId) {
@@ -64,11 +66,12 @@ export function SuperadminUserCreatePage() {
           }),
         },
       );
+      abm.success(abmToast.invited());
       navigate(`/superadmin/usuarios?tenantId=${encodeURIComponent(tenantId)}`, {
         replace: true,
       });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setLoading(false);
     }

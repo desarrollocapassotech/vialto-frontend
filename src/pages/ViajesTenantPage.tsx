@@ -19,7 +19,8 @@ import {
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
 } from '@/lib/currencyMask';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
@@ -117,6 +118,7 @@ export function ViajesTenantPage({
   embeddedInSuperadmin?: boolean;
 } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const abm = useAbmToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
@@ -431,7 +433,7 @@ export function ViajesTenantPage({
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, platform ? 'plataforma' : 'viajes'));
+          setError(abm.fail(e, platform ? 'plataforma' : 'viajes'));
           setListadoRefetching(false);
         }
       }
@@ -912,9 +914,10 @@ export function ViajesTenantPage({
       if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
       if (emitirCvlpViaje?.id === v.id) setEmitirCvlpViaje(null);
       if (facturarOpcionState?.viaje.id === v.id) setFacturarOpcionState(null);
+      abm.success(abmToast.deleted(EL.viaje));
       setViajeDeleteConfirm(null);
     } catch (e) {
-      setError(friendlyError(e, platform ? 'plataforma' : 'viajes'));
+      setError(abm.fail(e, platform ? 'plataforma' : 'viajes'));
     } finally {
       setDeletingViajeId(null);
     }
@@ -982,9 +985,10 @@ export function ViajesTenantPage({
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev));
+      abm.success(abmToast.saved(EL.viaje));
       setEstadoQuickId(null);
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       setSavingEstadoId(null);
     }
@@ -1049,7 +1053,7 @@ export function ViajesTenantPage({
       setFacturarOpcionState(null);
       navigate('/facturacion', { state: { ...facturacionNavExtras(), expandFacturaId: opcion.facturaId } });
     } catch (e) {
-      setError(friendlyError(e, 'facturacion'));
+      setError(abm.fail(e, 'facturacion'));
     } finally {
       setFacturarOpcionBusy(false);
     }
@@ -1199,9 +1203,10 @@ export function ViajesTenantPage({
         transportistas: mergeMaestroPorId(prev.transportistas, stubs.transportistas),
         vehiculos: mergeMaestroPorId(prev.vehiculos, stubs.vehiculos),
       }));
+      abm.success(abmToast.saved(EL.viaje));
       cancelEdit();
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       setSavingId(null);
     }

@@ -6,8 +6,9 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { validateClienteForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
@@ -18,6 +19,7 @@ export function ClienteCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
@@ -67,9 +69,10 @@ export function ClienteCreatePage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
+      abm.success(abmToast.created(EL.cliente));
       navigate('/clientes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'clientes'));
+      setError(abm.fail(e, 'clientes'));
     } finally {
       setLoading(false);
     }

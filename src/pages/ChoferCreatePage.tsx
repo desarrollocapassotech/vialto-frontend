@@ -11,8 +11,9 @@ import {
   validarDniForm,
   type ChoferFormState,
 } from '@/lib/choferForm';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { abmToast, EL } from '@/lib/toastAbm';
 
 const emptyForm = (): ChoferFormState => ({
   nombre: '',
@@ -26,6 +27,7 @@ export function ChoferCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [form, setForm] = useState<ChoferFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -56,9 +58,10 @@ export function ChoferCreatePage() {
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshChoferes();
+      abm.success(abmToast.created(EL.chofer));
       navigate('/choferes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'choferes'));
+      setError(abm.fail(e, 'choferes'));
     } finally {
       setLoading(false);
     }

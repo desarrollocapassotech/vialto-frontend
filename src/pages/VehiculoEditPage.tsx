@@ -7,8 +7,9 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { abmToast, EL } from '@/lib/toastAbm';
 import {
   vehiculoFormStateFromApi,
   vehiculoWritePayloadFromForm,
@@ -32,6 +33,7 @@ export function VehiculoEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [form, setForm] = useState<VehiculoFormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState('');
@@ -56,7 +58,7 @@ export function VehiculoEditPage() {
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'vehiculos'));
+        if (!cancelled) setError(abm.fail(e, 'vehiculos'));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -85,9 +87,10 @@ export function VehiculoEditPage() {
         body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
+      abm.success(abmToast.updated(EL.vehiculo));
       navigate('/vehiculos', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setError(abm.fail(e, 'vehiculos'));
     } finally {
       setLoading(false);
     }
@@ -104,9 +107,10 @@ export function VehiculoEditPage() {
         method: 'DELETE',
       });
       if (!tenantId) void maestro.refreshVehiculos();
+      abm.success(abmToast.deleted(EL.vehiculo));
       navigate('/vehiculos', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setError(abm.fail(e, 'vehiculos'));
     } finally {
       setDeleting(false);
     }

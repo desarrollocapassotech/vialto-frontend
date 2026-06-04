@@ -6,8 +6,9 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
@@ -32,6 +33,7 @@ export function VehiculoCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -62,9 +64,10 @@ export function VehiculoCreatePage() {
         body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
+      abm.success(abmToast.created(EL.vehiculo));
       navigate('/vehiculos', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setError(abm.fail(e, 'vehiculos'));
     } finally {
       setLoading(false);
     }

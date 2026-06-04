@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import type { Vehiculo } from '@/types/api';
@@ -37,6 +38,7 @@ export function VehiculoModal({
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -52,12 +54,13 @@ export function VehiculoModal({
         method: 'POST',
         body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
+      abm.success(abmToast.created(EL.vehiculo));
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
           ? 'Ya existe un vehículo con esa patente.'
-          : friendlyError(e, 'vehiculos'),
+          : abm.fail(e, 'vehiculos'),
       );
     } finally {
       setSaving(false);

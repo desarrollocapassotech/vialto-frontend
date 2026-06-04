@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TenantForm, type TenantFormValues } from '@/components/superadmin/TenantForm';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import type { Tenant } from '@/types/api';
 
 function mapTenantToForm(t: Tenant): TenantFormValues {
@@ -31,6 +32,7 @@ export function SuperadminTenantEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [tenantName, setTenantName] = useState('');
+  const abm = useAbmToast();
 
   useEffect(() => {
     if (!orgId) return;
@@ -49,7 +51,7 @@ export function SuperadminTenantEditPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(friendlyError(e, 'plataforma'));
+          setError(abm.fail(e, 'plataforma'));
         }
       } finally {
         if (!cancelled) setInitialLoading(false);
@@ -77,9 +79,10 @@ export function SuperadminTenantEditPage() {
           whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
         }),
       });
+      abm.success(abmToast.updated(EL.empresa));
       navigate('/', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setLoading(false);
     }
@@ -96,9 +99,10 @@ export function SuperadminTenantEditPage() {
       await apiJson(`/api/tenants/${encodeURIComponent(orgId)}`, () => getToken(), {
         method: 'DELETE',
       });
+      abm.success(abmToast.deleted(EL.empresa));
       navigate('/', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setDeleteLoading(false);
     }

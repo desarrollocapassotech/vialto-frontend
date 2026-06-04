@@ -8,9 +8,10 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { TransportistaPautHelperNotice } from '@/components/transportistas/TransportistaPautHelperNotice';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { apiJson } from '@/lib/api';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { validateTransportistaForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -22,6 +23,7 @@ export function TransportistaEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
@@ -77,7 +79,7 @@ export function TransportistaEditPage() {
           );
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'transportistas'));
+        if (!cancelled) setError(abm.fail(e, 'transportistas'));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -126,9 +128,10 @@ export function TransportistaEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
+      abm.success(abmToast.updated(EL.transportista));
       navigate('/transportistas', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'transportistas'));
+      setError(abm.fail(e, 'transportistas'));
     } finally {
       setLoading(false);
     }
@@ -144,9 +147,10 @@ export function TransportistaEditPage() {
         : `/api/transportistas/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshTransportistas();
+      abm.success(abmToast.deleted(EL.transportista));
       navigate('/transportistas', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'transportistas'));
+      setError(abm.fail(e, 'transportistas'));
     } finally {
       setDeleting(false);
     }

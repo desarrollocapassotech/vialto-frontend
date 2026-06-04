@@ -7,9 +7,10 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { TransportistaPautHelperNotice } from '@/components/transportistas/TransportistaPautHelperNotice';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { apiJson } from '@/lib/api';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { validateTransportistaForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -19,6 +20,7 @@ export function TransportistaCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [pais, setPais] = useState<PaisCodigo | ''>('');
@@ -74,9 +76,10 @@ export function TransportistaCreatePage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
+      abm.success(abmToast.created(EL.transportista));
       navigate('/transportistas', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'transportistas'));
+      setError(abm.fail(e, 'transportistas'));
     } finally {
       setLoading(false);
     }

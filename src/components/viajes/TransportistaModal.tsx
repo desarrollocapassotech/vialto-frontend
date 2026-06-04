@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { validateTransportistaForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -30,6 +31,7 @@ export function TransportistaModal({
   const [telefono, setTelefono] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -63,12 +65,13 @@ export function TransportistaModal({
           telefono: telefono.trim() || undefined,
         }),
       });
+      abm.success(abmToast.created(EL.transportista));
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
           ? 'Ya existe un transportista con ese ID fiscal.'
-          : friendlyError(e, 'transportistas'),
+          : abm.fail(e, 'transportistas'),
       );
     } finally {
       setSaving(false);

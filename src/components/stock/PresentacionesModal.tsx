@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import type { Presentacion, Producto } from '@/types/api';
 
@@ -35,6 +36,7 @@ export function PresentacionesModal({
   const [unidad, setUnidad] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   const load = useCallback(async () => {
     try {
@@ -42,7 +44,7 @@ export function PresentacionesModal({
       setRows(data);
       setLoadError(null);
     } catch (e) {
-      setLoadError(friendlyError(e, 'stock'));
+      setLoadError(abm.fail(e, 'stock'));
     }
   }, [presentacionesUrl, qs, getToken]);
 
@@ -83,6 +85,7 @@ export function PresentacionesModal({
           () => getToken(),
           { method: 'PATCH', body: JSON.stringify(body) },
         );
+        abm.success(abmToast.updated(EL.presentacion));
         setFormOpen(false);
         await load();
       } else {
@@ -91,12 +94,13 @@ export function PresentacionesModal({
           () => getToken(),
           { method: 'POST', body: JSON.stringify(body) },
         );
+        abm.success(abmToast.created(EL.presentacion));
         setFormOpen(false);
         await load();
         onPresentacionCreada?.(created);
       }
     } catch (e) {
-      setFormError(friendlyError(e, 'stock'));
+      setFormError(abm.fail(e, 'stock'));
     } finally {
       setSaving(false);
     }
@@ -110,9 +114,10 @@ export function PresentacionesModal({
         () => getToken(),
         { method: 'DELETE' },
       );
+      abm.success(abmToast.deleted(EL.presentacion));
       await load();
     } catch (e) {
-      setLoadError(friendlyError(e, 'stock'));
+      setLoadError(abm.fail(e, 'stock'));
     }
   }
 

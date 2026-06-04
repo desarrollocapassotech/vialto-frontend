@@ -1,7 +1,8 @@
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import type { Producto, PaginatedMeta } from '@/types/api';
 import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
@@ -33,6 +34,7 @@ export function ProductosTenantPage() {
   const [unidadFiltro, setUnidadFiltro] = useState('');
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
   const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
+  const abm = useAbmToast();
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -63,7 +65,7 @@ export function ProductosTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'stock'));
+          setError(abm.fail(e, 'stock'));
         }
       }
     })();
@@ -88,9 +90,10 @@ export function ProductosTenantPage() {
         () => getToken(),
         { method: 'PATCH', body: JSON.stringify({ activo: !row.activo }) },
       );
+      abm.success(row.activo ? abmToast.deactivated(EL.producto) : abmToast.activated(EL.producto));
       await load();
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(abm.fail(e, 'stock'));
     }
   }
 

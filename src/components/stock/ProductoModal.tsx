@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import type { Producto } from '@/types/api';
 
@@ -32,6 +33,7 @@ export function ProductoModal({
   const [unidadMedida, setUnidadMedida] = useState(productoInicial?.unidadMedida ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   const opcionesSelect = useMemo(() => {
     const out: { value: string; label: string }[] = UNIDADES_PRODUCTO_OPCIONES.map((o) => ({ value: o.value, label: o.label }));
@@ -67,12 +69,13 @@ export function ProductoModal({
           { method: 'PATCH', body: JSON.stringify(body) },
         );
       }
+      abm.success(modo === 'create' ? abmToast.created(EL.producto) : abmToast.updated(EL.producto));
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
           ? 'Ya existe un producto con ese nombre (sin distinguir mayúsculas).'
-          : friendlyError(e, 'stock'),
+          : abm.fail(e, 'stock'),
       );
     } finally {
       setSaving(false);

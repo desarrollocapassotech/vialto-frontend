@@ -7,9 +7,10 @@ import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { apiJson } from '@/lib/api';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { validateClienteForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -21,6 +22,7 @@ export function ClienteEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [nombre, setNombre] = useState('');
   const [idFiscal, setIdFiscal] = useState('');
@@ -59,7 +61,7 @@ export function ClienteEditPage() {
           setDireccion(row.direccion ?? '');
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'clientes'));
+        if (!cancelled) setError(abm.fail(e, 'clientes'));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -109,9 +111,10 @@ export function ClienteEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
+      abm.success(abmToast.updated(EL.cliente));
       navigate('/clientes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'clientes'));
+      setError(abm.fail(e, 'clientes'));
     } finally {
       setLoading(false);
     }
@@ -131,9 +134,10 @@ export function ClienteEditPage() {
         method: 'DELETE',
       });
       if (!tenantId) void maestro.refreshClientes();
+      abm.success(abmToast.deleted(EL.cliente));
       navigate('/clientes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'clientes'));
+      setError(abm.fail(e, 'clientes'));
     } finally {
       setDeleting(false);
     }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import {
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
@@ -27,8 +28,9 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGastosAnteriores, setShowGastosAnteriores] = useState(false);
+  const abm = useAbmToast();
 
-  if (!open || viaje == null) return null;
+  if (!open || !viaje) return null;
   const viajeActual = viaje;
   const gastos = viajeActual.otrosGastos ?? [];
 
@@ -79,10 +81,11 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );
+      abm.success(abmToast.saved(EL.gasto));
       resetForm();
       onSuccess(updated);
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(abm.fail(e, 'viajes'));
     } finally {
       setSaving(false);
     }

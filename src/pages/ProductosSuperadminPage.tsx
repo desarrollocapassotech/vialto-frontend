@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import type { Producto, PaginatedMeta } from '@/types/api';
 import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
@@ -34,6 +35,7 @@ export function ProductosSuperadminPage() {
   const [unidadFiltro, setUnidadFiltro] = useState('');
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
   const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
+  const abm = useAbmToast();
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
@@ -71,7 +73,7 @@ export function ProductosSuperadminPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'plataforma'));
+          setError(abm.fail(e, 'plataforma'));
         }
       }
     })();
@@ -96,9 +98,10 @@ export function ProductosSuperadminPage() {
         () => getToken(),
         { method: 'PATCH', body: JSON.stringify({ activo: !row.activo }) },
       );
+      abm.success(row.activo ? abmToast.deactivated(EL.producto) : abmToast.activated(EL.producto));
       await load();
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     }
   }
 

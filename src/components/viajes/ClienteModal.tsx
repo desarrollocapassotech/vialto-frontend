@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { validateClienteForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -31,6 +32,7 @@ export function ClienteModal({
   const [telefono, setTelefono] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -64,12 +66,13 @@ export function ClienteModal({
           telefono: telefono.trim() || undefined,
         }),
       });
+      abm.success(abmToast.created(EL.cliente));
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
           ? 'Ya existe un cliente con ese ID fiscal.'
-          : friendlyError(e, 'clientes'),
+          : abm.fail(e, 'clientes'),
       );
     } finally {
       setSaving(false);

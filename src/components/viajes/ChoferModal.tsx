@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 import { choferWritePayloadFromForm, validarDniForm, type ChoferFormState } from '@/lib/choferForm';
 import type { Chofer } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
@@ -22,6 +23,7 @@ export function ChoferModal({
   const [form, setForm] = useState<ChoferFormState>({ nombre: '', dni: '', cuit: '', telefono: '' });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const abm = useAbmToast();
 
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -39,12 +41,13 @@ export function ChoferModal({
         method: 'POST',
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
+      abm.success(abmToast.created(EL.chofer));
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
           ? 'Ya existe un chofer con ese DNI.'
-          : friendlyError(e, 'choferes'),
+          : abm.fail(e, 'choferes'),
       );
     } finally {
       setSaving(false);

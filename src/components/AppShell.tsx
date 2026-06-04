@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { Logo } from './Logo';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { MaestroDataProvider } from '@/hooks/useMaestroData';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 import { canAccessFacturacion, canAccessLiquidacionesArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
@@ -273,9 +274,11 @@ export function AppShell() {
       </aside>
 
       <main className="flex-1 min-w-0 p-8">
-        <MaestroDataProvider>
-          <Outlet />
-        </MaestroDataProvider>
+        <ToastProvider>
+          <MaestroDataProvider>
+            <Outlet />
+          </MaestroDataProvider>
+        </ToastProvider>
       </main>
     </div>
   );

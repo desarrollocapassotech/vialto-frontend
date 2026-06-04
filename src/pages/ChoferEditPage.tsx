@@ -13,8 +13,9 @@ import {
   validarDniForm,
   type ChoferFormState,
 } from '@/lib/choferForm';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { abmToast, EL } from '@/lib/toastAbm';
 import type { Chofer } from '@/types/api';
 
 function choferDetailUrl(id: string, tenantId: string): string {
@@ -30,6 +31,7 @@ export function ChoferEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const abm = useAbmToast();
   const maestro = useMaestroData();
   const [form, setForm] = useState<ChoferFormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState('');
@@ -54,7 +56,7 @@ export function ChoferEditPage() {
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'choferes'));
+        if (!cancelled) setError(abm.fail(e, 'choferes'));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -83,9 +85,10 @@ export function ChoferEditPage() {
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) await maestro.refreshChoferes();
+      abm.success(abmToast.updated(EL.chofer));
       navigate('/choferes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'choferes'));
+      setError(abm.fail(e, 'choferes'));
     } finally {
       setLoading(false);
     }
@@ -98,9 +101,10 @@ export function ChoferEditPage() {
     try {
       await apiJson(choferDetailUrl(id, tenantId), () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshChoferes();
+      abm.success(abmToast.deleted(EL.chofer));
       navigate('/choferes', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'choferes'));
+      setError(abm.fail(e, 'choferes'));
     } finally {
       setDeleting(false);
     }

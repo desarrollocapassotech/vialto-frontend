@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TenantForm, type TenantFormValues } from '@/components/superadmin/TenantForm';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAbmToast } from '@/hooks/useAbmToast';
+import { abmToast, EL } from '@/lib/toastAbm';
 
 const INITIAL_VALUES: TenantFormValues = {
   name: '',
@@ -19,6 +20,7 @@ export function SuperadminTenantCreatePage() {
   const [values, setValues] = useState<TenantFormValues>(INITIAL_VALUES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abm = useAbmToast();
 
   async function onSubmit() {
     const name = values.name.trim();
@@ -48,9 +50,10 @@ export function SuperadminTenantCreatePage() {
           modules: values.modules,
         }),
       });
+      abm.success(abmToast.created(EL.empresa));
       navigate('/', { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(abm.fail(e, 'plataforma'));
     } finally {
       setLoading(false);
     }
