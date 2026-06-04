@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { ConEmpresa, Transportista } from '@/types/api';
@@ -12,7 +13,7 @@ export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Transportista>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
   const tenants = useTenantsList();
 
@@ -56,7 +57,7 @@ export function TransportistasSuperadminPage() {
         Elegí una empresa para ver y administrar sus transportistas.
       </p>
       <div className="mt-6">
-        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={setFiltroEmpresa} />
+        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
       </div>
       <div className="mt-4 flex justify-end">
         <Link

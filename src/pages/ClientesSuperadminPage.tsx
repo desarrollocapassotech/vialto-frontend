@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Cliente, ConEmpresa } from '@/types/api';
@@ -12,7 +13,7 @@ export function ClientesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Cliente>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
 
@@ -60,7 +61,7 @@ export function ClientesSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">

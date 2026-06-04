@@ -440,7 +440,7 @@ export function ViajeCreatePage() {
           pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
-      navigate('/viajes', { replace: true });
+      navigate(`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
@@ -466,7 +466,7 @@ export function ViajeCreatePage() {
     <>
     <CrudPageLayout
       title="Crear viaje"
-      backTo="/viajes"
+      backTo={`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`}
       backLabel="← Volver a viajes"
     >
       {loadingRefs ? (

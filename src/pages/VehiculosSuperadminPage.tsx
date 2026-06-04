@@ -5,6 +5,7 @@ import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
 import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
@@ -13,7 +14,7 @@ import type { ConEmpresa, Vehiculo } from '@/types/api';
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
     !filtroEmpresa,
@@ -72,7 +73,7 @@ export function VehiculosSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">
