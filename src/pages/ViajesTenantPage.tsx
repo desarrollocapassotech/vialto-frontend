@@ -23,6 +23,10 @@ import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
   flotaPropiaVehiculosListaValida,
+  entidadesMaestroStubsDesdeViaje,
+  maestroListasParaEdicionViaje,
+  mantenerIdSiEnLista,
+  mergeMaestroPorId,
   mensajesAyudaFlotaPropia,
   normalizarIdEnLista,
   nombreClienteListadoViaje,
@@ -34,6 +38,7 @@ import {
   vehiculosFlotaPropia,
   mensajeErrorTransportistaEfectivoExterno,
   transportistaEfectivoIdDesdeViaje,
+  type MaestroListasViaje,
 } from '@/lib/viajesFlota';
 import {
   ViajeGananciaBrutaCelda,
@@ -243,9 +248,23 @@ export function ViajesTenantPage({
   );
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
+  /** Maestros fusionados (catálogo + sesión + relaciones del viaje) mientras el modal de edición está abierto. */
+  const [edicionMaestro, setEdicionMaestro] = useState<MaestroListasViaje | null>(null);
+  const [sessionMaestro, setSessionMaestro] = useState<MaestroListasViaje>({
+    clientes: [],
+    choferes: [],
+    transportistas: [],
+    vehiculos: [],
+  });
 
-  const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
-  const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
+  const choferesPropios = useMemo(
+    () => choferesFlotaPropia(edicionMaestro?.choferes ?? choferes),
+    [edicionMaestro?.choferes, choferes],
+  );
+  const vehiculosPropios = useMemo(
+    () => vehiculosFlotaPropia(edicionMaestro?.vehiculos ?? vehiculos),
+    [edicionMaestro?.vehiculos, vehiculos],
+  );
   const ayudaFlotaListado = useMemo(
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
@@ -679,6 +698,55 @@ export function ViajesTenantPage({
     if (draft?.operacionModo === 'externo') setViajeEditHint(null);
   }, [draft?.operacionModo]);
 
+  function upsertMaestroEdicion<K extends keyof MaestroListasViaje>(
+    key: K,
+    item: MaestroListasViaje[K][number],
+  ) {
+    const mergeOne = <T extends { id: string }>(prev: T[]) => mergeMaestroPorId(prev, [item as unknown as T]);
+    setSessionMaestro((prev) => ({
+      ...prev,
+      [key]: mergeOne(prev[key] as { id: string }[]),
+    } as MaestroListasViaje));
+    setEdicionMaestro((prev) =>
+      prev
+        ? ({
+            ...prev,
+            [key]: mergeOne(prev[key] as { id: string }[]),
+          } as MaestroListasViaje)
+        : prev,
+    );
+    if (platform) {
+      if (key === 'clientes') setClientesP((prev) => mergeOne(prev));
+      if (key === 'choferes') setChoferesP((prev) => mergeOne(prev));
+      if (key === 'transportistas') setTransportistasP((prev) => mergeOne(prev));
+      if (key === 'vehiculos') setVehiculosP((prev) => mergeOne(prev));
+    }
+  }
+
+  async function fetchMaestroListasFresh(): Promise<MaestroListasViaje> {
+    if (platform) {
+      const q = `tenantId=${encodeURIComponent(tid)}`;
+      const [c, ch, tr, vh] = await Promise.all([
+        apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
+        apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
+        apiJson<Transportista[]>(`/api/platform/transportistas?${q}`, () => getToken()),
+        apiJson<Vehiculo[]>(`/api/platform/vehiculos?${q}`, () => getToken()),
+      ]);
+      setClientesP(c);
+      setChoferesP(ch);
+      setTransportistasP(tr);
+      setVehiculosP(vh);
+      return { clientes: c, choferes: ch, transportistas: tr, vehiculos: vh };
+    }
+    const [c, ch, tr, vh] = await Promise.all([
+      maestro.refreshClientes(),
+      maestro.refreshChoferes(),
+      maestro.refreshTransportistas(),
+      maestro.refreshVehiculos(),
+    ]);
+    return { clientes: c, choferes: ch, transportistas: tr, vehiculos: vh };
+  }
+
   /** Carga el viaje desde la API antes de abrir el editor (evita datos viejos en el listado). */
   async function beginEditViaje(v: Viaje, origen: 'listado' | 'remoto' = 'listado') {
     let viaje = v;
@@ -690,17 +758,48 @@ export function ViajesTenantPage({
         /* usar fila del listado */
       }
     }
-    startEdit(viaje, origen);
+    try {
+      const fresh = await fetchMaestroListasFresh();
+      const conSesion: MaestroListasViaje = {
+        clientes: mergeMaestroPorId(fresh.clientes, sessionMaestro.clientes),
+        choferes: mergeMaestroPorId(fresh.choferes, sessionMaestro.choferes),
+        transportistas: mergeMaestroPorId(fresh.transportistas, sessionMaestro.transportistas),
+        vehiculos: mergeMaestroPorId(fresh.vehiculos, sessionMaestro.vehiculos),
+      };
+      const merged = maestroListasParaEdicionViaje(viaje, conSesion);
+      setEdicionMaestro(merged);
+      startEdit(viaje, origen, merged);
+    } catch {
+      const merged = maestroListasParaEdicionViaje(viaje, {
+        clientes,
+        choferes,
+        transportistas,
+        vehiculos,
+      });
+      setEdicionMaestro(merged);
+      startEdit(viaje, origen, merged);
+    }
   }
 
-  function startEdit(v: Viaje, origen: 'listado' | 'remoto' = 'listado') {
+  function startEdit(
+    v: Viaje,
+    origen: 'listado' | 'remoto' = 'listado',
+    listas: MaestroListasViaje = {
+      clientes,
+      choferes,
+      transportistas,
+      vehiculos,
+    },
+  ) {
     if (origen === 'listado') setViajeSnapshotRemoto(null);
     else setViajeSnapshotRemoto(v);
     setEstadoQuickId(null);
     setError(null);
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? '').trim();
-    const chRow = choferes.find((c) => c.id === v.choferId);
+    const chRow = listas.choferes.find((c) => c.id === v.choferId);
+    const choferesPropiosEdit = choferesFlotaPropia(listas.choferes);
+    const vehiculosPropiosEdit = vehiculosFlotaPropia(listas.vehiculos);
     const partes: string[] = [];
     if (!esExterno && v.choferId && chRow?.transportistaId) {
       partes.push(
@@ -709,7 +808,7 @@ export function ViajesTenantPage({
     }
     if (!esExterno && v.vehiculosViaje?.length) {
       for (const vv of v.vehiculosViaje) {
-        const vr = vehiculos.find((x) => x.id === vv.vehiculoId);
+        const vr = listas.vehiculos.find((x) => x.id === vv.vehiculoId);
         if (vr?.transportistaId) {
           partes.push(
             'Algún vehículo del viaje figura con transportista externo en su ficha; elegí flota propia o actualizá el maestro.',
@@ -724,11 +823,10 @@ export function ViajesTenantPage({
     setDraft({
       numero: v.numero ?? '',
       estado: v.estado ?? 'pendiente',
-      clienteId: v.clienteId ?? '',
       operacionModo: esExterno ? 'externo' : 'propio',
-      choferId: normalizarIdEnLista(v.choferId, choferesPropios),
-      choferExternoId: esExterno ? (v.choferId ?? '') : '',
-      transportistaId: v.transportistaId ?? '',
+      choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
+      choferExternoId: esExterno ? mantenerIdSiEnLista(v.choferId, listas.choferes) : '',
+      transportistaId: mantenerIdSiEnLista(v.transportistaId, listas.transportistas),
       vehiculosRows:
         v.vehiculosViaje && v.vehiculosViaje.length > 0
           ? [...v.vehiculosViaje]
@@ -737,11 +835,12 @@ export function ViajesTenantPage({
                 tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
                 vehiculoId: esExterno
                   ? String(x.vehiculoId ?? '').trim()
-                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropios),
+                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropiosEdit),
               }))
-          : esExterno
-            ? []
-            : [{ tipo: 'tractor', vehiculoId: '' }],
+          : !esExterno
+            ? [{ tipo: 'tractor', vehiculoId: '' }]
+            : [],
+      clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
       paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
@@ -772,13 +871,17 @@ export function ViajesTenantPage({
       otrosGastos: (v.otrosGastos ?? []).map(otroGastoDraftFromApi),
       pagosTransportista: (v.pagosTransportista ?? []).map(pagoTransportistaDraftFromApi),
       realizaFlete: !transportistaEfectivoIdDesdeViaje(v),
-      transportistaEfectivoId: transportistaEfectivoIdDesdeViaje(v),
+      transportistaEfectivoId: mantenerIdSiEnLista(
+        transportistaEfectivoIdDesdeViaje(v),
+        listas.transportistas,
+      ),
     });
   }
 
   function cancelEdit() {
     setEditingId(null);
     setDraft(null);
+    setEdicionMaestro(null);
     setViajeSnapshotRemoto(null);
     setEstadoQuickId(null);
     setViajeEditHint(null);
@@ -840,7 +943,7 @@ export function ViajesTenantPage({
           v = await apiJson<Viaje>(viajeApiUrl(id), () => getToken());
         }
         if (cancelled || !v) return;
-        startEdit(v, 'remoto');
+        void beginEditViaje(v, 'remoto');
       } catch {
         /* viaje inexistente o sin permiso */
       } finally {
@@ -1087,6 +1190,13 @@ export function ViajesTenantPage({
         }),
       });
       setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
+      const stubs = entidadesMaestroStubsDesdeViaje(updated);
+      setSessionMaestro((prev) => ({
+        clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
+        choferes: prev.choferes,
+        transportistas: mergeMaestroPorId(prev.transportistas, stubs.transportistas),
+        vehiculos: mergeMaestroPorId(prev.vehiculos, stubs.vehiculos),
+      }));
       cancelEdit();
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
@@ -1715,15 +1825,19 @@ export function ViajesTenantPage({
           setDraft={setDraft}
           snapshotViaje={viajeEdicionSnapshot}
           opcionesProducto={opcionesProductoModal}
-          clientes={clientes}
-          choferes={choferes}
-          transportistas={transportistas}
-          vehiculos={vehiculos}
+          clientes={edicionMaestro?.clientes ?? clientes}
+          choferes={edicionMaestro?.choferes ?? choferes}
+          transportistas={edicionMaestro?.transportistas ?? transportistas}
+          vehiculos={edicionMaestro?.vehiculos ?? vehiculos}
           choferesPropios={choferesPropios}
           vehiculosPropios={vehiculosPropios}
           viajesConFactura={viajesConFactura}
           onModoChange={applyDraftModo}
-          ayudaFlota={ayudaFlotaListado}
+          ayudaFlota={
+            edicionMaestro
+              ? mensajesAyudaFlotaPropia(edicionMaestro.choferes, edicionMaestro.vehiculos)
+              : ayudaFlotaListado
+          }
           viajeEditHint={viajeEditHint}
           fechaCargaError={fechaCargaError}
           fechaDescargaError={fechaDescargaError}
@@ -1750,7 +1864,12 @@ export function ViajesTenantPage({
             platform ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}` : undefined
           }
           getToken={getToken}
+          tenantId={platform ? tid : undefined}
           onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
+          onClienteCreado={(c) => upsertMaestroEdicion('clientes', c)}
+          onTransportistaCreado={(t) => upsertMaestroEdicion('transportistas', t)}
+          onChoferCreado={(c) => upsertMaestroEdicion('choferes', c)}
+          onVehiculoCreado={(v) => upsertMaestroEdicion('vehiculos', v)}
         />
       )}
 

@@ -11,7 +11,10 @@ import {
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
-import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import {
+  preserveAmountOnMonedaChange,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
   mensajesAyudaFlotaPropia,
@@ -131,7 +134,12 @@ export function ViajeInlineEditForm({
                 />
                 <MonedaSelect
                   value={draft.monedaMonto}
-                  onChange={(m: ViajeMonedaCodigo) => set({ monedaMonto: m })}
+                  onChange={(m: ViajeMonedaCodigo) =>
+                    set({
+                      monedaMonto: m,
+                      monto: preserveAmountOnMonedaChange(draft.monto, draft.monedaMonto, m),
+                    })
+                  }
                   aria-label="Moneda monto a facturar"
                 />
               </div>
@@ -171,7 +179,14 @@ export function ViajeInlineEditForm({
                       <MonedaSelect
                         value={draft.monedaPrecioTransportistaExterno}
                         onChange={(m: ViajeMonedaCodigo) =>
-                          set({ monedaPrecioTransportistaExterno: m })
+                          set({
+                            monedaPrecioTransportistaExterno: m,
+                            precioTransportistaExterno: preserveAmountOnMonedaChange(
+                              draft.precioTransportistaExterno,
+                              draft.monedaPrecioTransportistaExterno,
+                              m,
+                            ),
+                          })
                         }
                         aria-label="Moneda precio transportista externo"
                       />

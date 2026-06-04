@@ -124,22 +124,24 @@ export function MovimientoStockDetallePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Presentación
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{row.presentacion?.nombre ?? '—'}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
             Empresa / Cliente
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">{row.cliente?.nombre ?? row.clienteId}</dd>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Cantidad
+            Pallets
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">
-            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad}</span>
+            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidadPallets}</span>
+          </dd>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+            Suelto
+          </dt>
+          <dd className="sm:col-span-2 text-vialto-charcoal">
+            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidadSuelto}</span>
           </dd>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">

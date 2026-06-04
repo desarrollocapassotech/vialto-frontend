@@ -29,7 +29,10 @@ import {
   emptyPagoTransportista,
   type PagoTransportistaDraft,
 } from '@/components/viajes/PagosTransportistaFieldset';
-import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import {
+  preserveAmountOnMonedaChange,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import {
   estadoMuestraKmLitros,
@@ -353,7 +356,15 @@ export function ViajeEditModal({
                 <MonedaSelect
                   value={draft.monedaMonto}
                   onChange={(m: ViajeMonedaCodigo) =>
-                    setDraft((p) => (p ? { ...p, monedaMonto: m } : p))
+                    setDraft((p) =>
+                      p
+                        ? {
+                            ...p,
+                            monedaMonto: m,
+                            monto: preserveAmountOnMonedaChange(p.monto, p.monedaMonto, m),
+                          }
+                        : p,
+                    )
                   }
                   aria-label="Moneda monto a facturar"
                 />
@@ -409,7 +420,17 @@ export function ViajeEditModal({
                           value={draft.monedaPrecioTransportistaExterno}
                           onChange={(m: ViajeMonedaCodigo) =>
                             setDraft((p) =>
-                              p ? { ...p, monedaPrecioTransportistaExterno: m } : p,
+                              p
+                                ? {
+                                    ...p,
+                                    monedaPrecioTransportistaExterno: m,
+                                    precioTransportistaExterno: preserveAmountOnMonedaChange(
+                                      p.precioTransportistaExterno,
+                                      p.monedaPrecioTransportistaExterno,
+                                      m,
+                                    ),
+                                  }
+                                : p,
                             )
                           }
                           aria-label="Moneda precio transportista externo"

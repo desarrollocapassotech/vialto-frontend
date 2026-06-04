@@ -7,7 +7,6 @@ import { friendlyError } from '@/lib/friendlyError';
 import type { Producto, PaginatedMeta } from '@/types/api';
 import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
-import { PresentacionesModal } from '@/components/stock/PresentacionesModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
@@ -16,8 +15,7 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'create' }
   | { mode: 'view'; producto: Producto }
-  | { mode: 'edit'; producto: Producto }
-  | { mode: 'presentaciones'; producto: Producto };
+  | { mode: 'edit'; producto: Producto };
 
 export function ProductosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -29,6 +27,8 @@ export function ProductosSuperadminPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [codigoFiltroInput, setCodigoFiltroInput] = useState('');
+  const [codigoFiltro, setCodigoFiltro] = useState('');
   const [nombreFiltroInput, setNombreFiltroInput] = useState('');
   const [nombreFiltro, setNombreFiltro] = useState('');
   const [unidadFiltro, setUnidadFiltro] = useState('');
@@ -43,6 +43,7 @@ export function ProductosSuperadminPage() {
       filtroActivo,
       tenantId: filtroEmpresa,
     });
+    if (codigoFiltro) params.set('codigo', codigoFiltro);
     if (nombreFiltro) params.set('q', nombreFiltro);
     if (unidadFiltro) params.set('unidadMedida', unidadFiltro);
     const data = await apiJson<Paginated>(
@@ -51,7 +52,7 @@ export function ProductosSuperadminPage() {
     );
     setRows(data.items);
     setMeta(data.meta);
-  }, [getToken, isLoaded, isSignedIn, filtroEmpresa, page, pageSize, nombreFiltro, unidadFiltro, filtroActivo]);
+  }, [getToken, isLoaded, isSignedIn, filtroEmpresa, page, pageSize, codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -81,7 +82,7 @@ export function ProductosSuperadminPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [nombreFiltro, unidadFiltro, filtroActivo, filtroEmpresa]);
+  }, [codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo, filtroEmpresa]);
 
   async function toggleActivo(row: Producto) {
     const mensaje = row.activo
@@ -103,13 +104,16 @@ export function ProductosSuperadminPage() {
 
   const anyFiltroActivo = useMemo(
     () =>
+      Boolean(codigoFiltro.trim()) ||
       Boolean(nombreFiltro.trim()) ||
       Boolean(unidadFiltro) ||
       filtroActivo !== 'todos',
-    [nombreFiltro, unidadFiltro, filtroActivo],
+    [codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo],
   );
 
   function limpiarFiltros() {
+    setCodigoFiltroInput('');
+    setCodigoFiltro('');
     setNombreFiltroInput('');
     setNombreFiltro('');
     setUnidadFiltro('');
@@ -169,6 +173,36 @@ export function ProductosSuperadminPage() {
                 <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
                   <th scope="col" className="px-4 py-3 align-top">
                     <ViajesListadoHeaderFiltro
+                      title="Código"
+                      filterActive={!!codigoFiltro.trim()}
+                      filterSignature={codigoFiltro}
+                    >
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={codigoFiltroInput}
+                          onChange={(e) => setCodigoFiltroInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') setCodigoFiltro(codigoFiltroInput.trim());
+                          }}
+                          placeholder="Buscar…"
+                          className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
+                            codigoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                          }`}
+                          aria-label="Filtrar por código de producto"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCodigoFiltro(codigoFiltroInput.trim())}
+                          className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    </ViajesListadoHeaderFiltro>
+                  </th>
+                  <th scope="col" className="px-4 py-3 align-top">
+                    <ViajesListadoHeaderFiltro
                       title="Nombre"
                       filterActive={!!nombreFiltro.trim()}
                       filterSignature={nombreFiltro}
@@ -221,9 +255,6 @@ export function ProductosSuperadminPage() {
                     </ViajesListadoHeaderFiltro>
                   </th>
                   <th scope="col" className="px-4 py-3 align-top">
-                    Presentaciones
-                  </th>
-                  <th scope="col" className="px-4 py-3 align-top">
                     <ViajesListadoHeaderFiltro
                       title="Estado"
                       filterActive={filtroActivo !== 'todos'}
@@ -267,6 +298,9 @@ export function ProductosSuperadminPage() {
                 )}
                 {rows?.map((r) => (
                   <tr key={r.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
+                    <td className="px-4 py-3 font-mono text-sm text-vialto-steel">
+                      {r.codigo ?? '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-[family-name:var(--font-ui)] font-semibold tracking-wide">
                         {r.nombre}
@@ -276,15 +310,6 @@ export function ProductosSuperadminPage() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-vialto-steel">{etiquetaUnidadProducto(r.unidadMedida)}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setModal({ mode: 'presentaciones', producto: r })}
-                        className="text-xs uppercase tracking-wider text-vialto-fire hover:underline"
-                      >
-                        Ver / gestionar
-                      </button>
-                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={
@@ -414,15 +439,6 @@ export function ProductosSuperadminPage() {
             setModal({ mode: 'closed' });
             await load();
           }}
-        />
-      )}
-      {modal.mode === 'presentaciones' && filtroEmpresa && (
-        <PresentacionesModal
-          producto={modal.producto}
-          baseUrl="/api/platform/stock/productos"
-          tenantId={filtroEmpresa}
-          getToken={getToken}
-          onClose={() => setModal({ mode: 'closed' })}
         />
       )}
     </div>

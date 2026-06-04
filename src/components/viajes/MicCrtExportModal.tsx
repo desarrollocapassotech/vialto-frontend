@@ -2,6 +2,12 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
+import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
+import {
+  labelCampo,
+  labelCampoCrt,
+  MIC_CRT_LEGAL_DISCLAIMER,
+} from '@/lib/micCrtFieldLabels';
 import { micCrtExportBodyForApi, normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from '@/types/micCrtDocumento';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -15,8 +21,6 @@ type Props = {
   tenantId?: string;
   onGenerated?: () => void;
 };
-
-type MissingGroup = { fields: string[]; entityId?: string };
 
 const inputClass =
   'w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
@@ -100,12 +104,38 @@ function FormGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-2 sm:grid-cols-2">{children}</div>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <label className="grid gap-0.5">
+    <label className={`grid gap-0.5 ${className ?? ''}`}>
       <span className={labelClass}>{label}</span>
       {children}
     </label>
+  );
+}
+
+function MicCrtLegalDisclaimer({ className }: { className?: string }) {
+  return (
+    <div
+      role="note"
+      className={`rounded border border-amber-300/90 bg-amber-50 px-3 py-2.5 text-xs text-amber-950 leading-relaxed ${className ?? ''}`}
+    >
+      <p className="font-semibold uppercase tracking-wide text-[10px] text-amber-900">
+        Atención
+      </p>
+      <p className="mt-1">{MIC_CRT_LEGAL_DISCLAIMER}</p>
+      <p className="mt-1.5 text-amber-900/85">
+        Los números entre paréntesis en cada etiqueta corresponden al formulario MIC/DTA impreso
+        (se indica CRT cuando aplica a la carta de porte).
+      </p>
+    </div>
   );
 }
 
@@ -137,7 +167,7 @@ function ActorBlock({
           <input className={inputClass} value={actor.calle} disabled={disabled}
             onChange={(e) => set('calle', e.target.value)} />
         </Field>
-        <Field label="Número *">
+        <Field label="Número de domicilio">
           <input className={inputClass} value={actor.numero} disabled={disabled}
             onChange={(e) => set('numero', e.target.value)} />
         </Field>
@@ -173,7 +203,6 @@ function validateForm(f: MicCrtExportPayload): string | null {
     if (!actor.ciudad.trim()) return `${label}: indicá la ciudad.`;
     if (!actor.pais.trim()) return `${label}: indicá el país.`;
   }
-  if (!f.ncm.trim()) return 'Indicá el NCM.';
   if (f.bultos <= 0) return 'La cantidad de bultos debe ser mayor a 0.';
   if (!f.tipoBultos.trim()) return 'Seleccioná el tipo de bultos.';
   if (f.pesoBrutoKg <= 0) return 'El peso bruto debe ser mayor a 0.';
@@ -205,7 +234,6 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [missingGroups, setMissingGroups] = useState<Record<string, MissingGroup> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,7 +244,15 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
         const data = await apiJson<MicCrtPrefillResponse>(prefillUrl(), getToken);
         if (!cancelled) setForm(normalizeMicCrtPayload(data.prefill, data.operativo));
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'No se pudo cargar el formulario.');
+        if (!cancelled) {
+          const raw =
+            e && typeof e === 'object' && 'message' in e
+              ? (e as { message: unknown }).message
+              : e instanceof Error
+                ? e.message
+                : null;
+          setError(formatMicCrtExportError(raw));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -238,7 +274,6 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       return;
     }
     setError(null);
-    setMissingGroups(null);
     setGenerando(true);
     try {
       const res = await apiFetch(pdfUrl(), getToken, {
@@ -249,11 +284,10 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as {
-          message?: string;
-          missingGroups?: Record<string, MissingGroup>;
+          message?: string | string[];
+          missingGroups?: Record<string, { fields: string[]; entityId?: string }>;
         };
-        setMissingGroups(data.missingGroups ?? null);
-        setError(data.message ?? 'No se pudo generar el PDF.');
+        setError(formatMicCrtExportError(data.message, data.missingGroups));
         return;
       }
       const blob = await res.blob();
@@ -296,24 +330,26 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           {loading && <p className="text-xs text-vialto-steel">Cargando datos…</p>}
 
+          {form && !loading && <MicCrtLegalDisclaimer />}
+
           {form && !loading && (
             <>
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">1 · Identificación</h3>
                 <FormGrid>
-                  <Field label="Fecha de emisión *">
+                  <Field label={`${labelCampo('Fecha de emisión', 6)} *`}>
                     <input type="date" className={inputClass} value={form.fechaEmision} disabled={ocupado}
                       onChange={(e) => patch('fechaEmision', e.target.value)} />
                   </Field>
-                  <Field label="N° MIC *">
+                  <Field label={`${labelCampo('N° MIC', 4)} *`}>
                     <input className={inputClass} value={form.micNumero} disabled={ocupado}
                       onChange={(e) => patch('micNumero', e.target.value)} placeholder="Número aduanero" />
                   </Field>
-                  <Field label="N° CRT *">
+                  <Field label={`${labelCampoCrt('N° CRT', 2)} *`}>
                     <input className={inputClass} value={form.crtNumero} disabled={ocupado}
                       onChange={(e) => patch('crtNumero', e.target.value)} />
                   </Field>
-                  <Field label="Moneda documento">
+                  <Field label={labelCampo('Moneda documento', 25)}>
                     <MonedaSelect value={(form.monedaDocumento ?? form.monedaFot) as ViajeMonedaCodigo}
                       onChange={(m) => patch('monedaDocumento', m)} disabled={ocupado} />
                   </Field>
@@ -323,11 +359,11 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">2 · Actores</h3>
                 <div className="space-y-3">
-                  <ActorBlock title="Remitente" actor={form.remitente} disabled={ocupado}
+                  <ActorBlock title={labelCampo('Remitente', 33)} actor={form.remitente} disabled={ocupado}
                     onChange={(a) => patch('remitente', a)} />
-                  <ActorBlock title="Destinatario" actor={form.destinatario} disabled={ocupado}
+                  <ActorBlock title={labelCampo('Destinatario', 34)} actor={form.destinatario} disabled={ocupado}
                     onChange={(a) => patch('destinatario', a)} />
-                  <ActorBlock title="Consignatario" actor={form.consignatario} disabled={ocupado}
+                  <ActorBlock title={labelCampo('Consignatario', 35)} actor={form.consignatario} disabled={ocupado}
                     onChange={(a) => patch('consignatario', a)} />
                 </div>
               </section>
@@ -335,15 +371,16 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">3 · Detalle aduanero</h3>
                 <FormGrid>
-                  <Field label="NCM *">
+                  <Field label={labelCampo('NCM', 38)}>
                     <input className={inputClass} value={form.ncm} disabled={ocupado}
+                      placeholder="Opcional"
                       onChange={(e) => patch('ncm', e.target.value)} />
                   </Field>
-                  <Field label="Cantidad de bultos *">
+                  <Field label={`${labelCampo('Cantidad de bultos', 31)} *`}>
                     <input type="number" min={0} className={inputClass} value={form.bultos || ''} disabled={ocupado}
                       onChange={(e) => patch('bultos', Number(e.target.value) || 0)} />
                   </Field>
-                  <Field label="Tipo de bultos *">
+                  <Field label={`${labelCampo('Tipo de bultos', 30)} *`}>
                     <select className={inputClass} value={form.tipoBultos} disabled={ocupado}
                       onChange={(e) => patch('tipoBultos', e.target.value)}>
                       {TIPOS_BULTOS_MIC.map((t) => (
@@ -351,20 +388,20 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                       ))}
                     </select>
                   </Field>
-                  <Field label="Peso bruto total (kg) *">
+                  <Field label={`${labelCampo('Peso bruto total (kg)', 32)} *`}>
                     <input type="number" min={0} step="0.01" className={inputClass} value={form.pesoBrutoKg || ''} disabled={ocupado}
                       onChange={(e) => patch('pesoBrutoKg', Number(e.target.value) || 0)} />
                   </Field>
-                  <Field label="Volumen (m³)">
+                  <Field label={labelCampoCrt('Volumen (m³)', 13)}>
                     <input type="number" min={0} step="0.01" className={inputClass}
                       value={form.volumenM3 ?? ''} disabled={ocupado}
                       onChange={(e) => patch('volumenM3', e.target.value ? Number(e.target.value) : undefined)} />
                   </Field>
-                  <Field label="Descripción mercaderías">
+                  <Field label={labelCampo('Descripción mercaderías', 38)}>
                     <textarea className={`${inputClass} min-h-[60px]`} value={form.descripcionMercaderias ?? ''} disabled={ocupado}
                       onChange={(e) => patch('descripcionMercaderias', e.target.value)} />
                   </Field>
-                  <Field label="Origen comercial">
+                  <Field label={labelCampo('Origen comercial', 26)}>
                     <input
                       className={inputClass}
                       value={form.origenComercial ?? ''}
@@ -379,28 +416,28 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">4 · Valores comerciales</h3>
                 <FormGrid>
-                  <Field label="Valor FOT *">
+                  <Field label={`${labelCampo('Valor FOT', 27)} *`}>
                     <input type="number" min={0} step="0.01" className={inputClass} value={form.valorFot || ''} disabled={ocupado}
                       onChange={(e) => patch('valorFot', Number(e.target.value) || 0)} />
                   </Field>
-                  <Field label="Moneda FOT">
+                  <Field label={labelCampo('Moneda FOT', 27)}>
                     <MonedaSelect value={form.monedaFot as ViajeMonedaCodigo}
                       onChange={(m) => patch('monedaFot', m)} disabled={ocupado} />
                   </Field>
-                  <Field label="Flete internacional *">
+                  <Field label={`${labelCampo('Flete internacional', 28)} *`}>
                     <input type="number" min={0} step="0.01" className={inputClass} value={form.flete || ''} disabled={ocupado}
                       onChange={(e) => patch('flete', Number(e.target.value) || 0)} />
                   </Field>
-                  <Field label="Moneda flete">
+                  <Field label={labelCampo('Moneda flete', 28)}>
                     <MonedaSelect value={form.monedaFlete as ViajeMonedaCodigo}
                       onChange={(m) => patch('monedaFlete', m)} disabled={ocupado} />
                   </Field>
-                  <Field label="Seguro (USD)">
+                  <Field label={labelCampo('Seguro (USD)', 29)}>
                     <input type="number" min={0} step="0.01" className={inputClass}
                       value={form.seguroUsd ?? ''} disabled={ocupado}
                       onChange={(e) => patch('seguroUsd', e.target.value ? Number(e.target.value) : undefined)} />
                   </Field>
-                  <Field label="Condición de pago flete *">
+                  <Field label={`${labelCampoCrt('Condición de pago flete', 15)} *`}>
                     <select className={inputClass} value={form.condicionPago} disabled={ocupado}
                       onChange={(e) => patch('condicionPago', e.target.value as 'origen' | 'destino')}>
                       <option value="origen">Origen (Remitente)</option>
@@ -414,10 +451,10 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">5 · Anexos y aduanas</h3>
                 <fieldset className="mb-3 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
-                    Partida 
+                    {labelCampo('Partida', 7)}
                   </legend>
                   <FormGrid>
-                    <Field label="Ciudad / lugar de partida *">
+                    <Field label={`${labelCampo('Ciudad / lugar de partida', 7)} *`}>
                       <input
                         className={inputClass}
                         value={form.aduanaPartida}
@@ -426,7 +463,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                         onChange={(e) => patch('aduanaPartida', e.target.value)}
                       />
                     </Field>
-                    <Field label="País">
+                    <Field label={labelCampo('País de partida', 7)}>
                       <PaisUbicacionSelect
                         value={(form.partidaPais?.trim() || '') as PaisCodigo | ''}
                         onChange={(p) => patch('partidaPais', p)}
@@ -435,7 +472,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                         className={inputClass}
                       />
                     </Field>
-                    <Field label="Aduana específica">
+                    <Field label={labelCampo('Aduana específica', 7)}>
                       <input
                         className={inputClass}
                         value={form.aduanaEspecificaPartida ?? ''}
@@ -444,7 +481,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                         onChange={(e) => patch('aduanaEspecificaPartida', e.target.value)}
                       />
                     </Field>
-                    <Field label="Código / lugar operativo">
+                    <Field label={labelCampo('Código / lugar operativo', 24)}>
                       <input
                         className={inputClass}
                         value={form.codigoLugarOperativoPartida ?? ''}
@@ -456,31 +493,37 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                   </FormGrid>
                 </fieldset>
                 <FormGrid>
-                  <Field label="Aduana destino *">
+                  <Field label={`${labelCampo('Aduana destino', 8)} *`}>
                     <input className={inputClass} value={form.aduanaDestino} disabled={ocupado}
                       onChange={(e) => patch('aduanaDestino', e.target.value)} />
                   </Field>
-                  <Field label="Documentos anexos">
+                  <Field label={labelCampo('Documentos anexos', 36)}>
                     <input className={inputClass} value={form.documentosAnexos ?? ''} disabled={ocupado}
                       onChange={(e) => patch('documentosAnexos', e.target.value)} />
                   </Field>
-                  <Field label="N° precintos">
+                  <Field label={labelCampo('N° precintos', 37)}>
                     <input className={inputClass} value={form.precintos ?? ''} disabled={ocupado}
                       onChange={(e) => patch('precintos', e.target.value)} />
                   </Field>
-                  <Field label="Carta de porte">
+                  <Field label={labelCampo('Carta de porte', 23)}>
                     <input className={inputClass} value={form.cartaPorte ?? ''} disabled={ocupado}
                       onChange={(e) => patch('cartaPorte', e.target.value)} />
                   </Field>
-                  <Field label="Ruta / plazo DTA">
-                    <input className={inputClass} value={form.ruta ?? ''} disabled={ocupado}
-                      onChange={(e) => patch('ruta', e.target.value)} />
+                  <Field label={labelCampo('Ruta / plazo DTA', 40)} className="sm:col-span-2">
+                    <textarea
+                      className={`${inputClass} min-h-[120px] resize-y leading-relaxed`}
+                      value={form.ruta ?? ''}
+                      disabled={ocupado}
+                      rows={5}
+                      placeholder={'Tramo / ruta (una línea por tramo)\nAduana y plazos\nConductores'}
+                      onChange={(e) => patch('ruta', e.target.value)}
+                    />
                   </Field>
-                  <Field label="Domicilio porteador">
+                  <Field label={labelCampo('Domicilio porteador', 1)}>
                     <input className={inputClass} value={form.porteadorDomicilio ?? ''} disabled={ocupado}
                       onChange={(e) => patch('porteadorDomicilio', e.target.value)} />
                   </Field>
-                  <Field label="País porteador">
+                  <Field label={labelCampo('País porteador', 1)}>
                     <PaisUbicacionSelect
                       value={(form.porteadorPais || 'AR') as PaisCodigo}
                       onChange={(p) => patch('porteadorPais', p)}
@@ -495,7 +538,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                     CRT · 2.ª hoja
                   </legend>
                   <div className="grid gap-3">
-                    <Field label="Porteadores sucesivos (campo 10)">
+                    <Field label={labelCampoCrt('Porteadores sucesivos', 10)}>
                       <textarea
                         className={`${inputClass} min-h-[72px]`}
                         value={form.porteadoresSucesivos ?? ''}
@@ -504,7 +547,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                         onChange={(e) => patch('porteadoresSucesivos', e.target.value)}
                       />
                     </Field>
-                    <Field label="Instrucciones sobre formalidades de aduana (campo 18)">
+                    <Field label={labelCampoCrt('Instrucciones sobre formalidades de aduana', 18)}>
                       <textarea
                         className={`${inputClass} min-h-[56px]`}
                         value={form.instruccionesFormalidadesAduana ?? ''}
@@ -514,7 +557,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                       />
                     </Field>
                     <FormGrid>
-                      <Field label="Monto flete externo">
+                      <Field label={labelCampoCrt('Monto flete externo', 19)}>
                         <MicCrtMontoInput
                           value={form.montoFleteExterno}
                           disabled={ocupado}
@@ -522,7 +565,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                           onChange={(v) => patch('montoFleteExterno', v)}
                         />
                       </Field>
-                      <Field label="Moneda flete externo">
+                      <Field label={labelCampoCrt('Moneda flete externo', 19)}>
                         <MonedaSelect
                           value={(form.monedaFleteExterno ?? form.monedaFlete) as ViajeMonedaCodigo}
                           onChange={(m) => patch('monedaFleteExterno', m)}
@@ -531,7 +574,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                       </Field>
                     </FormGrid>
                     <FormGrid>
-                      <Field label="Reembolso contra entrega">
+                      <Field label={labelCampoCrt('Reembolso contra entrega', 20)}>
                         <MicCrtMontoInput
                           value={form.montoReembolsoContraEntrega}
                           disabled={ocupado}
@@ -539,7 +582,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                           onChange={(v) => patch('montoReembolsoContraEntrega', v)}
                         />
                       </Field>
-                      <Field label="Moneda reembolso">
+                      <Field label={labelCampoCrt('Moneda reembolso', 20)}>
                         <MonedaSelect
                           value={
                             (form.monedaReembolsoContraEntrega ?? form.monedaFot) as ViajeMonedaCodigo
@@ -549,7 +592,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                         />
                       </Field>
                     </FormGrid>
-                    <Field label="Declaraciones y observaciones">
+                    <Field label={labelCampoCrt('Declaraciones y observaciones', 22)}>
                       <textarea
                         className={`${inputClass} min-h-[72px]`}
                         value={form.declaracionesObservaciones ?? ''}
@@ -562,9 +605,11 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                 </fieldset>
 
                 <fieldset className="mt-3 border border-black/10 p-3">
-                  <legend className="px-1 text-xs font-semibold text-vialto-charcoal">Semirremolque (opcional)</legend>
+                  <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
+                    Semirremolque (Campos 13–15, opcional)
+                  </legend>
                   <FormGrid>
-                    <Field label="Propietario">
+                    <Field label={labelCampo('Propietario remolque', 13)}>
                       <input className={inputClass} value={form.semirremolque?.propietario ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', { ...form.semirremolque, propietario: e.target.value })} />
                     </Field>
@@ -572,22 +617,22 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                       <input className={inputClass} value={form.semirremolque?.idFiscal ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', { ...form.semirremolque, idFiscal: e.target.value })} />
                     </Field>
-                    <Field label="Patente">
+                    <Field label={labelCampo('Patente remolque', 13)}>
                       <input className={inputClass} value={form.semirremolque?.patente ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', { ...form.semirremolque, patente: e.target.value })} />
                     </Field>
-                    <Field label="Marca">
+                    <Field label={labelCampo('Marca remolque', 13)}>
                       <input className={inputClass} value={form.semirremolque?.marca ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', { ...form.semirremolque, marca: e.target.value })} />
                     </Field>
-                    <Field label="Año">
+                    <Field label={labelCampo('Año camión', 14)}>
                       <input type="number" className={inputClass} value={form.semirremolque?.anio ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', {
                           ...form.semirremolque,
                           anio: e.target.value ? Number(e.target.value) : undefined,
                         })} />
                     </Field>
-                    <Field label="Capacidad arrastre (t)">
+                    <Field label={labelCampo('Capacidad arrastre (t)', 15)}>
                       <input type="number" min={0} step="0.1" className={inputClass}
                         value={form.semirremolque?.capacidadArrastreT ?? ''} disabled={ocupado}
                         onChange={(e) => patch('semirremolque', {
@@ -602,22 +647,13 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
           )}
 
           {error && (
-            <div className="border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 leading-snug">
               <p>{error}</p>
-              {missingGroups && (
-                <ul className="mt-2 space-y-1">
-                  {Object.entries(missingGroups).map(([g, entry]) => (
-                    <li key={g}>
-                      <span className="font-semibold">{g}:</span> {entry.fields.join(', ')}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-black/10 px-4 py-3">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-4 py-3">
           <button type="button" disabled={ocupado} onClick={onClose}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50">
             Cancelar

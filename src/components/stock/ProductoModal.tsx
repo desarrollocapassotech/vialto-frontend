@@ -109,6 +109,12 @@ export function ProductoModal({
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Nombre</p>
                 <p className="mt-1 text-sm">{productoInicial?.nombre ?? '—'}</p>
               </div>
+              {productoInicial?.codigo?.trim() && (
+                <div>
+                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Código</p>
+                  <p className="mt-1 font-mono text-sm">{productoInicial.codigo}</p>
+                </div>
+              )}
               {productoInicial?.descripcion?.trim() && (
                 <div>
                   <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Descripción</p>

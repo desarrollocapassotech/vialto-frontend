@@ -287,27 +287,16 @@ export interface ImportTemplate {
   updatedAt: string;
 }
 
-export interface Presentacion {
-  id: string;
-  tenantId: string;
-  productoId: string;
-  nombre: string;
-  cantidadEquivalente: number;
-  unidadEquivalente: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Producto {
   id: string;
   tenantId: string;
   nombre: string;
+  codigo: string | null;
   descripcion: string | null;
   unidadMedida: string | null;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
-  presentaciones?: Presentacion[];
 }
 
 export interface PlatformUser {
@@ -320,17 +309,27 @@ export interface PlatformUser {
   createdAt: number | string;
 }
 
+export interface Presentacion {
+  id: string;
+  tenantId: string;
+  productoId: string;
+  nombre: string;
+  cantidadEquivalente: number;
+  unidadEquivalente: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MovimientoStock {
   id: string;
   tenantId: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidadMedida: string };
-  presentacionId: string | null;
-  presentacion?: { id: string; nombre: string } | null;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   tipo: 'ingreso' | 'egreso' | 'division';
-  cantidad: number;
+  cantidadPallets: number;
+  cantidadSuelto: number;
   numeroRemito?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
@@ -411,10 +410,9 @@ export interface StockItem {
   tenantId: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidadMedida: string };
-  presentacionId: string;
-  presentacion?: { id: string; nombre: string };
   clienteId: string;
   cliente?: { id: string; nombre: string };
-  cantidad: number;
+  cantidadPallets: number;
+  cantidadSuelto: number;
   updatedAt: string;
 }
