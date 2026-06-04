@@ -68,6 +68,9 @@ function stubCliente(v: Viaje, c: { id: string; nombre: string }): Cliente {
     nombre: c.nombre,
     pais: null,
     idFiscal: null,
+    email: null,
+    telefono: null,
+    direccion: null,
     condicionIva: null,
     condicionTributaria: null,
     createdAt: '',
@@ -86,6 +89,9 @@ function stubTransportista(v: Viaje, t: { id: string; nombre: string }): Transpo
     domicilio: null,
     condicionIva: null,
     condicionTributaria: null,
+    paut: null,
+    permisoInternacional: null,
+    fechaVencimientoPermiso: null,
     createdAt: '',
   };
 }
@@ -101,6 +107,7 @@ function stubVehiculo(
     tipo: veh.tipo,
     marca: null,
     modelo: null,
+    año: null,
     anio: null,
     kmActual: 0,
     nroChasis: null,

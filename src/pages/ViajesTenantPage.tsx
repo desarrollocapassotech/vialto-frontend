@@ -702,17 +702,17 @@ export function ViajesTenantPage({
     key: K,
     item: MaestroListasViaje[K][number],
   ) {
-    const mergeOne = <T extends { id: string }>(prev: T[]) => mergeMaestroPorId(prev, [item as T]);
+    const mergeOne = <T extends { id: string }>(prev: T[]) => mergeMaestroPorId(prev, [item as unknown as T]);
     setSessionMaestro((prev) => ({
       ...prev,
-      [key]: mergeOne(prev[key]),
-    }));
+      [key]: mergeOne(prev[key] as { id: string }[]),
+    } as MaestroListasViaje));
     setEdicionMaestro((prev) =>
       prev
-        ? {
+        ? ({
             ...prev,
-            [key]: mergeOne(prev[key]),
-          }
+            [key]: mergeOne(prev[key] as { id: string }[]),
+          } as MaestroListasViaje)
         : prev,
     );
     if (platform) {
