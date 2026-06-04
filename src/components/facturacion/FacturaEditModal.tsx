@@ -62,10 +62,27 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
   };
 }
 
-/** Al cambiar el tipo de factura, limpiar contraparte y viajes vinculados. */
+/** Al cambiar el tipo de factura, preserva el viaje actual y actualiza la contraparte según el tipo. Si no hay viaje previo, limpia todo. */
 export function patchFacturaTipo(
   tipo: FacturaDraft['tipo'],
+  viajeActual?: Viaje | null,
 ): Pick<FacturaDraft, 'tipo' | 'clienteId' | 'transportistaId' | 'viajeIds'> {
+  if (tipo === 'transportista_externo' && viajeActual) {
+    return {
+      tipo,
+      clienteId: '',
+      transportistaId: viajeActual.transportistaId ?? '',
+      viajeIds: [viajeActual.id],
+    };
+  }
+  if (tipo === 'cliente' && viajeActual) {
+    return {
+      tipo,
+      clienteId: viajeActual.clienteId ?? '',
+      transportistaId: '',
+      viajeIds: [viajeActual.id],
+    };
+  }
   return { tipo, clienteId: '', transportistaId: '', viajeIds: [] };
 }
 
@@ -440,9 +457,11 @@ export function FacturaCreateModal({
               </label>
               <select
                 value={draft.tipo}
-                onChange={(e) =>
-                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
-                }
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
+                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
+                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
+                }}
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
                 <option value="cliente">Factura a cliente</option>
@@ -489,7 +508,7 @@ export function FacturaCreateModal({
                 Importe calculado
               </label>
               <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
               </p>
               <p className="text-[10px] text-vialto-steel">
                 Suma de los montos de los viajes (ARS y USD por separado).
@@ -667,9 +686,11 @@ export function FacturaEditModal({
               </label>
               <select
                 value={draft.tipo}
-                onChange={(e) =>
-                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
-                }
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
+                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
+                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
+                }}
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
                 <option value="cliente">Factura a cliente</option>
@@ -716,7 +737,7 @@ export function FacturaEditModal({
                 Importe calculado
               </label>
               <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
               </p>
               <p className="text-[10px] text-vialto-steel">
                 Suma de los montos de los viajes (ARS y USD por separado).
