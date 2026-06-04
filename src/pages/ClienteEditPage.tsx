@@ -109,7 +109,7 @@ export function ClienteEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
-      navigate('/clientes', { replace: true });
+      navigate('/base-de-datos?tab=clientes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'clientes'));
     } finally {
@@ -131,7 +131,7 @@ export function ClienteEditPage() {
         method: 'DELETE',
       });
       if (!tenantId) void maestro.refreshClientes();
-      navigate('/clientes', { replace: true });
+      navigate('/base-de-datos?tab=clientes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'clientes'));
     } finally {
@@ -146,7 +146,7 @@ export function ClienteEditPage() {
   return (
     <CrudPageLayout
       title="Editar cliente"
-      backTo="/clientes"
+      backTo="/base-de-datos?tab=clientes"
       backLabel="← Volver a clientes"
     >
       {initialLoading ? (

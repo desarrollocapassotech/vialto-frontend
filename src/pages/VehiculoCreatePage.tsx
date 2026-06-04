@@ -62,7 +62,7 @@ export function VehiculoCreatePage() {
         body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate('/vehiculos', { replace: true });
+      navigate('/base-de-datos?tab=vehiculos', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'vehiculos'));
     } finally {
@@ -73,7 +73,7 @@ export function VehiculoCreatePage() {
   return (
     <CrudPageLayout
       title="Crear vehículo"
-      backTo="/vehiculos"
+      backTo="/base-de-datos?tab=vehiculos"
       backLabel="← Volver a vehículos"
     >
       <form

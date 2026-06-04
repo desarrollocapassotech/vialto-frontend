@@ -56,7 +56,7 @@ export function ChoferCreatePage() {
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshChoferes();
-      navigate('/choferes', { replace: true });
+      navigate('/base-de-datos?tab=choferes', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
     } finally {
@@ -68,7 +68,7 @@ export function ChoferCreatePage() {
     'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
 
   return (
-    <CrudPageLayout title="Crear chofer" backTo="/choferes" backLabel="← Volver a choferes">
+    <CrudPageLayout title="Crear chofer" backTo="/base-de-datos?tab=choferes" backLabel="← Volver a choferes">
       <form
         className="mt-6 grid gap-4"
         onSubmit={(e) => {

@@ -126,7 +126,7 @@ export function TransportistaEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
-      navigate('/transportistas', { replace: true });
+      navigate('/base-de-datos?tab=transportistas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'transportistas'));
     } finally {
@@ -144,7 +144,7 @@ export function TransportistaEditPage() {
         : `/api/transportistas/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshTransportistas();
-      navigate('/transportistas', { replace: true });
+      navigate('/base-de-datos?tab=transportistas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'transportistas'));
     } finally {
@@ -160,7 +160,7 @@ export function TransportistaEditPage() {
   return (
     <CrudPageLayout
       title="Editar transportista"
-      backTo="/transportistas"
+      backTo="/base-de-datos?tab=transportistas"
       backLabel="← Volver a transportistas"
     >
       {initialLoading ? (

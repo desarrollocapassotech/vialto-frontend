@@ -3,10 +3,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { HomePage } from '@/pages/HomePage';
 import { ViajesPage } from '@/pages/ViajesPage';
-import { ClientesPage } from '@/pages/ClientesPage';
-import { TransportistasPage } from '@/pages/TransportistasPage';
-import { ChoferesPage } from '@/pages/ChoferesPage';
-import { VehiculosPage } from '@/pages/VehiculosPage';
+import { BaseDeDatosPage } from '@/pages/BaseDeDatosPage';
 import { SuperadminTenantCreatePage } from '@/pages/SuperadminTenantCreatePage';
 import { SuperadminTenantEditPage } from '@/pages/SuperadminTenantEditPage';
 import { ClienteCreatePage } from '@/pages/ClienteCreatePage';
@@ -18,7 +15,6 @@ import { ChoferEditPage } from '@/pages/ChoferEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
-import { ProductosPage } from '@/pages/ProductosPage';
 import { IngresosStockPage } from '@/pages/IngresosStockPage';
 import { IngresosStockHistorialPage } from '@/pages/IngresosStockHistorialPage';
 import { EgresosStockPage } from '@/pages/EgresosStockPage';
@@ -86,25 +82,27 @@ export default function App() {
           <Route path="viajes/:id/editar" element={<Navigate to="/viajes" replace />} />
           <Route path="facturacion" element={<FacturacionPage />} />
           <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
-          <Route path="stock/productos" element={<ProductosPage />} />
+          <Route path="base-de-datos" element={<BaseDeDatosPage />} />
+          {/* rutas legacy → redirigen al tab correspondiente en /base-de-datos */}
+          <Route path="clientes" element={<Navigate to="/base-de-datos?tab=clientes" replace />} />
+          <Route path="transportistas" element={<Navigate to="/base-de-datos?tab=transportistas" replace />} />
+          <Route path="choferes" element={<Navigate to="/base-de-datos?tab=choferes" replace />} />
+          <Route path="vehiculos" element={<Navigate to="/base-de-datos?tab=vehiculos" replace />} />
+          <Route path="stock/productos" element={<Navigate to="/base-de-datos?tab=productos" replace />} />
+          <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
+          <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
+          <Route path="transportistas/nuevo" element={<TransportistaCreatePage />} />
+          <Route path="transportistas/:id/editar" element={<TransportistaEditPage />} />
+          <Route path="choferes/nuevo" element={<ChoferCreatePage />} />
+          <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
+          <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
+          <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
           <Route path="stock/ingresos" element={<IngresosStockPage />} />
           <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
           <Route path="stock/egresos" element={<EgresosStockPage />} />
           <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
           <Route path="stock/movimientos" element={<StockMovimientosPage />} />
           <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
-          <Route path="clientes" element={<ClientesPage />} />
-          <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
-          <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
-          <Route path="transportistas" element={<TransportistasPage />} />
-          <Route path="transportistas/nuevo" element={<TransportistaCreatePage />} />
-          <Route path="transportistas/:id/editar" element={<TransportistaEditPage />} />
-          <Route path="choferes" element={<ChoferesPage />} />
-          <Route path="choferes/nuevo" element={<ChoferCreatePage />} />
-          <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
-          <Route path="vehiculos" element={<VehiculosPage />} />
-          <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
-          <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
           <Route path="superadmin/empresas" element={<SuperadminEmpresasPage />} />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   OrganizationSwitcher,
   UserButton,
@@ -17,7 +17,7 @@ import {
   userButtonSidebarAppearance,
 } from './clerkSidebarAppearance';
 
-type NavItem = { to: string; label: string; end?: boolean };
+type NavItem = { to: string; label: string; end?: boolean; extraActivePaths?: string[] };
 
 type NavGroup = {
   /** `null` = sin rótulo (p. ej. solo inicio). */
@@ -30,6 +30,7 @@ export function AppShell() {
   const { orgRole } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const { tenant } = useCurrentTenant();
+  const location = useLocation();
 
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
@@ -51,18 +52,11 @@ export function AppShell() {
       });
     }
 
-    const viajesModule = superadmin || canAccessViajes(tenant?.modules ?? []);
-    if (viajesModule) {
-      const items: NavItem[] = [{ to: '/viajes', label: 'Viajes' }];
-      items.push(
-        { to: '/transportistas', label: 'Transportistas' },
-        { to: '/choferes', label: 'Choferes' },
-        { to: '/vehiculos', label: 'Vehículos' },
-      );
-      if (!superadmin && !canAccessStock(tenant?.modules ?? [])) {
-        items.push({ to: '/stock/productos', label: 'Productos' });
-      }
-      groups.push({ title: 'Viajes y flota', items });
+    if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
+      groups.push({
+        title: 'Viajes y flota',
+        items: [{ to: '/viajes', label: 'Viajes' }],
+      });
     }
 
     if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
@@ -83,7 +77,6 @@ export function AppShell() {
       groups.push({
         title: 'Stock',
         items: [
-          { to: '/stock/productos', label: 'Productos' },
           { to: '/stock/ingresos', label: 'Ingresos' },
           { to: '/stock/egresos', label: 'Egresos' },
           { to: '/stock/movimientos', label: 'Movimientos', end: true },
@@ -92,8 +85,20 @@ export function AppShell() {
     }
 
     groups.push({
-      title: 'Comercial',
-      items: [{ to: '/clientes', label: 'Clientes' }],
+      title: 'Base de datos',
+      items: [
+        {
+          to: '/base-de-datos',
+          label: 'Base de datos',
+          extraActivePaths: [
+            '/clientes',
+            '/transportistas',
+            '/choferes',
+            '/vehiculos',
+            '/stock/productos',
+          ],
+        },
+      ],
     });
 
     return groups;
@@ -177,37 +182,30 @@ export function AppShell() {
           </p>
         </div>
 
-        <nav className="flex flex-col gap-5">
+        <nav className="flex flex-col gap-3">
           {navGroups.map((group, gi) => (
             <div key={group.title ?? `g-${gi}`} className="flex flex-col gap-0.5">
-              {group.title &&
-              (group.items.length > 1 ||
-                group.items[0].label.toLowerCase() !== group.title.toLowerCase()) ? (
-                <div className="mb-1.5 px-2">
-                  <div className="flex items-center gap-2 border-b border-white/20 pb-2">
-                    <span
-                      className="h-4 w-1 shrink-0 rounded-sm bg-vialto-fire/90"
-                      aria-hidden
-                    />
-                    <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.2em] text-white/95">
-                      {group.title}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
+              {gi > 0 && (
+                <div className="mb-2 border-t border-white/[0.12]" />
+              )}
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.end === true}
-                  className={({ isActive }) =>
-                    [
+                  className={({ isActive }) => {
+                    const active =
+                      isActive ||
+                      (item.extraActivePaths?.some((p) =>
+                        location.pathname.startsWith(p),
+                      ) ?? false);
+                    return [
                       'rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
-                      isActive
+                      active
                         ? 'border-vialto-fire bg-vialto-fire text-white shadow-sm'
                         : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white',
-                    ].join(' ')
-                  }
+                    ].join(' ');
+                  }}
                 >
                   {item.label}
                 </NavLink>
