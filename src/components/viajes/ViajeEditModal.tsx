@@ -171,7 +171,7 @@ export function ViajeEditModal({
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
   const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
-  const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
+  const [localVehiculos] = useState<Vehiculo[]>([]);
 
   const todosClientes = useMemo(() => {
     const ids = new Set(clientes.map((c) => c.id));
