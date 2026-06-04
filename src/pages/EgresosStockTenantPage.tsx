@@ -1,4 +1,4 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
@@ -9,9 +9,8 @@ import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelec
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, MovimientoStock, Producto, StockEgresoRemitoConfig, StockItem } from '@/types/api';
+import type { Cliente, MovimientoStock, Producto, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
-import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 
@@ -34,8 +33,7 @@ export function EgresosStockTenantPage({
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
 }) {
-  const { getToken, orgRole } = useAuth();
-  const { user } = useUser();
+  const { getToken } = useAuth();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
@@ -45,16 +43,11 @@ export function EgresosStockTenantPage({
     return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
   }, [clientesExternos, maestro.clientes, sessionClientes]);
   const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
-  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
-  const puedeEditarFormatoRemito = Boolean(tenantId) || puedeGestionar;
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
     : '/api/stock/egresos';
   const disponibleBase = platform ? '/api/platform/stock/disponible' : '/api/stock/disponible';
-  const remitoConfigUrl = platform
-    ? `/api/platform/stock/egresos/remito-config${buildQs({}, tenantId)}`
-    : '/api/stock/egresos/remito-config';
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -77,11 +70,6 @@ export function EgresosStockTenantPage({
   const [success, setSuccess] = useState(false);
   const [ultimoRemito, setUltimoRemito] = useState<string | null>(null);
   const [stockDisponible, setStockDisponible] = useState<{ pallets: number; suelto: number } | null>(null);
-  const [remitoConfig, setRemitoConfig] = useState<StockEgresoRemitoConfig | null>(null);
-  const [configDraft, setConfigDraft] = useState({ remitoPrefix: 'R', remitoDigitos: 5 });
-  const [configSaving, setConfigSaving] = useState(false);
-  const [configMsg, setConfigMsg] = useState<string | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
 
   const loadProductos = useCallback(async () => {
     setProductosLoading(true);
@@ -97,20 +85,9 @@ export function EgresosStockTenantPage({
     }
   }, [productosBase, tenantId, getToken]);
 
-  const loadRemitoConfig = useCallback(async () => {
-    try {
-      const c = await apiJson<StockEgresoRemitoConfig>(remitoConfigUrl, () => getToken());
-      setRemitoConfig(c);
-      setConfigDraft({ remitoPrefix: c.remitoPrefix, remitoDigitos: c.remitoDigitos });
-    } catch {
-      setRemitoConfig(null);
-    }
-  }, [remitoConfigUrl, getToken]);
-
   useEffect(() => {
     void loadProductos();
-    void loadRemitoConfig();
-  }, [loadProductos, loadRemitoConfig]);
+  }, [loadProductos]);
 
   useEffect(() => {
     if (!productoId || !clienteId) {
@@ -132,26 +109,6 @@ export function EgresosStockTenantPage({
       }
     })();
   }, [productoId, clienteId, disponibleBase, tenantId, getToken]);
-
-  async function guardarRemitoConfig(e: React.FormEvent) {
-    e.preventDefault();
-    setConfigMsg(null);
-    setConfigSaving(true);
-    try {
-      const method = 'PATCH';
-      const body = JSON.stringify({
-        remitoPrefix: configDraft.remitoPrefix.trim(),
-        remitoDigitos: Number(configDraft.remitoDigitos),
-      });
-      const c = await apiJson<StockEgresoRemitoConfig>(remitoConfigUrl, () => getToken(), { method, body });
-      setRemitoConfig(c);
-      setConfigMsg('Formato actualizado.');
-    } catch (e) {
-      setConfigMsg(friendlyError(e, 'stock'));
-    } finally {
-      setConfigSaving(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -226,13 +183,6 @@ export function EgresosStockTenantPage({
     }
   }
 
-  const ejemploYear =
-    fechaMov.trim().length >= 4 ? parseInt(fechaMov.slice(0, 4), 10) : new Date().getFullYear();
-  const formatoEjemplo =
-    remitoConfig != null && !Number.isNaN(ejemploYear)
-      ? `${remitoConfig.remitoPrefix}-${ejemploYear}-${String(1).padStart(remitoConfig.remitoDigitos, '0')}`
-      : null;
-
   const historialHref = platform
     ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/egresos/historial';
@@ -264,61 +214,8 @@ export function EgresosStockTenantPage({
         </Link>
       </div>
 
-      {puedeEditarFormatoRemito && (
-        <div className="rounded-lg border border-black/10 bg-white p-4">
-          <button
-            type="button"
-            onClick={() => setShowConfig((v) => !v)}
-            className="text-sm font-medium text-vialto-fire hover:underline"
-          >
-            {showConfig ? 'Ocultar formato del remito' : 'Formato del número de remito (prefijo y dígitos)'}
-          </button>
-          {showConfig && (
-            <form onSubmit={guardarRemitoConfig} className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className={LABEL}>Prefijo</label>
-                <input
-                  className={INPUT}
-                  value={configDraft.remitoPrefix}
-                  onChange={(e) => setConfigDraft((d) => ({ ...d, remitoPrefix: e.target.value }))}
-                  maxLength={20}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className={LABEL}>Dígitos del correlativo</label>
-                <input
-                  type="number"
-                  min={3}
-                  max={12}
-                  className={INPUT}
-                  value={configDraft.remitoDigitos}
-                  onChange={(e) =>
-                    setConfigDraft((d) => ({ ...d, remitoDigitos: Number(e.target.value) || 5 }))
-                  }
-                />
-              </div>
-              {configMsg && <p className="sm:col-span-2 text-sm text-vialto-steel">{configMsg}</p>}
-              <div className="sm:col-span-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={configSaving}
-                  className="px-4 py-2 text-sm font-semibold bg-vialto-charcoal text-white rounded hover:bg-vialto-graphite disabled:opacity-50"
-                >
-                  {configSaving ? 'Guardando…' : 'Guardar formato'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-black/10 p-6 space-y-5">
         <h2 className="text-base font-semibold text-vialto-charcoal">Nuevo egreso</h2>
-        {formatoEjemplo && (
-          <p className="text-xs text-vialto-steel">
-            Ejemplo con el próximo correlativo: <span className="font-mono text-vialto-charcoal">{formatoEjemplo}</span>
-          </p>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">

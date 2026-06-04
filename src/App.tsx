@@ -19,6 +19,8 @@ import { IngresosStockPage } from '@/pages/IngresosStockPage';
 import { IngresosStockHistorialPage } from '@/pages/IngresosStockHistorialPage';
 import { EgresosStockPage } from '@/pages/EgresosStockPage';
 import { EgresosStockHistorialPage } from '@/pages/EgresosStockHistorialPage';
+import { DivisionesStockPage } from '@/pages/DivisionesStockPage';
+import { DivisionesStockHistorialPage } from '@/pages/DivisionesStockHistorialPage';
 import { MovimientoStockDetallePage } from '@/pages/MovimientoStockDetallePage';
 import { StockMovimientosPage } from '@/pages/StockMovimientosPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
@@ -101,6 +103,8 @@ export default function App() {
           <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
           <Route path="stock/egresos" element={<EgresosStockPage />} />
           <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
+          <Route path="stock/divisiones" element={<DivisionesStockPage />} />
+          <Route path="stock/divisiones/historial" element={<DivisionesStockHistorialPage />} />
           <Route path="stock/movimientos" element={<StockMovimientosPage />} />
           <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
           <Route path="superadmin/empresas" element={<SuperadminEmpresasPage />} />

@@ -333,6 +333,8 @@ export interface MovimientoStock {
   numeroRemito?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
+  /** ID del movimiento par en una división (origen ↔ destino). */
+  movimientoVinculadoId?: string | null;
   createdBy: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
   createdByLabel?: string | null;

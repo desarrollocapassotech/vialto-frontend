@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import {
   ArrowLeftRight,
   Building2,
+  Split,
   Calculator,
   Database,
   House,
@@ -95,6 +96,7 @@ export function AppShell() {
         items: [
           { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
           { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
+          { to: '/stock/divisiones', label: 'Divisiones', icon: Split },
           { to: '/stock/movimientos', label: 'Movimientos', icon: ArrowLeftRight, end: true },
         ],
       });
