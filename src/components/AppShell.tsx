@@ -43,11 +43,13 @@ export function AppShell() {
   const { organization } = useOrganization();
   const { orgRole } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
-  const { tenant } = useCurrentTenant();
+  const { tenant, loading: tenantLoading } = useCurrentTenant();
   const location = useLocation();
 
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+
+  const navLoading = !userLoaded || tenantLoading;
 
   const navGroups = useMemo((): NavGroup[] => {
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
@@ -198,7 +200,17 @@ export function AppShell() {
         </div>
 
         <nav className="flex flex-col gap-3">
-          {navGroups.map((group, gi) => (
+          {navLoading ? (
+            <div className="flex flex-col gap-2" aria-hidden>
+              {[80, 65, 75, 55, 70].map((w, i) => (
+                <div
+                  key={i}
+                  className="h-10 rounded-md bg-white/10 animate-pulse"
+                  style={{ width: `${w}%` }}
+                />
+              ))}
+            </div>
+          ) : navGroups.map((group, gi) => (
             <div key={group.title ?? `g-${gi}`} className="flex flex-col gap-0.5">
               {gi > 0 && (
                 <div className="mb-2 border-t border-white/[0.12]" />
