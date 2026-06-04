@@ -1,16 +1,17 @@
 import { useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { Car, Package, Truck, UserCheck, Users, type LucideIcon } from 'lucide-react';
+import { Car, Package, Truck, UserCheck, Users, Warehouse, type LucideIcon } from 'lucide-react';
 import { ClientesPage } from './ClientesPage';
 import { TransportistasPage } from './TransportistasPage';
 import { ChoferesPage } from './ChoferesPage';
 import { VehiculosPage } from './VehiculosPage';
 import { ProductosPage } from './ProductosPage';
+import { DepositosPage } from './DepositosPage';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { canAccessViajes, canAccessStock } from '@/lib/tenantModules';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 
-type Tab = 'clientes' | 'transportistas' | 'choferes' | 'vehiculos' | 'productos';
+type Tab = 'clientes' | 'transportistas' | 'choferes' | 'vehiculos' | 'productos' | 'depositos';
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'clientes',       label: 'Clientes',       icon: Users      },
@@ -18,6 +19,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'choferes',       label: 'Choferes',        icon: UserCheck  },
   { id: 'vehiculos',      label: 'Vehículos',       icon: Car        },
   { id: 'productos',      label: 'Productos',       icon: Package    },
+  { id: 'depositos',      label: 'Depósitos',       icon: Warehouse  },
 ];
 
 export function BaseDeDatosPage() {
@@ -38,6 +40,7 @@ export function BaseDeDatosPage() {
       case 'choferes':
       case 'vehiculos': return hasViajes;
       case 'productos': return hasViajes || hasStock;
+      case 'depositos': return hasStock;
     }
   });
 
@@ -92,6 +95,7 @@ export function BaseDeDatosPage() {
         {activeTab === 'choferes' && <ChoferesPage />}
         {activeTab === 'vehiculos' && <VehiculosPage />}
         {activeTab === 'productos' && <ProductosPage />}
+        {activeTab === 'depositos' && <DepositosPage />}
       </div>
     </div>
   );

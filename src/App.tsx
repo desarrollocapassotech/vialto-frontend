@@ -91,6 +91,7 @@ export default function App() {
           <Route path="choferes" element={<Navigate to="/base-de-datos?tab=choferes" replace />} />
           <Route path="vehiculos" element={<Navigate to="/base-de-datos?tab=vehiculos" replace />} />
           <Route path="stock/productos" element={<Navigate to="/base-de-datos?tab=productos" replace />} />
+          <Route path="stock/depositos" element={<Navigate to="/base-de-datos?tab=depositos" replace />} />
           <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
           <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
           <Route path="transportistas/nuevo" element={<TransportistaCreatePage />} />

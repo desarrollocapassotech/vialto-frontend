@@ -149,6 +149,15 @@ export interface Transportista {
   createdAt: string;
 }
 
+export interface Deposito {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+  createdAt: string;
+}
+
 /** Empresa registrada en Vialto. */
 export interface Tenant {
   id: string;
