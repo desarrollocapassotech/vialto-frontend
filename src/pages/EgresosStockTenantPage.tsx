@@ -478,6 +478,7 @@ export function EgresosStockTenantPage({
             setSessionClientes((prev) => [...prev, c]);
             setClienteId(c.id);
             setModalCliente(false);
+            if (!tenantId) void maestro.refreshClientes();
           }}
         />
       )}
