@@ -7,6 +7,20 @@ import {
   useUser,
 } from '@clerk/clerk-react';
 import { useMemo } from 'react';
+import {
+  ArrowLeftRight,
+  Building2,
+  Calculator,
+  Database,
+  House,
+  Landmark,
+  PackageMinus,
+  PackagePlus,
+  Receipt,
+  Truck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Logo } from './Logo';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { MaestroDataProvider } from '@/hooks/useMaestroData';
@@ -17,7 +31,7 @@ import {
   userButtonSidebarAppearance,
 } from './clerkSidebarAppearance';
 
-type NavItem = { to: string; label: string; end?: boolean; extraActivePaths?: string[] };
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; extraActivePaths?: string[] };
 
 type NavGroup = {
   /** `null` = sin rótulo (p. ej. solo inicio). */
@@ -38,16 +52,16 @@ export function AppShell() {
   const navGroups = useMemo((): NavGroup[] => {
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
     const groups: NavGroup[] = [
-      { title: null, items: [{ to: '/', label: homeLabel, end: true }] },
+      { title: null, items: [{ to: '/', label: homeLabel, icon: House, end: true }] },
     ];
 
     if (superadmin) {
       groups.push({
         title: 'Plataforma',
         items: [
-          { to: '/superadmin/empresas', label: 'Empresas' },
-          { to: '/superadmin/usuarios', label: 'Usuarios' },
-          { to: '/superadmin/arca', label: 'ARCA / AFIP' },
+          { to: '/superadmin/empresas', label: 'Empresas', icon: Building2 },
+          { to: '/superadmin/usuarios', label: 'Usuarios', icon: Users },
+          { to: '/superadmin/arca', label: 'ARCA / AFIP', icon: Landmark },
         ],
       });
     }
@@ -55,21 +69,21 @@ export function AppShell() {
     if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
       groups.push({
         title: 'Viajes y flota',
-        items: [{ to: '/viajes', label: 'Viajes' }],
+        items: [{ to: '/viajes', label: 'Viajes', icon: Truck }],
       });
     }
 
     if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
       groups.push({
         title: 'Facturación',
-        items: [{ to: '/facturacion', label: 'Facturación' }],
+        items: [{ to: '/facturacion', label: 'Facturación', icon: Receipt }],
       });
     }
 
     if (canAccessLiquidacionesArca(tenant?.modules ?? [])) {
       groups.push({
         title: 'Liquidaciones',
-        items: [{ to: '/liquidaciones', label: 'Liquidaciones CVLP' }],
+        items: [{ to: '/liquidaciones', label: 'Liquidaciones CVLP', icon: Calculator }],
       });
     }
 
@@ -77,9 +91,9 @@ export function AppShell() {
       groups.push({
         title: 'Stock',
         items: [
-          { to: '/stock/ingresos', label: 'Ingresos' },
-          { to: '/stock/egresos', label: 'Egresos' },
-          { to: '/stock/movimientos', label: 'Movimientos', end: true },
+          { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
+          { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
+          { to: '/stock/movimientos', label: 'Movimientos', icon: ArrowLeftRight, end: true },
         ],
       });
     }
@@ -90,6 +104,7 @@ export function AppShell() {
         {
           to: '/base-de-datos',
           label: 'Base de datos',
+          icon: Database,
           extraActivePaths: [
             '/clientes',
             '/transportistas',
@@ -200,14 +215,15 @@ export function AppShell() {
                         location.pathname.startsWith(p),
                       ) ?? false);
                     return [
-                      'rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
+                      'flex items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
                       active
                         ? 'border-vialto-fire bg-vialto-fire text-white shadow-sm'
                         : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white',
                     ].join(' ');
                   }}
                 >
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <span>{item.label}</span>
                 </NavLink>
               ))}
             </div>
