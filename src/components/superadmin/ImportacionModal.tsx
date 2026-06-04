@@ -35,13 +35,11 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
     setTplNombre(m ? `Template ${labelModulo(m)} — ${tenant.name}` : '');
     setTplConfig(m ? getTemplateExample(m) : '');
     setTplJsonError(null);
-    setTplSaved(false);
   }
 
   function handleConfigChange(val: string) {
     setTplConfig(val);
     setTplJsonError(null);
-    setTplSaved(false);
     try { JSON.parse(val); } catch { setTplJsonError('JSON inválido'); }
   }
 
