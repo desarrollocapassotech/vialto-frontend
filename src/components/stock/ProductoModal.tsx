@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
+import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import { UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import type { Producto } from '@/types/api';
@@ -196,8 +197,9 @@ export function ProductoModal({
               type="button"
               disabled={saving}
               onClick={() => void submit()}
-              className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+              className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
             >
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           )}

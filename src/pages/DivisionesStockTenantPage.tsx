@@ -1,5 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
 import { Link } from 'react-router-dom';
 import { CircleHelp, X } from 'lucide-react';
 import { apiJson } from '@/lib/api';
@@ -33,6 +35,7 @@ export function DivisionesStockTenantPage({
   clientesExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
+  const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
 
@@ -65,7 +68,6 @@ export function DivisionesStockTenantPage({
   const [observaciones, setObservaciones] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const [stockDisponible, setStockDisponible] = useState<StockItem | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
@@ -105,7 +107,6 @@ export function DivisionesStockTenantPage({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    setSuccess(false);
 
     if (!productoId) return setFormError('Seleccioná un producto.');
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
@@ -150,7 +151,7 @@ export function DivisionesStockTenantPage({
         body: JSON.stringify(body),
       });
 
-      setSuccess(true);
+      showToast('División registrada correctamente.');
       setProductoId('');
       setClienteId('');
       setPalletsOrigen('');
@@ -358,16 +359,14 @@ export function DivisionesStockTenantPage({
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        {success && (
-          <p className="text-sm text-emerald-600">División registrada correctamente.</p>
-        )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
           >
+            {saving && <Spinner />}
             {saving ? 'Guardando…' : 'Registrar división'}
           </button>
         </div>

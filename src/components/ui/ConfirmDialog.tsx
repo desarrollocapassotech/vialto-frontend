@@ -1,4 +1,5 @@
 import { useEffect, useId } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 
 export type ConfirmDialogProps = {
   open: boolean;
@@ -87,8 +88,9 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={() => void onConfirm()}
-            className={confirmClass}
+            className={`inline-flex items-center gap-2 ${confirmClass}`}
           >
+            {busy && <Spinner className="h-3.5 w-3.5" />}
             {busy ? 'Procesando…' : confirmLabel}
           </button>
         </div>

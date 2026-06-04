@@ -1,4 +1,5 @@
 import { labelModulo } from '@/lib/platformLabels';
+import { Spinner } from '@/components/ui/Spinner';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
 
 export interface TenantFormValues {
@@ -179,8 +180,9 @@ export function TenantForm({
         <button
           type="submit"
           disabled={loading}
-          className="h-10 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider disabled:opacity-50"
+          className="inline-flex items-center gap-2 h-10 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider disabled:opacity-50"
         >
+          {loading && <Spinner />}
           {loading ? 'Guardando…' : submitLabel}
         </button>
       </div>

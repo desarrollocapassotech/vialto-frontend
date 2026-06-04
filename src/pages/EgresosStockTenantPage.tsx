@@ -1,5 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -34,6 +36,7 @@ export function EgresosStockTenantPage({
   clientesExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
+  const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
@@ -67,8 +70,6 @@ export function EgresosStockTenantPage({
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [ultimoRemito, setUltimoRemito] = useState<string | null>(null);
   const [stockDisponible, setStockDisponible] = useState<{ pallets: number; suelto: number } | null>(null);
 
   const loadProductos = useCallback(async () => {
@@ -113,8 +114,6 @@ export function EgresosStockTenantPage({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    setSuccess(false);
-    setUltimoRemito(null);
 
     if (!productoId) return setFormError('Seleccioná un producto.');
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
@@ -164,8 +163,11 @@ export function EgresosStockTenantPage({
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      setSuccess(true);
-      setUltimoRemito(created.numeroRemito ?? null);
+      showToast(
+        created.numeroRemito
+          ? `Egreso registrado — remito ${created.numeroRemito}`
+          : 'Egreso registrado correctamente.',
+      );
       setProductoId('');
       setClienteId('');
       setCantidadPallets('');
@@ -341,26 +343,14 @@ export function EgresosStockTenantPage({
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        {success && (
-          <p className="text-sm text-red-800">
-            Egreso registrado correctamente
-            {ultimoRemito ? (
-              <>
-                {' '}
-                — remito{' '}
-                <span className="font-mono font-semibold text-vialto-charcoal">{ultimoRemito}</span>
-              </>
-            ) : null}
-            .
-          </p>
-        )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
           >
+            {saving && <Spinner />}
             {saving ? 'Guardando…' : 'Registrar egreso'}
           </button>
         </div>

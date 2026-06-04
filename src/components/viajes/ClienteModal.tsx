@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
+import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import { validateClienteForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
@@ -186,8 +187,9 @@ export function ClienteModal({
             type="button"
             disabled={saving || !!errorFiscal}
             onClick={() => void submit()}
-            className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+            className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>

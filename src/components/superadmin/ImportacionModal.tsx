@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
 import { useImportacion } from '@/hooks/useImportacion';
 import { useImportTemplates, getTemplateExample } from '@/hooks/useImportTemplates';
 import { labelModulo } from '@/lib/platformLabels';
@@ -15,6 +17,7 @@ type ImportStep = 'upload' | 'preview' | 'result';
 
 export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   const { getToken } = useAuth();
+  const { showToast } = useToast();
   const [mainTab, setMainTab] = useState<MainTab>('importar');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,7 +29,6 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   const [tplNombre, setTplNombre] = useState('');
   const [tplConfig, setTplConfig] = useState('');
   const [tplJsonError, setTplJsonError] = useState<string | null>(null);
-  const [tplSaved, setTplSaved] = useState(false);
 
   function handleModuloChange(m: string) {
     setTplModulo(m);
@@ -47,7 +49,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
     if (!tplModulo || !tplNombre || !tplConfig) return;
     try { JSON.parse(tplConfig); } catch { setTplJsonError('JSON inválido — corregilo antes de guardar'); return; }
     const ok = await saveTemplate(tplModulo, tplNombre, tplConfig);
-    if (ok) { setTplSaved(true); }
+    if (ok) { showToast('Template guardado correctamente.'); }
   }
 
   function handleClose() {
@@ -217,7 +219,8 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
               </button>
               {step === 'upload' && (
                 <button type="button" disabled={!modulo || !file || loading} onClick={submitPreview}
-                  className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+                  {loading && <Spinner className="h-3.5 w-3.5" />}
                   {loading ? 'Procesando…' : 'Ver previsualización'}
                 </button>
               )}
@@ -226,8 +229,9 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   type="button"
                   disabled={loading || preview.exitosas === 0}
                   onClick={confirm}
-                  className="inline-flex h-10 items-center px-5 bg-vialto-fire text-white text-sm uppercase tracking-wider hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-fire text-white text-sm uppercase tracking-wider hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
+                  {loading && <Spinner className="h-3.5 w-3.5" />}
                   {loading ? 'Importando…' : `Confirmar importación (${preview.exitosas} filas)`}
                 </button>
               )}
@@ -275,7 +279,6 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
               <div>
                 <p className="mb-3 text-xs uppercase tracking-wider text-vialto-steel">Crear / actualizar template</p>
                 {tplError && <div className="mb-3 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{tplError}</div>}
-                {tplSaved && <div className="mb-3 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">✓ Template guardado correctamente.</div>}
 
                 <div className="space-y-4">
                   <div className="space-y-1">
@@ -330,7 +333,8 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
               <button type="button"
                 disabled={!tplModulo || !tplNombre || !tplConfig || !!tplJsonError || saving}
                 onClick={handleSaveTemplate}
-                className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+                className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+                {saving && <Spinner className="h-3.5 w-3.5" />}
                 {saving ? 'Guardando…' : 'Guardar template'}
               </button>
             </div>

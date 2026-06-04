@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
+import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import { UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import type { Presentacion, Producto } from '@/types/api';
@@ -271,8 +272,9 @@ export function PresentacionesModal({
                 type="button"
                 disabled={saving}
                 onClick={() => void submitForm()}
-                className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+                className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
               >
+                {saving && <Spinner className="h-3.5 w-3.5" />}
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
             </div>

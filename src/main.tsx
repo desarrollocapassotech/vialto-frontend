@@ -7,6 +7,7 @@ import './index.css';
 import App from './App.tsx';
 import { initSentry } from './lib/sentry';
 import { MissingClerkConfig } from './components/MissingClerkConfig';
+import { ToastProvider } from './lib/toast';
 
 initSentry();
 
@@ -28,7 +29,9 @@ function ClerkWithRouter() {
         'reset-password': '/tasks/reset-password',
       }}
     >
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </ClerkProvider>
   );
 }

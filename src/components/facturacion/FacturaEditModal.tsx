@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction, useCallback } from 'react';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
@@ -558,9 +559,10 @@ export function FacturaCreateModal({
             type="button"
             onClick={onSave}
             disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
+            {saving ? 'Guardando…' :'Guardar'}
           </button>
         </footer>
       </div>
@@ -787,9 +789,10 @@ export function FacturaEditModal({
             type="button"
             onClick={onSave}
             disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
+            {saving ? 'Guardando…' :'Guardar cambios'}
           </button>
         </footer>
       </div>

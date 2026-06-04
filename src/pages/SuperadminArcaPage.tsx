@@ -1,5 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
@@ -149,18 +151,17 @@ function TextInput({
 
 function ConfigTab({ tenantId }: { tenantId: string }) {
   const { getToken } = useAuth();
+  const { showToast } = useToast();
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<ConfigFormValues>(EMPTY_FORM);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setInitialLoading(true);
     setError(null);
-    setSuccess(false);
     (async () => {
       try {
         const config = await apiJson<ArcaConfig | null>(
@@ -203,7 +204,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
     }
     setLoading(true);
     setError(null);
-    setSuccess(false);
     try {
       const body = {
         cuitEmisor: values.cuitEmisor.trim(),
@@ -227,7 +227,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       );
       setExisting(config);
       setValues(configToForm(config));
-      setSuccess(true);
+      showToast('Configuración guardada correctamente.');
     } catch (e) {
       setError(friendlyError(e, 'arca'));
     } finally {
@@ -264,11 +264,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
-      {success && (
-        <div className="rounded border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900">
-          Configuración guardada correctamente.
-        </div>
-      )}
 
       {/* Datos del emisor */}
       <div className="flex flex-col gap-1.5">
@@ -417,8 +412,9 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
+        className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
       >
+        {loading && <Spinner />}
         {loading ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar configuración'}
       </button>
     </form>
