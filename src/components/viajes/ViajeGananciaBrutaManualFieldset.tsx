@@ -5,6 +5,7 @@ import {
 } from '@/components/viajes/OtrosGastosFieldset';
 import {
   parseCurrencyForMoneda,
+  preserveAmountOnMonedaChange,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { buildGananciaBrutaResumen } from '@/lib/viajeGananciaBrutaResumen';
@@ -119,7 +120,14 @@ export function ViajeGananciaBrutaManualFieldset({
             <MonedaSelect
               value={draft.monedaGananciaBrutaManual}
               onChange={(m: ViajeMonedaCodigo) =>
-                onPatch({ monedaGananciaBrutaManual: m })
+                onPatch({
+                  monedaGananciaBrutaManual: m,
+                  gananciaBrutaManual: preserveAmountOnMonedaChange(
+                    draft.gananciaBrutaManual,
+                    draft.monedaGananciaBrutaManual,
+                    m,
+                  ),
+                })
               }
               aria-label="Moneda ganancia bruta manual"
             />
