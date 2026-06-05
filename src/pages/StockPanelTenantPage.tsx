@@ -6,7 +6,9 @@ import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelec
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+import type { Cliente, Deposito, StockItem } from '@/types/api';
+
+type ProductoFiltro = { id: string; nombre: string };
 import {
   listadoTablaBodyRowClass,
   listadoTablaClass,
@@ -104,21 +106,13 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
 
   const productosEnDeposito = useMemo(() => {
     if (!depositoActivoId) return [];
-    const map = new Map<string, Producto>();
+    const map = new Map<string, ProductoFiltro>();
     for (const item of items) {
       if (item.depositoId !== depositoActivoId || !item.producto) continue;
       if (!map.has(item.producto.id)) {
         map.set(item.producto.id, {
           id: item.producto.id,
-          tenantId: item.tenantId,
           nombre: item.producto.nombre,
-          codigo: null,
-          descripcion: null,
-          unidad1Nombre: item.producto.unidad1Nombre,
-          unidad2Nombre: item.producto.unidad2Nombre,
-          activo: true,
-          createdAt: '',
-          updatedAt: '',
         });
       }
     }
@@ -284,7 +278,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                       filterActive={!!filtroProductoId.trim()}
                       filterSignature={filtroProductoId}
                     >
-                      <SearchableEntitySelect<Producto>
+                      <SearchableEntitySelect<ProductoFiltro>
                         items={productosEnDeposito}
                         value={filtroProductoId}
                         onChange={setFiltroProductoId}
