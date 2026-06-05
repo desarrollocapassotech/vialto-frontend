@@ -9,7 +9,7 @@ import {
   listadoTablaClass,
   listadoTablaEmptyCellClass,
   listadoTablaHeadRowClass,
-  listadoTablaLinkClass,
+  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaThClass,
   listadoTablaWrapperClass,
@@ -102,7 +102,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                 Cant. 2
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Detalle
+                Acciones
               </th>
             </tr>
           </thead>
@@ -157,9 +157,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                         setDetalleMovimientoId(m.id);
                         setDetalleMovimientoTipo(m.tipo);
                       }}
-                      className={listadoTablaLinkClass}
+                      className={listadoTablaAccionClass}
                     >
-                      Ver detalle
+                      Ver
                     </button>
                   </td>
                 </tr>

@@ -9,6 +9,8 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
+import { RemitoAdjuntoStock } from '@/components/stock/RemitoAdjuntoStock';
+import { isRemitoAdjuntoFile, uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import type { Cliente, Deposito, Producto } from '@/types/api';
@@ -69,6 +71,7 @@ export function IngresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [remitoFile, setRemitoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
@@ -125,13 +128,23 @@ export function IngresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    if (!remitoFile) {
+      return setFormError('Cargá el remito antes de registrar el ingreso.');
+    }
+    if (!isRemitoAdjuntoFile(remitoFile)) {
+      return setFormError('El remito debe ser un PDF o una imagen (foto).');
+    }
+
     setSaving(true);
     try {
+      const remitoEscaneadoUrl = await uploadStockRemitoPdf(getToken, remitoFile, tenantId);
+
       const body: Record<string, unknown> = {
         productoId,
         clienteId,
         depositoId,
         fecha: fechaIso,
+        remitoEscaneadoUrl,
       };
       if (pallets > 0) body.cantidad1 = pallets;
       if (suelto > 0) body.cantidad2 = suelto;
@@ -153,6 +166,7 @@ export function IngresosStockTenantPage({
       setHoraMov(p.hora);
       setFechaMovError(null);
       setObservaciones('');
+      setRemitoFile(null);
     } catch (e) {
       setFormError(friendlyError(e, 'stock'));
     } finally {
@@ -312,6 +326,13 @@ export function IngresosStockTenantPage({
             placeholder="Notas internas…"
           />
         </div>
+
+        <RemitoAdjuntoStock
+          file={remitoFile}
+          onFileChange={setRemitoFile}
+          labelClassName={LABEL}
+          disabled={saving}
+        />
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 

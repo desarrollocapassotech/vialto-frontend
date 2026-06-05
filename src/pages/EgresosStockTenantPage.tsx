@@ -9,6 +9,8 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ProductoModal } from '@/components/stock/ProductoModal';
+import { RemitoAdjuntoStock } from '@/components/stock/RemitoAdjuntoStock';
+import { isRemitoAdjuntoFile, uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import type { Cliente, Deposito, MovimientoStock, Producto, StockItem } from '@/types/api';
@@ -69,7 +71,7 @@ export function EgresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
-  const [remitoEscaneadoUrl, setRemitoEscaneadoUrl] = useState('');
+  const [remitoFile, setRemitoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
@@ -163,8 +165,17 @@ export function EgresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    if (!remitoFile) {
+      return setFormError('Cargá el remito antes de registrar el egreso.');
+    }
+    if (!isRemitoAdjuntoFile(remitoFile)) {
+      return setFormError('El remito debe ser un PDF o una imagen (foto).');
+    }
+
     setSaving(true);
     try {
+      const remitoEscaneadoUrl = await uploadStockRemitoPdf(getToken, remitoFile, tenantId);
+
       const payload: Record<string, unknown> = {
         productoId,
         clienteId,
@@ -174,7 +185,7 @@ export function EgresosStockTenantPage({
       if (pallets > 0) payload.cantidad1 = pallets;
       if (suelto > 0) payload.cantidad2 = suelto;
       if (observaciones.trim()) payload.observaciones = observaciones.trim();
-      if (remitoEscaneadoUrl.trim()) payload.remitoEscaneadoUrl = remitoEscaneadoUrl.trim();
+      payload.remitoEscaneadoUrl = remitoEscaneadoUrl;
 
       const created = await apiJson<MovimientoStock>(egresosUrl, () => getToken(), {
         method: 'POST',
@@ -196,7 +207,7 @@ export function EgresosStockTenantPage({
       setHoraMov(p.hora);
       setFechaMovError(null);
       setObservaciones('');
-      setRemitoEscaneadoUrl('');
+      setRemitoFile(null);
     } catch (e) {
       setFormError(friendlyError(e, 'stock'));
     } finally {
@@ -368,20 +379,12 @@ export function EgresosStockTenantPage({
           />
         </div>
 
-        <div className="space-y-1">
-          <label className={LABEL}>Remito escaneado (URL) — opcional</label>
-          <input
-            type="url"
-            value={remitoEscaneadoUrl}
-            onChange={(e) => setRemitoEscaneadoUrl(e.target.value)}
-            className={INPUT}
-            placeholder="https://… (se completará con subida a almacenamiento en una próxima tarea)"
-          />
-          <p className="text-xs text-vialto-steel">
-            Por ahora podés pegar una URL pública si ya tenés el archivo hospedado. La subida directa desde acá se
-            agregará después.
-          </p>
-        </div>
+        <RemitoAdjuntoStock
+          file={remitoFile}
+          onFileChange={setRemitoFile}
+          labelClassName={LABEL}
+          disabled={saving}
+        />
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 

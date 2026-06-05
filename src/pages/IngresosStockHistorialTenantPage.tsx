@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { MovimientoStock } from '@/types/api';
@@ -9,7 +10,7 @@ import {
   listadoTablaClass,
   listadoTablaEmptyCellClass,
   listadoTablaHeadRowClass,
-  listadoTablaLinkClass,
+  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaThClass,
   listadoTablaWrapperClass,
@@ -37,6 +38,7 @@ export function IngresosStockHistorialTenantPage({
   const [items, setItems] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,7 +119,7 @@ export function IngresosStockHistorialTenantPage({
                 Cant. 2
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Detalle
+                Acciones
               </th>
             </tr>
           </thead>
@@ -160,18 +162,28 @@ export function IngresosStockHistorialTenantPage({
                     ) : '—'}
                   </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
-                    <Link
-                      to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQsTenant(tenantId)}`}
-                      className={listadoTablaLinkClass}
+                    <button
+                      type="button"
+                      onClick={() => setDetalleMovimientoId(m.id)}
+                      className={listadoTablaAccionClass}
                     >
-                      Ver detalle
-                    </Link>
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {detalleMovimientoId && (
+        <MovimientoStockViewModal
+          movimientoId={detalleMovimientoId}
+          tenantId={tenantId}
+          tipoTitulo="ingreso"
+          onClose={() => setDetalleMovimientoId(null)}
+        />
+      )}
     </div>
   );
 }

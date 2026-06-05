@@ -9,7 +9,7 @@ import {
   listadoTablaClass,
   listadoTablaEmptyCellClass,
   listadoTablaHeadRowClass,
-  listadoTablaLinkClass,
+  listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaThClass,
   listadoTablaWrapperClass,
@@ -93,7 +93,7 @@ export function DivisionesStockHistorialTenantPage({
               <th scope="col" className={listadoTablaThClass}>Depósito</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Cant. 1</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Cant. 2</th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>Detalle</th>
+              <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -137,9 +137,9 @@ export function DivisionesStockHistorialTenantPage({
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link
                       to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQsTenant(tenantId)}`}
-                      className={listadoTablaLinkClass}
+                      className={listadoTablaAccionClass}
                     >
-                      Ver detalle
+                      Ver
                     </Link>
                   </td>
                 </tr>

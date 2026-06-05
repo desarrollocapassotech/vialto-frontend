@@ -69,10 +69,15 @@ export function MovimientoStockViewModal({
   const tipo = row?.tipo ?? tipoTitulo;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
       <div
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xl rounded border border-black/10 bg-white shadow-lg max-h-[90vh] flex flex-col"
       >
         <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4 shrink-0">
@@ -108,7 +113,7 @@ export function MovimientoStockViewModal({
             </p>
           )}
           {!loading && row && (
-            <MovimientoStockDetalleBody row={row} />
+            <MovimientoStockDetalleBody row={row} tenantId={tenantId} />
           )}
         </div>
 

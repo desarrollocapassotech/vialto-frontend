@@ -16,5 +16,10 @@ export const listadoTablaTdClass = 'px-4 py-3 text-vialto-charcoal';
 
 export const listadoTablaEmptyCellClass = 'px-4 py-8 text-vialto-steel';
 
+/** Botón de acción en celdas (Ver, Editar, etc.), alineado con clientes, productos y depósitos. */
+export const listadoTablaAccionClass =
+  'text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist';
+
+/** @deprecated Usar listadoTablaAccionClass para acciones en tablas. */
 export const listadoTablaLinkClass =
   'text-xs uppercase tracking-wider text-vialto-fire hover:underline font-[family-name:var(--font-ui)]';

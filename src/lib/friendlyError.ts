@@ -64,6 +64,11 @@ export function friendlyError(
       // Errores de ARCA/AFIP SDK — el backend incluye el mensaje real
       if (err.message && err.message !== 'Unprocessable Entity') return err.message;
     }
+    if (err.status === 502 || err.status === 503) {
+      if (err.message && err.message !== 'Bad Gateway' && err.message !== 'Service Unavailable') {
+        return err.message;
+      }
+    }
     if (err.status >= 500) {
       return 'Tuvimos un problema del nuestro. Intentá de nuevo más tarde.';
     }

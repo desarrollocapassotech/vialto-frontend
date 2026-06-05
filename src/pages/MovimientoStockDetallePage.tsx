@@ -101,7 +101,7 @@ export function MovimientoStockDetallePage() {
       </div>
 
       <div className="rounded-lg border border-black/10 bg-white">
-        <MovimientoStockDetalleBody row={row} />
+        <MovimientoStockDetalleBody row={row} tenantId={tenantIdParam ?? undefined} />
       </div>
     </div>
   );
