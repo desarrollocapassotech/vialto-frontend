@@ -23,6 +23,7 @@ import { DivisionesStockPage } from '@/pages/DivisionesStockPage';
 import { DivisionesStockHistorialPage } from '@/pages/DivisionesStockHistorialPage';
 import { MovimientoStockDetallePage } from '@/pages/MovimientoStockDetallePage';
 import { StockMovimientosPage } from '@/pages/StockMovimientosPage';
+import { StockPanelPage } from '@/pages/StockPanelPage';
 import { FacturacionPage } from '@/pages/FacturacionPage';
 import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
 import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
@@ -100,6 +101,8 @@ export default function App() {
           <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
           <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
           <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
+          <Route path="stock/inventario" element={<StockPanelPage />} />
+          <Route path="stock/panel" element={<Navigate to="/stock/inventario" replace />} />
           <Route path="stock/ingresos" element={<IngresosStockPage />} />
           <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
           <Route path="stock/egresos" element={<EgresosStockPage />} />

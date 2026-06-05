@@ -13,6 +13,8 @@ type Props = {
    * Así no se cierra al elegir solo el tipo (p. ej. Origen) antes de ciudad/fechas.
    */
   filterSignature?: string;
+  /** Alinea título + icono al borde derecho de la celda (columnas numéricas). */
+  alignRight?: boolean;
 };
 
 function IconoFiltro({ marcado }: { marcado: boolean }) {
@@ -39,6 +41,7 @@ export function ViajesListadoHeaderFiltro({
   children,
   filterActive,
   filterSignature,
+  alignRight = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const iconoMarcado = filterActive || abierto;
@@ -71,7 +74,9 @@ export function ViajesListadoHeaderFiltro({
   const mostrarContador = filterActive && !abierto;
 
   return (
-    <div className="flex min-w-[9rem] flex-col gap-1.5">
+    <div
+      className={`flex flex-col gap-1.5 ${alignRight ? 'w-full items-end' : 'min-w-[9rem]'}`}
+    >
       <div className="flex items-start gap-2">
         <div className="relative inline-flex shrink-0">
           <button
@@ -96,13 +101,17 @@ export function ViajesListadoHeaderFiltro({
             </span>
           ) : null}
         </div>
-        <span className="min-w-0 flex-1 text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
+        <span
+          className={`text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase ${
+            alignRight ? 'shrink-0' : 'min-w-0 flex-1'
+          }`}
+        >
           {title}
         </span>
       </div>
       {abierto ? (
         <div
-          className="normal-case text-sm tracking-normal"
+          className={`normal-case text-sm tracking-normal ${alignRight ? 'min-w-[9rem]' : ''}`}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {children}

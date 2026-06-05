@@ -20,6 +20,7 @@ import {
   PackagePlus,
   Receipt,
   Truck,
+  Warehouse,
   Users,
   LogOut,
   type LucideIcon,
@@ -101,6 +102,7 @@ export function AppShell() {
       groups.push({
         title: 'Stock',
         items: [
+          { to: '/stock/inventario', label: 'Inventario', icon: Warehouse },
           { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
           { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
           { to: '/stock/divisiones', label: 'Divisiones', icon: Split },
