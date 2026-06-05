@@ -303,6 +303,8 @@ export interface Producto {
   codigo: string | null;
   descripcion: string | null;
   unidadMedida: string | null;
+  unidad1Nombre: string;
+  unidad2Nombre: string | null;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
@@ -333,14 +335,14 @@ export interface MovimientoStock {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string };
+  producto?: { id: string; nombre: string; unidadMedida: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
   deposito?: { id: string; nombre: string };
   tipo: 'ingreso' | 'egreso' | 'division';
-  cantidadPallets: number;
-  cantidadSuelto: number;
+  cantidad1: number;
+  cantidad2: number;
   numeroRemito?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
@@ -422,12 +424,12 @@ export interface StockItem {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string };
+  producto?: { id: string; nombre: string; unidadMedida: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
   deposito?: { id: string; nombre: string };
-  cantidadPallets: number;
-  cantidadSuelto: number;
+  cantidad1: number;
+  cantidad2: number;
   updatedAt: string;
 }

@@ -91,8 +91,8 @@ export function DivisionesStockHistorialTenantPage({
               <th scope="col" className={listadoTablaThClass}>Producto</th>
               <th scope="col" className={listadoTablaThClass}>Cliente</th>
               <th scope="col" className={listadoTablaThClass}>Depósito</th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>Pallets</th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>Suelto</th>
+              <th scope="col" className={`${listadoTablaThClass} text-right`}>Cant. 1</th>
+              <th scope="col" className={`${listadoTablaThClass} text-right`}>Cant. 2</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Detalle</th>
             </tr>
           </thead>
@@ -117,14 +117,22 @@ export function DivisionesStockHistorialTenantPage({
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
                   <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={m.cantidadPallets < 0 ? 'text-red-600' : 'text-emerald-700'}>
-                      {m.cantidadPallets >= 0 ? '+' : ''}{m.cantidadPallets}
+                    <span className={m.cantidad1 < 0 ? 'text-red-600' : 'text-emerald-700'}>
+                      {m.cantidad1 >= 0 ? '+' : ''}{m.cantidad1}
                     </span>
+                    {' '}
+                    <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
                   </td>
                   <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={m.cantidadSuelto < 0 ? 'text-red-600' : 'text-emerald-700'}>
-                      {m.cantidadSuelto >= 0 ? '+' : ''}{m.cantidadSuelto}
-                    </span>
+                    {m.producto?.unidad2Nombre !== null ? (
+                      <>
+                        <span className={m.cantidad2 < 0 ? 'text-red-600' : 'text-emerald-700'}>
+                          {m.cantidad2 >= 0 ? '+' : ''}{m.cantidad2}
+                        </span>
+                        {' '}
+                        <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
+                      </>
+                    ) : '—'}
                   </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link

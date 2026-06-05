@@ -58,12 +58,13 @@ export function DivisionesStockTenantPage({
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
-  const [palletsOrigen, setPalletsOrigen] = useState('');
-  const [sueltoOrigen, setSueltoOrigen] = useState('');
-  const [palletsDestino, setPalletsDestino] = useState('');
-  const [sueltoDestino, setSueltoDestino] = useState('');
+  const [cantidad1Origen, setPalletsOrigen] = useState('');
+  const [cantidad2Origen, setSueltoOrigen] = useState('');
+  const [cantidad1Destino, setPalletsDestino] = useState('');
+  const [cantidad2Destino, setSueltoDestino] = useState('');
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -127,16 +128,18 @@ export function DivisionesStockTenantPage({
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
     if (!depositoId) return setFormError('Seleccioná un depósito.');
 
-    const po = parseFloat(palletsOrigen) || 0;
-    const so = parseFloat(sueltoOrigen) || 0;
-    const pd = parseFloat(palletsDestino) || 0;
-    const sd = parseFloat(sueltoDestino) || 0;
+    const po = parseFloat(cantidad1Origen) || 0;
+    const so = parseFloat(cantidad2Origen) || 0;
+    const pd = parseFloat(cantidad1Destino) || 0;
+    const sd = parseFloat(cantidad2Destino) || 0;
 
-    if (po <= 0 && so <= 0) {
-      return setFormError('Ingresá al menos una cantidad de origen (Pallets o Suelto) mayor a 0.');
+    const u1 = productoSeleccionado?.unidad1Nombre ?? 'Pallets';
+    const u2 = productoSeleccionado?.unidad2Nombre ?? null;
+    if (po <= 0 && (u2 === null || so <= 0)) {
+      return setFormError(`Ingresá al menos una cantidad de origen (${u1}${u2 ? ` o ${u2}` : ''}) mayor a 0.`);
     }
-    if (pd <= 0 && sd <= 0) {
-      return setFormError('Ingresá al menos una cantidad de destino (Pallets o Suelto) mayor a 0.');
+    if (pd <= 0 && (u2 === null || sd <= 0)) {
+      return setFormError(`Ingresá al menos una cantidad de destino (${u1}${u2 ? ` o ${u2}` : ''}) mayor a 0.`);
     }
     if (po < 0 || so < 0 || pd < 0 || sd < 0) {
       return setFormError('Las cantidades no pueden ser negativas.');
@@ -157,10 +160,10 @@ export function DivisionesStockTenantPage({
         depositoId,
         fecha: fechaIso,
       };
-      if (po > 0) body.palletsOrigen = po;
-      if (so > 0) body.sueltoOrigen = so;
-      if (pd > 0) body.palletsDestino = pd;
-      if (sd > 0) body.sueltoDestino = sd;
+      if (po > 0) body.cantidad1Origen = po;
+      if (so > 0) body.cantidad2Origen = so;
+      if (pd > 0) body.cantidad1Destino = pd;
+      if (sd > 0) body.cantidad2Destino = sd;
       if (observaciones.trim()) body.observaciones = observaciones.trim();
 
       await apiJson(divisionesUrl, () => getToken(), {
@@ -170,6 +173,7 @@ export function DivisionesStockTenantPage({
 
       showToast('División registrada correctamente.');
       setProductoId('');
+      setProductoSeleccionado(null);
       setClienteId('');
       setDepositoId('');
       setPalletsOrigen('');
@@ -241,7 +245,14 @@ export function DivisionesStockTenantPage({
             <SearchableEntitySelect<Producto>
               items={productos}
               value={productoId}
-              onChange={setProductoId}
+              onChange={(id) => {
+                setProductoId(id);
+                setProductoSeleccionado(productos.find((p) => p.id === id) ?? null);
+                setPalletsOrigen('');
+                setSueltoOrigen('');
+                setPalletsDestino('');
+                setSueltoDestino('');
+              }}
               loading={productosLoading}
               filterItems={(items, q) => {
                 const lq = q.toLowerCase();
@@ -293,7 +304,10 @@ export function DivisionesStockTenantPage({
               <span className="text-vialto-steel">Verificando stock…</span>
             ) : stockDisponible ? (
               <span className="text-vialto-charcoal">
-                Stock disponible — Pallets: <strong>{stockDisponible.cantidadPallets}</strong> · Suelto: <strong>{stockDisponible.cantidadSuelto}</strong>
+                Stock disponible — {productoSeleccionado?.unidad1Nombre ?? 'Pallets'}: <strong>{stockDisponible.cantidad1}</strong>
+                {(productoSeleccionado === null || productoSeleccionado.unidad2Nombre !== null) && (
+                  <> · {productoSeleccionado?.unidad2Nombre ?? 'Unidad'}: <strong>{stockDisponible.cantidad2}</strong></>
+                )}
               </span>
             ) : (
               <span className="text-vialto-steel">Sin stock registrado para esta combinación.</span>
@@ -305,57 +319,61 @@ export function DivisionesStockTenantPage({
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">Origen (resta)</p>
             <div className="space-y-1">
-              <label className={LABEL}>Pallets a restar</label>
+              <label className={LABEL}>{productoSeleccionado?.unidad1Nombre ?? 'Pallets'} a restar</label>
               <input
                 type="number"
                 min="0"
                 step="any"
-                value={palletsOrigen}
+                value={cantidad1Origen}
                 onChange={(e) => setPalletsOrigen(e.target.value)}
                 className={INPUT}
                 placeholder="0"
               />
             </div>
-            <div className="space-y-1">
-              <label className={LABEL}>Suelto a restar</label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={sueltoOrigen}
-                onChange={(e) => setSueltoOrigen(e.target.value)}
-                className={INPUT}
-                placeholder="0"
-              />
-            </div>
+            {(productoSeleccionado === null || productoSeleccionado.unidad2Nombre !== null) && (
+              <div className="space-y-1">
+                <label className={LABEL}>{productoSeleccionado?.unidad2Nombre ?? 'Unidad'} a restar</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={cantidad2Origen}
+                  onChange={(e) => setSueltoOrigen(e.target.value)}
+                  className={INPUT}
+                  placeholder="0"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">Destino (suma)</p>
             <div className="space-y-1">
-              <label className={LABEL}>Pallets a sumar</label>
+              <label className={LABEL}>{productoSeleccionado?.unidad1Nombre ?? 'Pallets'} a sumar</label>
               <input
                 type="number"
                 min="0"
                 step="any"
-                value={palletsDestino}
+                value={cantidad1Destino}
                 onChange={(e) => setPalletsDestino(e.target.value)}
                 className={INPUT}
                 placeholder="0"
               />
             </div>
-            <div className="space-y-1">
-              <label className={LABEL}>Suelto a sumar</label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={sueltoDestino}
-                onChange={(e) => setSueltoDestino(e.target.value)}
-                className={INPUT}
-                placeholder="0"
-              />
-            </div>
+            {(productoSeleccionado === null || productoSeleccionado.unidad2Nombre !== null) && (
+              <div className="space-y-1">
+                <label className={LABEL}>{productoSeleccionado?.unidad2Nombre ?? 'Unidad'} a sumar</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={cantidad2Destino}
+                  onChange={(e) => setSueltoDestino(e.target.value)}
+                  className={INPUT}
+                  placeholder="0"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -431,23 +449,28 @@ export function DivisionesStockTenantPage({
 
             <div className="px-5 py-5 space-y-4 text-sm text-vialto-charcoal">
               <p>
-                Una división hace exactamente lo mismo que un egreso seguido de un ingreso:
-                resta una cantidad y suma otra. La diferencia es que <strong>ambos movimientos
-                quedan vinculados en el historial</strong>, dejando claro que fue una conversión
-                interna y no una salida o entrada real de mercadería.
+                Usá una división cuando la mercadería <strong>no entra ni sale del depósito</strong>,
+                sino que cambia de presentación. Por ejemplo: tenías 2 pallets y los abriste
+                en 48 unidades sueltas.
               </p>
 
+              <div className="rounded bg-vialto-mist/60 px-3 py-2.5 space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-vialto-steel">Ejemplo</p>
+                <p>Origen → <strong>2 Pallets</strong> (lo que se deshace)</p>
+                <p>Destino → <strong>48 Unidades</strong> (lo que queda en su lugar)</p>
+              </div>
+
               <p className="text-vialto-steel">
-                Si la trazabilidad no te importa, podés lograr el mismo resultado registrando
-                un egreso de lo que resta y un ingreso de lo que suma.
+                El sistema registra los dos movimientos juntos y los vincula en el historial,
+                para que quede claro que fue una conversión interna y no una salida real.
               </p>
 
               <div className="space-y-1.5">
-                <p className="font-semibold text-vialto-steel uppercase tracking-wide text-xs">Cómo completar el formulario</p>
+                <p className="font-semibold text-vialto-steel uppercase tracking-wide text-xs">Pasos</p>
                 <ol className="list-decimal list-inside space-y-1">
                   <li>Elegí el producto y la empresa.</li>
-                  <li>En <strong>Origen</strong>, ingresá la cantidad que se resta del stock.</li>
-                  <li>En <strong>Destino</strong>, ingresá la cantidad que se suma al stock.</li>
+                  <li>En <strong>Origen</strong>, poné lo que se resta.</li>
+                  <li>En <strong>Destino</strong>, poné lo que se suma.</li>
                   <li>Confirmá la fecha y guardá.</li>
                 </ol>
               </div>

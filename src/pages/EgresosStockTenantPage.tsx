@@ -59,10 +59,11 @@ export function EgresosStockTenantPage({
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
-  const [cantidadPallets, setCantidadPallets] = useState('');
-  const [cantidadSuelto, setCantidadSuelto] = useState('');
+  const [cantidad1, setCantidadPallets] = useState('');
+  const [cantidad2, setCantidadSuelto] = useState('');
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -114,7 +115,7 @@ export function EgresosStockTenantPage({
         );
         setStockDisponible(
           row
-            ? { pallets: row.cantidadPallets, suelto: row.cantidadSuelto }
+            ? { pallets: row.cantidad1, suelto: row.cantidad2 }
             : { pallets: 0, suelto: 0 },
         );
       } catch {
@@ -131,10 +132,12 @@ export function EgresosStockTenantPage({
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
     if (!depositoId) return setFormError('Seleccioná un depósito.');
 
-    const pallets = parseFloat(cantidadPallets) || 0;
-    const suelto = parseFloat(cantidadSuelto) || 0;
-    if (pallets <= 0 && suelto <= 0) {
-      return setFormError('Ingresá al menos una cantidad (Pallets o Suelto) mayor a 0.');
+    const pallets = parseFloat(cantidad1) || 0;
+    const suelto = parseFloat(cantidad2) || 0;
+    const u1 = productoSeleccionado?.unidad1Nombre ?? 'Pallets';
+    const u2 = productoSeleccionado?.unidad2Nombre ?? null;
+    if (pallets <= 0 && (u2 === null || suelto <= 0)) {
+      return setFormError(`Ingresá al menos una cantidad (${u1}${u2 ? ` o ${u2}` : ''}) mayor a 0.`);
     }
     if (pallets < 0 || suelto < 0) {
       return setFormError('Las cantidades no pueden ser negativas.');
@@ -143,12 +146,12 @@ export function EgresosStockTenantPage({
     if (stockDisponible !== null) {
       if (pallets > 0 && pallets > stockDisponible.pallets) {
         return setFormError(
-          `No podés egresar más pallets de los disponibles. Stock disponible: ${stockDisponible.pallets} pallets.`,
+          `No podés egresar más ${u1.toLowerCase()} de los disponibles. Stock disponible: ${stockDisponible.pallets} ${u1.toLowerCase()}.`,
         );
       }
-      if (suelto > 0 && suelto > stockDisponible.suelto) {
+      if (u2 !== null && suelto > 0 && suelto > stockDisponible.suelto) {
         return setFormError(
-          `No podés egresar más suelto del disponible. Stock disponible: ${stockDisponible.suelto} unidades sueltas.`,
+          `No podés egresar más ${u2.toLowerCase()} del disponible. Stock disponible: ${stockDisponible.suelto} ${u2.toLowerCase()}.`,
         );
       }
     }
@@ -168,8 +171,8 @@ export function EgresosStockTenantPage({
         depositoId,
         fecha: fechaIso,
       };
-      if (pallets > 0) payload.cantidadPallets = pallets;
-      if (suelto > 0) payload.cantidadSuelto = suelto;
+      if (pallets > 0) payload.cantidad1 = pallets;
+      if (suelto > 0) payload.cantidad2 = suelto;
       if (observaciones.trim()) payload.observaciones = observaciones.trim();
       if (remitoEscaneadoUrl.trim()) payload.remitoEscaneadoUrl = remitoEscaneadoUrl.trim();
 
@@ -183,6 +186,7 @@ export function EgresosStockTenantPage({
           : 'Egreso registrado correctamente.',
       );
       setProductoId('');
+      setProductoSeleccionado(null);
       setClienteId('');
       setDepositoId('');
       setCantidadPallets('');
@@ -240,7 +244,12 @@ export function EgresosStockTenantPage({
             <SearchableEntitySelect<Producto>
               items={productos}
               value={productoId}
-              onChange={setProductoId}
+              onChange={(id) => {
+                setProductoId(id);
+                setProductoSeleccionado(productos.find((p) => p.id === id) ?? null);
+                setCantidadPallets('');
+                setCantidadSuelto('');
+              }}
               loading={productosLoading}
               filterItems={(items, q) => {
                 const lq = q.toLowerCase();
@@ -289,40 +298,44 @@ export function EgresosStockTenantPage({
           </div>
 
           <div className="space-y-1 min-w-0">
-            <label className={LABEL}>Pallets</label>
+            <label className={LABEL}>{productoSeleccionado?.unidad1Nombre ?? 'Pallets'}</label>
             <input
               type="number"
               min="0"
               step="any"
-              value={cantidadPallets}
+              value={cantidad1}
               onChange={(e) => setCantidadPallets(e.target.value)}
               className={INPUT}
               placeholder="0"
             />
             {stockDisponible !== null && productoId && clienteId && depositoId && (
               <p className="text-xs text-vialto-steel mt-1">
-                Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.pallets}</span> pallets
+                Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.pallets}</span>{' '}
+                {productoSeleccionado?.unidad1Nombre ?? 'pallets'}
               </p>
             )}
           </div>
 
-          <div className="space-y-1 min-w-0">
-            <label className={LABEL}>Suelto</label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={cantidadSuelto}
-              onChange={(e) => setCantidadSuelto(e.target.value)}
-              className={INPUT}
-              placeholder="0"
-            />
-            {stockDisponible !== null && productoId && clienteId && depositoId && (
-              <p className="text-xs text-vialto-steel mt-1">
-                Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.suelto}</span> unidades
-              </p>
-            )}
-          </div>
+          {(productoSeleccionado === null || productoSeleccionado.unidad2Nombre !== null) && (
+            <div className="space-y-1 min-w-0">
+              <label className={LABEL}>{productoSeleccionado?.unidad2Nombre ?? 'Unidad'}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={cantidad2}
+                onChange={(e) => setCantidadSuelto(e.target.value)}
+                className={INPUT}
+                placeholder="0"
+              />
+              {stockDisponible !== null && productoId && clienteId && depositoId && (
+                <p className="text-xs text-vialto-steel mt-1">
+                  Disponible: <span className="font-semibold text-vialto-charcoal">{stockDisponible.suelto}</span>{' '}
+                  {productoSeleccionado?.unidad2Nombre ?? 'unidades'}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1 sm:col-span-2">
             <ViajeFechaHoraFields

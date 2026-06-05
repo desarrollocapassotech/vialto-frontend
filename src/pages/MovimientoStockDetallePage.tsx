@@ -136,20 +136,22 @@ export function MovimientoStockDetallePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Pallets
+            {row.producto?.unidad1Nombre ?? 'Pallets'}
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">
-            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidadPallets}</span>
+            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad1}</span>
           </dd>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Suelto
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">
-            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidadSuelto}</span>
-          </dd>
-        </div>
+        {row.producto?.unidad2Nombre !== null && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+            <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+              {row.producto?.unidad2Nombre ?? 'Unidad'}
+            </dt>
+            <dd className="sm:col-span-2 text-vialto-charcoal">
+              <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad2}</span>
+            </dd>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
             Observaciones

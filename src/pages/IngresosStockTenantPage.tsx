@@ -59,10 +59,11 @@ export function IngresosStockTenantPage({
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
-  const [cantidadPallets, setCantidadPallets] = useState('');
-  const [cantidadSuelto, setCantidadSuelto] = useState('');
+  const [cantidad1, setCantidadPallets] = useState('');
+  const [cantidad2, setCantidadSuelto] = useState('');
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -106,10 +107,12 @@ export function IngresosStockTenantPage({
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
     if (!depositoId) return setFormError('Seleccioná un depósito.');
 
-    const pallets = parseFloat(cantidadPallets) || 0;
-    const suelto = parseFloat(cantidadSuelto) || 0;
-    if (pallets <= 0 && suelto <= 0) {
-      return setFormError('Ingresá al menos una cantidad (Pallets o Suelto) mayor a 0.');
+    const pallets = parseFloat(cantidad1) || 0;
+    const suelto = parseFloat(cantidad2) || 0;
+    const u1 = productoSeleccionado?.unidad1Nombre ?? 'Pallets';
+    const u2 = productoSeleccionado?.unidad2Nombre ?? null;
+    if (pallets <= 0 && (u2 === null || suelto <= 0)) {
+      return setFormError(`Ingresá al menos una cantidad (${u1}${u2 ? ` o ${u2}` : ''}) mayor a 0.`);
     }
     if (pallets < 0 || suelto < 0) {
       return setFormError('Las cantidades no pueden ser negativas.');
@@ -130,8 +133,8 @@ export function IngresosStockTenantPage({
         depositoId,
         fecha: fechaIso,
       };
-      if (pallets > 0) body.cantidadPallets = pallets;
-      if (suelto > 0) body.cantidadSuelto = suelto;
+      if (pallets > 0) body.cantidad1 = pallets;
+      if (suelto > 0) body.cantidad2 = suelto;
       if (observaciones.trim()) body.observaciones = observaciones.trim();
 
       await apiJson(ingresosUrl, () => getToken(), {
@@ -140,6 +143,7 @@ export function IngresosStockTenantPage({
       });
       showToast('Ingreso registrado correctamente.');
       setProductoId('');
+      setProductoSeleccionado(null);
       setClienteId('');
       setDepositoId('');
       setCantidadPallets('');
@@ -197,7 +201,12 @@ export function IngresosStockTenantPage({
             <SearchableEntitySelect<Producto>
               items={productos}
               value={productoId}
-              onChange={setProductoId}
+              onChange={(id) => {
+                setProductoId(id);
+                setProductoSeleccionado(productos.find((p) => p.id === id) ?? null);
+                setCantidadPallets('');
+                setCantidadSuelto('');
+              }}
               loading={productosLoading}
               filterItems={(items, q) => {
                 const lq = q.toLowerCase();
@@ -246,30 +255,32 @@ export function IngresosStockTenantPage({
           </div>
 
           <div className="space-y-1 min-w-0">
-            <label className={LABEL}>Pallets</label>
+            <label className={LABEL}>{productoSeleccionado?.unidad1Nombre ?? 'Pallets'}</label>
             <input
               type="number"
               min="0"
               step="any"
-              value={cantidadPallets}
+              value={cantidad1}
               onChange={(e) => setCantidadPallets(e.target.value)}
               className={INPUT}
               placeholder="0"
             />
           </div>
 
-          <div className="space-y-1 min-w-0">
-            <label className={LABEL}>Suelto</label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={cantidadSuelto}
-              onChange={(e) => setCantidadSuelto(e.target.value)}
-              className={INPUT}
-              placeholder="0"
-            />
-          </div>
+          {(productoSeleccionado === null || productoSeleccionado.unidad2Nombre !== null) && (
+            <div className="space-y-1 min-w-0">
+              <label className={LABEL}>{productoSeleccionado?.unidad2Nombre ?? 'Unidad'}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={cantidad2}
+                onChange={(e) => setCantidadSuelto(e.target.value)}
+                className={INPUT}
+                placeholder="0"
+              />
+            </div>
+          )}
 
           <div className="space-y-1 sm:col-span-2">
             <ViajeFechaHoraFields

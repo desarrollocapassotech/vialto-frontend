@@ -94,10 +94,10 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                 Depósito
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Pallets
+                Cant. 1
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Suelto
+                Cant. 2
               </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
                 Detalle
@@ -135,10 +135,18 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
                   <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadPallets}</span>
+                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad1}</span>
+                    {' '}
+                    <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
                   </td>
                   <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadSuelto}</span>
+                    {m.producto?.unidad2Nombre !== null ? (
+                      <>
+                        <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad2}</span>
+                        {' '}
+                        <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
+                      </>
+                    ) : '—'}
                   </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
                     <Link

@@ -31,6 +31,9 @@ export function ProductoModal({
   const [nombre, setNombre] = useState(productoInicial?.nombre ?? '');
   const [descripcion, setDescripcion] = useState(productoInicial?.descripcion ?? '');
   const [unidadMedida, setUnidadMedida] = useState(productoInicial?.unidadMedida ?? '');
+  const [unidad1Nombre, setUnidad1Nombre] = useState(productoInicial?.unidad1Nombre ?? 'Pallets');
+  const [unidad2Nombre, setUnidad2Nombre] = useState<string>(productoInicial?.unidad2Nombre ?? 'Unidad');
+  const [tieneUnidad2, setTieneUnidad2] = useState(productoInicial ? productoInicial.unidad2Nombre !== null : true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +57,8 @@ export function ProductoModal({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
         unidadMedida: unidadMedida.trim() || undefined,
+        unidad1Nombre: unidad1Nombre.trim() || 'Pallets',
+        unidad2Nombre: tieneUnidad2 ? (unidad2Nombre.trim() || 'Unidad') : null,
       };
       let result: Producto;
       if (modo === 'create') {
@@ -128,6 +133,14 @@ export function ProductoModal({
                   <p className="mt-1 text-sm">{productoInicial.unidadMedida}</p>
                 </div>
               )}
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Nombre cantidad 1</p>
+                <p className="mt-1 text-sm">{productoInicial?.unidad1Nombre ?? 'Pallets'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Nombre cantidad 2</p>
+                <p className="mt-1 text-sm">{productoInicial?.unidad2Nombre ?? '—'}</p>
+              </div>
             </>
           ) : (
             <>
@@ -165,6 +178,34 @@ export function ProductoModal({
                   ))}
                 </select>
               </label>
+              <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                Nombre cantidad 1
+                <input
+                  value={unidad1Nombre}
+                  onChange={(e) => setUnidad1Nombre(e.target.value)}
+                  placeholder="Ej. Pallets, Kg, Cajas…"
+                  className="h-9 border border-black/15 px-2 text-sm"
+                />
+              </label>
+              <div className="flex flex-col gap-1">
+                <label className="flex items-center gap-2 text-sm uppercase tracking-[0.08em] text-vialto-steel cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tieneUnidad2}
+                    onChange={(e) => setTieneUnidad2(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Usar segunda cantidad
+                </label>
+                {tieneUnidad2 && (
+                  <input
+                    value={unidad2Nombre}
+                    onChange={(e) => setUnidad2Nombre(e.target.value)}
+                    placeholder="Ej. Unidad, Unidades, Bolsas…"
+                    className="h-9 border border-black/15 px-2 text-sm"
+                  />
+                )}
+              </div>
             </>
           )}
         </div>
