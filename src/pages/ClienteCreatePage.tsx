@@ -67,7 +67,7 @@ export function ClienteCreatePage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
-      navigate('/base-de-datos?tab=clientes', { replace: true });
+      navigate(`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'clientes'));
     } finally {
@@ -82,7 +82,7 @@ export function ClienteCreatePage() {
   return (
     <CrudPageLayout
       title="Crear cliente"
-      backTo="/base-de-datos?tab=clientes"
+      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
       backLabel="← Volver a clientes"
     >
       <form

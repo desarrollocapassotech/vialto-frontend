@@ -5,6 +5,7 @@ import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
@@ -12,7 +13,7 @@ import type { Chofer, ConEmpresa } from '@/types/api';
 
 export function ChoferesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
     !filtroEmpresa,
@@ -26,7 +27,7 @@ export function ChoferesSuperadminPage() {
   const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
   const [viewingChoferNombre, setViewingChoferNombre] = useState('');
   const tenants = useTenantsList();
-
+  
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (!filtroEmpresa) {
@@ -70,7 +71,7 @@ export function ChoferesSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">

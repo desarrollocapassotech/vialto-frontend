@@ -77,7 +77,7 @@ export function SuperadminTenantEditPage() {
           whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
         }),
       });
-      navigate('/', { replace: true });
+      navigate('/superadmin/empresas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'plataforma'));
     } finally {
@@ -96,7 +96,7 @@ export function SuperadminTenantEditPage() {
       await apiJson(`/api/tenants/${encodeURIComponent(orgId)}`, () => getToken(), {
         method: 'DELETE',
       });
-      navigate('/', { replace: true });
+      navigate('/superadmin/empresas', { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'plataforma'));
     } finally {
@@ -115,8 +115,8 @@ export function SuperadminTenantEditPage() {
         </p>
 
         <div className="mt-4">
-          <Link className="text-sm text-vialto-fire hover:text-vialto-bright" to="/">
-            ← Volver a panorama
+          <Link className="text-sm text-vialto-fire hover:text-vialto-bright" to="/superadmin/empresas">
+            ← Volver a empresas
           </Link>
         </div>
 

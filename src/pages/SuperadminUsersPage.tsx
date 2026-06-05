@@ -1,10 +1,11 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { UserViewModal } from '@/components/superadmin/UserViewModal';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { PlatformUser } from '@/types/api';
@@ -34,11 +35,10 @@ function formatDate(value: number | string) {
 export function SuperadminUsersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filtroEmpresa = searchParams.get('tenantId')?.trim() ?? '';
   const [rows, setRows] = useState<PlatformUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -70,16 +70,6 @@ export function SuperadminUsersPage() {
       cancelled = true;
     };
   }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
-
-  function onChangeTenant(nextTenantId: string) {
-    const next = new URLSearchParams(searchParams);
-    if (nextTenantId) {
-      next.set('tenantId', nextTenantId);
-    } else {
-      next.delete('tenantId');
-    }
-    setSearchParams(next, { replace: true });
-  }
 
   const count = useMemo(() => rows?.length ?? 0, [rows]);
 
