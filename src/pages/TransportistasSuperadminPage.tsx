@@ -2,10 +2,12 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
+import { useListadoFiltros } from '@/hooks/useListadoFiltros';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
@@ -18,6 +20,7 @@ export function TransportistasSuperadminPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
   const tenants = useTenantsList();
+  const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -84,6 +87,23 @@ export function TransportistasSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && !error && (
+        <ListadoToolbar
+          searchValue={busqueda}
+          onSearchChange={setBusqueda}
+          searchPlaceholder="Buscar por nombre, ID fiscal o N° PAUT"
+          filtros={[
+            {
+              value: filtroPais,
+              onChange: setFiltroPais,
+              placeholder: 'Todos los países',
+              opciones: paisesList.map((p) => ({ value: p, label: p })),
+            },
+          ]}
+          onClear={onClear}
+        />
+      )}
+
       <ListadoDatos
         className="mt-8"
         columns={[
@@ -100,15 +120,35 @@ export function TransportistasSuperadminPage() {
             cell: (t) => t.idFiscal ?? '—',
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
+          {
+            id: 'pais',
+            header: 'País',
+            cell: (t) => t.pais ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'contacto',
+            header: 'Contacto',
+            cell: (t) => t.email ?? t.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'paut',
+            header: 'N° PAUT',
+            cell: (t) => t.paut ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
         ]}
-        rows={!filtroEmpresa || error ? [] : rows}
+        rows={!filtroEmpresa || error ? [] : rowsFiltradas}
         rowKey={(t) => t.id}
         emptyMessage={
           !filtroEmpresa
             ? 'Seleccioná una empresa para ver los transportistas.'
             : error
               ? 'No se pudieron cargar los transportistas.'
-              : 'No hay transportistas cargados para esta empresa.'
+              : activeFilterCount > 0
+                ? 'No hay transportistas que coincidan con los filtros aplicados.'
+                : 'No hay transportistas cargados para esta empresa.'
         }
         loadingMessage="Cargando…"
         renderActions={(t) => (
