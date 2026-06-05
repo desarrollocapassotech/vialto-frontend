@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { MovimientoStock } from '@/types/api';
@@ -38,6 +38,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const [items, setItems] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(null);
+  const [detalleMovimientoTipo, setDetalleMovimientoTipo] = useState<MovimientoStock['tipo'] | undefined>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,18 +151,34 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     ) : '—'}
                   </td>
                   <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
-                    <Link
-                      to={`/stock/movimientos/${encodeURIComponent(m.id)}${buildQs({ from: 'movimientos' }, tenantId)}`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDetalleMovimientoId(m.id);
+                        setDetalleMovimientoTipo(m.tipo);
+                      }}
                       className={listadoTablaLinkClass}
                     >
                       Ver detalle
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
+
+      {detalleMovimientoId && (
+        <MovimientoStockViewModal
+          movimientoId={detalleMovimientoId}
+          tenantId={tenantId}
+          tipoTitulo={detalleMovimientoTipo}
+          onClose={() => {
+            setDetalleMovimientoId(null);
+            setDetalleMovimientoTipo(undefined);
+          }}
+        />
+      )}
     </div>
   );
 }
