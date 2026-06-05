@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -12,8 +12,10 @@ import {
 } from '@/components/facturacion/FacturaEditModal';
 import { FacturaAccionesMenu } from '@/components/facturacion/FacturaAccionesMenu';
 import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
+import { ListadoCard } from '@/components/listado/ListadoCard';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -22,6 +24,8 @@ import {
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
+import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
 
 function facturaPayloadFromDraft(draft: FacturaDraft) {
@@ -220,15 +224,27 @@ export function FacturacionTenantPage({
     };
   }, [platform, tid, isLoaded, isSignedIn, getToken]);
 
-  const anyFiltroActivo =
-    !!numFiltro.trim() ||
-    !!tipoFiltro ||
-    !!clienteIdFiltro ||
-    !!emisionDesdeFiltro ||
-    !!emisionHastaFiltro ||
-    !!vencimientoDesdeFiltro ||
-    !!vencimientoHastaFiltro ||
-    !!estadoFiltro;
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (numFiltro.trim()) n += 1;
+    if (tipoFiltro) n += 1;
+    if (clienteIdFiltro) n += 1;
+    if (emisionDesdeFiltro || emisionHastaFiltro) n += 1;
+    if (vencimientoDesdeFiltro || vencimientoHastaFiltro) n += 1;
+    if (estadoFiltro) n += 1;
+    return n;
+  }, [
+    numFiltro,
+    tipoFiltro,
+    clienteIdFiltro,
+    emisionDesdeFiltro,
+    emisionHastaFiltro,
+    vencimientoDesdeFiltro,
+    vencimientoHastaFiltro,
+    estadoFiltro,
+  ]);
+
+  const anyFiltroActivo = activeFilterCount > 0;
 
   const facturasFiltradas = useMemo(() => {
     if (!facturas) return null;
@@ -512,13 +528,131 @@ export function FacturacionTenantPage({
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const COL_SPAN = 8;
+  const facturasEmptyMessage =
+    facturas?.length === 0
+      ? 'Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.'
+      : 'No hay facturas que coincidan con los filtros aplicados.';
+
+  const facturasListadoFiltros = (
+    <>
+      <ListadoFiltroCampo label="Número" active={!!numFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={numFiltroInput}
+            onChange={(e) => setNumFiltroInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+              numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            }`}
+            aria-label="Filtrar por número de factura"
+          />
+          <button
+            type="button"
+            onClick={() => setNumFiltro(numFiltroInput)}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro}>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+          aria-label="Filtrar por tipo de factura"
+        >
+          <option value="">Todos</option>
+          <option value="cliente">Cliente</option>
+          <option value="transportista_externo">Transportista externo</option>
+        </select>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltro}>
+        <ClienteSearchSelect
+          id="facturas-filtro-cliente"
+          clientes={clientes}
+          value={clienteIdFiltro}
+          onChange={(id) => setClienteIdFiltro(id)}
+          allowEmptyValue
+          emptyListChoiceLabel="Todos"
+          placeholderCerrado="Todos"
+          aria-label="Filtrar por cliente"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+        />
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Emisión" active={!!emisionDesdeFiltro || !!emisionHastaFiltro}>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+            Desde
+            <input
+              type="date"
+              value={emisionDesdeFiltro}
+              onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
+              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+            Hasta
+            <input
+              type="date"
+              value={emisionHastaFiltro}
+              onChange={(e) => setEmisionHastaFiltro(e.target.value)}
+              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+            />
+          </label>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Vencimiento" active={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+            Desde
+            <input
+              type="date"
+              value={vencimientoDesdeFiltro}
+              onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
+              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+            Hasta
+            <input
+              type="date"
+              value={vencimientoHastaFiltro}
+              onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
+              className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+            />
+          </label>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value)}
+          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+          aria-label="Filtrar por estado"
+        >
+          <option value="">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="cobrada">Cobrada</option>
+          <option value="vencida">Vencida</option>
+        </select>
+      </ListadoFiltroCampo>
+    </>
+  );
 
   return (
     <div className="w-full">
       {!embeddedInSuperadmin && (
         <>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">Facturación</h1>
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Facturación</h1>
           <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
         </>
       )}
@@ -531,7 +665,7 @@ export function FacturacionTenantPage({
             <button
               type="button"
               onClick={limpiarFiltros}
-              className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
             >
               Limpiar filtros
             </button>
@@ -551,220 +685,227 @@ export function FacturacionTenantPage({
         </div>
       </div>
 
-      {/* tabla */}
-      <div className="mt-6 overflow-x-hidden rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full table-fixed text-left text-base">
-          <colgroup>
-            <col className="w-[12%]" />
-            <col className="w-[11%]" />
-            <col className="w-[17%]" />
-            <col className="w-[14%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-            <col className="w-[13%]" />
-            <col className="w-[9%]" />
-          </colgroup>
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Número"
-                  filterActive={!!numFiltro.trim()}
-                  filterSignature={numFiltro}
-                >
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={numFiltroInput}
-                      onChange={(e) => setNumFiltroInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
-                      placeholder="Buscar…"
-                      className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                        numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                      }`}
-                      aria-label="Filtrar por número de factura"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setNumFiltro(numFiltroInput)}
-                      className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                    >
-                      OK
-                    </button>
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Tipo"
-                  filterActive={!!tipoFiltro}
-                  filterSignature={tipoFiltro}
-                >
-                  <select
-                    value={tipoFiltro}
-                    onChange={(e) => setTipoFiltro(e.target.value)}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+      <ListadoDatos
+        className="mt-6"
+        columns={[]}
+        rows={error ? [] : facturasFiltradas}
+        rowKey={(f) => f.id}
+        emptyMessage={error ? 'No se pudieron cargar las facturas.' : facturasEmptyMessage}
+        loadingMessage="Cargando…"
+        tableColSpan={8}
+        filters={facturasListadoFiltros}
+        activeFilterCount={activeFilterCount}
+        onClearFilters={limpiarFiltros}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Número"
+                filterActive={!!numFiltro.trim()}
+                filterSignature={numFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={numFiltroInput}
+                    onChange={(e) => setNumFiltroInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
                     }`}
-                    aria-label="Filtrar por tipo de factura"
-                  >
-                    <option value="">Todos</option>
-                    <option value="cliente">Cliente</option>
-                    <option value="transportista_externo">Transportista externo</option>
-                  </select>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Cliente"
-                  filterActive={!!clienteIdFiltro}
-                  filterSignature={clienteIdFiltro}
-                >
-                  <ClienteSearchSelect
-                    id="facturas-col-filtro-cliente"
-                    clientes={clientes}
-                    value={clienteIdFiltro}
-                    onChange={(id) => setClienteIdFiltro(id)}
-                    allowEmptyValue
-                    emptyListChoiceLabel="Todos"
-                    placeholderCerrado="Todos"
-                    aria-label="Filtrar por cliente"
-                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                    }`}
+                    aria-label="Filtrar por número de factura"
                   />
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Emisión"
-                  filterActive={!!emisionDesdeFiltro || !!emisionHastaFiltro}
-                  filterSignature={`${emisionDesdeFiltro}|${emisionHastaFiltro}`}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                      Desde
-                      <input
-                        type="date"
-                        value={emisionDesdeFiltro}
-                        onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
-                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                      Hasta
-                      <input
-                        type="date"
-                        value={emisionHastaFiltro}
-                        onChange={(e) => setEmisionHastaFiltro(e.target.value)}
-                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                      />
-                    </label>
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Vencimiento"
-                  filterActive={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
-                  filterSignature={`${vencimientoDesdeFiltro}|${vencimientoHastaFiltro}`}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                      Desde
-                      <input
-                        type="date"
-                        value={vencimientoDesdeFiltro}
-                        onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
-                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                      Hasta
-                      <input
-                        type="date"
-                        value={vencimientoHastaFiltro}
-                        onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
-                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                      />
-                    </label>
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Estado"
-                  filterActive={!!estadoFiltro}
-                  filterSignature={estadoFiltro}
-                >
-                  <select
-                    value={estadoFiltro}
-                    onChange={(e) => setEstadoFiltro(e.target.value)}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                    }`}
-                    aria-label="Filtrar por estado"
+                  <button
+                    type="button"
+                    onClick={() => setNumFiltro(numFiltroInput)}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
                   >
-                    <option value="">Todos</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="cobrada">Cobrada</option>
-                    <option value="vencida">Vencida</option>
-                  </select>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th className="px-4 py-3 text-right">Importe</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {facturas === null && !error && (
-              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">Cargando…</td></tr>
-            )}
-            {facturas?.length === 0 && (
-              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">
-                Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.
-              </td></tr>
-            )}
-            {facturasFiltradas?.length === 0 && facturas !== null && facturas.length > 0 && (
-              <tr><td colSpan={COL_SPAN} className="px-4 py-8 text-vialto-steel">
-                No hay facturas que coincidan con los filtros aplicados.
-              </td></tr>
-            )}
-
-            {facturasFiltradas?.map((f) => (
-                <Fragment key={f.id}>
-                  <tr className="border-b border-black/5 hover:bg-vialto-mist/40">
-                    <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
-                    <td className="px-4 py-3 leading-snug">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
-                    <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>{nombreContraparte(f)}</td>
-                    <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
-                      {fmtFecha(f.fechaEmision)}
-                    </td>
-                    <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
-                      {fmtFecha(f.fechaVencimiento)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={['border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
-                        {ESTADO_LABEL[f.estado] ?? f.estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
-                      {textoImporteFacturaListado(f, viajes)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <FacturaAccionesMenu
-                        factura={f}
-                        deleting={deletingId === f.id}
-                        onVer={() => setViewingFactura(f)}
-                        onEliminar={() => setFacturaDeleteConfirm(f)}
-                      />
-                    </td>
-                  </tr>
-                </Fragment>
-              ))}
-          </tbody>
-        </table>
-      </div>
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Tipo"
+                filterActive={!!tipoFiltro}
+                filterSignature={tipoFiltro}
+              >
+                <select
+                  value={tipoFiltro}
+                  onChange={(e) => setTipoFiltro(e.target.value)}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                  aria-label="Filtrar por tipo de factura"
+                >
+                  <option value="">Todos</option>
+                  <option value="cliente">Cliente</option>
+                  <option value="transportista_externo">Transportista externo</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Cliente"
+                filterActive={!!clienteIdFiltro}
+                filterSignature={clienteIdFiltro}
+              >
+                <ClienteSearchSelect
+                  id="facturas-col-filtro-cliente"
+                  clientes={clientes}
+                  value={clienteIdFiltro}
+                  onChange={(id) => setClienteIdFiltro(id)}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  aria-label="Filtrar por cliente"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Emisión"
+                filterActive={!!emisionDesdeFiltro || !!emisionHastaFiltro}
+                filterSignature={`${emisionDesdeFiltro}|${emisionHastaFiltro}`}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={emisionDesdeFiltro}
+                      onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={emisionHastaFiltro}
+                      onChange={(e) => setEmisionHastaFiltro(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Vencimiento"
+                filterActive={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
+                filterSignature={`${vencimientoDesdeFiltro}|${vencimientoHastaFiltro}`}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={vencimientoDesdeFiltro}
+                      onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={vencimientoHastaFiltro}
+                      onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={!!estadoFiltro}
+                filterSignature={estadoFiltro}
+              >
+                <select
+                  value={estadoFiltro}
+                  onChange={(e) => setEstadoFiltro(e.target.value)}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                  aria-label="Filtrar por estado"
+                >
+                  <option value="">Todos</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="cobrada">Cobrada</option>
+                  <option value="vencida">Vencida</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Importe</th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
+          </tr>
+        }
+        renderTableRow={(f) => (
+          <tr key={f.id} className="border-b border-black/5 hover:bg-vialto-mist/40">
+            <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
+            <td className="px-4 py-3 leading-snug">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
+            <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>{nombreContraparte(f)}</td>
+            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+              {fmtFecha(f.fechaEmision)}
+            </td>
+            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+              {fmtFecha(f.fechaVencimiento)}
+            </td>
+            <td className="px-4 py-3">
+              <span className={['border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
+                {ESTADO_LABEL[f.estado] ?? f.estado}
+              </span>
+            </td>
+            <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
+              {textoImporteFacturaListado(f, viajes)}
+            </td>
+            <td className="px-4 py-3 text-right">
+              <FacturaAccionesMenu
+                factura={f}
+                deleting={deletingId === f.id}
+                onVer={() => setViewingFactura(f)}
+                onEliminar={() => setFacturaDeleteConfirm(f)}
+              />
+            </td>
+          </tr>
+        )}
+        renderMobileCard={(f) => (
+          <ListadoCard
+            primary={f.numero}
+            fields={[
+              { label: 'Tipo', value: TIPO_LABEL[f.tipo] ?? f.tipo },
+              { label: 'Cliente', value: nombreContraparte(f) },
+              { label: 'Emisión', value: fmtFecha(f.fechaEmision) },
+              { label: 'Vencimiento', value: fmtFecha(f.fechaVencimiento) },
+              {
+                label: 'Estado',
+                value: (
+                  <span className={['border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
+                    {ESTADO_LABEL[f.estado] ?? f.estado}
+                  </span>
+                ),
+              },
+              { label: 'Importe', value: textoImporteFacturaListado(f, viajes) },
+            ]}
+            actions={
+              <FacturaAccionesMenu
+                factura={f}
+                deleting={deletingId === f.id}
+                onVer={() => setViewingFactura(f)}
+                onEliminar={() => setFacturaDeleteConfirm(f)}
+              />
+            }
+          />
+        )}
+      />
 
       {facturas && facturas.length > 0 && (
         <p className="mt-3 text-xs text-vialto-steel">

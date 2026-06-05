@@ -179,7 +179,7 @@ export function TransportistaEditPage() {
               <CrudFieldLabel required>País</CrudFieldLabel>
               <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5">
                 <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
                 <CrudInput

@@ -7,6 +7,7 @@ import {
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
+import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import type { OtroGasto, Viaje } from '@/types/api';
 
@@ -95,7 +96,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className={modalOverlayClass.replace('z-50', 'z-[100]')}
       role="dialog"
       aria-modal="true"
       aria-labelledby="agregar-gasto-title"

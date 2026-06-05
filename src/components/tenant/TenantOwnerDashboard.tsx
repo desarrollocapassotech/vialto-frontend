@@ -7,6 +7,9 @@ import {
 } from '@/lib/tenantModules';
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
+import { modalOverlayClass } from '@/lib/modalLayers';
 
 function formatMoney(n: number) {
   return `$ ${n.toLocaleString('es-AR', {
@@ -34,6 +37,7 @@ function MetricCard({
   linkTo,
   alwaysLink,
   simpleCount,
+  className = '',
 }: {
   title: string;
   caption?: string;
@@ -46,6 +50,7 @@ function MetricCard({
   alwaysLink?: boolean;
   /** Muestra un conteo simple en lugar de la métrica comparativa. */
   simpleCount?: number;
+  className?: string;
 }) {
   const m = metric ?? {
     current: 0,
@@ -71,70 +76,99 @@ function MetricCard({
 
   const effectiveCount = simpleCount !== undefined ? simpleCount : m.current;
   const showLink = !!linkTo && !loading && (alwaysLink || effectiveCount > 0);
-  const cardClass = `group bg-vialto-charcoal p-5 min-h-[120px] flex flex-col justify-between${showLink ? ' hover:bg-vialto-graphite transition-colors cursor-pointer' : ''}`;
+  const spanClass = dual ? 'col-span-2 lg:col-span-1' : '';
+  const cardClass = [
+    'group bg-vialto-charcoal',
+    'flex flex-row items-center gap-2.5 p-3',
+    'lg:flex-col lg:items-stretch lg:justify-between lg:gap-0 lg:p-5 lg:min-h-[120px]',
+    showLink ? 'hover:bg-vialto-graphite transition-colors cursor-pointer' : '',
+    spanClass,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const valueBlock = loading ? (
+    <span className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-white lg:text-4xl">
+      —
+    </span>
+  ) : simpleCount !== undefined ? (
+    <span
+      className={`font-[family-name:var(--font-display)] text-2xl tracking-wide lg:text-4xl ${valueColorClass}`}
+    >
+      {String(Math.round(simpleCount))}
+    </span>
+  ) : dual ? (
+    <div className="flex flex-col items-end gap-0.5 text-right lg:items-stretch lg:text-left lg:gap-1.5">
+      <div>
+        <span className="mb-0.5 block font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.18em] text-white/40 lg:text-[10px]">
+          ARS
+        </span>
+        <span
+          className={`block font-[family-name:var(--font-display)] text-lg leading-tight tracking-wide lg:text-3xl ${valueColorClass}`}
+        >
+          {arsAmount === 0 ? '—' : formatMoney(arsAmount)}
+        </span>
+      </div>
+      <div>
+        <span className="mb-0.5 block font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.18em] text-white/40 lg:text-[10px]">
+          USD
+        </span>
+        <span
+          className={`block font-[family-name:var(--font-display)] text-base leading-tight tracking-wide lg:text-2xl ${valueColorClass}`}
+        >
+          {usdAmount === 0 ? '—' : formatMoneyUSD(usdAmount)}
+        </span>
+      </div>
+    </div>
+  ) : (
+    <span
+      className={`font-[family-name:var(--font-display)] text-xl tracking-wide lg:text-4xl ${valueColorClass}`}
+    >
+      {formatValue(m.current)}
+    </span>
+  );
+
   const inner = (
     <>
-      <div>
-        <div className="flex items-center gap-1.5">
-          <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wide text-white/80">
+      <div className="min-w-0 flex-1 lg:flex-none">
+        <div className="flex items-start gap-1">
+          <span className="line-clamp-2 font-[family-name:var(--font-ui)] text-[11px] uppercase leading-snug tracking-wide text-white/80 lg:line-clamp-none lg:text-sm">
             {title}
           </span>
           {tooltip && (
-            <span title={tooltip} className="cursor-help text-white/25 hover:text-white/50 transition-colors text-[11px] leading-none select-none">
+            <span
+              title={tooltip}
+              className="mt-0.5 shrink-0 cursor-help select-none text-[10px] leading-none text-white/25 transition-colors hover:text-white/50 lg:text-[11px]"
+            >
               ⓘ
             </span>
           )}
         </div>
         {caption ? (
-          <p className="mt-1.5 text-[11px] leading-snug text-white/30 normal-case tracking-normal">
+          <p className="mt-1.5 hidden text-[11px] leading-snug tracking-normal text-white/30 normal-case lg:block">
             {caption}
           </p>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-0.5">
-        {loading ? (
-          <span className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-white">—</span>
-        ) : simpleCount !== undefined ? (
-          <span className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}>
-            {String(Math.round(simpleCount))}
-          </span>
-        ) : dual ? (
-          <div className="flex flex-col gap-1.5">
-            <div>
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-white/40 block mb-0.5">
-                ARS
-              </span>
-              <span className={`font-[family-name:var(--font-display)] text-3xl tracking-wide block leading-tight ${valueColorClass}`}>
-                {arsAmount === 0 ? '—' : formatMoney(arsAmount)}
-              </span>
-            </div>
-            <div>
-              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-white/40 block mb-0.5">
-                USD
-              </span>
-              <span className={`font-[family-name:var(--font-display)] text-2xl tracking-wide block leading-tight ${valueColorClass}`}>
-                {usdAmount === 0 ? '—' : formatMoneyUSD(usdAmount)}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <span className={`font-[family-name:var(--font-display)] text-4xl tracking-wide ${valueColorClass}`}>
-            {formatValue(m.current)}
+      <div className="flex shrink-0 flex-col items-end gap-0.5 lg:mt-auto lg:items-stretch">
+        {valueBlock}
+        {showLink && (
+          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] text-white/40 transition-colors group-hover:text-white/80 lg:flex lg:justify-end lg:text-[10px]">
+            Ver →
           </span>
         )}
       </div>
-
-      {showLink && (
-        <span className="flex justify-end font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-white/40 group-hover:text-white/80 transition-colors">
-          Ver →
-        </span>
-      )}
     </>
   );
 
   if (showLink) {
-    return <Link to={linkTo!} className={cardClass}>{inner}</Link>;
+    return (
+      <Link to={linkTo!} className={cardClass}>
+        {inner}
+      </Link>
+    );
   }
   return <div className={cardClass}>{inner}</div>;
 }
@@ -190,21 +224,8 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
   useEffect(() => {
     if (shouldClose) setAbierto(false);
   }, [shouldClose]);
-  const headingId = useId();
-  const panelId = `${headingId}-panel`;
-  const vencMon = montosPorMonedaCompat(alertas.facturasVencidas);
-  const sinFacturaMon = montosPorMonedaCompat(alertas.viajesSinFactura);
-  const itemsFacturasVencidas = alertas.facturasVencidas.items ?? [];
-  const itemsViajesSinFactura = alertas.viajesSinFactura.items ?? [];
-  const totalAlertasBadge =
-    (alertas.facturasVencidas.cantidad > 0 ? alertas.facturasVencidas.cantidad : 0) +
-    (alertas.viajesSinFactura.cantidad > 0 ? alertas.viajesSinFactura.cantidad : 0);
-  const badgeText = totalAlertasBadge > 99 ? '99+' : String(totalAlertasBadge);
 
-  const linkFacturaClass =
-    'inline-flex w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors';
-  const linkViajeClass =
-    'inline-flex w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors';
+  useLockBodyScroll(abierto);
 
   useEffect(() => {
     if (!abierto) return;
@@ -215,222 +236,322 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
     return () => window.removeEventListener('keydown', onKey);
   }, [abierto]);
 
-  const listaAlertas = (
-    <div className="flex flex-col gap-3">
-      {alertas.facturasVencidas.cantidad > 0 && (
-        <div className="rounded-md border-2 border-rose-500/70 bg-rose-950/35 px-3 py-3 flex gap-3">
-          <AlertTriangleIcon className="text-rose-400 shrink-0 mt-0.5 w-5 h-5" />
-          <div className="min-w-0 flex-1">
-            <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
-              {alertas.facturasVencidas.cantidad === 1
-                ? 'Factura vencida sin cobrar'
-                : 'Facturas vencidas sin cobrar'}
-            </p>
-            <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-              {alertas.facturasVencidas.cantidad}{' '}
-              <span className="text-base text-white/70 font-body">
-                {alertas.facturasVencidas.cantidad === 1 ? 'factura' : 'facturas'}
-              </span>
-            </p>
-            <div className="text-xs text-rose-100/90 mt-1 space-y-0.5">
-              <p>
-                <span className="text-rose-200/70 uppercase tracking-wider text-[10px] mr-1.5">ARS</span>
-                {vencMon.ARS === 0 ? '—' : formatMoney(vencMon.ARS)}
-              </p>
-              <p>
-                <span className="text-rose-200/70 uppercase tracking-wider text-[10px] mr-1.5">USD</span>
-                {vencMon.USD === 0 ? '—' : formatMoneyUSD(vencMon.USD)}
-              </p>
-            </div>
-            <div className="mt-2.5 flex flex-col gap-1.5">
-              {itemsFacturasVencidas.length > 0 ? (
-                itemsFacturasVencidas.map((it) =>
-                  onViewFactura ? (
-                    <button
-                      key={it.id}
-                      type="button"
-                      disabled={loadingFacturaId === it.id}
-                      className={`${linkFacturaClass} disabled:opacity-60 disabled:cursor-wait`}
-                      onClick={() => onViewFactura(it.id)}
-                    >
-                      {loadingFacturaId === it.id ? (
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-rose-300 border-t-transparent" />
-                          Cargando…
-                        </span>
-                      ) : (
-                        <>Factura {it.numero.trim() || it.id.slice(0, 8)} →</>
-                      )}
-                    </button>
-                  ) : (
-                    <Link
-                      key={it.id}
-                      to={`/facturacion?factura=${encodeURIComponent(it.id)}`}
-                      className={linkFacturaClass}
-                      onClick={() => setAbierto(false)}
-                    >
-                      Factura {it.numero.trim() || it.id.slice(0, 8)} →
-                    </Link>
-                  )
-                )
-              ) : (
-                <Link
-                  to="/facturacion"
-                  className={linkFacturaClass}
-                  onClick={() => setAbierto(false)}
-                >
-                  Ir a facturación →
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {alertas.viajesSinFactura.cantidad > 0 && (
-        <div className="rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3 flex gap-3">
-          <AlertTriangleIcon className="text-amber-400 shrink-0 mt-0.5 w-5 h-5" />
-          <div className="min-w-0 flex-1">
-            <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
-              {alertas.viajesSinFactura.cantidad === 1
-                ? 'Viaje finalizado sin factura'
-                : 'Viajes finalizados sin factura'}
-            </p>
-            <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
-              {alertas.viajesSinFactura.cantidad}{' '}
-              <span className="text-base text-white/70 font-body">
-                {alertas.viajesSinFactura.cantidad === 1 ? 'viaje' : 'viajes'}
-              </span>
-            </p>
-            <div className="text-xs text-amber-100/90 mt-1 space-y-0.5">
-              <p>
-                <span className="text-amber-200/70 uppercase tracking-wider text-[10px] mr-1.5">ARS</span>
-                {sinFacturaMon.ARS === 0 ? '—' : formatMoney(sinFacturaMon.ARS)}
-              </p>
-              <p>
-                <span className="text-amber-200/70 uppercase tracking-wider text-[10px] mr-1.5">USD</span>
-                {sinFacturaMon.USD === 0 ? '—' : formatMoneyUSD(sinFacturaMon.USD)}
-              </p>
-            </div>
-            <div className="mt-2.5 flex flex-col gap-1.5">
-              {itemsViajesSinFactura.length > 0 ? (
-                itemsViajesSinFactura.map((it) =>
-                  onViewViaje ? (
-                    <button
-                      key={it.id}
-                      type="button"
-                      disabled={loadingViajeId === it.id}
-                      className={`${linkViajeClass} disabled:opacity-60 disabled:cursor-wait`}
-                      onClick={() => onViewViaje(it.id)}
-                    >
-                      {loadingViajeId === it.id ? (
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
-                          Cargando…
-                        </span>
-                      ) : (
-                        <>Viaje {it.numero.trim() || it.id.slice(0, 8)} →</>
-                      )}
-                    </button>
-                  ) : (
-                    <Link
-                      key={it.id}
-                      to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
-                      className={linkViajeClass}
-                      onClick={() => setAbierto(false)}
-                    >
-                      Viaje {it.numero.trim() || it.id.slice(0, 8)} →
-                    </Link>
-                  )
-                )
-              ) : (
-                <Link to="/viajes" className={linkViajeClass} onClick={() => setAbierto(false)}>
-                  Ir a viajes →
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const headingId = useId();
+  const panelId = `${headingId}-panel`;
+  const vencMon = montosPorMonedaCompat(alertas.facturasVencidas);
+  const sinFacturaMon = montosPorMonedaCompat(alertas.viajesSinFactura);
+  const itemsFacturasVencidas = alertas.facturasVencidas.items ?? [];
+  const itemsViajesSinFactura = alertas.viajesSinFactura.items ?? [];
+  const totalAlertasBadge =
+    (alertas.facturasVencidas.cantidad > 0 ? alertas.facturasVencidas.cantidad : 0) +
+    (alertas.viajesSinFactura.cantidad > 0 ? alertas.viajesSinFactura.cantidad : 0);
+  const badgeText = totalAlertasBadge > 99 ? '99+' : String(totalAlertasBadge);
+  const resumenMobile =
+    totalAlertasBadge === 1
+      ? '1 pendiente'
+      : `${totalAlertasBadge} pendientes`;
 
-  if (!abierto) {
+  function closePanel() {
+    setAbierto(false);
+  }
+
+  function renderAlertActions(
+    tone: 'rose' | 'amber',
+    items: Array<{ id: string; numero: string }>,
+    fallbackTo: string,
+    fallbackLabel: string,
+    itemPrefix: string,
+    onView?: (id: string) => void,
+    loadingId?: string | null,
+  ) {
+    const linkClass =
+      tone === 'rose'
+        ? 'inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors'
+        : 'inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors';
+    const spinnerClass =
+      tone === 'rose'
+        ? 'inline-block h-3 w-3 animate-spin rounded-full border-2 border-rose-300 border-t-transparent'
+        : 'inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent';
+
     return (
-      <div className="shrink-0 self-start">
-        <button
-          type="button"
-          onClick={() => setAbierto(true)}
-          aria-expanded="false"
-          aria-controls={panelId}
-          aria-label={`Alertas: ${totalAlertasBadge} pendiente${totalAlertasBadge === 1 ? '' : 's'}, ver detalle`}
-          className="group flex items-center gap-2.5 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-2.5 text-left shadow-md ring-1 ring-vialto-fire/35 animate-alarm-chip-pulse motion-reduce:animate-none hover:border-vialto-bright hover:ring-vialto-fire/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-vialto-mist)] active:scale-[0.98] transition-[border-color,box-shadow,transform] cursor-pointer"
-        >
-          <span
-            className="inline-flex text-vialto-fire motion-reduce:animate-none animate-alarm-bell origin-top"
-            aria-hidden
-          >
-            <BellIcon className="w-6 h-6" />
-          </span>
-          <span className="inline-flex items-center gap-2.5 pl-1">
-            <span
-              id={headingId}
-              className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors"
-            >
-              Alertas
-            </span>
-            {totalAlertasBadge > 0 ? (
-              <span
-                className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
-                aria-hidden
+      <div className="mt-3 flex flex-col gap-2">
+        {items.length > 0 ? (
+          items.map((it) =>
+            onView ? (
+              <button
+                key={it.id}
+                type="button"
+                disabled={loadingId === it.id}
+                className={`${linkClass} disabled:opacity-60 disabled:cursor-wait`}
+                onClick={() => onView(it.id)}
               >
-                {badgeText}
-              </span>
-            ) : null}
-          </span>
-        </button>
+                {loadingId === it.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className={spinnerClass} />
+                    Cargando…
+                  </span>
+                ) : (
+                  <>{itemPrefix} {it.numero.trim() || it.id.slice(0, 8)} →</>
+                )}
+              </button>
+            ) : (
+              <Link
+                key={it.id}
+                to={tone === 'rose' ? `/facturacion?factura=${encodeURIComponent(it.id)}` : `/viajes?viaje=${encodeURIComponent(it.id)}`}
+                className={linkClass}
+                onClick={closePanel}
+              >
+                {itemPrefix} {it.numero.trim() || it.id.slice(0, 8)} →
+              </Link>
+            ),
+          )
+        ) : (
+          <Link to={fallbackTo} className={linkClass} onClick={closePanel}>
+            {fallbackLabel}
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  function renderAlertList() {
+    return (
+      <div className="flex flex-col gap-3">
+        {alertas.facturasVencidas.cantidad > 0 && (
+          <div className="flex gap-3 rounded-md border-2 border-rose-500/70 bg-rose-950/35 px-3 py-3">
+            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
+                {alertas.facturasVencidas.cantidad === 1
+                  ? 'Factura vencida sin cobrar'
+                  : 'Facturas vencidas sin cobrar'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {alertas.facturasVencidas.cantidad}{' '}
+                <span className="font-body text-base text-white/70">
+                  {alertas.facturasVencidas.cantidad === 1 ? 'factura' : 'facturas'}
+                </span>
+              </p>
+              <div className="mt-1 space-y-0.5 text-xs text-rose-100/90">
+                <p>
+                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">ARS</span>
+                  {vencMon.ARS === 0 ? '—' : formatMoney(vencMon.ARS)}
+                </p>
+                <p>
+                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">USD</span>
+                  {vencMon.USD === 0 ? '—' : formatMoneyUSD(vencMon.USD)}
+                </p>
+              </div>
+              {renderAlertActions(
+                'rose',
+                itemsFacturasVencidas,
+                '/facturacion',
+                'Ir a facturación →',
+                'Factura',
+                onViewFactura,
+                loadingFacturaId,
+              )}
+            </div>
+          </div>
+        )}
+
+        {alertas.viajesSinFactura.cantidad > 0 && (
+          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
+            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
+                {alertas.viajesSinFactura.cantidad === 1
+                  ? 'Viaje finalizado sin factura'
+                  : 'Viajes finalizados sin factura'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {alertas.viajesSinFactura.cantidad}{' '}
+                <span className="font-body text-base text-white/70">
+                  {alertas.viajesSinFactura.cantidad === 1 ? 'viaje' : 'viajes'}
+                </span>
+              </p>
+              <div className="mt-1 space-y-0.5 text-xs text-amber-100/90">
+                <p>
+                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">ARS</span>
+                  {sinFacturaMon.ARS === 0 ? '—' : formatMoney(sinFacturaMon.ARS)}
+                </p>
+                <p>
+                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">USD</span>
+                  {sinFacturaMon.USD === 0 ? '—' : formatMoneyUSD(sinFacturaMon.USD)}
+                </p>
+              </div>
+              {renderAlertActions(
+                'amber',
+                itemsViajesSinFactura,
+                '/viajes',
+                'Ir a viajes →',
+                'Viaje',
+                onViewViaje,
+                loadingViajeId,
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <aside
-      id={panelId}
-      role="region"
-      aria-labelledby={headingId}
-      className="w-full max-w-md lg:w-80 shrink-0 rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-lg ring-1 ring-vialto-fire/20"
-    >
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex text-vialto-fire shrink-0" aria-hidden>
-            <BellIcon className="w-5 h-5" />
-          </span>
-          <h2
-            id={headingId}
-            className="font-[family-name:var(--font-display)] text-lg tracking-wide text-white min-w-0 inline-flex items-center gap-2.5 pl-1"
-          >
-            <span className="max-w-[10rem] truncate sm:max-w-[14rem]">Alertas</span>
-            {totalAlertasBadge > 0 ? (
-              <span
-                className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
-                aria-hidden
-              >
-                {badgeText}
-              </span>
-            ) : null}
-          </h2>
-        </div>
+    <>
+      <div className="w-full lg:hidden">
         <button
           type="button"
-          onClick={() => setAbierto(false)}
-          aria-expanded="true"
-          aria-controls={panelId}
-          className="shrink-0 rounded border border-white/20 bg-white/5 px-2.5 py-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire transition-colors"
+          onClick={() => setAbierto(true)}
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          aria-label={`Alertas: ${resumenMobile}, ver detalle`}
+          className="group flex min-h-11 w-full items-center gap-3 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-3 text-left shadow-md ring-1 ring-vialto-fire/35 transition-[border-color,box-shadow] hover:border-vialto-bright hover:ring-vialto-fire/60"
         >
-          Minimizar
+          <span
+            className="inline-flex shrink-0 text-vialto-fire motion-reduce:animate-none animate-alarm-bell origin-top"
+            aria-hidden
+          >
+            <BellIcon className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors">
+              Alertas
+            </span>
+            <span className="block text-xs text-white/60">{resumenMobile}</span>
+          </span>
+          <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 text-[10px] font-bold text-white ring-2 ring-vialto-charcoal">
+            {badgeText}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-white/50" strokeWidth={2} />
         </button>
       </div>
-      {listaAlertas}
-    </aside>
+
+      {abierto && (
+        <div
+          className={`${modalOverlayClass} lg:hidden`}
+          role="presentation"
+          onClick={closePanel}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`${headingId}-mobile-title`}
+            className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite shadow-lg ring-1 ring-vialto-fire/20 sm:max-w-md sm:rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex shrink-0 text-vialto-fire" aria-hidden>
+                  <BellIcon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2
+                    id={`${headingId}-mobile-title`}
+                    className="font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
+                  >
+                    Alertas
+                  </h2>
+                  <p className="mt-0.5 text-xs text-white/50">{resumenMobile}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePanel}
+                aria-label="Cerrar"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-white/70 hover:bg-white/10 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderAlertList()}</div>
+            <div className="shrink-0 border-t border-white/10 p-4">
+              <button
+                type="button"
+                onClick={closePanel}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded border border-white/20 bg-white/5 px-4 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white hover:bg-white/10"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="hidden shrink-0 self-start lg:block">
+        {!abierto ? (
+          <button
+            type="button"
+            onClick={() => setAbierto(true)}
+            aria-expanded="false"
+            aria-controls={panelId}
+            aria-label={`Alertas: ${totalAlertasBadge} pendiente${totalAlertasBadge === 1 ? '' : 's'}, ver detalle`}
+            className="group flex items-center gap-2.5 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-2.5 text-left shadow-md ring-1 ring-vialto-fire/35 animate-alarm-chip-pulse motion-reduce:animate-none hover:border-vialto-bright hover:ring-vialto-fire/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-vialto-mist)] active:scale-[0.98] transition-[border-color,box-shadow,transform] cursor-pointer"
+          >
+            <span
+              className="inline-flex text-vialto-fire motion-reduce:animate-none animate-alarm-bell origin-top"
+              aria-hidden
+            >
+              <BellIcon className="w-6 h-6" />
+            </span>
+            <span className="inline-flex items-center gap-2.5 pl-1">
+              <span
+                id={headingId}
+                className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors"
+              >
+                Alertas
+              </span>
+              {totalAlertasBadge > 0 ? (
+                <span
+                  className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
+                  aria-hidden
+                >
+                  {badgeText}
+                </span>
+              ) : null}
+            </span>
+          </button>
+        ) : (
+          <aside
+            id={panelId}
+            role="region"
+            aria-labelledby={headingId}
+            className="w-80 shrink-0 rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-lg ring-1 ring-vialto-fire/20"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex shrink-0 text-vialto-fire" aria-hidden>
+                  <BellIcon className="h-5 w-5" />
+                </span>
+                <h2
+                  id={headingId}
+                  className="inline-flex min-w-0 items-center gap-2.5 pl-1 font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
+                >
+                  <span className="max-w-[10rem] truncate">Alertas</span>
+                  {totalAlertasBadge > 0 ? (
+                    <span
+                      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
+                      aria-hidden
+                    >
+                      {badgeText}
+                    </span>
+                  ) : null}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closePanel}
+                aria-expanded="true"
+                aria-controls={panelId}
+                className="shrink-0 rounded border border-white/20 bg-white/5 px-2.5 py-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire transition-colors"
+              >
+                Minimizar
+              </button>
+            </div>
+            {renderAlertList()}
+          </aside>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -443,6 +564,7 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
   const showViajes = canAccessViajes(modules);
   const showFin = canAccessFacturacion(modules) || showViajes;
   const showStock = canAccessStock(modules);
+  const [periodModalOpen, setPeriodModalOpen] = useState(false);
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -451,14 +573,154 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
     { id: 'custom', label: 'Personalizado' },
   ];
 
+  const activePeriodLabel =
+    periodTabs.find((t) => t.id === dash.period)?.label ?? 'Período';
+
+  useEffect(() => {
+    if (!periodModalOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPeriodModalOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [periodModalOpen]);
+
+  useLockBodyScroll(periodModalOpen);
+
+  function selectPeriod(id: typeof dash.period) {
+    dash.setPeriod(id);
+    if (id !== 'custom') setPeriodModalOpen(false);
+  }
+
   const fin = dash.data?.financiero;
   const viajes = dash.data?.viajes;
 
   return (
-    <div className="mt-8 space-y-10">
+    <div className="mt-6 space-y-6 lg:mt-8 lg:space-y-10">
       <div className="flex flex-col gap-4">
+        <div className="lg:hidden">
+          <button
+            type="button"
+            onClick={() => setPeriodModalOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={periodModalOpen}
+            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-black/10 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-vialto-fire/40"
+          >
+            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+              Período
+            </span>
+            <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+              <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+                {activePeriodLabel}
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={2} />
+            </span>
+          </button>
+        </div>
+
+        {periodModalOpen && (
+          <div
+            className={modalOverlayClass}
+            role="presentation"
+            onClick={() => setPeriodModalOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dashboard-period-title"
+              className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl border border-black/10 bg-white shadow-lg sm:max-w-md sm:rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 py-4">
+                <h2
+                  id="dashboard-period-title"
+                  className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal"
+                >
+                  Elegir período
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setPeriodModalOpen(false)}
+                  aria-label="Cerrar"
+                  className="inline-flex h-11 w-11 items-center justify-center text-vialto-steel hover:bg-vialto-mist"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                {periodTabs.map((t) => {
+                  const active = dash.period === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => selectPeriod(t.id)}
+                      className={[
+                        'flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left transition-colors',
+                        active
+                          ? 'bg-vialto-mist text-vialto-charcoal'
+                          : 'text-vialto-charcoal hover:bg-vialto-mist/70',
+                      ].join(' ')}
+                    >
+                      <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider">
+                        {t.label}
+                      </span>
+                      {active && (
+                        <span className="text-vialto-fire text-sm font-semibold" aria-hidden>
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {dash.period === 'custom' && (
+                  <div className="mt-2 space-y-3 border-t border-black/10 px-3 py-4">
+                    <label className="flex flex-col gap-1.5 text-xs text-vialto-steel">
+                      Desde
+                      <input
+                        type="date"
+                        className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
+                        value={dash.customFrom}
+                        onChange={(e) => dash.setCustomFrom(e.target.value)}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-vialto-steel">
+                      Hasta
+                      <input
+                        type="date"
+                        className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
+                        value={dash.customTo}
+                        min={dash.customFrom || undefined}
+                        onChange={(e) => dash.setCustomTo(e.target.value)}
+                      />
+                    </label>
+                    {(!dash.customFrom || !dash.customTo) && (
+                      <p className="text-xs text-vialto-steel">
+                        Elegí fecha desde y hasta para ver los indicadores.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0 border-t border-black/10 p-4">
+                <button
+                  type="button"
+                  onClick={() => setPeriodModalOpen(false)}
+                  disabled={dash.period === 'custom' && (!dash.customFrom || !dash.customTo)}
+                  className="inline-flex min-h-11 w-full items-center justify-center bg-vialto-charcoal px-4 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {dash.period === 'custom' ? 'Aplicar' : 'Listo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
-          className="flex flex-wrap gap-2"
+          className="hidden flex-wrap gap-2 lg:flex"
           role="tablist"
           aria-label="Período del panel"
         >
@@ -484,27 +746,27 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         </div>
 
         {dash.period === 'custom' && (
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-vialto-steel">
+          <div className="hidden flex-col gap-3 lg:flex lg:flex-row lg:flex-wrap lg:items-end lg:gap-3">
+            <label className="flex w-full flex-col gap-1.5 text-xs text-vialto-steel lg:w-auto">
               Desde
               <input
                 type="date"
-                className="rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
+                className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal lg:min-h-0 lg:w-auto"
                 value={dash.customFrom}
                 onChange={(e) => dash.setCustomFrom(e.target.value)}
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-vialto-steel">
+            <label className="flex w-full flex-col gap-1.5 text-xs text-vialto-steel lg:w-auto">
               Hasta
               <input
                 type="date"
-                className="rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal"
+                className="min-h-11 w-full rounded border border-vialto-steel/40 bg-white px-3 py-2 text-sm text-vialto-charcoal lg:min-h-0 lg:w-auto"
                 value={dash.customTo}
                 onChange={(e) => dash.setCustomTo(e.target.value)}
               />
             </label>
             {(!dash.customFrom || !dash.customTo) && (
-              <p className="text-xs text-vialto-steel">
+              <p className="text-xs text-vialto-steel lg:self-center">
                 Elegí fecha desde y hasta para ver los indicadores.
               </p>
             )}
@@ -525,17 +787,18 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         <section aria-labelledby="fin-heading">
           <h2
             id="fin-heading"
-            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel mb-3"
+            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
           >
             Resumen financiero
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <MetricCard
               title="A pagar (transportistas externos)"
               tooltip="Suma del precio acordado con transportistas externos en viajes del período"
               metric={fin?.aPagarTransportistas}
               loading={dash.loading}
               valueTone="payable"
+              className="col-span-2 lg:col-span-1"
             />
             <MetricCard
               title="Sin facturar"
@@ -564,11 +827,11 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         <section aria-labelledby="viajes-heading">
           <h2
             id="viajes-heading"
-            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel mb-3"
+            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
           >
             Actividad operativa
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <MetricCard
               title="En curso"
               tooltip="Viajes del período actualmente en curso"
@@ -609,11 +872,11 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         <section aria-labelledby="stock-heading">
           <h2
             id="stock-heading"
-            className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel mb-3"
+            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
           >
             Stock
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <MetricCard
               title="Productos en catálogo"
               tooltip="Productos activos registrados en el catálogo"

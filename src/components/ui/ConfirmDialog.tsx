@@ -1,5 +1,6 @@
 import { useEffect, useId } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { modalOverlayClass } from '@/lib/modalLayers';
 
 export type ConfirmDialogProps = {
   open: boolean;
@@ -15,7 +16,7 @@ export type ConfirmDialogProps = {
 };
 
 const btnGhost =
-  'text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex min-h-11 items-center text-xs uppercase tracking-wider px-3 py-2 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none md:min-h-0 md:py-1.5';
 
 export function ConfirmDialog({
   open,
@@ -52,7 +53,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4"
+      className={modalOverlayClass.replace('z-50', 'z-[120]')}
       role="presentation"
       onClick={() => {
         if (!busy) onCancel();
@@ -63,7 +64,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="w-full max-w-sm rounded border border-black/15 bg-white p-5 shadow-lg"
+        className="w-full max-w-sm rounded-t-xl border border-black/15 bg-white p-5 shadow-lg sm:rounded"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -75,7 +76,7 @@ export function ConfirmDialog({
         <p id={descId} className="mt-2 text-sm text-vialto-steel">
           {message}
         </p>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             disabled={busy}

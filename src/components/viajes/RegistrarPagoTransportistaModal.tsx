@@ -7,6 +7,7 @@ import {
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
 } from '@/lib/currencyMask';
+import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
 import type { Viaje } from '@/types/api';
@@ -98,7 +99,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className={modalOverlayClass.replace('z-50', 'z-[100]')}
       role="dialog"
       aria-modal="true"
       aria-labelledby="registrar-pago-title"

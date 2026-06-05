@@ -1,10 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { PaginatedMeta, Vehiculo } from '@/types/api';
 
 type VehiculosPaginatedResponse = {
@@ -70,65 +72,64 @@ export function VehiculosTenantPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Patente</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Marca</th>
-              <th className="px-4 py-3">Modelo</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows === null && !error && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {rows?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Todavía no tenés vehículos cargados.
-                </td>
-              </tr>
-            )}
-            {rows?.map((v) => (
-              <tr key={v.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-[family-name:var(--font-ui)] tracking-wider font-semibold">
-                  {v.patente}
-                </td>
-                <td className="px-4 py-3 text-vialto-steel">{labelVehiculoTipo(v.tipo)}</td>
-                <td className="px-4 py-3 text-vialto-steel">{v.marca ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{v.modelo ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="inline-flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setViewingVehiculoId(v.id);
-                        setViewingVehiculoPatente(v.patente);
-                      }}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
-                    <Link
-                      to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Editar
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'patente',
+            header: 'Patente',
+            primary: true,
+            cell: (v) => v.patente,
+            tdClassName: `${listadoTablaTdClass} font-[family-name:var(--font-ui)] tracking-wider font-semibold`,
+          },
+          {
+            id: 'tipo',
+            header: 'Tipo',
+            cell: (v) => labelVehiculoTipo(v.tipo),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'marca',
+            header: 'Marca',
+            cell: (v) => v.marca ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'modelo',
+            header: 'Modelo',
+            cell: (v) => v.modelo ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(v) => v.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar los vehículos.'
+            : 'Todavía no tenés vehículos cargados.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(v) => (
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setViewingVehiculoId(v.id);
+                setViewingVehiculoPatente(v.patente);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+            <Link
+              to={`/vehiculos/${encodeURIComponent(v.id)}/editar`}
+              className={listadoTablaAccionClass}
+            >
+              Editar
+            </Link>
+          </div>
+        )}
+      />
 
       {meta && (
         <div className="mt-4 flex items-center justify-between">

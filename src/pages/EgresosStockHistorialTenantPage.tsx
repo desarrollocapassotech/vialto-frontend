@@ -1,22 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import type { MovimientoStock } from '@/types/api';
-import {
-  listadoTablaBodyRowClass,
-  listadoTablaClass,
-  listadoTablaEmptyCellClass,
-  listadoTablaHeadRowClass,
-  listadoTablaAccionClass,
-  listadoTablaTdClass,
-  listadoTablaThClass,
-  listadoTablaWrapperClass,
-} from '@/lib/listadoTabla';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import { movimientoStockTipoNumeroClass } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import type { MovimientoStock } from '@/types/api';
 
 function buildQsTenant(tenantId?: string): string {
   return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
@@ -92,93 +84,83 @@ export function EgresosStockHistorialTenantPage({
         </div>
       )}
 
-      <div
-        className={[listadoTablaWrapperClass, !embeddedInSuperadmin ? 'mt-4' : '']
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <table className={listadoTablaClass}>
-          <thead>
-            <tr className={listadoTablaHeadRowClass}>
-              <th scope="col" className={listadoTablaThClass}>
-                Fecha
-              </th>
-              <th scope="col" className={listadoTablaThClass}>
-                Remito
-              </th>
-              <th scope="col" className={listadoTablaThClass}>
-                Producto
-              </th>
-              <th scope="col" className={listadoTablaThClass}>
-                Cliente
-              </th>
-              <th scope="col" className={listadoTablaThClass}>
-                Depósito
-              </th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Cant. 1
-              </th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Cant. 2
-              </th>
-              <th scope="col" className={`${listadoTablaThClass} text-right`}>
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={8} className={listadoTablaEmptyCellClass}>
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={8} className={listadoTablaEmptyCellClass}>
-                  No hay egresos registrados.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              items.map((m) => (
-                <tr key={m.id} className={listadoTablaBodyRowClass}>
-                  <td className={`${listadoTablaTdClass} whitespace-nowrap`}>
-                    {formatMovimientoStockFechaFromIso(m.fecha)}
-                  </td>
-                  <td className={`${listadoTablaTdClass} font-mono`}>{m.numeroRemito ?? '—'}</td>
-                  <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
-                  <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
-                  <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
-                  <td className={`${listadoTablaTdClass} text-right`}>
-                    <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad1}</span>
-                    {' '}
-                    <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
-                  </td>
-                  <td className={`${listadoTablaTdClass} text-right`}>
-                    {m.producto?.unidad2Nombre !== null ? (
-                      <>
-                        <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad2}</span>
-                        {' '}
-                        <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
-                      </>
-                    ) : '—'}
-                  </td>
-                  <td className={`${listadoTablaTdClass} text-right whitespace-nowrap`}>
-                    <button
-                      type="button"
-                      onClick={() => setDetalleMovimientoId(m.id)}
-                      className={listadoTablaAccionClass}
-                    >
-                      Ver
-                    </button>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+      <ListadoDatos
+        className={!embeddedInSuperadmin ? 'mt-4' : ''}
+        columns={[
+          {
+            id: 'fecha',
+            header: 'Fecha',
+            primary: true,
+            cell: (m) => formatMovimientoStockFechaFromIso(m.fecha),
+            tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
+          },
+          {
+            id: 'remito',
+            header: 'Remito',
+            cell: (m) => m.numeroRemito ?? '—',
+            tdClassName: `${listadoTablaTdClass} font-mono`,
+          },
+          {
+            id: 'producto',
+            header: 'Producto',
+            cell: (m) => m.producto?.nombre ?? m.productoId,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'cliente',
+            header: 'Cliente',
+            cell: (m) => m.cliente?.nombre ?? m.clienteId,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'deposito',
+            header: 'Depósito',
+            cell: (m) => m.deposito?.nombre ?? '—',
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'cant1',
+            header: 'Cant. 1',
+            cell: (m) => (
+              <>
+                <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad1}</span>
+                {' '}
+                <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
+              </>
+            ),
+            tdClassName: `${listadoTablaTdClass} text-right`,
+          },
+          {
+            id: 'cant2',
+            header: 'Cant. 2',
+            cell: (m) =>
+              m.producto?.unidad2Nombre !== null ? (
+                <>
+                  <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad2}</span>
+                  {' '}
+                  <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
+                </>
+              ) : (
+                '—'
+              ),
+            tdClassName: `${listadoTablaTdClass} text-right`,
+          },
+        ]}
+        rows={loading ? null : items}
+        rowKey={(m) => m.id}
+        emptyMessage="No hay egresos registrados."
+        loadingMessage="Cargando…"
+        renderActions={(m) => (
+          <button
+            type="button"
+            onClick={() => setDetalleMovimientoId(m.id)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
+        actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
+      />
 
       {detalleMovimientoId && (
         <MovimientoStockViewModal

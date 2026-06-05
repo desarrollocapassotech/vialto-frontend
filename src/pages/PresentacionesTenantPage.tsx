@@ -1,7 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Presentacion } from '@/types/api';
 
 type FormState = { nombre: string; activo: boolean };
@@ -126,68 +128,63 @@ export function PresentacionesTenantPage() {
         </p>
       )}
 
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows === null && !error && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {rows?.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  No hay presentaciones cargadas. Creá una para usarla en los productos.
-                </td>
-              </tr>
-            )}
-            {rows?.map((row) => (
-              <tr key={row.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-medium">{row.nombre}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={
-                      row.activo
-                        ? 'text-xs uppercase tracking-wider text-emerald-800'
-                        : 'text-xs uppercase tracking-wider text-vialto-steel'
-                    }
-                  >
-                    {row.activo ? 'Activa' : 'Inactiva'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingId(row.id);
-                      setIsFormOpen(true);
-                    }}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void eliminar(row)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 text-red-900 hover:bg-red-50"
-                  >
-                    Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (row) => row.nombre,
+            tdClassName: `${listadoTablaTdClass} font-medium`,
+          },
+          {
+            id: 'estado',
+            header: 'Estado',
+            cell: (row) => (
+              <span
+                className={
+                  row.activo
+                    ? 'text-xs uppercase tracking-wider text-emerald-800'
+                    : 'text-xs uppercase tracking-wider text-vialto-steel'
+                }
+              >
+                {row.activo ? 'Activa' : 'Inactiva'}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(row) => row.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar las presentaciones.'
+            : 'No hay presentaciones cargadas. Creá una para usarla en los productos.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(row) => (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(row.id);
+                setIsFormOpen(true);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => void eliminar(row)}
+              className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+            >
+              Eliminar
+            </button>
+          </>
+        )}
+      />
 
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

@@ -7,7 +7,7 @@ import {
   useOrganization,
   useUser,
 } from '@clerk/clerk-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeftRight,
   Building2,
@@ -16,6 +16,7 @@ import {
   Database,
   House,
   Landmark,
+  Menu,
   PackageMinus,
   PackagePlus,
   Receipt,
@@ -23,6 +24,7 @@ import {
   Warehouse,
   Users,
   LogOut,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from './Logo';
@@ -43,6 +45,9 @@ type NavGroup = {
   items: NavItem[];
 };
 
+const sidebarAsideClass =
+  'w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto';
+
 export function AppShell() {
   const { organization } = useOrganization();
   const { orgRole } = useAuth();
@@ -50,6 +55,7 @@ export function AppShell() {
   const { user, isLoaded: userLoaded } = useUser();
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const superadmin =
     userLoaded && isPlatformSuperadmin(user?.publicMetadata);
@@ -57,6 +63,19 @@ export function AppShell() {
   async function handleSignOut() {
     await signOut();
   }
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen]);
 
   const navLoading = !userLoaded || tenantLoading;
 
@@ -185,29 +204,26 @@ export function AppShell() {
       : { label: 'Backend: QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
     : null;
 
-  return (
-    <div className="min-h-screen flex bg-vialto-mist">
-      {envBadge && (
-        <div className="fixed top-2 right-3 z-50 pointer-events-none flex items-center gap-1.5">
-          {neonBranch && (
-            <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
-              Neon: {neonBranch}
-            </span>
+  function renderSidebar(showCloseButton: boolean) {
+    return (
+      <>
+        <div className={`px-1 ${showCloseButton ? 'flex items-start justify-between gap-2' : ''}`}>
+          <div className="min-w-0">
+            <Logo heightClass="h-14 max-w-[11rem]" />
+            <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
+              TRANSPORTE Y LOGISTICA
+            </p>
+          </div>
+          {showCloseButton && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Cerrar menú"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 text-white/80 hover:bg-white/10"
+            >
+              <X className="h-5 w-5" strokeWidth={1.75} />
+            </button>
           )}
-          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
-            {clerkEnv}
-          </span>
-          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
-            {envBadge.label}
-          </span>
-        </div>
-      )}
-      <aside className="w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 sticky top-0 h-screen overflow-y-auto">
-        <div className="px-1">
-          <Logo heightClass="h-14 max-w-[11rem]" />
-          <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
-            TRANSPORTE Y LOGISTICA
-          </p>
         </div>
 
         <nav className="flex flex-col gap-3">
@@ -231,6 +247,7 @@ export function AppShell() {
                   key={item.to}
                   to={item.to}
                   end={item.end === true}
+                  onClick={() => setSidebarOpen(false)}
                   className={({ isActive }) => {
                     const active =
                       isActive ||
@@ -238,7 +255,7 @@ export function AppShell() {
                         location.pathname.startsWith(p),
                       ) ?? false);
                     return [
-                      'flex items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
+                      'flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
                       active
                         ? 'border-vialto-fire bg-vialto-fire text-white shadow-sm'
                         : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white',
@@ -313,7 +330,7 @@ export function AppShell() {
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className="mt-2 flex w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Cerrar sesión</span>
@@ -327,13 +344,72 @@ export function AppShell() {
             </div>
           </div>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex bg-vialto-mist overflow-x-clip">
+      {envBadge && (
+        <div className="fixed top-2 right-3 z-[60] pointer-events-none hidden sm:flex items-center gap-1.5 max-w-[calc(100vw-1rem)]">
+          {neonBranch && (
+            <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
+              Neon: {neonBranch}
+            </span>
+          )}
+          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
+            {clerkEnv}
+          </span>
+          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
+            {envBadge.label}
+          </span>
+        </div>
+      )}
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`hidden lg:flex sticky top-0 ${sidebarAsideClass}`}>
+        {renderSidebar(false)}
       </aside>
 
-      <main className="flex-1 min-w-0 p-8">
-        <MaestroDataProvider>
-          <Outlet />
-        </MaestroDataProvider>
-      </main>
+      <aside
+        aria-hidden={!sidebarOpen}
+        className={[
+          sidebarAsideClass,
+          'lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none',
+        ].join(' ')}
+      >
+        {renderSidebar(true)}
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-vialto-charcoal px-4 py-3 lg:hidden">
+          <button
+            type="button"
+            aria-label="Abrir menú"
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(true)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white hover:bg-white/10"
+          >
+            <Menu className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+          <Logo heightClass="h-8 max-w-[8rem]" />
+        </header>
+
+        <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
+          <MaestroDataProvider>
+            <Outlet />
+          </MaestroDataProvider>
+        </main>
+      </div>
     </div>
   );
 }

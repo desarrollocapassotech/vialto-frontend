@@ -2,9 +2,13 @@ import { useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
+import { ListadoCard } from '@/components/listado/ListadoCard';
+import { ListadoDatos, type ListadoColumn } from '@/components/listado/ListadoDatos';
 import { useImportacion } from '@/hooks/useImportacion';
 import { useImportTemplates, getTemplateExample } from '@/hooks/useImportTemplates';
+import { modalOverlayClass } from '@/lib/modalLayers';
 import { labelModulo } from '@/lib/platformLabels';
+import { listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Tenant, ImportPreviewViaje, ImportPreviewFactura, ImportPreviewEntidad } from '@/types/api';
 
 interface ImportacionModalProps {
@@ -63,7 +67,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className={modalOverlayClass}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div className="relative w-full max-w-5xl bg-white shadow-xl flex flex-col max-h-[90vh]">
@@ -431,94 +435,124 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
 }
 
 function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
-  const fmt = (v: unknown) => v != null ? String(v) : null;
-  const money = (v: number | null) => v != null ? `$${v.toLocaleString('es-AR')}` : null;
+  const fmt = (v: unknown) => (v != null ? String(v) : '—');
+  const money = (v: number | null) => (v != null ? `$${v.toLocaleString('es-AR')}` : '—');
   const hasChofer = viajes.some((v) => v.chofer);
   const hasVehiculo = viajes.some((v) => v.vehiculo);
+
+  const columns: ListadoColumn<ImportPreviewViaje>[] = [
+    {
+      id: 'fila',
+      header: 'Fila',
+      primary: true,
+      cell: (v) => v.fila,
+      tdClassName: `${listadoTablaTdClass} text-vialto-steel text-xs`,
+    },
+    { id: 'cliente', header: 'Cliente', cell: (v) => fmt(v.cliente) },
+    { id: 'transporte', header: 'Transporte', cell: (v) => fmt(v.transporte) },
+    { id: 'origen', header: 'Origen', cell: (v) => fmt(v.origen) },
+    { id: 'destino', header: 'Destino', cell: (v) => fmt(v.destino) },
+    ...(hasChofer
+      ? [{ id: 'chofer', header: 'Chofer', cell: (v: ImportPreviewViaje) => fmt(v.chofer) }]
+      : []),
+    ...(hasVehiculo
+      ? [{ id: 'vehiculo', header: 'Vehículo', cell: (v: ImportPreviewViaje) => fmt(v.vehiculo) }]
+      : []),
+    { id: 'fechaCarga', header: 'F. Carga', cell: (v) => fmt(v.fechaCarga) },
+    { id: 'fechaDescarga', header: 'F. Descarga', cell: (v) => fmt(v.fechaDescarga) },
+    { id: 'carga', header: 'Carga', cell: (v) => fmt(v.detalleCarga) },
+    { id: 'monto', header: 'Monto', cell: (v) => money(v.monto) },
+    { id: 'moneda', header: 'Moneda', cell: (v) => fmt(v.monedaMonto) },
+    { id: 'nroFc', header: 'Nro FC', cell: (v) => fmt(v.nroFactura) },
+    { id: 'flete', header: 'Flete', cell: (v) => money(v.precioTransportistaExterno) },
+    { id: 'monedaFlete', header: 'Moneda Flete', cell: (v) => fmt(v.monedaPrecioTransportistaExterno) },
+    { id: 'fcFlete', header: 'FC Flete', cell: (v) => fmt(v.nroFacturaTransporte) },
+  ];
+
   return (
-    <div className="overflow-x-auto rounded border border-black/10">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-vialto-mist font-[family-name:var(--font-ui)] uppercase tracking-wider text-vialto-fire text-left">
-            <th className="px-3 py-2 whitespace-nowrap">Fila</th>
-            <th className="px-3 py-2 whitespace-nowrap">Cliente</th>
-            <th className="px-3 py-2 whitespace-nowrap">Transporte</th>
-            <th className="px-3 py-2 whitespace-nowrap">Origen</th>
-            <th className="px-3 py-2 whitespace-nowrap">Destino</th>
-            {hasChofer && <th className="px-3 py-2 whitespace-nowrap">Chofer</th>}
-            {hasVehiculo && <th className="px-3 py-2 whitespace-nowrap">Vehículo</th>}
-            <th className="px-3 py-2 whitespace-nowrap">F. Carga</th>
-            <th className="px-3 py-2 whitespace-nowrap">F. Descarga</th>
-            <th className="px-3 py-2 whitespace-nowrap">Carga</th>
-            <th className="px-3 py-2 whitespace-nowrap">Monto</th>
-            <th className="px-3 py-2 whitespace-nowrap">Moneda</th>
-            <th className="px-3 py-2 whitespace-nowrap">Nro FC</th>
-            <th className="px-3 py-2 whitespace-nowrap">Flete</th>
-            <th className="px-3 py-2 whitespace-nowrap">Moneda Flete</th>
-            <th className="px-3 py-2 whitespace-nowrap">FC Flete</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-black/5">
-          {viajes.map((v) => (
-            <tr key={v.fila} className="hover:bg-vialto-mist/50">
-              <td className="px-3 py-1.5 text-vialto-steel">{v.fila}</td>
-              <Td>{fmt(v.cliente)}</Td>
-              <Td>{fmt(v.transporte)}</Td>
-              <Td>{fmt(v.origen)}</Td>
-              <Td>{fmt(v.destino)}</Td>
-              {hasChofer && <Td>{fmt(v.chofer)}</Td>}
-              {hasVehiculo && <Td>{fmt(v.vehiculo)}</Td>}
-              <Td>{fmt(v.fechaCarga)}</Td>
-              <Td>{fmt(v.fechaDescarga)}</Td>
-              <Td>{fmt(v.detalleCarga)}</Td>
-              <Td>{money(v.monto)}</Td>
-              <Td>{fmt(v.monedaMonto)}</Td>
-              <Td>{fmt(v.nroFactura)}</Td>
-              <Td>{money(v.precioTransportistaExterno)}</Td>
-              <Td>{fmt(v.monedaPrecioTransportistaExterno)}</Td>
-              <Td>{fmt(v.nroFacturaTransporte)}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListadoDatos
+      columns={columns}
+      rows={viajes}
+      rowKey={(v) => String(v.fila)}
+      emptyMessage="No hay viajes en la vista previa."
+      renderMobileCard={(v) => (
+        <ListadoCard
+          primary={`Fila ${v.fila} · ${fmt(v.cliente)}`}
+          fields={[
+            { label: 'Transporte', value: fmt(v.transporte) },
+            { label: 'Origen', value: fmt(v.origen) },
+            { label: 'Destino', value: fmt(v.destino) },
+            ...(hasChofer ? [{ label: 'Chofer', value: fmt(v.chofer) }] : []),
+            ...(hasVehiculo ? [{ label: 'Vehículo', value: fmt(v.vehiculo) }] : []),
+            { label: 'F. Carga', value: fmt(v.fechaCarga) },
+            { label: 'F. Descarga', value: fmt(v.fechaDescarga) },
+            { label: 'Carga', value: fmt(v.detalleCarga) },
+            { label: 'Monto', value: money(v.monto) },
+            { label: 'Moneda', value: fmt(v.monedaMonto) },
+            { label: 'Nro FC', value: fmt(v.nroFactura) },
+            { label: 'Flete', value: money(v.precioTransportistaExterno) },
+            { label: 'Moneda Flete', value: fmt(v.monedaPrecioTransportistaExterno) },
+            { label: 'FC Flete', value: fmt(v.nroFacturaTransporte) },
+          ]}
+        />
+      )}
+    />
   );
 }
 
 function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
+  const tipoBadge = (tipo: ImportPreviewFactura['tipo']) => (
+    <span
+      className={[
+        'text-[10px] px-1.5 py-0.5 uppercase tracking-wider rounded',
+        tipo === 'cliente' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
+      ].join(' ')}
+    >
+      {tipo === 'cliente' ? 'Cliente' : 'Flete'}
+    </span>
+  );
+
   return (
-    <div className="overflow-x-auto rounded border border-black/10">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-vialto-mist font-[family-name:var(--font-ui)] uppercase tracking-wider text-vialto-fire text-left">
-            <th className="px-3 py-2 whitespace-nowrap">Tipo</th>
-            <th className="px-3 py-2 whitespace-nowrap">Número</th>
-            <th className="px-3 py-2 whitespace-nowrap">Nombre</th>
-            <th className="px-3 py-2 whitespace-nowrap">Importe</th>
-            <th className="px-3 py-2 whitespace-nowrap">Emisión</th>
-            <th className="px-3 py-2 whitespace-nowrap">Vencimiento</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-black/5">
-          {facturas.map((f, i) => (
-            <tr key={i} className="hover:bg-vialto-mist/50">
-              <td className="px-3 py-1.5">
-                <span className={['text-[10px] px-1.5 py-0.5 uppercase tracking-wider rounded',
-                  f.tipo === 'cliente' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
-                ].join(' ')}>
-                  {f.tipo === 'cliente' ? 'Cliente' : 'Flete'}
-                </span>
-              </td>
-              <Td>{f.numero}</Td>
-              <Td>{f.nombre}</Td>
-              <td className="px-3 py-1.5 text-vialto-charcoal font-medium">${f.importe.toLocaleString('es-AR')}</td>
-              <Td>{f.fechaEmision}</Td>
-              <Td>{f.fechaVencimiento}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListadoDatos
+      columns={[
+        {
+          id: 'tipo',
+          header: 'Tipo',
+          cell: (f) => tipoBadge(f.tipo),
+          tdClassName: listadoTablaTdClass,
+        },
+        {
+          id: 'numero',
+          header: 'Número',
+          primary: true,
+          cell: (f) => f.numero,
+        },
+        { id: 'nombre', header: 'Nombre', cell: (f) => f.nombre },
+        {
+          id: 'importe',
+          header: 'Importe',
+          cell: (f) => `$${f.importe.toLocaleString('es-AR')}`,
+          tdClassName: `${listadoTablaTdClass} font-medium`,
+        },
+        { id: 'emision', header: 'Emisión', cell: (f) => f.fechaEmision },
+        { id: 'vencimiento', header: 'Vencimiento', cell: (f) => f.fechaVencimiento },
+      ]}
+      rows={facturas}
+      rowKey={(f) => `${f.tipo}-${f.numero}`}
+      emptyMessage="No hay facturas en la vista previa."
+      renderMobileCard={(f) => (
+        <ListadoCard
+          primary={f.numero}
+          fields={[
+            { label: 'Tipo', value: tipoBadge(f.tipo) },
+            { label: 'Nombre', value: f.nombre },
+            { label: 'Importe', value: `$${f.importe.toLocaleString('es-AR')}` },
+            { label: 'Emisión', value: f.fechaEmision },
+            { label: 'Vencimiento', value: f.fechaVencimiento },
+          ]}
+        />
+      )}
+    />
   );
 }
 
@@ -535,13 +569,5 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function Td({ children }: { children: React.ReactNode }) {
-  return (
-    <td className="px-3 py-1.5 text-vialto-charcoal whitespace-nowrap max-w-[140px] truncate">
-      {children ?? <span className="text-vialto-steel">—</span>}
-    </td>
   );
 }

@@ -4,6 +4,7 @@ import { PresentacionFormModal } from '@/components/stock/PresentacionFormModal'
 import { ApiError, apiJson } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
+import { modalOverlayClass } from '@/lib/modalLayers';
 import type { Presentacion, Producto } from '@/types/api';
 
 const SELECT_CLASS = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
@@ -122,7 +123,7 @@ export function ProductoModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className={modalOverlayClass}>
         <div
           role="dialog"
           aria-modal="true"

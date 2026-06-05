@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalBtnPrimary,
+  viewModalGridClass,
+} from '@/components/ui/ViewModalShell';
 import type { PlatformUser } from '@/types/api';
 
 function formatRole(role: string, platformRole?: string | null) {
@@ -18,7 +24,6 @@ function formatDate(value: number | string) {
     return '—';
   }
 }
-
 
 export function UserViewModal({
   user,
@@ -43,58 +48,36 @@ export function UserViewModal({
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-md rounded border border-black/10 bg-white shadow-lg"
-      >
-        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-            {nombreCompleto}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="px-6 py-5 grid grid-cols-2 gap-x-8 gap-y-4">
-          {[
-            { label: 'Nombre', value: nombreCompleto },
-            { label: 'Email', value: user.email },
-            { label: 'Rol', value: formatRole(user.role, user.platformRole) },
-            { label: 'Alta', value: formatDate(user.createdAt) },
-          ].filter(c => c.value != null && c.value !== '').map((c, i) => (
-            <div key={i}>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-              <p className="mt-1 text-sm">{c.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-black/10 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist"
-          >
+    <ViewModalShell
+      title={nombreCompleto}
+      onClose={onClose}
+      maxWidthClass="sm:max-w-md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
           {editTo && (
-            <Link
-              to={editTo}
-              className="inline-flex h-9 items-center px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-            >
+            <Link to={editTo} className={viewModalBtnPrimary}>
               Editar
             </Link>
           )}
-        </div>
+        </>
+      }
+    >
+      <div className={viewModalGridClass}>
+        {[
+          { label: 'Nombre', value: nombreCompleto },
+          { label: 'Email', value: user.email },
+          { label: 'Rol', value: formatRole(user.role, user.platformRole) },
+          { label: 'Alta', value: formatDate(user.createdAt) },
+        ].filter(c => c.value != null && c.value !== '').map((c, i) => (
+          <div key={i}>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
+            <p className="mt-1 text-sm">{c.value}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </ViewModalShell>
   );
 }

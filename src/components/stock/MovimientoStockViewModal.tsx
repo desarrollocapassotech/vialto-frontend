@@ -1,5 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+} from '@/components/ui/ViewModalShell';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
@@ -69,64 +73,37 @@ export function MovimientoStockViewModal({
   const tipo = row?.tipo ?? tipoTitulo;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-      role="presentation"
+    <ViewModalShell
+      title={
+        <span className="flex flex-col items-start gap-1">
+          <span>Movimiento de stock</span>
+          {tipo && (
+            <span className={movimientoStockTipoBadgeClass(tipo)}>
+              {movimientoStockTipoLabel(tipo)}
+            </span>
+          )}
+        </span>
+      }
+      onClose={onClose}
+      onOverlayClick={onClose}
+      scrollBody
+      footer={
+        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+          Cerrar
+        </button>
+      }
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl rounded border border-black/10 bg-white shadow-lg max-h-[90vh] flex flex-col"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4 shrink-0">
-          <div>
-            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-              Movimiento de stock
-            </h2>
-            {tipo && (
-              <p className="mt-1">
-                <span className={movimientoStockTipoBadgeClass(tipo)}>
-                  {movimientoStockTipoLabel(tipo)}
-                </span>
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none shrink-0"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="overflow-y-auto min-h-0">
-          {loading && (
-            <p className="px-5 py-8 text-sm text-vialto-steel">Cargando detalle…</p>
-          )}
-          {error && (
-            <p className="mx-5 my-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {error}
-            </p>
-          )}
-          {!loading && row && (
-            <MovimientoStockDetalleBody row={row} tenantId={tenantId} />
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist"
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
+      {loading && (
+        <p className="text-sm text-vialto-steel">Cargando detalle…</p>
+      )}
+      {error && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {error}
+        </p>
+      )}
+      {!loading && row && (
+        <MovimientoStockDetalleBody row={row} tenantId={tenantId} />
+      )}
+    </ViewModalShell>
   );
 }

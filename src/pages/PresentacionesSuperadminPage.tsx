@@ -1,10 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Presentacion } from '@/types/api';
 
 type FormState = { nombre: string; activo: boolean };
@@ -139,58 +141,53 @@ export function PresentacionesSuperadminPage() {
       )}
 
       {filtroEmpresa && (
-        <div className="mt-4 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-          <table className="w-full text-left text-base">
-            <thead>
-              <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows === null && !error && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {rows?.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                    No hay presentaciones para esta empresa.
-                  </td>
-                </tr>
-              )}
-              {rows?.map((row) => (
-                <tr key={row.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                  <td className="px-4 py-3 font-medium">{row.nombre}</td>
-                  <td className="px-4 py-3 text-vialto-steel">{row.activo ? 'Activa' : 'Inactiva'}</td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(row.id);
-                        setIsFormOpen(true);
-                      }}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void eliminar(row)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 text-red-900 hover:bg-red-50"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ListadoDatos
+          className="mt-4"
+          columns={[
+            {
+              id: 'nombre',
+              header: 'Nombre',
+              primary: true,
+              cell: (row) => row.nombre,
+              tdClassName: `${listadoTablaTdClass} font-medium`,
+            },
+            {
+              id: 'estado',
+              header: 'Estado',
+              cell: (row) => (row.activo ? 'Activa' : 'Inactiva'),
+              tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+            },
+          ]}
+          rows={error ? [] : rows}
+          rowKey={(row) => row.id}
+          emptyMessage={
+            error
+              ? 'No se pudieron cargar las presentaciones.'
+              : 'No hay presentaciones para esta empresa.'
+          }
+          loadingMessage="Cargando…"
+          renderActions={(row) => (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(row.id);
+                  setIsFormOpen(true);
+                }}
+                className={listadoTablaAccionClass}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => void eliminar(row)}
+                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+              >
+                Eliminar
+              </button>
+            </>
+          )}
+        />
       )}
 
       {isFormOpen && filtroEmpresa && (

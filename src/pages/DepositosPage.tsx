@@ -1,7 +1,9 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Deposito } from '@/types/api';
 
 type DepositoFormState = {
@@ -159,52 +161,47 @@ export function DepositosPage() {
         </p>
       )}
 
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Dirección</th>
-              <th className="px-4 py-3">Activo</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {depositos === null && !error && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {depositos !== null && depositos.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Todavía no tenés depósitos cargados.
-                </td>
-              </tr>
-            )}
-            {depositos?.map((deposito) => (
-              <tr key={deposito.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-medium">{deposito.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{deposito.descripcion ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">
-                  {deposito.activo ? 'Sí' : 'No'}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => openEditForm(deposito)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Editar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (deposito) => deposito.nombre,
+            tdClassName: `${listadoTablaTdClass} font-medium`,
+          },
+          {
+            id: 'direccion',
+            header: 'Dirección',
+            cell: (deposito) => deposito.descripcion ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'activo',
+            header: 'Activo',
+            cell: (deposito) => (deposito.activo ? 'Sí' : 'No'),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : depositos}
+        rowKey={(deposito) => deposito.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar los depósitos.'
+            : 'Todavía no tenés depósitos cargados.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(deposito) => (
+          <button
+            type="button"
+            onClick={() => openEditForm(deposito)}
+            className={listadoTablaAccionClass}
+          >
+            Editar
+          </button>
+        )}
+      />
 
       {isFormOpen && (
         <div className="mt-8 rounded border border-black/5 bg-white p-6 shadow-sm">
