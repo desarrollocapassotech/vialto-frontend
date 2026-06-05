@@ -301,6 +301,8 @@ export interface Producto {
   nombre: string;
   codigo: string | null;
   descripcion: string | null;
+  presentacion1Id: string | null;
+  presentacion2Id: string | null;
   unidad1Nombre: string;
   unidad2Nombre: string | null;
   activo: boolean;
@@ -321,10 +323,8 @@ export interface PlatformUser {
 export interface Presentacion {
   id: string;
   tenantId: string;
-  productoId: string;
   nombre: string;
-  cantidadEquivalente: number;
-  unidadEquivalente: string;
+  activo: boolean;
   createdAt: string;
   updatedAt: string;
 }
