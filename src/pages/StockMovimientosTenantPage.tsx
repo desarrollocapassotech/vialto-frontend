@@ -90,6 +90,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
               <th scope="col" className={listadoTablaThClass}>
                 Cliente
               </th>
+              <th scope="col" className={listadoTablaThClass}>
+                Depósito
+              </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
                 Pallets
               </th>
@@ -104,14 +107,14 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} className={listadoTablaEmptyCellClass}>
+                <td colSpan={9} className={listadoTablaEmptyCellClass}>
                   Cargando…
                 </td>
               </tr>
             )}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={8} className={listadoTablaEmptyCellClass}>
+                <td colSpan={9} className={listadoTablaEmptyCellClass}>
                   No hay movimientos para mostrar.
                 </td>
               </tr>
@@ -130,6 +133,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                   <td className={`${listadoTablaTdClass} font-mono`}>{m.numeroRemito ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
+                  <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
                     <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadPallets}</span>
                   </td>

@@ -10,7 +10,7 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Producto, StockItem } from '@/types/api';
+import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -50,13 +50,16 @@ export function DivisionesStockTenantPage({
     ? `/api/platform/stock/divisiones${buildQs({}, tenantId)}`
     : '/api/stock/divisiones';
   const disponibleBase = platform ? '/api/platform/stock/disponible' : '/api/stock/disponible';
+  const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
 
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
 
   const [productoId, setProductoId] = useState('');
   const [clienteId, setClienteId] = useState('');
+  const [depositoId, setDepositoId] = useState('');
   const [palletsOrigen, setPalletsOrigen] = useState('');
   const [sueltoOrigen, setSueltoOrigen] = useState('');
   const [palletsDestino, setPalletsDestino] = useState('');
@@ -92,17 +95,29 @@ export function DivisionesStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    if (!productoId || !clienteId) {
+    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
+    void apiJson<Deposito[]>(url, () => getToken())
+      .then(setDepositos)
+      .catch(() => setDepositos([]));
+  }, [depositosBase, tenantId, getToken]);
+
+  useEffect(() => {
+    if (!productoId || !clienteId || !depositoId) {
       setStockDisponible(null);
       return;
     }
     setStockLoading(true);
-    const qs = buildQs({ productoId, clienteId }, tenantId);
+    const qs = buildQs({ productoId, clienteId, depositoId }, tenantId);
     void apiJson<StockItem[]>(`${disponibleBase}${qs}`, () => getToken())
-      .then((items) => setStockDisponible(items[0] ?? null))
+      .then((items) => {
+        const match = items.find(
+          (s) => s.productoId === productoId && s.clienteId === clienteId && s.depositoId === depositoId,
+        );
+        setStockDisponible(match ?? null);
+      })
       .catch(() => setStockDisponible(null))
       .finally(() => setStockLoading(false));
-  }, [productoId, clienteId, disponibleBase, tenantId, getToken]);
+  }, [productoId, clienteId, depositoId, disponibleBase, tenantId, getToken]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -110,6 +125,7 @@ export function DivisionesStockTenantPage({
 
     if (!productoId) return setFormError('Seleccioná un producto.');
     if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
+    if (!depositoId) return setFormError('Seleccioná un depósito.');
 
     const po = parseFloat(palletsOrigen) || 0;
     const so = parseFloat(sueltoOrigen) || 0;
@@ -138,6 +154,7 @@ export function DivisionesStockTenantPage({
       const body: Record<string, unknown> = {
         productoId,
         clienteId,
+        depositoId,
         fecha: fechaIso,
       };
       if (po > 0) body.palletsOrigen = po;
@@ -154,6 +171,7 @@ export function DivisionesStockTenantPage({
       showToast('División registrada correctamente.');
       setProductoId('');
       setClienteId('');
+      setDepositoId('');
       setPalletsOrigen('');
       setSueltoOrigen('');
       setPalletsDestino('');
@@ -253,9 +271,23 @@ export function DivisionesStockTenantPage({
               inputClassName={INPUT}
             />
           </div>
+
+          <div className="space-y-1 min-w-0 sm:col-span-2">
+            <label className={LABEL}>Depósito</label>
+            <select
+              value={depositoId}
+              onChange={(e) => setDepositoId(e.target.value)}
+              className={INPUT}
+            >
+              <option value="">Elegí un depósito…</option>
+              {depositos.map((d) => (
+                <option key={d.id} value={d.id}>{d.nombre}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {(productoId && clienteId) && (
+        {(productoId && clienteId && depositoId) && (
           <div className="rounded border border-black/10 bg-vialto-mist/40 px-4 py-3 text-sm">
             {stockLoading ? (
               <span className="text-vialto-steel">Verificando stock…</span>

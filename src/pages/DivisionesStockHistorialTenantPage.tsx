@@ -90,6 +90,7 @@ export function DivisionesStockHistorialTenantPage({
               <th scope="col" className={listadoTablaThClass}>Fecha</th>
               <th scope="col" className={listadoTablaThClass}>Producto</th>
               <th scope="col" className={listadoTablaThClass}>Cliente</th>
+              <th scope="col" className={listadoTablaThClass}>Depósito</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Pallets</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Suelto</th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>Detalle</th>
@@ -98,12 +99,12 @@ export function DivisionesStockHistorialTenantPage({
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className={listadoTablaEmptyCellClass}>Cargando…</td>
+                <td colSpan={7} className={listadoTablaEmptyCellClass}>Cargando…</td>
               </tr>
             )}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={6} className={listadoTablaEmptyCellClass}>No hay divisiones registradas.</td>
+                <td colSpan={7} className={listadoTablaEmptyCellClass}>No hay divisiones registradas.</td>
               </tr>
             )}
             {!loading &&
@@ -114,6 +115,7 @@ export function DivisionesStockHistorialTenantPage({
                   </td>
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
+                  <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
                     <span className={m.cantidadPallets < 0 ? 'text-red-600' : 'text-emerald-700'}>
                       {m.cantidadPallets >= 0 ? '+' : ''}{m.cantidadPallets}

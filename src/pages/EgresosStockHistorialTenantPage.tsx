@@ -110,6 +110,9 @@ export function EgresosStockHistorialTenantPage({
               <th scope="col" className={listadoTablaThClass}>
                 Cliente
               </th>
+              <th scope="col" className={listadoTablaThClass}>
+                Depósito
+              </th>
               <th scope="col" className={`${listadoTablaThClass} text-right`}>
                 Pallets
               </th>
@@ -124,14 +127,14 @@ export function EgresosStockHistorialTenantPage({
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className={listadoTablaEmptyCellClass}>
+                <td colSpan={8} className={listadoTablaEmptyCellClass}>
                   Cargando…
                 </td>
               </tr>
             )}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={7} className={listadoTablaEmptyCellClass}>
+                <td colSpan={8} className={listadoTablaEmptyCellClass}>
                   No hay egresos registrados.
                 </td>
               </tr>
@@ -145,6 +148,7 @@ export function EgresosStockHistorialTenantPage({
                   <td className={`${listadoTablaTdClass} font-mono`}>{m.numeroRemito ?? '—'}</td>
                   <td className={listadoTablaTdClass}>{m.producto?.nombre ?? m.productoId}</td>
                   <td className={listadoTablaTdClass}>{m.cliente?.nombre ?? m.clienteId}</td>
+                  <td className={listadoTablaTdClass}>{m.deposito?.nombre ?? '—'}</td>
                   <td className={`${listadoTablaTdClass} text-right`}>
                     <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidadPallets}</span>
                   </td>

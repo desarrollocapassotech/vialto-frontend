@@ -336,6 +336,8 @@ export interface MovimientoStock {
   producto?: { id: string; nombre: string; unidadMedida: string };
   clienteId: string;
   cliente?: { id: string; nombre: string };
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
   tipo: 'ingreso' | 'egreso' | 'division';
   cantidadPallets: number;
   cantidadSuelto: number;
@@ -423,6 +425,8 @@ export interface StockItem {
   producto?: { id: string; nombre: string; unidadMedida: string };
   clienteId: string;
   cliente?: { id: string; nombre: string };
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
   cantidadPallets: number;
   cantidadSuelto: number;
   updatedAt: string;
