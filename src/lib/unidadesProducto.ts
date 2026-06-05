@@ -1,4 +1,4 @@
-/** Unidades de medida para el catálogo de Productos (módulo Stock). */
+/** Unidades para presentaciones de producto (equivalencias). */
 export const UNIDADES_PRODUCTO_OPCIONES = [
   { value: 'kg', label: 'Kilogramos (kg)' },
   { value: 'tn', label: 'Toneladas (tn)' },
@@ -10,16 +10,3 @@ export const UNIDADES_PRODUCTO_OPCIONES = [
   { value: 'm3', label: 'Metros cúbicos (m³)' },
   { value: 'litros', label: 'Litros (l)' },
 ] as const;
-
-const codigos = new Set<string>(UNIDADES_PRODUCTO_OPCIONES.map((o) => o.value));
-
-export function etiquetaUnidadProducto(codigo: string | null | undefined): string {
-  if (!codigo?.trim()) return '—';
-  const row = UNIDADES_PRODUCTO_OPCIONES.find((o) => o.value === codigo);
-  return row?.label ?? codigo.trim();
-}
-
-export function unidadProductoEsCatalogo(codigo: string | null | undefined): boolean {
-  if (!codigo?.trim()) return false;
-  return codigos.has(codigo.trim());
-}

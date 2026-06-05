@@ -846,7 +846,6 @@ export function ViajeCreatePage() {
                 id: p.id,
                 nombre: p.nombre,
                 activo: p.activo,
-                unidadMedida: p.unidadMedida ?? null,
               }))}
               triggerClassName={inputClass}
               inputClassName={inputClass}

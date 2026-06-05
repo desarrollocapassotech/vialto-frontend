@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
-import { UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import type { Producto } from '@/types/api';
 
 export function ProductoModal({
@@ -30,20 +29,11 @@ export function ProductoModal({
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
   const [nombre, setNombre] = useState(productoInicial?.nombre ?? '');
   const [descripcion, setDescripcion] = useState(productoInicial?.descripcion ?? '');
-  const [unidadMedida, setUnidadMedida] = useState(productoInicial?.unidadMedida ?? '');
   const [unidad1Nombre, setUnidad1Nombre] = useState(productoInicial?.unidad1Nombre ?? 'Pallets');
   const [unidad2Nombre, setUnidad2Nombre] = useState<string>(productoInicial?.unidad2Nombre ?? 'Unidad');
   const [tieneUnidad2, setTieneUnidad2] = useState(productoInicial ? productoInicial.unidad2Nombre !== null : true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const opcionesSelect = useMemo(() => {
-    const out: { value: string; label: string }[] = UNIDADES_PRODUCTO_OPCIONES.map((o) => ({ value: o.value, label: o.label }));
-    if (unidadMedida.trim() && !out.some((o) => o.value === unidadMedida)) {
-      out.push({ value: unidadMedida, label: `${unidadMedida} (valor previo)` });
-    }
-    return out;
-  }, [unidadMedida]);
 
   async function submit() {
     if (!nombre.trim()) {
@@ -56,7 +46,6 @@ export function ProductoModal({
       const body = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
-        unidadMedida: unidadMedida.trim() || undefined,
         unidad1Nombre: unidad1Nombre.trim() || 'Pallets',
         unidad2Nombre: tieneUnidad2 ? (unidad2Nombre.trim() || 'Unidad') : null,
       };
@@ -127,12 +116,6 @@ export function ProductoModal({
                   <p className="mt-1 text-sm">{productoInicial.descripcion}</p>
                 </div>
               )}
-              {productoInicial?.unidadMedida && (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Unidad de medida</p>
-                  <p className="mt-1 text-sm">{productoInicial.unidadMedida}</p>
-                </div>
-              )}
               <div>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Nombre cantidad 1</p>
                 <p className="mt-1 text-sm">{productoInicial?.unidad1Nombre ?? 'Pallets'}</p>
@@ -162,21 +145,6 @@ export function ProductoModal({
                   rows={3}
                   className="border border-black/15 px-2 py-2 text-sm"
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                Unidad de medida (opcional)
-                <select
-                  value={unidadMedida}
-                  onChange={(e) => setUnidadMedida(e.target.value)}
-                  className="h-9 border border-black/15 bg-white px-2 text-sm"
-                >
-                  <option value="">Sin unidad</option>
-                  {opcionesSelect.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
               </label>
               <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
                 Nombre cantidad 1

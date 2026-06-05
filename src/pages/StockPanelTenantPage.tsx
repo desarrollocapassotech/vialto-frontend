@@ -114,7 +114,6 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           nombre: item.producto.nombre,
           codigo: null,
           descripcion: null,
-          unidadMedida: item.producto.unidadMedida ?? null,
           unidad1Nombre: item.producto.unidad1Nombre,
           unidad2Nombre: item.producto.unidad2Nombre,
           activo: true,
@@ -298,7 +297,6 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                           return lista.filter((p) => p.nombre.toLowerCase().includes(lq));
                         }}
                         getPrimaryLabel={(p) => p.nombre}
-                        getSecondaryLabel={(p) => p.unidadMedida ?? undefined}
                         searchAriaLabel="Filtrar productos"
                         aria-label="Filtrar por producto"
                         inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Producto, PaginatedMeta } from '@/types/api';
-import { etiquetaUnidadProducto, UNIDADES_PRODUCTO_OPCIONES } from '@/lib/unidadesProducto';
 import { ProductoModal } from '@/components/stock/ProductoModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
@@ -30,7 +29,6 @@ export function ProductosTenantPage() {
   const [codigoFiltro, setCodigoFiltro] = useState('');
   const [nombreFiltroInput, setNombreFiltroInput] = useState('');
   const [nombreFiltro, setNombreFiltro] = useState('');
-  const [unidadFiltro, setUnidadFiltro] = useState('');
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
   const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
 
@@ -43,14 +41,13 @@ export function ProductosTenantPage() {
     });
     if (codigoFiltro) params.set('codigo', codigoFiltro);
     if (nombreFiltro) params.set('q', nombreFiltro);
-    if (unidadFiltro) params.set('unidadMedida', unidadFiltro);
     const data = await apiJson<Paginated>(
       `/api/stock/productos/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
     setMeta(data.meta);
-  }, [getToken, isLoaded, isSignedIn, page, pageSize, codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize, codigoFiltro, nombreFiltro, filtroActivo]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -74,7 +71,7 @@ export function ProductosTenantPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo]);
+  }, [codigoFiltro, nombreFiltro, filtroActivo]);
 
   async function toggleActivo(row: Producto) {
     const mensaje = row.activo
@@ -98,9 +95,8 @@ export function ProductosTenantPage() {
     () =>
       Boolean(codigoFiltro.trim()) ||
       Boolean(nombreFiltro.trim()) ||
-      Boolean(unidadFiltro) ||
       filtroActivo !== 'todos',
-    [codigoFiltro, nombreFiltro, unidadFiltro, filtroActivo],
+    [codigoFiltro, nombreFiltro, filtroActivo],
   );
 
   function limpiarFiltros() {
@@ -108,7 +104,6 @@ export function ProductosTenantPage() {
     setCodigoFiltro('');
     setNombreFiltroInput('');
     setNombreFiltro('');
-    setUnidadFiltro('');
     setFiltroActivo('todos');
   }
 
@@ -214,29 +209,6 @@ export function ProductosTenantPage() {
               </th>
               <th scope="col" className="px-4 py-3 align-top">
                 <ViajesListadoHeaderFiltro
-                  title="Unidad"
-                  filterActive={!!unidadFiltro}
-                  filterSignature={unidadFiltro}
-                >
-                  <select
-                    value={unidadFiltro}
-                    onChange={(e) => setUnidadFiltro(e.target.value)}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      unidadFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                    }`}
-                    aria-label="Filtrar por unidad de medida"
-                  >
-                    <option value="">Todas</option>
-                    {UNIDADES_PRODUCTO_OPCIONES.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
                   title="Estado"
                   filterActive={filtroActivo !== 'todos'}
                   filterSignature={filtroActivo}
@@ -265,14 +237,14 @@ export function ProductosTenantPage() {
           <tbody>
             {rows === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
                   Cargando…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
+                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
                   No hay productos que coincidan con el criterio.
                 </td>
               </tr>
@@ -289,9 +261,6 @@ export function ProductosTenantPage() {
                   {r.descripcion?.trim() ? (
                     <div className="mt-0.5 text-xs text-vialto-steel line-clamp-2">{r.descripcion}</div>
                   ) : null}
-                </td>
-                <td className="px-4 py-3 text-vialto-steel">
-                  {etiquetaUnidadProducto(r.unidadMedida)}
                 </td>
                 <td className="px-4 py-3">
                   <span

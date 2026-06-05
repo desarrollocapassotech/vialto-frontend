@@ -219,7 +219,6 @@ export function IngresosStockTenantPage({
               getPrimaryLabel={(p) =>
                 p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
               }
-              getSecondaryLabel={(p) => p.unidadMedida ?? undefined}
               placeholderCerrado="Elegí un producto…"
               placeholderBuscar="Buscar por nombre o código…"
               inputClassName={INPUT}

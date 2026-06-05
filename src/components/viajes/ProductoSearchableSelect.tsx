@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { OpcionProducto } from '@/lib/productosViaje';
 
 function filaLabel(o: OpcionProducto) {
-  return o.unidadMedida?.trim() ? `${o.nombre} · ${o.unidadMedida.trim()}` : o.nombre;
+  return o.nombre;
 }
 
 function etiquetaSeleccion(value: string, opciones: OpcionProducto[]) {
@@ -43,11 +43,7 @@ export function ProductoSearchableSelect({
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return opciones;
-    return opciones.filter((o) => {
-      const n = o.nombre.toLowerCase();
-      const u = (o.unidadMedida ?? '').toLowerCase();
-      return n.includes(q) || u.includes(q);
-    });
+    return opciones.filter((o) => o.nombre.toLowerCase().includes(q));
   }, [opciones, search]);
 
   const actualizarRect = useCallback(() => {

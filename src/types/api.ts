@@ -53,7 +53,6 @@ export interface Viaje {
       id: string;
       nombre: string;
       activo: boolean;
-      unidadMedida: string | null;
     };
   }>;
   detalleCarga: string | null;
@@ -302,7 +301,6 @@ export interface Producto {
   nombre: string;
   codigo: string | null;
   descripcion: string | null;
-  unidadMedida: string | null;
   unidad1Nombre: string;
   unidad2Nombre: string | null;
   activo: boolean;
@@ -335,7 +333,7 @@ export interface MovimientoStock {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
@@ -424,7 +422,7 @@ export interface StockItem {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
