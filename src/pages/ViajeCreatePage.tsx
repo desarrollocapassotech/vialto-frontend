@@ -40,6 +40,7 @@ import { apiJson } from '@/lib/api';
 import {
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
@@ -590,7 +591,7 @@ export function ViajeCreatePage() {
                   inputMode="decimal"
                   autoComplete="off"
                   value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
+                  onChange={(e) => setMonto(maskCurrencyForMoneda(e.target.value, monedaMonto))}
                   placeholder="0.00"
                   className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                 />
@@ -636,7 +637,7 @@ export function ViajeCreatePage() {
                         inputMode="decimal"
                         autoComplete="off"
                         value={precioTransportistaExterno}
-                        onChange={(e) => setPrecioTransportistaExterno(e.target.value)}
+                        onChange={(e) => setPrecioTransportistaExterno(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista))}
                         placeholder="0.00"
                         className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
                       />
