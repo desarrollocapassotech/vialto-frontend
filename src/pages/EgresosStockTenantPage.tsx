@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -38,6 +38,7 @@ export function EgresosStockTenantPage({
   clientesExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
+  const { user } = useUser();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
@@ -72,12 +73,21 @@ export function EgresosStockTenantPage({
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [lote, setLote] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [entregadoPor, setEntregadoPor] = useState('');
+  const [destinatario, setDestinatario] = useState('');
+  const [destinoFinal, setDestinoFinal] = useState('');
   const [remitoFile, setRemitoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalProducto, setModalProducto] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
   const [stockDisponible, setStockDisponible] = useState<{ pallets: number; suelto: number } | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const nombre = user.fullName?.trim() || user.firstName?.trim() || '';
+    setEntregadoPor((prev) => prev || nombre);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadProductos = useCallback(async () => {
     setProductosLoading(true);
@@ -187,6 +197,9 @@ export function EgresosStockTenantPage({
       if (suelto > 0) payload.cantidad2 = suelto;
       if (lote.trim()) payload.lote = lote.trim();
       if (observaciones.trim()) payload.observaciones = observaciones.trim();
+      if (entregadoPor.trim()) payload.entregadoPor = entregadoPor.trim();
+      if (destinatario.trim()) payload.destinatario = destinatario.trim();
+      if (destinoFinal.trim()) payload.destinoFinal = destinoFinal.trim();
       payload.remitoEscaneadoUrl = remitoEscaneadoUrl;
 
       const created = await apiJson<MovimientoStock>(egresosUrl, () => getToken(), {
@@ -210,6 +223,9 @@ export function EgresosStockTenantPage({
       setFechaMovError(null);
       setLote('');
       setObservaciones('');
+      setEntregadoPor('');
+      setDestinatario('');
+      setDestinoFinal('');
       setRemitoFile(null);
     } catch (e) {
       setFormError(friendlyError(e, 'stock'));
@@ -379,6 +395,42 @@ export function EgresosStockTenantPage({
               labelClassName={LABEL}
               inputClassName={INPUT}
               errorFechaCarga={fechaMovError}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className={LABEL}>Entregado por — opcional</label>
+            <input
+              type="text"
+              value={entregadoPor}
+              onChange={(e) => setEntregadoPor(e.target.value)}
+              className={INPUT}
+              placeholder="Ej: Cacho, Gustavo…"
+              maxLength={200}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={LABEL}>Destinatario — opcional</label>
+            <input
+              type="text"
+              value={destinatario}
+              onChange={(e) => setDestinatario(e.target.value)}
+              className={INPUT}
+              placeholder="Ej: Luvi SRL, Myca SRL…"
+              maxLength={200}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <label className={LABEL}>Dirección / Ruta de entrega — opcional</label>
+            <input
+              type="text"
+              value={destinoFinal}
+              onChange={(e) => setDestinoFinal(e.target.value)}
+              className={INPUT}
+              placeholder="Ej: Express Brio, Pampa 1087 San Fernando…"
+              maxLength={300}
             />
           </div>
         </div>

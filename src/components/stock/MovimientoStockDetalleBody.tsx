@@ -102,6 +102,33 @@ export function MovimientoStockDetalleBody({
             )}
           </dd>
         </div>
+        {row.tipo === 'egreso' && (
+          <>
+            <div className="col-span-full px-4 pt-4 pb-1">
+              <p className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider text-vialto-steel">
+                Datos de entrega
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+              <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+                Entregado por
+              </dt>
+              <dd className="sm:col-span-2 text-vialto-charcoal">{row.entregadoPor ?? '—'}</dd>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+              <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+                Destinatario
+              </dt>
+              <dd className="sm:col-span-2 text-vialto-charcoal">{row.destinatario ?? '—'}</dd>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+              <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+                Dirección / Ruta
+              </dt>
+              <dd className="sm:col-span-2 text-vialto-charcoal">{row.destinoFinal ?? '—'}</dd>
+            </div>
+          </>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
             Registrado por
