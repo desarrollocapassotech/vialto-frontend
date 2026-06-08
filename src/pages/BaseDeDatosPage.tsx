@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { Car, ChevronDown, Layers, Package, Truck, UserCheck, Users, Warehouse, type LucideIcon } from 'lucide-react';
+import { Car, ChevronDown, Layers, Package, ShieldCheck, Truck, UserCheck, Users, Warehouse, type LucideIcon } from 'lucide-react';
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
@@ -14,24 +14,28 @@ import { VehiculosPage } from './VehiculosPage';
 import { ProductosPage } from './ProductosPage';
 import { DepositosPage } from './DepositosPage';
 import { PresentacionesPage } from './PresentacionesPage';
+import { UsuariosTenantPage } from './UsuariosTenantPage';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { canAccessViajes, canAccessStock } from '@/lib/tenantModules';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
+import { useAuth } from '@clerk/clerk-react';
 
-type Tab = 'clientes' | 'transportistas' | 'choferes' | 'vehiculos' | 'productos' | 'presentaciones' | 'depositos';
+type Tab = 'clientes' | 'transportistas' | 'choferes' | 'vehiculos' | 'productos' | 'presentaciones' | 'depositos' | 'usuarios';
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'clientes',       label: 'Clientes',       icon: Users      },
-  { id: 'transportistas', label: 'Transportistas',  icon: Truck      },
-  { id: 'choferes',       label: 'Choferes',        icon: UserCheck  },
-  { id: 'vehiculos',      label: 'Vehículos',       icon: Car        },
-  { id: 'productos',      label: 'Productos',       icon: Package    },
-  { id: 'presentaciones', label: 'Presentaciones', icon: Layers     },
-  { id: 'depositos',      label: 'Depósitos',       icon: Warehouse  },
+  { id: 'clientes',       label: 'Clientes',       icon: Users        },
+  { id: 'transportistas', label: 'Transportistas',  icon: Truck        },
+  { id: 'choferes',       label: 'Choferes',        icon: UserCheck    },
+  { id: 'vehiculos',      label: 'Vehículos',       icon: Car          },
+  { id: 'productos',      label: 'Productos',       icon: Package      },
+  { id: 'presentaciones', label: 'Presentaciones',  icon: Layers       },
+  { id: 'depositos',      label: 'Depósitos',       icon: Warehouse    },
+  { id: 'usuarios',       label: 'Usuarios',        icon: ShieldCheck  },
 ];
 
 export function BaseDeDatosPage() {
   const { user, isLoaded } = useUser();
+  const { orgRole } = useAuth();
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -40,6 +44,7 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
+  const isOrgAdmin = superadmin || orgRole === 'org:admin';
 
   const visibleTabs = ALL_TABS.filter((tab) => {
     switch (tab.id) {
@@ -50,6 +55,7 @@ export function BaseDeDatosPage() {
       case 'productos': return hasViajes || hasStock;
       case 'presentaciones': return hasStock;
       case 'depositos': return hasStock;
+      case 'usuarios': return isOrgAdmin;
     }
   });
 
@@ -155,6 +161,7 @@ export function BaseDeDatosPage() {
         {activeTab === 'productos' && <ProductosPage />}
         {activeTab === 'presentaciones' && <PresentacionesPage />}
         {activeTab === 'depositos' && <DepositosPage />}
+        {activeTab === 'usuarios' && <UsuariosTenantPage />}
       </div>
     </div>
   );

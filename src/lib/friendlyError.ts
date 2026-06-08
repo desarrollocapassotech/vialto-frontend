@@ -11,7 +11,8 @@ export type FriendlyErrorContext =
   | 'facturacion'
   | 'stock'
   | 'plataforma'
-  | 'arca';
+  | 'arca'
+  | 'usuarios';
 
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: 'No pudimos cargar el tablero. Probá de nuevo en un momento.',
@@ -31,6 +32,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
     'No pudimos cargar el panorama de empresas. Probá de nuevo en un momento.',
   arca:
     'No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo.',
+  usuarios:
+    'No pudimos cargar los usuarios. Probá de nuevo en un momento.',
 };
 
 /**
