@@ -342,6 +342,7 @@ export interface MovimientoStock {
   cantidad1: number;
   cantidad2: number;
   numeroRemito?: string | null;
+  lote?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
   /** ID del movimiento par en una división (origen ↔ destino). */

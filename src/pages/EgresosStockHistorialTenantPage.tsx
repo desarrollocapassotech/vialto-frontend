@@ -119,6 +119,12 @@ export function EgresosStockHistorialTenantPage({
             tdClassName: listadoTablaTdClass,
           },
           {
+            id: 'lote',
+            header: 'Lote',
+            cell: (m) => m.lote ?? '—',
+            tdClassName: listadoTablaTdClass,
+          },
+          {
             id: 'cant1',
             header: 'Cant. 1',
             cell: (m) => (

@@ -74,6 +74,12 @@ export function MovimientoStockDetalleBody({
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+            Lote
+          </dt>
+          <dd className="sm:col-span-2 text-vialto-charcoal">{row.lote ?? '—'}</dd>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
             Observaciones
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal whitespace-pre-wrap">{row.observaciones ?? '—'}</dd>

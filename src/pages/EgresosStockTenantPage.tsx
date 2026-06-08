@@ -70,6 +70,7 @@ export function EgresosStockTenantPage({
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
+  const [lote, setLote] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [remitoFile, setRemitoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -184,6 +185,7 @@ export function EgresosStockTenantPage({
       };
       if (pallets > 0) payload.cantidad1 = pallets;
       if (suelto > 0) payload.cantidad2 = suelto;
+      if (lote.trim()) payload.lote = lote.trim();
       if (observaciones.trim()) payload.observaciones = observaciones.trim();
       payload.remitoEscaneadoUrl = remitoEscaneadoUrl;
 
@@ -206,6 +208,7 @@ export function EgresosStockTenantPage({
       setFechaMov(p.fecha);
       setHoraMov(p.hora);
       setFechaMovError(null);
+      setLote('');
       setObservaciones('');
       setRemitoFile(null);
     } catch (e) {
@@ -346,6 +349,18 @@ export function EgresosStockTenantPage({
               )}
             </div>
           )}
+
+          <div className="space-y-1 sm:col-span-2">
+            <label className={LABEL}>Lote — opcional</label>
+            <input
+              type="text"
+              value={lote}
+              onChange={(e) => setLote(e.target.value)}
+              className={INPUT}
+              placeholder="Ej: R17-25147, 6061125, Lote 3…"
+              maxLength={200}
+            />
+          </div>
 
           <div className="space-y-1 sm:col-span-2">
             <ViajeFechaHoraFields
