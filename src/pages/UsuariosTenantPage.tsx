@@ -178,9 +178,9 @@ function UsuarioModal({
   );
 }
 
-// ─── Modal de invitación ─────────────────────────────────────────────────────
+// ─── Modal de creación de usuario ───────────────────────────────────────────
 
-function InviteModal({
+function CreateUserModal({
   busy,
   error,
   onClose,
@@ -189,24 +189,30 @@ function InviteModal({
   busy: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (email: string, role: 'admin' | 'member') => void;
+  onSubmit: (name: string, email: string, password: string, role: 'admin' | 'member') => void;
 }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handleSubmit() {
-    if (!email.trim()) {
-      setFieldErrors({ email: 'Ingresá el email del usuario.' });
-      return;
-    }
+    const errors: Record<string, string> = {};
+    if (!name.trim()) errors.name = 'Ingresá el nombre del usuario.';
+    if (!email.trim()) errors.email = 'Ingresá el email del usuario.';
+    if (!password || password.length < 8) errors.password = 'La contraseña debe tener al menos 8 caracteres.';
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
     setFieldErrors({});
-    onSubmit(email, role);
+    onSubmit(name, email, password, role);
   }
+
+  const inputClass = (field: string) =>
+    `mt-1 w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire ${fieldErrors[field] ? 'border-red-400' : 'border-black/15'}`;
 
   return (
     <ViewModalShell
-      title="Invitar usuario"
+      title="Crear usuario"
       onClose={onClose}
       maxWidthClass="sm:max-w-sm"
       footer={
@@ -214,35 +220,57 @@ function InviteModal({
           <button type="button" onClick={onClose} disabled={busy} className={viewModalBtnGhost}>
             Cancelar
           </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={busy}
-            className={viewModalBtnPrimary}
-          >
-            {busy ? 'Enviando…' : 'Enviar invitación'}
+          <button type="button" onClick={handleSubmit} disabled={busy} className={viewModalBtnPrimary}>
+            {busy ? 'Creando…' : 'Crear usuario'}
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-vialto-steel">
-          Se enviará un email de invitación. El usuario deberá aceptarla para unirse.
-        </p>
         <div>
-          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="invite-email">
+          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-name">
+            Nombre <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="cu-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Juan Pérez"
+            className={inputClass('name')}
+            disabled={busy}
+          />
+          <CrudFieldError message={fieldErrors.name} />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-email">
             Email <span className="text-red-500">*</span>
           </label>
           <input
-            id="invite-email"
+            id="cu-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="nombre@empresa.com"
-            className={`mt-1 w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire ${fieldErrors.email ? 'border-red-400' : 'border-black/15'}`}
+            className={inputClass('email')}
             disabled={busy}
           />
           <CrudFieldError message={fieldErrors.email} />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-password">
+            Contraseña <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="cu-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mínimo 8 caracteres"
+            className={inputClass('password')}
+            disabled={busy}
+          />
+          <CrudFieldError message={fieldErrors.password} />
         </div>
         <div>
           <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">Rol</p>
@@ -254,7 +282,7 @@ function InviteModal({
               >
                 <input
                   type="radio"
-                  name="invite-role"
+                  name="cu-role"
                   value={r}
                   checked={role === r}
                   onChange={() => setRole(r)}
@@ -354,22 +382,21 @@ export function UsuariosTenantPage() {
     }
   }
 
-  async function handleInvite(email: string, role: 'admin' | 'member') {
+  async function handleCreate(name: string, email: string, password: string, role: 'admin' | 'member') {
     setBusy(true);
     setActionError(null);
     try {
-      await apiJson('/api/users/invite', () => getToken(), {
+      await apiJson('/api/users', () => getToken(), {
         method: 'POST',
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ name, email, password, role }),
       });
       setModal(null);
       load();
     } catch (e) {
       setActionError(friendlyError(e, 'usuarios'));
+    } finally {
       setBusy(false);
-      return;
     }
-    setBusy(false);
   }
 
   return (
@@ -387,7 +414,7 @@ export function UsuariosTenantPage() {
           onClick={() => { setActionError(null); setModal({ mode: 'invite' }); }}
           className="inline-flex min-h-11 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite md:min-h-0 md:h-10"
         >
-          Invitar usuario
+          Crear usuario
         </button>
       </div>
 
@@ -473,11 +500,11 @@ export function UsuariosTenantPage() {
       )}
 
       {modal?.mode === 'invite' && (
-        <InviteModal
+        <CreateUserModal
           busy={busy}
           error={actionError}
           onClose={() => setModal(null)}
-          onSubmit={handleInvite}
+          onSubmit={handleCreate}
         />
       )}
 
