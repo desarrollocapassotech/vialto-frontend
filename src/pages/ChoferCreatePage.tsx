@@ -77,7 +77,7 @@ export function ChoferCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className={labelClass}>Nombre *</span>
+          <span className={labelClass}>Nombre <span className="text-red-500">*</span></span>
           <CrudInput
             placeholder="Ej: Juan Perez"
             value={form.nombre}

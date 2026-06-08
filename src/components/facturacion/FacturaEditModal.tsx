@@ -441,7 +441,7 @@ export function FacturaCreateModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número *
+                Número <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -454,7 +454,7 @@ export function FacturaCreateModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo *
+                Tipo <span className="text-red-500">*</span>
               </label>
               <select
                 value={draft.tipo}
@@ -482,7 +482,7 @@ export function FacturaCreateModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de emisión *
+                Fecha de emisión <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -671,7 +671,7 @@ export function FacturaEditModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número *
+                Número <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -684,7 +684,7 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo *
+                Tipo <span className="text-red-500">*</span>
               </label>
               <select
                 value={draft.tipo}
@@ -712,7 +712,7 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de emisión *
+                Fecha de emisión <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"

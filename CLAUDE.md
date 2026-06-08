@@ -249,6 +249,30 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 
 ---
 
+## Campos de formulario: obligatorios y opcionales
+
+**Regla global para todos los formularios actuales y futuros.**
+
+- Los campos **obligatorios** muestran un asterisco rojo al final de la etiqueta: `<span className="text-red-500">*</span>`
+- Los campos **opcionales** no llevan ninguna indicación. Nunca escribir "(opcional)", "— opcional" ni ninguna variante.
+
+### Patrón correcto
+
+```tsx
+// Obligatorio
+<span className={labelClass}>Nombre <span className="text-red-500">*</span></span>
+
+// Opcional
+<span className={labelClass}>Observaciones</span>
+```
+
+### Componentes que ya manejan esto automáticamente
+
+- `CrudFieldLabel` (en `src/components/crud/CrudFields.tsx`): recibe prop `required` y agrega el asterisco rojo.
+- `Field` en `MicCrtExportModal.tsx`: detecta si el string `label` termina en `*` (con espacio previo) y renderiza el asterisco en rojo.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -258,7 +282,8 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 - Verificar estados de carga, error y vacío.
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
+- **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 
 ---
 
-*Última actualización: mayo 2026*
+Última actualización: junio 2026

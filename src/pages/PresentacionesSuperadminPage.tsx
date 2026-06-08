@@ -200,7 +200,7 @@ export function PresentacionesSuperadminPage() {
               {editingId ? 'Editar presentación' : 'Nueva presentación'}
             </h2>
             <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-              Nombre *
+              Nombre <span className="text-red-500">*</span>
               <input
                 value={form.nombre}
                 onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}

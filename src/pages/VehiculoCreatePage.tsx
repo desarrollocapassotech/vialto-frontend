@@ -84,7 +84,7 @@ export function VehiculoCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className={LABEL}>Patente *</span>
+          <span className={LABEL}>Patente <span className="text-red-500">*</span></span>
           <CrudInput
             placeholder="Ej: AA123BB"
             value={form.patente}

@@ -196,7 +196,7 @@ export function ViajeInlineEditForm({
                 </div>
                 <div className="grid gap-3">
                   <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                    <span className={LABEL}>Chofer (opcional)</span>
+                    <span className={LABEL}>Chofer</span>
                     <ChoferSearchSelect
                       choferes={choferes}
                       value={draft.choferExternoId}
@@ -300,7 +300,7 @@ export function ViajeInlineEditForm({
           </div>
 
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Detalle adicional (opcional)</span>
+            <span className={LABEL}>Detalle adicional</span>
             <textarea
               value={draft.detalleCarga}
               onChange={(e) => set({ detalleCarga: e.target.value })}

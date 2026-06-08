@@ -87,7 +87,7 @@ export function VehiculoModal({
         </div>
         <div className="px-5 py-4 grid gap-3">
           <label className="flex flex-col gap-1">
-            <span className={L}>Patente *</span>
+            <span className={L}>Patente <span className="text-red-500">*</span></span>
             <input
               autoFocus
               value={form.patente}

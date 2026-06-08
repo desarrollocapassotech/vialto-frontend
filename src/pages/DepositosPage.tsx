@@ -217,7 +217,7 @@ export function DepositosPage() {
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-semibold text-vialto-charcoal">
-                Nombre
+                Nombre <span className="text-red-500">*</span>
               </label>
               <input
                 value={form.nombre}

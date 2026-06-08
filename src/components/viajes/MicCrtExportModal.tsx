@@ -113,9 +113,14 @@ function Field({
   children: ReactNode;
   className?: string;
 }) {
+  const isRequired = label.endsWith(' *');
+  const labelText = isRequired ? label.slice(0, -2) : label;
   return (
     <label className={`grid gap-0.5 ${className ?? ''}`}>
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        {labelText}
+        {isRequired && <span className="text-red-500"> *</span>}
+      </span>
       {children}
     </label>
   );

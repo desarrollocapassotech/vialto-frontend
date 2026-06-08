@@ -397,7 +397,7 @@ export function DivisionesStockTenantPage({
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL}>Observaciones — opcional</label>
+          <label className={LABEL}>Observaciones</label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}

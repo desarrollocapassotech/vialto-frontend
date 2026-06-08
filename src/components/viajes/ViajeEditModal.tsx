@@ -504,7 +504,7 @@ export function ViajeEditModal({
                   )}
                   <div className="grid gap-3">
                     <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                      <span className={labelClass}>Chofer (opcional)</span>
+                      <span className={labelClass}>Chofer</span>
                       <ChoferSearchSelect
                         choferes={todosChoferes}
                         value={draft.choferExternoId}
@@ -634,7 +634,7 @@ export function ViajeEditModal({
             </div>
 
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={labelClass}>Detalle adicional (opcional)</span>
+              <span className={labelClass}>Detalle adicional</span>
               <textarea
                 value={draft.detalleCarga}
                 onChange={(e) =>

@@ -41,7 +41,7 @@ export function RemitoAdjuntoStock({
   return (
     <>
       <div className="space-y-1">
-        <span className={labelClassName}>Remito *</span>
+        <span className={labelClassName}>Remito <span className="text-red-500">*</span></span>
 
         {!file ? (
           <div className="flex flex-wrap items-start gap-2">

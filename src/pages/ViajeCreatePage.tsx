@@ -711,7 +711,7 @@ export function ViajeCreatePage() {
                 )}
                 <div className="grid gap-3">
                   <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                    <span className={fieldLabelClass}>Chofer (opcional)</span>
+                    <span className={fieldLabelClass}>Chofer</span>
                     <ChoferSearchSelect
                       choferes={choferes}
                       value={choferExternoId}
@@ -855,7 +855,7 @@ export function ViajeCreatePage() {
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={fieldLabelClass}>Detalle adicional (opcional)</span>
+            <span className={fieldLabelClass}>Detalle adicional</span>
             <textarea
               value={detalleCarga}
               onChange={(e) => setDetalleCarga(e.target.value)}

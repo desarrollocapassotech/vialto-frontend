@@ -367,7 +367,7 @@ export function EgresosStockTenantPage({
           )}
 
           <div className="space-y-1 sm:col-span-2">
-            <label className={LABEL}>Lote — opcional</label>
+            <label className={LABEL}>Lote</label>
             <input
               type="text"
               value={lote}
@@ -401,7 +401,7 @@ export function EgresosStockTenantPage({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className={LABEL}>Entregado por — opcional</label>
+            <label className={LABEL}>Entregado por</label>
             <input
               type="text"
               value={entregadoPor}
@@ -412,7 +412,7 @@ export function EgresosStockTenantPage({
             />
           </div>
           <div className="space-y-1">
-            <label className={LABEL}>Destinatario — opcional</label>
+            <label className={LABEL}>Destinatario</label>
             <input
               type="text"
               value={destinatario}
@@ -423,7 +423,7 @@ export function EgresosStockTenantPage({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <label className={LABEL}>Dirección / Ruta de entrega — opcional</label>
+            <label className={LABEL}>Dirección / Ruta de entrega</label>
             <input
               type="text"
               value={destinoFinal}
@@ -436,7 +436,7 @@ export function EgresosStockTenantPage({
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL}>Observaciones — opcional</label>
+          <label className={LABEL}>Observaciones</label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}

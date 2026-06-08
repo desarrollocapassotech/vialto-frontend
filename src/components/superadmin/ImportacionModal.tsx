@@ -129,7 +129,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
               {step === 'upload' && (
                 <div className="space-y-5">
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo *</label>
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo <span className="text-red-500">*</span></label>
                     {modulosDisponibles.length === 0 ? (
                       <p className="text-sm text-vialto-steel">Esta empresa no tiene módulos con soporte de importación.</p>
                     ) : (
@@ -153,7 +153,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   )}
                   
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Archivo Excel (.xlsx / .xls) *</label>
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Archivo Excel (.xlsx / .xls) <span className="text-red-500">*</span></label>
                     <div onClick={() => fileInputRef.current?.click()}
                       className="flex cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-black/20 py-8 text-sm text-vialto-steel hover:border-vialto-charcoal hover:text-vialto-charcoal transition-colors">
                       {file ? (
@@ -284,7 +284,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo *</label>
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo <span className="text-red-500">*</span></label>
                     <select value={tplModulo} onChange={(e) => handleModuloChange(e.target.value)}
                       className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal">
                       <option value="">Seleccioná un módulo…</option>
@@ -293,7 +293,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Nombre del template *</label>
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Nombre del template <span className="text-red-500">*</span></label>
                     <input value={tplNombre} onChange={(e) => setTplNombre(e.target.value)}
                       placeholder="ej. Template viajes Fernández v1"
                       className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal" />
@@ -301,7 +301,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="block text-xs uppercase tracking-wider text-vialto-steel">Configuración (JSON) *</label>
+                      <label className="block text-xs uppercase tracking-wider text-vialto-steel">Configuración (JSON) <span className="text-red-500">*</span></label>
                       {tplJsonError && <span className="text-xs text-red-600">{tplJsonError}</span>}
                     </div>
                     <textarea

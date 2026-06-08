@@ -99,7 +99,7 @@ export function TransportistaModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="grid gap-3">
             <label className="flex flex-col gap-1">
-              <span className={L}>Nombre *</span>
+              <span className={L}>Nombre <span className="text-red-500">*</span></span>
               <input
                 autoFocus
                 value={nombre}
@@ -109,11 +109,11 @@ export function TransportistaModal({
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className={L}>País *</span>
+              <span className={L}>País <span className="text-red-500">*</span></span>
               <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className={L}>{idFiscalPorPais(pais).label} *</span>
+              <span className={L}>{idFiscalPorPais(pais).label} <span className="text-red-500">*</span></span>
               <input
                 value={idFiscal}
                 onChange={(e) => setIdFiscal(e.target.value)}

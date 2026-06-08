@@ -55,7 +55,7 @@ export function TenantForm({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-wider text-vialto-steel">
-            Nombre de empresa *
+            Nombre de empresa <span className="text-red-500">*</span>
           </span>
           <input
             value={values.name}
@@ -67,7 +67,7 @@ export function TenantForm({
         {showOrgIdInput && (
           <label className="space-y-1">
             <span className="text-xs uppercase tracking-wider text-vialto-steel">
-              Org ID de Clerk *
+              Org ID de Clerk <span className="text-red-500">*</span>
             </span>
             <input
               value={values.clerkOrgId}

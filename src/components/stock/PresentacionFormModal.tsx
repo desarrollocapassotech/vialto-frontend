@@ -82,7 +82,7 @@ export function PresentacionFormModal({
 
         <div className="px-5 py-4">
           <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-            Nombre *
+            Nombre <span className="text-red-500">*</span>
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}

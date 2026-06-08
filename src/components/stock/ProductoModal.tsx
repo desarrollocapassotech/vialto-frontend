@@ -184,7 +184,7 @@ export function ProductoModal({
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                  Descripción (opcional)
+                  Descripción
                   <textarea
                     value={descripcion}
                     onChange={(e) => setDescripcion(e.target.value)}
@@ -194,7 +194,7 @@ export function ProductoModal({
                 </label>
                 <div className="flex flex-col gap-1">
                   <span className="text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                    Presentación cantidad 1 *
+                    Presentación cantidad 1 <span className="text-red-500">*</span>
                   </span>
                   <SearchableEntitySelect<Presentacion>
                     items={presentaciones}

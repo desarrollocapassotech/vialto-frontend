@@ -299,7 +299,7 @@ export function IngresosStockTenantPage({
           )}
 
           <div className="space-y-1 sm:col-span-2">
-            <label className={LABEL}>Lote — opcional</label>
+            <label className={LABEL}>Lote</label>
             <input
               type="text"
               value={lote}
@@ -332,7 +332,7 @@ export function IngresosStockTenantPage({
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL}>Observaciones — opcional</label>
+          <label className={LABEL}>Observaciones</label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}

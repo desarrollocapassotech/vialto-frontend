@@ -215,7 +215,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className={labelClass}>Fecha (opcional)</span>
+            <span className={labelClass}>Fecha</span>
             <input
               type="date"
               value={fecha}
