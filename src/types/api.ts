@@ -352,6 +352,10 @@ export interface MovimientoStock {
   createdByLabel?: string | null;
   fecha: string;
   createdAt: string;
+  /** Pendiente de implementación en el backend. */
+  destinatario?: string | null;
+  entregadoPor?: string | null;
+  destinoFinal?: string | null;
 }
 
 export interface StockEgresoRemitoConfig {

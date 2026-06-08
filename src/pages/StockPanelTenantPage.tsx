@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
-import { ChevronDown, Warehouse } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, Warehouse } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
+import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
@@ -14,6 +15,7 @@ import {
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { generarExcel, stockItemColumnas } from '@/lib/stockExcelExport';
 import type { Cliente, Deposito, StockItem } from '@/types/api';
 
 type ProductoFiltro = { id: string; nombre: string };
@@ -80,6 +82,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   const [filtroProductoId, setFiltroProductoId] = useState('');
   const [soloConStockCant1, setSoloConStockCant1] = useState(false);
   const [soloConStockCant2, setSoloConStockCant2] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -297,11 +300,22 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {!platform && (
-        <div>
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">Inventario</h1>
-          <p className="mt-1 text-sm text-vialto-steel">
-            Stock disponible en cada depósito, en tiempo real.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">Inventario</h1>
+            <p className="mt-1 text-sm text-vialto-steel">
+              Stock disponible en cada depósito, en tiempo real.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={filteredItems.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+            Descargar Excel
+          </button>
         </div>
       )}
 
@@ -538,6 +552,20 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
             }}
           />
         </>
+      )}
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={stockItemColumnas(filteredItems)}
+          rowCount={filteredItems.length}
+          onExport={(selectedIds) => {
+            const allCols = stockItemColumnas(filteredItems);
+            const cols = allCols.filter((c) => selectedIds.includes(c.id));
+            const deposito = depositoActivo?.nombre ?? 'inventario';
+            generarExcel(cols, filteredItems, `inventario-${deposito}`);
+          }}
+          onClose={() => setExportModalOpen(false)}
+        />
       )}
     </div>
   );

@@ -1,10 +1,13 @@
 import { useAuth } from '@clerk/clerk-react';
+import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
+import { generarExcel, movimientoStockColumnas } from '@/lib/stockExcelExport';
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
@@ -32,6 +35,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const [error, setError] = useState<string | null>(null);
   const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(null);
   const [detalleMovimientoTipo, setDetalleMovimientoTipo] = useState<MovimientoStock['tipo'] | undefined>();
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,11 +57,22 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {!platform && (
-        <div>
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimientos</h1>
-          <p className="mt-1 text-sm text-vialto-steel">
-            Ingresos y egresos al depósito, ordenados por fecha de movimiento (más reciente primero).
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimientos</h1>
+            <p className="mt-1 text-sm text-vialto-steel">
+              Ingresos y egresos al depósito, ordenados por fecha de movimiento (más reciente primero).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={items.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+            Descargar Excel
+          </button>
         </div>
       )}
 
@@ -165,6 +180,19 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             setDetalleMovimientoId(null);
             setDetalleMovimientoTipo(undefined);
           }}
+        />
+      )}
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={movimientoStockColumnas(items)}
+          rowCount={items.length}
+          onExport={(selectedIds) => {
+            const allCols = movimientoStockColumnas(items);
+            const cols = allCols.filter((c) => selectedIds.includes(c.id));
+            generarExcel(cols, items, 'movimientos-stock');
+          }}
+          onClose={() => setExportModalOpen(false)}
         />
       )}
     </div>

@@ -1,11 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
+import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
+import { generarExcel, movimientoStockColumnas } from '@/lib/stockExcelExport';
 import { movimientoStockTipoNumeroClass } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { MovimientoStock } from '@/types/api';
@@ -31,6 +34,7 @@ export function EgresosStockHistorialTenantPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,17 +62,36 @@ export function EgresosStockHistorialTenantPage({
       {!embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-vialto-charcoal">Historial de egresos</h1>
-          <Link
-            to={volverHref}
-            className="text-sm font-medium text-vialto-fire hover:underline"
-          >
-            ← Volver a egresos
-          </Link>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setExportModalOpen(true)}
+              disabled={items.length === 0}
+              className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+              Descargar Excel
+            </button>
+            <Link
+              to={volverHref}
+              className="text-sm font-medium text-vialto-fire hover:underline"
+            >
+              ← Volver a egresos
+            </Link>
+          </div>
         </div>
       )}
 
       {embeddedInSuperadmin && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={items.length === 0}
+            className="text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+          >
+            Descargar Excel
+          </button>
           <Link
             to={volverHref}
             className="text-sm font-medium text-vialto-fire hover:underline"
@@ -174,6 +197,19 @@ export function EgresosStockHistorialTenantPage({
           tenantId={tenantId}
           tipoTitulo="egreso"
           onClose={() => setDetalleMovimientoId(null)}
+        />
+      )}
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={movimientoStockColumnas(items)}
+          rowCount={items.length}
+          onExport={(selectedIds) => {
+            const allCols = movimientoStockColumnas(items);
+            const cols = allCols.filter((c) => selectedIds.includes(c.id));
+            generarExcel(cols, items, 'historial-egresos');
+          }}
+          onClose={() => setExportModalOpen(false)}
         />
       )}
     </div>
