@@ -1,6 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
 import { Link } from 'react-router-dom';
 import { CircleHelp, X } from 'lucide-react';
@@ -71,6 +73,7 @@ export function DivisionesStockTenantPage({
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const [stockDisponible, setStockDisponible] = useState<StockItem | null>(null);
@@ -124,9 +127,12 @@ export function DivisionesStockTenantPage({
     e.preventDefault();
     setFormError(null);
 
-    if (!productoId) return setFormError('Seleccioná un producto.');
-    if (!clienteId) return setFormError('Seleccioná una empresa/cliente.');
-    if (!depositoId) return setFormError('Seleccioná un depósito.');
+    const ferrs: Record<string, string> = {};
+    if (!productoId) ferrs.productoId = 'Seleccioná un producto.';
+    if (!clienteId) ferrs.clienteId = 'Seleccioná una empresa/cliente.';
+    if (!depositoId) ferrs.depositoId = 'Seleccioná un depósito.';
+    if (Object.keys(ferrs).length > 0) { setFieldErrors(ferrs); return; }
+    setFieldErrors({});
 
     const po = parseFloat(cantidad1Origen) || 0;
     const so = parseFloat(cantidad2Origen) || 0;
@@ -241,7 +247,7 @@ export function DivisionesStockTenantPage({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className={LABEL}>Producto</label>
+            <label className={LABEL}>Producto <span className="text-red-500">*</span></label>
             <SearchableEntitySelect<Producto>
               items={productos}
               value={productoId}
@@ -269,10 +275,11 @@ export function DivisionesStockTenantPage({
               placeholderBuscar="Buscar por nombre o código…"
               inputClassName={INPUT}
             />
+            <CrudFieldError message={fieldErrors.productoId} />
           </div>
 
           <div className="space-y-1 min-w-0">
-            <label className={LABEL}>Empresa / Cliente</label>
+            <label className={LABEL}>Empresa / Cliente <span className="text-red-500">*</span></label>
             <ClienteSearchSelect
               clientes={clientes}
               value={clienteId}
@@ -280,20 +287,22 @@ export function DivisionesStockTenantPage({
               loading={clientesSelectLoading}
               inputClassName={INPUT}
             />
+            <CrudFieldError message={fieldErrors.clienteId} />
           </div>
 
           <div className="space-y-1 min-w-0 sm:col-span-2">
-            <label className={LABEL}>Depósito</label>
+            <label className={LABEL}>Depósito <span className="text-red-500">*</span></label>
             <select
               value={depositoId}
               onChange={(e) => setDepositoId(e.target.value)}
-              className={INPUT}
+              className={`h-9 w-full border bg-white px-2 text-sm ${fieldErrors.depositoId ? 'border-red-400' : 'border-black/15'}`}
             >
               <option value="">Elegí un depósito…</option>
               {depositos.map((d) => (
                 <option key={d.id} value={d.id}>{d.nombre}</option>
               ))}
             </select>
+            <CrudFieldError message={fieldErrors.depositoId} />
           </div>
         </div>
 
@@ -407,7 +416,7 @@ export function DivisionesStockTenantPage({
           />
         </div>
 
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
+        <CrudFormErrorAlert message={formError} />
 
         <div className="flex justify-end">
           <button

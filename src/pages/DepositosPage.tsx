@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -18,6 +19,7 @@ export function DepositosPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [editingDepositoId, setEditingDepositoId] = useState<string | null>(null);
   const [form, setForm] = useState<DepositoFormState>({
     nombre: '',
@@ -87,6 +89,11 @@ export function DepositosPage() {
     event.preventDefault();
     if (!isLoaded || !isSignedIn) return;
 
+    if (!form.nombre.trim()) {
+      setFieldErrors({ nombre: 'Ingresá el nombre del depósito.' });
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
 
@@ -222,9 +229,9 @@ export function DepositosPage() {
               <input
                 value={form.nombre}
                 onChange={(event) => setForm((current) => ({ ...current, nombre: event.target.value }))}
-                className="mt-2 w-full rounded border border-black/10 px-3 py-2 text-sm"
-                required
+                className={`mt-2 w-full rounded border px-3 py-2 text-sm ${fieldErrors.nombre ? 'border-red-400' : 'border-black/10'}`}
               />
+              <CrudFieldError message={fieldErrors.nombre} />
             </div>
 
             <div>
@@ -263,6 +270,7 @@ export function DepositosPage() {
                   setIsFormOpen(false);
                   setEditingDepositoId(null);
                   setError(null);
+                  setFieldErrors({});
                 }}
                 className="inline-flex h-10 items-center px-4 border border-black/10 text-sm uppercase tracking-wider hover:bg-vialto-mist"
               >

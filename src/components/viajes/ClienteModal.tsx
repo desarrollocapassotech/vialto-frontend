@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
-import { validateClienteForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -31,6 +31,7 @@ export function ClienteModal({
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   function handlePaisChange(newPais: PaisCodigo | '') {
@@ -41,12 +42,20 @@ export function ClienteModal({
 
   const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
   const condInfo = condicionTributariaPorPais(pais);
+  const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
   async function submit() {
-    const validationError = validateClienteForm(nombre, pais, idFiscal);
-    if (validationError) { setError(validationError); return; }
+    const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del cliente.';
+    if (!pais) errs.pais = 'Seleccioná el país.';
+    if (!idFiscal.trim()) {
+      const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
+      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
+    }
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
     const fiscalErr = validarIdFiscal(pais, idFiscal.trim());
-    if (fiscalErr) { setError(fiscalErr); return; }
+    if (fiscalErr) { setFieldErrors({ idFiscal: fiscalErr }); return; }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
     try {
@@ -78,7 +87,7 @@ export function ClienteModal({
   }
 
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';
-  const I = 'h-9 w-full border border-black/15 px-2 text-sm';
+  const I = 'h-9 w-full border px-2 text-sm';
 
   return (
     <div className={modalQuickCreateOverlayClass(stacked)}>
@@ -106,12 +115,14 @@ export function ClienteModal({
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Transportes del Norte SA"
-                className={I}
+                className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
               />
+              <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={L}>País <span className="text-red-500">*</span></span>
               <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
+              <CrudFieldError message={fieldErrors.pais} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={L}>{idFiscalPorPais(pais).label} <span className="text-red-500">*</span></span>
@@ -119,9 +130,9 @@ export function ClienteModal({
                 value={idFiscal}
                 onChange={(e) => setIdFiscal(e.target.value)}
                 placeholder={idFiscalPorPais(pais).placeholder}
-                className={`${I}${errorFiscal ? ' border-red-400' : ''}`}
+                className={`${I} ${idFiscalError ? 'border-red-400' : 'border-black/15'}`}
               />
-              {errorFiscal && <p className="text-xs text-red-600">{errorFiscal}</p>}
+              <CrudFieldError message={idFiscalError} />
             </label>
             {pais && (
               <label className="flex flex-col gap-1">
@@ -130,7 +141,7 @@ export function ClienteModal({
                   <select
                     value={condicionIva ?? ''}
                     onChange={(e) => setCondicionIva(e.target.value ? Number(e.target.value) : null)}
-                    className={`${I} bg-white`}
+                    className={`${I} border-black/15 bg-white`}
                   >
                     <option value="">Seleccioná una opción</option>
                     {condInfo.options.map((o) => (
@@ -144,7 +155,7 @@ export function ClienteModal({
                     value={condicionTributaria}
                     onChange={(e) => setCondicionTributaria(e.target.value)}
                     placeholder={condInfo.placeholder}
-                    className={I}
+                    className={`${I} border-black/15`}
                   />
                 )}
               </label>
@@ -155,7 +166,7 @@ export function ClienteModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Ej: contacto@empresa.com"
-                className={I}
+                className={`${I} border-black/15`}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -164,7 +175,7 @@ export function ClienteModal({
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 placeholder="Ej: +54 9 11 1234-5678"
-                className={I}
+                className={`${I} border-black/15`}
               />
             </label>
           </div>

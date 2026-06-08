@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -16,6 +17,7 @@ export function PresentacionesTenantPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ nombre: '', activo: true });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const editing = rows?.find((r) => r.id === editingId) ?? null;
 
@@ -58,6 +60,11 @@ export function PresentacionesTenantPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isLoaded || !isSignedIn) return;
+    if (!form.nombre.trim()) {
+      setFieldErrors({ nombre: 'Ingresá el nombre de la presentación.' });
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
     try {
@@ -200,11 +207,11 @@ export function PresentacionesTenantPage() {
               <input
                 value={form.nombre}
                 onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                className="h-9 border border-black/15 px-2 text-sm normal-case tracking-normal"
-                required
+                className={`h-9 border px-2 text-sm normal-case tracking-normal ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
                 autoFocus
               />
             </label>
+            <CrudFieldError message={fieldErrors.nombre} />
             {editingId && (
               <label className="mt-3 flex items-center gap-2 text-sm text-vialto-charcoal cursor-pointer">
                 <input
@@ -220,7 +227,7 @@ export function PresentacionesTenantPage() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => setIsFormOpen(false)}
+                onClick={() => { setIsFormOpen(false); setFieldErrors({}); }}
                 className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
               >
                 Cancelar

@@ -1,3 +1,4 @@
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { labelModulo } from '@/lib/platformLabels';
 import { Spinner } from '@/components/ui/Spinner';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
@@ -23,6 +24,8 @@ interface TenantFormProps {
   disableOrgId?: boolean;
   showOrgIdInput?: boolean;
   submitAlign?: 'left' | 'right';
+  fieldErrors?: Record<string, string>;
+  formError?: string | null;
 }
 
 export function TenantForm({
@@ -35,6 +38,8 @@ export function TenantForm({
   disableOrgId = false,
   showOrgIdInput = true,
   submitAlign = 'left',
+  fieldErrors = {},
+  formError,
 }: TenantFormProps) {
   const toggleModule = (moduleCode: string) => {
     const exists = values.modules.includes(moduleCode);
@@ -60,9 +65,9 @@ export function TenantForm({
           <input
             value={values.name}
             onChange={(e) => onChange({ ...values, name: e.target.value })}
-            required
-            className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
+            className={`h-10 w-full border bg-white px-3 text-sm ${fieldErrors.name ? 'border-red-400' : 'border-black/15'}`}
           />
+          <CrudFieldError message={fieldErrors.name} />
         </label>
         {showOrgIdInput && (
           <label className="space-y-1">
@@ -72,10 +77,10 @@ export function TenantForm({
             <input
               value={values.clerkOrgId}
               onChange={(e) => onChange({ ...values, clerkOrgId: e.target.value })}
-              required
               disabled={disableOrgId}
-              className="h-10 w-full border border-black/15 bg-white px-3 text-sm disabled:bg-black/5"
+              className={`h-10 w-full border bg-white px-3 text-sm disabled:bg-black/5 ${fieldErrors.clerkOrgId ? 'border-red-400' : 'border-black/15'}`}
             />
+            <CrudFieldError message={fieldErrors.clerkOrgId} />
           </label>
         )}
       </div>
@@ -174,6 +179,12 @@ export function TenantForm({
             />
           </label>
         </div>
+      )}
+
+      {formError && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {formError}
+        </p>
       )}
 
       <div className={submitAlign === 'right' ? 'flex justify-end' : ''}>

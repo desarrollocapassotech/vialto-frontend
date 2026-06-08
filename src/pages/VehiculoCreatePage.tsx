@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
@@ -36,21 +37,21 @@ export function VehiculoCreatePage() {
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
   }
 
   async function onSubmit() {
-    if (!form.patente.trim()) {
-      setError('Ingresá la patente.');
+    const errs: Record<string, string> = {};
+    if (!form.patente.trim()) errs.patente = 'Ingresá la patente.';
+    if (form.tara.trim() && vehiculoWritePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
-    const taraRaw = form.tara.trim();
-    if (taraRaw && vehiculoWritePayloadFromForm(form).tara == null) {
-      setError('La tara debe ser un número válido.');
-      return;
-    }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -88,8 +89,10 @@ export function VehiculoCreatePage() {
           <CrudInput
             placeholder="Ej: AA123BB"
             value={form.patente}
+            error={fieldErrors.patente}
             onChange={(e) => patch({ patente: e.target.value })}
           />
+          <CrudFieldError message={fieldErrors.patente} />
         </label>
         <label className="grid gap-1.5">
           <span className={LABEL}>Tipo</span>
@@ -159,8 +162,10 @@ export function VehiculoCreatePage() {
             type="number"
             placeholder="Ej: 8500"
             value={form.tara}
+            error={fieldErrors.tara}
             onChange={(e) => patch({ tara: e.target.value })}
           />
+          <CrudFieldError message={fieldErrors.tara} />
         </label>
         <label className="grid gap-1.5">
           <span className={LABEL}>Precinto</span>

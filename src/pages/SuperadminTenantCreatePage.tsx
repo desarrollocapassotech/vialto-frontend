@@ -19,19 +19,17 @@ export function SuperadminTenantCreatePage() {
   const [values, setValues] = useState<TenantFormValues>(INITIAL_VALUES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit() {
     const name = values.name.trim();
     const hasModules = values.modules.length > 0;
 
-    if (!name && !hasModules) {
-      setError('Ingresá el nombre de la empresa y seleccioná al menos un módulo.');
-      return;
-    }
-    if (!name) {
-      setError('Ingresá el nombre de la empresa.');
-      return;
-    }
+    const errs: Record<string, string> = {};
+    if (!name) errs.name = 'Ingresá el nombre de la empresa.';
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+    setFieldErrors({});
+
     if (!hasModules) {
       setError('Seleccioná al menos un módulo para crear la empresa.');
       return;
@@ -72,15 +70,6 @@ export function SuperadminTenantCreatePage() {
           </Link>
         </div>
 
-        {error && (
-          <div
-            className="mt-6 rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-            role="alert"
-          >
-            {error}
-          </div>
-        )}
-
         <TenantForm
           values={values}
           onChange={setValues}
@@ -89,6 +78,8 @@ export function SuperadminTenantCreatePage() {
           loading={loading}
           showOrgIdInput={false}
           submitAlign="right"
+          fieldErrors={fieldErrors}
+          formError={error}
         />
       </div>
     </SuperadminOnly>

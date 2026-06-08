@@ -29,6 +29,7 @@ export function SuperadminTenantEditPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [tenantName, setTenantName] = useState('');
 
@@ -62,6 +63,11 @@ export function SuperadminTenantEditPage() {
 
   async function onSubmit() {
     if (!orgId || !values) return;
+    if (!values.name.trim()) {
+      setFieldErrors({ name: 'Ingresá el nombre de la empresa.' });
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -120,15 +126,6 @@ export function SuperadminTenantEditPage() {
           </Link>
         </div>
 
-        {error && (
-          <div
-            className="mt-6 rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-            role="alert"
-          >
-            {error}
-          </div>
-        )}
-
         {initialLoading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
         )}
@@ -143,6 +140,8 @@ export function SuperadminTenantEditPage() {
               loading={loading}
               includeAdvancedFields
               disableOrgId
+              fieldErrors={fieldErrors}
+              formError={error}
             />
 
             <section className="mt-10 border border-red-300 bg-red-50 p-5">

@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
@@ -10,7 +11,6 @@ import { TransportistaPautHelperNotice } from '@/components/transportistas/Trans
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { validateTransportistaForm } from '@/lib/clienteForm';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 
@@ -33,6 +33,7 @@ export function TransportistaCreatePage() {
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -41,16 +42,23 @@ export function TransportistaCreatePage() {
   }
 
   async function onSubmit() {
-    const validationError = validateTransportistaForm(nombre, pais, idFiscal);
-    if (validationError) {
-      setError(validationError);
+    const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del transportista.';
+    if (!pais) errs.pais = 'Seleccioná el país del transportista.';
+    if (!idFiscal.trim()) {
+      const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
+      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
+    }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
     if (errorFiscal) {
-      setError(errorFiscal);
+      setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -86,6 +94,7 @@ export function TransportistaCreatePage() {
   const sectionClass = 'mt-2 border-t border-black/10 pt-4';
   const condInfo = condicionTributariaPorPais(pais);
   const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
+  const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
   return (
     <CrudPageLayout
@@ -99,11 +108,18 @@ export function TransportistaCreatePage() {
       >
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Nombre</CrudFieldLabel>
-          <CrudInput placeholder="Ej: Transportes del Norte SA" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <CrudInput
+            placeholder="Ej: Transportes del Norte SA"
+            value={nombre}
+            error={fieldErrors.nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
+          <CrudFieldError message={fieldErrors.nombre} />
         </label>
         <label className="grid gap-1.5">
           <CrudFieldLabel required>País</CrudFieldLabel>
           <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
+          <CrudFieldError message={fieldErrors.pais} />
         </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="grid gap-1.5">
@@ -111,10 +127,10 @@ export function TransportistaCreatePage() {
             <CrudInput
               placeholder={idFiscalPorPais(pais).placeholder}
               value={idFiscal}
+              error={idFiscalError || undefined}
               onChange={(e) => setIdFiscal(e.target.value)}
-              className={errorFiscal ? 'border-red-400' : undefined}
             />
-            {errorFiscal && <p className="text-xs text-red-600">{errorFiscal}</p>}
+            <CrudFieldError message={idFiscalError} />
           </label>
           <label className="grid gap-1.5">
             <span className={labelClass}>{condInfo.label}</span>

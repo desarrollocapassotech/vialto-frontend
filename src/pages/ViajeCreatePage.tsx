@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import {
@@ -160,6 +161,7 @@ export function ViajeCreatePage() {
     return [...base, ...sessionVehiculos.filter((v) => !ids.has(v.id))];
   }, [tenantId, localVehiculos, maestro.vehiculos, sessionVehiculos]);
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
   const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
@@ -321,15 +323,12 @@ export function ViajeCreatePage() {
 
   async function onSubmit(opts?: { kmLitrosFromModal?: boolean; km?: number; litros?: number }) {
     if (submitBusyRef.current) return;
-    if (!clienteId) {
-      setError('Seleccioná un cliente.');
-      return;
-    }
     const externo = modoOperacion === 'externo';
-    if (externo && !transportistaId.trim()) {
-      setError('Seleccioná un transportista externo.');
-      return;
-    }
+    const errs: Record<string, string> = {};
+    if (!clienteId) errs.clienteId = 'Seleccioná un cliente.';
+    if (externo && !transportistaId.trim()) errs.transportistaId = 'Seleccioná un transportista externo.';
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+    setFieldErrors({});
     const teErr = mensajeErrorTransportistaEfectivoExterno({
       operacionModo: modoOperacion,
       transportistaId,
@@ -572,15 +571,16 @@ export function ViajeCreatePage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Cliente</span>
+              <span className={fieldLabelClass}>Cliente <span className="text-red-500">*</span></span>
               <ClienteSearchSelect
                 clientes={clientes}
                 value={clienteId}
-                onChange={setClienteId}
+                onChange={(id) => { setClienteId(id); if (id) setFieldErrors((p) => ({ ...p, clienteId: '' })); }}
                 inputClassName={inputClass}
                 aria-label="Cliente"
                 onNuevo={() => setQuickCreate('cliente')}
               />
+              <CrudFieldError message={fieldErrors.clienteId} />
             </div>
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Monto a facturar</span>
@@ -612,7 +612,7 @@ export function ViajeCreatePage() {
               <div className="grid gap-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>Transportista externo</span>
+                    <span className={fieldLabelClass}>Transportista externo <span className="text-red-500">*</span></span>
                     <TransportistaSearchSelect
                       transportistas={transportistas}
                       value={transportistaId}
@@ -620,11 +620,13 @@ export function ViajeCreatePage() {
                         setTransportistaId(id);
                         setRealizaFlete(true);
                         setTransportistaEfectivoId('');
+                        if (id) setFieldErrors((p) => ({ ...p, transportistaId: '' }));
                       }}
                       inputClassName={inputClass}
                       aria-label="Transportista externo"
                       onNuevo={() => setQuickCreate('transportista')}
                     />
+                    <CrudFieldError message={fieldErrors.transportistaId} />
                   </div>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className={fieldLabelClass}>Precio transporte</span>

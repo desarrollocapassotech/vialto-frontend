@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { apiJson } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
@@ -25,6 +26,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
   const [montoStr, setMontoStr] = useState('');
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [observaciones, setObservaciones] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showPagosAnteriores, setShowPagosAnteriores] = useState(false);
@@ -40,6 +42,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
     setMontoStr('');
     setFecha(new Date().toISOString().slice(0, 10));
     setObservaciones('');
+    setFieldErrors({});
     setError(null);
     setShowPagosAnteriores(false);
   }
@@ -52,7 +55,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
   async function handleSubmit() {
     const monto = parseCurrencyForMoneda(montoStr, moneda);
     if (monto == null || monto <= 0) {
-      setError('Ingresá un monto mayor a 0.');
+      setFieldErrors({ monto: 'Ingresá un monto mayor a 0.' });
       return;
     }
     if (saldo) {
@@ -61,10 +64,11 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         return;
       }
       if (monto > saldo.saldo) {
-        setError(`El monto supera el saldo pendiente (${formatViajeImporteForListado(saldo.saldo, saldo.moneda)}).`);
+        setFieldErrors({ monto: `El monto supera el saldo pendiente (${formatViajeImporteForListado(saldo.saldo, saldo.moneda)}).` });
         return;
       }
     }
+    setFieldErrors({});
 
     setSaving(true);
     setError(null);
@@ -187,18 +191,19 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex gap-2">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className={labelClass}>Monto</span>
+              <span className={labelClass}>Monto <span className="text-red-500">*</span></span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
                 onChange={(e) => setMontoStr(e.target.value)}
                 placeholder="0.00"
-                className={`${inputClass} text-right tabular-nums`}
+                className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? 'border-red-400' : ''}`}
                 autoFocus
                 disabled={saving}
                 aria-label="Monto del pago"
               />
+              <CrudFieldError message={fieldErrors.monto} />
             </div>
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Moneda</span>

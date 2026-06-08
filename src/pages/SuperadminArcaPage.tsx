@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
 import { ListadoCard } from '@/components/listado/ListadoCard';
@@ -162,6 +163,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<ConfigFormValues>(EMPTY_FORM);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,9 +208,10 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!values.cuitEmisor.trim()) {
-      setError('El CUIT emisor es obligatorio.');
+      setFieldErrors({ cuitEmisor: 'El CUIT emisor es obligatorio.' });
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -295,13 +298,16 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor</FieldLabel>
-          <TextInput
+          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor <span className="text-red-500">*</span></FieldLabel>
+          <input
             id="cuitEmisor"
+            type="text"
             value={values.cuitEmisor}
-            onChange={(v) => set('cuitEmisor', v)}
+            onChange={(e) => set('cuitEmisor', e.target.value)}
             placeholder="20XXXXXXXXXXX"
+            className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${fieldErrors.cuitEmisor ? 'border-red-400' : 'border-black/10'}`}
           />
+          <CrudFieldError message={fieldErrors.cuitEmisor} />
         </div>
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="condicionIvaEmisor">Condición frente al IVA</FieldLabel>

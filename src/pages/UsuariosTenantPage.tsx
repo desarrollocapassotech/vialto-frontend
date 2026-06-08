@@ -1,5 +1,6 @@
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
@@ -192,6 +193,16 @@ function InviteModal({
 }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function handleSubmit() {
+    if (!email.trim()) {
+      setFieldErrors({ email: 'Ingresá el email del usuario.' });
+      return;
+    }
+    setFieldErrors({});
+    onSubmit(email, role);
+  }
 
   return (
     <ViewModalShell
@@ -205,8 +216,8 @@ function InviteModal({
           </button>
           <button
             type="button"
-            onClick={() => onSubmit(email, role)}
-            disabled={busy || !email.trim()}
+            onClick={handleSubmit}
+            disabled={busy}
             className={viewModalBtnPrimary}
           >
             {busy ? 'Enviando…' : 'Enviar invitación'}
@@ -220,7 +231,7 @@ function InviteModal({
         </p>
         <div>
           <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="invite-email">
-            Email
+            Email <span className="text-red-500">*</span>
           </label>
           <input
             id="invite-email"
@@ -228,9 +239,10 @@ function InviteModal({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="nombre@empresa.com"
-            className="mt-1 w-full rounded border border-black/15 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire"
+            className={`mt-1 w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire ${fieldErrors.email ? 'border-red-400' : 'border-black/15'}`}
             disabled={busy}
           />
+          <CrudFieldError message={fieldErrors.email} />
         </div>
         <div>
           <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">Rol</p>
