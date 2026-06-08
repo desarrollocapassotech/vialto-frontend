@@ -11,7 +11,7 @@ import type { PlatformUser } from '@/types/api';
 function formatRole(role: string, platformRole?: string | null) {
   if (platformRole === 'superadmin') return 'Superadmin';
   if (role === 'org:admin') return 'Admin';
-  if (role === 'org:supervisor' || role === 'org:member') return 'Miembro';
+  if (role === 'org:member') return 'Miembro';
   return role;
 }
 
