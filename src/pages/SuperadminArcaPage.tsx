@@ -788,7 +788,7 @@ export function SuperadminArcaPage() {
 
   return (
     <SuperadminOnly>
-      <div className="max-w-5xl">
+      <div className="w-full">
         <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
           ARCA / AFIP
         </h1>

@@ -49,7 +49,7 @@ export function userRoleDisplay({
     case 'org:admin':
       return 'Administrador';
     case 'org:member':
-      return 'Operador';
+      return 'Miembro';
     default: {
       const raw = orgRole.replace(/^org:/, '').replace(/_/g, ' ');
       return raw

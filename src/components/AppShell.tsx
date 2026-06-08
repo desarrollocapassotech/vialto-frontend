@@ -80,6 +80,22 @@ export function AppShell() {
   const navLoading = !userLoaded || tenantLoading;
 
   const navGroups = useMemo((): NavGroup[] => {
+    const isMember = orgRole === 'org:member';
+
+    // org:member: solo ve Ingresos y Egresos del módulo de stock
+    if (isMember) {
+      if (canAccessStock(tenant?.modules ?? [])) {
+        return [{
+          title: 'Stock',
+          items: [
+            { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
+            { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
+          ],
+        }];
+      }
+      return [];
+    }
+
     const homeLabel = superadmin ? 'Panorama' : 'Inicio';
     const groups: NavGroup[] = [
       { title: null, items: [{ to: '/', label: homeLabel, icon: House, end: true }] },
@@ -149,7 +165,7 @@ export function AppShell() {
     });
 
     return groups;
-  }, [superadmin, tenant?.modules]);
+  }, [superadmin, tenant?.modules, orgRole]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === 'string'
