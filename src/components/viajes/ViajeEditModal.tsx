@@ -32,6 +32,7 @@ import {
 } from '@/components/viajes/PagosTransportistaFieldset';
 import {
   preserveAmountOnMonedaChange,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -349,7 +350,7 @@ export function ViajeEditModal({
                   autoComplete="off"
                   value={draft.monto}
                   onChange={(e) =>
-                    setDraft((p) => (p ? { ...p, monto: e.target.value } : p))
+                    setDraft((p) => (p ? { ...p, monto: maskCurrencyForMoneda(e.target.value, p.monedaMonto) } : p))
                   }
                   placeholder="0.00"
                   className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
@@ -410,9 +411,7 @@ export function ViajeEditModal({
                           autoComplete="off"
                           value={draft.precioTransportistaExterno}
                           onChange={(e) =>
-                            setDraft((p) =>
-                              p ? { ...p, precioTransportistaExterno: e.target.value } : p,
-                            )
+                            setDraft((p) => p ? { ...p, precioTransportistaExterno: maskCurrencyForMoneda(e.target.value, p.monedaPrecioTransportistaExterno) } : p)
                           }
                           placeholder="0.00"
                           className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
