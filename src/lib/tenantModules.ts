@@ -47,6 +47,6 @@ export function canAccessStock(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'stock');
 }
 
-export function canAccessLiquidacionesArca(modules: string[]): boolean {
-  return modules.some((m) => m.toLowerCase() === 'liquidaciones-arca');
+export function canAccessIntegracionArca(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'integracion-arca');
 }

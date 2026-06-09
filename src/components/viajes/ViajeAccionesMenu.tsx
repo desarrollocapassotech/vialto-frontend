@@ -22,7 +22,7 @@ interface Props {
   onFacturar: () => void;
   onExportar: () => void;
   onVerFactura?: () => void;
-  /** Si se provee, reemplaza "Facturar" con "Emitir CVLP" cuando el módulo liquidaciones-arca está activo. */
+  /** Si se provee, reemplaza "Facturar" con "Emitir CVLP" cuando el módulo integracion-arca está activo. */
   onEmitirCvlp?: () => void;
   onEliminar?: () => void;
 }
@@ -51,10 +51,13 @@ export function ViajeAccionesMenu({
     if (viaje.facturaId && onVerFactura) {
       items.push({ id: 'ver-factura', label: 'Ver factura', icon: FileText, onClick: onVerFactura });
     }
-    if (permiteFacturar && onEmitirCvlp) {
-      items.push({ id: 'emitir-cvlp', label: 'Emitir comprobante', icon: Receipt, onClick: onEmitirCvlp });
-    } else if (permiteFacturar) {
-      items.push({ id: 'facturar', label: 'Facturar', icon: Receipt, onClick: onFacturar });
+    if (permiteFacturar) {
+      items.push({
+        id: 'facturar',
+        label: 'Facturar',
+        icon: Receipt,
+        onClick: onEmitirCvlp ?? onFacturar,
+      });
     }
     if (permiteGasto) {
       items.push({ id: 'gasto', label: 'Agregar gasto', icon: PlusCircle, onClick: onAgregarGasto });

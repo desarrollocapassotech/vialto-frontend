@@ -28,6 +28,7 @@ export type FacturaDraft = {
   viajeIds: string[];
   fechaEmision: string;
   fechaVencimiento: string;
+  ivaPct: string;
 };
 
 function todayIso() {
@@ -48,6 +49,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     viajeIds: [],
     fechaEmision: todayIso(),
     fechaVencimiento: '',
+    ivaPct: '21',
   };
 }
 
@@ -60,6 +62,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     viajeIds: f.viajeIds,
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
+    ivaPct: f.ivaPct != null ? String(f.ivaPct) : '21',
   };
 }
 
@@ -438,7 +441,7 @@ export function FacturaCreateModal({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Número <span className="text-red-500">*</span>
@@ -450,24 +453,6 @@ export function FacturaCreateModal({
                 placeholder="0001-00000001"
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={draft.tipo}
-                onChange={(e) => {
-                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
-                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
-                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
-                }}
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              >
-                <option value="cliente">Factura a cliente</option>
-                <option value="transportista_externo">Factura de transportista externo</option>
-              </select>
             </div>
 
             <FacturaContraparteField
@@ -506,20 +491,31 @@ export function FacturaCreateModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Importe calculado
+                IVA (%)
               </label>
-              <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
-              </p>
-              <p className="text-[10px] text-vialto-steel">
-                Suma de los montos de los viajes (ARS y USD por separado).
-              </p>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={draft.ivaPct}
+                onChange={(e) => patch({ ivaPct: e.target.value })}
+                placeholder="21"
+                className="h-9 border border-black/20 bg-white px-3 text-sm"
+              />
             </div>
 
             <div className="col-span-full flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
-              </label>
+              <div className="flex items-baseline justify-between gap-2">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+                </label>
+                {draft.viajeIds.length > 0 && (
+                  <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
+                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
+                  </span>
+                )}
+              </div>
               <ViajesVinculadosEditor
                 viajes={viajes}
                 disponibles={viajesNueva}
@@ -532,6 +528,25 @@ export function FacturaCreateModal({
               />
             </div>
           </div>
+
+          {(() => {
+            const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 0;
+            const importe = draft.viajeIds.length > 0
+              ? draft.viajeIds.reduce((sum, id) => {
+                  const v = viajes.find((x) => x.id === id);
+                  return sum + (v?.monto ?? 0);
+                }, 0)
+              : 0;
+            if (ivaN <= 0 || importe === 0) return null;
+            const total = importe * (1 + ivaN / 100);
+            return (
+              <p className="mt-3 text-xs text-vialto-steel text-right">
+                Total con IVA {ivaN}%: <span className="font-medium text-vialto-charcoal tabular-nums">
+                  ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+            );
+          })()}
 
           {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
             <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -668,7 +683,7 @@ export function FacturaEditModal({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Número <span className="text-red-500">*</span>
@@ -680,24 +695,6 @@ export function FacturaEditModal({
                 placeholder="0001-00000001"
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={draft.tipo}
-                onChange={(e) => {
-                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
-                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
-                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
-                }}
-                className="h-9 border border-black/20 bg-white px-3 text-sm"
-              >
-                <option value="cliente">Factura a cliente</option>
-                <option value="transportista_externo">Factura de transportista externo</option>
-              </select>
             </div>
 
             <FacturaContraparteField
@@ -736,20 +733,31 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Importe calculado
+                IVA (%)
               </label>
-              <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
-              </p>
-              <p className="text-[10px] text-vialto-steel">
-                Suma de los montos de los viajes (ARS y USD por separado).
-              </p>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={draft.ivaPct}
+                onChange={(e) => patch({ ivaPct: e.target.value })}
+                placeholder="21"
+                className="h-9 border border-black/20 bg-white px-3 text-sm"
+              />
             </div>
 
             <div className="col-span-full flex flex-col gap-1">
-              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
-              </label>
+              <div className="flex items-baseline justify-between gap-2">
+                <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+                </label>
+                {draft.viajeIds.length > 0 && (
+                  <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
+                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
+                  </span>
+                )}
+              </div>
               <ViajesVinculadosEditor
                 viajes={viajes}
                 disponibles={viajesEdicion}
@@ -762,6 +770,25 @@ export function FacturaEditModal({
               />
             </div>
           </div>
+
+          {(() => {
+            const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 0;
+            const importe = draft.viajeIds.length > 0
+              ? draft.viajeIds.reduce((sum, id) => {
+                  const v = viajes.find((x) => x.id === id);
+                  return sum + (v?.monto ?? 0);
+                }, 0)
+              : 0;
+            if (ivaN <= 0 || importe === 0) return null;
+            const total = importe * (1 + ivaN / 100);
+            return (
+              <p className="mt-3 text-xs text-vialto-steel text-right">
+                Total con IVA {ivaN}%: <span className="font-medium text-vialto-charcoal tabular-nums">
+                  ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+            );
+          })()}
 
           {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
             <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">

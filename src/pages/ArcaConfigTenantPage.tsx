@@ -108,7 +108,7 @@ export function ArcaConfigTenantPage() {
     void (async () => {
       try {
         const config = await apiJson<ArcaConfig | null>(
-          '/api/liquidaciones-arca/config',
+          '/api/integracion-arca/config',
           () => getToken(),
         );
         if (!cancelled) {
@@ -157,7 +157,7 @@ export function ArcaConfigTenantPage() {
         keyPem: values.keyPem.trim() || undefined,
       };
       const config = await apiJson<ArcaConfig>(
-        '/api/liquidaciones-arca/config',
+        '/api/integracion-arca/config',
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );
