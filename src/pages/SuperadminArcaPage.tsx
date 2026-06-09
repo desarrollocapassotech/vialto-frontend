@@ -1,10 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Receipt } from 'lucide-react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
 import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { EmitirLiquidacionModal } from '@/components/liquidaciones/EmitirLiquidacionModal';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
@@ -87,6 +89,8 @@ type ConfigFormValues = {
   comisionPctDefault: string;
   comisionPctAlt: string;
   ivaGastosAdmin: string;
+  certPem: string;
+  keyPem: string;
 };
 
 const EMPTY_FORM: ConfigFormValues = {
@@ -102,6 +106,8 @@ const EMPTY_FORM: ConfigFormValues = {
   comisionPctDefault: '8',
   comisionPctAlt: '7',
   ivaGastosAdmin: '21',
+  certPem: '',
+  keyPem: '',
 };
 
 function configToForm(c: ArcaConfig): ConfigFormValues {
@@ -118,6 +124,8 @@ function configToForm(c: ArcaConfig): ConfigFormValues {
     comisionPctDefault: String(c.comisionPctDefault),
     comisionPctAlt: String(c.comisionPctAlt),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
+    certPem: '',
+    keyPem: '',
   };
 }
 
@@ -228,6 +236,8 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         comisionPctDefault: Number(values.comisionPctDefault),
         comisionPctAlt: Number(values.comisionPctAlt),
         ivaGastosAdmin: Number(values.ivaGastosAdmin),
+        certPem: values.certPem.trim() || undefined,
+        keyPem: values.keyPem.trim() || undefined,
       };
 
       const config = await apiJson<ArcaConfig>(
@@ -422,6 +432,44 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         />
       </div>
 
+      {/* Certificado y clave privada */}
+      <div className="border-t border-black/10 pt-5 space-y-4">
+        <div>
+          <FieldLabel>Certificado y clave privada</FieldLabel>
+          <p className="text-xs text-vialto-steel mt-1">
+            Archivos PEM generados en AFIP y vinculados al servicio WSFE. Dejá vacío para conservar el valor actual.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="certPem">
+            Certificado digital (.crt / .pem)
+            {existing?.certConfigurado && <span className="ml-2 normal-case text-green-700">● configurado</span>}
+          </FieldLabel>
+          <textarea
+            id="certPem"
+            rows={5}
+            value={values.certPem}
+            onChange={(e) => set('certPem', e.target.value)}
+            placeholder={existing?.certConfigurado ? 'Pegá aquí para reemplazar el certificado actual.' : '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'}
+            className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="keyPem">
+            Clave privada (.key / .pem)
+            {existing?.keyConfigurado && <span className="ml-2 normal-case text-green-700">● configurada</span>}
+          </FieldLabel>
+          <textarea
+            id="keyPem"
+            rows={5}
+            value={values.keyPem}
+            onChange={(e) => set('keyPem', e.target.value)}
+            placeholder={existing?.keyConfigurado ? 'Pegá aquí para reemplazar la clave actual.' : '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'}
+            className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
+          />
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={loading}
@@ -439,20 +487,27 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
 function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const { getToken } = useAuth();
   const [items, setItems] = useState<Liquidacion[] | null>(null);
+  const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [emitting, setEmitting] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingEmitir, setPendingEmitir] = useState<Liquidacion | null>(null);
 
   function load() {
     setLoading(true);
     setError(null);
-    apiJson<Liquidacion[]>(
-      `/api/platform/arca/liquidaciones?tenantId=${encodeURIComponent(tenantId)}`,
-      () => getToken(),
-    )
-      .then(setItems)
+    Promise.all([
+      apiJson<Liquidacion[]>(
+        `/api/platform/arca/liquidaciones?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+      ),
+      apiJson<ArcaConfig | null>(
+        `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+      ).catch(() => null),
+    ])
+      .then(([liq, cfg]) => { setItems(liq); setArcaConfig(cfg); })
       .catch((e) => setError(friendlyError(e, 'arca')))
       .finally(() => setLoading(false));
   }
@@ -461,21 +516,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
     load();
   }, [tenantId]);
 
-  async function emitir(id: string) {
-    setEmitting(id);
-    setActionError(null);
-    try {
-      await apiJson<Liquidacion>(
-        `/api/platform/arca/liquidaciones/${id}/emitir?tenantId=${encodeURIComponent(tenantId)}`,
-        () => getToken(),
-        { method: 'POST' },
-      );
-      load();
-    } catch (e) {
-      setActionError(friendlyError(e, 'arca'));
-    } finally {
-      setEmitting(null);
-    }
+  function onEmitirSuccess(updated: Liquidacion) {
+    setItems((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+    setPendingEmitir(null);
   }
 
   async function descargarPdf(id: string) {
@@ -587,11 +630,10 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
               liq.estado === 'error') && (
               <button
                 type="button"
-                disabled={emitting === liq.id}
-                onClick={() => emitir(liq.id)}
+                onClick={() => setPendingEmitir(liq)}
                 className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
               >
-                {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
+                Emitir
               </button>
             )}
             <button
@@ -640,11 +682,11 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   liq.estado === 'error') && (
                   <button
                     type="button"
-                    disabled={emitting === liq.id}
-                    onClick={() => emitir(liq.id)}
-                    className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
+                    onClick={() => setPendingEmitir(liq)}
+                    className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
                   >
-                    {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
+                    <Receipt className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    Emitir
                   </button>
                 )}
                 <button
@@ -660,6 +702,17 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
           />
         )}
       />
+
+      {pendingEmitir && (
+        <EmitirLiquidacionModal
+          liq={pendingEmitir}
+          getToken={getToken}
+          onSuccess={onEmitirSuccess}
+          onClose={() => setPendingEmitir(null)}
+          emitirUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}/emitir?tenantId=${encodeURIComponent(tenantId)}`}
+          ivaPct={arcaConfig?.ivaGastosAdmin}
+        />
+      )}
     </div>
   );
 }

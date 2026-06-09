@@ -126,10 +126,13 @@ export function AppShell() {
     }
 
     if (canAccessLiquidacionesArca(tenant?.modules ?? [])) {
-      groups.push({
-        title: 'Liquidaciones',
-        items: [{ to: '/liquidaciones', label: 'Liquidaciones CVLP', icon: Calculator }],
-      });
+      const liquidacionesItems: NavItem[] = [
+        { to: '/liquidaciones', label: 'Liquidaciones CVLP', icon: Calculator, end: true },
+      ];
+      if (!superadmin) {
+        liquidacionesItems.push({ to: '/liquidaciones/configuracion', label: 'Configuración ARCA', icon: Landmark });
+      }
+      groups.push({ title: 'Liquidaciones', items: liquidacionesItems });
     }
 
     if (superadmin || canAccessStock(tenant?.modules ?? [])) {

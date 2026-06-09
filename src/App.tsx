@@ -32,6 +32,7 @@ import { SuperadminUserCreatePage } from '@/pages/SuperadminUserCreatePage';
 import { SuperadminUserEditPage } from '@/pages/SuperadminUserEditPage';
 import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
 import { LiquidacionesTenantPage } from '@/pages/LiquidacionesTenantPage';
+import { ArcaConfigTenantPage } from '@/pages/ArcaConfigTenantPage';
 import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
 import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
 import { TaskSetupMFAPage } from '@/pages/TaskSetupMFAPage';
@@ -119,6 +120,7 @@ export default function App() {
 
           {/* rutas accesibles solo para org:admin y superadmin */}
           <Route element={<RequireOrgAdmin />}>
+            <Route path="liquidaciones/configuracion" element={<ArcaConfigTenantPage />} />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
             <Route path="clientes/:id/editar" element={<ClienteEditPage />} />

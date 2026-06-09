@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Banknote, Download, Eye, FileText, PlusCircle, Receipt, Trash2 } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
@@ -7,6 +8,11 @@ import {
   viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
+
+function fmtDate(iso: string) {
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
 
 interface Props {
   viaje: Viaje;
@@ -40,31 +46,32 @@ export function ViajeAccionesMenu({
   const permiteExportar = viaje.estado !== 'cancelado';
 
   const options = useMemo(() => {
-    const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', onClick: onVer }];
+    const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', icon: Eye, onClick: onVer }];
 
     if (viaje.facturaId && onVerFactura) {
-      items.push({ id: 'ver-factura', label: 'Ver factura', onClick: onVerFactura });
+      items.push({ id: 'ver-factura', label: 'Ver factura', icon: FileText, onClick: onVerFactura });
     }
     if (permiteFacturar && onEmitirCvlp) {
-      items.push({ id: 'emitir-cvlp', label: 'Emitir comprobante', onClick: onEmitirCvlp });
+      items.push({ id: 'emitir-cvlp', label: 'Emitir comprobante', icon: Receipt, onClick: onEmitirCvlp });
     } else if (permiteFacturar) {
-      items.push({ id: 'facturar', label: 'Facturar', onClick: onFacturar });
+      items.push({ id: 'facturar', label: 'Facturar', icon: Receipt, onClick: onFacturar });
     }
     if (permiteGasto) {
-      items.push({ id: 'gasto', label: 'Agregar gasto', onClick: onAgregarGasto });
+      items.push({ id: 'gasto', label: 'Agregar gasto', icon: PlusCircle, onClick: onAgregarGasto });
     }
     if (permitePago) {
       items.push({
         id: 'pago',
         label: 'Registrar pago transportista',
+        icon: Banknote,
         onClick: onRegistrarPago,
       });
     }
     if (permiteExportar) {
-      items.push({ id: 'exportar', label: 'Exportar', onClick: onExportar });
+      items.push({ id: 'exportar', label: 'Exportar', icon: Download, onClick: onExportar });
     }
     if (onEliminar) {
-      items.push({ id: 'eliminar', label: 'Eliminar', onClick: onEliminar, danger: true });
+      items.push({ id: 'eliminar', label: 'Eliminar', icon: Trash2, onClick: onEliminar, danger: true });
     }
 
     return items;
@@ -91,7 +98,14 @@ export function ViajeAccionesMenu({
       <AccionesOpcionesSheet
         open={open}
         onClose={() => setOpen(false)}
-        subtitle={`Viaje #${viaje.numero}`}
+        subtitle={[
+          viaje.origen && viaje.destino ? `${viaje.origen} → ${viaje.destino}` : null,
+          viaje.fechaCarga && viaje.fechaDescarga
+            ? `${fmtDate(viaje.fechaCarga)} — ${fmtDate(viaje.fechaDescarga)}`
+            : viaje.fechaCarga
+              ? fmtDate(viaje.fechaCarga)
+              : null,
+        ].filter(Boolean).join(' · ') || `Viaje #${viaje.numero}`}
         options={options}
       />
     </>

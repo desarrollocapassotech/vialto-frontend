@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, type ComponentType, type ReactNode, type SVGProps } from 'react';
 import { createPortal } from 'react-dom';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { modalOverlayClass } from '@/lib/modalLayers';
@@ -6,9 +6,12 @@ import { modalOverlayClass } from '@/lib/modalLayers';
 export type AccionOpcion = {
   id: string;
   label: string;
+  description?: string;
+  icon?: ComponentType<SVGProps<SVGSVGElement> & { strokeWidth?: number }>;
   onClick: () => void;
   danger?: boolean;
   disabled?: boolean;
+  separator?: boolean;
 };
 
 type Props = {
@@ -59,7 +62,12 @@ export function AccionesOpcionesSheet({
               {title}
             </h2>
             {subtitle != null && subtitle !== '' && (
-              <p className="mt-0.5 truncate text-sm text-vialto-steel">{subtitle}</p>
+              <p
+                className="mt-0.5 truncate text-sm text-vialto-steel"
+                title={typeof subtitle === 'string' ? subtitle : undefined}
+              >
+                {subtitle}
+              </p>
             )}
           </div>
           <button
@@ -72,27 +80,48 @@ export function AccionesOpcionesSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              disabled={opt.disabled}
-              onClick={() => {
-                onClose();
-                opt.onClick();
-              }}
-              className={[
-                'flex min-h-11 w-full items-center rounded-md px-3 py-3 text-left font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider transition-colors',
-                'disabled:cursor-not-allowed disabled:opacity-40',
-                opt.danger
-                  ? 'text-red-700 hover:bg-red-50'
-                  : 'text-vialto-charcoal hover:bg-vialto-mist/70',
-              ].join(' ')}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="min-h-0 flex-1 overflow-y-auto py-2">
+          {options.map((opt, i) => {
+            const Icon = opt.icon;
+            const prevDanger = i > 0 && options[i - 1].danger;
+            const showSeparator = opt.separator || (opt.danger && !prevDanger);
+            return (
+              <div key={opt.id}>
+                {showSeparator && <div className="mx-3 my-1.5 border-t border-black/8" />}
+                <button
+                  type="button"
+                  disabled={opt.disabled}
+                  onClick={() => {
+                    onClose();
+                    opt.onClick();
+                  }}
+                  className={[
+                    'flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
+                    opt.danger
+                      ? 'text-red-700 hover:bg-red-50'
+                      : 'text-vialto-charcoal hover:bg-vialto-mist/70',
+                  ].join(' ')}
+                >
+                  {Icon && (
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${opt.danger ? 'bg-red-50' : 'bg-vialto-mist'}`}>
+                      <Icon className="h-4 w-4" strokeWidth={1.75} />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider leading-none">
+                      {opt.label}
+                    </span>
+                    {opt.description && (
+                      <span className="mt-0.5 block text-xs text-vialto-steel leading-snug normal-case tracking-normal font-[family-name:var(--font-body)]">
+                        {opt.description}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         <div className="shrink-0 border-t border-black/10 p-4">

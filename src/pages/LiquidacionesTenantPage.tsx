@@ -1,14 +1,16 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Receipt } from 'lucide-react';
 import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { EmitirLiquidacionModal } from '@/components/liquidaciones/EmitirLiquidacionModal';
 import { apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
 } from '@/lib/listadoTabla';
-import type { Liquidacion, LiquidacionEstado } from '@/types/api';
+import type { ArcaConfig, Liquidacion, LiquidacionEstado } from '@/types/api';
 
 type LiquidacionConTransportista = Liquidacion & {
   transportista?: { id: string; nombre: string; idFiscal: string | null } | null;
@@ -98,8 +100,9 @@ function LiquidacionAcciones({
             type="button"
             disabled={isBusy}
             onClick={onEmitir}
-            className={`${listadoTablaAccionClass} h-7 px-3`}
+            className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 h-7 px-3`}
           >
+            <Receipt className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
             {isBusy ? '…' : 'Emitir'}
           </button>
         )}
@@ -144,20 +147,25 @@ function LiquidacionAcciones({
 export function LiquidacionesTenantPage() {
   const { getToken } = useAuth();
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
+  const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<{ id: string; msg: string } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [pendingEmitir, setPendingEmitir] = useState<LiquidacionConTransportista | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const data = await apiJson<LiquidacionConTransportista[]>(
-          '/api/liquidaciones-arca/liquidaciones',
-          () => getToken(),
-        );
-        if (!cancelled) setRows(data);
+        const [data, cfg] = await Promise.all([
+          apiJson<LiquidacionConTransportista[]>('/api/liquidaciones-arca/liquidaciones', () => getToken()),
+          apiJson<ArcaConfig | null>('/api/liquidaciones-arca/config', () => getToken()).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setRows(data);
+          setConfig(cfg);
+        }
       } catch (err) {
         if (!cancelled) setError(friendlyError(err, 'arca'));
       }
@@ -165,21 +173,9 @@ export function LiquidacionesTenantPage() {
     return () => { cancelled = true; };
   }, [getToken]);
 
-  async function emitirArca(liq: LiquidacionConTransportista) {
-    setActionError(null);
-    setBusyId(liq.id);
-    try {
-      const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`,
-        () => getToken(),
-        { method: 'POST' },
-      );
-      setRows((prev) => prev?.map((r) => (r.id === updated.id ? { ...updated, transportista: r.transportista } : r)) ?? prev);
-    } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, 'arca') });
-    } finally {
-      setBusyId(null);
-    }
+  function onEmitirSuccess(updated: LiquidacionConTransportista) {
+    setRows((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+    setPendingEmitir(null);
   }
 
   async function eliminar(liq: LiquidacionConTransportista) {
@@ -246,7 +242,7 @@ export function LiquidacionesTenantPage() {
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      onEmitir: () => void emitirArca(liq),
+      onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
       onAnular: () => void anular(liq),
       onEliminar: () => void eliminar(liq),
@@ -382,6 +378,16 @@ export function LiquidacionesTenantPage() {
           />
         )}
       />
+
+      {pendingEmitir && (
+        <EmitirLiquidacionModal
+          liq={pendingEmitir}
+          getToken={getToken}
+          onSuccess={onEmitirSuccess}
+          onClose={() => setPendingEmitir(null)}
+          ivaPct={config?.ivaGastosAdmin}
+        />
+      )}
     </div>
   );
 }

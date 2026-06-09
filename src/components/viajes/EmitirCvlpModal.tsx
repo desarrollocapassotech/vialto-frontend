@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { apiFetch, apiJson } from '@/lib/api';
+import { Receipt } from 'lucide-react';
+import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
 
@@ -30,6 +32,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>('tipo');
   const [tipo, setTipo] = useState<TipoComprobante>('cvlp');
   const [periodoDesde, setPeriodoDesde] = useState('');
@@ -38,6 +41,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [liquidacion, setLiquidacion] = useState<Liquidacion | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
@@ -94,7 +98,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       setStep('creada');
       onEmitido(liq);
     } catch (err) {
-      setError(friendlyError(err, 'arca'));
+      if (err instanceof ApiError && err.status === 404 && err.message?.toLowerCase().includes('arca')) {
+        setArcaConfigMissing(true);
+        setError(err.message);
+      } else {
+        setArcaConfigMissing(false);
+        setError(friendlyError(err, 'arca'));
+      }
     } finally {
       setBusyCrear(false);
     }
@@ -353,11 +363,20 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                   {error}
                 </p>
               )}
+              {arcaConfigMissing && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); navigate('/liquidaciones/configuracion'); }}
+                  className="w-full h-9 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
+                >
+                  Ir a configuración de ARCA
+                </button>
+              )}
 
               <div className="flex justify-between pt-1">
                 <button
                   type="button"
-                  onClick={() => { setStep('tipo'); setError(null); }}
+                  onClick={() => { setStep('tipo'); setError(null); setArcaConfigMissing(false); }}
                   className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
                 >
                   ← Volver
@@ -427,8 +446,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                   type="button"
                   disabled={busyArca}
                   onClick={() => void handleEmitirArca()}
-                  className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
                 >
+                  {!busyArca && <Receipt className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />}
                   {busyArca ? 'Enviando a ARCA…' : 'Emitir a ARCA'}
                 </button>
               </div>

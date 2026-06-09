@@ -378,6 +378,8 @@ export interface ArcaConfig {
   comisionPctAlt: number;
   ivaGastosAdmin: number;
   updatedAt: string;
+  certConfigurado: boolean;
+  keyConfigurado: boolean;
 }
 
 export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
