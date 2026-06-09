@@ -210,6 +210,8 @@ export interface Factura {
   estado: 'pendiente' | 'cobrada' | 'vencida';
   diferencia: number | null;
   createdAt: string;
+  ivaPorcentaje?: number | null;
+  ivaTotalConIva?: number | null;
 }
 
 export interface ImportRowError {

@@ -454,3 +454,27 @@ export function textoImporteFacturaListado(
   }
   return '—';
 }
+
+/**
+ * Devuelve los importes numéricos (ARS y USD) de los viajes seleccionados.
+ * Usado para calcular el total con IVA.
+ */
+export function importesNumerosFacturaSeleccion(
+  viajeIds: string[],
+  viajes: Viaje[],
+  tipo: 'cliente' | 'transportista_externo' = 'cliente',
+): { ars: number; usd: number } {
+  let ars = 0;
+  let usd = 0;
+  for (const id of viajeIds) {
+    const v = viajes.find((x) => x.id === id);
+    if (!v) continue;
+    const esTransportista = tipo === 'transportista_externo';
+    const monto = esTransportista ? v.precioTransportistaExterno : v.monto;
+    const moneda = esTransportista ? v.monedaPrecioTransportistaExterno : v.monedaMonto;
+    if (monto == null) continue;
+    if (normalizeViajeMoneda(moneda) === 'USD') usd += monto;
+    else ars += monto;
+  }
+  return { ars, usd };
+}

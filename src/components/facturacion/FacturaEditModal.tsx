@@ -5,7 +5,7 @@ import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
-import { monedaUnicaDeViajes, textoImporteFacturaSeleccion, textoMontoFacturarListado } from '@/lib/viajesFlota';
+import { monedaUnicaDeViajes, textoImporteFacturaSeleccion, textoMontoFacturarListado, importesNumerosFacturaSeleccion } from '@/lib/viajesFlota';
 import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -28,6 +28,7 @@ export type FacturaDraft = {
   viajeIds: string[];
   fechaEmision: string;
   fechaVencimiento: string;
+  ivaPorcentaje: number | '';
 };
 
 function todayIso() {
@@ -48,6 +49,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     viajeIds: [],
     fechaEmision: todayIso(),
     fechaVencimiento: '',
+    ivaPorcentaje: 21,
   };
 }
 
@@ -60,6 +62,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     viajeIds: f.viajeIds,
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
+    ivaPorcentaje: f.ivaPorcentaje ?? 21,
   };
 }
 
@@ -516,6 +519,44 @@ export function FacturaCreateModal({
               </p>
             </div>
 
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                IVA (%)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={draft.ivaPorcentaje}
+                onChange={(e) =>
+                  patch({ ivaPorcentaje: e.target.value === '' ? '' : Number(e.target.value) })
+                }
+                placeholder="21"
+                className="h-9 border border-black/20 bg-white px-3 text-sm"
+              />
+            </div>
+
+            {draft.ivaPorcentaje !== '' && draft.ivaPorcentaje > 0 && (() => {
+              const { ars, usd } = importesNumerosFacturaSeleccion(draft.viajeIds, viajes, draft.tipo);
+              const factor = 1 + (draft.ivaPorcentaje as number) / 100;
+              const parts: string[] = [];
+              if (ars > 0) parts.push(`$ ${(ars * factor).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`);
+              if (usd > 0) parts.push(`US$ ${(usd * factor).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+              if (parts.length === 0) return null;
+              return (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                    Total con IVA
+                  </label>
+                  <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
+                    {parts.join(' · ')}
+                  </p>
+                  <p className="text-[10px] text-vialto-steel">
+                    Importe calculado × (1 + IVA / 100)
+                  </p>
+                </div>
+              );
+            })()}
+
             <div className="col-span-full flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                 Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
@@ -745,6 +786,44 @@ export function FacturaEditModal({
                 Suma de los montos de los viajes (ARS y USD por separado).
               </p>
             </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                IVA (%)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={draft.ivaPorcentaje}
+                onChange={(e) =>
+                  patch({ ivaPorcentaje: e.target.value === '' ? '' : Number(e.target.value) })
+                }
+                placeholder="21"
+                className="h-9 border border-black/20 bg-white px-3 text-sm"
+              />
+            </div>
+
+            {draft.ivaPorcentaje !== '' && draft.ivaPorcentaje > 0 && (() => {
+              const { ars, usd } = importesNumerosFacturaSeleccion(draft.viajeIds, viajes, draft.tipo);
+              const factor = 1 + (draft.ivaPorcentaje as number) / 100;
+              const parts: string[] = [];
+              if (ars > 0) parts.push(`$ ${(ars * factor).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`);
+              if (usd > 0) parts.push(`US$ ${(usd * factor).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+              if (parts.length === 0) return null;
+              return (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                    Total con IVA
+                  </label>
+                  <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
+                    {parts.join(' · ')}
+                  </p>
+                  <p className="text-[10px] text-vialto-steel">
+                    Importe calculado × (1 + IVA / 100)
+                  </p>
+                </div>
+              );
+            })()}
 
             <div className="col-span-full flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">

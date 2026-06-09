@@ -23,18 +23,21 @@ import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
+  importesNumerosFacturaSeleccion,
 } from '@/lib/viajesFlota';
 import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
 
-function facturaPayloadFromDraft(draft: FacturaDraft) {
+function facturaPayloadFromDraft(draft: FacturaDraft, ivaTotalConIva?: number | null) {
   const base = {
     numero: draft.numero.trim(),
     tipo: draft.tipo,
     viajeIds: draft.viajeIds,
     fechaEmision: draft.fechaEmision,
     fechaVencimiento: draft.fechaVencimiento || undefined,
+    ivaPorcentaje: draft.ivaPorcentaje === '' ? null : draft.ivaPorcentaje || null,
+    ivaTotalConIva: ivaTotalConIva ?? null,
   };
   if (draft.tipo === 'transportista_externo') {
     return {
@@ -420,9 +423,12 @@ export function FacturacionTenantPage({
     }
     setSaving(true);
     try {
+      const { ars, usd } = importesNumerosFacturaSeleccion(draft.viajeIds, viajes, draft.tipo);
+      const factor = draft.ivaPorcentaje !== '' && draft.ivaPorcentaje > 0 ? 1 + (draft.ivaPorcentaje as number) / 100 : null;
+      const ivaTotalConIva = factor ? (ars + usd) * factor : null;
       await apiJson<Factura>(facturasCreateUrl(), () => getToken(), {
         method: 'POST',
-        body: JSON.stringify(facturaPayloadFromDraft(draft)),
+        body: JSON.stringify(facturaPayloadFromDraft(draft, ivaTotalConIva)),
       });
       setCreating(false);
       setDraft(emptyFacturaDraft());
@@ -461,12 +467,15 @@ export function FacturacionTenantPage({
     }
     setSavingEditId(editingId);
     try {
+      const { ars, usd } = importesNumerosFacturaSeleccion(editDraft.viajeIds, viajes, editDraft.tipo);
+      const factor = editDraft.ivaPorcentaje !== '' && editDraft.ivaPorcentaje > 0 ? 1 + (editDraft.ivaPorcentaje as number) / 100 : null;
+      const ivaTotalConIva = factor ? (ars + usd) * factor : null;
       const updated = await apiJson<Factura>(
         facturaUrl(editingId),
         () => getToken(),
         {
           method: 'PATCH',
-          body: JSON.stringify(facturaPayloadFromDraft(editDraft)),
+          body: JSON.stringify(facturaPayloadFromDraft(editDraft, ivaTotalConIva)),
         },
       );
       setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
