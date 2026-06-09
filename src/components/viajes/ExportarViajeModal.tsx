@@ -377,14 +377,14 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
               onClick={() =>
                 void ejecutarDescarga(
                   viajePdfUrl('paut'),
-                  `PAUT-${viaje.numero}.pdf`,
+                  `NOMINA-${viaje.numero}.pdf`,
                   setGenerandoPaut,
                 )
               }
               className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-sm font-medium text-vialto-charcoal">
-                {generandoPaut ? 'Generando…' : 'PAUT'}
+                {generandoPaut ? 'Generando…' : 'NOMINA'}
               </span>
               {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
             </button>
