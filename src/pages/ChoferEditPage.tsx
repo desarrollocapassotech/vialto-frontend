@@ -85,7 +85,7 @@ export function ChoferEditPage() {
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) await maestro.refreshChoferes();
-      navigate('/base-de-datos?tab=choferes', { replace: true });
+      navigate(`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
     } finally {
@@ -100,7 +100,7 @@ export function ChoferEditPage() {
     try {
       await apiJson(choferDetailUrl(id, tenantId), () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshChoferes();
-      navigate('/base-de-datos?tab=choferes', { replace: true });
+      navigate(`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
     } finally {
@@ -109,7 +109,7 @@ export function ChoferEditPage() {
   }
 
   return (
-    <CrudPageLayout title="Editar chofer" backTo="/base-de-datos?tab=choferes" backLabel="← Volver a choferes">
+    <CrudPageLayout title="Editar chofer" backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`} backLabel="← Volver a choferes">
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : form ? (
