@@ -53,7 +53,6 @@ export interface Viaje {
       id: string;
       nombre: string;
       activo: boolean;
-      unidadMedida: string | null;
     };
   }>;
   detalleCarga: string | null;
@@ -146,6 +145,15 @@ export interface Transportista {
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;
+  createdAt: string;
+}
+
+export interface Deposito {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
   createdAt: string;
 }
 
@@ -287,27 +295,19 @@ export interface ImportTemplate {
   updatedAt: string;
 }
 
-export interface Presentacion {
-  id: string;
-  tenantId: string;
-  productoId: string;
-  nombre: string;
-  cantidadEquivalente: number;
-  unidadEquivalente: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Producto {
   id: string;
   tenantId: string;
   nombre: string;
+  codigo: string | null;
   descripcion: string | null;
-  unidadMedida: string | null;
+  presentacion1Id: string | null;
+  presentacion2Id: string | null;
+  unidad1Nombre: string;
+  unidad2Nombre: string | null;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
-  presentaciones?: Presentacion[];
 }
 
 export interface PlatformUser {
@@ -320,25 +320,41 @@ export interface PlatformUser {
   createdAt: number | string;
 }
 
+export interface Presentacion {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MovimientoStock {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string };
-  presentacionId: string | null;
-  presentacion?: { id: string; nombre: string } | null;
+  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
   tipo: 'ingreso' | 'egreso' | 'division';
-  cantidad: number;
+  cantidad1: number;
+  cantidad2: number;
   numeroRemito?: string | null;
+  lote?: string | null;
   observaciones: string | null;
   remitoUrl: string | null;
+  /** ID del movimiento par en una división (origen ↔ destino). */
+  movimientoVinculadoId?: string | null;
   createdBy: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
   createdByLabel?: string | null;
   fecha: string;
   createdAt: string;
+  entregadoPor?: string | null;
+  destinatario?: string | null;
+  destinoFinal?: string | null;
 }
 
 export interface StockEgresoRemitoConfig {
@@ -410,11 +426,12 @@ export interface StockItem {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidadMedida: string };
-  presentacionId: string;
-  presentacion?: { id: string; nombre: string };
+  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
   cliente?: { id: string; nombre: string };
-  cantidad: number;
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
+  cantidad1: number;
+  cantidad2: number;
   updatedAt: string;
 }

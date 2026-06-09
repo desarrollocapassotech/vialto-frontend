@@ -21,15 +21,20 @@ export function CrudFieldLabel({
   );
 }
 
-export function CrudInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  const mergedClassName = className ? `${baseClassName} ${className}` : baseClassName;
-  return <input className={mergedClassName} {...props} />;
+export function CrudInput({
+  className,
+  error,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
+  const parts = [baseClassName, error ? 'border-red-400' : '', className].filter(Boolean);
+  return <input className={parts.join(' ')} {...props} />;
 }
 
 export function CrudSelect({
   className,
+  error,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
-  const mergedClassName = className ? `${baseClassName} ${className}` : baseClassName;
-  return <select className={mergedClassName} {...props} />;
+}: SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
+  const parts = [baseClassName, error ? 'border-red-400' : '', className].filter(Boolean);
+  return <select className={parts.join(' ')} {...props} />;
 }

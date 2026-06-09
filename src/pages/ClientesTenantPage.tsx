@@ -2,8 +2,13 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from '@/lib/listadoTabla';
 import type { Cliente, PaginatedMeta } from '@/types/api';
 
 type ClientesPaginatedResponse = {
@@ -49,7 +54,7 @@ export function ClientesTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+      <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
         Clientes
       </h1>
       <p className="mt-2 text-vialto-steel">
@@ -58,7 +63,7 @@ export function ClientesTenantPage() {
       <div className="mt-4 flex justify-end">
         <Link
           to="/clientes/nuevo"
-          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+          className="inline-flex min-h-11 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite md:min-h-0 md:h-10"
         >
           Crear cliente
         </Link>
@@ -68,58 +73,60 @@ export function ClientesTenantPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">ID Fiscal</th>
-              <th className="px-4 py-3">País</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Teléfono</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows === null && !error && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {rows?.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-vialto-steel">
-                  Todavía no tenés clientes cargados.
-                </td>
-              </tr>
-            )}
-            {rows?.map((c) => (
-              <tr key={c.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-medium">{c.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.idFiscal ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.pais ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.email ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setViewingCliente(c)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Ver
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (c) => c.nombre,
+            tdClassName: `${listadoTablaTdClass} font-medium`,
+          },
+          {
+            id: 'idFiscal',
+            header: 'ID Fiscal',
+            cell: (c) => c.idFiscal ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'pais',
+            header: 'País',
+            cell: (c) => c.pais ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'email',
+            header: 'Email',
+            cell: (c) => c.email ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'telefono',
+            header: 'Teléfono',
+            cell: (c) => c.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(c) => c.id}
+        emptyMessage={error ? 'No se pudieron cargar los clientes.' : 'Todavía no tenés clientes cargados.'}
+        loadingMessage="Cargando…"
+        renderActions={(c) => (
+          <button
+            type="button"
+            onClick={() => setViewingCliente(c)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
+      />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm text-vialto-steel">
               Página {meta.page} de {meta.totalPages} · {meta.total} registros
             </p>
@@ -131,7 +138,7 @@ export function ClientesTenantPage() {
                   setPageSize(Number(e.target.value));
                   setPage(1);
                 }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
+                className="h-11 min-h-11 border border-black/20 bg-white px-2 text-xs sm:h-8 sm:min-h-0"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -144,7 +151,7 @@ export function ClientesTenantPage() {
               type="button"
               disabled={!meta.hasPrev}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+              className="inline-flex min-h-11 flex-1 items-center justify-center border border-black/20 px-3 text-xs uppercase tracking-wider disabled:opacity-40 sm:min-h-0 sm:h-9 sm:flex-none"
             >
               Anterior
             </button>
@@ -152,7 +159,7 @@ export function ClientesTenantPage() {
               type="button"
               disabled={!meta.hasNext}
               onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+              className="inline-flex min-h-11 flex-1 items-center justify-center border border-black/20 px-3 text-xs uppercase tracking-wider disabled:opacity-40 sm:min-h-0 sm:h-9 sm:flex-none"
             >
               Siguiente
             </button>

@@ -50,4 +50,10 @@ export type OwnerDashboardResponse = {
     sinCobrar: number;
     cobrados: number;
   };
+  stock?: {
+    totalProductos: number;
+    totalClientes: number;
+    ingresosHoy: number;
+    egresosHoy: number;
+  };
 };

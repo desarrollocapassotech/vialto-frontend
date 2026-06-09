@@ -1,7 +1,13 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { ListadoCard } from '@/components/listado/ListadoCard';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from '@/lib/listadoTabla';
 import type { Liquidacion, LiquidacionEstado } from '@/types/api';
 
 type LiquidacionConTransportista = Liquidacion & {
@@ -33,6 +39,106 @@ function fmtDate(iso: string) {
   const s = iso.slice(0, 10);
   const [y, m, d] = s.split('-');
   return `${d}/${m}/${y}`;
+}
+
+function transportistaNombre(liq: LiquidacionConTransportista) {
+  return liq.transportista?.nombre ?? liq.transportistaId;
+}
+
+function caeCell(liq: LiquidacionConTransportista) {
+  if (liq.cae) {
+    return (
+      <div>
+        <p className="font-mono">{liq.cae}</p>
+        {liq.caeFechaVto && (
+          <p className="text-[11px]">Vto: {fmtDate(liq.caeFechaVto)}</p>
+        )}
+      </div>
+    );
+  }
+  if (liq.arcaError) {
+    return (
+      <p className="text-red-600 text-[11px] max-w-[180px] truncate" title={liq.arcaError}>
+        {liq.arcaError}
+      </p>
+    );
+  }
+  return '—';
+}
+
+function LiquidacionAcciones({
+  liq,
+  isBusy,
+  isDownloading,
+  actionErrorMsg,
+  onEmitir,
+  onPdf,
+  onAnular,
+  onEliminar,
+}: {
+  liq: LiquidacionConTransportista;
+  isBusy: boolean;
+  isDownloading: boolean;
+  actionErrorMsg?: string;
+  onEmitir: () => void;
+  onPdf: () => void;
+  onAnular: () => void;
+  onEliminar: () => void;
+}) {
+  const puedeEmitir = liq.estado === 'borrador' || liq.estado === 'error';
+  const puedeEliminar = liq.estado === 'borrador' || liq.estado === 'error' || liq.estado === 'pendiente_cae';
+  const puedeAnular = liq.estado === 'autorizado';
+  const tienePdf = liq.estado === 'autorizado' || liq.estado === 'anulado';
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {puedeEmitir && (
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={onEmitir}
+            className={`${listadoTablaAccionClass} h-7 px-3`}
+          >
+            {isBusy ? '…' : 'Emitir'}
+          </button>
+        )}
+        {tienePdf && (
+          <button
+            type="button"
+            disabled={isDownloading}
+            onClick={onPdf}
+            className={`${listadoTablaAccionClass} h-7 px-3`}
+          >
+            {isDownloading ? '…' : 'PDF'}
+          </button>
+        )}
+        {puedeAnular && (
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={onAnular}
+            className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
+          >
+            {isBusy ? '…' : 'Anular'}
+          </button>
+        )}
+        {puedeEliminar && (
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={onEliminar}
+            className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
+          >
+            {isBusy ? '…' : 'Eliminar'}
+          </button>
+        )}
+      </div>
+      {actionErrorMsg && (
+        <p className="mt-1 text-right text-xs text-red-700">{actionErrorMsg}</p>
+      )}
+    </div>
+  );
 }
 
 export function LiquidacionesTenantPage() {
@@ -77,7 +183,7 @@ export function LiquidacionesTenantPage() {
   }
 
   async function eliminar(liq: LiquidacionConTransportista) {
-    if (!confirm(`¿Eliminar la liquidación de ${liq.transportista?.nombre ?? liq.transportistaId}? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar la liquidación de ${transportistaNombre(liq)}? Esta acción no se puede deshacer.`)) return;
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -95,7 +201,7 @@ export function LiquidacionesTenantPage() {
   }
 
   async function anular(liq: LiquidacionConTransportista) {
-    if (!confirm(`¿Anular la liquidación de ${liq.transportista?.nombre ?? liq.transportistaId}? Esta acción emite un comprobante negativo en ARCA.`)) return;
+    if (!confirm(`¿Anular la liquidación de ${transportistaNombre(liq)}? Esta acción emite un comprobante negativo en ARCA.`)) return;
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -134,6 +240,19 @@ export function LiquidacionesTenantPage() {
     }
   }
 
+  function accionesProps(liq: LiquidacionConTransportista) {
+    return {
+      liq,
+      isBusy: busyId === liq.id,
+      isDownloading: downloading === liq.id,
+      actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
+      onEmitir: () => void emitirArca(liq),
+      onPdf: () => void descargarPdf(liq),
+      onAnular: () => void anular(liq),
+      onEliminar: () => void eliminar(liq),
+    };
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -151,156 +270,118 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
-      {rows === null && !error && (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
-      )}
-
-      {rows !== null && rows.length === 0 && (
-        <div className="border border-black/10 bg-white px-6 py-10 text-center">
-          <p className="text-sm text-vialto-steel">
-            Todavía no hay liquidaciones. Creá una desde las acciones de un viaje.
-          </p>
-        </div>
-      )}
-
-      {rows !== null && rows.length > 0 && (
-        <div className="overflow-x-auto border border-black/10 bg-white">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-black/10 bg-vialto-mist/60">
-                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-vialto-steel">
-                  Transportista
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-vialto-steel">
-                  Período
-                </th>
-                <th className="px-4 py-3 text-right text-xs uppercase tracking-wider text-vialto-steel">
-                  Viajes
-                </th>
-                <th className="px-4 py-3 text-right text-xs uppercase tracking-wider text-vialto-steel">
-                  Bruto
-                </th>
-                <th className="px-4 py-3 text-right text-xs uppercase tracking-wider text-vialto-steel">
-                  Comisión
-                </th>
-                <th className="px-4 py-3 text-right text-xs uppercase tracking-wider text-vialto-steel">
-                  Líquido
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-vialto-steel">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-vialto-steel">
-                  CAE
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5">
-              {rows.map((liq) => {
-                const isBusy = busyId === liq.id;
-                const isDownloading = downloading === liq.id;
-                const puedeEmitir = liq.estado === 'borrador' || liq.estado === 'error';
-                const puedeEliminar = liq.estado === 'borrador' || liq.estado === 'error' || liq.estado === 'pendiente_cae';
-                const puedeAnular = liq.estado === 'autorizado';
-                const tienePdf = liq.estado === 'autorizado' || liq.estado === 'anulado';
-
-                return (
-                  <tr key={liq.id} className="hover:bg-vialto-mist/30">
-                    <td className="px-4 py-3 text-vialto-charcoal">
-                      <p className="font-medium">{liq.transportista?.nombre ?? liq.transportistaId}</p>
-                      {liq.transportista?.idFiscal && (
-                        <p className="text-xs text-vialto-steel">{liq.transportista.idFiscal}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-vialto-steel whitespace-nowrap">
-                      {fmtDate(liq.periodoDesde)} — {fmtDate(liq.periodoHasta)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-vialto-charcoal">
-                      {liq.cantViajes}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-vialto-charcoal">
-                      {fmtMoney(liq.bruto)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-vialto-steel">
-                      {fmtMoney(liq.comision)}
-                      <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-vialto-charcoal">
-                      {fmtMoney(liq.liquido)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}>
-                        {ESTADO_LABEL[liq.estado]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-vialto-steel">
-                      {liq.cae ? (
-                        <div>
-                          <p className="font-mono">{liq.cae}</p>
-                          {liq.caeFechaVto && (
-                            <p className="text-[11px]">Vto: {fmtDate(liq.caeFechaVto)}</p>
-                          )}
-                        </div>
-                      ) : liq.arcaError ? (
-                        <p className="text-red-600 text-[11px] max-w-[180px] truncate" title={liq.arcaError}>
-                          {liq.arcaError}
-                        </p>
-                      ) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        {puedeEmitir && (
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => void emitirArca(liq)}
-                            className="h-7 px-3 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-40"
-                          >
-                            {isBusy ? '…' : 'Emitir'}
-                          </button>
-                        )}
-                        {tienePdf && (
-                          <button
-                            type="button"
-                            disabled={isDownloading}
-                            onClick={() => void descargarPdf(liq)}
-                            className="h-7 px-3 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-40"
-                          >
-                            {isDownloading ? '…' : 'PDF'}
-                          </button>
-                        )}
-                        {puedeAnular && (
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => void anular(liq)}
-                            className="h-7 px-3 border border-red-200 text-xs uppercase tracking-wider text-red-700 hover:bg-red-50 disabled:opacity-40"
-                          >
-                            {isBusy ? '…' : 'Anular'}
-                          </button>
-                        )}
-                        {puedeEliminar && (
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => void eliminar(liq)}
-                            className="h-7 px-3 border border-red-200 text-xs uppercase tracking-wider text-red-700 hover:bg-red-50 disabled:opacity-40"
-                          >
-                            {isBusy ? '…' : 'Eliminar'}
-                          </button>
-                        )}
-                      </div>
-                      {actionError?.id === liq.id && (
-                        <p className="mt-1 text-right text-xs text-red-700">{actionError.msg}</p>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ListadoDatos
+        columns={[
+          {
+            id: 'transportista',
+            header: 'Transportista',
+            primary: true,
+            cell: (liq) => (
+              <>
+                <p className="font-medium">{transportistaNombre(liq)}</p>
+                {liq.transportista?.idFiscal && (
+                  <p className="text-xs text-vialto-steel">{liq.transportista.idFiscal}</p>
+                )}
+              </>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'periodo',
+            header: 'Período',
+            cell: (liq) => `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+          },
+          {
+            id: 'viajes',
+            header: 'Viajes',
+            cell: (liq) => liq.cantViajes,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: 'bruto',
+            header: 'Bruto',
+            cell: (liq) => fmtMoney(liq.bruto),
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: 'comision',
+            header: 'Comisión',
+            cell: (liq) => (
+              <>
+                {fmtMoney(liq.comision)}
+                <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
+              </>
+            ),
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+          },
+          {
+            id: 'liquido',
+            header: 'Líquido',
+            cell: (liq) => fmtMoney(liq.liquido),
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
+          },
+          {
+            id: 'estado',
+            header: 'Estado',
+            cell: (liq) => (
+              <span className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}>
+                {ESTADO_LABEL[liq.estado]}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'cae',
+            header: 'CAE',
+            cell: (liq) => caeCell(liq),
+            tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(liq) => liq.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar las liquidaciones.'
+            : 'Todavía no hay liquidaciones. Creá una desde las acciones de un viaje.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(liq) => <LiquidacionAcciones {...accionesProps(liq)} />}
+        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        renderMobileCard={(liq) => (
+          <ListadoCard
+            primary={transportistaNombre(liq)}
+            fields={[
+              {
+                label: 'Período',
+                value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+              },
+              { label: 'Viajes', value: liq.cantViajes },
+              { label: 'Bruto', value: fmtMoney(liq.bruto) },
+              {
+                label: 'Comisión',
+                value: (
+                  <>
+                    {fmtMoney(liq.comision)}
+                    <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
+                  </>
+                ),
+              },
+              { label: 'Líquido', value: fmtMoney(liq.liquido) },
+              {
+                label: 'Estado',
+                value: (
+                  <span className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}>
+                    {ESTADO_LABEL[liq.estado]}
+                  </span>
+                ),
+              },
+              { label: 'CAE', value: caeCell(liq) },
+            ]}
+            actions={<LiquidacionAcciones {...accionesProps(liq)} />}
+          />
+        )}
+      />
     </div>
   );
 }

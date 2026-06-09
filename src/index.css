@@ -83,5 +83,10 @@
     font-family: var(--font-body);
     color: var(--color-vialto-charcoal);
     background-color: var(--color-vialto-mist);
+    overflow-x: clip;
+  }
+
+  body {
+    overflow-x: clip;
   }
 }

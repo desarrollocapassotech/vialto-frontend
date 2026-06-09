@@ -1,4 +1,10 @@
 import { useEffect } from 'react';
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalBtnPrimary,
+  viewModalGridClass,
+} from '@/components/ui/ViewModalShell';
 import type { Factura } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -45,70 +51,48 @@ export function FacturaViewModal({
   const importeFormato = `${factura.moneda === 'USD' ? 'USD ' : '$ '}${factura.importe.toLocaleString('es-AR')}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-xl rounded border border-black/10 bg-white shadow-lg"
-      >
-        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-              Factura {factura.numero}
-            </h2>
-            <span
-              className={[
-                'text-xs font-medium border rounded px-2 py-0.5',
-                ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
-              ].join(' ')}
-            >
-              {ESTADO_LABEL[factura.estado] ?? factura.estado}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
+    <ViewModalShell
+      title={
+        <span className="inline-flex items-center gap-3">
+          <span>Factura {factura.numero}</span>
+          <span
+            className={[
+              'text-xs font-medium border rounded px-2 py-0.5',
+              ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
+            ].join(' ')}
           >
-            ×
-          </button>
-        </div>
-
-        <div className="px-6 py-5 grid grid-cols-2 gap-x-8 gap-y-4">
-          {[
-            { label: 'Número', value: factura.numero },
-            { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
-            { label: 'Cliente', value: clienteNombre },
-            { label: 'Importe', value: importeFormato },
-            { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
-            { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
-            { label: 'Diferencia', value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null },
-          ].filter(c => c.value != null && c.value !== '').map((c, i) => (
-            <div key={i}>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-              <p className="mt-1 text-sm">{c.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-black/10 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist"
-          >
+            {ESTADO_LABEL[factura.estado] ?? factura.estado}
+          </span>
+        </span>
+      }
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          <button
-            type="button"
-            onClick={onEditar}
-            className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-          >
+          <button type="button" onClick={onEditar} className={viewModalBtnPrimary}>
             Editar
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className={viewModalGridClass}>
+        {[
+          { label: 'Número', value: factura.numero },
+          { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
+          { label: 'Cliente', value: clienteNombre },
+          { label: 'Importe', value: importeFormato },
+          { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
+          { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
+          { label: 'Diferencia', value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null },
+        ].filter(c => c.value != null && c.value !== '').map((c, i) => (
+          <div key={i}>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
+            <p className="mt-1 text-sm">{c.value}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </ViewModalShell>
   );
 }

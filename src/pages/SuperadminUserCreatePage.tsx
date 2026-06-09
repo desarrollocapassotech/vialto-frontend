@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
@@ -14,6 +15,9 @@ const ROLES = [
   { value: 'member', label: 'Miembro' },
 ] as const;
 
+const labelClass =
+  'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel';
+
 export function SuperadminUserCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -26,28 +30,23 @@ export function SuperadminUserCreatePage() {
   const [role, setRole] = useState<(typeof ROLES)[number]['value']>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit() {
     if (!tenantId) {
       setError('Seleccioná una empresa antes de crear usuarios.');
       return;
     }
-    if (!name.trim()) {
-      setError('Ingresá el nombre del usuario.');
+    const errs: Record<string, string> = {};
+    if (!name.trim()) errs.name = 'Ingresá el nombre del usuario.';
+    if (!email.trim()) errs.email = 'Ingresá un email.';
+    if (!password.trim()) errs.password = 'Ingresá una contraseña.';
+    else if (password.trim().length < 8) errs.password = 'La contraseña debe tener al menos 8 caracteres.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
-    if (!email.trim()) {
-      setError('Ingresá un email.');
-      return;
-    }
-    if (!password.trim()) {
-      setError('Ingresá una contraseña.');
-      return;
-    }
-    if (password.trim().length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -89,30 +88,28 @@ export function SuperadminUserCreatePage() {
           }}
         >
           <label className="grid gap-1.5">
-            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-              Nombre
-            </span>
+            <span className={labelClass}>Nombre <span className="text-red-500">*</span></span>
             <CrudInput
               value={name}
               placeholder="Ej: Juan Perez"
+              error={fieldErrors.name}
               onChange={(e) => setName(e.target.value)}
             />
+            <CrudFieldError message={fieldErrors.name} />
           </label>
           <label className="grid gap-1.5">
-            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-              Email
-            </span>
+            <span className={labelClass}>Email <span className="text-red-500">*</span></span>
             <CrudInput
               type="email"
               value={email}
               placeholder="usuario@empresa.com"
+              error={fieldErrors.email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <CrudFieldError message={fieldErrors.email} />
           </label>
           <label className="grid gap-1.5">
-            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-              Rol
-            </span>
+            <span className={labelClass}>Rol</span>
             <CrudSelect value={role} onChange={(e) => setRole(e.target.value as (typeof ROLES)[number]['value'])}>
               {ROLES.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -122,15 +119,14 @@ export function SuperadminUserCreatePage() {
             </CrudSelect>
           </label>
           <label className="grid gap-1.5">
-            <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-              Contraseña inicial
-            </span>
+            <span className={labelClass}>Contraseña inicial <span className="text-red-500">*</span></span>
             <div className="relative">
               <CrudInput
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 placeholder="Mínimo 8 caracteres"
                 className="w-full pr-24"
+                error={fieldErrors.password}
                 onChange={(e) => setPassword(e.target.value)}
               />
               <button
@@ -141,6 +137,7 @@ export function SuperadminUserCreatePage() {
                 {showPassword ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
+            <CrudFieldError message={fieldErrors.password} />
           </label>
           <CrudFormErrorAlert message={error} />
           <CrudSubmitButton loading={loading} label="Crear usuario" />

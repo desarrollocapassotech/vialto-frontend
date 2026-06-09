@@ -1,23 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { ViajesTenantPage } from '@/pages/ViajesTenantPage';
 
-type ViajesNavState = {
-  tenantId?: string;
-};
-
 export function ViajesSuperadminPage() {
-  const location = useLocation();
   const tenants = useTenantsList();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
-
-  useEffect(() => {
-    const state = location.state as ViajesNavState | null;
-    if (state?.tenantId) setFiltroEmpresa(state.tenantId);
-  }, [location.state]);
-
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
+  
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
@@ -28,7 +17,7 @@ export function ViajesSuperadminPage() {
       </p>
 
       <div className="mt-6">
-        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={setFiltroEmpresa} />
+        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
       </div>
 
       {!filtroEmpresa && (

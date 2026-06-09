@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction, useCallback } from 'react';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
@@ -62,10 +63,27 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
   };
 }
 
-/** Al cambiar el tipo de factura, limpiar contraparte y viajes vinculados. */
+/** Al cambiar el tipo de factura, preserva el viaje actual y actualiza la contraparte según el tipo. Si no hay viaje previo, limpia todo. */
 export function patchFacturaTipo(
   tipo: FacturaDraft['tipo'],
+  viajeActual?: Viaje | null,
 ): Pick<FacturaDraft, 'tipo' | 'clienteId' | 'transportistaId' | 'viajeIds'> {
+  if (tipo === 'transportista_externo' && viajeActual) {
+    return {
+      tipo,
+      clienteId: '',
+      transportistaId: viajeActual.transportistaId ?? '',
+      viajeIds: [viajeActual.id],
+    };
+  }
+  if (tipo === 'cliente' && viajeActual) {
+    return {
+      tipo,
+      clienteId: viajeActual.clienteId ?? '',
+      transportistaId: '',
+      viajeIds: [viajeActual.id],
+    };
+  }
   return { tipo, clienteId: '', transportistaId: '', viajeIds: [] };
 }
 
@@ -423,7 +441,7 @@ export function FacturaCreateModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número *
+                Número <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -436,13 +454,15 @@ export function FacturaCreateModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo *
+                Tipo <span className="text-red-500">*</span>
               </label>
               <select
                 value={draft.tipo}
-                onChange={(e) =>
-                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
-                }
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
+                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
+                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
+                }}
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
                 <option value="cliente">Factura a cliente</option>
@@ -462,7 +482,7 @@ export function FacturaCreateModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de emisión *
+                Fecha de emisión <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -489,7 +509,7 @@ export function FacturaCreateModal({
                 Importe calculado
               </label>
               <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
               </p>
               <p className="text-[10px] text-vialto-steel">
                 Suma de los montos de los viajes (ARS y USD por separado).
@@ -539,9 +559,10 @@ export function FacturaCreateModal({
             type="button"
             onClick={onSave}
             disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
+            {saving ? 'Guardando…' :'Guardar'}
           </button>
         </footer>
       </div>
@@ -650,7 +671,7 @@ export function FacturaEditModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Número *
+                Número <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -663,13 +684,15 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Tipo *
+                Tipo <span className="text-red-500">*</span>
               </label>
               <select
                 value={draft.tipo}
-                onChange={(e) =>
-                  patch(patchFacturaTipo(e.target.value as FacturaDraft['tipo']))
-                }
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value as FacturaDraft['tipo'];
+                  const viajeActual = viajes.find((v) => v.id === draft.viajeIds[0]) ?? null;
+                  patch(patchFacturaTipo(nuevoTipo, viajeActual));
+                }}
                 className="h-9 border border-black/20 bg-white px-3 text-sm"
               >
                 <option value="cliente">Factura a cliente</option>
@@ -689,7 +712,7 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Fecha de emisión *
+                Fecha de emisión <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -716,7 +739,7 @@ export function FacturaEditModal({
                 Importe calculado
               </label>
               <p className="flex min-h-9 flex-wrap items-center gap-x-2 px-1 text-sm font-medium tabular-nums">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
               </p>
               <p className="text-[10px] text-vialto-steel">
                 Suma de los montos de los viajes (ARS y USD por separado).
@@ -766,9 +789,10 @@ export function FacturaEditModal({
             type="button"
             onClick={onSave}
             disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
-            className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
+            {saving ? 'Guardando…' :'Guardar cambios'}
           </button>
         </footer>
       </div>

@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
@@ -39,6 +40,7 @@ export function VehiculoEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
@@ -68,15 +70,14 @@ export function VehiculoEditPage() {
 
   async function onSave() {
     if (!id || !form) return;
-    if (!form.patente.trim()) {
-      setError('Ingresá la patente.');
+    const errs: Record<string, string> = {};
+    if (!form.patente.trim()) errs.patente = 'Ingresá la patente.';
+    if (form.tara.trim() && vehiculoWritePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
-    const taraRaw = form.tara.trim();
-    if (taraRaw && vehiculoWritePayloadFromForm(form).tara == null) {
-      setError('La tara debe ser un número válido.');
-      return;
-    }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -85,7 +86,7 @@ export function VehiculoEditPage() {
         body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate('/vehiculos', { replace: true });
+      navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'vehiculos'));
     } finally {
@@ -104,7 +105,7 @@ export function VehiculoEditPage() {
         method: 'DELETE',
       });
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate('/vehiculos', { replace: true });
+      navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'vehiculos'));
     } finally {
@@ -115,7 +116,7 @@ export function VehiculoEditPage() {
   return (
     <CrudPageLayout
       title="Editar vehículo"
-      backTo="/vehiculos"
+      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
       backLabel="← Volver a vehículos"
     >
       {initialLoading ? (
@@ -130,12 +131,14 @@ export function VehiculoEditPage() {
             }}
           >
             <label className="grid gap-1.5">
-              <span className={LABEL}>Patente</span>
+              <span className={LABEL}>Patente <span className="text-red-500">*</span></span>
               <CrudInput
                 value={form.patente}
                 placeholder="Ej: AA123BB"
+                error={fieldErrors.patente}
                 onChange={(e) => patch({ patente: e.target.value })}
               />
+              <CrudFieldError message={fieldErrors.patente} />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Tipo</span>
@@ -205,8 +208,10 @@ export function VehiculoEditPage() {
                 type="number"
                 placeholder="Ej: 8500"
                 value={form.tara}
+                error={fieldErrors.tara}
                 onChange={(e) => patch({ tara: e.target.value })}
               />
+              <CrudFieldError message={fieldErrors.tara} />
             </label>
             <label className="grid gap-1.5">
               <span className={LABEL}>Precinto</span>

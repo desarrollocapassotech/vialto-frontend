@@ -1,10 +1,20 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
+import { ListadoCard } from '@/components/listado/ListadoCard';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson, apiFetch } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+  listadoTablaThClass,
+} from '@/lib/listadoTabla';
 import type { ArcaConfig, ArcaLog, Liquidacion } from '@/types/api';
 
 // ── Helpers visuales ──────────────────────────────────────────────────────────
@@ -149,18 +159,18 @@ function TextInput({
 
 function ConfigTab({ tenantId }: { tenantId: string }) {
   const { getToken } = useAuth();
+  const { showToast } = useToast();
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<ConfigFormValues>(EMPTY_FORM);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setInitialLoading(true);
     setError(null);
-    setSuccess(false);
     (async () => {
       try {
         const config = await apiJson<ArcaConfig | null>(
@@ -198,12 +208,12 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!values.cuitEmisor.trim()) {
-      setError('El CUIT emisor es obligatorio.');
+      setFieldErrors({ cuitEmisor: 'El CUIT emisor es obligatorio.' });
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
-    setSuccess(false);
     try {
       const body = {
         cuitEmisor: values.cuitEmisor.trim(),
@@ -227,7 +237,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       );
       setExisting(config);
       setValues(configToForm(config));
-      setSuccess(true);
+      showToast('Configuración guardada correctamente.');
     } catch (e) {
       setError(friendlyError(e, 'arca'));
     } finally {
@@ -264,11 +274,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
-      {success && (
-        <div className="rounded border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900">
-          Configuración guardada correctamente.
-        </div>
-      )}
 
       {/* Datos del emisor */}
       <div className="flex flex-col gap-1.5">
@@ -293,13 +298,16 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor</FieldLabel>
-          <TextInput
+          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor <span className="text-red-500">*</span></FieldLabel>
+          <input
             id="cuitEmisor"
+            type="text"
             value={values.cuitEmisor}
-            onChange={(v) => set('cuitEmisor', v)}
+            onChange={(e) => set('cuitEmisor', e.target.value)}
             placeholder="20XXXXXXXXXXX"
+            className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${fieldErrors.cuitEmisor ? 'border-red-400' : 'border-black/10'}`}
           />
+          <CrudFieldError message={fieldErrors.cuitEmisor} />
         </div>
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="condicionIvaEmisor">Condición frente al IVA</FieldLabel>
@@ -417,8 +425,9 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
+        className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
       >
+        {loading && <Spinner />}
         {loading ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar configuración'}
       </button>
     </form>
@@ -506,94 +515,151 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
-      {!items?.length ? (
-        <p className="text-sm text-vialto-steel">No hay liquidaciones para esta empresa.</p>
-      ) : (
-        <div className="overflow-x-auto rounded border border-black/8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-black/8 bg-vialto-mist/70">
-                {['Período', 'Vj.', 'Bruto', 'Comisión', 'Líquido', 'CAE', 'Estado', ''].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className={`px-3 py-2.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel ${h === '' || h === 'Vj.' || h === 'Bruto' || h === 'Comisión' || h === 'Líquido' ? 'text-right' : 'text-left'}`}
-                    >
-                      {h}
-                    </th>
-                  ),
+      <ListadoDatos
+        columns={[
+          {
+            id: 'periodo',
+            header: 'Período',
+            primary: true,
+            cell: (liq) => `${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'viajes',
+            header: 'Vj.',
+            cell: (liq) => liq.cantViajes,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: 'bruto',
+            header: 'Bruto',
+            cell: (liq) => fmt(liq.bruto),
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: 'comision',
+            header: 'Comisión',
+            cell: (liq) => fmt(liq.comision),
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+          },
+          {
+            id: 'liquido',
+            header: 'Líquido',
+            cell: (liq) => fmt(liq.liquido),
+            tdClassName: `${listadoTablaTdClass} text-right font-medium tabular-nums`,
+          },
+          {
+            id: 'cae',
+            header: 'CAE',
+            cell: (liq) => liq.cae ?? '—',
+            tdClassName: `${listadoTablaTdClass} font-mono text-xs text-vialto-steel`,
+          },
+          {
+            id: 'estado',
+            header: 'Estado',
+            cell: (liq) => (
+              <>
+                <span
+                  className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ''}`}
+                >
+                  {ESTADO_LABEL[liq.estado] ?? liq.estado}
+                </span>
+                {liq.arcaError && (
+                  <p
+                    className="mt-0.5 max-w-[180px] truncate text-xs text-red-600"
+                    title={liq.arcaError}
+                  >
+                    {liq.arcaError}
+                  </p>
                 )}
-                <th className="px-3 py-2.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel text-right">
-                  PDF
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((liq) => (
-                <tr key={liq.id} className="border-b border-black/5 hover:bg-vialto-mist/40">
-                  <td className="px-3 py-2.5 text-vialto-charcoal">
-                    {fmtDate(liq.periodoDesde)} – {fmtDate(liq.periodoHasta)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-vialto-charcoal">
-                    {liq.cantViajes}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-vialto-charcoal">
-                    {fmt(liq.bruto)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-vialto-steel">
-                    {fmt(liq.comision)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-medium tabular-nums text-vialto-charcoal">
-                    {fmt(liq.liquido)}
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-vialto-steel">
-                    {liq.cae ?? '—'}
-                  </td>
-                  <td className="px-3 py-2.5">
+              </>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
+        ]}
+        rows={items ?? []}
+        rowKey={(liq) => liq.id}
+        emptyMessage="No hay liquidaciones para esta empresa."
+        renderActions={(liq) => (
+          <>
+            {(liq.estado === 'borrador' ||
+              liq.estado === 'pendiente_cae' ||
+              liq.estado === 'error') && (
+              <button
+                type="button"
+                disabled={emitting === liq.id}
+                onClick={() => emitir(liq.id)}
+                className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
+              >
+                {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={downloading === liq.id}
+              onClick={() => descargarPdf(liq.id)}
+              className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+            >
+              {downloading === liq.id ? '…' : 'PDF'}
+            </button>
+          </>
+        )}
+        actionsHeader="Acciones"
+        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        renderMobileCard={(liq) => (
+          <ListadoCard
+            primary={`${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`}
+            fields={[
+              { label: 'Viajes', value: liq.cantViajes },
+              { label: 'Bruto', value: fmt(liq.bruto) },
+              { label: 'Comisión', value: fmt(liq.comision) },
+              { label: 'Líquido', value: fmt(liq.liquido) },
+              { label: 'CAE', value: liq.cae ?? '—' },
+              {
+                label: 'Estado',
+                value: (
+                  <>
                     <span
                       className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ''}`}
                     >
                       {ESTADO_LABEL[liq.estado] ?? liq.estado}
                     </span>
                     {liq.arcaError && (
-                      <p
-                        className="mt-0.5 max-w-[180px] truncate text-xs text-red-600"
-                        title={liq.arcaError}
-                      >
+                      <p className="mt-0.5 truncate text-xs text-red-600" title={liq.arcaError}>
                         {liq.arcaError}
                       </p>
                     )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {(liq.estado === 'borrador' ||
-                      liq.estado === 'pendiente_cae' ||
-                      liq.estado === 'error') && (
-                      <button
-                        type="button"
-                        disabled={emitting === liq.id}
-                        onClick={() => emitir(liq.id)}
-                        className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-fire hover:text-vialto-bright disabled:opacity-50"
-                      >
-                        {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <button
-                      type="button"
-                      disabled={downloading === liq.id}
-                      onClick={() => descargarPdf(liq.id)}
-                      className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50"
-                    >
-                      {downloading === liq.id ? '…' : 'PDF'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  </>
+                ),
+              },
+            ]}
+            actions={
+              <>
+                {(liq.estado === 'borrador' ||
+                  liq.estado === 'pendiente_cae' ||
+                  liq.estado === 'error') && (
+                  <button
+                    type="button"
+                    disabled={emitting === liq.id}
+                    onClick={() => emitir(liq.id)}
+                    className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
+                  >
+                    {emitting === liq.id ? 'Emitiendo…' : 'Emitir'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={downloading === liq.id}
+                  onClick={() => descargarPdf(liq.id)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                >
+                  {downloading === liq.id ? '…' : 'PDF'}
+                </button>
+              </>
+            }
+          />
+        )}
+      />
     </div>
   );
 }
@@ -620,54 +686,83 @@ function LogsTab({ tenantId }: { tenantId: string }) {
 
   if (loading) return <p className="mt-6 text-sm text-vialto-steel">Cargando logs…</p>;
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
-  if (!logs?.length)
-    return (
-      <p className="mt-6 text-sm text-vialto-steel">
-        No hay logs registrados para esta empresa.
-      </p>
-    );
 
   return (
-    <div className="mt-6 overflow-x-auto rounded border border-black/8">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-black/8 bg-vialto-mist/70">
-            {['Fecha', 'Método', 'Ambiente', 'HTTP', 'ms', 'Resultado'].map((h) => (
-              <th
-                key={h}
-                className={`px-3 py-2.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel ${h === 'HTTP' || h === 'ms' ? 'text-right' : 'text-left'}`}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map((log) => (
-            <tr key={log.id} className="border-b border-black/5 hover:bg-vialto-mist/40">
-              <td className="px-3 py-2 text-xs text-vialto-steel">{fmtTs(log.createdAt)}</td>
-              <td className="px-3 py-2 font-mono text-xs text-vialto-charcoal">{log.method}</td>
-              <td className="px-3 py-2 text-xs text-vialto-steel">{log.ambiente}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-xs text-vialto-steel">
-                {log.httpStatus ?? '—'}
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums text-xs text-vialto-steel">
-                {log.durationMs}
-              </td>
-              <td className="px-3 py-2 text-xs">
-                {log.exitoso ? (
-                  <span className="font-medium text-green-700">OK</span>
-                ) : (
-                  <span className="text-red-600" title={log.error ?? ''}>
-                    {log.error ? 'Error' : 'Fallido'}
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListadoDatos
+      className="mt-6"
+      columns={[
+        {
+          id: 'fecha',
+          header: 'Fecha',
+          primary: true,
+          cell: (log) => fmtTs(log.createdAt),
+          tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
+        },
+        {
+          id: 'method',
+          header: 'Método',
+          cell: (log) => (
+            <span className="font-mono text-xs text-vialto-charcoal">{log.method}</span>
+          ),
+          tdClassName: listadoTablaTdClass,
+        },
+        {
+          id: 'ambiente',
+          header: 'Ambiente',
+          cell: (log) => log.ambiente,
+          tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
+        },
+        {
+          id: 'http',
+          header: 'HTTP',
+          cell: (log) => log.httpStatus ?? '—',
+          thClassName: `${listadoTablaThClass} text-right`,
+          tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-xs text-vialto-steel`,
+        },
+        {
+          id: 'ms',
+          header: 'ms',
+          cell: (log) => log.durationMs,
+          thClassName: `${listadoTablaThClass} text-right`,
+          tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-xs text-vialto-steel`,
+        },
+        {
+          id: 'resultado',
+          header: 'Resultado',
+          cell: (log) =>
+            log.exitoso ? (
+              <span className="font-medium text-green-700">OK</span>
+            ) : (
+              <span className="text-red-600" title={log.error ?? ''}>
+                {log.error ? 'Error' : 'Fallido'}
+              </span>
+            ),
+          tdClassName: listadoTablaTdClass,
+        },
+      ]}
+      rows={logs ?? []}
+      rowKey={(log) => log.id}
+      emptyMessage="No hay logs registrados para esta empresa."
+      renderMobileCard={(log) => (
+        <ListadoCard
+          primary={fmtTs(log.createdAt)}
+          fields={[
+            { label: 'Método', value: <span className="font-mono">{log.method}</span> },
+            { label: 'Ambiente', value: log.ambiente },
+            { label: 'HTTP', value: log.httpStatus ?? '—' },
+            { label: 'ms', value: log.durationMs },
+            {
+              label: 'Resultado',
+              value: log.exitoso ? (
+                <span className="font-medium text-green-700">OK</span>
+              ) : (
+                <span className="text-red-600">{log.error ?? 'Fallido'}</span>
+              ),
+            },
+          ]}
+        />
+      )}
+    />
   );
 }
 
@@ -693,7 +788,7 @@ export function SuperadminArcaPage() {
 
   return (
     <SuperadminOnly>
-      <div className="max-w-5xl">
+      <div className="w-full">
         <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
           ARCA / AFIP
         </h1>

@@ -2,17 +2,20 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Chofer, ConEmpresa } from '@/types/api';
 
 export function ChoferesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
     !filtroEmpresa,
@@ -70,7 +73,7 @@ export function ChoferesSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">
@@ -95,76 +98,61 @@ export function ChoferesSuperadminPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Contacto</th>
-              <th className="px-4 py-3">Pertenencia</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!filtroEmpresa && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Seleccioná una empresa para ver los choferes.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows === null && !error && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  No hay choferes cargados para esta empresa.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa &&
-              rows?.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-black/5 hover:bg-vialto-mist/80"
-                >
-                  <td className="px-4 py-3">{c.nombre}</td>
-                  <td className="px-4 py-3 text-vialto-steel">
-                    {c.telefono ?? c.dni ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-vialto-steel">
-                    {labelAsignacionTransportista(c.transportistaId, nombresTransportistas)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setViewingChoferId(c.id);
-                          setViewingChoferNombre(c.nombre);
-                        }}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Ver
-                      </button>
-                      <Link
-                        to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (c) => c.nombre,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'contacto',
+            header: 'Contacto',
+            cell: (c) => c.telefono ?? c.dni ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'pertenencia',
+            header: 'Pertenencia',
+            cell: (c) => labelAsignacionTransportista(c.transportistaId, nombresTransportistas),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={!filtroEmpresa || error ? [] : rows}
+        rowKey={(c) => c.id}
+        emptyMessage={
+          !filtroEmpresa
+            ? 'Seleccioná una empresa para ver los choferes.'
+            : error
+              ? 'No se pudieron cargar los choferes.'
+              : 'No hay choferes cargados para esta empresa.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(c) => (
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setViewingChoferId(c.id);
+                setViewingChoferNombre(c.nombre);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+            <Link
+              to={`/choferes/${encodeURIComponent(c.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+              className={listadoTablaAccionClass}
+            >
+              Editar
+            </Link>
+          </div>
+        )}
+      />
 
       {viewingChoferId && (
         <ChoferViewModal

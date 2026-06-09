@@ -1,4 +1,6 @@
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { labelModulo } from '@/lib/platformLabels';
+import { Spinner } from '@/components/ui/Spinner';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
 
 export interface TenantFormValues {
@@ -22,6 +24,8 @@ interface TenantFormProps {
   disableOrgId?: boolean;
   showOrgIdInput?: boolean;
   submitAlign?: 'left' | 'right';
+  fieldErrors?: Record<string, string>;
+  formError?: string | null;
 }
 
 export function TenantForm({
@@ -34,6 +38,8 @@ export function TenantForm({
   disableOrgId = false,
   showOrgIdInput = true,
   submitAlign = 'left',
+  fieldErrors = {},
+  formError,
 }: TenantFormProps) {
   const toggleModule = (moduleCode: string) => {
     const exists = values.modules.includes(moduleCode);
@@ -54,27 +60,27 @@ export function TenantForm({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-wider text-vialto-steel">
-            Nombre de empresa *
+            Nombre de empresa <span className="text-red-500">*</span>
           </span>
           <input
             value={values.name}
             onChange={(e) => onChange({ ...values, name: e.target.value })}
-            required
-            className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
+            className={`h-10 w-full border bg-white px-3 text-sm ${fieldErrors.name ? 'border-red-400' : 'border-black/15'}`}
           />
+          <CrudFieldError message={fieldErrors.name} />
         </label>
         {showOrgIdInput && (
           <label className="space-y-1">
             <span className="text-xs uppercase tracking-wider text-vialto-steel">
-              Org ID de Clerk *
+              Org ID de Clerk <span className="text-red-500">*</span>
             </span>
             <input
               value={values.clerkOrgId}
               onChange={(e) => onChange({ ...values, clerkOrgId: e.target.value })}
-              required
               disabled={disableOrgId}
-              className="h-10 w-full border border-black/15 bg-white px-3 text-sm disabled:bg-black/5"
+              className={`h-10 w-full border bg-white px-3 text-sm disabled:bg-black/5 ${fieldErrors.clerkOrgId ? 'border-red-400' : 'border-black/15'}`}
             />
+            <CrudFieldError message={fieldErrors.clerkOrgId} />
           </label>
         )}
       </div>
@@ -175,12 +181,19 @@ export function TenantForm({
         </div>
       )}
 
+      {formError && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {formError}
+        </p>
+      )}
+
       <div className={submitAlign === 'right' ? 'flex justify-end' : ''}>
         <button
           type="submit"
           disabled={loading}
-          className="h-10 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider disabled:opacity-50"
+          className="inline-flex items-center gap-2 h-10 px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider disabled:opacity-50"
         >
+          {loading && <Spinner />}
           {loading ? 'Guardando…' : submitLabel}
         </button>
       </div>

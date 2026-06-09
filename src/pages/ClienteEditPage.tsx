@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
@@ -10,7 +11,6 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { validateClienteForm } from '@/lib/clienteForm';
 import { esPaisSoportado, idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Cliente } from '@/types/api';
@@ -35,6 +35,7 @@ export function ClienteEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -43,9 +44,7 @@ export function ClienteEditPage() {
     (async () => {
       try {
         const path = tenantId
-          ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-              tenantId,
-            )}`
+          ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
           : `/api/clientes/${encodeURIComponent(id)}`;
         const row = await apiJson<Cliente>(path, () => getToken());
         if (!cancelled) {
@@ -77,23 +76,28 @@ export function ClienteEditPage() {
 
   async function onSave() {
     if (!id) return;
-    const validationError = validateClienteForm(nombre, pais, idFiscal);
-    if (validationError) {
-      setError(validationError);
+    const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del cliente.';
+    if (!pais) errs.pais = 'Seleccioná el país del cliente.';
+    if (!idFiscal.trim()) {
+      const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
+      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
+    }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
     const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
     if (errorFiscal) {
-      setError(errorFiscal);
+      setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
       const path = tenantId
-        ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
+        ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
         : `/api/clientes/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), {
         method: 'PATCH',
@@ -109,7 +113,7 @@ export function ClienteEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
-      navigate('/clientes', { replace: true });
+      navigate(`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'clientes'));
     } finally {
@@ -123,15 +127,11 @@ export function ClienteEditPage() {
     setError(null);
     try {
       const path = tenantId
-        ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(
-            tenantId,
-          )}`
+        ? `/api/platform/clientes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId)}`
         : `/api/clientes/${encodeURIComponent(id)}`;
-      await apiJson(path, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(path, () => getToken(), { method: 'DELETE' });
       if (!tenantId) void maestro.refreshClientes();
-      navigate('/clientes', { replace: true });
+      navigate(`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'clientes'));
     } finally {
@@ -142,11 +142,12 @@ export function ClienteEditPage() {
   const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
   const condInfo = condicionTributariaPorPais(pais);
   const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
+  const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
   return (
     <CrudPageLayout
       title="Editar cliente"
-      backTo="/clientes"
+      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
       backLabel="← Volver a clientes"
     >
       {initialLoading ? (
@@ -162,8 +163,10 @@ export function ClienteEditPage() {
               <CrudInput
                 value={nombre}
                 placeholder="Ej: Transportes del Norte SA"
+                error={fieldErrors.nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />
+              <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="grid gap-1.5">
               <CrudFieldLabel required>País</CrudFieldLabel>
@@ -172,17 +175,18 @@ export function ClienteEditPage() {
                 onChange={handlePaisChange}
                 placeholder="Seleccioná un país"
               />
+              <CrudFieldError message={fieldErrors.pais} />
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5">
                 <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
                 <CrudInput
                   value={idFiscal}
                   placeholder={idFiscalPorPais(pais).placeholder}
+                  error={idFiscalError || undefined}
                   onChange={(e) => setIdFiscal(e.target.value)}
-                  className={errorFiscal ? 'border-red-400' : undefined}
                 />
-                {errorFiscal && <p className="text-xs text-red-600">{errorFiscal}</p>}
+                <CrudFieldError message={idFiscalError} />
               </label>
               <label className="grid gap-1.5">
                 <span className={labelClass}>{condInfo.label}</span>

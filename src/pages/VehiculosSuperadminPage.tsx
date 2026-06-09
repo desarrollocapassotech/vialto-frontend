@@ -1,19 +1,22 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTransportistasList } from '@/hooks/useTransportistasList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { labelVehiculoTipo } from '@/lib/labels';
 import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { ConEmpresa, Vehiculo } from '@/types/api';
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const transportistas = useTransportistasList(
     filtroEmpresa || undefined,
     !filtroEmpresa,
@@ -72,7 +75,7 @@ export function VehiculosSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">
@@ -97,79 +100,66 @@ export function VehiculosSuperadminPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Patente</th>
-              <th className="px-4 py-3">Tipo y marca</th>
-              <th className="px-4 py-3">Pertenencia</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!filtroEmpresa && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Seleccioná una empresa para ver los vehículos.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows === null && !error && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-vialto-steel">
-                  No hay vehículos cargados para esta empresa.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa &&
-              rows?.map((v) => (
-                <tr
-                  key={v.id}
-                  className="border-b border-black/5 hover:bg-vialto-mist/80"
-                >
-                  <td className="px-4 py-3 font-[family-name:var(--font-ui)] tracking-wider font-semibold">
-                    {v.patente}
-                  </td>
-                  <td className="px-4 py-3 text-vialto-steel">
-                    {labelVehiculoTipo(v.tipo)}
-                    {v.marca ? ` · ${v.marca}` : ''}
-                  </td>
-                  <td className="px-4 py-3 text-vialto-steel">
-                    {labelAsignacionTransportista(v.transportistaId, nombresTransportistas)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setViewingVehiculoId(v.id);
-                          setViewingVehiculoPatente(v.patente);
-                        }}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Ver
-                      </button>
-                      <Link
-                        to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
-                        className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                      >
-                        Editar
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'patente',
+            header: 'Patente',
+            primary: true,
+            cell: (v) => v.patente,
+            tdClassName: `${listadoTablaTdClass} font-[family-name:var(--font-ui)] tracking-wider font-semibold`,
+          },
+          {
+            id: 'tipoMarca',
+            header: 'Tipo y marca',
+            cell: (v) => (
+              <>
+                {labelVehiculoTipo(v.tipo)}
+                {v.marca ? ` · ${v.marca}` : ''}
+              </>
+            ),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'pertenencia',
+            header: 'Pertenencia',
+            cell: (v) => labelAsignacionTransportista(v.transportistaId, nombresTransportistas),
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={!filtroEmpresa || error ? [] : rows}
+        rowKey={(v) => v.id}
+        emptyMessage={
+          !filtroEmpresa
+            ? 'Seleccioná una empresa para ver los vehículos.'
+            : error
+              ? 'No se pudieron cargar los vehículos.'
+              : 'No hay vehículos cargados para esta empresa.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(v) => (
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setViewingVehiculoId(v.id);
+                setViewingVehiculoPatente(v.patente);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+            <Link
+              to={`/vehiculos/${encodeURIComponent(v.id)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
+              className={listadoTablaAccionClass}
+            >
+              Editar
+            </Link>
+          </div>
+        )}
+      />
 
       {viewingVehiculoId && (
         <VehiculoViewModal

@@ -1,18 +1,20 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
 import { UserViewModal } from '@/components/superadmin/UserViewModal';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { PlatformUser } from '@/types/api';
 
 function formatRole(role: string, platformRole?: string | null) {
   if (platformRole === 'superadmin') return 'Superadmin';
   if (role === 'org:admin') return 'Admin';
-  if (role === 'org:supervisor') return 'Miembro';
   if (role === 'org:member') return 'Miembro';
   return role;
 }
@@ -34,11 +36,10 @@ function formatDate(value: number | string) {
 export function SuperadminUsersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filtroEmpresa = searchParams.get('tenantId')?.trim() ?? '';
   const [rows, setRows] = useState<PlatformUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -70,16 +71,6 @@ export function SuperadminUsersPage() {
       cancelled = true;
     };
   }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
-
-  function onChangeTenant(nextTenantId: string) {
-    const next = new URLSearchParams(searchParams);
-    if (nextTenantId) {
-      next.set('tenantId', nextTenantId);
-    } else {
-      next.delete('tenantId');
-    }
-    setSearchParams(next, { replace: true });
-  }
 
   const count = useMemo(() => rows?.length ?? 0, [rows]);
 
@@ -129,68 +120,59 @@ export function SuperadminUsersPage() {
           </p>
         )}
 
-        <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-          <table className="w-full text-left text-base">
-            <thead>
-              <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Rol</th>
-                <th className="px-4 py-3">Alta</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!filtroEmpresa && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                    Seleccioná una empresa para ver sus usuarios.
-                  </td>
-                </tr>
-              )}
-              {filtroEmpresa && rows === null && !error && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                    No hay usuarios en esta empresa.
-                  </td>
-                </tr>
-              )}
-              {filtroEmpresa &&
-                rows?.map((u, idx) => (
-                  <tr key={`${u.userId ?? u.email ?? `row-${idx}`}`} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                    <td className="px-4 py-3">
-                      {[u.firstName, u.lastName].filter(Boolean).join(' ') || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-vialto-steel">{u.email ?? '—'}</td>
-                    <td className="px-4 py-3">{formatRole(u.role, u.platformRole)}</td>
-                    <td className="px-4 py-3 text-vialto-steel">
-                      {formatDate(u.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {u.userId ? (
-                        <button
-                          type="button"
-                          onClick={() => setViewingUser(u)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                        >
-                          Ver
-                        </button>
-                      ) : (
-                        <span className="text-xs text-vialto-steel">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+        <ListadoDatos
+          className="mt-8"
+          columns={[
+            {
+              id: 'nombre',
+              header: 'Nombre',
+              primary: true,
+              cell: (u) => [u.firstName, u.lastName].filter(Boolean).join(' ') || '—',
+              tdClassName: listadoTablaTdClass,
+            },
+            {
+              id: 'email',
+              header: 'Email',
+              cell: (u) => u.email ?? '—',
+              tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+            },
+            {
+              id: 'rol',
+              header: 'Rol',
+              cell: (u) => formatRole(u.role, u.platformRole),
+              tdClassName: listadoTablaTdClass,
+            },
+            {
+              id: 'alta',
+              header: 'Alta',
+              cell: (u) => formatDate(u.createdAt),
+              tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+            },
+          ]}
+          rows={!filtroEmpresa || error ? [] : rows}
+          rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
+          emptyMessage={
+            !filtroEmpresa
+              ? 'Seleccioná una empresa para ver sus usuarios.'
+              : error
+                ? 'No se pudieron cargar los usuarios.'
+                : 'No hay usuarios en esta empresa.'
+          }
+          loadingMessage="Cargando…"
+          renderActions={(u) =>
+            u.userId ? (
+              <button
+                type="button"
+                onClick={() => setViewingUser(u)}
+                className={listadoTablaAccionClass}
+              >
+                Ver
+              </button>
+            ) : (
+              <span className="text-xs text-vialto-steel">—</span>
+            )
+          }
+        />
       </div>
       {viewingUser && (
         <UserViewModal

@@ -15,7 +15,7 @@ export function puedeGestionarComoAdminEmpresa(
   publicMetadata: { vialtoRole?: unknown } | null | undefined,
 ): boolean {
   if (isPlatformSuperadmin(publicMetadata)) return true;
-  return orgRole === 'org:admin' || orgRole === 'org:supervisor';
+  return orgRole === 'org:admin';
 }
 
 type RoleSource = {
@@ -48,10 +48,8 @@ export function userRoleDisplay({
   switch (orgRole) {
     case 'org:admin':
       return 'Administrador';
-    case 'org:supervisor':
-      return 'Operador';
     case 'org:member':
-      return 'Operador';
+      return 'Miembro';
     default: {
       const raw = orgRole.replace(/^org:/, '').replace(/_/g, ' ');
       return raw

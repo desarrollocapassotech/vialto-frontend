@@ -2,17 +2,20 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Cliente, ConEmpresa } from '@/types/api';
 
 export function ClientesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Cliente>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
 
@@ -60,7 +63,7 @@ export function ClientesSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={setFiltroEmpresa}
+          onChange={onChangeTenant}
         />
       </div>
       <div className="mt-4 flex justify-end">
@@ -85,61 +88,44 @@ export function ClientesSuperadminPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">ID Fiscal</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!filtroEmpresa && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  Seleccioná una empresa para ver los clientes.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows === null && !error && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  No hay clientes cargados para esta empresa.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa &&
-              rows?.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-black/5 hover:bg-vialto-mist/80"
-                >
-                  <td className="px-4 py-3">{c.nombre}</td>
-                  <td className="px-4 py-3 text-vialto-steel">
-                    {c.idFiscal ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setViewingCliente(c)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (c) => c.nombre,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'idFiscal',
+            header: 'ID Fiscal',
+            cell: (c) => c.idFiscal ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={!filtroEmpresa || error ? [] : rows}
+        rowKey={(c) => c.id}
+        emptyMessage={
+          !filtroEmpresa
+            ? 'Seleccioná una empresa para ver los clientes.'
+            : error
+              ? 'No se pudieron cargar los clientes.'
+              : 'No hay clientes cargados para esta empresa.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(c) => (
+          <button
+            type="button"
+            onClick={() => setViewingCliente(c)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
+      />
 
       {viewingCliente && (
         <ClienteViewModal

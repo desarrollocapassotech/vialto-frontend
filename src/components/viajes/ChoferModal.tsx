@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
+import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import { choferWritePayloadFromForm, validarDniForm, type ChoferFormState } from '@/lib/choferForm';
 import type { Chofer } from '@/types/api';
@@ -21,6 +23,7 @@ export function ChoferModal({
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
   const [form, setForm] = useState<ChoferFormState>({ nombre: '', dni: '', cuit: '', telefono: '' });
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   function patch(p: Partial<ChoferFormState>) {
@@ -28,9 +31,15 @@ export function ChoferModal({
   }
 
   async function submit() {
-    if (!form.nombre.trim()) { setError('Ingresá el nombre del chofer.'); return; }
+    const errs: Record<string, string> = {};
+    if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre del chofer.';
     const dniError = validarDniForm(form.dni);
-    if (dniError) { setError(dniError); return; }
+    if (dniError) errs.dni = dniError;
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
     try {
@@ -52,7 +61,7 @@ export function ChoferModal({
   }
 
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';
-  const I = 'h-9 w-full border border-black/15 px-2 text-sm';
+  const I = 'h-9 w-full border px-2 text-sm';
 
   return (
     <div className={modalQuickCreateOverlayClass(stacked)}>
@@ -73,14 +82,15 @@ export function ChoferModal({
         </div>
         <div className="px-5 py-4 grid gap-3">
           <label className="flex flex-col gap-1">
-            <span className={L}>Nombre *</span>
+            <span className={L}>Nombre <span className="text-red-500">*</span></span>
             <input
               autoFocus
               value={form.nombre}
               onChange={(e) => patch({ nombre: e.target.value })}
               placeholder="Ej: Juan Pérez"
-              className={I}
+              className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
             />
+            <CrudFieldError message={fieldErrors.nombre} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={L}>DNI</span>
@@ -88,8 +98,9 @@ export function ChoferModal({
               value={form.dni}
               onChange={(e) => patch({ dni: e.target.value })}
               placeholder="Ej: 30123456"
-              className={I}
+              className={`${I} ${fieldErrors.dni ? 'border-red-400' : 'border-black/15'}`}
             />
+            <CrudFieldError message={fieldErrors.dni} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={L}>CUIT</span>
@@ -97,7 +108,7 @@ export function ChoferModal({
               value={form.cuit}
               onChange={(e) => patch({ cuit: e.target.value })}
               placeholder="Ej: 20-30123456-7"
-              className={I}
+              className={`${I} border-black/15`}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -106,7 +117,7 @@ export function ChoferModal({
               value={form.telefono}
               onChange={(e) => patch({ telefono: e.target.value })}
               placeholder="Ej: +54 9 11 1234-5678"
-              className={I}
+              className={`${I} border-black/15`}
             />
           </label>
         </div>
@@ -128,8 +139,9 @@ export function ChoferModal({
             type="button"
             disabled={saving}
             onClick={() => void submit()}
-            className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+            className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>

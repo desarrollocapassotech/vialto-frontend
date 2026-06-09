@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import type { Viaje, Chofer, Vehiculo } from '@/types/api';
 import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
 import { viajeUsaFlotaPropia } from '@/lib/viajesGananciaBruta';
@@ -455,8 +456,9 @@ export function ExportarViajeModal({ viaje, onClose, tenantId }: Props) {
                       type="button"
                       onClick={() => void guardarYReintentar()}
                       disabled={ocupado}
-                      className="border border-red-400 bg-red-100 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-2 border border-red-400 bg-red-100 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                      {guardando && <Spinner className="h-3.5 w-3.5 text-red-800" />}
                       {guardando ? 'Guardando…' : 'Guardar y reintentar'}
                     </button>
                   </div>

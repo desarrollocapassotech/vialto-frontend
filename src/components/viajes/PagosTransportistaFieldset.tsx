@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   parseCurrencyForMoneda,
+  preserveAmountOnMonedaChange,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -121,7 +122,10 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
               value={row.moneda}
               onChange={(e) => {
                 const m = e.target.value as ViajeMonedaCodigo;
-                update(i, { moneda: m, montoStr: '' });
+                update(i, {
+                  moneda: m,
+                  montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
+                });
               }}
               className={`${smallInputClass} w-20`}
               aria-label={`Moneda pago ${i + 1}`}

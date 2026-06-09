@@ -11,7 +11,8 @@ export type FriendlyErrorContext =
   | 'facturacion'
   | 'stock'
   | 'plataforma'
-  | 'arca';
+  | 'arca'
+  | 'usuarios';
 
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: 'No pudimos cargar el tablero. Probá de nuevo en un momento.',
@@ -31,6 +32,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
     'No pudimos cargar el panorama de empresas. Probá de nuevo en un momento.',
   arca:
     'No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo.',
+  usuarios:
+    'No pudimos cargar los usuarios. Probá de nuevo en un momento.',
 };
 
 /**
@@ -63,6 +66,11 @@ export function friendlyError(
     if (err.status === 422) {
       // Errores de ARCA/AFIP SDK — el backend incluye el mensaje real
       if (err.message && err.message !== 'Unprocessable Entity') return err.message;
+    }
+    if (err.status === 502 || err.status === 503) {
+      if (err.message && err.message !== 'Bad Gateway' && err.message !== 'Service Unavailable') {
+        return err.message;
+      }
     }
     if (err.status >= 500) {
       return 'Tuvimos un problema del nuestro. Intentá de nuevo más tarde.';

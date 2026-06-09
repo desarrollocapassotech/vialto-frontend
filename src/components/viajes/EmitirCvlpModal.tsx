@@ -252,7 +252,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                   Período
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="periodoDesde" className="block text-xs text-vialto-steel mb-1">
                       Desde

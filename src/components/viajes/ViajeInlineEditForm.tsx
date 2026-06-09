@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import {
   ViajeOperacionTipoFieldset,
@@ -12,7 +12,10 @@ import {
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
-import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import {
+  preserveAmountOnMonedaChange,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import {
   choferesFlotaPropia,
   mensajesAyudaFlotaPropia,
@@ -92,7 +95,6 @@ export function ViajeInlineEditForm({
           : {
               transportistaId: '',
               choferExternoId: '',
-              vehiculoExternoId: '',
               choferId: normalizarIdEnLista(p.choferId, choferesPropios),
               vehiculosRows:
                 p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -133,7 +135,12 @@ export function ViajeInlineEditForm({
                 />
                 <MonedaSelect
                   value={draft.monedaMonto}
-                  onChange={(m: ViajeMonedaCodigo) => set({ monedaMonto: m })}
+                  onChange={(m: ViajeMonedaCodigo) =>
+                    set({
+                      monedaMonto: m,
+                      monto: preserveAmountOnMonedaChange(draft.monto, draft.monedaMonto, m),
+                    })
+                  }
                   aria-label="Moneda monto a facturar"
                 />
               </div>
@@ -173,16 +180,23 @@ export function ViajeInlineEditForm({
                       <MonedaSelect
                         value={draft.monedaPrecioTransportistaExterno}
                         onChange={(m: ViajeMonedaCodigo) =>
-                          set({ monedaPrecioTransportistaExterno: m })
+                          set({
+                            monedaPrecioTransportistaExterno: m,
+                            precioTransportistaExterno: preserveAmountOnMonedaChange(
+                              draft.precioTransportistaExterno,
+                              draft.monedaPrecioTransportistaExterno,
+                              m,
+                            ),
+                          })
                         }
                         aria-label="Moneda precio transportista externo"
                       />
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Chofer (opcional)</span>
+                <div className="grid gap-3">
+                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                    <span className={LABEL}>Chofer</span>
                     <ChoferSearchSelect
                       choferes={choferes}
                       value={draft.choferExternoId}
@@ -191,23 +205,20 @@ export function ViajeInlineEditForm({
                       aria-label="Chofer transportista externo"
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Vehículo (opcional)</span>
-                    <VehiculoPatenteSearchSelect
-                      vehiculos={vehiculos}
-                      value={draft.vehiculoExternoId}
-                      onChange={(id) => set({ vehiculoExternoId: id })}
-                      sinOpciones={vehiculos.length === 0}
-                      inputClassName={INPUT}
-                      aria-label="Vehículo transportista externo"
-                    />
-                  </div>
+                  <ViajeVehiculosLista
+                    groupId={`viaje-sa-ext-${draft.numero || 'e'}`}
+                    crearVehiculoHref={crearVehiculoHref ?? '/vehiculos/nuevo'}
+                    rows={draft.vehiculosRows}
+                    onChange={(rows) => set({ vehiculosRows: rows })}
+                    vehiculos={vehiculos}
+                    alMenosUno={false}
+                  />
                 </div>
               </div>
             }
             propioContent={
               <div className="grid gap-3">
-                <div className="flex min-w-0 max-w-md flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 max-w-md">
                   <span className={LABEL}>Chofer (flota propia)</span>
                   <ChoferSearchSelect
                     choferes={choferesPropios}
@@ -289,7 +300,7 @@ export function ViajeInlineEditForm({
           </div>
 
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Detalle adicional (opcional)</span>
+            <span className={LABEL}>Detalle adicional</span>
             <textarea
               value={draft.detalleCarga}
               onChange={(e) => set({ detalleCarga: e.target.value })}
@@ -322,8 +333,9 @@ export function ViajeInlineEditForm({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="text-xs uppercase tracking-wider px-3 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </button>
           <button
