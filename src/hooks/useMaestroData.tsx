@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
-import type { Cliente, Chofer, Transportista, Vehiculo } from '@/types/api';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
+import type { Cliente, Chofer, Transportista, Vehiculo, Tenant } from '@/types/api';
 
 type MaestroDataContextValue = {
   clientes: Cliente[];
@@ -9,6 +10,8 @@ type MaestroDataContextValue = {
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
   loading: boolean;
+  tenant: Tenant | null;
+  tenantLoading: boolean;
   refreshClientes: () => Promise<Cliente[]>;
   refreshChoferes: () => Promise<Chofer[]>;
   refreshTransportistas: () => Promise<Transportista[]>;
@@ -23,6 +26,8 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
   const orgId = organization?.id;
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+
+  const { tenant, loading: tenantLoading } = useCurrentTenant();
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [choferes, setChoferes] = useState<Chofer[]>([]);
@@ -100,7 +105,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
 
   return (
     <MaestroDataContext.Provider
-      value={{ clientes, choferes, transportistas, vehiculos, loading, refreshClientes, refreshChoferes, refreshTransportistas, refreshVehiculos }}
+      value={{ clientes, choferes, transportistas, vehiculos, loading, tenant, tenantLoading, refreshClientes, refreshChoferes, refreshTransportistas, refreshVehiculos }}
     >
       {children}
     </MaestroDataContext.Provider>

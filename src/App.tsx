@@ -1,6 +1,7 @@
 import { AuthenticateWithRedirectCallback, useAuth } from '@clerk/clerk-react';
 import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
+import { MaestroDataProvider } from '@/hooks/useMaestroData';
 import { HomePage } from '@/pages/HomePage';
 import { ViajesPage } from '@/pages/ViajesPage';
 import { BaseDeDatosPage } from '@/pages/BaseDeDatosPage';
@@ -100,7 +101,7 @@ export default function App() {
       <Route path="/tasks/choose-organization" element={<TaskChooseOrganizationPage />} />
 
       <Route element={<RequireAuth />}>
-        <Route path="/" element={<AppShell />}>
+        <Route path="/" element={<MaestroDataProvider><AppShell /></MaestroDataProvider>}>
           <Route index element={<HomePage />} />
           <Route path="viajes" element={<ViajesPage />} />
           <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
