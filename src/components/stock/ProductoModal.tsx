@@ -5,6 +5,8 @@ import { ApiError, apiJson } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import { modalOverlayClass } from '@/lib/modalLayers';
+import { useMaestroData } from '@/hooks/useMaestroData';
+import { canAccessStock } from '@/lib/tenantModules';
 import type { Presentacion, Producto } from '@/types/api';
 
 const SELECT_CLASS = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
@@ -33,6 +35,12 @@ export function ProductoModal({
     ? `/api/platform/stock/presentaciones?tenantId=${encodeURIComponent(tenantId)}&activo=1`
     : '/api/stock/presentaciones?activo=1';
 
+  // Cuando tenantId está presente es contexto superadmin → siempre mostrar.
+  // En contexto tenant, ocultar si el módulo stock no está contratado.
+  // tenantLoading=true → false (ocultar) para evitar flicker.
+  const { tenant, tenantLoading } = useMaestroData();
+  const showCantidades = tenantId ? true : tenantLoading ? false : canAccessStock(tenant?.modules ?? []);
+
   const [nombre, setNombre] = useState(productoInicial?.nombre ?? '');
   const [descripcion, setDescripcion] = useState(productoInicial?.descripcion ?? '');
   const [presentacion1Id, setPresentacion1Id] = useState(productoInicial?.presentacion1Id ?? '');
@@ -59,31 +67,34 @@ export function ProductoModal({
   }, [presentacionesUrl, getToken]);
 
   useEffect(() => {
+    if (!showCantidades) return;
     void loadPresentaciones();
-  }, [loadPresentaciones]);
+  }, [loadPresentaciones, showCantidades]);
 
   async function submit() {
     if (!nombre.trim()) {
       setError('El nombre es obligatorio.');
       return;
     }
-    if (!presentacion1Id) {
+    if (showCantidades && !presentacion1Id) {
       setError('Seleccioná una presentación para cantidad 1.');
       return;
     }
-    if (tieneUnidad2 && !presentacion2Id) {
+    if (showCantidades && tieneUnidad2 && !presentacion2Id) {
       setError('Seleccioná una presentación para cantidad 2.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
-        presentacion1Id,
-        presentacion2Id: tieneUnidad2 ? presentacion2Id : null,
       };
+      if (showCantidades) {
+        body.presentacion1Id = presentacion1Id;
+        body.presentacion2Id = tieneUnidad2 ? presentacion2Id : null;
+      }
       let result: Producto;
       if (modo === 'create') {
         result = await apiJson<Producto>(`${baseUrl}${qs}`, () => getToken(), {
@@ -162,14 +173,18 @@ export function ProductoModal({
                     <p className="mt-1 text-sm">{productoInicial.descripcion}</p>
                   </div>
                 )}
-                <div>
-                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Cantidad 1</p>
-                  <p className="mt-1 text-sm">{productoInicial?.unidad1Nombre ?? '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Cantidad 2</p>
-                  <p className="mt-1 text-sm">{productoInicial?.unidad2Nombre ?? '—'}</p>
-                </div>
+                {showCantidades && (
+                  <>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Cantidad 1</p>
+                      <p className="mt-1 text-sm">{productoInicial?.unidad1Nombre ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Cantidad 2</p>
+                      <p className="mt-1 text-sm">{productoInicial?.unidad2Nombre ?? '—'}</p>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -192,65 +207,69 @@ export function ProductoModal({
                     className="border border-black/15 px-2 py-2 text-sm"
                   />
                 </label>
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm uppercase tracking-[0.08em] text-vialto-steel">
-                    Presentación cantidad 1 <span className="text-red-500">*</span>
-                  </span>
-                  <SearchableEntitySelect<Presentacion>
-                    items={presentaciones}
-                    value={presentacion1Id}
-                    onChange={handlePresentacion1Change}
-                    loading={presentacionesLoading}
-                    filterItems={(items, q) => {
-                      const lq = q.toLowerCase();
-                      return items.filter((p) => p.nombre.toLowerCase().includes(lq));
-                    }}
-                    getPrimaryLabel={(p) => p.nombre}
-                    placeholderCerrado="Elegí una presentación…"
-                    placeholderBuscar="Buscar presentación…"
-                    inputClassName={SELECT_CLASS}
-                    onNuevo={() => setModalPresentacion('cant1')}
-                    onNuevoLabel="+ Nueva presentación"
-                    aria-label="Presentación para cantidad 1"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="flex items-center gap-2 text-sm uppercase tracking-[0.08em] text-vialto-steel cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tieneUnidad2}
-                      onChange={(e) => {
-                        setTieneUnidad2(e.target.checked);
-                        if (!e.target.checked) setPresentacion2Id('');
-                      }}
-                      className="h-4 w-4"
-                    />
-                    Usar segunda cantidad
-                  </label>
-                  {tieneUnidad2 && (
-                    <SearchableEntitySelect<Presentacion>
-                      items={presentacionesCant2}
-                      value={presentacion2Id}
-                      onChange={setPresentacion2Id}
-                      loading={presentacionesLoading}
-                      filterItems={(items, q) => {
-                        const lq = q.toLowerCase();
-                        return items.filter((p) => p.nombre.toLowerCase().includes(lq));
-                      }}
-                      getPrimaryLabel={(p) => p.nombre}
-                      placeholderCerrado="Elegí una presentación…"
-                      placeholderBuscar="Buscar presentación…"
-                      inputClassName={SELECT_CLASS}
-                      onNuevo={() => setModalPresentacion('cant2')}
-                      onNuevoLabel="+ Nueva presentación"
-                      aria-label="Presentación para cantidad 2"
-                    />
-                  )}
-                </div>
-                {presentaciones.length === 0 && !presentacionesLoading && (
-                  <p className="text-xs text-vialto-steel">
-                    No hay presentaciones activas. Creá una desde acá o en Base de datos → Presentaciones.
-                  </p>
+                {showCantidades && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm uppercase tracking-[0.08em] text-vialto-steel">
+                        Presentación cantidad 1 <span className="text-red-500">*</span>
+                      </span>
+                      <SearchableEntitySelect<Presentacion>
+                        items={presentaciones}
+                        value={presentacion1Id}
+                        onChange={handlePresentacion1Change}
+                        loading={presentacionesLoading}
+                        filterItems={(items, q) => {
+                          const lq = q.toLowerCase();
+                          return items.filter((p) => p.nombre.toLowerCase().includes(lq));
+                        }}
+                        getPrimaryLabel={(p) => p.nombre}
+                        placeholderCerrado="Elegí una presentación…"
+                        placeholderBuscar="Buscar presentación…"
+                        inputClassName={SELECT_CLASS}
+                        onNuevo={() => setModalPresentacion('cant1')}
+                        onNuevoLabel="+ Nueva presentación"
+                        aria-label="Presentación para cantidad 1"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="flex items-center gap-2 text-sm uppercase tracking-[0.08em] text-vialto-steel cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={tieneUnidad2}
+                          onChange={(e) => {
+                            setTieneUnidad2(e.target.checked);
+                            if (!e.target.checked) setPresentacion2Id('');
+                          }}
+                          className="h-4 w-4"
+                        />
+                        Usar segunda cantidad
+                      </label>
+                      {tieneUnidad2 && (
+                        <SearchableEntitySelect<Presentacion>
+                          items={presentacionesCant2}
+                          value={presentacion2Id}
+                          onChange={setPresentacion2Id}
+                          loading={presentacionesLoading}
+                          filterItems={(items, q) => {
+                            const lq = q.toLowerCase();
+                            return items.filter((p) => p.nombre.toLowerCase().includes(lq));
+                          }}
+                          getPrimaryLabel={(p) => p.nombre}
+                          placeholderCerrado="Elegí una presentación…"
+                          placeholderBuscar="Buscar presentación…"
+                          inputClassName={SELECT_CLASS}
+                          onNuevo={() => setModalPresentacion('cant2')}
+                          onNuevoLabel="+ Nueva presentación"
+                          aria-label="Presentación para cantidad 2"
+                        />
+                      )}
+                    </div>
+                    {presentaciones.length === 0 && !presentacionesLoading && (
+                      <p className="text-xs text-vialto-steel">
+                        No hay presentaciones activas. Creá una desde acá o en Base de datos → Presentaciones.
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             )}

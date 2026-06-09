@@ -28,8 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from './Logo';
-import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { MaestroDataProvider } from '@/hooks/useMaestroData';
+import { useMaestroData } from '@/hooks/useMaestroData';
 import { canAccessFacturacion, canAccessLiquidacionesArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
@@ -53,7 +52,7 @@ export function AppShell() {
   const { orgRole } = useAuth();
   const { signOut } = useClerk();
   const { user, isLoaded: userLoaded } = useUser();
-  const { tenant, loading: tenantLoading } = useCurrentTenant();
+  const { tenant, tenantLoading } = useMaestroData();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -421,9 +420,7 @@ export function AppShell() {
         </header>
 
         <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
-          <MaestroDataProvider>
-            <Outlet />
-          </MaestroDataProvider>
+          <Outlet />
         </main>
       </div>
     </div>
