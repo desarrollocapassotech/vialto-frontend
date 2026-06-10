@@ -39,7 +39,15 @@ export interface Viaje {
     vehiculo: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>;
   }>;
   origen: string | null;
+  /** Denormalizado: último destino de la ruta (legacy / compat). */
   destino: string | null;
+  /** Destinos ordenados del viaje (orden = secuencia de la ruta). */
+  destinosViaje?: Array<{
+    id: string;
+    orden: number;
+    etiqueta: string;
+    createdAt?: string;
+  }>;
   fechaCarga: string | null;
   fechaDescarga: string | null;
   /** Productos vinculados al viaje (orden operativo). */

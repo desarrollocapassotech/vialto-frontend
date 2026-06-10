@@ -108,6 +108,7 @@ import type {
   Viaje,
 } from '@/types/api';
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
+import { destinosRowsDesdeViaje, validarDestinosRows } from '@/lib/viajesDestinos';
 
 
 type ViajesPaginatedResponse = {
@@ -848,9 +849,8 @@ export function ViajesTenantPage({
             : [],
       clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
-      paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
-      destino: v.destino ?? '',
+      destinosRows: destinosRowsDesdeViaje(v),
       fechaCarga: partesFc.fecha,
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
@@ -1113,16 +1113,17 @@ export function ViajesTenantPage({
       return;
     }
     const o = draft.origen.trim();
-    const d = draft.destino.trim();
-    if (o || d) {
-      const [okO, okD] = await Promise.all([
-        o ? esEtiquetaCiudadValida(draft.paisOrigen, o) : Promise.resolve(true),
-        d ? esEtiquetaCiudadValida(draft.paisDestino, d) : Promise.resolve(true),
-      ]);
-      if (!okO || !okD) {
-        setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+    if (o) {
+      const okO = await esEtiquetaCiudadValida(draft.paisOrigen, o);
+      if (!okO) {
+        setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
         return;
       }
+    }
+    const destinosVal = await validarDestinosRows(draft.destinosRows);
+    if (!destinosVal.ok) {
+      setError(destinosVal.message);
+      return;
     }
     const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
     const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
@@ -1175,7 +1176,7 @@ export function ViajesTenantPage({
                 vehiculoIds: vids,
               }),
           origen: draft.origen.trim() || undefined,
-          destino: draft.destino.trim() || undefined,
+          destinos: destinosVal.destinos,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
           productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
@@ -1744,7 +1745,11 @@ export function ViajesTenantPage({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-vialto-steel max-w-[220px]">
-                  <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
+                  <ViajeOrigenDestinoLinea
+                    origen={v.origen}
+                    destino={v.destino}
+                    destinosViaje={v.destinosViaje}
+                  />
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
@@ -1901,7 +1906,13 @@ export function ViajesTenantPage({
                 { label: 'Estado', value: estadoValue },
                 {
                   label: 'Origen — Destino',
-                  value: <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />,
+                  value: (
+                    <ViajeOrigenDestinoLinea
+                      origen={v.origen}
+                      destino={v.destino}
+                      destinosViaje={v.destinosViaje}
+                    />
+                  ),
                 },
                 {
                   label: 'Carga — Descarga',

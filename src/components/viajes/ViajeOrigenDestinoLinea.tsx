@@ -1,36 +1,35 @@
-import { soloCiudadDesdeEtiquetaUbicacion } from '@/lib/ciudades';
+import { etiquetasDestinosDesdeViaje, textoRutaViaje } from '@/lib/viajesDestinos';
+import type { Viaje } from '@/types/api';
 
 type Props = {
   origen: string | null | undefined;
-  destino: string | null | undefined;
+  destino?: string | null | undefined;
+  destinosViaje?: Viaje['destinosViaje'];
   className?: string;
 };
 
-/** Muestra siempre origen arriba y destino abajo con flecha. */
-export function ViajeOrigenDestinoLinea({ origen, destino, className }: Props) {
-  const o = soloCiudadDesdeEtiquetaUbicacion(origen);
-  const d = soloCiudadDesdeEtiquetaUbicacion(destino);
-  const origenTexto = o || '—';
-  const destinoTexto = d || '—';
+/** Ruta en una sola línea: «Origen → Destino 1 → Destino 2». */
+export function ViajeOrigenDestinoLinea({
+  origen,
+  destino,
+  destinosViaje,
+  className,
+}: Props) {
+  const destinos = etiquetasDestinosDesdeViaje({ destino: destino ?? null, destinosViaje });
+  const linea = textoRutaViaje(origen, destinos);
   const rawO = origen?.trim();
-  const rawD = destino?.trim();
+  const rawDestinos = destinos.map((d) => d.trim()).filter(Boolean);
   const title =
-    rawO && rawD ? `${rawO} → ${rawD}` : rawO || rawD || undefined;
+    rawO || rawDestinos.length > 0
+      ? [rawO, ...rawDestinos].filter(Boolean).join(' → ')
+      : undefined;
 
   return (
     <div
       className={`min-w-0 text-sm text-vialto-charcoal ${className ?? ''}`}
       title={title}
     >
-      <div className="grid min-w-0 grid-cols-1 gap-0.5">
-        <span className="min-w-0 truncate">{origenTexto}</span>
-        <span className="min-w-0 truncate text-vialto-steel">
-          <span className="mr-1.5 select-none text-vialto-steel/80" aria-hidden>
-            ↓
-          </span>
-          {destinoTexto}
-        </span>
-      </div>
+      <span className="block min-w-0 truncate">{linea}</span>
     </div>
   );
 }
