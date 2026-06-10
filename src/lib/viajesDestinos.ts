@@ -54,6 +54,45 @@ export function destinosApiDesdeRows(rows: ViajeDestinoRowDraft[]): ViajeDestino
   return out;
 }
 
+/** Última parada de la ruta (campo legacy `destino` del viaje). */
+export function ultimaEtiquetaDestino(destinos: ViajeDestinoApiItem[]): string | undefined {
+  return destinos.length > 0 ? destinos[destinos.length - 1].etiqueta : undefined;
+}
+
+/**
+ * Body para POST/PATCH: `destinos[]` (ruta completa) y `destino` (última parada, legacy).
+ * El backend VT-57 sincroniza `destino` con el último ítem de `destinos`.
+ */
+export function destinosPayloadParaApi(
+  destinos: ViajeDestinoApiItem[],
+): { destinos: ViajeDestinoApiItem[]; destino: string } {
+  const ultima = ultimaEtiquetaDestino(destinos);
+  if (!ultima) {
+    throw new Error('destinosPayloadParaApi: sin destinos');
+  }
+  return { destinos, destino: ultima };
+}
+
+/** Si la API no devolvió `destinosViaje`, reconstruir desde lo enviado o el legacy `destino`. */
+export function viajeConDestinosEnRespuesta(
+  viaje: Viaje,
+  destinosGuardados: ViajeDestinoApiItem[],
+): Viaje {
+  const esperados = destinosGuardados.length;
+  if (esperados === 0) return viaje;
+  const actuales = etiquetasDestinosDesdeViaje(viaje);
+  if (actuales.length >= esperados) return viaje;
+  return {
+    ...viaje,
+    destino: ultimaEtiquetaDestino(destinosGuardados) ?? viaje.destino,
+    destinosViaje: destinosGuardados.map((d, orden) => ({
+      id: viaje.destinosViaje?.[orden]?.id ?? `local-${orden}`,
+      orden,
+      etiqueta: d.etiqueta,
+    })),
+  };
+}
+
 /** Texto de ruta para listados: «Origen → Destino 1 → Destino 2». */
 export function textoRutaViaje(
   origen: string | null | undefined,

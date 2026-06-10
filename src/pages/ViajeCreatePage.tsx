@@ -63,6 +63,7 @@ import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
+  destinosPayloadParaApi,
   emptyDestinoRow,
   validarDestinosRows,
   type ViajeDestinoRowDraft,
@@ -456,7 +457,7 @@ export function ViajeCreatePage() {
                 vehiculoIds: vids,
               }),
           origen: origen.trim(),
-          destinos: destinosVal.destinos,
+          ...destinosPayloadParaApi(destinosVal.destinos),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
           productoItems: productoItems.filter((x) => x.productoId.trim()),

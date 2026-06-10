@@ -1,4 +1,6 @@
-import { etiquetasDestinosDesdeViaje, textoRutaViaje } from '@/lib/viajesDestinos';
+import { Fragment } from 'react';
+import { soloCiudadDesdeEtiquetaUbicacion } from '@/lib/ciudades';
+import { etiquetasDestinosDesdeViaje } from '@/lib/viajesDestinos';
 import type { Viaje } from '@/types/api';
 
 type Props = {
@@ -8,7 +10,21 @@ type Props = {
   className?: string;
 };
 
-/** Ruta en una sola línea: «Origen → Destino 1 → Destino 2». */
+function partesRutaVisibles(
+  origen: string | null | undefined,
+  destinos: string[],
+): string[] {
+  const partes: string[] = [];
+  const o = origen?.trim();
+  if (o) partes.push(soloCiudadDesdeEtiquetaUbicacion(o) || o);
+  for (const d of destinos) {
+    const t = d.trim();
+    if (t) partes.push(soloCiudadDesdeEtiquetaUbicacion(t) || t);
+  }
+  return partes.length > 0 ? partes : ['—'];
+}
+
+/** Ruta legible: origen y destinos con flechas; hace wrap entre paradas sin cortar nombres. */
 export function ViajeOrigenDestinoLinea({
   origen,
   destino,
@@ -16,7 +32,7 @@ export function ViajeOrigenDestinoLinea({
   className,
 }: Props) {
   const destinos = etiquetasDestinosDesdeViaje({ destino: destino ?? null, destinosViaje });
-  const linea = textoRutaViaje(origen, destinos);
+  const partes = partesRutaVisibles(origen, destinos);
   const rawO = origen?.trim();
   const rawDestinos = destinos.map((d) => d.trim()).filter(Boolean);
   const title =
@@ -29,7 +45,18 @@ export function ViajeOrigenDestinoLinea({
       className={`min-w-0 text-sm text-vialto-charcoal ${className ?? ''}`}
       title={title}
     >
-      <span className="block min-w-0 truncate">{linea}</span>
+      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 leading-snug">
+        {partes.map((parte, i) => (
+          <Fragment key={`${i}-${parte}`}>
+            {i > 0 && (
+              <span className="shrink-0 text-vialto-steel/75 select-none" aria-hidden>
+                →
+              </span>
+            )}
+            <span className="min-w-0">{parte}</span>
+          </Fragment>
+        ))}
+      </div>
     </div>
   );
 }
