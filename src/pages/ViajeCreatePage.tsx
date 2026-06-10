@@ -62,6 +62,7 @@ import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
+import { ViajeExportacionLeyenda } from '@/components/viajes/ViajeExportacionLeyenda';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   destinosPayloadParaApi,
@@ -890,6 +891,9 @@ export function ViajeCreatePage() {
               </button>
             </div>
           )}
+          <div className="md:col-span-2 lg:col-span-3">
+            <ViajeExportacionLeyenda />
+          </div>
           {error && (
             <div className="md:col-span-2 lg:col-span-3">
               <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
