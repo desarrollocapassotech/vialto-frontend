@@ -2,8 +2,6 @@ import { useMemo, useState } from 'react';
 
 interface FiltrableRow {
   pais?: string | null;
-  nombre: string;
-  idFiscal?: string | null;
 }
 
 export function useListadoFiltros<T extends FiltrableRow>(
