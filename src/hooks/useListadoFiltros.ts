@@ -4,10 +4,12 @@ interface FiltrableRow {
   pais?: string | null;
   nombre: string;
   idFiscal?: string | null;
-  paut?: string | null;
 }
 
-export function useListadoFiltros<T extends FiltrableRow>(rows: T[] | null) {
+export function useListadoFiltros<T extends FiltrableRow>(
+  rows: T[] | null,
+  camposBusqueda: (keyof T)[],
+) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroPais, setFiltroPais] = useState('');
 
@@ -23,13 +25,13 @@ export function useListadoFiltros<T extends FiltrableRow>(rows: T[] | null) {
     return rows.filter((t) => {
       const matchBusqueda =
         !q ||
-        t.nombre.toLowerCase().includes(q) ||
-        (t.idFiscal ?? '').toLowerCase().includes(q) ||
-        (t.paut ?? '').toLowerCase().includes(q);
+        camposBusqueda.some((campo) =>
+          (t[campo] ?? '').toString().toLowerCase().includes(q),
+        );
       const matchPais = !filtroPais || t.pais === filtroPais;
       return matchBusqueda && matchPais;
     });
-  }, [rows, busqueda, filtroPais]);
+  }, [rows, busqueda, filtroPais, camposBusqueda]);
 
   const onClear = () => {
     setBusqueda('');
