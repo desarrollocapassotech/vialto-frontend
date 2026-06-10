@@ -18,12 +18,15 @@ export function AdjuntoPreviewModal({
   movimientoId,
   tenantId,
   file,
+  url,
   title = 'Vista previa',
   onClose,
 }: {
-  /** Remito ya guardado en el servidor. */
+  /** Remito ya guardado en el servidor (streaming por backend). */
   movimientoId?: string;
   tenantId?: string;
+  /** URL directa (Cloudinary) de un comprobante guardado. */
+  url?: string;
   /** Archivo local seleccionado antes de subir. */
   file?: File;
   title?: string;
@@ -32,7 +35,7 @@ export function AdjuntoPreviewModal({
   const { getToken } = useAuth();
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string>('application/pdf');
-  const [loading, setLoading] = useState(!file);
+  const [loading, setLoading] = useState(!file && !url);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

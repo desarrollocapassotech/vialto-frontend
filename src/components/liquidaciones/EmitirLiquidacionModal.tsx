@@ -80,7 +80,7 @@ export function EmitirLiquidacionModal({
     setSubmitting(true);
     setError(null);
     try {
-      const url = emitirUrl ?? `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`;
+      const url = emitirUrl ?? `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`;
       const updated = await apiJson<LiquidacionConTransportista>(
         url,
         () => getToken(),

@@ -15,6 +15,7 @@ import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
 import { ExportarViajeModal } from '@/components/viajes/ExportarViajeModal';
 import { EmitirCvlpModal } from '@/components/viajes/EmitirCvlpModal';
+import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
@@ -95,7 +96,8 @@ import {
 } from '@/lib/viajesFiltroPagoTransportista';
 import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { canAccessLiquidacionesArca } from '@/lib/tenantModules';
+import { canAccessFacturacion, canAccessIntegracionArca } from '@/lib/tenantModules';
+import { FacturarSelectorModal } from '@/components/viajes/FacturarSelectorModal';
 import type {
   Chofer,
   Cliente,
@@ -129,7 +131,11 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const platform = Boolean(tenantId?.trim());
   const hasLiquidacionesArca =
-    !platform && canAccessLiquidacionesArca(currentTenant?.modules ?? []);
+    !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
+  const hasFacturacionSinArca =
+    !platform &&
+    !hasLiquidacionesArca &&
+    canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? '';
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -226,6 +232,10 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
   /** Viaje para el que se quiere emitir un CVLP. */
   const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
+  /** Viaje para el selector manual factura/liquidación (tenants sin integracion-arca). */
+  const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
+  /** Viaje para el modal de creación manual de liquidación. */
+  const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
   /** Conteos globales para los chips de acceso rápido. */
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
@@ -1790,7 +1800,9 @@ export function ViajesTenantPage({
                     onEmitirCvlp={
                       hasLiquidacionesArca && v.transportistaId
                         ? () => setEmitirCvlpViaje(v)
-                        : undefined
+                        : hasFacturacionSinArca && v.transportistaId
+                          ? () => setSelectorViaje(v)
+                          : undefined
                     }
                     onEliminar={() => requestDeleteViaje(v)}
                   />
@@ -1943,7 +1955,9 @@ export function ViajesTenantPage({
                   onEmitirCvlp={
                     hasLiquidacionesArca && v.transportistaId
                       ? () => setEmitirCvlpViaje(v)
-                      : undefined
+                      : hasFacturacionSinArca && v.transportistaId
+                        ? () => setSelectorViaje(v)
+                        : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
@@ -2140,6 +2154,28 @@ export function ViajesTenantPage({
             // La liquidación se creó; refrescar listado para reflejar el nuevo estado si corresponde
             setListadoQueryVersion((v) => v + 1);
           }}
+          onFacturarManual={() => void navigateToFacturacion(emitirCvlpViaje)}
+        />
+      )}
+
+      {selectorViaje && (
+        <FacturarSelectorModal
+          onClose={() => setSelectorViaje(null)}
+          onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
+          onLiquidacion={() => { setCrearLiqViaje(selectorViaje); setSelectorViaje(null); }}
+        />
+      )}
+
+      {crearLiqViaje && (
+        <CrearLiquidacionManualModal
+          viajeInicial={crearLiqViaje}
+          transportistas={maestro.transportistas}
+          getToken={getToken}
+          onSuccess={() => {
+            setCrearLiqViaje(null);
+            setListadoQueryVersion((v) => v + 1);
+          }}
+          onClose={() => setCrearLiqViaje(null)}
         />
       )}
 

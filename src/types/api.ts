@@ -209,6 +209,8 @@ export interface Factura {
   fechaVencimiento: string | null;
   estado: 'pendiente' | 'cobrada' | 'vencida';
   diferencia: number | null;
+  ivaPct: number | null;
+  comprobanteUrl: string | null;
   createdAt: string;
 }
 
@@ -405,6 +407,7 @@ export interface Liquidacion {
   estado: LiquidacionEstado;
   arcaError: string | null;
   reintentos: number;
+  comprobanteUrl: string | null;
   createdAt: string;
   createdBy: string;
 }
