@@ -110,6 +110,13 @@ import type {
   Viaje,
 } from '@/types/api';
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
+import {
+  destinosPayloadParaApi,
+  destinosRowsDesdeViaje,
+  etiquetasDestinosDesdeViaje,
+  validarDestinosRows,
+  viajeConDestinosEnRespuesta,
+} from '@/lib/viajesDestinos';
 
 
 type ViajesPaginatedResponse = {
@@ -858,9 +865,8 @@ export function ViajesTenantPage({
             : [],
       clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
-      paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
-      destino: v.destino ?? '',
+      destinosRows: destinosRowsDesdeViaje(v),
       fechaCarga: partesFc.fecha,
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
@@ -1123,16 +1129,17 @@ export function ViajesTenantPage({
       return;
     }
     const o = draft.origen.trim();
-    const d = draft.destino.trim();
-    if (o || d) {
-      const [okO, okD] = await Promise.all([
-        o ? esEtiquetaCiudadValida(draft.paisOrigen, o) : Promise.resolve(true),
-        d ? esEtiquetaCiudadValida(draft.paisDestino, d) : Promise.resolve(true),
-      ]);
-      if (!okO || !okD) {
-        setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+    if (o) {
+      const okO = await esEtiquetaCiudadValida(draft.paisOrigen, o);
+      if (!okO) {
+        setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
         return;
       }
+    }
+    const destinosVal = await validarDestinosRows(draft.destinosRows);
+    if (!destinosVal.ok) {
+      setError(destinosVal.message);
+      return;
     }
     const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
     const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
@@ -1162,6 +1169,7 @@ export function ViajesTenantPage({
     setSavingId(viajeId);
     setError(null);
     try {
+      const destinosBody = destinosPayloadParaApi(destinosVal.destinos);
       const updated = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({
@@ -1185,7 +1193,7 @@ export function ViajesTenantPage({
                 vehiculoIds: vids,
               }),
           origen: draft.origen.trim() || undefined,
-          destino: draft.destino.trim() || undefined,
+          ...destinosBody,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
           productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
@@ -1205,7 +1213,16 @@ export function ViajesTenantPage({
           pagosTransportista: draft.pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
-      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
+      let viajeGuardado = viajeConDestinosEnRespuesta(updated, destinosVal.destinos);
+      if (etiquetasDestinosDesdeViaje(viajeGuardado).length < destinosVal.destinos.length) {
+        try {
+          viajeGuardado = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken());
+        } catch {
+          /* mantener respuesta del PATCH */
+        }
+        viajeGuardado = viajeConDestinosEnRespuesta(viajeGuardado, destinosVal.destinos);
+      }
+      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? viajeGuardado : r)) : prev));
       const stubs = entidadesMaestroStubsDesdeViaje(updated);
       setSessionMaestro((prev) => ({
         clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
@@ -1753,8 +1770,12 @@ export function ViajesTenantPage({
                   )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-vialto-steel max-w-[220px]">
-                  <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
+                <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
+                  <ViajeOrigenDestinoLinea
+                    origen={v.origen}
+                    destino={v.destino}
+                    destinosViaje={v.destinosViaje}
+                  />
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
@@ -1913,7 +1934,13 @@ export function ViajesTenantPage({
                 { label: 'Estado', value: estadoValue },
                 {
                   label: 'Origen — Destino',
-                  value: <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />,
+                  value: (
+                    <ViajeOrigenDestinoLinea
+                      origen={v.origen}
+                      destino={v.destino}
+                      destinosViaje={v.destinosViaje}
+                    />
+                  ),
                 },
                 {
                   label: 'Carga — Descarga',

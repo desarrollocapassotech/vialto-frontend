@@ -49,7 +49,9 @@ import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos'
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
+import { ViajeDestinosLista } from '@/components/viajes/ViajeDestinosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
+import type { ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -61,9 +63,8 @@ export type ViajeInlineDraft = {
   vehiculosRows: ViajeVehiculoRowDraft[];
   choferExternoId: string;
   paisOrigen: PaisCodigo;
-  paisDestino: PaisCodigo;
   origen: string;
-  destino: string;
+  destinosRows: ViajeDestinoRowDraft[];
   fechaCarga: string;
   horaCarga: string;
   fechaDescarga: string;
@@ -307,27 +308,14 @@ export function ViajeEditModal({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={labelClass}>Destino</span>
-              <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                <PaisUbicacionSelect
-                  value={draft.paisDestino}
-                  onChange={(p) =>
-                    setDraft((prev) => (prev ? { ...prev, paisDestino: p, destino: '' } : prev))
-                  }
-                  aria-label="País de destino"
-                  className={`${inputClass} w-full sm:w-40`}
-                />
-                <CiudadCombobox
-                  pais={draft.paisDestino}
-                  value={draft.destino}
-                  onChange={(next) =>
-                    setDraft((prev) => (prev ? { ...prev, destino: next } : prev))
-                  }
-                  inputClassName={`${inputClass} w-full`}
-                />
-              </div>
-            </div>
+            <ViajeDestinosLista
+              groupId={`viaje-edit-${draft.numero || 'e'}`}
+              rows={draft.destinosRows}
+              onChange={(destinosRows) =>
+                setDraft((prev) => (prev ? { ...prev, destinosRows } : prev))
+              }
+              inputClassName={inputClass}
+            />
 
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Cliente</span>

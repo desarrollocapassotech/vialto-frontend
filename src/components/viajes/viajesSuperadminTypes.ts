@@ -2,6 +2,7 @@ import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
 import type { ViajeVehiculoRowDraft } from '@/components/viajes/ViajeVehiculosLista';
+import type { ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
 import type { ViajeProductoItem } from '@/lib/productosViaje';
 
 export type ViajeInlineDraft = {
@@ -15,9 +16,8 @@ export type ViajeInlineDraft = {
   /** Solo en modo externo: chofer del transportista tercero (opcional). */
   choferExternoId: string;
   paisOrigen: PaisCodigo;
-  paisDestino: PaisCodigo;
   origen: string;
-  destino: string;
+  destinosRows: ViajeDestinoRowDraft[];
   /** `YYYY-MM-DD` */
   fechaCarga: string;
   /** `HH:mm` o vacío (opcional). */
