@@ -52,6 +52,7 @@ import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ViajeDestinosLista } from '@/components/viajes/ViajeDestinosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
 import type { ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
+import { ViajeExportacionLeyenda } from '@/components/viajes/ViajeExportacionLeyenda';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -686,7 +687,9 @@ export function ViajeEditModal({
               </div>
             )}
           </div>
-
+          <div className="md:col-span-2 lg:col-span-3 mt-4">
+            <ViajeExportacionLeyenda />
+          </div>
           {error && (
             <p
               role="alert"
