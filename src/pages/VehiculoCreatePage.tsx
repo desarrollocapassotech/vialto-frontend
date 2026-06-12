@@ -9,7 +9,7 @@ import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
+import { vehiculoCreatePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 
 const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
 
@@ -46,7 +46,7 @@ export function VehiculoCreatePage() {
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!form.patente.trim()) errs.patente = 'Ingresá la patente.';
-    if (form.tara.trim() && vehiculoWritePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
+    if (form.tara.trim() && vehiculoCreatePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -60,7 +60,7 @@ export function VehiculoCreatePage() {
         : '/api/vehiculos';
       await apiJson(path, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
+        body: JSON.stringify(vehiculoCreatePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
       navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
