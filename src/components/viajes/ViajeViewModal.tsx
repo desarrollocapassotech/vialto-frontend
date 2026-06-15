@@ -8,6 +8,8 @@ import {
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { textoRutaViaje, etiquetasDestinosDesdeViaje } from '@/lib/viajesDestinos';
+import { OtroGastoAutorDisplay } from '@/components/viajes/OtrosGastosFieldset';
+import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import type { Viaje } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -32,11 +34,15 @@ export function ViajeViewModal({
   viaje,
   onClose,
   onEditar,
+  tenantId,
 }: {
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
+  /** Clerk org id para resolver nombres en vista superadmin. */
+  tenantId?: string;
 }) {
+  const userLabelMap = useOrgUserLabels(tenantId);
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -144,6 +150,14 @@ export function ViajeViewModal({
                   header: 'Fecha',
                   cell: (g) => fmtDate(g.fecha),
                   tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                },
+                {
+                  id: 'cargadoPor',
+                  header: 'Cargado por',
+                  cell: (g) => (
+                    <OtroGastoAutorDisplay row={g} labelMap={userLabelMap} className="max-w-[11rem]" />
+                  ),
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
                 },
                 {
                   id: 'monto',

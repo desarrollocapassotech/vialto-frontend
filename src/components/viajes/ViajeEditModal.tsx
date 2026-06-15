@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Spinner } from '@/components/ui/Spinner';
 import {
   ChoferSearchSelect,
@@ -23,6 +24,7 @@ import {
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otroGastoAutorFromClerk,
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
 import {
@@ -170,6 +172,8 @@ export function ViajeEditModal({
   onVehiculoCreado,
 }: ViajeEditModalProps) {
   type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop';
+  const { user } = useUser();
+  const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
@@ -649,12 +653,13 @@ export function ViajeEditModal({
               <OtrosGastosFieldset
                 rows={draft.otrosGastos}
                 onChange={(rows) => setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))}
+                tenantId={tenantId}
               />
               <button
                 type="button"
                 onClick={() =>
                   setDraft((p) =>
-                    p ? { ...p, otrosGastos: [...p.otrosGastos, emptyOtroGasto()] } : p,
+                    p ? { ...p, otrosGastos: [...p.otrosGastos, emptyOtroGasto(gastoAutor)] } : p,
                   )
                 }
                 className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"

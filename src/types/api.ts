@@ -16,6 +16,8 @@ export interface OtroGasto {
   moneda: 'ARS' | 'USD';
   fecha?: string;
   createdBy?: string;
+  /** Nombre o correo resuelto vía Clerk (solo en detalle). */
+  createdByLabel?: string | null;
 }
 
 export interface Viaje {
