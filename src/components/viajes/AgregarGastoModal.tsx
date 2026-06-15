@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   parseCurrencyForMoneda,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { modalOverlayClass } from '@/lib/modalLayers';
@@ -190,7 +191,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
-                onChange={(e) => setMontoStr(e.target.value)}
+                onChange={(e) => setMontoStr(maskCurrencyForMoneda(e.target.value, moneda))}
                 placeholder="0.00"
                 className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? 'border-red-400' : ''}`}
                 disabled={saving}
