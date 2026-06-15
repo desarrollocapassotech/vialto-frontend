@@ -10,7 +10,6 @@ export type OpcionProducto = {
   id: string;
   nombre: string;
   activo: boolean;
-  unidadMedida: string | null;
 };
 
 /** Items de producto del viaje en orden guardado. */
@@ -37,7 +36,6 @@ export function mergeOpcionesProducto(
       id: p.id,
       nombre: p.nombre,
       activo: p.activo,
-      unidadMedida: p.unidadMedida ?? null,
     });
   }
   const desdeViaje = viaje?.productosViaje?.length
@@ -50,7 +48,6 @@ export function mergeOpcionesProducto(
         id: cur.id,
         nombre: cur.activo ? cur.nombre : `${cur.nombre} (inactivo)`,
         activo: cur.activo,
-        unidadMedida: cur.unidadMedida,
       });
     }
   }

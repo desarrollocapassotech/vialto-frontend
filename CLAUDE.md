@@ -249,6 +249,89 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 
 ---
 
+## Campos de formulario: obligatorios y opcionales
+
+**Regla global para todos los formularios actuales y futuros.**
+
+- Los campos **obligatorios** muestran un asterisco rojo al final de la etiqueta: `<span className="text-red-500">*</span>`
+- Los campos **opcionales** no llevan ninguna indicación. Nunca escribir "(opcional)", "— opcional" ni ninguna variante.
+
+### Patrón correcto
+
+```tsx
+// Obligatorio
+<span className={labelClass}>Nombre <span className="text-red-500">*</span></span>
+
+// Opcional
+<span className={labelClass}>Observaciones</span>
+```
+
+### Componentes que ya manejan esto automáticamente
+
+- `CrudFieldLabel` (en `src/components/crud/CrudFields.tsx`): recibe prop `required` y agrega el asterisco rojo.
+- `Field` en `MicCrtExportModal.tsx`: detecta si el string `label` termina en `*` (con espacio previo) y renderiza el asterisco en rojo.
+
+---
+
+## Validación de formularios: errores por campo
+
+**Regla global para todos los formularios actuales y futuros.**
+
+Cuando el usuario intenta enviar un formulario con campos inválidos:
+
+- El borde del input afectado se marca en rojo (`border-red-400`).
+- Debajo de ese input se muestra el mensaje de error con `<CrudFieldError>`.
+- Los errores de validación (campos vacíos, formato incorrecto) son por campo.
+- Los errores de API/servidor se muestran globalmente con `<CrudFormErrorAlert>`.
+
+### Patrón correcto en páginas CRUD
+
+```tsx
+// Estado
+const [error, setError] = useState<string | null>(null);         // error API
+const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+// En onSubmit
+const errs: Record<string, string> = {};
+if (!nombre.trim()) errs.nombre = 'Ingresá el nombre.';
+if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+setFieldErrors({});
+// …llamada API…
+```
+
+```tsx
+// En JSX
+<label className="grid gap-1.5">
+  <CrudFieldLabel required>Nombre</CrudFieldLabel>
+  <CrudInput
+    value={nombre}
+    error={fieldErrors.nombre}
+    onChange={(e) => setNombre(e.target.value)}
+  />
+  <CrudFieldError message={fieldErrors.nombre} />
+</label>
+<CrudFormErrorAlert message={error} />
+```
+
+### Componentes disponibles
+
+- `CrudFieldError` (`src/components/crud/CrudFieldError.tsx`): mensaje de error por campo. Usa `text-xs font-medium text-red-600`.
+- `CrudInput` y `CrudSelect` (`src/components/crud/CrudFields.tsx`): reciben prop `error?: string` que agrega `border-red-400` automáticamente.
+- `CrudFormErrorAlert` (`src/components/crud/CrudFormErrorAlert.tsx`): solo para errores de servidor/API.
+
+### En modales (inputs nativos sin CrudInput)
+
+Aplicar la clase `border-red-400` de forma condicional:
+
+```tsx
+<input
+  className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
+/>
+<CrudFieldError message={fieldErrors.nombre} />
+```
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -258,7 +341,8 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 - Verificar estados de carga, error y vacío.
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
+- **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 
 ---
 
-*Última actualización: mayo 2026*
+Última actualización: junio 2026

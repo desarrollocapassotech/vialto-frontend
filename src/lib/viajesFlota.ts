@@ -83,6 +83,9 @@ function stubCliente(v: Viaje, c: { id: string; nombre: string }): Cliente {
     nombre: c.nombre,
     pais: null,
     idFiscal: null,
+    email: null,
+    telefono: null,
+    direccion: null,
     condicionIva: null,
     condicionTributaria: null,
     createdAt: '',
@@ -101,6 +104,9 @@ function stubTransportista(v: Viaje, t: { id: string; nombre: string }): Transpo
     domicilio: null,
     condicionIva: null,
     condicionTributaria: null,
+    paut: null,
+    permisoInternacional: null,
+    fechaVencimientoPermiso: null,
     createdAt: '',
   };
 }
@@ -134,6 +140,7 @@ function stubVehiculo(
     tipo: veh.tipo,
     marca: null,
     modelo: null,
+    año: null,
     anio: null,
     kmActual: 0,
     nroChasis: null,
@@ -444,14 +451,24 @@ export function monedaUnicaDeViajes(viajeIds: string[], viajes: Viaje[]): string
 /**
  * Suma importes de viajes seleccionados, separando ARS y USD (no mezcla montos entre monedas).
  */
-export function textoImporteFacturaSeleccion(viajeIds: string[], viajes: Viaje[]): string {
+export function textoImporteFacturaSeleccion(
+  viajeIds: string[],
+  viajes: Viaje[],
+  tipo: 'cliente' | 'transportista_externo' = 'cliente',
+): string {
   let ars = 0;
   let usd = 0;
   for (const id of viajeIds) {
     const v = viajes.find((x) => x.id === id);
-    if (!v || v.monto == null) continue;
-    if (normalizeViajeMoneda(v.monedaMonto) === 'USD') usd += v.monto;
-    else ars += v.monto;
+    if (!v) continue;
+
+    const esTransportista = tipo === 'transportista_externo';
+    const monto = esTransportista ? v.precioTransportistaExterno : v.monto;
+    const moneda = esTransportista ? v.monedaPrecioTransportistaExterno : v.monedaMonto;
+
+    if (monto == null) continue;
+    if (normalizeViajeMoneda(moneda) === 'USD') usd += monto;
+    else ars += monto;
   }
   const parts: string[] = [];
   if (ars > 0) {

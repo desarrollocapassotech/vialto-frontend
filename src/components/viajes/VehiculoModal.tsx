@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { friendlyError } from '@/lib/friendlyError';
+import { Spinner } from '@/components/ui/Spinner';
 import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import type { Vehiculo } from '@/types/api';
@@ -36,6 +38,7 @@ export function VehiculoModal({
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   function patch(p: Partial<VehiculoFormState>) {
@@ -43,7 +46,11 @@ export function VehiculoModal({
   }
 
   async function submit() {
-    if (!form.patente.trim()) { setError('Ingresá la patente.'); return; }
+    if (!form.patente.trim()) {
+      setFieldErrors({ patente: 'Ingresá la patente.' });
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     setError(null);
     try {
@@ -65,7 +72,7 @@ export function VehiculoModal({
   }
 
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';
-  const I = 'h-9 w-full border border-black/15 px-2 text-sm';
+  const I = 'h-9 w-full border px-2 text-sm';
 
   return (
     <div className={modalQuickCreateOverlayClass(stacked)}>
@@ -86,21 +93,22 @@ export function VehiculoModal({
         </div>
         <div className="px-5 py-4 grid gap-3">
           <label className="flex flex-col gap-1">
-            <span className={L}>Patente *</span>
+            <span className={L}>Patente <span className="text-red-500">*</span></span>
             <input
               autoFocus
               value={form.patente}
               onChange={(e) => patch({ patente: e.target.value })}
               placeholder="Ej: AA123BB"
-              className={I}
+              className={`${I} ${fieldErrors.patente ? 'border-red-400' : 'border-black/15'}`}
             />
+            <CrudFieldError message={fieldErrors.patente} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={L}>Tipo</span>
             <select
               value={form.tipo}
               onChange={(e) => patch({ tipo: e.target.value })}
-              className={`${I} bg-white`}
+              className={`${I} border-black/15 bg-white`}
             >
               {TIPOS.map((t) => (
                 <option key={t} value={t}>
@@ -115,7 +123,7 @@ export function VehiculoModal({
               value={form.marca}
               onChange={(e) => patch({ marca: e.target.value })}
               placeholder="Ej: Scania"
-              className={I}
+              className={`${I} border-black/15`}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -124,7 +132,7 @@ export function VehiculoModal({
               value={form.modelo}
               onChange={(e) => patch({ modelo: e.target.value })}
               placeholder="Ej: R450"
-              className={I}
+              className={`${I} border-black/15`}
             />
           </label>
         </div>
@@ -146,8 +154,9 @@ export function VehiculoModal({
             type="button"
             disabled={saving}
             onClick={() => void submit()}
-            className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+            className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>

@@ -1,7 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudInput } from '@/components/crud/CrudFields';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
+import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
 import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
@@ -30,21 +31,22 @@ export function ChoferCreatePage() {
   const [form, setForm] = useState<ChoferFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
   }
 
   async function onSubmit() {
-    if (!form.nombre.trim()) {
-      setError('Ingresá el nombre del chofer.');
-      return;
-    }
+    const errs: Record<string, string> = {};
+    if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre del chofer.';
     const dniError = validarDniForm(form.dni);
-    if (dniError) {
-      setError(dniError);
+    if (dniError) errs.dni = dniError;
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
@@ -56,7 +58,7 @@ export function ChoferCreatePage() {
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshChoferes();
-      navigate('/choferes', { replace: true });
+      navigate(`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
       setError(friendlyError(e, 'choferes'));
     } finally {
@@ -64,11 +66,8 @@ export function ChoferCreatePage() {
     }
   }
 
-  const labelClass =
-    'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
-
   return (
-    <CrudPageLayout title="Crear chofer" backTo="/choferes" backLabel="← Volver a choferes">
+    <CrudPageLayout title="Crear chofer" backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`} backLabel="← Volver a choferes">
       <form
         className="mt-6 grid gap-4"
         onSubmit={(e) => {
@@ -77,23 +76,27 @@ export function ChoferCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className={labelClass}>Nombre *</span>
+          <CrudFieldLabel required>Nombre</CrudFieldLabel>
           <CrudInput
             placeholder="Ej: Juan Perez"
             value={form.nombre}
+            error={fieldErrors.nombre}
             onChange={(e) => patch({ nombre: e.target.value })}
           />
+          <CrudFieldError message={fieldErrors.nombre} />
         </label>
         <label className="grid gap-1.5">
-          <span className={labelClass}>DNI</span>
+          <CrudFieldLabel>DNI</CrudFieldLabel>
           <CrudInput
             placeholder="Ej: 30123456"
             value={form.dni}
+            error={fieldErrors.dni}
             onChange={(e) => patch({ dni: e.target.value })}
           />
+          <CrudFieldError message={fieldErrors.dni} />
         </label>
         <label className="grid gap-1.5">
-          <span className={labelClass}>CUIT</span>
+          <CrudFieldLabel>CUIT</CrudFieldLabel>
           <CrudInput
             placeholder="Ej: 20-30123456-7"
             value={form.cuit}
@@ -101,7 +104,7 @@ export function ChoferCreatePage() {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className={labelClass}>Teléfono</span>
+          <CrudFieldLabel>Teléfono</CrudFieldLabel>
           <CrudInput
             placeholder="Ej: +54 9 11 1234-5678"
             value={form.telefono}

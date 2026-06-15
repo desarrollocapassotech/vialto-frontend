@@ -1,14 +1,13 @@
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { MovimientoStockDetalleBody } from '@/components/stock/MovimientoStockDetalleBody';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
-import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
-  movimientoStockTipoNumeroClass,
 } from '@/lib/stockMovimientoTipo';
 import type { MovimientoStock } from '@/types/api';
 
@@ -101,90 +100,9 @@ export function MovimientoStockDetallePage() {
         </Link>
       </div>
 
-      <dl className="rounded-lg border border-black/10 bg-white divide-y divide-black/5 text-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Número de remito
-          </dt>
-          <dd className="sm:col-span-2 font-mono text-vialto-charcoal">{row.numeroRemito ?? '—'}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Fecha movimiento
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">
-            {formatMovimientoStockFechaFromIso(row.fecha, { alwaysShowTime: true })}
-          </dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Producto
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{row.producto?.nombre ?? row.productoId}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Presentación
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{row.presentacion?.nombre ?? '—'}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Empresa / Cliente
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{row.cliente?.nombre ?? row.clienteId}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Cantidad
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">
-            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad}</span>
-          </dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Observaciones
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal whitespace-pre-wrap">{row.observaciones ?? '—'}</dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Remito escaneado
-          </dt>
-          <dd className="sm:col-span-2 break-all">
-            {row.remitoUrl ? (
-              <a href={row.remitoUrl} className="text-vialto-fire hover:underline" target="_blank" rel="noreferrer">
-                {row.remitoUrl}
-              </a>
-            ) : (
-              <span className="text-vialto-steel">Sin adjunto</span>
-            )}
-          </dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Registrado por
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">
-            {row.createdByLabel ? (
-              <span title={row.createdBy ? `ID: ${row.createdBy}` : undefined}>{row.createdByLabel}</span>
-            ) : row.createdBy ? (
-              <span className="text-vialto-steel" title={row.createdBy}>
-                Usuario no disponible
-              </span>
-            ) : (
-              '—'
-            )}
-          </dd>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Fecha y hora de registro
-          </dt>
-          <dd className="sm:col-span-2 text-vialto-charcoal">{formatInstantEsAr24h(row.createdAt)}</dd>
-        </div>
-      </dl>
+      <div className="rounded-lg border border-black/10 bg-white">
+        <MovimientoStockDetalleBody row={row} tenantId={tenantIdParam ?? undefined} />
+      </div>
     </div>
   );
 }

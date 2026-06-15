@@ -1,35 +1,61 @@
+import { Fragment } from 'react';
 import { soloCiudadDesdeEtiquetaUbicacion } from '@/lib/ciudades';
+import { etiquetasDestinosDesdeViaje } from '@/lib/viajesDestinos';
+import type { Viaje } from '@/types/api';
 
 type Props = {
   origen: string | null | undefined;
-  destino: string | null | undefined;
+  destino?: string | null | undefined;
+  destinosViaje?: Viaje['destinosViaje'];
   className?: string;
 };
 
-/** Muestra siempre origen arriba y destino abajo con flecha. */
-export function ViajeOrigenDestinoLinea({ origen, destino, className }: Props) {
-  const o = soloCiudadDesdeEtiquetaUbicacion(origen);
-  const d = soloCiudadDesdeEtiquetaUbicacion(destino);
-  const origenTexto = o || '—';
-  const destinoTexto = d || '—';
+function partesRutaVisibles(
+  origen: string | null | undefined,
+  destinos: string[],
+): string[] {
+  const partes: string[] = [];
+  const o = origen?.trim();
+  if (o) partes.push(soloCiudadDesdeEtiquetaUbicacion(o) || o);
+  for (const d of destinos) {
+    const t = d.trim();
+    if (t) partes.push(soloCiudadDesdeEtiquetaUbicacion(t) || t);
+  }
+  return partes.length > 0 ? partes : ['—'];
+}
+
+/** Ruta legible: origen y destinos con flechas; hace wrap entre paradas sin cortar nombres. */
+export function ViajeOrigenDestinoLinea({
+  origen,
+  destino,
+  destinosViaje,
+  className,
+}: Props) {
+  const destinos = etiquetasDestinosDesdeViaje({ destino: destino ?? null, destinosViaje });
+  const partes = partesRutaVisibles(origen, destinos);
   const rawO = origen?.trim();
-  const rawD = destino?.trim();
+  const rawDestinos = destinos.map((d) => d.trim()).filter(Boolean);
   const title =
-    rawO && rawD ? `${rawO} → ${rawD}` : rawO || rawD || undefined;
+    rawO || rawDestinos.length > 0
+      ? [rawO, ...rawDestinos].filter(Boolean).join(' → ')
+      : undefined;
 
   return (
     <div
       className={`min-w-0 text-sm text-vialto-charcoal ${className ?? ''}`}
       title={title}
     >
-      <div className="grid min-w-0 grid-cols-1 gap-0.5">
-        <span className="min-w-0 truncate">{origenTexto}</span>
-        <span className="min-w-0 truncate text-vialto-steel">
-          <span className="mr-1.5 select-none text-vialto-steel/80" aria-hidden>
-            ↓
-          </span>
-          {destinoTexto}
-        </span>
+      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 leading-snug">
+        {partes.map((parte, i) => (
+          <Fragment key={`${i}-${parte}`}>
+            {i > 0 && (
+              <span className="shrink-0 text-vialto-steel/75 select-none" aria-hidden>
+                →
+              </span>
+            )}
+            <span className="min-w-0">{parte}</span>
+          </Fragment>
+        ))}
       </div>
     </div>
   );

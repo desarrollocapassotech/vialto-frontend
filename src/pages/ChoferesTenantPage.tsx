@@ -2,8 +2,10 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Chofer, PaginatedMeta } from '@/types/api';
 
 type ChoferesPaginatedResponse = {
@@ -69,63 +71,64 @@ export function ChoferesTenantPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">DNI</th>
-              <th className="px-4 py-3">Licencia</th>
-              <th className="px-4 py-3">Teléfono</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows === null && !error && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {rows?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Todavía no tenés choferes cargados.
-                </td>
-              </tr>
-            )}
-            {rows?.map((c) => (
-              <tr key={c.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-medium">{c.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.dni ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.licencia ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{c.telefono ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="inline-flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setViewingChoferId(c.id);
-                        setViewingChoferNombre(c.nombre);
-                      }}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
-                    <Link
-                      to={`/choferes/${encodeURIComponent(c.id)}/editar`}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Editar
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (c) => c.nombre,
+            tdClassName: `${listadoTablaTdClass} font-medium`,
+          },
+          {
+            id: 'dni',
+            header: 'DNI',
+            cell: (c) => c.dni ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'licencia',
+            header: 'Licencia',
+            cell: (c) => c.licencia ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'telefono',
+            header: 'Teléfono',
+            cell: (c) => c.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(c) => c.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar los choferes.'
+            : 'Todavía no tenés choferes cargados.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(c) => (
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setViewingChoferId(c.id);
+                setViewingChoferNombre(c.nombre);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+            <Link
+              to={`/choferes/${encodeURIComponent(c.id)}/editar`}
+              className={listadoTablaAccionClass}
+            >
+              Editar
+            </Link>
+          </div>
+        )}
+      />
 
       {meta && (
         <div className="mt-4 flex items-center justify-between">

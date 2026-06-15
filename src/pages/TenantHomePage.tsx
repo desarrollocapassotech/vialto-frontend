@@ -56,9 +56,9 @@ export function TenantHomePage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
             Panel de {companyName}
           </h1>
         </div>

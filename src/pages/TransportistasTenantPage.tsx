@@ -1,9 +1,11 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { Transportista } from '@/types/api';
 
 export function TransportistasTenantPage() {
@@ -57,52 +59,54 @@ export function TransportistasTenantPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">ID Fiscal</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Teléfono</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows === null && !error && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {rows?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-vialto-steel">
-                  Todavía no hay transportistas cargados.
-                </td>
-              </tr>
-            )}
-            {rows?.map((t) => (
-              <tr key={t.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                <td className="px-4 py-3 font-medium">{t.nombre}</td>
-                <td className="px-4 py-3 text-vialto-steel">{t.idFiscal ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{t.email ?? '—'}</td>
-                <td className="px-4 py-3 text-vialto-steel">{t.telefono ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setViewingTransportista(t)}
-                    className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                  >
-                    Ver
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (t) => t.nombre,
+            tdClassName: `${listadoTablaTdClass} font-medium`,
+          },
+          {
+            id: 'idFiscal',
+            header: 'ID Fiscal',
+            cell: (t) => t.idFiscal ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'email',
+            header: 'Email',
+            cell: (t) => t.email ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'telefono',
+            header: 'Teléfono',
+            cell: (t) => t.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={error ? [] : rows}
+        rowKey={(t) => t.id}
+        emptyMessage={
+          error
+            ? 'No se pudieron cargar los transportistas.'
+            : 'Todavía no hay transportistas cargados.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(t) => (
+          <button
+            type="button"
+            onClick={() => setViewingTransportista(t)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
+      />
 
       {viewingTransportista && (
         <TransportistaViewModal

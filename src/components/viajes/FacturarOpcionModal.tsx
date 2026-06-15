@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Factura } from '@/types/api';
+import { Spinner } from '@/components/ui/Spinner';
 
 type Props = {
   open: boolean;
@@ -151,8 +152,9 @@ export function FacturarOpcionModal({
             type="button"
             disabled={busy || (opcion === 'existente' && (!facturaSeleccionadaId || facturasFiltradas.length === 0))}
             onClick={handleConfirm}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
+            {busy && <Spinner className="h-3.5 w-3.5" />}
             {busy ? 'Guardando…' : 'Confirmar'}
           </button>
         </div>

@@ -129,3 +129,18 @@ export function parseCurrencyForMoneda(raw: string, moneda: ViajeMonedaCodigo): 
 export function formatNumberForMoneda(value: number | null | undefined, moneda: ViajeMonedaCodigo): string {
   return moneda === 'USD' ? formatUsdFromNumber(value) : formatCurrencyArFromNumber(value);
 }
+
+/**
+ * Al cambiar solo la moneda del selector, conserva el valor numérico y actualiza el texto visible
+ * (p. ej. "3.000" ARS → "3,000" USD, no 3 USD).
+ */
+export function preserveAmountOnMonedaChange(
+  amountStr: string,
+  fromMoneda: ViajeMonedaCodigo,
+  toMoneda: ViajeMonedaCodigo,
+): string {
+  if (fromMoneda === toMoneda) return amountStr;
+  const num = parseCurrencyForMoneda(amountStr, fromMoneda);
+  if (num == null) return amountStr;
+  return formatNumberForMoneda(num, toMoneda);
+}

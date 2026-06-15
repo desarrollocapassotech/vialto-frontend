@@ -91,7 +91,7 @@ export function ViajeProductosLista({
           onSaved={(p) => {
             setLocalOpciones((prev) => [
               ...prev,
-              { id: p.id, nombre: p.nombre, activo: p.activo, unidadMedida: p.unidadMedida ?? null },
+              { id: p.id, nombre: p.nombre, activo: p.activo },
             ]);
             onProductoCreado?.(p);
             if (nuevoParaIndex !== null) {

@@ -1,6 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalBtnPrimary,
+  viewModalGridClass,
+} from '@/components/ui/ViewModalShell';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Chofer } from '@/types/api';
@@ -75,74 +81,51 @@ export function ChoferViewModal({
   const titulo = chofer?.nombre ?? nombreTitulo ?? 'Chofer';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-xl rounded border border-black/10 bg-white shadow-lg"
-      >
-        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-            {titulo}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="h-8 w-8 flex items-center justify-center text-vialto-steel hover:bg-vialto-mist text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        {loading && (
-          <p className="px-6 py-8 text-sm text-vialto-steel">Cargando detalle…</p>
-        )}
-        {error && (
-          <p className="mx-6 my-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {error}
-          </p>
-        )}
-        {!loading && chofer && (
-          <div className="px-6 py-5 grid grid-cols-2 gap-x-8 gap-y-4">
-            {[
-              { label: 'Nombre', value: chofer.nombre },
-              { label: 'DNI', value: chofer.dni },
-              { label: 'CUIT', value: chofer.cuit },
-              { label: 'N.° Licencia', value: chofer.licencia },
-              {
-                label: 'Vto. Licencia',
-                value: chofer.licenciaVence ? fmtDate(chofer.licenciaVence) : null,
-              },
-              { label: 'Teléfono', value: chofer.telefono },
-              { label: 'Alta', value: fmtDate(chofer.createdAt) },
-            ]
-              .filter((c) => c.value != null && c.value !== '')
-              .map((c, i) => (
-                <div key={i}>
-                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
-                  <p className="mt-1 text-sm">{c.value}</p>
-                </div>
-              ))}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2 border-t border-black/10 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist"
-          >
+    <ViewModalShell
+      title={titulo}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          <Link
-            to={editTo}
-            className="inline-flex h-9 items-center px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-          >
+          <Link to={editTo} className={viewModalBtnPrimary}>
             Editar
           </Link>
+        </>
+      }
+    >
+      {loading && (
+        <p className="text-sm text-vialto-steel">Cargando detalle…</p>
+      )}
+      {error && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {error}
+        </p>
+      )}
+      {!loading && chofer && (
+        <div className={viewModalGridClass}>
+          {[
+            { label: 'Nombre', value: chofer.nombre },
+            { label: 'DNI', value: chofer.dni },
+            { label: 'CUIT', value: chofer.cuit },
+            { label: 'N.° Licencia', value: chofer.licencia },
+            {
+              label: 'Vto. Licencia',
+              value: chofer.licenciaVence ? fmtDate(chofer.licenciaVence) : null,
+            },
+            { label: 'Teléfono', value: chofer.telefono },
+            { label: 'Alta', value: fmtDate(chofer.createdAt) },
+          ]
+            .filter((c) => c.value != null && c.value !== '')
+            .map((c, i) => (
+              <div key={i}>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
+                <p className="mt-1 text-sm">{c.value}</p>
+              </div>
+            ))}
         </div>
-      </div>
-    </div>
+      )}
+    </ViewModalShell>
   );
 }

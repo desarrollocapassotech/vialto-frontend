@@ -1,20 +1,26 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
+import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
+import { useListadoFiltros } from '@/hooks/useListadoFiltros';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { ConEmpresa, Transportista } from '@/types/api';
 
 export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Transportista>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
   const tenants = useTenantsList();
+  const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows, ['nombre', 'idFiscal', 'paut']);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -56,7 +62,7 @@ export function TransportistasSuperadminPage() {
         Elegí una empresa para ver y administrar sus transportistas.
       </p>
       <div className="mt-6">
-        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={setFiltroEmpresa} />
+        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
       </div>
       <div className="mt-4 flex justify-end">
         <Link
@@ -80,56 +86,81 @@ export function TransportistasSuperadminPage() {
           {error}
         </p>
       )}
-      <div className="mt-8 overflow-x-auto rounded border border-black/5 bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">ID Fiscal</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!filtroEmpresa && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  Seleccioná una empresa para ver los transportistas.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows === null && !error && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa && rows !== null && rows.length === 0 && !error && (
-              <tr>
-                <td colSpan={3} className="px-4 py-8 text-vialto-steel">
-                  No hay transportistas cargados para esta empresa.
-                </td>
-              </tr>
-            )}
-            {filtroEmpresa &&
-              rows?.map((t) => (
-                <tr key={t.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
-                  <td className="px-4 py-3">{t.nombre}</td>
-                  <td className="px-4 py-3 text-vialto-steel">{t.idFiscal ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setViewingTransportista(t)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver
-                    </button>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+
+      {filtroEmpresa && !error && (
+        <ListadoToolbar
+          searchValue={busqueda}
+          onSearchChange={setBusqueda}
+          searchPlaceholder="Buscar por nombre, ID fiscal o N° PAUT"
+          filtros={[
+            {
+              value: filtroPais,
+              onChange: setFiltroPais,
+              placeholder: 'Todos los países',
+              opciones: paisesList.map((p) => ({ value: p, label: p })),
+            },
+          ]}
+          onClear={onClear}
+        />
+      )}
+
+      <ListadoDatos
+        className="mt-8"
+        columns={[
+          {
+            id: 'nombre',
+            header: 'Nombre',
+            primary: true,
+            cell: (t) => t.nombre,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'idFiscal',
+            header: 'ID Fiscal',
+            cell: (t) => t.idFiscal ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'pais',
+            header: 'País',
+            cell: (t) => t.pais ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'contacto',
+            header: 'Contacto',
+            cell: (t) => t.email ?? t.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'paut',
+            header: 'N° PAUT',
+            cell: (t) => t.paut ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+        ]}
+        rows={!filtroEmpresa || error ? [] : rowsFiltradas}
+        rowKey={(t) => t.id}
+        emptyMessage={
+          !filtroEmpresa
+            ? 'Seleccioná una empresa para ver los transportistas.'
+            : error
+              ? 'No se pudieron cargar los transportistas.'
+              : activeFilterCount > 0
+                ? 'No hay transportistas que coincidan con los filtros aplicados.'
+                : 'No hay transportistas cargados para esta empresa.'
+        }
+        loadingMessage="Cargando…"
+        renderActions={(t) => (
+          <button
+            type="button"
+            onClick={() => setViewingTransportista(t)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
+      />
 
       {viewingTransportista && (
         <TransportistaViewModal

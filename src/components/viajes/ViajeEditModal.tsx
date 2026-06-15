@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   ChoferSearchSelect,
   ClienteSearchSelect,
   TransportistaSearchSelect,
-  VehiculoPatenteSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
-import { VehiculoModal } from '@/components/viajes/VehiculoModal';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -31,7 +30,11 @@ import {
   emptyPagoTransportista,
   type PagoTransportistaDraft,
 } from '@/components/viajes/PagosTransportistaFieldset';
-import { type ViajeMonedaCodigo } from '@/lib/currencyMask';
+import {
+  preserveAmountOnMonedaChange,
+  maskCurrencyForMoneda,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import type { PaisCodigo } from '@/lib/ciudades';
 import {
   estadoMuestraKmLitros,
@@ -46,7 +49,9 @@ import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos'
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
+import { ViajeDestinosLista } from '@/components/viajes/ViajeDestinosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
+import type { ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -57,11 +62,9 @@ export type ViajeInlineDraft = {
   transportistaId: string;
   vehiculosRows: ViajeVehiculoRowDraft[];
   choferExternoId: string;
-  vehiculoExternoId: string;
   paisOrigen: PaisCodigo;
-  paisDestino: PaisCodigo;
   origen: string;
-  destino: string;
+  destinosRows: ViajeDestinoRowDraft[];
   fechaCarga: string;
   horaCarga: string;
   fechaDescarga: string;
@@ -165,12 +168,12 @@ export function ViajeEditModal({
   onChoferCreado,
   onVehiculoCreado,
 }: ViajeEditModalProps) {
-  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop' | 'vehiculo-ext';
+  type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop';
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
   const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
-  const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
+  const [localVehiculos] = useState<Vehiculo[]>([]);
 
   const todosClientes = useMemo(() => {
     const ids = new Set(clientes.map((c) => c.id));
@@ -313,27 +316,14 @@ export function ViajeEditModal({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={labelClass}>Destino</span>
-              <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                <PaisUbicacionSelect
-                  value={draft.paisDestino}
-                  onChange={(p) =>
-                    setDraft((prev) => (prev ? { ...prev, paisDestino: p, destino: '' } : prev))
-                  }
-                  aria-label="País de destino"
-                  className={`${inputClass} w-full sm:w-40`}
-                />
-                <CiudadCombobox
-                  pais={draft.paisDestino}
-                  value={draft.destino}
-                  onChange={(next) =>
-                    setDraft((prev) => (prev ? { ...prev, destino: next } : prev))
-                  }
-                  inputClassName={`${inputClass} w-full`}
-                />
-              </div>
-            </div>
+            <ViajeDestinosLista
+              groupId={`viaje-edit-${draft.numero || 'e'}`}
+              rows={draft.destinosRows}
+              onChange={(destinosRows) =>
+                setDraft((prev) => (prev ? { ...prev, destinosRows } : prev))
+              }
+              inputClassName={inputClass}
+            />
 
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Cliente</span>
@@ -356,7 +346,7 @@ export function ViajeEditModal({
                   autoComplete="off"
                   value={draft.monto}
                   onChange={(e) =>
-                    setDraft((p) => (p ? { ...p, monto: e.target.value } : p))
+                    setDraft((p) => (p ? { ...p, monto: maskCurrencyForMoneda(e.target.value, p.monedaMonto) } : p))
                   }
                   placeholder="0.00"
                   className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
@@ -364,7 +354,15 @@ export function ViajeEditModal({
                 <MonedaSelect
                   value={draft.monedaMonto}
                   onChange={(m: ViajeMonedaCodigo) =>
-                    setDraft((p) => (p ? { ...p, monedaMonto: m } : p))
+                    setDraft((p) =>
+                      p
+                        ? {
+                            ...p,
+                            monedaMonto: m,
+                            monto: preserveAmountOnMonedaChange(p.monto, p.monedaMonto, m),
+                          }
+                        : p,
+                    )
                   }
                   aria-label="Moneda monto a facturar"
                 />
@@ -376,7 +374,7 @@ export function ViajeEditModal({
               onModoChange={onModoChange}
               groupName={`viaje-edit-${draft.numero || 'e'}`}
               externoContent={
-                <div className="grid gap-2">
+                <div className="grid gap-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={labelClass}>Transportista externo</span>
@@ -409,9 +407,7 @@ export function ViajeEditModal({
                           autoComplete="off"
                           value={draft.precioTransportistaExterno}
                           onChange={(e) =>
-                            setDraft((p) =>
-                              p ? { ...p, precioTransportistaExterno: e.target.value } : p,
-                            )
+                            setDraft((p) => p ? { ...p, precioTransportistaExterno: maskCurrencyForMoneda(e.target.value, p.monedaPrecioTransportistaExterno) } : p)
                           }
                           placeholder="0.00"
                           className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
@@ -420,7 +416,17 @@ export function ViajeEditModal({
                           value={draft.monedaPrecioTransportistaExterno}
                           onChange={(m: ViajeMonedaCodigo) =>
                             setDraft((p) =>
-                              p ? { ...p, monedaPrecioTransportistaExterno: m } : p,
+                              p
+                                ? {
+                                    ...p,
+                                    monedaPrecioTransportistaExterno: m,
+                                    precioTransportistaExterno: preserveAmountOnMonedaChange(
+                                      p.precioTransportistaExterno,
+                                      p.monedaPrecioTransportistaExterno,
+                                      m,
+                                    ),
+                                  }
+                                : p,
                             )
                           }
                           aria-label="Moneda precio transportista externo"
@@ -491,9 +497,9 @@ export function ViajeEditModal({
                       )}
                     </div>
                   )}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Chofer (opcional)</span>
+                  <div className="grid gap-3">
+                    <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                      <span className={labelClass}>Chofer</span>
                       <ChoferSearchSelect
                         choferes={todosChoferes}
                         value={draft.choferExternoId}
@@ -505,26 +511,24 @@ export function ViajeEditModal({
                         onNuevo={getToken ? () => setQuickCreate('chofer-ext') : undefined}
                       />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>Vehículo (opcional)</span>
-                      <VehiculoPatenteSearchSelect
-                        vehiculos={todosVehiculos}
-                        value={draft.vehiculoExternoId}
-                        onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, vehiculoExternoId: id } : p))
-                        }
-                        sinOpciones={todosVehiculos.length === 0}
-                        inputClassName={inputClass}
-                        aria-label="Vehículo transportista externo"
-                        onNuevo={getToken ? () => setQuickCreate('vehiculo-ext') : undefined}
-                      />
-                    </div>
+                    <ViajeVehiculosLista
+                      groupId={`viaje-modal-ext-${draft.numero || 'e'}`}
+                      crearVehiculoHref={crearVehiculoHref}
+                      rows={draft.vehiculosRows}
+                      onChange={(rows) => setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))}
+                      vehiculos={todosVehiculos}
+                      alMenosUno={false}
+                      getToken={getToken}
+                      tenantId={tenantId}
+                      onVehiculoCreado={onVehiculoCreado}
+                      quickCreateStacked
+                    />
                   </div>
                 </div>
               }
               propioContent={
                 <div className="grid gap-3">
-                  <div className="flex min-w-0 max-w-md flex-col gap-1">
+                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={labelClass}>Chofer (flota propia)</span>
                     <ChoferSearchSelect
                       choferes={todosChoferesPropios}
@@ -625,7 +629,7 @@ export function ViajeEditModal({
             </div>
 
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={labelClass}>Detalle adicional (opcional)</span>
+              <span className={labelClass}>Detalle adicional</span>
               <textarea
                 value={draft.detalleCarga}
                 onChange={(e) =>
@@ -742,8 +746,9 @@ export function ViajeEditModal({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
             >
+              {saving && <Spinner className="h-3.5 w-3.5" />}
               {saving ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
@@ -793,20 +798,6 @@ export function ViajeEditModal({
           } else {
             setDraft((p) => (p ? { ...p, choferId: c.id } : p));
           }
-          setQuickCreate(null);
-        }}
-      />
-    )}
-    {quickCreate === 'vehiculo-ext' && getToken && (
-      <VehiculoModal
-        stacked
-        getToken={getToken}
-        tenantId={tenantId}
-        onClose={() => setQuickCreate(null)}
-        onSaved={(v) => {
-          setLocalVehiculos((prev) => [...prev, v]);
-          onVehiculoCreado?.(v);
-          setDraft((p) => (p ? { ...p, vehiculoExternoId: v.id } : p));
           setQuickCreate(null);
         }}
       />

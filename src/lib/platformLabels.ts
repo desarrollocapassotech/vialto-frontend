@@ -8,7 +8,7 @@ const facturacion: Record<string, string> = {
 const modulos: Record<string, string> = {
   viajes: 'Viajes',
   facturacion: 'Registro de Facturas',
-  'liquidaciones-arca': 'Emisión ARCA / AFIP',
+  'integracion-arca': 'Integración ARCA / AFIP',
   'cuenta-corriente': 'Cuenta corriente',
   stock: 'Stock',
   combustible: 'Combustible',

@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { apiJson } from '@/lib/api';
+import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
+import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import type { OtroGasto, Viaje } from '@/types/api';
 
@@ -24,6 +27,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   const [montoStr, setMontoStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGastosAnteriores, setShowGastosAnteriores] = useState(false);
@@ -37,6 +41,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
     setMontoStr('');
     setMoneda('ARS');
     setFecha(new Date().toISOString().slice(0, 10));
+    setFieldErrors({});
     setError(null);
     setShowGastosAnteriores(false);
   }
@@ -47,22 +52,19 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   }
 
   async function handleSubmit() {
-    if (!descripcion.trim()) {
-      setError('Ingresá una descripción.');
-      return;
-    }
-    const monto = parseCurrencyForMoneda(montoStr, moneda);
-    if (monto == null || monto < 0) {
-      setError('Ingresá un monto válido mayor o igual a 0.');
-      return;
-    }
+    const errs: Record<string, string> = {};
+    if (!descripcion.trim()) errs.descripcion = 'Ingresá una descripción.';
+    const montoNum = parseCurrencyForMoneda(montoStr, moneda);
+    if (montoNum == null || montoNum < 0) errs.monto = 'Ingresá un monto válido mayor o igual a 0.';
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+    setFieldErrors({});
 
     setSaving(true);
     setError(null);
     try {
       const body: Record<string, unknown> = {
         descripcion: descripcion.trim(),
-        monto,
+        monto: montoNum,
         moneda,
       };
       if (fecha.trim()) body.fecha = fecha.trim();
@@ -94,7 +96,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className={modalOverlayClass.replace('z-50', 'z-[100]')}
       role="dialog"
       aria-modal="true"
       aria-labelledby="agregar-gasto-title"
@@ -167,32 +169,34 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
 
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <span className={labelClass}>Descripción</span>
+            <span className={labelClass}>Descripción <span className="text-red-500">*</span></span>
             <input
               type="text"
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               placeholder="Ej. Peaje, estadía, reparación…"
-              className={inputClass}
+              className={`${inputClass} ${fieldErrors.descripcion ? 'border-red-400' : ''}`}
               autoFocus
               disabled={saving}
               aria-label="Descripción del gasto"
             />
+            <CrudFieldError message={fieldErrors.descripcion} />
           </div>
 
           <div className="flex gap-2">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className={labelClass}>Monto</span>
+              <span className={labelClass}>Monto <span className="text-red-500">*</span></span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
                 onChange={(e) => setMontoStr(e.target.value)}
                 placeholder="0.00"
-                className={`${inputClass} text-right tabular-nums`}
+                className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? 'border-red-400' : ''}`}
                 disabled={saving}
                 aria-label="Monto del gasto"
               />
+              <CrudFieldError message={fieldErrors.monto} />
             </div>
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Moneda</span>
@@ -213,7 +217,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className={labelClass}>Fecha (opcional)</span>
+            <span className={labelClass}>Fecha</span>
             <input
               type="date"
               value={fecha}
@@ -247,8 +251,9 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
             type="button"
             disabled={saving}
             onClick={() => void handleSubmit()}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {saving ? 'Guardando…' : 'Guardar gasto'}
           </button>
         </div>

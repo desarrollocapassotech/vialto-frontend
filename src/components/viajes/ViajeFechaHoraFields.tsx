@@ -102,7 +102,7 @@ export function ViajeFechaHoraFields({
       <div className="min-w-[10rem]">
         {campoFechaHora({
           labelFecha: 'Fecha',
-          labelHora: 'Hora (opcional)',
+          labelHora: 'Hora',
           fecha: fechaCarga,
           hora: horaCarga,
           onFecha: (v) => onPatch({ fechaCarga: v }),
@@ -124,7 +124,7 @@ export function ViajeFechaHoraFields({
           <span className={tituloSeccion}>Carga</span>
           {campoFechaHora({
             labelFecha: 'Fecha',
-            labelHora: 'Hora (opcional)',
+            labelHora: 'Hora',
             fecha: fechaCarga,
             hora: horaCarga,
             onFecha: (v) => onPatch({ fechaCarga: v }),
@@ -140,7 +140,7 @@ export function ViajeFechaHoraFields({
           <span className={tituloSeccion}>Descarga</span>
           {campoFechaHora({
             labelFecha: 'Fecha',
-            labelHora: 'Hora (opcional)',
+            labelHora: 'Hora',
             fecha: fechaDescarga,
             hora: horaDescarga,
             onFecha: (v) => onPatch({ fechaDescarga: v }),
@@ -162,7 +162,7 @@ export function ViajeFechaHoraFields({
         <span className={tituloSeccion}>Carga</span>
         {campoFechaHora({
           labelFecha: 'Fecha',
-          labelHora: 'Hora (opcional)',
+          labelHora: 'Hora',
           fecha: fechaCarga,
           hora: horaCarga,
           onFecha: (v) => onPatch({ fechaCarga: v }),
@@ -179,7 +179,7 @@ export function ViajeFechaHoraFields({
         <span className={tituloSeccion}>Descarga</span>
         {campoFechaHora({
           labelFecha: 'Fecha',
-          labelHora: 'Hora (opcional)',
+          labelHora: 'Hora',
           fecha: fechaDescarga,
           hora: horaDescarga,
           onFecha: (v) => onPatch({ fechaDescarga: v }),

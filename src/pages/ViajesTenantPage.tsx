@@ -1,9 +1,12 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { ListadoCard } from '@/components/listado/ListadoCard';
+import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import type { ViajeOperacionModo } from '@/components/viajes/ViajeOperacionTipoFieldset';
@@ -12,7 +15,7 @@ import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
 import { ExportarViajeModal } from '@/components/viajes/ExportarViajeModal';
 import { EmitirCvlpModal } from '@/components/viajes/EmitirCvlpModal';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
@@ -52,9 +55,11 @@ import {
 import {
   draftRequiereGananciaBrutaManual,
   gananciaBrutaManualEnPatchParcial,
+  gananciaBrutaMetaDesdeViaje,
 } from '@/lib/viajesGananciaBruta';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeAccionesMenu } from '@/components/viajes/ViajeAccionesMenu';
+import { ViajesResumenFiltros } from '@/components/viajes/ViajesResumenFiltros';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   otroGastoDraftFromApi,
@@ -89,7 +94,10 @@ import {
   VIAJE_PAGO_TRANSPORTISTA_QUERY,
   type ViajePagoTransportistaFiltro,
 } from '@/lib/viajesFiltroPagoTransportista';
-import { canAccessLiquidacionesArca } from '@/lib/tenantModules';
+import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { canAccessFacturacion, canAccessIntegracionArca } from '@/lib/tenantModules';
+import { FacturarSelectorModal } from '@/components/viajes/FacturarSelectorModal';
 import type {
   Chofer,
   Cliente,
@@ -102,6 +110,13 @@ import type {
   Viaje,
 } from '@/types/api';
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
+import {
+  destinosPayloadParaApi,
+  destinosRowsDesdeViaje,
+  etiquetasDestinosDesdeViaje,
+  validarDestinosRows,
+  viajeConDestinosEnRespuesta,
+} from '@/lib/viajesDestinos';
 
 
 type ViajesPaginatedResponse = {
@@ -124,7 +139,11 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const platform = Boolean(tenantId?.trim());
   const hasLiquidacionesArca =
-    !platform && canAccessLiquidacionesArca(currentTenant?.modules ?? []);
+    !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
+  const hasFacturacionSinArca =
+    !platform &&
+    !hasLiquidacionesArca &&
+    canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? '';
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -221,6 +240,10 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
   /** Viaje para el que se quiere emitir un CVLP. */
   const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
+  /** Viaje para el selector manual factura/liquidación (tenants sin integracion-arca). */
+  const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
+  /** Viaje para el modal de creación manual de liquidación. */
+  const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
   /** Conteos globales para los chips de acceso rápido. */
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
@@ -716,17 +739,17 @@ export function ViajesTenantPage({
     key: K,
     item: MaestroListasViaje[K][number],
   ) {
-    const mergeOne = <T extends { id: string }>(prev: T[]) => mergeMaestroPorId(prev, [item as T]);
+    const mergeOne = <T extends { id: string }>(prev: T[]) => mergeMaestroPorId(prev, [item as unknown as T]);
     setSessionMaestro((prev) => ({
       ...prev,
-      [key]: mergeOne(prev[key]),
-    }));
+      [key]: mergeOne(prev[key] as { id: string }[]),
+    } as MaestroListasViaje));
     setEdicionMaestro((prev) =>
       prev
-        ? {
+        ? ({
             ...prev,
-            [key]: mergeOne(prev[key]),
-          }
+            [key]: mergeOne(prev[key] as { id: string }[]),
+          } as MaestroListasViaje)
         : prev,
     );
     if (platform) {
@@ -843,24 +866,22 @@ export function ViajesTenantPage({
       choferExternoId: esExterno ? mantenerIdSiEnLista(v.choferId, listas.choferes) : '',
       transportistaId: mantenerIdSiEnLista(v.transportistaId, listas.transportistas),
       vehiculosRows:
-        !esExterno && v.vehiculosViaje && v.vehiculosViaje.length > 0
+        v.vehiculosViaje && v.vehiculosViaje.length > 0
           ? [...v.vehiculosViaje]
               .sort((a, b) => a.orden - b.orden)
               .map((x) => ({
                 tipo: (x.vehiculo?.tipo ?? 'tractor').toLowerCase(),
-                vehiculoId: mantenerIdSiEnLista(x.vehiculoId, vehiculosPropiosEdit),
+                vehiculoId: esExterno
+                  ? String(x.vehiculoId ?? '').trim()
+                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropiosEdit),
               }))
           : !esExterno
             ? [{ tipo: 'tractor', vehiculoId: '' }]
             : [],
-      vehiculoExternoId: esExterno
-        ? mantenerIdSiEnLista(v.vehiculosViaje?.[0]?.vehiculoId, listas.vehiculos)
-        : '',
       clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
-      paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
-      destino: v.destino ?? '',
+      destinosRows: destinosRowsDesdeViaje(v),
       fechaCarga: partesFc.fecha,
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
@@ -1083,7 +1104,6 @@ export function ViajesTenantPage({
                   realizaFlete: true,
                   transportistaEfectivoId: '',
                   choferExternoId: '',
-                  vehiculoExternoId: '',
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0 ? p.vehiculosRows : [{ tipo: 'tractor', vehiculoId: '' }],
@@ -1124,16 +1144,17 @@ export function ViajesTenantPage({
       return;
     }
     const o = draft.origen.trim();
-    const d = draft.destino.trim();
-    if (o || d) {
-      const [okO, okD] = await Promise.all([
-        o ? esEtiquetaCiudadValida(draft.paisOrigen, o) : Promise.resolve(true),
-        d ? esEtiquetaCiudadValida(draft.paisDestino, d) : Promise.resolve(true),
-      ]);
-      if (!okO || !okD) {
-        setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+    if (o) {
+      const okO = await esEtiquetaCiudadValida(draft.paisOrigen, o);
+      if (!okO) {
+        setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
         return;
       }
+    }
+    const destinosVal = await validarDestinosRows(draft.destinosRows);
+    if (!destinosVal.ok) {
+      setError(destinosVal.message);
+      return;
     }
     const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
     const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
@@ -1163,6 +1184,7 @@ export function ViajesTenantPage({
     setSavingId(viajeId);
     setError(null);
     try {
+      const destinosBody = destinosPayloadParaApi(destinosVal.destinos);
       const updated = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({
@@ -1177,7 +1199,7 @@ export function ViajesTenantPage({
                   ? null
                   : draft.transportistaEfectivoId.trim() || null,
                 choferId: draft.choferExternoId.trim() || null,
-                vehiculoIds: draft.vehiculoExternoId.trim() ? [draft.vehiculoExternoId.trim()] : [],
+                vehiculoIds: vids,
               }
             : {
                 transportistaId: null,
@@ -1186,7 +1208,7 @@ export function ViajesTenantPage({
                 vehiculoIds: vids,
               }),
           origen: draft.origen.trim() || undefined,
-          destino: draft.destino.trim() || undefined,
+          ...destinosBody,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
           productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
@@ -1206,7 +1228,16 @@ export function ViajesTenantPage({
           pagosTransportista: draft.pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
-      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
+      let viajeGuardado = viajeConDestinosEnRespuesta(updated, destinosVal.destinos);
+      if (etiquetasDestinosDesdeViaje(viajeGuardado).length < destinosVal.destinos.length) {
+        try {
+          viajeGuardado = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken());
+        } catch {
+          /* mantener respuesta del PATCH */
+        }
+        viajeGuardado = viajeConDestinosEnRespuesta(viajeGuardado, destinosVal.destinos);
+      }
+      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? viajeGuardado : r)) : prev));
       const stubs = entidadesMaestroStubsDesdeViaje(updated);
       setSessionMaestro((prev) => ({
         clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
@@ -1232,127 +1263,185 @@ export function ViajesTenantPage({
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
+  const viajesListadoFiltros = (
+    <>
+      <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltroActivo.trim()}>
+        <ClienteSearchSelect
+          id="viajes-filtro-cliente"
+          clientes={clientes}
+          value={clienteIdFiltroActivo}
+          onChange={(id) => aplicarFiltroColumnaCliente(id)}
+          allowEmptyValue
+          emptyListChoiceLabel="Todos"
+          placeholderCerrado="Todos"
+          disabled={listadoRefetching}
+          aria-label="Filtrar listado por cliente"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            clienteIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+        />
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Transporte" active={!!transportistaIdFiltroActivo.trim()}>
+        <TransportistaSearchSelect
+          id="viajes-filtro-transporte"
+          transportistas={transportistas}
+          value={transportistaIdFiltroActivo}
+          onChange={(id) => aplicarFiltroColumnaTransportista(id)}
+          placeholderCerrado="Todos"
+          emptyListChoiceLabel="Todos"
+          disabled={listadoRefetching}
+          aria-label="Filtrar listado por transporte"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            transportistaIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+        />
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Estado" active={!!estadoFiltro.trim()}>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => aplicarFiltroEstado(e.target.value)}
+          disabled={listadoRefetching}
+          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            estadoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+          aria-label="Filtrar listado por estado"
+        >
+          <option value="">Todos</option>
+          {VIAJE_ESTADOS_TODOS.map((est) => (
+            <option key={est} value={est} title={tooltipEstadoViaje(est)}>
+              {estadoViajeLabel[est] ?? est}
+            </option>
+          ))}
+        </select>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Origen — Destino" active={!!ubicacionFiltro.trim()}>
+        <div className="flex flex-col gap-2">
+          <select
+            value={tipoUbicacionFiltro}
+            onChange={(e) => {
+              const v = e.target.value;
+              aplicarTipoUbicacionFiltro(v === 'origen' || v === 'destino' ? v : '');
+            }}
+            disabled={listadoRefetching}
+            className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+              tipoUbicacionFiltro && ubicacionFiltro.trim()
+                ? 'text-vialto-fire'
+                : 'text-vialto-charcoal'
+            }`}
+            aria-label="Filtrar por ciudad en origen o en destino"
+          >
+            <option value="">Sin filtro por ubicación</option>
+            <option value="origen">Origen</option>
+            <option value="destino">Destino</option>
+          </select>
+          {tipoUbicacionFiltro ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                País
+              </span>
+              <PaisUbicacionSelect
+                value={paisUbicacionFiltro}
+                onChange={(p) => aplicarPaisUbicacionFiltro(p)}
+                className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
+                aria-label="País para buscar la ciudad del filtro"
+              />
+              <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                Ciudad
+              </span>
+              <CiudadCombobox
+                pais={paisUbicacionFiltro}
+                value={ubicacionFiltro}
+                onChange={(next) => aplicarUbicacionCiudadSeleccion(next)}
+                inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                  ubicacionFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                }`}
+                disableBrowserAutocomplete
+                aria-label={
+                  tipoUbicacionFiltro === 'origen'
+                    ? 'Ciudad de origen (elegir de la lista)'
+                    : 'Ciudad de destino (elegir de la lista)'
+                }
+              />
+            </div>
+          ) : null}
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo
+        label="Carga — Descarga"
+        active={!!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()}
+      >
+        <div className="flex flex-col gap-2">
+          <select
+            value={tipoFechaFiltro}
+            onChange={(e) => {
+              const v = e.target.value;
+              aplicarTipoFechaFiltro(v === 'carga' || v === 'descarga' ? v : '');
+            }}
+            disabled={listadoRefetching}
+            className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+              tipoFechaFiltro && (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
+                ? 'text-vialto-fire'
+                : 'text-vialto-charcoal'
+            }`}
+            aria-label="Filtrar por fecha de carga o de descarga"
+          >
+            <option value="">Sin filtro por fecha</option>
+            <option value="carga">Fecha de carga</option>
+            <option value="descarga">Fecha de descarga</option>
+          </select>
+          {tipoFechaFiltro ? (
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+              <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                Desde
+                <input
+                  type="date"
+                  value={fechaDesdeFiltro}
+                  onChange={(e) => aplicarFechaDesdeFiltro(e.target.value)}
+                  disabled={listadoRefetching}
+                  className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                />
+              </label>
+              <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                Hasta
+                <input
+                  type="date"
+                  value={fechaHastaFiltro}
+                  onChange={(e) => aplicarFechaHastaFiltro(e.target.value)}
+                  disabled={listadoRefetching}
+                  className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+      </ListadoFiltroCampo>
+    </>
+  );
+
   return (
     <div className="w-full">
       {!embeddedInSuperadmin && (
         <>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
             Viajes
           </h1>
         </>
       )}
 
       {resumen && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => aplicarFiltroEstado(estadoFiltro === 'finalizado_sin_facturar' ? '' : 'finalizado_sin_facturar')}
-            className={[
-              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-              estadoFiltro === 'finalizado_sin_facturar'
-                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                : resumen.sinFacturar > 0
-                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
-            ].join(' ')}
-          >
-            Sin facturar
-            <span
-              className={[
-                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
-                estadoFiltro === 'finalizado_sin_facturar'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}
-            >
-              {resumen.sinFacturar}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => aplicarFiltroEstado(estadoFiltro === 'facturado_sin_cobrar' ? '' : 'facturado_sin_cobrar')}
-            className={[
-              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-              estadoFiltro === 'facturado_sin_cobrar'
-                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                : resumen.sinCobrar > 0
-                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
-            ].join(' ')}
-          >
-            Sin cobrar
-            <span
-              className={[
-                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
-                estadoFiltro === 'facturado_sin_cobrar'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}
-            >
-              {resumen.sinCobrar}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              aplicarFiltroPagoTransportista(
-                pagoTransportistaFiltro === 'sin_pagar' ? '' : 'sin_pagar',
-              )
-            }
-            className={[
-              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-              pagoTransportistaFiltro === 'sin_pagar'
-                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                : resumen.sinPagar > 0
-                  ? 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist animate-estado-atencion-suave motion-reduce:animate-none'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
-            ].join(' ')}
-          >
-            Sin pagar
-            <span
-              className={[
-                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
-                pagoTransportistaFiltro === 'sin_pagar'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}
-            >
-              {resumen.sinPagar}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              aplicarFiltroPagoTransportista(
-                pagoTransportistaFiltro === 'pagado' ? '' : 'pagado',
-              )
-            }
-            className={[
-              'inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs uppercase tracking-wider transition-colors',
-              pagoTransportistaFiltro === 'pagado'
-                ? 'border-emerald-700 bg-emerald-700 text-white'
-                : resumen.pagados > 0
-                  ? 'border-emerald-600/40 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
-                  : 'border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist',
-            ].join(' ')}
-          >
-            Pagados
-            <span
-              className={[
-                'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-semibold tabular-nums leading-none',
-                pagoTransportistaFiltro === 'pagado'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-black/10 text-vialto-charcoal',
-              ].join(' ')}
-            >
-              {resumen.pagados}
-            </span>
-          </button>
+        <div className="mt-3">
+          <ViajesResumenFiltros
+            resumen={resumen}
+            estadoFiltro={estadoFiltro}
+            pagoTransportistaFiltro={pagoTransportistaFiltro}
+            onFiltroEstado={aplicarFiltroEstado}
+            onFiltroPago={aplicarFiltroPagoTransportista}
+          />
         </div>
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-h-10 items-center">
+        <div className="hidden min-h-10 items-center lg:flex">
           {hayFiltrosColumnasActivos && (
             <button
               type="button"
@@ -1405,241 +1494,224 @@ export function ViajesTenantPage({
         </div>
       )}
 
-      <div className="mt-8 overflow-x-hidden rounded border border-black/5 bg-white shadow-sm">
-        <table
-          className="w-full table-fixed text-left text-base"
-          aria-busy={mostrarCargandoListado}
-        >
-          <thead>
-            <tr className="border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[15px] uppercase tracking-[0.2em] text-vialto-fire">
-              {mostrarColumnaFacturarLote && (
-                <th className="px-2 py-3 w-10 text-center align-middle">
-                  <span className="sr-only">Seleccionar para facturación conjunta</span>
-                  {elegiblesEnPagina.length > 0 ? (
-                    <input
-                      type="checkbox"
-                      checked={todosElegiblesMarcados}
-                      onChange={toggleSeleccionarTodosEnPagina}
-                      className="accent-vialto-charcoal"
-                      title="Marcar o desmarcar todos los viajes facturables en esta página"
-                      aria-label="Marcar o desmarcar todos los viajes facturables en esta página"
-                    />
-                  ) : null}
-                </th>
-              )}
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Cliente"
-                  filterActive={!!clienteIdFiltroActivo.trim()}
-                  filterSignature={clienteIdFiltroActivo}
-                >
-                  <ClienteSearchSelect
-                    id="viajes-col-filtro-cliente"
-                    clientes={clientes}
-                    value={clienteIdFiltroActivo}
-                    onChange={(id) => aplicarFiltroColumnaCliente(id)}
-                    allowEmptyValue
-                    emptyListChoiceLabel="Todos"
-                    placeholderCerrado="Todos"
-                    disabled={listadoRefetching}
-                    aria-label="Filtrar listado por cliente"
-                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      clienteIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                    }`}
+      <ListadoDatos
+        className="mt-8"
+        columns={[]}
+        rows={mostrarCargandoListado ? null : (rows ?? [])}
+        rowKey={(v) => v.id}
+        emptyMessage="Todavía no hay viajes cargados."
+        loadingMessage="Cargando…"
+        tableColSpan={tableColSpan}
+        filters={viajesListadoFiltros}
+        activeFilterCount={cantidadFiltrosColumnasActivos}
+        onClearFilters={limpiarFiltrosColumnas}
+        clearFiltersDisabled={listadoRefetching}
+        filtersTitle="Filtrar viajes"
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            {mostrarColumnaFacturarLote && (
+              <th className="px-2 py-3 w-10 text-center align-middle">
+                <span className="sr-only">Seleccionar para facturación conjunta</span>
+                {elegiblesEnPagina.length > 0 ? (
+                  <input
+                    type="checkbox"
+                    checked={todosElegiblesMarcados}
+                    onChange={toggleSeleccionarTodosEnPagina}
+                    className="accent-vialto-charcoal"
+                    title="Marcar o desmarcar todos los viajes facturables en esta página"
+                    aria-label="Marcar o desmarcar todos los viajes facturables en esta página"
                   />
-                </ViajesListadoHeaderFiltro>
+                ) : null}
               </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Transporte"
-                  filterActive={!!transportistaIdFiltroActivo.trim()}
-                  filterSignature={transportistaIdFiltroActivo}
+            )}
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Cliente"
+                filterActive={!!clienteIdFiltroActivo.trim()}
+                filterSignature={clienteIdFiltroActivo}
+              >
+                <ClienteSearchSelect
+                  id="viajes-col-filtro-cliente"
+                  clientes={clientes}
+                  value={clienteIdFiltroActivo}
+                  onChange={(id) => aplicarFiltroColumnaCliente(id)}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  disabled={listadoRefetching}
+                  aria-label="Filtrar listado por cliente"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    clienteIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Transporte"
+                filterActive={!!transportistaIdFiltroActivo.trim()}
+                filterSignature={transportistaIdFiltroActivo}
+              >
+                <TransportistaSearchSelect
+                  id="viajes-col-filtro-transporte"
+                  transportistas={transportistas}
+                  value={transportistaIdFiltroActivo}
+                  onChange={(id) => aplicarFiltroColumnaTransportista(id)}
+                  placeholderCerrado="Todos"
+                  emptyListChoiceLabel="Todos"
+                  disabled={listadoRefetching}
+                  aria-label="Filtrar listado por transporte"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    transportistaIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={!!estadoFiltro.trim()}
+                filterSignature={estadoFiltro}
+              >
+                <select
+                  value={estadoFiltro}
+                  onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                  disabled={listadoRefetching}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    estadoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                  aria-label="Filtrar listado por estado"
                 >
-                  <TransportistaSearchSelect
-                    id="viajes-col-filtro-transporte"
-                    transportistas={transportistas}
-                    value={transportistaIdFiltroActivo}
-                    onChange={(id) => aplicarFiltroColumnaTransportista(id)}
-                    placeholderCerrado="Todos"
-                    emptyListChoiceLabel="Todos"
-                    disabled={listadoRefetching}
-                    aria-label="Filtrar listado por transporte"
-                    inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      transportistaIdFiltroActivo.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                    }`}
-                  />
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Estado"
-                  filterActive={!!estadoFiltro.trim()}
-                  filterSignature={estadoFiltro}
-                >
+                  <option value="">Todos</option>
+                  {VIAJE_ESTADOS_TODOS.map((est) => (
+                    <option key={est} value={est} title={tooltipEstadoViaje(est)}>
+                      {estadoViajeLabel[est] ?? est}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Origen — Destino"
+                filterActive={!!ubicacionFiltro.trim()}
+                filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+              >
+                <div className="flex flex-col gap-2">
                   <select
-                    value={estadoFiltro}
-                    onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                    value={tipoUbicacionFiltro}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      aplicarTipoUbicacionFiltro(v === 'origen' || v === 'destino' ? v : '');
+                    }}
                     disabled={listadoRefetching}
                     className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      estadoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      tipoUbicacionFiltro && ubicacionFiltro.trim()
+                        ? 'text-vialto-fire'
+                        : 'text-vialto-charcoal'
                     }`}
-                    aria-label="Filtrar listado por estado"
+                    aria-label="Filtrar por ciudad en origen o en destino"
                   >
-                    <option value="">Todos</option>
-                    {VIAJE_ESTADOS_TODOS.map((est) => (
-                      <option key={est} value={est} title={tooltipEstadoViaje(est)}>
-                        {estadoViajeLabel[est] ?? est}
-                      </option>
-                    ))}
+                    <option value="">Sin filtro por ubicación</option>
+                    <option value="origen">Origen</option>
+                    <option value="destino">Destino</option>
                   </select>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Origen — Destino"
-                  filterActive={!!ubicacionFiltro.trim()}
-                  filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
-                >
-                  <div className="flex flex-col gap-2">
-                    <select
-                      value={tipoUbicacionFiltro}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        aplicarTipoUbicacionFiltro(
-                          v === 'origen' || v === 'destino' ? v : '',
-                        );
-                      }}
-                      disabled={listadoRefetching}
-                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        tipoUbicacionFiltro && ubicacionFiltro.trim()
-                          ? 'text-vialto-fire'
-                          : 'text-vialto-charcoal'
-                      }`}
-                      aria-label="Filtrar por ciudad en origen o en destino"
-                    >
-                      <option value="">Sin filtro por ubicación</option>
-                      <option value="origen">Origen</option>
-                      <option value="destino">Destino</option>
-                    </select>
-                    {tipoUbicacionFiltro ? (
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                          País
-                        </span>
-                        <PaisUbicacionSelect
-                          value={paisUbicacionFiltro}
-                          onChange={(p) => aplicarPaisUbicacionFiltro(p)}
-                            className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
-                          aria-label="País para buscar la ciudad del filtro"
+                  {tipoUbicacionFiltro ? (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                        País
+                      </span>
+                      <PaisUbicacionSelect
+                        value={paisUbicacionFiltro}
+                        onChange={(p) => aplicarPaisUbicacionFiltro(p)}
+                        className="h-8 w-full border border-black/15 bg-white px-2 text-xs text-vialto-charcoal"
+                        aria-label="País para buscar la ciudad del filtro"
+                      />
+                      <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
+                        Ciudad
+                      </span>
+                      <CiudadCombobox
+                        pais={paisUbicacionFiltro}
+                        value={ubicacionFiltro}
+                        onChange={(next) => aplicarUbicacionCiudadSeleccion(next)}
+                        inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                          ubicacionFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                        }`}
+                        disableBrowserAutocomplete
+                        aria-label={
+                          tipoUbicacionFiltro === 'origen'
+                            ? 'Ciudad de origen (elegir de la lista)'
+                            : 'Ciudad de destino (elegir de la lista)'
+                        }
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Carga — Descarga"
+                filterActive={!!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()}
+                filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+              >
+                <div className="flex flex-col gap-2">
+                  <select
+                    value={tipoFechaFiltro}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      aplicarTipoFechaFiltro(v === 'carga' || v === 'descarga' ? v : '');
+                    }}
+                    disabled={listadoRefetching}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      tipoFechaFiltro && (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
+                        ? 'text-vialto-fire'
+                        : 'text-vialto-charcoal'
+                    }`}
+                    aria-label="Filtrar por fecha de carga o de descarga"
+                  >
+                    <option value="">Sin filtro por fecha</option>
+                    <option value="carga">Fecha de carga</option>
+                    <option value="descarga">Fecha de descarga</option>
+                  </select>
+                  {tipoFechaFiltro ? (
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                        Desde
+                        <input
+                          type="date"
+                          value={fechaDesdeFiltro}
+                          onChange={(e) => aplicarFechaDesdeFiltro(e.target.value)}
+                          disabled={listadoRefetching}
+                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                         />
-                        <span className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel">
-                          Ciudad
-                        </span>
-                        <div className="w-full">
-                          <CiudadCombobox
-                            pais={paisUbicacionFiltro}
-                            value={ubicacionFiltro}
-                            onChange={(next) => aplicarUbicacionCiudadSeleccion(next)}
-                            inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                              ubicacionFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
-                            }`}
-                            disableBrowserAutocomplete
-                            aria-label={
-                              tipoUbicacionFiltro === 'origen'
-                                ? 'Ciudad de origen (elegir de la lista)'
-                                : 'Ciudad de destino (elegir de la lista)'
-                            }
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th scope="col" className="px-4 py-3 align-top">
-                <ViajesListadoHeaderFiltro
-                  title="Carga — Descarga"
-                  filterActive={
-                    !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
-                  }
-                  filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
-                >
-                  <div className="flex flex-col gap-2">
-                    <select
-                      value={tipoFechaFiltro}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        aplicarTipoFechaFiltro(
-                          v === 'carga' || v === 'descarga' ? v : '',
-                        );
-                      }}
-                      disabled={listadoRefetching}
-                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        tipoFechaFiltro &&
-                        (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim())
-                          ? 'text-vialto-fire'
-                          : 'text-vialto-charcoal'
-                      }`}
-                      aria-label="Filtrar por fecha de carga o de descarga"
-                    >
-                      <option value="">Sin filtro por fecha</option>
-                      <option value="carga">Fecha de carga</option>
-                      <option value="descarga">Fecha de descarga</option>
-                    </select>
-                    {tipoFechaFiltro ? (
-                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                        <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                          Desde
-                          <input
-                            type="date"
-                            value={fechaDesdeFiltro}
-                            onChange={(e) => aplicarFechaDesdeFiltro(e.target.value)}
-                            disabled={listadoRefetching}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                          />
-                        </label>
-                        <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-                          Hasta
-                          <input
-                            type="date"
-                            value={fechaHastaFiltro}
-                            onChange={(e) => aplicarFechaHastaFiltro(e.target.value)}
-                            disabled={listadoRefetching}
-                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
-                          />
-                        </label>
-                      </div>
-                    ) : null}
-                  </div>
-                </ViajesListadoHeaderFiltro>
-              </th>
-              <th className="px-4 py-3 text-right">Monto a facturar</th>
-              <ViajeGananciaBrutaColumnHeader />
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mostrarCargandoListado && (
-              <tr>
-                <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!mostrarCargandoListado && rows?.length === 0 && (
-              <tr>
-                <td colSpan={tableColSpan} className="px-4 py-8 text-vialto-steel">
-                  Todavía no hay viajes cargados.
-                </td>
-              </tr>
-            )}
-            {!mostrarCargandoListado && rows && rows.length > 0 && rows.map((v) => {
-              const nombreCliente = nombreClienteListadoViaje(v, clientes);
-              const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
-              const nombreTranspEfectivo = nombreTransportistaEfectivoListadoViaje(v, transportistas);
-              return (
-              <Fragment key={v.id}>
-              <tr className="border-b border-black/5 hover:bg-vialto-mist/80">
+                      </label>
+                      <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+                        Hasta
+                        <input
+                          type="date"
+                          value={fechaHastaFiltro}
+                          onChange={(e) => aplicarFechaHastaFiltro(e.target.value)}
+                          disabled={listadoRefetching}
+                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Monto a facturar</th>
+            <ViajeGananciaBrutaColumnHeader />
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
+          </tr>
+        }
+        renderTableRow={(v) => {
+          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
+          const nombreTranspEfectivo = nombreTransportistaEfectivoListadoViaje(v, transportistas);
+          return (
+              <tr key={v.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
                 {mostrarColumnaFacturarLote && (
                   <td className="px-2 py-3 align-middle text-center">
                     {esElegibleFacturarLote(v) ? (
@@ -1713,8 +1785,12 @@ export function ViajesTenantPage({
                   )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-vialto-steel max-w-[220px]">
-                  <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
+                <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
+                  <ViajeOrigenDestinoLinea
+                    origen={v.origen}
+                    destino={v.destino}
+                    destinosViaje={v.destinosViaje}
+                  />
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
@@ -1760,17 +1836,178 @@ export function ViajesTenantPage({
                     onEmitirCvlp={
                       hasLiquidacionesArca && v.transportistaId
                         ? () => setEmitirCvlpViaje(v)
-                        : undefined
+                        : hasFacturacionSinArca && v.transportistaId
+                          ? () => setSelectorViaje(v)
+                          : undefined
                     }
                     onEliminar={() => requestDeleteViaje(v)}
                   />
                 </td>
               </tr>
-              </Fragment>
-            );})}
-          </tbody>
-        </table>
-      </div>
+          );
+        }}
+        renderMobileCard={(v) => {
+          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
+          const nombreTranspEfectivo = nombreTransportistaEfectivoListadoViaje(v, transportistas);
+          const metaGanancia = gananciaBrutaMetaDesdeViaje(v);
+          const transporteValue = (
+            <>
+              <span className="block truncate" title={nombreTransp}>
+                {nombreTransp}
+              </span>
+              {nombreTranspEfectivo && (
+                <span
+                  className="block truncate text-[11px] text-vialto-steel/70"
+                  title={`Ejecuta: ${nombreTranspEfectivo}`}
+                >
+                  Ejecuta: {nombreTranspEfectivo}
+                </span>
+              )}
+            </>
+          );
+          const estadoValue = (
+            <div className="flex flex-col gap-0.5 items-start">
+              {estadoQuickId === v.id ? (
+                <select
+                  autoFocus
+                  value={v.estado}
+                  disabled={savingEstadoId === v.id}
+                  onChange={(e) => void patchEstadoDesdeListado(v, e.target.value)}
+                  onBlur={() => setEstadoQuickId(null)}
+                  className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
+                  aria-label="Cambiar estado del viaje"
+                >
+                  {estadosDisponiblesParaViaje(v, viajesConFactura).map((x) => (
+                    <option key={x} value={x} title={tooltipEstadoViaje(x)}>
+                      {estadoViajeLabel[x] ?? x}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <button
+                  type="button"
+                  title={tooltipEstadoViaje(v.estado)}
+                  aria-label={`Estado ${estadoViajeLabel[v.estado] ?? v.estado}. Abrir selector para cambiar.`}
+                  disabled={savingEstadoId === v.id}
+                  onClick={() => {
+                    if (savingEstadoId) return;
+                    setEstadoQuickId(v.id);
+                  }}
+                  className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                    estadoViajeBadgeClass[v.estado] ?? estadoViajeBadgeClassDefault
+                  }`}
+                >
+                  {savingEstadoId === v.id ? '…' : estadoViajeLabel[v.estado] ?? 'Sin clasificar'}
+                </button>
+              )}
+              {viajeEstadoEsFacturadoOCobrado(v.estado) && (
+                <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
+                  Factura: {numeroFacturaVisibleViaje(v) || '—'}
+                </span>
+              )}
+            </div>
+          );
+          const gananciaValue = (
+            <>
+              {metaGanancia.lineasBalance && metaGanancia.lineasBalance.length > 1 ? (
+                <span className="flex flex-col items-start gap-0.5 leading-tight">
+                  {metaGanancia.lineasBalance.map((l) => (
+                    <span key={l.moneda} className="tabular-nums">
+                      {l.formatted}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                metaGanancia.display
+              )}
+              {metaGanancia.reason && (
+                <span className="block text-[10px] text-vialto-steel/70 tabular-nums">{metaGanancia.reason}</span>
+              )}
+            </>
+          );
+          return (
+            <ListadoCard
+              primary={
+                <div className="flex items-start gap-2">
+                  {mostrarColumnaFacturarLote && esElegibleFacturarLote(v) ? (
+                    <input
+                      type="checkbox"
+                      checked={idsFacturarSeleccion.includes(v.id)}
+                      onChange={() => toggleFacturarLote(v.id)}
+                      className="mt-1 accent-vialto-charcoal"
+                      aria-label={`Incluir viaje ${v.numero} en facturación conjunta`}
+                    />
+                  ) : null}
+                  <span className="min-w-0 truncate font-medium" title={nombreCliente}>
+                    {nombreCliente}
+                  </span>
+                </div>
+              }
+              fields={[
+                { label: 'Transporte', value: transporteValue },
+                { label: 'Estado', value: estadoValue },
+                {
+                  label: 'Origen — Destino',
+                  value: (
+                    <ViajeOrigenDestinoLinea
+                      origen={v.origen}
+                      destino={v.destino}
+                      destinosViaje={v.destinosViaje}
+                    />
+                  ),
+                },
+                {
+                  label: 'Carga — Descarga',
+                  value: (
+                    <div className="flex flex-col gap-0.5 tabular-nums">
+                      <span title={v.fechaCarga ?? undefined}>
+                        {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
+                      </span>
+                      <span className="text-xs text-vialto-steel/90" title={v.fechaDescarga ?? undefined}>
+                        {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
+                      </span>
+                    </div>
+                  ),
+                },
+                { label: 'Monto', value: textoMontoFacturarListado(v) },
+                { label: 'Ganancia bruta', value: gananciaValue },
+              ]}
+              actions={
+                <ViajeAccionesMenu
+                  viaje={v}
+                  onVer={() => setViewingViaje(v)}
+                  onAgregarGasto={() => setAgregarGastoViaje(v)}
+                  onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                  onFacturar={() => void navigateToFacturacion(v)}
+                  onExportar={() => setExportarViaje(v)}
+                  onVerFactura={
+                    v.facturaId
+                      ? () =>
+                          navigate(
+                            platform
+                              ? '/facturacion'
+                              : `/facturacion?factura=${v.facturaId}`,
+                            platform
+                              ? { state: { ...facturacionNavExtras(), viewFacturaId: v.facturaId } }
+                              : undefined,
+                          )
+                      : undefined
+                  }
+                  onEmitirCvlp={
+                    hasLiquidacionesArca && v.transportistaId
+                      ? () => setEmitirCvlpViaje(v)
+                      : hasFacturacionSinArca && v.transportistaId
+                        ? () => setSelectorViaje(v)
+                        : undefined
+                  }
+                  onEliminar={() => requestDeleteViaje(v)}
+                />
+              }
+            />
+          );
+        }}
+      />
 
       {meta && (
         <div className="mt-4 flex items-center justify-between">
@@ -1959,6 +2196,28 @@ export function ViajesTenantPage({
             // La liquidación se creó; refrescar listado para reflejar el nuevo estado si corresponde
             setListadoQueryVersion((v) => v + 1);
           }}
+          onFacturarManual={() => void navigateToFacturacion(emitirCvlpViaje)}
+        />
+      )}
+
+      {selectorViaje && (
+        <FacturarSelectorModal
+          onClose={() => setSelectorViaje(null)}
+          onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
+          onLiquidacion={() => { setCrearLiqViaje(selectorViaje); setSelectorViaje(null); }}
+        />
+      )}
+
+      {crearLiqViaje && (
+        <CrearLiquidacionManualModal
+          viajeInicial={crearLiqViaje}
+          transportistas={maestro.transportistas}
+          getToken={getToken}
+          onSuccess={() => {
+            setCrearLiqViaje(null);
+            setListadoQueryVersion((v) => v + 1);
+          }}
+          onClose={() => setCrearLiqViaje(null)}
         />
       )}
 

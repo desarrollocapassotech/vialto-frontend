@@ -17,8 +17,8 @@ export function CrudPageLayout({
   children,
 }: CrudPageLayoutProps) {
   return (
-    <div className="max-w-4xl">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+    <div className="max-w-4xl w-full min-w-0">
+      <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-wide sm:text-4xl">
         {title}
       </h1>
       <div className="mt-4">
