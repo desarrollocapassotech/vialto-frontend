@@ -14,6 +14,7 @@ import { FacturaAccionesMenu } from '@/components/facturacion/FacturaAccionesMen
 import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoPagination } from '@/components/listado/ListadoPagination';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { apiJson } from '@/lib/api';
@@ -26,9 +27,19 @@ import {
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
 } from '@/lib/viajesFlota';
+import {
+  metaPaginacionCliente,
+  pageSizeListadoValido,
+  slicePaginaCliente,
+} from '@/lib/listadoPaginacion';
 import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
+import type { Cliente, Factura, PaginatedMeta, Transportista, Viaje } from '@/types/api';
+
+type FacturasPaginatedResponse = {
+  items: Factura[];
+  meta: PaginatedMeta;
+};
 
 function facturaPayloadFromDraft(draft: FacturaDraft) {
   const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : undefined;
@@ -128,6 +139,10 @@ export function FacturacionTenantPage({
   }
 
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [listadoRefetching, setListadoRefetching] = useState(false);
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,7 +267,7 @@ export function FacturacionTenantPage({
   const anyFiltroActivo = activeFilterCount > 0;
 
   const facturasFiltradas = useMemo(() => {
-    if (!facturas) return null;
+    if (!platform || !facturas) return null;
     return facturas.filter((f) => {
       if (numFiltro.trim() && !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())) return false;
       if (tipoFiltro && f.tipo !== tipoFiltro) return false;
@@ -267,6 +282,7 @@ export function FacturacionTenantPage({
       return true;
     });
   }, [
+    platform,
     facturas,
     numFiltro,
     tipoFiltro,
@@ -277,6 +293,22 @@ export function FacturacionTenantPage({
     vencimientoHastaFiltro,
     estadoFiltro,
   ]);
+
+  const metaListado = useMemo(() => {
+    if (platform) {
+      const total = facturasFiltradas?.length ?? 0;
+      return metaPaginacionCliente(total, page, pageSize);
+    }
+    return meta;
+  }, [platform, facturasFiltradas, page, pageSize, meta]);
+
+  const filasListado = useMemo(() => {
+    if (platform) {
+      if (facturasFiltradas === null) return null;
+      return slicePaginaCliente(facturasFiltradas, page, pageSize);
+    }
+    return facturas;
+  }, [platform, facturasFiltradas, facturas, page, pageSize]);
 
   /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
   useEffect(() => {
@@ -307,6 +339,21 @@ export function FacturacionTenantPage({
     viajesEdicionFactura,
   ]);
 
+  function buildFacturasPaginatedQuery(pageApi: number, pageSizeApi: number) {
+    const params = new URLSearchParams();
+    params.set('page', String(pageApi));
+    params.set('pageSize', String(pageSizeApi));
+    if (numFiltro.trim()) params.set('numero', numFiltro.trim());
+    if (tipoFiltro) params.set('tipo', tipoFiltro);
+    if (clienteIdFiltro) params.set('clienteId', clienteIdFiltro);
+    if (emisionDesdeFiltro) params.set('emisionDesde', emisionDesdeFiltro);
+    if (emisionHastaFiltro) params.set('emisionHasta', emisionHastaFiltro);
+    if (vencimientoDesdeFiltro) params.set('vencimientoDesde', vencimientoDesdeFiltro);
+    if (vencimientoHastaFiltro) params.set('vencimientoHasta', vencimientoHastaFiltro);
+    if (estadoFiltro) params.set('estado', estadoFiltro);
+    return params.toString();
+  }
+
   // ── carga inicial ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -315,47 +362,96 @@ export function FacturacionTenantPage({
     let cancelled = false;
     (async () => {
       try {
-        const facturasData = await apiJson<Factura[]>(facturasListUrl, () => getToken());
+        if (platform) {
+          const facturasData = await apiJson<Factura[]>(facturasListUrl, () => getToken());
+          if (!cancelled) {
+            setFacturas(facturasData);
+            setMeta(null);
+            setError(null);
+            setListadoRefetching(false);
+          }
+          return;
+        }
+
+        const pageApi = Math.max(1, Math.floor(page));
+        const pageSizeApi = pageSizeListadoValido(pageSize);
+        const data = await apiJson<FacturasPaginatedResponse>(
+          `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(pageApi, pageSizeApi)}`,
+          () => getToken(),
+        );
         if (!cancelled) {
-          setFacturas(facturasData);
+          setFacturas(data.items);
+          setMeta(data.meta);
           setError(null);
+          setListadoRefetching(false);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, platform ? 'plataforma' : 'facturacion'));
+        if (!cancelled) {
+          setFacturas(null);
+          setMeta(null);
+          setError(friendlyError(e, platform ? 'plataforma' : 'facturacion'));
+          setListadoRefetching(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, facturasListUrl, platform, tid]);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    facturasListUrl,
+    platform,
+    tid,
+    page,
+    pageSize,
+    numFiltro,
+    tipoFiltro,
+    clienteIdFiltro,
+    emisionDesdeFiltro,
+    emisionHastaFiltro,
+    vencimientoDesdeFiltro,
+    vencimientoHastaFiltro,
+    estadoFiltro,
+  ]);
 
   /** Abrir factura desde enlace (p. ej. alertas): `?factura=id` */
   useEffect(() => {
     const id = searchParams.get('factura')?.trim();
-    if (!id || facturas === null) return;
-    const f = facturas.find((x) => x.id === id);
-    if (!f) {
-      setSearchParams(
-        (p) => {
-          const next = new URLSearchParams(p);
-          next.delete('factura');
-          return next;
-        },
-        { replace: true },
-      );
-      return;
-    }
-    setViewingFactura(f);
-    setSearchParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        next.delete('factura');
-        return next;
-      },
-      { replace: true },
-    );
+    if (!id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const f = await apiJson<Factura>(facturaUrl(id), () => getToken());
+        if (cancelled) return;
+        setViewingFactura(f);
+        setSearchParams(
+          (p) => {
+            const next = new URLSearchParams(p);
+            next.delete('factura');
+            return next;
+          },
+          { replace: true },
+        );
+      } catch {
+        if (!cancelled) {
+          setSearchParams(
+            (p) => {
+              const next = new URLSearchParams(p);
+              next.delete('factura');
+              return next;
+            },
+            { replace: true },
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, facturas, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   async function ensureViajesLoaded() {
     if (viajes.length > 0 || viajesLoading) return;
@@ -383,33 +479,55 @@ export function FacturacionTenantPage({
 
   useEffect(() => {
     const expand = (location.state as FacturaNuevaNavState | null)?.expandFacturaId?.trim();
-    if (!expand || facturas === null || expandFacturaHandledRef.current) return;
-    const f = facturas.find((x) => x.id === expand);
-    if (!f) return;
+    if (!expand || expandFacturaHandledRef.current) return;
     expandFacturaHandledRef.current = true;
     window.history.replaceState({}, '');
-    startEdit(f);
+    void (async () => {
+      try {
+        const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
+        startEdit(f);
+      } catch {
+        /* silencioso */
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facturas]);
-
+  }, [location.state, getToken]);
 
   useEffect(() => {
     const viewId = (location.state as FacturaNuevaNavState | null)?.viewFacturaId?.trim();
-    if (!viewId || facturas === null || viewFacturaHandledRef.current) return;
-    const f = facturas.find((x) => x.id === viewId);
-    if (!f) return;
+    if (!viewId || viewFacturaHandledRef.current) return;
     viewFacturaHandledRef.current = true;
     window.history.replaceState({}, '');
-    setViewingFactura(f);
-  }, [facturas]);
+    void (async () => {
+      try {
+        const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
+        setViewingFactura(f);
+      } catch {
+        /* silencioso */
+      }
+    })();
+  }, [location.state, getToken]);
 
   // ── refetch ────────────────────────────────────────────────────────────────
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
     try {
-      const data = await apiJson<Factura[]>(facturasListUrl, () => getToken());
-      if (gen === fetchRef.current) setFacturas(data);
+      if (platform) {
+        const data = await apiJson<Factura[]>(facturasListUrl, () => getToken());
+        if (gen === fetchRef.current) setFacturas(data);
+        return;
+      }
+      const pageApi = Math.max(1, Math.floor(page));
+      const pageSizeApi = pageSizeListadoValido(pageSize);
+      const data = await apiJson<FacturasPaginatedResponse>(
+        `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(pageApi, pageSizeApi)}`,
+        () => getToken(),
+      );
+      if (gen === fetchRef.current) {
+        setFacturas(data.items);
+        setMeta(data.meta);
+      }
     } catch { /* silencioso */ }
   }
 
@@ -476,6 +594,7 @@ export function FacturacionTenantPage({
       );
       setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
       cancelEdit();
+      if (!platform) void refetchFacturas();
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
     } finally {
@@ -491,7 +610,13 @@ export function FacturacionTenantPage({
     setDeletingId(f.id);
     try {
       await apiJson(facturaUrl(f.id), () => getToken(), { method: 'DELETE' });
-      setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
+      if (platform) {
+        setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
+      } else if (meta && facturas?.length === 1 && meta.page > 1) {
+        setPage(meta.page - 1);
+      } else {
+        await refetchFacturas();
+      }
       if (editingId === f.id) cancelEdit();
       setFacturaDeleteConfirm(null);
     } catch {
@@ -529,12 +654,33 @@ export function FacturacionTenantPage({
     setVencimientoDesdeFiltro('');
     setVencimientoHastaFiltro('');
     setEstadoFiltro('');
+    setListadoRefetching(true);
+    setPage(1);
+  }
+
+  function irAPagina(nuevaPagina: number) {
+    if (!platform) setListadoRefetching(true);
+    setPage(Math.max(1, nuevaPagina));
+  }
+
+  function cambiarPageSize(nuevoSize: number) {
+    if (!platform) setListadoRefetching(true);
+    setPageSize(nuevoSize);
+    setPage(1);
+  }
+
+  function aplicarFiltroNumero() {
+    setListadoRefetching(true);
+    setNumFiltro(numFiltroInput);
+    setPage(1);
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
 
   const facturasEmptyMessage =
-    facturas?.length === 0
+    (metaListado?.total ?? 0) === 0 &&
+    !anyFiltroActivo &&
+    !(platform && (facturas?.length ?? 0) > 0)
       ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
       : 'No hay facturas que coincidan con los filtros aplicados.';
 
@@ -546,7 +692,7 @@ export function FacturacionTenantPage({
             type="text"
             value={numFiltroInput}
             onChange={(e) => setNumFiltroInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') aplicarFiltroNumero(); }}
             placeholder="Buscar…"
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
               numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
@@ -555,7 +701,7 @@ export function FacturacionTenantPage({
           />
           <button
             type="button"
-            onClick={() => setNumFiltro(numFiltroInput)}
+            onClick={() => aplicarFiltroNumero()}
             className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
           >
             OK
@@ -565,7 +711,7 @@ export function FacturacionTenantPage({
       <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro}>
         <select
           value={tipoFiltro}
-          onChange={(e) => setTipoFiltro(e.target.value)}
+          onChange={(e) => { setListadoRefetching(true); setPage(1); setTipoFiltro(e.target.value); }}
           className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
             tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
           }`}
@@ -580,7 +726,7 @@ export function FacturacionTenantPage({
           id="facturas-filtro-cliente"
           clientes={clientes}
           value={clienteIdFiltro}
-          onChange={(id) => setClienteIdFiltro(id)}
+          onChange={(id) => { setListadoRefetching(true); setPage(1); setClienteIdFiltro(id); }}
           allowEmptyValue
           emptyListChoiceLabel="Todos"
           placeholderCerrado="Todos"
@@ -597,7 +743,7 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={emisionDesdeFiltro}
-              onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
+              onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionDesdeFiltro(e.target.value); }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -606,7 +752,7 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={emisionHastaFiltro}
-              onChange={(e) => setEmisionHastaFiltro(e.target.value)}
+              onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionHastaFiltro(e.target.value); }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -619,7 +765,7 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={vencimientoDesdeFiltro}
-              onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
+              onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoDesdeFiltro(e.target.value); }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -628,7 +774,7 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={vencimientoHastaFiltro}
-              onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
+              onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoHastaFiltro(e.target.value); }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -637,7 +783,7 @@ export function FacturacionTenantPage({
       <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
         <select
           value={estadoFiltro}
-          onChange={(e) => setEstadoFiltro(e.target.value)}
+          onChange={(e) => { setListadoRefetching(true); setPage(1); setEstadoFiltro(e.target.value); }}
           className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
             estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
           }`}
@@ -698,7 +844,7 @@ export function FacturacionTenantPage({
       <ListadoDatos
         className="mt-6"
         columns={[]}
-        rows={error ? [] : facturasFiltradas}
+        rows={error ? [] : filasListado}
         rowKey={(f) => f.id}
         emptyMessage={error ? 'No se pudieron cargar las facturas.' : facturasEmptyMessage}
         loadingMessage="Cargando…"
@@ -719,7 +865,7 @@ export function FacturacionTenantPage({
                     type="text"
                     value={numFiltroInput}
                     onChange={(e) => setNumFiltroInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') setNumFiltro(numFiltroInput); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') aplicarFiltroNumero(); }}
                     placeholder="Buscar…"
                     className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
                       numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
@@ -728,7 +874,7 @@ export function FacturacionTenantPage({
                   />
                   <button
                     type="button"
-                    onClick={() => setNumFiltro(numFiltroInput)}
+                    onClick={() => aplicarFiltroNumero()}
                     className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
                   >
                     OK
@@ -744,7 +890,7 @@ export function FacturacionTenantPage({
               >
                 <select
                   value={tipoFiltro}
-                  onChange={(e) => setTipoFiltro(e.target.value)}
+                  onChange={(e) => { setListadoRefetching(true); setPage(1); setTipoFiltro(e.target.value); }}
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                     tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
                   }`}
@@ -766,7 +912,7 @@ export function FacturacionTenantPage({
                   id="facturas-col-filtro-cliente"
                   clientes={clientes}
                   value={clienteIdFiltro}
-                  onChange={(id) => setClienteIdFiltro(id)}
+                  onChange={(id) => { setListadoRefetching(true); setPage(1); setClienteIdFiltro(id); }}
                   allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
@@ -789,7 +935,7 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={emisionDesdeFiltro}
-                      onChange={(e) => setEmisionDesdeFiltro(e.target.value)}
+                      onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionDesdeFiltro(e.target.value); }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -798,7 +944,7 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={emisionHastaFiltro}
-                      onChange={(e) => setEmisionHastaFiltro(e.target.value)}
+                      onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionHastaFiltro(e.target.value); }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -817,7 +963,7 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={vencimientoDesdeFiltro}
-                      onChange={(e) => setVencimientoDesdeFiltro(e.target.value)}
+                      onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoDesdeFiltro(e.target.value); }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -826,7 +972,7 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={vencimientoHastaFiltro}
-                      onChange={(e) => setVencimientoHastaFiltro(e.target.value)}
+                      onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoHastaFiltro(e.target.value); }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -841,7 +987,7 @@ export function FacturacionTenantPage({
               >
                 <select
                   value={estadoFiltro}
-                  onChange={(e) => setEstadoFiltro(e.target.value)}
+                  onChange={(e) => { setListadoRefetching(true); setPage(1); setEstadoFiltro(e.target.value); }}
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                     estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
                   }`}
@@ -917,12 +1063,15 @@ export function FacturacionTenantPage({
         )}
       />
 
-      {facturas && facturas.length > 0 && (
-        <p className="mt-3 text-xs text-vialto-steel">
-          {anyFiltroActivo && facturasFiltradas !== null
-            ? `${facturasFiltradas.length} de ${facturas.length} factura${facturas.length !== 1 ? 's' : ''}`
-            : `${facturas.length} factura${facturas.length !== 1 ? 's' : ''}`}
-        </p>
+      {metaListado && metaListado.total > 0 && (
+        <ListadoPagination
+          meta={metaListado}
+          pageSize={pageSize}
+          loading={listadoRefetching}
+          totalLabel="facturas"
+          onPageChange={irAPagina}
+          onPageSizeChange={cambiarPageSize}
+        />
       )}
 
       <FacturaCreateModal
