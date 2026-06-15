@@ -4,11 +4,11 @@ export function mapTransportistaNombres(list: Transportista[]): Map<string, stri
   return new Map(list.map((t) => [t.id, t.nombre]));
 }
 
-/** Etiqueta para listados: flota propia o nombre del transportista. */
+/** Etiqueta para listados: sin asignar, o nombre del transportista externo. */
 export function labelAsignacionTransportista(
   transportistaId: string | null | undefined,
   nombresPorId: Map<string, string>,
 ): string {
-  if (!transportistaId) return 'Flota propia';
+  if (!transportistaId?.trim()) return '—';
   return nombresPorId.get(transportistaId) ?? '—';
 }

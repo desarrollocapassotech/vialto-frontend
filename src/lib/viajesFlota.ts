@@ -2,14 +2,14 @@ import { normalizeViajeMoneda } from '@/lib/currencyMask';
 
 import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
 
-/** Choferes con flota propia (`transportistaId` vacío en maestro). */
-export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
-  return choferes.filter((c) => !c.transportistaId?.trim());
+
+export function choferesFlotaPropia(_choferes: Chofer[]): Chofer[] {
+  return [];
 }
 
-/** Vehículos con flota propia. */
-export function vehiculosFlotaPropia(vehiculos: Vehiculo[]): Vehiculo[] {
-  return vehiculos.filter((v) => !v.transportistaId?.trim());
+
+export function vehiculosFlotaPropia(_vehiculos: Vehiculo[]): Vehiculo[] {
+  return [];
 }
 
 /** Textos de ayuda cuando no hay recursos de flota propia pero sí hay registros “externos”. */
@@ -22,11 +22,11 @@ export function mensajesAyudaFlotaPropia(
   const out: { chofer?: string; vehiculo?: string } = {};
   if (cp.length === 0 && choferes.length > 0) {
     out.chofer =
-      'Todos los choferes están asignados a transportistas externos. Para usarlos en flota propia, editá el chofer y elegí «Flota propia», o creá uno nuevo.';
+      'No hay choferes con pertenencia de flota propia asignada. La vinculación estará disponible cuando se implemente la asociación con choferes.';
   }
   if (vp.length === 0 && vehiculos.length > 0) {
     out.vehiculo =
-      'Todos los vehículos están asignados a transportistas externos. Para flota propia, editá el vehículo y elegí «Flota propia», o cargá uno nuevo.';
+      'No hay vehículos con pertenencia de flota propia asignada. La vinculación estará disponible cuando se implemente la asociación con choferes.';
   }
   return out;
 }
