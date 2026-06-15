@@ -6,6 +6,7 @@ import { ViajesTenantPage } from '@/pages/ViajesTenantPage';
 
 type ViajesNavState = {
   tenantId?: string;
+  sessionMaestro?: import('@/lib/viajesFlota').MaestroListasViaje;
 };
 
 export function ViajesSuperadminPage() {

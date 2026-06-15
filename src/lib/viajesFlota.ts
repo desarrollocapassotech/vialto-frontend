@@ -7,6 +7,21 @@ export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
   return choferes.filter((c) => !c.transportistaId?.trim());
 }
 
+/**
+ * Choferes elegibles en un viaje con transportista externo:
+ * sin transportista asignado o vinculados al contratante seleccionado.
+ */
+export function choferesParaTransportistaExterno(
+  choferes: Chofer[],
+  transportistaId: string,
+): Chofer[] {
+  const tid = transportistaId.trim();
+  if (!tid) return choferes;
+  return choferes.filter(
+    (c) => !c.transportistaId?.trim() || c.transportistaId.trim() === tid,
+  );
+}
+
 /** Vehículos con flota propia. */
 export function vehiculosFlotaPropia(vehiculos: Vehiculo[]): Vehiculo[] {
   return vehiculos.filter((v) => !v.transportistaId?.trim());
@@ -90,6 +105,24 @@ function stubTransportista(v: Viaje, t: { id: string; nombre: string }): Transpo
   };
 }
 
+function stubChofer(
+  v: Viaje,
+  ch: Pick<Chofer, 'id' | 'nombre'> & Partial<Pick<Chofer, 'dni' | 'cuit' | 'telefono' | 'transportistaId'>>,
+): Chofer {
+  return {
+    id: ch.id,
+    tenantId: v.tenantId,
+    nombre: ch.nombre,
+    dni: ch.dni ?? null,
+    cuit: ch.cuit ?? null,
+    licencia: null,
+    licenciaVence: null,
+    telefono: ch.telefono ?? null,
+    transportistaId: ch.transportistaId ?? null,
+    createdAt: '',
+  };
+}
+
 function stubVehiculo(
   v: Viaje,
   veh: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>,
@@ -116,14 +149,26 @@ function stubVehiculo(
 /** Stubs mínimos desde relaciones del viaje (para que los selectores muestren la etiqueta). */
 export function entidadesMaestroStubsDesdeViaje(v: Viaje): {
   clientes: Cliente[];
+  choferes: Chofer[];
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
 } {
   const clientes: Cliente[] = [];
+  const choferes: Chofer[] = [];
   const transportistas: Transportista[] = [];
   const vehiculos: Vehiculo[] = [];
 
   if (v.cliente) clientes.push(stubCliente(v, v.cliente));
+  if (v.chofer) {
+    choferes.push(stubChofer(v, v.chofer));
+  } else if (v.choferId?.trim()) {
+    choferes.push(
+      stubChofer(v, {
+        id: v.choferId.trim(),
+        nombre: `Chofer #${v.choferId.trim().slice(0, 8)}`,
+      }),
+    );
+  }
   if (v.transportista) transportistas.push(stubTransportista(v, v.transportista));
   if (v.transportistaEfectivo) {
     transportistas.push(stubTransportista(v, v.transportistaEfectivo));
@@ -132,7 +177,7 @@ export function entidadesMaestroStubsDesdeViaje(v: Viaje): {
     if (vv.vehiculo) vehiculos.push(stubVehiculo(v, vv.vehiculo));
   }
 
-  return { clientes, transportistas, vehiculos };
+  return { clientes, choferes, transportistas, vehiculos };
 }
 
 export type MaestroListasViaje = {
@@ -151,7 +196,7 @@ export function maestroListasParaEdicionViaje(
   return {
     clientes: mergeMaestroPorId(base.clientes, stubs.clientes),
     transportistas: mergeMaestroPorId(base.transportistas, stubs.transportistas),
-    choferes: base.choferes,
+    choferes: mergeMaestroPorId(base.choferes, stubs.choferes),
     vehiculos: mergeMaestroPorId(base.vehiculos, stubs.vehiculos),
   };
 }

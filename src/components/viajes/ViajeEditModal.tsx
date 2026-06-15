@@ -187,6 +187,14 @@ export function ViajeEditModal({
     return [...choferes, ...localChoferes.filter((c) => !ids.has(c.id))];
   }, [choferes, localChoferes]);
 
+  const todosChoferesPropios = useMemo(() => {
+    const ids = new Set(choferesPropios.map((c) => c.id));
+    return [
+      ...choferesPropios,
+      ...localChoferes.filter((c) => !ids.has(c.id) && !c.transportistaId?.trim()),
+    ];
+  }, [choferesPropios, localChoferes]);
+
   const todosVehiculos = useMemo(() => {
     const ids = new Set(vehiculos.map((v) => v.id));
     return [...vehiculos, ...localVehiculos.filter((v) => !ids.has(v.id))];
@@ -519,7 +527,7 @@ export function ViajeEditModal({
                   <div className="flex min-w-0 max-w-md flex-col gap-1">
                     <span className={labelClass}>Chofer (flota propia)</span>
                     <ChoferSearchSelect
-                      choferes={choferesPropios}
+                      choferes={todosChoferesPropios}
                       value={draft.choferId}
                       onChange={(id) => setDraft((p) => (p ? { ...p, choferId: id } : p))}
                       inputClassName={inputClass}

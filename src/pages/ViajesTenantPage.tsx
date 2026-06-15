@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -118,6 +118,7 @@ export function ViajesTenantPage({
 } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
@@ -256,6 +257,19 @@ export function ViajesTenantPage({
     transportistas: [],
     vehiculos: [],
   });
+
+  /** Entidades creadas en «Crear viaje» que deben seguir disponibles al volver al listado. */
+  useEffect(() => {
+    const incoming = (location.state as { sessionMaestro?: MaestroListasViaje } | null)?.sessionMaestro;
+    if (!incoming) return;
+    setSessionMaestro((prev) => ({
+      clientes: mergeMaestroPorId(prev.clientes, incoming.clientes),
+      choferes: mergeMaestroPorId(prev.choferes, incoming.choferes),
+      transportistas: mergeMaestroPorId(prev.transportistas, incoming.transportistas),
+      vehiculos: mergeMaestroPorId(prev.vehiculos, incoming.vehiculos),
+    }));
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const choferesPropios = useMemo(
     () => choferesFlotaPropia(edicionMaestro?.choferes ?? choferes),
@@ -770,12 +784,13 @@ export function ViajesTenantPage({
       setEdicionMaestro(merged);
       startEdit(viaje, origen, merged);
     } catch {
-      const merged = maestroListasParaEdicionViaje(viaje, {
-        clientes,
-        choferes,
-        transportistas,
-        vehiculos,
-      });
+      const conSesion: MaestroListasViaje = {
+        clientes: mergeMaestroPorId(clientes, sessionMaestro.clientes),
+        choferes: mergeMaestroPorId(choferes, sessionMaestro.choferes),
+        transportistas: mergeMaestroPorId(transportistas, sessionMaestro.transportistas),
+        vehiculos: mergeMaestroPorId(vehiculos, sessionMaestro.vehiculos),
+      };
+      const merged = maestroListasParaEdicionViaje(viaje, conSesion);
       setEdicionMaestro(merged);
       startEdit(viaje, origen, merged);
     }
@@ -1195,7 +1210,7 @@ export function ViajesTenantPage({
       const stubs = entidadesMaestroStubsDesdeViaje(updated);
       setSessionMaestro((prev) => ({
         clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
-        choferes: prev.choferes,
+        choferes: mergeMaestroPorId(prev.choferes, stubs.choferes),
         transportistas: mergeMaestroPorId(prev.transportistas, stubs.transportistas),
         vehiculos: mergeMaestroPorId(prev.vehiculos, stubs.vehiculos),
       }));
