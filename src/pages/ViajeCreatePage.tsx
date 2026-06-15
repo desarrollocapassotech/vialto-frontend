@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
@@ -28,6 +28,7 @@ import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otroGastoAutorFromClerk,
   otroGastoDraftToApi,
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
@@ -92,6 +93,8 @@ const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 
 
 export function ViajeCreatePage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
@@ -869,10 +872,10 @@ export function ViajeCreatePage() {
             />
           </div>
           <div className="md:col-span-2 lg:col-span-3">
-            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} />
+            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} tenantId={tenantId || undefined} />
             <button
               type="button"
-              onClick={() => setOtrosGastos((prev) => [...prev, emptyOtroGasto()])}
+              onClick={() => setOtrosGastos((prev) => [...prev, emptyOtroGasto(gastoAutor)])}
               className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
             >
               + Agregar gasto

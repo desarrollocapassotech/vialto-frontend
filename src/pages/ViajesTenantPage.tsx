@@ -2048,6 +2048,7 @@ export function ViajesTenantPage({
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
+          tenantId={platform ? tid : undefined}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {
             const v = viewingViaje;
