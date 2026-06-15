@@ -117,6 +117,13 @@ import {
   validarDestinosRows,
   viajeConDestinosEnRespuesta,
 } from '@/lib/viajesDestinos';
+import {
+  VIAJE_SORT_DEFAULT,
+  appendViajeSortQuery,
+  type ViajeSortDir,
+  type ViajeSortField,
+} from '@/lib/viajesOrdenamiento';
+import { ViajesOrdenamientoMenu } from '@/components/viajes/ViajesOrdenamientoMenu';
 
 
 type ViajesPaginatedResponse = {
@@ -190,6 +197,8 @@ export function ViajesTenantPage({
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState<ViajeSortField>(VIAJE_SORT_DEFAULT.sortBy);
+  const [sortDir, setSortDir] = useState<ViajeSortDir>(VIAJE_SORT_DEFAULT.sortDir);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? '';
@@ -306,6 +315,8 @@ export function ViajesTenantPage({
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
+  const ordenResaltaFechaCarga = sortBy === 'fecha_carga';
+  const ordenResaltaFechaDescarga = sortBy === 'fecha_descarga';
 
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
@@ -423,6 +434,7 @@ export function ViajesTenantPage({
           filtros.set('tipoUbicacion', tu);
           filtros.set('ubicacion', utTrim);
         }
+        appendViajeSortQuery(filtros, sortBy, sortDir);
         const filtrosQs = filtros.toString();
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : '&'}`
@@ -476,7 +488,15 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion, platform, tid]);
+  }, [isLoaded, isSignedIn, page, pageSize, sortBy, sortDir, listadoQueryVersion, platform, tid]);
+
+  function aplicarOrdenamiento(nuevoSortBy: ViajeSortField, nuevoSortDir: ViajeSortDir) {
+    setListadoRefetching(true);
+    setSortBy(nuevoSortBy);
+    setSortDir(nuevoSortDir);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
 
   function aplicarFiltroColumnaCliente(clienteId: string) {
     const cid = clienteId.trim();
@@ -530,6 +550,13 @@ export function ViajesTenantPage({
     setListadoQueryVersion((v) => v + 1);
   }
 
+  function alinearOrdenConFiltroFecha(tf: '' | 'carga' | 'descarga', fd: string, fh: string) {
+    if ((tf === 'carga' || tf === 'descarga') && (fd.trim() || fh.trim())) {
+      setSortBy(tf === 'carga' ? 'fecha_carga' : 'fecha_descarga');
+      setSortDir('asc');
+    }
+  }
+
   function aplicarTipoFechaFiltro(val: '' | 'carga' | 'descarga') {
     if (!val) {
       filtrosAplicadosRef.current = {
@@ -544,6 +571,11 @@ export function ViajesTenantPage({
     } else {
       filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, tipoFecha: val };
       setTipoFechaFiltro(val);
+      alinearOrdenConFiltroFecha(
+        val,
+        filtrosAplicadosRef.current.fechaDesde,
+        filtrosAplicadosRef.current.fechaHasta,
+      );
     }
     setListadoRefetching(true);
     setPage(1);
@@ -554,6 +586,11 @@ export function ViajesTenantPage({
     const s = val.trim();
     filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaDesde: s };
     setFechaDesdeFiltro(s);
+    alinearOrdenConFiltroFecha(
+      filtrosAplicadosRef.current.tipoFecha,
+      s,
+      filtrosAplicadosRef.current.fechaHasta,
+    );
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -563,6 +600,11 @@ export function ViajesTenantPage({
     const s = val.trim();
     filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaHasta: s };
     setFechaHastaFiltro(s);
+    alinearOrdenConFiltroFecha(
+      filtrosAplicadosRef.current.tipoFecha,
+      filtrosAplicadosRef.current.fechaDesde,
+      s,
+    );
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -1461,6 +1503,12 @@ export function ViajesTenantPage({
           )}
         </div>
         <div className="flex shrink-0 justify-end gap-2">
+          <ViajesOrdenamientoMenu
+            sortBy={sortBy}
+            sortDir={sortDir}
+            disabled={listadoRefetching}
+            onChange={aplicarOrdenamiento}
+          />
           <Link
             to={platform ? `/viajes/nuevo?tenantId=${encodeURIComponent(tid)}` : '/viajes/nuevo'}
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -1795,13 +1843,17 @@ export function ViajesTenantPage({
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span
-                      className="block"
+                        className={`block ${ordenResaltaFechaCarga ? 'font-medium text-vialto-charcoal' : ''}`}
                         title={v.fechaCarga ?? undefined}
                       >
                         {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
                       <span
-                        className="block text-xs text-vialto-steel/90"
+                        className={`block text-xs ${
+                          ordenResaltaFechaDescarga
+                            ? 'font-medium text-vialto-charcoal'
+                            : 'text-vialto-steel/90'
+                        }`}
                         title={v.fechaDescarga ?? undefined}
                       >
                         {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
@@ -1961,10 +2013,20 @@ export function ViajesTenantPage({
                   label: 'Carga — Descarga',
                   value: (
                     <div className="flex flex-col gap-0.5 tabular-nums">
-                      <span title={v.fechaCarga ?? undefined}>
+                      <span
+                        className={ordenResaltaFechaCarga ? 'font-medium text-vialto-charcoal' : undefined}
+                        title={v.fechaCarga ?? undefined}
+                      >
                         {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
-                      <span className="text-xs text-vialto-steel/90" title={v.fechaDescarga ?? undefined}>
+                      <span
+                        className={
+                          ordenResaltaFechaDescarga
+                            ? 'text-xs font-medium text-vialto-charcoal'
+                            : 'text-xs text-vialto-steel/90'
+                        }
+                        title={v.fechaDescarga ?? undefined}
+                      >
                         {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                       </span>
                     </div>
@@ -2063,6 +2125,7 @@ export function ViajesTenantPage({
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
+          tenantId={platform ? tid : undefined}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {
             const v = viewingViaje;

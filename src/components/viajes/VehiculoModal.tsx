@@ -3,7 +3,7 @@ import { ApiError, apiJson } from '@/lib/api';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { friendlyError } from '@/lib/friendlyError';
 import { Spinner } from '@/components/ui/Spinner';
-import { vehiculoWritePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
+import { vehiculoCreatePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import type { Vehiculo } from '@/types/api';
 
@@ -57,7 +57,7 @@ export function VehiculoModal({
       const path = tenantId ? `/api/platform/vehiculos${qs}` : '/api/vehiculos';
       const result = await apiJson<Vehiculo>(path, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
+        body: JSON.stringify(vehiculoCreatePayloadFromForm(form)),
       });
       onSaved(result);
     } catch (e) {

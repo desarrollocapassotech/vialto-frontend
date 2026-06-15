@@ -2,6 +2,7 @@ import { normalizeViajeMoneda } from '@/lib/currencyMask';
 
 import type { Chofer, Cliente, Transportista, Vehiculo, Viaje } from '@/types/api';
 
+
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
   return choferes.filter((c) => !c.transportistaId?.trim());
