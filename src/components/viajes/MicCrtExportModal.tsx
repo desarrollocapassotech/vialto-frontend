@@ -2,7 +2,6 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
-import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
 import {
   labelCampo,
   labelCampoCrt,
@@ -12,6 +11,10 @@ import { micCrtExportBodyForApi, normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiFetch, apiJson } from '@/lib/api';
+import { clearMicCrtBorrador, loadMicCrtBorrador, saveMicCrtBorrador } from '@/lib/micCrtBorrador';
+import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
+import { hasEditableViajeExportGroups, type ViajeExportMissingGroup } from '@/lib/viajeExportMissingFields';
+import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 
@@ -20,6 +23,7 @@ type Props = {
   onClose: () => void;
   tenantId?: string;
   onGenerated?: () => void;
+  onViajeUpdated?: () => void | Promise<void>;
 };
 
 const inputClass =
@@ -216,10 +220,25 @@ function validateForm(f: MicCrtExportPayload): string | null {
   return null;
 }
 
-export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Props) {
+function mergeMicCrtConBorrador(
+  prefill: MicCrtExportPayload,
+  operativo: MicCrtPrefillResponse['operativo'],
+  borrador: MicCrtExportPayload | null,
+): MicCrtExportPayload {
+  const base = normalizeMicCrtPayload(prefill, operativo);
+  if (!borrador) return base;
+  return normalizeMicCrtPayload({ ...base, ...borrador }, operativo);
+}
+
+export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onViajeUpdated }: Props) {
   const { getToken } = useAuth();
   const tid = tenantId?.trim() ?? '';
   const platform = Boolean(tid);
+  const [viajeLocal, setViajeLocal] = useState(viaje);
+
+  useEffect(() => {
+    setViajeLocal(viaje);
+  }, [viaje]);
 
   function prefillUrl() {
     if (platform) {
@@ -238,16 +257,24 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
   const [form, setForm] = useState<MicCrtExportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
+  const [guardandoBorrador, setGuardandoBorrador] = useState(false);
+  const [borradorGuardado, setBorradorGuardado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missingGroups, setMissingGroups] = useState<Record<string, ViajeExportMissingGroup> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
       setError(null);
+      setMissingGroups(null);
       try {
         const data = await apiJson<MicCrtPrefillResponse>(prefillUrl(), getToken);
-        if (!cancelled) setForm(normalizeMicCrtPayload(data.prefill, data.operativo));
+        const borrador = loadMicCrtBorrador(viaje.id);
+        if (!cancelled) {
+          setForm(mergeMicCrtConBorrador(data.prefill, data.operativo, borrador));
+          setBorradorGuardado(Boolean(borrador));
+        }
       } catch (e) {
         if (!cancelled) {
           const raw =
@@ -267,6 +294,19 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
 
   function patch<K extends keyof MicCrtExportPayload>(key: K, value: MicCrtExportPayload[K]) {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setBorradorGuardado(false);
+  }
+
+  function guardarBorrador() {
+    if (!form) return;
+    setGuardandoBorrador(true);
+    try {
+      saveMicCrtBorrador(viaje.id, normalizeMicCrtPayload(form));
+      setBorradorGuardado(true);
+      setError(null);
+    } finally {
+      setGuardandoBorrador(false);
+    }
   }
 
   async function generarPdf() {
@@ -279,6 +319,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       return;
     }
     setError(null);
+    setMissingGroups(null);
     setGenerando(true);
     try {
       const res = await apiFetch(pdfUrl(), getToken, {
@@ -290,9 +331,11 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as {
           message?: string | string[];
-          missingGroups?: Record<string, { fields: string[]; entityId?: string }>;
+          missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
-        setError(formatMicCrtExportError(data.message, data.missingGroups));
+        const groups = data.missingGroups ?? null;
+        setMissingGroups(groups && hasEditableViajeExportGroups(groups) ? groups : null);
+        setError(formatMicCrtExportError(data.message, groups));
         return;
       }
       const blob = await res.blob();
@@ -302,6 +345,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       a.download = `MIC-CRT-${viaje.numero}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      clearMicCrtBorrador(viaje.id);
       onGenerated?.();
       onClose();
     } catch (e) {
@@ -311,7 +355,14 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
     }
   }
 
-  const ocupado = loading || generando;
+  async function corregirDatosYReintentar() {
+    setMissingGroups(null);
+    setError(null);
+    if (onViajeUpdated) await onViajeUpdated();
+    void generarPdf();
+  }
+
+  const ocupado = loading || generando || guardandoBorrador;
 
   return (
     <div
@@ -651,10 +702,25 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
             </>
           )}
 
-          {error && (
+          {missingGroups ? (
+            <ViajeExportMissingFieldsPanel
+              viaje={viajeLocal}
+              tenantId={tenantId}
+              message={error ?? 'Completá los datos faltantes para generar el documento.'}
+              groups={missingGroups}
+              disabled={ocupado}
+              onSaved={() => void corregirDatosYReintentar()}
+            />
+          ) : error ? (
             <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 leading-snug">
               <p>{error}</p>
             </div>
+          ) : null}
+
+          {borradorGuardado && !error && (
+            <p className="text-xs text-vialto-steel">
+              Borrador guardado en este dispositivo. Podés cerrar y continuar más tarde.
+            </p>
           )}
         </div>
 
@@ -662,6 +728,14 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
           <button type="button" disabled={ocupado} onClick={onClose}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50">
             Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={ocupado || !form}
+            onClick={guardarBorrador}
+            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
+          >
+            {guardandoBorrador ? 'Guardando…' : 'Guardar borrador'}
           </button>
           <button type="button" disabled={ocupado || !form} onClick={() => void generarPdf()}
             className="text-xs uppercase tracking-wider px-3 py-1.5 bg-vialto-charcoal text-white hover:bg-black disabled:opacity-50">
