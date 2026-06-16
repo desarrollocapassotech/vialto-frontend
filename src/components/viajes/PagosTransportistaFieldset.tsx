@@ -51,7 +51,15 @@ export function emptyPagoTransportista(): PagoTransportistaDraft {
 const fieldLabelClass =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const smallInputClass = 'h-9 border border-black/15 bg-white px-2 text-sm';
+const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const pagoRowGridClass =
+  'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
+
+function pagoFieldLabel(label: string, rowIndex: number) {
+  return (
+    <span className={`${fieldLabelClass} ${rowIndex > 0 ? 'lg:hidden' : ''}`}>{label}</span>
+  );
+}
 
 interface Props {
   rows: PagoTransportistaDraft[];
@@ -85,13 +93,10 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
       )}
 
       {rows.map((row, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-end mb-2"
-        >
+        <div key={i} className={pagoRowGridClass}>
           {/* Observaciones (misma posición que descripción en otros gastos) */}
-          <div className="flex flex-col gap-1 min-w-0">
-            {i === 0 && <span className={fieldLabelClass}>Observaciones</span>}
+          <div className="flex min-w-0 flex-col gap-1">
+            {pagoFieldLabel('Observaciones', i)}
             <input
               type="text"
               value={row.observaciones}
@@ -103,22 +108,22 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
           </div>
 
           {/* Monto */}
-          <div className="flex flex-col gap-1 w-36">
-            {i === 0 && <span className={fieldLabelClass}>Monto</span>}
+          <div className="flex flex-col gap-1 lg:w-36">
+            {pagoFieldLabel('Monto', i)}
             <input
               type="text"
               inputMode="decimal"
               value={row.montoStr}
               onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
               placeholder="0.00"
-              className={`${smallInputClass} w-36 text-right tabular-nums`}
+              className={`${smallInputClass} text-right tabular-nums lg:w-36`}
               aria-label={`Monto pago ${i + 1}`}
             />
           </div>
 
           {/* Moneda */}
-          <div className="flex flex-col gap-1 w-20">
-            {i === 0 && <span className={fieldLabelClass}>Moneda</span>}
+          <div className="flex flex-col gap-1 lg:w-20">
+            {pagoFieldLabel('Moneda', i)}
             <select
               value={row.moneda}
               onChange={(e) => {
@@ -128,7 +133,7 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
                   montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
                 });
               }}
-              className={`${smallInputClass} w-20`}
+              className={`${smallInputClass} lg:w-20`}
               aria-label={`Moneda pago ${i + 1}`}
             >
               <option value="ARS">ARS</option>
@@ -137,24 +142,28 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
           </div>
 
           {/* Fecha */}
-          <div className="flex flex-col gap-1 w-36">
-            {i === 0 && <span className={fieldLabelClass}>Fecha (opc.)</span>}
+          <div className="flex flex-col gap-1 lg:w-36">
+            {pagoFieldLabel('Fecha (opc.)', i)}
             <input
               type="date"
               value={row.fecha}
               onChange={(e) => update(i, { fecha: e.target.value })}
-              className={`${smallInputClass} w-36`}
+              className={`${smallInputClass} lg:w-36`}
               aria-label={`Fecha pago ${i + 1}`}
             />
           </div>
 
           {/* Eliminar */}
           <div className="flex flex-col gap-1">
-            {i === 0 && <span className={fieldLabelClass}>&nbsp;</span>}
+            {i === 0 ? (
+              <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
+            ) : (
+              pagoFieldLabel('Eliminar', i)
+            )}
             <button
               type="button"
               onClick={() => setRemoveIndex(i)}
-              className="h-9 px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100"
+              className="h-9 w-full px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100 lg:w-auto"
               aria-label={`Eliminar pago ${i + 1}`}
             >
               ✕
