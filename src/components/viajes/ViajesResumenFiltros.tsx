@@ -66,7 +66,7 @@ export function ViajesResumenFiltros({
 
   return (
     <div
-      className="hidden flex-wrap gap-2 lg:flex"
+      className="flex gap-2 overflow-x-auto pb-0.5 lg:flex-wrap lg:pb-0"
       role="tablist"
       aria-label="Filtros rápidos de viajes"
     >

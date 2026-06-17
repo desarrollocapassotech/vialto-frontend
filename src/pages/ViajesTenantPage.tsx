@@ -1325,6 +1325,26 @@ export function ViajesTenantPage({
 
   const viajesListadoFiltros = (
     <>
+      <ListadoFiltroCampo label="Período" active={periodoFiltro !== 'todos'}>
+        <select
+          value={periodoFiltro}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'todos' || v === 'desde_hoy' || v === 'anteriores') {
+              aplicarPeriodoFiltro(v);
+            }
+          }}
+          disabled={listadoRefetching}
+          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            periodoFiltro !== 'todos' ? 'text-vialto-fire' : 'text-vialto-charcoal'
+          }`}
+          aria-label="Filtrar por período respecto a hoy"
+        >
+          <option value="todos">Todos los viajes</option>
+          <option value="desde_hoy">Desde hoy en adelante</option>
+          <option value="anteriores">Solo anteriores a hoy</option>
+        </select>
+      </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltroActivo.trim()}>
         <ClienteSearchSelect
           id="viajes-filtro-cliente"
@@ -1500,7 +1520,7 @@ export function ViajesTenantPage({
         </div>
       )}
 
-      <div className="mt-3 hidden items-center gap-2 lg:flex">
+      <div className="mt-3 grid grid-cols-3 gap-2 lg:flex lg:gap-2">
         {(
           [
             { val: 'todos', label: 'Todos' },
@@ -1519,7 +1539,7 @@ export function ViajesTenantPage({
         ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="hidden min-h-10 items-center lg:flex">
           {hayFiltrosColumnasActivos && (
             <button
@@ -1539,7 +1559,7 @@ export function ViajesTenantPage({
             </button>
           )}
         </div>
-        <div className="flex shrink-0 justify-end gap-2">
+        <div className="ml-auto flex shrink-0 gap-2">
           <ViajesOrdenamientoMenu
             sortBy={sortBy}
             sortDir={sortDir}
