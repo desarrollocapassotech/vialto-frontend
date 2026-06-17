@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   VIAJE_SORT_FIELDS,
   VIAJE_SORT_LABELS,
+  etiquetaDirAsc,
+  etiquetaDirDesc,
   etiquetaViajeOrdenamiento,
   type ViajeSortDir,
   type ViajeSortField,
@@ -35,12 +37,13 @@ export function ViajesOrdenamientoMenu({ sortBy, sortDir, disabled, onChange }: 
     };
   }, [abierto]);
 
-  function seleccionar(field: ViajeSortField) {
-    if (field === sortBy) {
-      onChange(field, sortDir === 'desc' ? 'asc' : 'desc');
-    } else {
-      onChange(field, 'desc');
-    }
+  function seleccionarCampo(field: ViajeSortField) {
+    onChange(field, 'desc');
+    setAbierto(false);
+  }
+
+  function seleccionarDir(field: ViajeSortField, dir: ViajeSortDir) {
+    onChange(field, dir);
     setAbierto(false);
   }
 
@@ -72,19 +75,49 @@ export function ViajesOrdenamientoMenu({ sortBy, sortDir, disabled, onChange }: 
         >
           {VIAJE_SORT_FIELDS.map((field) => {
             const activo = field === sortBy;
-            const Icon = activo ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : null;
             return (
               <li key={field} role="option" aria-selected={activo}>
-                <button
-                  type="button"
-                  onClick={() => seleccionar(field)}
-                  className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-vialto-mist/70 ${
-                    activo ? 'bg-vialto-mist/50 font-medium text-vialto-charcoal' : 'text-vialto-charcoal'
-                  }`}
-                >
-                  <span>{VIAJE_SORT_LABELS[field]}</span>
-                  {Icon ? <Icon className="h-4 w-4 shrink-0 text-vialto-fire" aria-hidden /> : null}
-                </button>
+                {activo ? (
+                  <div className="bg-vialto-mist/50 px-3 py-2">
+                    <p className="text-sm font-medium text-vialto-charcoal">
+                      {VIAJE_SORT_LABELS[field]}
+                    </p>
+                    <div className="mt-1.5 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => seleccionarDir(field, 'desc')}
+                        className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
+                          sortDir === 'desc'
+                            ? 'bg-vialto-fire text-white'
+                            : 'border border-black/15 text-vialto-steel hover:bg-vialto-mist'
+                        }`}
+                      >
+                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                        {etiquetaDirDesc(field)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => seleccionarDir(field, 'asc')}
+                        className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
+                          sortDir === 'asc'
+                            ? 'bg-vialto-fire text-white'
+                            : 'border border-black/15 text-vialto-steel hover:bg-vialto-mist'
+                        }`}
+                      >
+                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                        {etiquetaDirAsc(field)}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => seleccionarCampo(field)}
+                    className="flex w-full items-center px-3 py-2 text-left text-sm text-vialto-charcoal hover:bg-vialto-mist/70"
+                  >
+                    {VIAJE_SORT_LABELS[field]}
+                  </button>
+                )}
               </li>
             );
           })}

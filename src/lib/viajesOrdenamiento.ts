@@ -28,6 +28,18 @@ export function etiquetaViajeOrdenamiento(sortBy: ViajeSortField, sortDir: Viaje
   return sortDir === 'desc' ? `${base} (mayor primero)` : `${base} (menor primero)`;
 }
 
+function esCampoFecha(field: ViajeSortField): boolean {
+  return field === 'fecha_carga' || field === 'fecha_descarga';
+}
+
+export function etiquetaDirDesc(field: ViajeSortField): string {
+  return esCampoFecha(field) ? 'Más reciente primero' : 'Mayor primero';
+}
+
+export function etiquetaDirAsc(field: ViajeSortField): string {
+  return esCampoFecha(field) ? 'Más antiguo primero' : 'Menor primero';
+}
+
 export function appendViajeSortQuery(
   params: URLSearchParams,
   sortBy: ViajeSortField,
