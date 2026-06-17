@@ -124,6 +124,7 @@ import {
   type ViajeSortField,
 } from '@/lib/viajesOrdenamiento';
 import { ViajesOrdenamientoMenu } from '@/components/viajes/ViajesOrdenamientoMenu';
+import { selectorTabClass } from '@/components/ui/SelectorOpcionesSheet';
 
 
 type ViajesPaginatedResponse = {
@@ -216,6 +217,7 @@ export function ViajesTenantPage({
     tipoUbicacion: '' as '' | 'origen' | 'destino',
     /** Etiqueta completa de ciudad (misma que guarda el viaje al elegir del combobox). */
     ubicacion: '',
+    periodo: 'todos' as 'todos' | 'desde_hoy' | 'anteriores',
   });
   /** Cliente seleccionado en filtro de columna (checks y facturación masiva). */
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState('');
@@ -230,6 +232,7 @@ export function ViajesTenantPage({
   const [tipoUbicacionFiltro, setTipoUbicacionFiltro] = useState<'' | 'origen' | 'destino'>('');
   const [paisUbicacionFiltro, setPaisUbicacionFiltro] = useState<PaisCodigo>('AR');
   const [ubicacionFiltro, setUbicacionFiltro] = useState('');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'todos' | 'desde_hoy' | 'anteriores'>('todos');
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
   /** Mientras se vuelve a pedir el listado (filtros, página, etc.). */
   const [listadoRefetching, setListadoRefetching] = useState(false);
@@ -417,6 +420,7 @@ export function ViajesTenantPage({
           fechaHasta: fh,
           tipoUbicacion: tu,
           ubicacion: ut,
+          periodo: per,
         } = filtrosAplicadosRef.current;
         if (cid) filtros.set('clienteId', cid);
         if (transpFiltro) filtros.set('transportistaId', transpFiltro);
@@ -433,6 +437,9 @@ export function ViajesTenantPage({
         if ((tu === 'origen' || tu === 'destino') && utTrim) {
           filtros.set('tipoUbicacion', tu);
           filtros.set('ubicacion', utTrim);
+        }
+        if (per === 'desde_hoy' || per === 'anteriores') {
+          filtros.set('periodo', per);
         }
         appendViajeSortQuery(filtros, sortBy, sortDir);
         const filtrosQs = filtros.toString();
@@ -664,6 +671,14 @@ export function ViajesTenantPage({
     setListadoQueryVersion((v) => v + 1);
   }
 
+  function aplicarPeriodoFiltro(val: 'todos' | 'desde_hoy' | 'anteriores') {
+    filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, periodo: val };
+    setPeriodoFiltro(val);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
   function limpiarFiltrosColumnas() {
     filtrosAplicadosRef.current = {
       clienteId: '',
@@ -675,6 +690,7 @@ export function ViajesTenantPage({
       fechaHasta: '',
       tipoUbicacion: '',
       ubicacion: '',
+      periodo: 'todos',
     };
     setListadoRefetching(true);
     setClienteIdFiltroActivo('');
@@ -687,6 +703,7 @@ export function ViajesTenantPage({
     setTipoUbicacionFiltro('');
     setPaisUbicacionFiltro('AR');
     setUbicacionFiltro('');
+    setPeriodoFiltro('todos');
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -698,7 +715,8 @@ export function ViajesTenantPage({
     !!pagoTransportistaFiltro.trim() ||
     !!fechaDesdeFiltro.trim() ||
     !!fechaHastaFiltro.trim() ||
-    !!ubicacionFiltro.trim();
+    !!ubicacionFiltro.trim() ||
+    periodoFiltro !== 'todos';
 
   /** Una unidad por columna de filtro con criterio aplicado (máx. 5). */
   const cantidadFiltrosColumnasActivos = useMemo(() => {
@@ -708,9 +726,8 @@ export function ViajesTenantPage({
     if (estadoFiltro.trim()) n += 1;
     if (pagoTransportistaFiltro.trim()) n += 1;
     if (ubicacionFiltro.trim()) n += 1;
-    if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) {
-      n += 1;
-    }
+    if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) n += 1;
+    if (periodoFiltro !== 'todos') n += 1;
     return n;
   }, [
     clienteIdFiltroActivo,
@@ -720,6 +737,7 @@ export function ViajesTenantPage({
     ubicacionFiltro,
     fechaDesdeFiltro,
     fechaHastaFiltro,
+    periodoFiltro,
   ]);
 
   useEffect(() => {
@@ -1481,6 +1499,25 @@ export function ViajesTenantPage({
           />
         </div>
       )}
+
+      <div className="mt-3 hidden items-center gap-2 lg:flex">
+        {(
+          [
+            { val: 'todos', label: 'Todos' },
+            { val: 'desde_hoy', label: 'Desde hoy' },
+            { val: 'anteriores', label: 'Anteriores' },
+          ] as const
+        ).map(({ val, label }) => (
+          <button
+            key={val}
+            type="button"
+            onClick={() => aplicarPeriodoFiltro(val)}
+            className={selectorTabClass(periodoFiltro === val)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="hidden min-h-10 items-center lg:flex">
