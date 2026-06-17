@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
@@ -28,6 +28,7 @@ import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otroGastoAutorFromClerk,
   otroGastoDraftToApi,
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
@@ -47,12 +48,15 @@ import {
 import { friendlyError } from '@/lib/friendlyError';
 import {
   choferesFlotaPropia,
+  choferesParaTransportistaExterno,
   flotaPropiaVehiculosListaValida,
   mantenerIdSiEnLista,
+  mergeMaestroPorId,
   mensajesAyudaFlotaPropia,
   vehiculoIdsDesdeRows,
   vehiculosFlotaPropia,
   mensajeErrorTransportistaEfectivoExterno,
+  type MaestroListasViaje,
 } from '@/lib/viajesFlota';
 import {
   ViajeVehiculosLista,
@@ -62,6 +66,7 @@ import { vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
+import { ViajeExportacionLeyenda } from '@/components/viajes/ViajeExportacionLeyenda';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
   destinosPayloadParaApi,
@@ -92,6 +97,8 @@ const textareaLongClass = 'min-h-20 w-full border border-black/15 bg-white px-2 
 
 export function ViajeCreatePage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
@@ -143,6 +150,8 @@ export function ViajeCreatePage() {
   const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
   const [sessionChoferes, setSessionChoferes] = useState<Chofer[]>([]);
   const [sessionVehiculos, setSessionVehiculos] = useState<Vehiculo[]>([]);
+  /** Choferes creados en esta pantalla (overlay inmediato en selectores, como en edición). */
+  const [localChoferesRapidos, setLocalChoferesRapidos] = useState<Chofer[]>([]);
 
   const clientes = useMemo(() => {
     const base = tenantId ? localClientes : maestro.clientes;
@@ -155,6 +164,11 @@ export function ViajeCreatePage() {
     const ids = new Set(base.map((c) => c.id));
     return [...base, ...sessionChoferes.filter((c) => !ids.has(c.id))];
   }, [tenantId, localChoferes, maestro.choferes, sessionChoferes]);
+
+  const todosChoferes = useMemo(() => {
+    const ids = new Set(choferes.map((c) => c.id));
+    return [...choferes, ...localChoferesRapidos.filter((c) => !ids.has(c.id))];
+  }, [choferes, localChoferesRapidos]);
 
   const transportistas = useMemo(() => {
     const base = tenantId ? localTransportistas : maestro.transportistas;
@@ -175,6 +189,18 @@ export function ViajeCreatePage() {
   const [refreshingFlota, setRefreshingFlota] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
+  const choferIdRef = useRef('');
+  const choferExternoIdRef = useRef('');
+
+  function setChoferIdDraft(id: string) {
+    choferIdRef.current = id;
+    setChoferId(id);
+  }
+
+  function setChoferExternoIdDraft(id: string) {
+    choferExternoIdRef.current = id;
+    setChoferExternoId(id);
+  }
   const [kmLitrosModalOpen, setKmLitrosModalOpen] = useState(false);
   const [modalKm, setModalKm] = useState('');
   const [modalLitros, setModalLitros] = useState('');
@@ -279,9 +305,10 @@ export function ViajeCreatePage() {
           maestro.refreshVehiculos(),
         ]);
       }
-      const cp = choferesFlotaPropia(choferesData);
+      const cp = choferesFlotaPropia(mergeMaestroPorId(choferesData, sessionChoferes));
       const vp = vehiculosFlotaPropia(vehiculosData);
       setChoferId((prev) => mantenerIdSiEnLista(prev, cp));
+      choferIdRef.current = mantenerIdSiEnLista(choferIdRef.current, cp);
       setVehiculosRows((rows) =>
         rows.map((row) => {
           const candidatos = vehiculosPorTipo(vp, row.tipo);
@@ -298,7 +325,11 @@ export function ViajeCreatePage() {
     }
   }
 
-  const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
+  const choferesPropios = useMemo(() => choferesFlotaPropia(todosChoferes), [todosChoferes]);
+  const choferesExterno = useMemo(
+    () => choferesParaTransportistaExterno(todosChoferes, transportistaId),
+    [todosChoferes, transportistaId],
+  );
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
   const ayudaFlota = useMemo(
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
@@ -307,22 +338,35 @@ export function ViajeCreatePage() {
 
   useEffect(() => {
     if (modoOperacion !== 'propio') return;
-    setChoferId((prev) => mantenerIdSiEnLista(prev, choferesPropios));
+    setChoferId((prev) => {
+      const next = mantenerIdSiEnLista(prev, choferesPropios);
+      choferIdRef.current = next;
+      return next;
+    });
   }, [modoOperacion, choferesPropios]);
+
+  useEffect(() => {
+    if (modoOperacion !== 'externo' || !transportistaId.trim()) return;
+    setChoferExternoId((prev) => {
+      const next = mantenerIdSiEnLista(prev, choferesExterno);
+      choferExternoIdRef.current = next;
+      return next;
+    });
+  }, [modoOperacion, transportistaId, choferesExterno]);
 
   function applyModoOperacion(m: ViajeOperacionModo) {
     setModoOperacion(m);
     if (m === 'externo') {
-      setChoferId('');
+      setChoferIdDraft('');
       setVehiculosRows([]);
       setVehiculosExternosRows([]);
     } else {
       setTransportistaId('');
       setRealizaFlete(true);
       setTransportistaEfectivoId('');
-      setChoferExternoId('');
+      setChoferExternoIdDraft('');
       setVehiculosExternosRows([]);
-      setChoferId('');
+      setChoferIdDraft('');
       setVehiculosRows([{ tipo: 'tractor', vehiculoId: '' }]);
       setPagosTransportista([]);
     }
@@ -331,6 +375,8 @@ export function ViajeCreatePage() {
   async function onSubmit(opts?: { kmLitrosFromModal?: boolean; km?: number; litros?: number }) {
     if (submitBusyRef.current) return;
     const externo = modoOperacion === 'externo';
+    const choferPropioId = choferIdRef.current.trim();
+    const choferExternoSeleccionado = choferExternoIdRef.current.trim();
     const errs: Record<string, string> = {};
     if (!clienteId) errs.clienteId = 'Seleccioná un cliente.';
     if (externo && !transportistaId.trim()) errs.transportistaId = 'Seleccioná un transportista externo.';
@@ -357,7 +403,7 @@ export function ViajeCreatePage() {
     }
     if (
       !externo &&
-      !flotaPropiaVehiculosListaValida(choferId, vids, choferesPropios, vehiculosPropios)
+      !flotaPropiaVehiculosListaValida(choferPropioId, vids, choferesPropios, vehiculosPropios)
     ) {
       setError('En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).');
       return;
@@ -448,13 +494,13 @@ export function ViajeCreatePage() {
                 transportistaId: transportistaId.trim(),
                 contratanteRealizaFlete: realizaFlete,
                 transportistaEfectivoId: realizaFlete ? null : transportistaEfectivoId.trim() || null,
-                choferId: choferExternoId.trim() || null,
+                choferId: choferExternoSeleccionado || null,
                 vehiculoIds: vids,
               }
             : {
                 transportistaId: null,
                 transportistaEfectivoId: null,
-                choferId,
+                choferId: choferPropioId,
                 vehiculoIds: vids,
               }),
           origen: origen.trim(),
@@ -480,7 +526,18 @@ export function ViajeCreatePage() {
           pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
-      navigate(`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+      navigate(`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`, {
+        replace: true,
+        state: {
+          ...(tenantId ? { tenantId } : {}),
+          sessionMaestro: {
+            clientes: sessionClientes,
+            choferes: mergeMaestroPorId(sessionChoferes, localChoferesRapidos),
+            transportistas: sessionTransportistas,
+            vehiculos: sessionVehiculos,
+          },
+        } satisfies { tenantId?: string; sessionMaestro: MaestroListasViaje },
+      });
     } catch (e) {
       setError(friendlyError(e, 'viajes'));
     } finally {
@@ -614,6 +671,7 @@ export function ViajeCreatePage() {
                         setTransportistaId(id);
                         setRealizaFlete(true);
                         setTransportistaEfectivoId('');
+                        setChoferExternoIdDraft('');
                         if (id) setFieldErrors((p) => ({ ...p, transportistaId: '' }));
                       }}
                       inputClassName={inputClass}
@@ -709,9 +767,9 @@ export function ViajeCreatePage() {
                   <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={fieldLabelClass}>Chofer</span>
                     <ChoferSearchSelect
-                      choferes={choferes}
+                      choferes={choferesExterno}
                       value={choferExternoId}
-                      onChange={setChoferExternoId}
+                      onChange={setChoferExternoIdDraft}
                       inputClassName={inputClass}
                       aria-label="Chofer transportista externo"
                       onNuevo={() => setQuickCreate('chofer-ext')}
@@ -741,10 +799,10 @@ export function ViajeCreatePage() {
               <div className="grid gap-3">
                 <div className="flex min-w-0 flex-col gap-1 max-w-md">
                   <span className={fieldLabelClass}>Chofer (flota propia)</span>
-                  <ChoferSearchSelect
-                    choferes={choferesPropios}
-                    value={choferId}
-                    onChange={setChoferId}
+                    <ChoferSearchSelect
+                      choferes={choferesPropios}
+                      value={choferId}
+                    onChange={setChoferIdDraft}
                     inputClassName={inputClass}
                     aria-label="Chofer flota propia"
                     onNuevo={() => setQuickCreate('chofer-prop')}
@@ -869,10 +927,10 @@ export function ViajeCreatePage() {
             />
           </div>
           <div className="md:col-span-2 lg:col-span-3">
-            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} />
+            <OtrosGastosFieldset rows={otrosGastos} onChange={setOtrosGastos} tenantId={tenantId || undefined} />
             <button
               type="button"
-              onClick={() => setOtrosGastos((prev) => [...prev, emptyOtroGasto()])}
+              onClick={() => setOtrosGastos((prev) => [...prev, emptyOtroGasto(gastoAutor)])}
               className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
             >
               + Agregar gasto
@@ -890,6 +948,9 @@ export function ViajeCreatePage() {
               </button>
             </div>
           )}
+          <div className="md:col-span-2 lg:col-span-3">
+            <ViajeExportacionLeyenda />
+          </div>
           {error && (
             <div className="md:col-span-2 lg:col-span-3">
               <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -951,13 +1012,18 @@ export function ViajeCreatePage() {
       <ChoferModal
         getToken={getToken}
         tenantId={tenantId || undefined}
+        transportistaId={quickCreate === 'chofer-ext' ? transportistaId : undefined}
         onClose={() => setQuickCreate(null)}
         onSaved={(c) => {
           setSessionChoferes((prev) => [...prev, c]);
+          setLocalChoferesRapidos((prev) => [...prev, c]);
+          if (tenantId) {
+            setLocalChoferes((prev) => mergeMaestroPorId(prev, [c]));
+          }
           if (quickCreate === 'chofer-ext') {
-            setChoferExternoId(c.id);
+            setChoferExternoIdDraft(c.id);
           } else {
-            setChoferId(c.id);
+            setChoferIdDraft(c.id);
           }
           setQuickCreate(null);
         }}

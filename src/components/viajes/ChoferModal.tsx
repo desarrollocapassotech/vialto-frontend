@@ -12,12 +12,15 @@ export function ChoferModal({
   onClose,
   onSaved,
   tenantId,
+  transportistaId,
   stacked,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (chofer: Chofer) => void;
   tenantId?: string;
+  /** Si se crea desde un viaje con transportista externo, vincula el chofer a ese transportista. */
+  transportistaId?: string | null;
   stacked?: boolean;
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
@@ -46,7 +49,7 @@ export function ChoferModal({
       const path = tenantId ? `/api/platform/choferes${qs}` : '/api/choferes';
       const result = await apiJson<Chofer>(path, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify(choferWritePayloadFromForm(form)),
+        body: JSON.stringify(choferWritePayloadFromForm(form, transportistaId)),
       });
       onSaved(result);
     } catch (e) {

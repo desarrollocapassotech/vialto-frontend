@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { apiJson } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   parseCurrencyForMoneda,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import { OtroGastoAutorDisplay } from '@/components/viajes/OtrosGastosFieldset';
+import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import type { OtroGasto, Viaje } from '@/types/api';
 
 type Props = {
@@ -23,6 +26,8 @@ type Props = {
 
 export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }: Props) {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const userLabelMap = useOrgUserLabels(tenantId);
   const [descripcion, setDescripcion] = useState('');
   const [montoStr, setMontoStr] = useState('');
   const [moneda, setMoneda] = useState<ViajeMonedaCodigo>('ARS');
@@ -35,6 +40,11 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
   const gastos = viajeActual.otrosGastos ?? [];
+  const autorLabel =
+    user?.fullName?.trim() ||
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.id ||
+    null;
 
   function resetForm() {
     setDescripcion('');
@@ -140,14 +150,15 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
             <div className="mb-2 text-xs uppercase tracking-[0.15em] text-vialto-steel">
               Gastos anteriores
             </div>
-            <div className="grid grid-cols-[1fr_auto_auto] gap-2 text-xs text-vialto-steel border-b border-black/10 pb-2">
+            <div className="grid grid-cols-[1fr_auto_auto_minmax(6rem,10rem)] gap-2 text-xs text-vialto-steel border-b border-black/10 pb-2">
               <span>Descripción</span>
               <span className="text-right">Monto</span>
               <span className="text-right">Fecha</span>
+              <span>Cargado por</span>
             </div>
             <div className="mt-2 space-y-2">
               {gastos.map((g: OtroGasto, i: number) => (
-                <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center text-sm text-vialto-charcoal">
+                <div key={i} className="grid grid-cols-[1fr_auto_auto_minmax(6rem,10rem)] gap-2 items-center text-sm text-vialto-charcoal">
                   <span className="truncate">{g.descripcion}</span>
                   <span className="font-medium tabular-nums text-right">
                     {formatViajeImporteForListado(g.monto, g.moneda)}
@@ -161,6 +172,11 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
                         })
                       : '—'}
                   </span>
+                  <OtroGastoAutorDisplay
+                    row={g}
+                    labelMap={userLabelMap}
+                    className="text-vialto-steel text-xs"
+                  />
                 </div>
               ))}
             </div>
@@ -168,6 +184,12 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
         )}
 
         <div className="mt-4 flex flex-col gap-3">
+          {autorLabel && (
+            <p className="text-xs text-vialto-steel">
+              Se registrará como:{' '}
+              <span className="font-medium text-vialto-charcoal">{autorLabel}</span>
+            </p>
+          )}
           <div className="flex flex-col gap-1">
             <span className={labelClass}>Descripción <span className="text-red-500">*</span></span>
             <input
@@ -190,7 +212,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
-                onChange={(e) => setMontoStr(e.target.value)}
+                onChange={(e) => setMontoStr(maskCurrencyForMoneda(e.target.value, moneda))}
                 placeholder="0.00"
                 className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? 'border-red-400' : ''}`}
                 disabled={saving}

@@ -16,6 +16,8 @@ export interface OtroGasto {
   moneda: 'ARS' | 'USD';
   fecha?: string;
   createdBy?: string;
+  /** Nombre o correo resuelto vía Clerk (solo en detalle). */
+  createdByLabel?: string | null;
 }
 
 export interface Viaje {
@@ -31,6 +33,8 @@ export interface Viaje {
   transportistaEfectivoId?: string | null;
   transportistaEfectivo?: { id: string; nombre: string } | null;
   choferId: string | null;
+  /** Presente en listados/detalle cuando el backend incluye la relación. */
+  chofer?: Pick<Chofer, 'id' | 'nombre' | 'dni' | 'cuit' | 'telefono' | 'transportistaId'> | null;
   /** Vehículos asociados al viaje (orden = orden operativo). */
   vehiculosViaje?: Array<{
     id: string;

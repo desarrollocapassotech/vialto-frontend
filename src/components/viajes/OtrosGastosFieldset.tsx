@@ -2,16 +2,90 @@ import { useState } from 'react';
 import {
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
+import { resolveClerkUserLabel } from '@/lib/clerkUserLabels';
+import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { OtroGasto } from '@/types/api';
+
+export type OtroGastoAutor = { id: string; label: string };
 
 export interface OtroGastoDraft {
   descripcion: string;
   montoStr: string;
   moneda: ViajeMonedaCodigo;
   fecha: string;
+  createdBy?: string;
+  createdByLabel?: string | null;
+}
+
+export function otroGastoAutorFromClerk(
+  user: {
+    id: string;
+    fullName?: string | null;
+    primaryEmailAddress?: { emailAddress?: string } | null;
+  } | null | undefined,
+): OtroGastoAutor | undefined {
+  if (!user?.id) return undefined;
+  const label =
+    user.fullName?.trim() ||
+    user.primaryEmailAddress?.emailAddress ||
+    user.id;
+  return { id: user.id, label };
+}
+
+export function formatOtroGastoAutor(
+  row: Pick<OtroGastoDraft, 'createdBy' | 'createdByLabel'>,
+  labelMap?: ReadonlyMap<string, string>,
+): string {
+  return resolveClerkUserLabel(row.createdBy, labelMap, row.createdByLabel);
+}
+
+type OtroGastoAutorRow = Pick<OtroGastoDraft, 'createdBy' | 'createdByLabel'>;
+
+/** Muestra el autor con truncado y tooltip al hover/focus para nombres largos. */
+export function OtroGastoAutorDisplay({
+  row,
+  labelMap,
+  className = '',
+  variant = 'inline',
+  'aria-label': ariaLabel,
+}: {
+  row: OtroGastoAutorRow;
+  labelMap?: ReadonlyMap<string, string>;
+  className?: string;
+  /** `field` = celda read-only del formulario; `inline` = tablas y modal historial */
+  variant?: 'field' | 'inline';
+  'aria-label'?: string;
+}) {
+  const label = formatOtroGastoAutor(row, labelMap);
+  const showTip = label !== '—';
+
+  const shellClass =
+    variant === 'field'
+      ? 'h-9 flex min-w-0 items-center border border-black/10 bg-vialto-mist/50 px-2 text-sm text-vialto-charcoal'
+      : 'min-w-0 text-inherit';
+
+  return (
+    <div
+      className={`group relative min-w-0 outline-none ${shellClass} ${className}`}
+      title={showTip ? label : undefined}
+      tabIndex={showTip ? 0 : undefined}
+      aria-label={ariaLabel}
+    >
+      <span className="block min-w-0 truncate cursor-default">{label}</span>
+      {showTip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1 max-w-[min(16rem,calc(100vw-2rem))] rounded border border-black/10 bg-vialto-charcoal px-2 py-1.5 text-xs font-normal leading-snug text-white shadow-md whitespace-normal break-words opacity-0 transition-[opacity,visibility] group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
+        >
+          {label}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
@@ -20,6 +94,8 @@ export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
     montoStr: String(g.monto),
     moneda: g.moneda === 'USD' ? 'USD' : 'ARS',
     fecha: g.fecha ?? '',
+    createdBy: g.createdBy,
+    createdByLabel: g.createdByLabel,
   };
 }
 
@@ -34,11 +110,20 @@ export function otroGastoDraftToApi(
     moneda: d.moneda,
   };
   if (d.fecha.trim()) out.fecha = d.fecha.trim();
+  if (d.createdBy?.trim()) out.createdBy = d.createdBy.trim();
   return out;
 }
 
-export function emptyOtroGasto(): OtroGastoDraft {
-  return { descripcion: '', montoStr: '', moneda: 'ARS', fecha: '' };
+export function emptyOtroGasto(autor?: OtroGastoAutor): OtroGastoDraft {
+  return {
+    descripcion: '',
+    montoStr: '',
+    moneda: 'ARS',
+    fecha: '',
+    ...(autor
+      ? { createdBy: autor.id, createdByLabel: autor.label }
+      : {}),
+  };
 }
 
 const fieldLabelClass =
@@ -51,9 +136,12 @@ interface Props {
   onChange: (rows: OtroGastoDraft[]) => void;
   /** Extra CSS classes for the wrapper */
   className?: string;
+  /** Clerk org id para resolver nombres en vista superadmin. */
+  tenantId?: string;
 }
 
-export function OtrosGastosFieldset({ rows, onChange, className }: Props) {
+export function OtrosGastosFieldset({ rows, onChange, className, tenantId }: Props) {
+  const userLabelMap = useOrgUserLabels(tenantId);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
   function update(i: number, patch: Partial<OtroGastoDraft>) {
@@ -81,7 +169,7 @@ export function OtrosGastosFieldset({ rows, onChange, className }: Props) {
       {rows.map((row, i) => (
         <div
           key={i}
-          className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-end mb-2"
+          className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(7rem,11rem)_auto] gap-2 items-end mb-2"
         >
           {/* Descripción */}
           <div className="flex flex-col gap-1 min-w-0">
@@ -103,7 +191,7 @@ export function OtrosGastosFieldset({ rows, onChange, className }: Props) {
               type="text"
               inputMode="decimal"
               value={row.montoStr}
-              onChange={(e) => update(i, { montoStr: e.target.value })}
+              onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
               placeholder="0.00"
               className={`${smallInputClass} w-36 text-right tabular-nums`}
               aria-label={`Monto gasto ${i + 1}`}
@@ -130,15 +218,26 @@ export function OtrosGastosFieldset({ rows, onChange, className }: Props) {
             </select>
           </div>
 
-          {/* Fecha (opcional) */}
+          {/* Fecha */}
           <div className="flex flex-col gap-1 w-36">
-            {i === 0 && <span className={fieldLabelClass}>Fecha (opc.)</span>}
+            {i === 0 && <span className={fieldLabelClass}>Fecha</span>}
             <input
               type="date"
               value={row.fecha}
               onChange={(e) => update(i, { fecha: e.target.value })}
               className={`${smallInputClass} w-36`}
               aria-label={`Fecha gasto ${i + 1}`}
+            />
+          </div>
+
+          {/* Cargado por (solo lectura) */}
+          <div className="flex flex-col gap-1 min-w-0">
+            {i === 0 && <span className={fieldLabelClass}>Cargado por</span>}
+            <OtroGastoAutorDisplay
+              row={row}
+              labelMap={userLabelMap}
+              variant="field"
+              aria-label={`Usuario que cargó el gasto ${i + 1}`}
             />
           </div>
 

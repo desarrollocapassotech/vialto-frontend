@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Spinner } from '@/components/ui/Spinner';
 import {
   ChoferSearchSelect,
@@ -23,6 +24,7 @@ import {
 import {
   OtrosGastosFieldset,
   emptyOtroGasto,
+  otroGastoAutorFromClerk,
   type OtroGastoDraft,
 } from '@/components/viajes/OtrosGastosFieldset';
 import {
@@ -52,6 +54,7 @@ import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ViajeDestinosLista } from '@/components/viajes/ViajeDestinosLista';
 import { ViajeGananciaBrutaManualFieldset } from '@/components/viajes/ViajeGananciaBrutaManualFieldset';
 import type { ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
+import { ViajeExportacionLeyenda } from '@/components/viajes/ViajeExportacionLeyenda';
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -169,6 +172,8 @@ export function ViajeEditModal({
   onVehiculoCreado,
 }: ViajeEditModalProps) {
   type QuickCreate = 'cliente' | 'transportista' | 'chofer-ext' | 'chofer-prop';
+  const { user } = useUser();
+  const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
   const [localTransportistas, setLocalTransportistas] = useState<Transportista[]>([]);
@@ -189,6 +194,14 @@ export function ViajeEditModal({
     const ids = new Set(choferes.map((c) => c.id));
     return [...choferes, ...localChoferes.filter((c) => !ids.has(c.id))];
   }, [choferes, localChoferes]);
+
+  const todosChoferesPropios = useMemo(() => {
+    const ids = new Set(choferesPropios.map((c) => c.id));
+    return [
+      ...choferesPropios,
+      ...localChoferes.filter((c) => !ids.has(c.id) && !c.transportistaId?.trim()),
+    ];
+  }, [choferesPropios, localChoferes]);
 
   const todosVehiculos = useMemo(() => {
     const ids = new Set(vehiculos.map((v) => v.id));
@@ -523,7 +536,7 @@ export function ViajeEditModal({
                   <div className="flex min-w-0 flex-col gap-1 max-w-md">
                     <span className={labelClass}>Chofer (flota propia)</span>
                     <ChoferSearchSelect
-                      choferes={choferesPropios}
+                      choferes={todosChoferesPropios}
                       value={draft.choferId}
                       onChange={(id) => setDraft((p) => (p ? { ...p, choferId: id } : p))}
                       inputClassName={inputClass}
@@ -648,12 +661,13 @@ export function ViajeEditModal({
               <OtrosGastosFieldset
                 rows={draft.otrosGastos}
                 onChange={(rows) => setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))}
+                tenantId={tenantId}
               />
               <button
                 type="button"
                 onClick={() =>
                   setDraft((p) =>
-                    p ? { ...p, otrosGastos: [...p.otrosGastos, emptyOtroGasto()] } : p,
+                    p ? { ...p, otrosGastos: [...p.otrosGastos, emptyOtroGasto(gastoAutor)] } : p,
                   )
                 }
                 className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
@@ -686,7 +700,9 @@ export function ViajeEditModal({
               </div>
             )}
           </div>
-
+          <div className="md:col-span-2 lg:col-span-3 mt-4">
+            <ViajeExportacionLeyenda />
+          </div>
           {error && (
             <p
               role="alert"

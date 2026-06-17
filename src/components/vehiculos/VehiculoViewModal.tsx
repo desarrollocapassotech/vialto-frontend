@@ -122,6 +122,10 @@ export function VehiculoViewModal({
             },
             { label: 'Tara (kg)', value: vehiculo.tara },
             { label: 'Precinto', value: vehiculo.precinto },
+            {
+              label: 'Pertenencia',
+              value: vehiculo.transportistaId?.trim() ? 'Transportista externo' : 'Sin asignar',
+            },
             { label: 'Alta', value: fmtDate(vehiculo.createdAt) },
           ]
             .filter((c) => c.value != null && c.value !== '')
