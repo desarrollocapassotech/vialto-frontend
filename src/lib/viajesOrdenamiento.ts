@@ -10,7 +10,7 @@ export type ViajeSortDir = 'asc' | 'desc';
 
 export const VIAJE_SORT_DEFAULT: { sortBy: ViajeSortField; sortDir: ViajeSortDir } = {
   sortBy: 'fecha_carga',
-  sortDir: 'desc',
+  sortDir: 'asc',
 };
 
 export const VIAJE_SORT_LABELS: Record<ViajeSortField, string> = {
@@ -23,7 +23,7 @@ export const VIAJE_SORT_LABELS: Record<ViajeSortField, string> = {
 export function etiquetaViajeOrdenamiento(sortBy: ViajeSortField, sortDir: ViajeSortDir): string {
   const base = VIAJE_SORT_LABELS[sortBy];
   if (sortBy === 'fecha_carga' || sortBy === 'fecha_descarga') {
-    return sortDir === 'desc' ? `${base} (más nuevo primero)` : `${base} (más antiguo primero)`;
+    return sortDir === 'asc' ? `${base} (de vieja a nueva)` : `${base} (de nueva a vieja)`;
   }
   return sortDir === 'desc' ? `${base} (mayor primero)` : `${base} (menor primero)`;
 }
@@ -33,11 +33,11 @@ function esCampoFecha(field: ViajeSortField): boolean {
 }
 
 export function etiquetaDirDesc(field: ViajeSortField): string {
-  return esCampoFecha(field) ? 'Más reciente primero' : 'Mayor primero';
+  return esCampoFecha(field) ? 'De nueva a vieja' : 'Mayor primero';
 }
 
 export function etiquetaDirAsc(field: ViajeSortField): string {
-  return esCampoFecha(field) ? 'Más antiguo primero' : 'Menor primero';
+  return esCampoFecha(field) ? 'De vieja a nueva' : 'Menor primero';
 }
 
 export function appendViajeSortQuery(
