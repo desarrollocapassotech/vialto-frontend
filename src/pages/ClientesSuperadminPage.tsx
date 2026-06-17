@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
+import { useListadoFiltros } from '@/hooks/useListadoFiltros';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
@@ -18,6 +20,7 @@ export function ClientesSuperadminPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
+  const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows, ['nombre', 'idFiscal']);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -56,8 +59,7 @@ export function ClientesSuperadminPage() {
         Clientes
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa para ver sus clientes. Los datos los filtra el
-        servidor.
+        Elegí una empresa para ver sus clientes. Los datos los filtra el servidor.
       </p>
       <div className="mt-6">
         <EmpresaFilterBar
@@ -89,6 +91,23 @@ export function ClientesSuperadminPage() {
         </p>
       )}
 
+      {filtroEmpresa && !error && (
+        <ListadoToolbar
+          searchValue={busqueda}
+          onSearchChange={setBusqueda}
+          searchPlaceholder="Buscar por nombre o ID fiscal"
+          filtros={[
+            {
+              value: filtroPais,
+              onChange: setFiltroPais,
+              placeholder: 'Todos los países',
+              opciones: paisesList.map((p) => ({ value: p, label: p })),
+            },
+          ]}
+          onClear={onClear}
+        />
+      )}
+
       <ListadoDatos
         className="mt-8"
         columns={[
@@ -105,15 +124,35 @@ export function ClientesSuperadminPage() {
             cell: (c) => c.idFiscal ?? '—',
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
+          {
+            id: 'pais',
+            header: 'País',
+            cell: (c) => c.pais ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'direccion',
+            header: 'Dirección',
+            cell: (c) => c.direccion ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: 'contacto',
+            header: 'Contacto',
+            cell: (c) => c.email ?? c.telefono ?? '—',
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
         ]}
-        rows={!filtroEmpresa || error ? [] : rows}
+        rows={!filtroEmpresa || error ? [] : rowsFiltradas}
         rowKey={(c) => c.id}
         emptyMessage={
           !filtroEmpresa
             ? 'Seleccioná una empresa para ver los clientes.'
             : error
               ? 'No se pudieron cargar los clientes.'
-              : 'No hay clientes cargados para esta empresa.'
+              : activeFilterCount > 0
+                ? 'No hay clientes que coincidan con los filtros aplicados.'
+                : 'No hay clientes cargados para esta empresa.'
         }
         loadingMessage="Cargando…"
         renderActions={(c) => (

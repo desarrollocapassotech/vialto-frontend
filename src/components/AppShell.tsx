@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { canAccessFacturacion, canAccessLiquidacionesArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
+import { canAccessFacturacion, canAccessIntegracionArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
 import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
 import {
   orgSwitcherSidebarAppearance,
@@ -118,18 +118,21 @@ export function AppShell() {
       });
     }
 
-    if (superadmin || canAccessFacturacion(tenant?.modules ?? [])) {
-      groups.push({
-        title: 'Facturación',
-        items: [{ to: '/facturacion', label: 'Facturación', icon: Receipt }],
-      });
-    }
-
-    if (canAccessLiquidacionesArca(tenant?.modules ?? [])) {
-      groups.push({
-        title: 'Liquidaciones',
-        items: [{ to: '/liquidaciones', label: 'Liquidaciones CVLP', icon: Calculator }],
-      });
+    const hasFacturacion = superadmin || canAccessFacturacion(tenant?.modules ?? []);
+    const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
+    const hasLiquidaciones = superadmin || hasFacturacion || hasArca;
+    if (hasFacturacion || hasArca) {
+      const facturacionItems: NavItem[] = [];
+      if (hasFacturacion) {
+        facturacionItems.push({ to: '/facturacion', label: 'Facturas', icon: Receipt, end: true });
+      }
+      if (hasLiquidaciones) {
+        facturacionItems.push({ to: '/liquidaciones', label: 'Liquidaciones', icon: Calculator, end: true });
+        if (!superadmin && hasArca) {
+          facturacionItems.push({ to: '/liquidaciones/configuracion', label: 'Configuración ARCA', icon: Landmark });
+        }
+      }
+      groups.push({ title: 'Facturación', items: facturacionItems });
     }
 
     if (superadmin || canAccessStock(tenant?.modules ?? [])) {

@@ -39,7 +39,15 @@ export interface Viaje {
     vehiculo: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>;
   }>;
   origen: string | null;
+  /** Denormalizado: último destino de la ruta (legacy / compat). */
   destino: string | null;
+  /** Destinos ordenados del viaje (orden = secuencia de la ruta). */
+  destinosViaje?: Array<{
+    id: string;
+    orden: number;
+    etiqueta: string;
+    createdAt?: string;
+  }>;
   fechaCarga: string | null;
   fechaDescarga: string | null;
   /** Productos vinculados al viaje (orden operativo). */
@@ -209,6 +217,8 @@ export interface Factura {
   fechaVencimiento: string | null;
   estado: 'pendiente' | 'cobrada' | 'vencida';
   diferencia: number | null;
+  ivaPct: number | null;
+  comprobanteUrl: string | null;
   createdAt: string;
 }
 
@@ -378,6 +388,8 @@ export interface ArcaConfig {
   comisionPctAlt: number;
   ivaGastosAdmin: number;
   updatedAt: string;
+  certConfigurado: boolean;
+  keyConfigurado: boolean;
 }
 
 export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
@@ -403,6 +415,7 @@ export interface Liquidacion {
   estado: LiquidacionEstado;
   arcaError: string | null;
   reintentos: number;
+  comprobanteUrl: string | null;
   createdAt: string;
   createdBy: string;
 }

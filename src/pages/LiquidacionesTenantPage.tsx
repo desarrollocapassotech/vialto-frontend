@@ -1,14 +1,19 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { Landmark, Receipt } from 'lucide-react';
 import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { EmitirLiquidacionModal } from '@/components/liquidaciones/EmitirLiquidacionModal';
+import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
 import { apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
 } from '@/lib/listadoTabla';
-import type { Liquidacion, LiquidacionEstado } from '@/types/api';
+import { useMaestroData } from '@/hooks/useMaestroData';
+import { canAccessIntegracionArca } from '@/lib/tenantModules';
+import type { ArcaConfig, Liquidacion, LiquidacionEstado } from '@/types/api';
 
 type LiquidacionConTransportista = Liquidacion & {
   transportista?: { id: string; nombre: string; idFiscal: string | null } | null;
@@ -68,6 +73,7 @@ function caeCell(liq: LiquidacionConTransportista) {
 
 function LiquidacionAcciones({
   liq,
+  hasArca,
   isBusy,
   isDownloading,
   actionErrorMsg,
@@ -77,6 +83,7 @@ function LiquidacionAcciones({
   onEliminar,
 }: {
   liq: LiquidacionConTransportista;
+  hasArca: boolean;
   isBusy: boolean;
   isDownloading: boolean;
   actionErrorMsg?: string;
@@ -85,10 +92,10 @@ function LiquidacionAcciones({
   onAnular: () => void;
   onEliminar: () => void;
 }) {
-  const puedeEmitir = liq.estado === 'borrador' || liq.estado === 'error';
+  const puedeEmitir = hasArca && (liq.estado === 'borrador' || liq.estado === 'error');
   const puedeEliminar = liq.estado === 'borrador' || liq.estado === 'error' || liq.estado === 'pendiente_cae';
-  const puedeAnular = liq.estado === 'autorizado';
-  const tienePdf = liq.estado === 'autorizado' || liq.estado === 'anulado';
+  const puedeAnular = hasArca && liq.estado === 'autorizado';
+  const tienePdf = hasArca && (liq.estado === 'autorizado' || liq.estado === 'anulado');
 
   return (
     <div>
@@ -98,8 +105,9 @@ function LiquidacionAcciones({
             type="button"
             disabled={isBusy}
             onClick={onEmitir}
-            className={`${listadoTablaAccionClass} h-7 px-3`}
+            className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 h-7 px-3`}
           >
+            <Receipt className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
             {isBusy ? '…' : 'Emitir'}
           </button>
         )}
@@ -143,21 +151,29 @@ function LiquidacionAcciones({
 
 export function LiquidacionesTenantPage() {
   const { getToken } = useAuth();
+  const { tenant, transportistas } = useMaestroData();
+  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
+  const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<{ id: string; msg: string } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [pendingEmitir, setPendingEmitir] = useState<LiquidacionConTransportista | null>(null);
+  const [showCrear, setShowCrear] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const data = await apiJson<LiquidacionConTransportista[]>(
-          '/api/liquidaciones-arca/liquidaciones',
-          () => getToken(),
-        );
-        if (!cancelled) setRows(data);
+        const [data, cfg] = await Promise.all([
+          apiJson<LiquidacionConTransportista[]>('/api/integracion-arca/liquidaciones', () => getToken()),
+          apiJson<ArcaConfig | null>('/api/integracion-arca/config', () => getToken()).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setRows(data);
+          setConfig(cfg);
+        }
       } catch (err) {
         if (!cancelled) setError(friendlyError(err, 'arca'));
       }
@@ -165,21 +181,9 @@ export function LiquidacionesTenantPage() {
     return () => { cancelled = true; };
   }, [getToken]);
 
-  async function emitirArca(liq: LiquidacionConTransportista) {
-    setActionError(null);
-    setBusyId(liq.id);
-    try {
-      const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`,
-        () => getToken(),
-        { method: 'POST' },
-      );
-      setRows((prev) => prev?.map((r) => (r.id === updated.id ? { ...updated, transportista: r.transportista } : r)) ?? prev);
-    } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, 'arca') });
-    } finally {
-      setBusyId(null);
-    }
+  function onEmitirSuccess(updated: LiquidacionConTransportista) {
+    setRows((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+    setPendingEmitir(null);
   }
 
   async function eliminar(liq: LiquidacionConTransportista) {
@@ -188,7 +192,7 @@ export function LiquidacionesTenantPage() {
     setBusyId(liq.id);
     try {
       await apiFetch(
-        `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
         () => getToken(),
         { method: 'DELETE' },
       );
@@ -206,7 +210,7 @@ export function LiquidacionesTenantPage() {
     setBusyId(liq.id);
     try {
       const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular`,
         () => getToken(),
         { method: 'POST' },
       );
@@ -222,7 +226,7 @@ export function LiquidacionesTenantPage() {
     setDownloading(liq.id);
     try {
       const res = await apiFetch(
-        `/api/liquidaciones-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf`,
         () => getToken(),
       );
       if (!res.ok) throw new Error('Error al generar el PDF');
@@ -243,10 +247,11 @@ export function LiquidacionesTenantPage() {
   function accionesProps(liq: LiquidacionConTransportista) {
     return {
       liq,
+      hasArca,
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      onEmitir: () => void emitirArca(liq),
+      onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
       onAnular: () => void anular(liq),
       onEliminar: () => void eliminar(liq),
@@ -254,23 +259,41 @@ export function LiquidacionesTenantPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-          Liquidaciones CVLP
-        </h1>
-        <p className="mt-1 text-sm text-vialto-steel">
-          Comprobantes tipo 60 emitidos a transportistas vía ARCA.
-        </p>
-      </div>
-
-      {error && (
-        <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+    <div className="w-full">
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+        Liquidaciones
+      </h1>
+      <p className="mt-1 text-sm text-vialto-steel">
+        {hasArca ? 'Comprobantes CVLP tipo 60 emitidos a transportistas.' : 'Liquidaciones emitidas a transportistas.'}
+      </p>
+      {hasArca && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+          <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+          Emisión electrónica vía ARCA
         </div>
       )}
 
+      <div className="mt-4">
+        {error && (
+          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+        <div className="flex justify-end gap-2 mt-2">
+          {!hasArca && (
+            <button
+              type="button"
+              onClick={() => setShowCrear(true)}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva liquidación
+            </button>
+          )}
+        </div>
+      </div>
+
       <ListadoDatos
+        className="mt-6"
         columns={[
           {
             id: 'transportista',
@@ -382,6 +405,28 @@ export function LiquidacionesTenantPage() {
           />
         )}
       />
+
+      {pendingEmitir && hasArca && (
+        <EmitirLiquidacionModal
+          liq={pendingEmitir}
+          getToken={getToken}
+          onSuccess={onEmitirSuccess}
+          onClose={() => setPendingEmitir(null)}
+          ivaPct={config?.ivaGastosAdmin}
+        />
+      )}
+
+      {showCrear && (
+        <CrearLiquidacionManualModal
+          transportistas={transportistas}
+          getToken={getToken}
+          onSuccess={(liq) => {
+            setRows((prev) => (prev ? [{ ...liq, transportista: transportistas.find((t) => t.id === liq.transportistaId) ?? null }, ...prev] : [{ ...liq, transportista: null }]));
+            setShowCrear(false);
+          }}
+          onClose={() => setShowCrear(false)}
+        />
+      )}
     </div>
   );
 }

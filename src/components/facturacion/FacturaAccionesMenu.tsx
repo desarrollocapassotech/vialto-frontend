@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Eye, Trash2 } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -15,10 +16,11 @@ export function FacturaAccionesMenu({ factura, deleting, onVer, onEliminar }: Pr
 
   const options = useMemo<AccionOpcion[]>(
     () => [
-      { id: 'ver', label: 'Ver', onClick: onVer },
+      { id: 'ver', label: 'Ver', icon: Eye, onClick: onVer },
       {
         id: 'eliminar',
         label: deleting ? 'Eliminando…' : 'Eliminar',
+        icon: Trash2,
         onClick: onEliminar,
         danger: true,
         disabled: deleting,

@@ -15,6 +15,7 @@ import { AgregarGastoModal } from '@/components/viajes/AgregarGastoModal';
 import { RegistrarPagoTransportistaModal } from '@/components/viajes/RegistrarPagoTransportistaModal';
 import { ExportarViajeModal } from '@/components/viajes/ExportarViajeModal';
 import { EmitirCvlpModal } from '@/components/viajes/EmitirCvlpModal';
+import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
 import { apiJson } from '@/lib/api';
 import {
   formatNumberForMoneda,
@@ -95,7 +96,8 @@ import {
 } from '@/lib/viajesFiltroPagoTransportista';
 import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { canAccessLiquidacionesArca } from '@/lib/tenantModules';
+import { canAccessFacturacion, canAccessIntegracionArca } from '@/lib/tenantModules';
+import { FacturarSelectorModal } from '@/components/viajes/FacturarSelectorModal';
 import type {
   Chofer,
   Cliente,
@@ -108,6 +110,20 @@ import type {
   Viaje,
 } from '@/types/api';
 import { productoItemsDesdeViaje, mergeOpcionesProducto } from '@/lib/productosViaje';
+import {
+  destinosPayloadParaApi,
+  destinosRowsDesdeViaje,
+  etiquetasDestinosDesdeViaje,
+  validarDestinosRows,
+  viajeConDestinosEnRespuesta,
+} from '@/lib/viajesDestinos';
+import {
+  VIAJE_SORT_DEFAULT,
+  appendViajeSortQuery,
+  type ViajeSortDir,
+  type ViajeSortField,
+} from '@/lib/viajesOrdenamiento';
+import { ViajesOrdenamientoMenu } from '@/components/viajes/ViajesOrdenamientoMenu';
 
 
 type ViajesPaginatedResponse = {
@@ -129,7 +145,11 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const platform = Boolean(tenantId?.trim());
   const hasLiquidacionesArca =
-    !platform && canAccessLiquidacionesArca(currentTenant?.modules ?? []);
+    !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
+  const hasFacturacionSinArca =
+    !platform &&
+    !hasLiquidacionesArca &&
+    canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? '';
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -176,6 +196,8 @@ export function ViajesTenantPage({
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState<ViajeSortField>(VIAJE_SORT_DEFAULT.sortBy);
+  const [sortDir, setSortDir] = useState<ViajeSortDir>(VIAJE_SORT_DEFAULT.sortDir);
   const initialEstadoFromUrl = searchParams.get('estado')?.trim() ?? '';
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? '';
@@ -226,6 +248,10 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(null);
   /** Viaje para el que se quiere emitir un CVLP. */
   const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
+  /** Viaje para el selector manual factura/liquidación (tenants sin integracion-arca). */
+  const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
+  /** Viaje para el modal de creación manual de liquidación. */
+  const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
   /** Conteos globales para los chips de acceso rápido. */
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
@@ -275,6 +301,8 @@ export function ViajesTenantPage({
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
+  const ordenResaltaFechaCarga = sortBy === 'fecha_carga';
+  const ordenResaltaFechaDescarga = sortBy === 'fecha_descarga';
 
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
@@ -392,6 +420,7 @@ export function ViajesTenantPage({
           filtros.set('tipoUbicacion', tu);
           filtros.set('ubicacion', utTrim);
         }
+        appendViajeSortQuery(filtros, sortBy, sortDir);
         const filtrosQs = filtros.toString();
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : '&'}`
@@ -445,7 +474,15 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, page, pageSize, listadoQueryVersion, platform, tid]);
+  }, [isLoaded, isSignedIn, page, pageSize, sortBy, sortDir, listadoQueryVersion, platform, tid]);
+
+  function aplicarOrdenamiento(nuevoSortBy: ViajeSortField, nuevoSortDir: ViajeSortDir) {
+    setListadoRefetching(true);
+    setSortBy(nuevoSortBy);
+    setSortDir(nuevoSortDir);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
 
   function aplicarFiltroColumnaCliente(clienteId: string) {
     const cid = clienteId.trim();
@@ -499,6 +536,13 @@ export function ViajesTenantPage({
     setListadoQueryVersion((v) => v + 1);
   }
 
+  function alinearOrdenConFiltroFecha(tf: '' | 'carga' | 'descarga', fd: string, fh: string) {
+    if ((tf === 'carga' || tf === 'descarga') && (fd.trim() || fh.trim())) {
+      setSortBy(tf === 'carga' ? 'fecha_carga' : 'fecha_descarga');
+      setSortDir('asc');
+    }
+  }
+
   function aplicarTipoFechaFiltro(val: '' | 'carga' | 'descarga') {
     if (!val) {
       filtrosAplicadosRef.current = {
@@ -513,6 +557,11 @@ export function ViajesTenantPage({
     } else {
       filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, tipoFecha: val };
       setTipoFechaFiltro(val);
+      alinearOrdenConFiltroFecha(
+        val,
+        filtrosAplicadosRef.current.fechaDesde,
+        filtrosAplicadosRef.current.fechaHasta,
+      );
     }
     setListadoRefetching(true);
     setPage(1);
@@ -523,6 +572,11 @@ export function ViajesTenantPage({
     const s = val.trim();
     filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaDesde: s };
     setFechaDesdeFiltro(s);
+    alinearOrdenConFiltroFecha(
+      filtrosAplicadosRef.current.tipoFecha,
+      s,
+      filtrosAplicadosRef.current.fechaHasta,
+    );
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -532,6 +586,11 @@ export function ViajesTenantPage({
     const s = val.trim();
     filtrosAplicadosRef.current = { ...filtrosAplicadosRef.current, fechaHasta: s };
     setFechaHastaFiltro(s);
+    alinearOrdenConFiltroFecha(
+      filtrosAplicadosRef.current.tipoFecha,
+      filtrosAplicadosRef.current.fechaDesde,
+      s,
+    );
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -848,9 +907,8 @@ export function ViajesTenantPage({
             : [],
       clienteId: mantenerIdSiEnLista(v.clienteId, listas.clientes) || v.clienteId || '',
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ''),
-      paisDestino: inferirPaisDesdeUbicacion(v.destino ?? ''),
       origen: v.origen ?? '',
-      destino: v.destino ?? '',
+      destinosRows: destinosRowsDesdeViaje(v),
       fechaCarga: partesFc.fecha,
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
@@ -1113,16 +1171,17 @@ export function ViajesTenantPage({
       return;
     }
     const o = draft.origen.trim();
-    const d = draft.destino.trim();
-    if (o || d) {
-      const [okO, okD] = await Promise.all([
-        o ? esEtiquetaCiudadValida(draft.paisOrigen, o) : Promise.resolve(true),
-        d ? esEtiquetaCiudadValida(draft.paisDestino, d) : Promise.resolve(true),
-      ]);
-      if (!okO || !okD) {
-        setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+    if (o) {
+      const okO = await esEtiquetaCiudadValida(draft.paisOrigen, o);
+      if (!okO) {
+        setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
         return;
       }
+    }
+    const destinosVal = await validarDestinosRows(draft.destinosRows);
+    if (!destinosVal.ok) {
+      setError(destinosVal.message);
+      return;
     }
     const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
     const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
@@ -1152,6 +1211,7 @@ export function ViajesTenantPage({
     setSavingId(viajeId);
     setError(null);
     try {
+      const destinosBody = destinosPayloadParaApi(destinosVal.destinos);
       const updated = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify({
@@ -1175,7 +1235,7 @@ export function ViajesTenantPage({
                 vehiculoIds: vids,
               }),
           origen: draft.origen.trim() || undefined,
-          destino: draft.destino.trim() || undefined,
+          ...destinosBody,
           fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
           fechaDescarga: fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga),
           productoItems: draft.productoItems.filter((x) => x.productoId.trim()),
@@ -1195,7 +1255,16 @@ export function ViajesTenantPage({
           pagosTransportista: draft.pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
         }),
       });
-      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? updated : r)) : prev));
+      let viajeGuardado = viajeConDestinosEnRespuesta(updated, destinosVal.destinos);
+      if (etiquetasDestinosDesdeViaje(viajeGuardado).length < destinosVal.destinos.length) {
+        try {
+          viajeGuardado = await apiJson<Viaje>(viajeApiUrl(viajeId), () => getToken());
+        } catch {
+          /* mantener respuesta del PATCH */
+        }
+        viajeGuardado = viajeConDestinosEnRespuesta(viajeGuardado, destinosVal.destinos);
+      }
+      setRows((prev) => (prev ? prev.map((r) => (r.id === viajeId ? viajeGuardado : r)) : prev));
       const stubs = entidadesMaestroStubsDesdeViaje(updated);
       setSessionMaestro((prev) => ({
         clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
@@ -1419,6 +1488,12 @@ export function ViajesTenantPage({
           )}
         </div>
         <div className="flex shrink-0 justify-end gap-2">
+          <ViajesOrdenamientoMenu
+            sortBy={sortBy}
+            sortDir={sortDir}
+            disabled={listadoRefetching}
+            onChange={aplicarOrdenamiento}
+          />
           <Link
             to={platform ? `/viajes/nuevo?tenantId=${encodeURIComponent(tid)}` : '/viajes/nuevo'}
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -1743,19 +1818,27 @@ export function ViajesTenantPage({
                   )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-vialto-steel max-w-[220px]">
-                  <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />
+                <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
+                  <ViajeOrigenDestinoLinea
+                    origen={v.origen}
+                    destino={v.destino}
+                    destinosViaje={v.destinosViaje}
+                  />
                 </td>
                 <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span
-                      className="block"
+                        className={`block ${ordenResaltaFechaCarga ? 'font-medium text-vialto-charcoal' : ''}`}
                         title={v.fechaCarga ?? undefined}
                       >
                         {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
                       <span
-                        className="block text-xs text-vialto-steel/90"
+                        className={`block text-xs ${
+                          ordenResaltaFechaDescarga
+                            ? 'font-medium text-vialto-charcoal'
+                            : 'text-vialto-steel/90'
+                        }`}
                         title={v.fechaDescarga ?? undefined}
                       >
                         {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
@@ -1790,7 +1873,9 @@ export function ViajesTenantPage({
                     onEmitirCvlp={
                       hasLiquidacionesArca && v.transportistaId
                         ? () => setEmitirCvlpViaje(v)
-                        : undefined
+                        : hasFacturacionSinArca && v.transportistaId
+                          ? () => setSelectorViaje(v)
+                          : undefined
                     }
                     onEliminar={() => requestDeleteViaje(v)}
                   />
@@ -1901,16 +1986,32 @@ export function ViajesTenantPage({
                 { label: 'Estado', value: estadoValue },
                 {
                   label: 'Origen — Destino',
-                  value: <ViajeOrigenDestinoLinea origen={v.origen} destino={v.destino} />,
+                  value: (
+                    <ViajeOrigenDestinoLinea
+                      origen={v.origen}
+                      destino={v.destino}
+                      destinosViaje={v.destinosViaje}
+                    />
+                  ),
                 },
                 {
                   label: 'Carga — Descarga',
                   value: (
                     <div className="flex flex-col gap-0.5 tabular-nums">
-                      <span title={v.fechaCarga ?? undefined}>
+                      <span
+                        className={ordenResaltaFechaCarga ? 'font-medium text-vialto-charcoal' : undefined}
+                        title={v.fechaCarga ?? undefined}
+                      >
                         {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                       </span>
-                      <span className="text-xs text-vialto-steel/90" title={v.fechaDescarga ?? undefined}>
+                      <span
+                        className={
+                          ordenResaltaFechaDescarga
+                            ? 'text-xs font-medium text-vialto-charcoal'
+                            : 'text-xs text-vialto-steel/90'
+                        }
+                        title={v.fechaDescarga ?? undefined}
+                      >
                         {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                       </span>
                     </div>
@@ -1943,7 +2044,9 @@ export function ViajesTenantPage({
                   onEmitirCvlp={
                     hasLiquidacionesArca && v.transportistaId
                       ? () => setEmitirCvlpViaje(v)
-                      : undefined
+                      : hasFacturacionSinArca && v.transportistaId
+                        ? () => setSelectorViaje(v)
+                        : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
@@ -2140,6 +2243,28 @@ export function ViajesTenantPage({
             // La liquidación se creó; refrescar listado para reflejar el nuevo estado si corresponde
             setListadoQueryVersion((v) => v + 1);
           }}
+          onFacturarManual={() => void navigateToFacturacion(emitirCvlpViaje)}
+        />
+      )}
+
+      {selectorViaje && (
+        <FacturarSelectorModal
+          onClose={() => setSelectorViaje(null)}
+          onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
+          onLiquidacion={() => { setCrearLiqViaje(selectorViaje); setSelectorViaje(null); }}
+        />
+      )}
+
+      {crearLiqViaje && (
+        <CrearLiquidacionManualModal
+          viajeInicial={crearLiqViaje}
+          transportistas={maestro.transportistas}
+          getToken={getToken}
+          onSuccess={() => {
+            setCrearLiqViaje(null);
+            setListadoQueryVersion((v) => v + 1);
+          }}
+          onClose={() => setCrearLiqViaje(null)}
         />
       )}
 

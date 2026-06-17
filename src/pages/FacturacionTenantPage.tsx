@@ -19,6 +19,8 @@ import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { canAccessIntegracionArca } from '@/lib/tenantModules';
+import { Landmark } from 'lucide-react';
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
@@ -29,12 +31,14 @@ import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHead
 import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
 
 function facturaPayloadFromDraft(draft: FacturaDraft) {
+  const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : undefined;
   const base = {
     numero: draft.numero.trim(),
     tipo: draft.tipo,
     viajeIds: draft.viajeIds,
     fechaEmision: draft.fechaEmision,
     fechaVencimiento: draft.fechaVencimiento || undefined,
+    ivaPct: ivaN,
   };
   if (draft.tipo === 'transportista_externo') {
     return {
@@ -96,6 +100,7 @@ export function FacturacionTenantPage({
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId?.trim());
+  const hasArca = !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
   const tid = tenantId?.trim() ?? '';
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const [transportistasPlatform, setTransportistasPlatform] = useState<Transportista[]>([]);
@@ -530,7 +535,7 @@ export function FacturacionTenantPage({
 
   const facturasEmptyMessage =
     facturas?.length === 0
-      ? 'Todavía no hay facturas registradas. Hacé clic en "Nueva factura" para empezar.'
+      ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
       : 'No hay facturas que coincidan con los filtros aplicados.';
 
   const facturasListadoFiltros = (
@@ -568,7 +573,6 @@ export function FacturacionTenantPage({
         >
           <option value="">Todos</option>
           <option value="cliente">Cliente</option>
-          <option value="transportista_externo">Transportista externo</option>
         </select>
       </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltro}>
@@ -652,8 +656,14 @@ export function FacturacionTenantPage({
     <div className="w-full">
       {!embeddedInSuperadmin && (
         <>
-          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Facturación</h1>
-          <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes y de transportistas externos.</p>
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Facturas</h1>
+          <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes.</p>
+          {hasArca && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+              Emisión electrónica vía ARCA
+            </div>
+          )}
         </>
       )}
 

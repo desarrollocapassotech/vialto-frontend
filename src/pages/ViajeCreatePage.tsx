@@ -19,6 +19,7 @@ import {
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeKmLitrosDialog } from '@/components/viajes/ViajeKmLitrosDialog';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
+import { ViajeDestinosLista } from '@/components/viajes/ViajeDestinosLista';
 import {
   ViajeGananciaBrutaManualFieldset,
   gananciaBrutaManualPayloadFromDraft,
@@ -63,6 +64,12 @@ import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
 import { esEtiquetaCiudadValida, type PaisCodigo } from '@/lib/ciudades';
 import {
+  destinosPayloadParaApi,
+  emptyDestinoRow,
+  validarDestinosRows,
+  type ViajeDestinoRowDraft,
+} from '@/lib/viajesDestinos';
+import {
   estadoViajeLabel,
   tooltipEstadoViaje,
   estadoMuestraKmLitros,
@@ -105,9 +112,8 @@ export function ViajeCreatePage() {
   const [vehiculosExternosRows, setVehiculosExternosRows] = useState<ViajeVehiculoRowDraft[]>([]);
   const [choferExternoId, setChoferExternoId] = useState('');
   const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>('AR');
-  const [paisDestino, setPaisDestino] = useState<PaisCodigo>('AR');
   const [origen, setOrigen] = useState('');
-  const [destino, setDestino] = useState('');
+  const [destinosRows, setDestinosRows] = useState<ViajeDestinoRowDraft[]>([emptyDestinoRow()]);
   const [fechaCarga, setFechaCarga] = useState('');
   const [horaCarga, setHoraCarga] = useState('');
   const [fechaDescarga, setFechaDescarga] = useState('');
@@ -356,16 +362,18 @@ export function ViajeCreatePage() {
       setError('En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).');
       return;
     }
-    if (!origen.trim() || !destino.trim()) {
-      setError('Completá origen y destino.');
+    if (!origen.trim()) {
+      setError('Completá el origen.');
       return;
     }
-    const [okOrigen, okDestino] = await Promise.all([
-      esEtiquetaCiudadValida(paisOrigen, origen),
-      esEtiquetaCiudadValida(paisDestino, destino),
-    ]);
-    if (!okOrigen || !okDestino) {
-      setError('Origen y destino deben elegirse de la lista de ciudades (no se admite texto libre).');
+    const okOrigen = await esEtiquetaCiudadValida(paisOrigen, origen);
+    if (!okOrigen) {
+      setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
+      return;
+    }
+    const destinosVal = await validarDestinosRows(destinosRows);
+    if (!destinosVal.ok) {
+      setError(destinosVal.message);
       return;
     }
     const fcError = !fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
@@ -450,7 +458,7 @@ export function ViajeCreatePage() {
                 vehiculoIds: vids,
               }),
           origen: origen.trim(),
-          destino: destino.trim(),
+          ...destinosPayloadParaApi(destinosVal.destinos),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
           productoItems: productoItems.filter((x) => x.productoId.trim()),
@@ -548,28 +556,13 @@ export function ViajeCreatePage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={fieldLabelClass}>Destino</span>
-            <div className="flex flex-wrap gap-2 items-start">
-              <PaisUbicacionSelect
-                value={paisDestino}
-                onChange={(p) => {
-                  setPaisDestino(p);
-                  setDestino('');
-                }}
-                aria-label="País de destino"
-              />
-              <div className="min-w-[200px] flex-1">
-                <CiudadCombobox
-                  pais={paisDestino}
-                  value={destino}
-                  onChange={setDestino}
-                  inputClassName={inputClass}
-                  disableBrowserAutocomplete
-                />
-              </div>
-            </div>
-          </div>
+          <ViajeDestinosLista
+            groupId="viaje-create"
+            rows={destinosRows}
+            onChange={setDestinosRows}
+            inputClassName={inputClass}
+            disableBrowserAutocomplete
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Cliente <span className="text-red-500">*</span></span>

@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { textoRutaViaje, etiquetasDestinosDesdeViaje } from '@/lib/viajesDestinos';
 import type { Viaje } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -54,8 +55,10 @@ export function ViajeViewModal({
   const campos = [
     { label: 'Cliente', value: clienteNombre },
     { label: 'Transportista', value: viaje.transportistaId ? transportistaNombre : 'Flota propia' },
-    { label: 'Origen', value: viaje.origen },
-    { label: 'Destino', value: viaje.destino },
+    {
+      label: 'Ruta',
+      value: textoRutaViaje(viaje.origen, etiquetasDestinosDesdeViaje(viaje)),
+    },
     { label: 'Fecha de carga', value: viaje.fechaCarga ? fmtDate(viaje.fechaCarga) : null },
     { label: 'Fecha de descarga', value: viaje.fechaDescarga ? fmtDate(viaje.fechaDescarga) : null },
     { label: 'Vehículos', value: vehiculoPatentes },
