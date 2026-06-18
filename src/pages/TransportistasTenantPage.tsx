@@ -2,16 +2,27 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoPagination } from '@/components/listado/ListadoPagination';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { pageSizeListadoValido } from '@/lib/listadoPaginacion';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Transportista } from '@/types/api';
+import type { PaginatedMeta, Transportista } from '@/types/api';
+
+type TransportistasPaginatedResponse = {
+  items: Transportista[];
+  meta: PaginatedMeta;
+};
 
 export function TransportistasTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Transportista[] | null>(null);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [listadoRefetching, setListadoRefetching] = useState(false);
   const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
 
   useEffect(() => {
@@ -19,24 +30,42 @@ export function TransportistasTenantPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiJson<Transportista[]>('/api/transportistas', () =>
-          getToken(),
+        const pageApi = Math.max(1, Math.floor(page));
+        const pageSizeApi = pageSizeListadoValido(pageSize);
+        const data = await apiJson<TransportistasPaginatedResponse>(
+          `/api/transportistas/paginated?page=${pageApi}&pageSize=${pageSizeApi}`,
+          () => getToken(),
         );
         if (!cancelled) {
-          setRows(data);
+          setRows(data.items);
+          setMeta(data.meta);
           setError(null);
+          setListadoRefetching(false);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
+          setMeta(null);
           setError(friendlyError(e, 'transportistas'));
+          setListadoRefetching(false);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+
+  function irAPagina(nuevaPagina: number) {
+    setListadoRefetching(true);
+    setPage(Math.max(1, nuevaPagina));
+  }
+
+  function cambiarPageSize(nuevoSize: number) {
+    setListadoRefetching(true);
+    setPageSize(nuevoSize);
+    setPage(1);
+  }
 
   return (
     <div className="w-full">
@@ -107,6 +136,17 @@ export function TransportistasTenantPage() {
           </button>
         )}
       />
+
+      {meta && meta.total > 0 && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={listadoRefetching}
+          totalLabel="transportistas"
+          onPageChange={irAPagina}
+          onPageSizeChange={cambiarPageSize}
+        />
+      )}
 
       {viewingTransportista && (
         <TransportistaViewModal

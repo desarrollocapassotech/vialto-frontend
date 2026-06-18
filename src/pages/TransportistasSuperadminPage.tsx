@@ -1,7 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoPagination } from '@/components/listado/ListadoPagination';
 import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
 import { TransportistaViewModal } from '@/components/transportistas/TransportistaViewModal';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
@@ -10,6 +11,7 @@ import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
 import { useListadoFiltros } from '@/hooks/useListadoFiltros';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { metaPaginacionCliente, slicePaginaCliente } from '@/lib/listadoPaginacion';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
 import type { ConEmpresa, Transportista } from '@/types/api';
 
@@ -17,10 +19,16 @@ export function TransportistasSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Transportista>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingTransportista, setViewingTransportista] = useState<Transportista | null>(null);
   const tenants = useTenantsList();
   const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows, ['nombre', 'idFiscal', 'paut']);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtroEmpresa, busqueda, filtroPais]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -52,6 +60,26 @@ export function TransportistasSuperadminPage() {
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
+
+  const metaListado = useMemo(() => {
+    const total = rowsFiltradas?.length ?? 0;
+    return metaPaginacionCliente(total, page, pageSize);
+  }, [rowsFiltradas, page, pageSize]);
+
+  const filasPagina = useMemo(() => {
+    if (rowsFiltradas === null) return null;
+    return slicePaginaCliente(rowsFiltradas, page, pageSize);
+  }, [rowsFiltradas, page, pageSize]);
+
+  function cambiarPageSize(nuevoSize: number) {
+    setPageSize(nuevoSize);
+    setPage(1);
+  }
+
+  function limpiarFiltros() {
+    onClear();
+    setPage(1);
+  }
 
   return (
     <div className="w-full">
@@ -100,7 +128,7 @@ export function TransportistasSuperadminPage() {
               opciones: paisesList.map((p) => ({ value: p, label: p })),
             },
           ]}
-          onClear={onClear}
+          onClear={limpiarFiltros}
         />
       )}
 
@@ -139,7 +167,7 @@ export function TransportistasSuperadminPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={!filtroEmpresa || error ? [] : rowsFiltradas}
+        rows={!filtroEmpresa || error ? [] : filasPagina}
         rowKey={(t) => t.id}
         emptyMessage={
           !filtroEmpresa
@@ -161,6 +189,16 @@ export function TransportistasSuperadminPage() {
           </button>
         )}
       />
+
+      {metaListado.total > 0 && filtroEmpresa && !error && (
+        <ListadoPagination
+          meta={metaListado}
+          pageSize={pageSize}
+          totalLabel="transportistas"
+          onPageChange={setPage}
+          onPageSizeChange={cambiarPageSize}
+        />
+      )}
 
       {viewingTransportista && (
         <TransportistaViewModal
