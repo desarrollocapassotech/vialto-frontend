@@ -59,6 +59,7 @@ export function ExcelExportModal({ columns, rowCount, onExport, onClose }: Props
       title="Descargar Excel"
       onClose={onClose}
       maxWidthClass="sm:max-w-sm"
+      scrollBody
       footer={
         <>
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
