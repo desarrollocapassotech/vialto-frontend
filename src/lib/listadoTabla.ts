@@ -5,7 +5,7 @@ export const pageTitleClass =
   'font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide';
 
 export const listadoDatosWrapperClass =
-  'rounded border border-black/5 bg-white shadow-sm overflow-hidden';
+  'rounded border border-black/5 bg-white';
 
 export const listadoCardListClass = 'flex flex-col gap-3 p-3 lg:hidden';
 
@@ -24,14 +24,18 @@ export const listadoCardActionsClass =
   'mt-4 flex flex-wrap justify-end gap-2 border-t border-black/10 pt-3';
 
 export const listadoTablaWrapperClass =
-  'overflow-x-auto rounded border border-black/5 bg-white shadow-sm [-webkit-overflow-scrolling:touch]';
+  'overflow-x-auto rounded border border-black/5 bg-white [-webkit-overflow-scrolling:touch]';
 
-export const listadoTablaClass = 'w-full text-left text-base';
+export const listadoTablaClass = 'w-full border-collapse text-left text-base';
+
+export const listadoTablaTheadClass = '[&_th]:border-b [&_th]:border-black/10';
+
+export const listadoTablaTbodyClass = '[&_td]:border-b [&_td]:border-black/5';
 
 export const listadoTablaHeadRowClass =
-  'border-b border-black/10 bg-vialto-mist font-[family-name:var(--font-ui)] text-[13px] uppercase tracking-[0.15em] text-vialto-fire md:text-[15px] md:tracking-[0.2em]';
+  'bg-vialto-mist font-[family-name:var(--font-ui)] text-[13px] uppercase tracking-[0.15em] text-vialto-fire md:text-[15px] md:tracking-[0.2em]';
 
-export const listadoTablaBodyRowClass = 'border-b border-black/5 hover:bg-vialto-mist/80';
+export const listadoTablaBodyRowClass = 'hover:bg-vialto-mist';
 
 export const listadoTablaThClass = 'px-3 py-3 md:px-4';
 

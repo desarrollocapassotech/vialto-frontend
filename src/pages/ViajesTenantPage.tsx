@@ -94,7 +94,7 @@ import {
   VIAJE_PAGO_TRANSPORTISTA_QUERY,
   type ViajePagoTransportistaFiltro,
 } from '@/lib/viajesFiltroPagoTransportista';
-import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { listadoTablaBodyRowClass, listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { canAccessFacturacion, canAccessIntegracionArca } from '@/lib/tenantModules';
 import { FacturarSelectorModal } from '@/components/viajes/FacturarSelectorModal';
@@ -1816,7 +1816,7 @@ export function ViajesTenantPage({
           const nombreTransp = nombreTransportistaExternoListadoViaje(v, transportistas);
           const nombreTranspEfectivo = nombreTransportistaEfectivoListadoViaje(v, transportistas);
           return (
-              <tr key={v.id} className="border-b border-black/5 hover:bg-vialto-mist/80">
+              <tr key={v.id} className={listadoTablaBodyRowClass}>
                 {mostrarColumnaFacturarLote && (
                   <td className="px-2 py-3 align-middle text-center">
                     {esElegibleFacturarLote(v) ? (

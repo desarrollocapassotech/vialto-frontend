@@ -32,7 +32,7 @@ import {
   pageSizeListadoValido,
   slicePaginaCliente,
 } from '@/lib/listadoPaginacion';
-import { listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
+import { listadoTablaBodyRowClass, listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import type { Cliente, Factura, PaginatedMeta, Transportista, Viaje } from '@/types/api';
 
@@ -1005,7 +1005,7 @@ export function FacturacionTenantPage({
           </tr>
         }
         renderTableRow={(f) => (
-          <tr key={f.id} className="border-b border-black/5 hover:bg-vialto-mist/40">
+          <tr key={f.id} className={listadoTablaBodyRowClass}>
             <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
             <td className="px-4 py-3 leading-snug">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>{nombreContraparte(f)}</td>
