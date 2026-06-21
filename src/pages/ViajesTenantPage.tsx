@@ -187,6 +187,7 @@ export function ViajesTenantPage({
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+  const [destinosError, setDestinosError] = useState<string | null>(null);
   const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<string | null>(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
@@ -893,6 +894,7 @@ export function ViajesTenantPage({
     else setViajeSnapshotRemoto(v);
     setEstadoQuickId(null);
     setError(null);
+    setDestinosError(null);
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? '').trim();
     const chRow = listas.choferes.find((c) => c.id === v.choferId);
@@ -984,6 +986,7 @@ export function ViajesTenantPage({
     setViajeEditHint(null);
     setFechaCargaError(null);
     setFechaDescargaError(null);
+    setDestinosError(null);
     setTransportistaEfectivoError(null);
   }
 
@@ -1179,6 +1182,10 @@ export function ViajesTenantPage({
       setError('Ingresá el número de viaje.');
       return;
     }
+    if (!draft.destinosRows[0]?.etiqueta.trim()) {
+      setDestinosError('Ingresá el destino 1.');
+      return;
+    }
     const externo = draft.operacionModo === 'externo';
     if (externo && !draft.transportistaId.trim()) {
       setError('Seleccioná un transportista externo.');
@@ -1213,9 +1220,10 @@ export function ViajesTenantPage({
     }
     const destinosVal = await validarDestinosRows(draft.destinosRows);
     if (!destinosVal.ok) {
-      setError(destinosVal.message);
+      setDestinosError(destinosVal.message);
       return;
     }
+    setDestinosError(null);
     const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
     const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
     setFechaCargaError(fcError);
@@ -2215,6 +2223,8 @@ export function ViajesTenantPage({
           viajeEditHint={viajeEditHint}
           fechaCargaError={fechaCargaError}
           fechaDescargaError={fechaDescargaError}
+          destinosError={destinosError}
+          onClearDestinosError={() => setDestinosError(null)}
           transportistaEfectivoError={transportistaEfectivoError}
           onClearTransportistaEfectivoError={() => setTransportistaEfectivoError(null)}
           onDraftFechasPatch={(p) => {

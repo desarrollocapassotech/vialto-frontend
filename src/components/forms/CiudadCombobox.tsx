@@ -19,6 +19,8 @@ type Props = {
    * Usa nombre no semántico, atributos anti-extensiones y `readOnly` hasta el primer foco.
    */
   disableBrowserAutocomplete?: boolean;
+  /** Marca borde rojo cuando el campo tiene error de validación. */
+  error?: boolean;
 };
 
 const MIN_CHARS = 2;
@@ -34,6 +36,7 @@ export function CiudadCombobox({
   id: idProp,
   'aria-label': ariaLabel,
   disableBrowserAutocomplete = false,
+  error = false,
 }: Props) {
   const defaultPlaceholder =
     pais === 'UY' ? 'Buscá ciudad o localidad en Uruguay…' : 'Buscá ciudad o localidad en Argentina…';
@@ -176,6 +179,10 @@ export function CiudadCombobox({
       </ul>
     ) : null;
 
+  const resolvedInputClass = error
+    ? `${inputClassName.replace(/\bborder-black\/\d+\b/g, '').replace(/\s+/g, ' ').trim()} border-red-400`
+    : inputClassName;
+
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
       <input
@@ -190,11 +197,12 @@ export function CiudadCombobox({
         data-1p-ignore={disableBrowserAutocomplete ? 'true' : undefined}
         placeholder={placeholder ?? defaultPlaceholder}
         aria-label={ariaLabel}
+        aria-invalid={error || undefined}
         aria-expanded={open}
         aria-controls={showList ? listboxId : undefined}
         aria-autocomplete="list"
         role="combobox"
-        className={inputClassName}
+        className={resolvedInputClass}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onFocus={() => {
