@@ -76,7 +76,7 @@ export function EgresosStockHistorialTenantPage({
               Descargar Excel
             </button>
             <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
-              â† Volver a egresos
+              ← Volver a egresos
             </Link>
           </div>
         </div>
@@ -93,7 +93,7 @@ export function EgresosStockHistorialTenantPage({
             Descargar Excel
           </button>
           <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
-            â† Volver a egresos
+            ← Volver a egresos
           </Link>
         </div>
       )}

@@ -52,6 +52,7 @@ export function StockOperacionViewModal({
       onClose={onClose}
       onOverlayClick={onClose}
       scrollBody
+      maxWidthClass="sm:max-w-3xl"
       footer={
         <button type="button" onClick={onClose} className={viewModalBtnGhost}>
           Cerrar
@@ -146,7 +147,7 @@ export function StockOperacionViewModal({
       <div className="px-4 pb-4 pt-2">
         <p className={`${DT} mb-2`}>Productos ({operacion.movimientos.length})</p>
         <div className="overflow-x-auto rounded border border-black/10">
-          <table className="w-full text-sm min-w-[520px]">
+          <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-vialto-mist/40">
               <tr>
                 <th className={TH}>Producto</th>

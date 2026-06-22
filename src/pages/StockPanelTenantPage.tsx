@@ -270,7 +270,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           }`}
         />
       </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Cant. 1" active={soloConStockCant1}>
+      <ListadoFiltroCampo label="Bultos" active={soloConStockCant1}>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
           <input
             type="checkbox"
@@ -282,7 +282,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         </label>
       </ListadoFiltroCampo>
       {showUnidad2 && (
-        <ListadoFiltroCampo label="Cant. 2" active={soloConStockCant2}>
+        <ListadoFiltroCampo label="Sueltas" active={soloConStockCant2}>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
             <input
               type="checkbox"
@@ -463,7 +463,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                 </th>
                 <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>
                   <ViajesListadoHeaderFiltro
-                    title="Cant. 1"
+                    title="Bultos"
                     alignRight
                     filterActive={soloConStockCant1}
                     filterSignature={soloConStockCant1 ? '1' : ''}
@@ -482,7 +482,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                 {showUnidad2 && (
                   <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>
                     <ViajesListadoHeaderFiltro
-                      title="Cant. 2"
+                      title="Sueltas"
                       alignRight
                       filterActive={soloConStockCant2}
                       filterSignature={soloConStockCant2 ? '1' : ''}
@@ -536,12 +536,12 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                   value: <span className={sinStock ? 'text-vialto-steel' : ''}>{productoNombre}</span>,
                 },
                 {
-                  label: 'Cant. 1',
+                  label: 'Bultos',
                   value: cantidad1Cell(item),
                 },
               ];
               if (showUnidad2) {
-                fields.push({ label: 'Cant. 2', value: cantidad2Cell(item) });
+                fields.push({ label: 'Sueltas', value: cantidad2Cell(item) });
               }
               return (
                 <ListadoCard

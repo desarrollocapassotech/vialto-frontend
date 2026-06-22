@@ -1,57 +1,90 @@
-﻿import { useAuth, useUser } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { Spinner } from '@/components/ui/Spinner';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
-import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { RemitoAdjuntoStock } from '@/components/stock/RemitoAdjuntoStock';
-import { isRemitoAdjuntoFile, uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
-import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Deposito, Producto, ProductoPresentacion, StockItem } from '@/types/api';
+import { isRemitoAdjuntoFile, uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
+import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
+import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type EgresoResult = { id: string; numeroRemito: string | null; movimientosCount: number };
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
-
-type EgresoRow = {
-  _key: string;
-  ProductoId: string;
-  presentacionId: string;
-  bultos: string;
-  sueltas: string;
-  lote: string;
-};
-
-function emptyRow(): EgresoRow {
-  return {
-    _key: crypto.randomUUID(),
-    ProductoId: '',
-    presentacionId: '',
-    bultos: '',
-    sueltas: '',
-    lote: '',
-  };
-}
+type WizardStep = 1 | 2 | 3;
 
 function buildQs(params: Record<string, string | number>, tenantId?: string): string {
   const parts: string[] = [];
   if (tenantId) parts.push(`tenantId=${encodeURIComponent(tenantId)}`);
-  for (const [k, v] of Object.entries(params)) parts.push(`${k}=${encodeURIComponent(String(v))}`);
+  for (const [k, v] of Object.entries(params))
+    parts.push(`${k}=${encodeURIComponent(String(v))}`);
   return parts.length ? `?${parts.join('&')}` : '';
 }
 
-function getPresentaciones(Productos: Producto[], ProductoId: string): ProductoPresentacion[] {
-  return Productos.find((p) => p.id === ProductoId)?.productoPresentaciones ?? [];
+const STEPS: { label: string }[] = [
+  { label: 'Empresa' },
+  { label: 'Entrega' },
+  { label: 'Productos' },
+];
+
+function StepIndicator({ step }: { step: WizardStep }) {
+  return (
+    <div className="flex items-center gap-2">
+      {STEPS.map((s, i) => {
+        const n = (i + 1) as WizardStep;
+        const done = step > n;
+        const active = step === n;
+        return (
+          <div key={n} className="flex items-center gap-2">
+            <div className="flex flex-col items-center gap-0.5">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                  active
+                    ? 'border-vialto-fire bg-vialto-fire text-white'
+                    : done
+                    ? 'border-vialto-fire bg-white text-vialto-fire'
+                    : 'border-black/20 bg-white text-vialto-steel'
+                }`}
+              >
+                {done ? '✓' : n}
+              </div>
+              <span
+                className={`text-[10px] leading-tight ${
+                  active ? 'font-semibold text-vialto-charcoal' : 'text-vialto-steel'
+                }`}
+              >
+                {s.label}
+              </span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                className={`w-8 h-px mb-3 ${step > n ? 'bg-vialto-fire' : 'bg-black/10'}`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatFechaLabel(fecha: string, hora: string): string {
+  if (!fecha) return '';
+  try {
+    const d = new Date(`${fecha}T${hora || '00:00'}`);
+    const f = d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    return hora ? `${f} ${hora}` : f;
+  } catch {
+    return fecha;
+  }
 }
 
 export function EgresosStockTenantPage({
@@ -68,29 +101,39 @@ export function EgresosStockTenantPage({
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
+
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
     const base = clientesExternos ?? maestro.clientes;
     const ids = new Set(base.map((c) => c.id));
     return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
   }, [clientesExternos, maestro.clientes, sessionClientes]);
-  const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
-  const ProductosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+
+  const clientesLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
     : '/api/stock/egresos';
   const disponibleBase = platform ? '/api/platform/stock/disponible' : '/api/stock/disponible';
   const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
 
-  const [Productos, setProductos] = useState<Producto[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [ProductosLoading, setProductosLoading] = useState(true);
+  const [productosLoading, setProductosLoading] = useState(true);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con stock
+  const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
+  const [allStockLoading, setAllStockLoading] = useState(true);
 
-  // Header
+  // Wizard
+  const [step, setStep] = useState<WizardStep>(1);
+
+  // Paso 1
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
+
+  // Paso 2
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -101,9 +144,10 @@ export function EgresosStockTenantPage({
   const [observaciones, setObservaciones] = useState('');
   const [remitoFile, setRemitoFile] = useState<File | null>(null);
 
-  // Líneas
-  const [rows, setRows] = useState<EgresoRow[]>([emptyRow()]);
+  // Paso 3
+  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
 
+  // Estado compartido
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -120,7 +164,10 @@ export function EgresosStockTenantPage({
     setProductosLoading(true);
     setLoadError(null);
     try {
-      const url = `${ProductosBase}/paginated${buildQs({ page: 1, pageSize: 200, filtroActivo: 'activos' }, tenantId)}`;
+      const url = `${productosBase}/paginated${buildQs(
+        { page: 1, pageSize: 200, filtroActivo: 'activos' },
+        tenantId,
+      )}`;
       const data = await apiJson<PaginatedProductos>(url, () => getToken());
       setProductos(data.items);
     } catch (e) {
@@ -128,9 +175,11 @@ export function EgresosStockTenantPage({
     } finally {
       setProductosLoading(false);
     }
-  }, [ProductosBase, tenantId, getToken]);
+  }, [productosBase, tenantId, getToken]);
 
-  useEffect(() => { void loadProductos(); }, [loadProductos]);
+  useEffect(() => {
+    void loadProductos();
+  }, [loadProductos]);
 
   useEffect(() => {
     const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
@@ -139,35 +188,35 @@ export function EgresosStockTenantPage({
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
-  // Cargar stock disponible cuando cambian cliente o depósito
+  // Cargar todo el stock del tenant para filtrar clientes/depósitos en paso 1
+  useEffect(() => {
+    setAllStockLoading(true);
+    void apiJson<StockItem[]>(`${disponibleBase}${buildQs({}, tenantId)}`, () => getToken())
+      .then((items) => setAllStockItems(items.filter((s) => s.cantidad1 > 0 || s.cantidad2 > 0)))
+      .catch(() => setAllStockItems([]))
+      .finally(() => setAllStockLoading(false));
+  }, [disponibleBase, tenantId, getToken]);
+
+  // Cargar stock disponible para el cliente+depósito seleccionados (para mostrar disponible en paso 3)
   useEffect(() => {
     if (!clienteId || !depositoId) {
       setStockItems([]);
       return;
     }
     void apiJson<StockItem[]>(
-      `${disponibleBase}${buildQs({ clienteId, depositoId }, tenantId)}`,
+      `${disponibleBase}${buildQs({ clienteId }, tenantId)}`,
       () => getToken(),
     )
       .then(setStockItems)
       .catch(() => setStockItems([]));
   }, [clienteId, depositoId, disponibleBase, tenantId, getToken]);
 
-  function getDisponible(ProductoId: string, presentacionId: string): StockItem | null {
-    if (!ProductoId || !presentacionId) return null;
-    return (
-      stockItems.find(
-        (s) => s.productoId === ProductoId && s.presentacionId === presentacionId,
-      ) ?? null
-    );
-  }
-
   function updateRow(key: string, patch: Partial<EgresoRow>) {
     setRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...patch } : r)));
   }
 
   function addRow() {
-    setRows((prev) => [...prev, emptyRow()]);
+    setRows((prev) => [...prev, emptyEgresoRow()]);
   }
 
   function removeRow(key: string) {
@@ -186,8 +235,43 @@ export function EgresosStockTenantPage({
     setDestinoFinal('');
     setObservaciones('');
     setRemitoFile(null);
-    setRows([emptyRow()]);
+    setRows([emptyEgresoRow()]);
     setStockItems([]);
+    setFormError(null);
+    setFieldErrors({});
+    setStep(1);
+  }
+
+  function handleContinuar1() {
+    const errs: Record<string, string> = {};
+    if (!clienteId) errs.clienteId = 'Seleccioná una empresa/cliente.';
+    if (!depositoId) errs.depositoId = 'Seleccioná un depósito.';
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
+    setFieldErrors({});
+    setFormError(null);
+    setStep(2);
+  }
+
+  function handleContinuar2() {
+    if (!fechaMov.trim()) {
+      setFechaMovError('Ingresá la fecha del movimiento.');
+      return;
+    }
+    if (!remitoFile) {
+      setFieldErrors({ remitoFile: 'Cargá el remito antes de continuar.' });
+      return;
+    }
+    if (!isRemitoAdjuntoFile(remitoFile)) {
+      setFieldErrors({ remitoFile: 'El remito debe ser un PDF o una imagen.' });
+      return;
+    }
+    setFechaMovError(null);
+    setFieldErrors({});
+    setFormError(null);
+    setStep(3);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -195,25 +279,24 @@ export function EgresosStockTenantPage({
     setFormError(null);
 
     const ferrs: Record<string, string> = {};
-    if (!clienteId) ferrs.clienteId = 'Seleccioná una empresa/cliente.';
-    if (!depositoId) ferrs.depositoId = 'Seleccioná un depósito.';
-
     rows.forEach((row, idx) => {
-      if (!row.ProductoId) ferrs[`row_${idx}_ProductoId`] = 'Seleccioná un Producto.';
-      if (!row.presentacionId) ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
+      if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
+      if (!row.presentacionId)
+        ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
       const b = parseFloat(row.bultos) || 0;
       const s = parseFloat(row.sueltas) || 0;
       if (b <= 0 && s <= 0) {
         ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (row.ProductoId && row.presentacionId && clienteId && depositoId) {
-        const disponible = getDisponible(row.ProductoId, row.presentacionId);
-        const dispBultos = disponible?.cantidad1 ?? 0;
-        const dispSueltas = disponible?.cantidad2 ?? 0;
-        if (b > dispBultos) {
-          ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${dispBultos} bultos.`;
-        }
-        if (s > dispSueltas) {
-          ferrs[`row_${idx}_sueltas`] = `Stock insuficiente. Disponible: ${dispSueltas} sueltas.`;
+      } else if (row.productoId && row.presentacionId) {
+        const disponible =
+          stockItems.find(
+            (si) => si.productoId === row.productoId && si.presentacionId === row.presentacionId,
+          ) ?? null;
+        if (disponible) {
+          if (b > disponible.cantidad1)
+            ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${disponible.cantidad1} bultos.`;
+          if (s > disponible.cantidad2)
+            ferrs[`row_${idx}_sueltas`] = `Stock insuficiente. Disponible: ${disponible.cantidad2} sueltas.`;
         }
       }
     });
@@ -225,45 +308,33 @@ export function EgresosStockTenantPage({
     }
     setFieldErrors({});
 
-    const fmError = !fechaMov.trim() ? 'Ingresá la fecha del movimiento.' : null;
-    setFechaMovError(fmError);
-    if (fmError) return setFormError(fmError);
-
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
-
     if (!remitoFile) return setFormError('Cargá el remito antes de registrar el egreso.');
-    if (!isRemitoAdjuntoFile(remitoFile)) {
-      return setFormError('El remito debe ser un PDF o una imagen (foto).');
-    }
 
     setSaving(true);
     try {
       const remitoEscaneadoUrl = await uploadStockRemitoPdf(getToken, remitoFile, tenantId);
-
-      const body = {
-        clienteId,
-        depositoId,
-        fecha: fechaIso,
-        remitoEscaneadoUrl,
-        entregadoPor: entregadoPor.trim() || undefined,
-        destinatario: destinatario.trim() || undefined,
-        destinoFinal: destinoFinal.trim() || undefined,
-        observaciones: observaciones.trim() || undefined,
-        lineas: rows.map((row) => ({
-          productoId: row.ProductoId,
-          presentacionId: row.presentacionId,
-          bultos: parseFloat(row.bultos) || 0,
-          sueltas: parseFloat(row.sueltas) || 0,
-          lote: row.lote.trim() || undefined,
-        })),
-      };
-
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          clienteId,
+          depositoId,
+          fecha: fechaIso,
+          remitoEscaneadoUrl,
+          entregadoPor: entregadoPor.trim() || undefined,
+          destinatario: destinatario.trim() || undefined,
+          destinoFinal: destinoFinal.trim() || undefined,
+          observaciones: observaciones.trim() || undefined,
+          lineas: rows.map((row) => ({
+            productoId: row.productoId,
+            presentacionId: row.presentacionId,
+            bultos: parseFloat(row.bultos) || 0,
+            sueltas: parseFloat(row.sueltas) || 0,
+            lote: row.lote.trim() || undefined,
+          })),
+        }),
       });
-
       showToast(
         result.numeroRemito
           ? `Egreso registrado — remito ${result.numeroRemito}`
@@ -281,14 +352,35 @@ export function EgresosStockTenantPage({
     ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/egresos/historial';
 
+  // Clientes que tienen al menos un item con stock > 0
+  const clientesFiltrados = useMemo(() => {
+    if (allStockLoading) return [];
+    const ids = new Set(allStockItems.map((s) => s.clienteId));
+    return clientes.filter((c) => ids.has(c.id));
+  }, [clientes, allStockItems, allStockLoading]);
+
+  // Depósitos que tienen stock para el cliente seleccionado (o cualquiera si no hay cliente)
+  const depositosFiltrados = useMemo(() => {
+    if (allStockLoading) return [];
+    const items = clienteId
+      ? allStockItems.filter((s) => s.clienteId === clienteId)
+      : allStockItems;
+    const ids = new Set(items.map((s) => s.depositoId));
+    return depositos.filter((d) => ids.has(d.id));
+  }, [depositos, allStockItems, allStockLoading, clienteId]);
+
+  const clienteNombre = clientes.find((c) => c.id === clienteId)?.nombre ?? '';
+  const depositoNombre = depositos.find((d) => d.id === depositoId)?.nombre ?? '';
+  const fechaLabel = formatFechaLabel(fechaMov, horaMov);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8">
       {!platform && (
         <div>
           <h1 className="text-2xl font-semibold text-vialto-charcoal">Egresos / despacho</h1>
           <p className="mt-1 text-sm text-vialto-steel">
             Registrá salida de mercadería. Se genera un número de remito interno y el stock se
-            descuenta de forma atómica al guardar.
+            descuenta automáticamente al guardar.
           </p>
         </div>
       )}
@@ -299,8 +391,8 @@ export function EgresosStockTenantPage({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-vialto-charcoal"></h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <StepIndicator step={step} />
         <Link
           to={historialHref}
           className="shrink-0 inline-flex items-center gap-2 rounded border border-black/15 bg-white px-3 py-1.5 text-sm font-medium text-vialto-charcoal hover:bg-vialto-mist/60 transition-colors"
@@ -310,304 +402,94 @@ export function EgresosStockTenantPage({
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* â”€â”€ CABECERA â”€â”€ */}
-        <div className="bg-white rounded-lg border border-black/10 p-6 space-y-5">
-          <h2 className="text-base font-semibold text-vialto-charcoal">Datos del egreso</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>Empresa / Cliente <span className="text-red-500">*</span></label>
-              <ClienteSearchSelect
-                clientes={clientes}
-                value={clienteId}
-                onChange={(id) => {
-                  setClienteId(id);
-                  setStockItems([]);
-                }}
-                loading={clientesSelectLoading}
-                inputClassName={INPUT}
-                onNuevo={() => setModalCliente(true)}
-              />
-              <CrudFieldError message={fieldErrors.clienteId} />
-            </div>
-
-            <div className="space-y-1 min-w-0">
-              <label className={LABEL}>Depósito <span className="text-red-500">*</span></label>
-              <select
-                value={depositoId}
-                onChange={(e) => {
-                  setDepositoId(e.target.value);
-                  setStockItems([]);
-                }}
-                className={`h-9 w-full border bg-white px-2 text-sm ${fieldErrors.depositoId ? 'border-red-400' : 'border-black/15'}`}
-              >
-                <option value="">Elegí un depósito…</option>
-                {depositos.map((d) => (
-                  <option key={d.id} value={d.id}>{d.nombre}</option>
-                ))}
-              </select>
-              <CrudFieldError message={fieldErrors.depositoId} />
-            </div>
-
-            <div className="space-y-1 sm:col-span-2">
-              <ViajeFechaHoraFields
-                mode="cargaOnly"
-                fechaCarga={fechaMov}
-                horaCarga={horaMov}
-                fechaDescarga=""
-                horaDescarga=""
-                onPatch={(p) => {
-                  if (p.fechaCarga !== undefined) {
-                    setFechaMov(p.fechaCarga);
-                    if (p.fechaCarga) setFechaMovError(null);
-                  }
-                  if (p.horaCarga !== undefined) setHoraMov(p.horaCarga);
-                }}
-                labelClassName={LABEL}
-                inputClassName={INPUT}
-                errorFechaCarga={fechaMovError}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className={LABEL}>Conductor</label>
-              <input
-                type="text"
-                value={entregadoPor}
-                onChange={(e) => setEntregadoPor(e.target.value)}
-                className={INPUT}
-                placeholder="Ej: Cacho, Gustavo…"
-                maxLength={200}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className={LABEL}>Destinatario</label>
-              <input
-                type="text"
-                value={destinatario}
-                onChange={(e) => setDestinatario(e.target.value)}
-                className={INPUT}
-                placeholder="Ej: Luvi SRL, Myca SRL…"
-                maxLength={200}
-              />
-            </div>
-
-            <div className="space-y-1 sm:col-span-2">
-              <label className={LABEL}>Dirección / Ruta de entrega</label>
-              <input
-                type="text"
-                value={destinoFinal}
-                onChange={(e) => setDestinoFinal(e.target.value)}
-                className={INPUT}
-                placeholder="Ej: Express Brio, Pampa 1087 San Fernando…"
-                maxLength={300}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className={LABEL}>Observaciones</label>
-            <textarea
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              rows={2}
-              className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
-              placeholder="Notas internas…"
-            />
-          </div>
-
-          <RemitoAdjuntoStock
-            file={remitoFile}
-            onFileChange={setRemitoFile}
-            labelClassName={LABEL}
-            disabled={saving}
-          />
-        </div>
-
-        {/* â”€â”€ LÃNEAS â”€â”€ */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-vialto-charcoal">
-              Productos <span className="ml-1 text-sm font-normal text-vialto-steel">({rows.length})</span>
-            </h2>
-            <button
-              type="button"
-              onClick={addRow}
-              className="text-sm font-medium text-vialto-charcoal border border-black/15 bg-white px-3 py-1.5 rounded hover:bg-vialto-mist/60 transition-colors"
-            >
-              + Agregar línea
-            </button>
-          </div>
-
-          {(!clienteId || !depositoId) && (
-            <p className="text-xs text-vialto-steel italic">
-              Seleccioná cliente y depósito para ver el stock disponible por línea.
-            </p>
-          )}
-
-          {rows.map((row, idx) => {
-            const pps = getPresentaciones(Productos, row.ProductoId);
-            const selectedPP = pps.find((pp) => pp.id === row.presentacionId);
-            const disponible = getDisponible(row.ProductoId, row.presentacionId);
-
-            return (
-              <div key={row._key} className="bg-white rounded-lg border border-black/10 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className={`${LABEL} text-xs`}>Línea {idx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(row._key)}
-                    disabled={rows.length <= 1}
-                    className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Producto */}
-                  <div className="space-y-1">
-                    <label className={LABEL}>Producto <span className="text-red-500">*</span></label>
-                    <SearchableEntitySelect<Producto>
-                      items={Productos}
-                      value={row.ProductoId}
-                      onChange={(id) =>
-                        updateRow(row._key, { ProductoId: id, presentacionId: '' })
-                      }
-                      loading={ProductosLoading}
-                      filterItems={(items, q) => {
-                        const lq = q.toLowerCase();
-                        return items.filter(
-                          (p) =>
-                            p.nombre.toLowerCase().includes(lq) ||
-                            (p.codigo?.toLowerCase().includes(lq) ?? false),
-                        );
-                      }}
-                      getPrimaryLabel={(p) =>
-                        p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
-                      }
-                      placeholderCerrado="Elegí un Producto…"
-                      placeholderBuscar="Buscar por nombre o código…"
-                      inputClassName={`${INPUT} ${fieldErrors[`row_${idx}_ProductoId`] ? 'border-red-400' : ''}`}
-                    />
-                    <CrudFieldError message={fieldErrors[`row_${idx}_ProductoId`]} />
-                  </div>
-
-                  {/* Presentación */}
-                  <div className="space-y-1">
-                    <label className={LABEL}>Presentación <span className="text-red-500">*</span></label>
-                    <select
-                      value={row.presentacionId}
-                      onChange={(e) => updateRow(row._key, { presentacionId: e.target.value })}
-                      disabled={!row.ProductoId || pps.length === 0}
-                      className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${fieldErrors[`row_${idx}_presentacionId`] ? 'border-red-400' : 'border-black/15'}`}
-                    >
-                      <option value="">
-                        {!row.ProductoId ? 'Primero elegí un Producto' : 'Elegí una presentación…'}
-                      </option>
-                      {pps.map((pp) => (
-                        <option key={pp.id} value={pp.id}>
-                          {pp.presentacion?.nombre ?? pp.presentacionId} — {pp.unidadesPorBulto} uds/bulto
-                        </option>
-                      ))}
-                    </select>
-                    {selectedPP && (
-                      <p className="text-xs text-vialto-steel">
-                        {selectedPP.unidadesPorBulto} unidades por bulto
-                      </p>
-                    )}
-                    <CrudFieldError message={fieldErrors[`row_${idx}_presentacionId`]} />
-                  </div>
-
-                  {/* Bultos */}
-                  <div className="space-y-1">
-                    <label className={LABEL}>Bultos <span className="text-red-500">*</span></label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.bultos}
-                      onChange={(e) => updateRow(row._key, { bultos: e.target.value })}
-                      className={`${INPUT} ${fieldErrors[`row_${idx}_bultos`] ? 'border-red-400' : ''}`}
-                      placeholder="0"
-                    />
-                    {disponible !== null && (
-                      <p className="text-xs text-vialto-steel">
-                        Disponible:{' '}
-                        <span className="font-semibold text-vialto-charcoal">
-                          {disponible.cantidad1}
-                        </span>{' '}
-                        bultos
-                      </p>
-                    )}
-                    <CrudFieldError message={fieldErrors[`row_${idx}_bultos`]} />
-                  </div>
-
-                  {/* Sueltas */}
-                  <div className="space-y-1">
-                    <label className={LABEL}>Sueltas</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={row.sueltas}
-                      onChange={(e) => updateRow(row._key, { sueltas: e.target.value })}
-                      className={`${INPUT} ${fieldErrors[`row_${idx}_sueltas`] ? 'border-red-400' : ''}`}
-                      placeholder="0"
-                    />
-                    {disponible !== null && (
-                      <p className="text-xs text-vialto-steel">
-                        Disponible:{' '}
-                        <span className="font-semibold text-vialto-charcoal">
-                          {disponible.cantidad2}
-                        </span>{' '}
-                        sueltas
-                      </p>
-                    )}
-                    <CrudFieldError message={fieldErrors[`row_${idx}_sueltas`]} />
-                  </div>
-
-                  {/* Lote */}
-                  <div className="space-y-1 sm:col-span-2">
-                    <label className={LABEL}>Lote</label>
-                    <input
-                      type="text"
-                      value={row.lote}
-                      onChange={(e) => updateRow(row._key, { lote: e.target.value })}
-                      className={INPUT}
-                      placeholder="Ej: R17-25147"
-                      maxLength={200}
-                    />
-                  </div>
-                </div>
-              </div>
+      {step === 1 && (
+        <EgresoWizardStep1
+          clientes={clientesFiltrados}
+          clienteId={clienteId}
+          onClienteChange={(id) => {
+            setClienteId(id);
+            setStockItems([]);
+            // Si el depósito actual no tiene stock para el nuevo cliente, lo limpiamos
+            const depositosParaCliente = new Set(
+              allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
             );
-          })}
+            if (depositoId && !depositosParaCliente.has(depositoId)) setDepositoId('');
+          }}
+          clientesLoading={clientesLoading || allStockLoading}
+          depositos={depositosFiltrados}
+          depositoId={depositoId}
+          onDepositoChange={(id) => {
+            setDepositoId(id);
+            setStockItems([]);
+          }}
+          fieldErrors={fieldErrors}
+          onNuevoCliente={() => setModalCliente(true)}
+          onContinuar={handleContinuar1}
+        />
+      )}
 
-          <button
-            type="button"
-            onClick={addRow}
-            className="w-full py-2 border border-dashed border-black/20 text-sm text-vialto-steel rounded hover:bg-vialto-mist/40 transition-colors"
-          >
-            + Agregar otra línea
-          </button>
-        </div>
+      {step === 2 && (
+        <EgresoWizardStep2
+          fechaMov={fechaMov}
+          horaMov={horaMov}
+          fechaMovError={fechaMovError}
+          onFechaHoraPatch={(p) => {
+            if (p.fechaCarga !== undefined) {
+              setFechaMov(p.fechaCarga);
+              if (p.fechaCarga) setFechaMovError(null);
+            }
+            if (p.horaCarga !== undefined) setHoraMov(p.horaCarga);
+          }}
+          entregadoPor={entregadoPor}
+          onEntregadoPorChange={setEntregadoPor}
+          destinatario={destinatario}
+          onDestinatarioChange={setDestinatario}
+          destinoFinal={destinoFinal}
+          onDestinoFinalChange={setDestinoFinal}
+          observaciones={observaciones}
+          onObservacionesChange={setObservaciones}
+          remitoFile={remitoFile}
+          onRemitoFileChange={setRemitoFile}
+          fieldErrors={fieldErrors}
+          saving={saving}
+          clienteNombre={clienteNombre}
+          depositoNombre={depositoNombre}
+          onVolver={() => {
+            setStep(1);
+            setFieldErrors({});
+            setFormError(null);
+          }}
+          onContinuar={handleContinuar2}
+        />
+      )}
 
-        <CrudFormErrorAlert message={formError} />
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
-          >
-            {saving && <Spinner />}
-            {saving ? 'Guardando…' : 'Registrar egreso'}
-          </button>
-        </div>
-      </form>
+      {step === 3 && (
+        <EgresoWizardStep3
+          rows={rows}
+          onAddRow={addRow}
+          onRemoveRow={removeRow}
+          onUpdateRow={updateRow}
+          productos={productos}
+          productosLoading={productosLoading}
+          stockItems={stockItems}
+          fieldErrors={fieldErrors}
+          formError={formError}
+          saving={saving}
+          clienteId={clienteId}
+          depositoId={depositoId}
+          clienteNombre={clienteNombre}
+          depositoNombre={depositoNombre}
+          fechaLabel={fechaLabel}
+          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
+          tenantId={tenantId}
+          onVolver={() => {
+            setStep(2);
+            setFieldErrors({});
+            setFormError(null);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
 
       {modalCliente && (
         <ClienteModal
