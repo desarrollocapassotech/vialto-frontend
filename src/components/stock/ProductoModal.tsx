@@ -250,7 +250,7 @@ export function ProductoModal({
                             <li key={pp.id} className="text-sm">
                               {pp.presentacion?.nombre ?? '—'}
                               <span className="text-vialto-steel">
-                                {' '}— {pp.unidadesPorBulto} uds/bulto
+                                {' '}— {pp.unidadesPorBulto} unidades dentro del bulto
                               </span>
                             </li>
                           ))}
@@ -320,7 +320,7 @@ export function ProductoModal({
                       {/* Column headers */}
                       <div className="grid grid-cols-[1fr_6rem_2rem] gap-2">
                         <span className="text-xs text-vialto-steel">Presentación</span>
-                        <span className="text-xs text-vialto-steel">Uds/bulto</span>
+                        <span className="text-xs text-vialto-steel">Unidades dentro del bulto</span>
                         <span />
                       </div>
 
@@ -372,13 +372,23 @@ export function ProductoModal({
                         </span>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={addRow}
-                        className="self-start text-xs uppercase tracking-wider text-vialto-steel border border-black/15 px-2 h-7 hover:bg-vialto-mist"
-                      >
-                        + Agregar presentación
-                      </button>
+                      {(() => {
+                        const last = rows[rows.length - 1];
+                        const lastComplete =
+                          last &&
+                          Boolean(last.presentacionId) &&
+                          Boolean(last.unidadesPorBulto) &&
+                          parseInt(last.unidadesPorBulto, 10) >= 1;
+                        return lastComplete ? (
+                          <button
+                            type="button"
+                            onClick={addRow}
+                            className="self-start text-xs uppercase tracking-wider text-vialto-steel border border-black/15 px-2 h-7 hover:bg-vialto-mist"
+                          >
+                            + Agregar presentación
+                          </button>
+                        ) : null;
+                      })()}
                     </div>
                   </>
                 )}
@@ -404,13 +414,15 @@ export function ProductoModal({
               {readOnly ? 'Cerrar' : 'Cancelar'}
             </button>
             {readOnly ? (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
-              >
-                Editar
-              </button>
+              onEdit ? (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite"
+                >
+                  Editar
+                </button>
+              ) : null
             ) : (
               <button
                 type="button"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { StockOperacionViewModal } from '@/components/stock/StockOperacionViewModal';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
@@ -156,13 +157,22 @@ export function EgresosStockHistorialTenantPage({
         emptyMessage="No hay egresos registrados."
         loadingMessage="Cargando…"
         renderActions={(op) => (
-          <button
-            type="button"
-            onClick={() => setViendo(op)}
-            className={listadoTablaAccionClass}
-          >
-            Ver
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <ImprimirRemitoButton
+              variant="listado"
+              className={listadoTablaAccionClass}
+              egresoId={op.id}
+              tenantId={tenantId}
+              titulo={op.numeroRemito ? `Remito ${op.numeroRemito}` : 'Remito interno'}
+            />
+            <button
+              type="button"
+              onClick={() => setViendo(op)}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+          </div>
         )}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
@@ -170,6 +180,7 @@ export function EgresosStockHistorialTenantPage({
       {viendo && (
         <StockOperacionViewModal
           operacion={viendo}
+          tenantId={tenantId}
           onClose={() => setViendo(null)}
         />
       )}

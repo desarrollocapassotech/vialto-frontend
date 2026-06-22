@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion } from '@/types/api';
@@ -30,12 +31,13 @@ function Campo({
 
 export function StockOperacionViewModal({
   operacion,
+  tenantId,
   onClose,
 }: {
   operacion: StockOperacion;
+  tenantId?: string;
   onClose: () => void;
 }) {
-  const [previewRemito, setPreviewRemito] = useState(false);
   const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
   const fotosUrls = operacion.tipo === 'ingreso' ? (operacion.fotosUrls ?? []) : [];
 
@@ -54,9 +56,22 @@ export function StockOperacionViewModal({
       scrollBody
       maxWidthClass="sm:max-w-3xl"
       footer={
-        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-          Cerrar
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {operacion.tipo === 'egreso' && (
+            <ImprimirRemitoButton
+              egresoId={operacion.id}
+              tenantId={tenantId}
+              titulo={
+                operacion.numeroRemito
+                  ? `Remito ${operacion.numeroRemito}`
+                  : 'Remito interno'
+              }
+            />
+          )}
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+            Cerrar
+          </button>
+        </div>
       }
     >
       {/* â”€â”€ Cabecera â”€â”€ */}
@@ -84,10 +99,10 @@ export function StockOperacionViewModal({
           <Campo label="Observaciones" value={operacion.observaciones} />
         )}
 
-        {/* Fotos del ingreso */}
+        {/* Fotos del producto (ingresos) */}
         {operacion.tipo === 'ingreso' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-            <dt className={DT}>Fotos</dt>
+            <dt className={DT}>Fotos del producto</dt>
             <dd className="sm:col-span-2 flex flex-wrap gap-2">
               {fotosUrls.length > 0 ? (
                 fotosUrls.map((url, idx) => (
@@ -100,14 +115,6 @@ export function StockOperacionViewModal({
                     Foto {idx + 1}
                   </button>
                 ))
-              ) : operacion.remitoUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewRemito(true)}
-                  className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
-                >
-                  Ver
-                </button>
               ) : (
                 <span className="text-vialto-steel">Sin fotos</span>
               )}
@@ -115,22 +122,21 @@ export function StockOperacionViewModal({
           </div>
         )}
 
-        {/* Remito escaneado (egresos) */}
-        {operacion.tipo !== 'ingreso' && (
+        {/* Remito PDF (egresos) */}
+        {operacion.tipo === 'egreso' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-            <dt className={DT}>Remito escaneado</dt>
+            <dt className={DT}>Remito PDF</dt>
             <dd className="sm:col-span-2">
-              {operacion.remitoUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewRemito(true)}
-                  className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
-                >
-                  Ver
-                </button>
-              ) : (
-                <span className="text-vialto-steel">Sin adjunto</span>
-              )}
+              <ImprimirRemitoButton
+                variant="compact"
+                egresoId={operacion.id}
+                tenantId={tenantId}
+                titulo={
+                  operacion.numeroRemito
+                    ? `Remito ${operacion.numeroRemito}`
+                    : 'Remito interno'
+                }
+              />
             </dd>
           </div>
         )}
@@ -185,16 +191,8 @@ export function StockOperacionViewModal({
       {previewFotoIdx !== null && fotosUrls[previewFotoIdx] && (
         <AdjuntoPreviewModal
           url={fotosUrls[previewFotoIdx]}
-          title={`Foto ${previewFotoIdx + 1}`}
+          title={`Foto del producto ${previewFotoIdx + 1}`}
           onClose={() => setPreviewFotoIdx(null)}
-        />
-      )}
-
-      {previewRemito && operacion.remitoUrl && (
-        <AdjuntoPreviewModal
-          url={operacion.remitoUrl}
-          title={titulo}
-          onClose={() => setPreviewRemito(false)}
         />
       )}
     </ViewModalShell>

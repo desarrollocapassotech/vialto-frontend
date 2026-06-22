@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { LoteDatalistInput } from '@/components/stock/LoteDatalistInput';
+import { ProductoModal } from '@/components/stock/ProductoModal';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Producto, ProductoPresentacion } from '@/types/api';
 
@@ -63,6 +65,10 @@ export function IngresoWizardStep3({
   fechaLabel,
   lotesBase,
   tenantId,
+  getToken,
+  productosBase,
+  canCreateProducto,
+  onProductoCreado,
   onVolver,
   onSubmit,
 }: {
@@ -82,10 +88,17 @@ export function IngresoWizardStep3({
   fechaLabel: string;
   lotesBase: string;
   tenantId?: string;
+  getToken: () => Promise<string | null>;
+  productosBase: string;
+  canCreateProducto?: boolean;
+  onProductoCreado: (p: Producto) => void;
   onVolver: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
+  const [nuevoProductoRowKey, setNuevoProductoRowKey] = useState<string | null>(null);
+
   return (
+    <>
     <form onSubmit={onSubmit} className="space-y-6">
       {/* Resumen pasos 1 y 2 */}
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
@@ -166,6 +179,8 @@ export function IngresoWizardStep3({
                     inputClassName={`${INPUT} ${
                       fieldErrors[`row_${idx}_productoId`] ? 'border-red-400' : ''
                     }`}
+                    onNuevo={canCreateProducto ? () => setNuevoProductoRowKey(row._key) : undefined}
+                    onNuevoLabel="+ Nuevo producto"
                   />
                   <CrudFieldError message={fieldErrors[`row_${idx}_productoId`]} />
                 </div>
@@ -324,5 +339,21 @@ export function IngresoWizardStep3({
         </button>
       </div>
     </form>
+
+    {nuevoProductoRowKey !== null && (
+      <ProductoModal
+        modo="create"
+        getToken={getToken}
+        baseUrl={productosBase}
+        tenantId={tenantId}
+        onClose={() => setNuevoProductoRowKey(null)}
+        onSaved={(p) => {
+          onProductoCreado(p);
+          onUpdateRow(nuevoProductoRowKey, { productoId: p.id, presentacionId: '' });
+          setNuevoProductoRowKey(null);
+        }}
+      />
+    )}
+    </>
   );
 }

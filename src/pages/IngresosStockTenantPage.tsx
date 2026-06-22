@@ -6,7 +6,7 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
-import { uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
+import { uploadStockIngresoFoto } from '@/lib/stockRemitoUpload';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import type { Cliente, Deposito, Producto } from '@/types/api';
@@ -96,10 +96,11 @@ export function IngresosStockTenantPage({
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
 }) {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
+  const canCreateProducto = platform || orgRole === 'org:admin';
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
@@ -257,7 +258,7 @@ export function IngresosStockTenantPage({
     setSaving(true);
     try {
       const fotosUrls = await Promise.all(
-        fotoFiles.map((f) => uploadStockRemitoPdf(getToken, f, tenantId)),
+        fotoFiles.map((f) => uploadStockIngresoFoto(getToken, f, tenantId)),
       );
       await apiJson(ingresosUrl, () => getToken(), {
         method: 'POST',
@@ -385,6 +386,10 @@ export function IngresosStockTenantPage({
           fechaLabel={fechaLabel}
           lotesBase={lotesBase}
           tenantId={tenantId}
+          getToken={getToken}
+          productosBase={productosBase}
+          canCreateProducto={canCreateProducto}
+          onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
           onVolver={() => {
             setStep(2);
             setFieldErrors({});

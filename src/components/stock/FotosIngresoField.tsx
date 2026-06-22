@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { isRemitoAdjuntoFile } from '@/lib/stockRemitoUpload';
+import { isIngresoFotoFile } from '@/lib/stockRemitoUpload';
 
 const MAX_FOTOS = 2;
 const ACCEPT_FOTOS = 'image/jpeg,image/png,.jpg,.jpeg,.png';
@@ -23,7 +23,7 @@ export function FotosIngresoField({
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []).filter(isRemitoAdjuntoFile);
+    const selected = Array.from(e.target.files ?? []).filter(isIngresoFotoFile);
     const combined = [...files, ...selected].slice(0, MAX_FOTOS);
     onChange(combined);
     if (inputRef.current) inputRef.current.value = '';
@@ -38,7 +38,7 @@ export function FotosIngresoField({
   return (
     <div className="space-y-1">
       <span className={LABEL}>
-        Fotos
+        Fotos del producto
         <span className="ml-1 normal-case font-normal text-vialto-steel">(máx. 2 imágenes JPG/PNG)</span>
       </span>
 

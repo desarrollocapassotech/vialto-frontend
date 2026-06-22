@@ -43,7 +43,7 @@ function getDisponible(
   ) ?? null;
 }
 
-function isRowComplete(row: EgresoRow): boolean {
+export function isEgresoRowComplete(row: EgresoRow): boolean {
   const b = parseFloat(row.bultos) || 0;
   const s = parseFloat(row.sueltas) || 0;
   return Boolean(row.productoId) && Boolean(row.presentacionId) && (b > 0 || s > 0);
@@ -290,7 +290,7 @@ export function EgresoWizardStep3({
 
         {(() => {
           const lastRow = rows[rows.length - 1];
-          const canAdd = lastRow ? isRowComplete(lastRow) : false;
+          const canAdd = lastRow ? isEgresoRowComplete(lastRow) : false;
           return (
             <button
               type="button"

@@ -6,7 +6,6 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
-import { isRemitoAdjuntoFile, uploadStockRemitoPdf } from '@/lib/stockRemitoUpload';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
@@ -142,7 +141,6 @@ export function EgresosStockTenantPage({
   const [destinatario, setDestinatario] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [observaciones, setObservaciones] = useState('');
-  const [remitoFile, setRemitoFile] = useState<File | null>(null);
 
   // Paso 3
   const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
@@ -234,7 +232,6 @@ export function EgresosStockTenantPage({
     setDestinatario('');
     setDestinoFinal('');
     setObservaciones('');
-    setRemitoFile(null);
     setRows([emptyEgresoRow()]);
     setStockItems([]);
     setFormError(null);
@@ -258,14 +255,6 @@ export function EgresosStockTenantPage({
   function handleContinuar2() {
     if (!fechaMov.trim()) {
       setFechaMovError('Ingresá la fecha del movimiento.');
-      return;
-    }
-    if (!remitoFile) {
-      setFieldErrors({ remitoFile: 'Cargá el remito antes de continuar.' });
-      return;
-    }
-    if (!isRemitoAdjuntoFile(remitoFile)) {
-      setFieldErrors({ remitoFile: 'El remito debe ser un PDF o una imagen.' });
       return;
     }
     setFechaMovError(null);
@@ -310,18 +299,15 @@ export function EgresosStockTenantPage({
 
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
-    if (!remitoFile) return setFormError('Cargá el remito antes de registrar el egreso.');
 
     setSaving(true);
     try {
-      const remitoEscaneadoUrl = await uploadStockRemitoPdf(getToken, remitoFile, tenantId);
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
           clienteId,
           depositoId,
           fecha: fechaIso,
-          remitoEscaneadoUrl,
           entregadoPor: entregadoPor.trim() || undefined,
           destinatario: destinatario.trim() || undefined,
           destinoFinal: destinoFinal.trim() || undefined,
@@ -448,10 +434,6 @@ export function EgresosStockTenantPage({
           onDestinoFinalChange={setDestinoFinal}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
-          remitoFile={remitoFile}
-          onRemitoFileChange={setRemitoFile}
-          fieldErrors={fieldErrors}
-          saving={saving}
           clienteNombre={clienteNombre}
           depositoNombre={depositoNombre}
           onVolver={() => {

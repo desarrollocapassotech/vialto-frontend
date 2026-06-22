@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
   movimientoStockTipoNumeroClass,
@@ -8,17 +9,17 @@ import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetalleBody({
   row,
+  tenantId,
 }: {
   row: MovimientoStock;
   tenantId?: string;
 }) {
-  const [previewRemito, setPreviewRemito] = useState(false);
   const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
   const fotosUrls = row.tipo === 'ingreso' ? (row.fotosUrls ?? []) : [];
 
-  const remitoPreviewTitulo = row.numeroRemito?.trim()
+  const remitoTitulo = row.numeroRemito?.trim()
     ? `Remito ${row.numeroRemito.trim()}`
-    : 'Remito';
+    : 'Remito interno';
 
   return (
     <>
@@ -89,7 +90,7 @@ export function MovimientoStockDetalleBody({
         {row.tipo === 'ingreso' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
             <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-              Fotos
+              Fotos del producto
             </dt>
             <dd className="sm:col-span-2 flex flex-wrap gap-2">
               {fotosUrls.length > 0 ? (
@@ -110,24 +111,18 @@ export function MovimientoStockDetalleBody({
           </div>
         )}
 
-        {/* Remito escaneado (egresos) */}
-        {row.tipo !== 'ingreso' && (
+        {row.tipo === 'egreso' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
             <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-              Remito escaneado
+              Remito PDF
             </dt>
             <dd className="sm:col-span-2">
-              {row.remitoUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewRemito(true)}
-                  className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
-                >
-                  Ver
-                </button>
-              ) : (
-                <span className="text-vialto-steel">Sin adjunto</span>
-              )}
+              <ImprimirRemitoButton
+                variant="compact"
+                egresoId={row.operacionId}
+                tenantId={tenantId}
+                titulo={remitoTitulo}
+              />
             </dd>
           </div>
         )}
@@ -181,14 +176,6 @@ export function MovimientoStockDetalleBody({
           <dd className="sm:col-span-2 text-vialto-charcoal">{formatInstantEsAr24h(row.createdAt)}</dd>
         </div>
       </dl>
-
-      {previewRemito && row.remitoUrl && (
-        <AdjuntoPreviewModal
-          url={row.remitoUrl}
-          title={remitoPreviewTitulo}
-          onClose={() => setPreviewRemito(false)}
-        />
-      )}
 
       {previewFotoIdx !== null && fotosUrls[previewFotoIdx] && (
         <AdjuntoPreviewModal

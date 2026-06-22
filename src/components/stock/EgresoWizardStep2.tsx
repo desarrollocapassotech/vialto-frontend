@@ -1,6 +1,4 @@
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import { RemitoAdjuntoStock } from '@/components/stock/RemitoAdjuntoStock';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -25,10 +23,6 @@ export function EgresoWizardStep2({
   onDestinoFinalChange,
   observaciones,
   onObservacionesChange,
-  remitoFile,
-  onRemitoFileChange,
-  fieldErrors,
-  saving,
   clienteNombre,
   depositoNombre,
   onVolver,
@@ -46,10 +40,6 @@ export function EgresoWizardStep2({
   onDestinoFinalChange: (v: string) => void;
   observaciones: string;
   onObservacionesChange: (v: string) => void;
-  remitoFile: File | null;
-  onRemitoFileChange: (f: File | null) => void;
-  fieldErrors: Record<string, string>;
-  saving: boolean;
   clienteNombre: string;
   depositoNombre: string;
   onVolver: () => void;
@@ -71,7 +61,7 @@ export function EgresoWizardStep2({
 
       <div className="bg-white rounded-lg border border-black/10 p-6 space-y-5">
         <p className="text-sm text-vialto-steel">
-          Completá la fecha, los datos de entrega y adjuntá el remito.
+          Completá la fecha y los datos de entrega.
         </p>
 
         {/* Fecha */}
@@ -86,15 +76,6 @@ export function EgresoWizardStep2({
           inputClassName={INPUT}
           errorFechaCarga={fechaMovError}
         />
-
-        {/* Remito */}
-        <RemitoAdjuntoStock
-          file={remitoFile}
-          onFileChange={onRemitoFileChange}
-          labelClassName={LABEL}
-          disabled={saving}
-        />
-        <CrudFieldError message={fieldErrors.remitoFile} />
 
         {/* Datos de entrega */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">

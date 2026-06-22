@@ -3,6 +3,7 @@ import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
@@ -463,16 +464,27 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
         emptyMessage="No hay movimientos para mostrar."
         loadingMessage="Cargando…"
         renderActions={(m) => (
-          <button
-            type="button"
-            onClick={() => {
-              setDetalleMovimientoId(m.id);
-              setDetalleMovimientoTipo(m.tipo);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {m.tipo === 'egreso' && (
+              <ImprimirRemitoButton
+                variant="listado"
+                className={listadoTablaAccionClass}
+                egresoId={m.operacionId}
+                tenantId={tenantId}
+                titulo={m.numeroRemito ? `Remito ${m.numeroRemito}` : 'Remito interno'}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setDetalleMovimientoId(m.id);
+                setDetalleMovimientoTipo(m.tipo);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+          </div>
         )}
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}

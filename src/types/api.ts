@@ -351,6 +351,7 @@ export interface Presentacion {
 export interface MovimientoStock {
   id: string;
   tenantId: string;
+  operacionId?: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
   clienteId: string;
@@ -363,6 +364,7 @@ export interface MovimientoStock {
   numeroRemito?: string | null;
   lote?: string | null;
   observaciones: string | null;
+  /** PDF del remito interno (solo egresos). */
   remitoUrl: string | null;
   movimientoVinculadoId?: string | null;
   createdBy: string;
@@ -373,6 +375,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
 
@@ -463,7 +466,7 @@ export interface StockItem {
 export interface StockOperacionLinea {
   id: string;
   productoId: string;
-  producto?: { id: string; nombre: string };
+  producto?: { id: string; nombre: string; unidad1Nombre?: string; unidad2Nombre?: string | null };
   presentacionId?: string | null;
   presentacion?: ProductoPresentacion | null;
   bultos: number;
@@ -482,12 +485,14 @@ export interface StockOperacion {
   cliente?: { id: string; nombre: string };
   depositoId: string;
   deposito?: { id: string; nombre: string };
+  /** PDF del remito interno generado al egresar. */
   remitoUrl?: string | null;
   numeroRemito?: string | null;
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
   observaciones?: string | null;
+  /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
   createdBy: string;
   createdAt: string;

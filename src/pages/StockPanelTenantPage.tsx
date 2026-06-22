@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { ChevronDown, FileSpreadsheet, Warehouse } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
@@ -7,6 +7,7 @@ import { ListadoCard } from '@/components/listado/ListadoCard';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
+import { ProductoModal } from '@/components/stock/ProductoModal';
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
@@ -16,7 +17,13 @@ import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHead
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { generarExcel, stockItemColumnas } from '@/lib/stockExcelExport';
-import type { Cliente, Deposito, StockItem } from '@/types/api';
+import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
+import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+
+type ProductoModalState =
+  | { mode: 'closed' }
+  | { mode: 'view'; producto: Producto }
+  | { mode: 'edit'; producto: Producto };
 
 type ProductoFiltro = { id: string; nombre: string };
 import {
@@ -62,7 +69,9 @@ function cantidad2Cell(item: StockItem) {
 }
 
 export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
   const platform = Boolean(tenantId);
   const disponibleUrl = platform
     ? `/api/platform/stock/disponible${buildQs(tenantId)}`
@@ -83,6 +92,25 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   const [soloConStockCant1, setSoloConStockCant1] = useState(false);
   const [soloConStockCant2, setSoloConStockCant2] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [productoModal, setProductoModal] = useState<ProductoModalState>({ mode: 'closed' });
+
+  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+
+  const abrirProducto = useCallback(
+    async (productoId: string) => {
+      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+      try {
+        const producto = await apiJson<Producto>(
+          `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
+          () => getToken(),
+        );
+        setProductoModal({ mode: 'view', producto });
+      } catch {
+        // sin feedback: el listado ya muestra el nombre del producto
+      }
+    },
+    [productosBase, tenantId, getToken],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -499,6 +527,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                     </ViajesListadoHeaderFiltro>
                   </th>
                 )}
+                <th scope="col" className={`${listadoTablaThClass} w-16`} />
               </tr>
             }
             renderTableRow={(item) => {
@@ -523,6 +552,15 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                       {cantidad2Cell(item)}
                     </td>
                   )}
+                  <td className={`${listadoTablaTdClass} text-right`}>
+                    <button
+                      type="button"
+                      onClick={() => void abrirProducto(item.productoId)}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                    >
+                      Ver
+                    </button>
+                  </td>
                 </tr>
               );
             }}
@@ -547,6 +585,15 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                 <ListadoCard
                   primary={<span className={sinStock ? 'text-vialto-steel' : ''}>{clienteNombre}</span>}
                   fields={fields}
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => void abrirProducto(item.productoId)}
+                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                    >
+                      Ver
+                    </button>
+                  }
                 />
               );
             }}
@@ -565,6 +612,38 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
             generarExcel(cols, filteredItems, `inventario-${deposito}`);
           }}
           onClose={() => setExportModalOpen(false)}
+        />
+      )}
+
+      {productoModal.mode === 'view' && (
+        <ProductoModal
+          modo="view"
+          productoInicial={productoModal.producto}
+          getToken={getToken}
+          baseUrl={productosBase}
+          tenantId={tenantId}
+          onClose={() => setProductoModal({ mode: 'closed' })}
+          onSaved={() => {}}
+          onEdit={
+            puedeGestionar
+              ? () => setProductoModal({ mode: 'edit', producto: productoModal.producto })
+              : undefined
+          }
+        />
+      )}
+
+      {productoModal.mode === 'edit' && (
+        <ProductoModal
+          modo="edit"
+          productoInicial={productoModal.producto}
+          getToken={getToken}
+          baseUrl={productosBase}
+          tenantId={tenantId}
+          onClose={() => setProductoModal({ mode: 'closed' })}
+          onSaved={async () => {
+            setProductoModal({ mode: 'closed' });
+            await load();
+          }}
         />
       )}
     </div>
