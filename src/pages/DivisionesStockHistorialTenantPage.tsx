@@ -108,8 +108,8 @@ export function DivisionesStockHistorialTenantPage({
             header: 'Cant. 1',
             cell: (m) => (
               <>
-                <span className={m.cantidad1 < 0 ? 'text-red-600' : 'text-emerald-700'}>
-                  {m.cantidad1 >= 0 ? '+' : ''}{m.cantidad1}
+                <span className={(m.cantidad1 ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}>
+                  {(m.cantidad1 ?? 0) >= 0 ? '+' : ''}{m.cantidad1 ?? 0}
                 </span>
                 {' '}
                 <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
@@ -123,8 +123,8 @@ export function DivisionesStockHistorialTenantPage({
             cell: (m) =>
               m.producto?.unidad2Nombre !== null ? (
                 <>
-                  <span className={m.cantidad2 < 0 ? 'text-red-600' : 'text-emerald-700'}>
-                    {m.cantidad2 >= 0 ? '+' : ''}{m.cantidad2}
+                  <span className={(m.cantidad2 ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}>
+                    {(m.cantidad2 ?? 0) >= 0 ? '+' : ''}{m.cantidad2 ?? 0}
                   </span>
                   {' '}
                   <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>

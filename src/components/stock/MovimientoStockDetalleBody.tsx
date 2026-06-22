@@ -8,12 +8,13 @@ import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetalleBody({
   row,
-  tenantId,
 }: {
   row: MovimientoStock;
   tenantId?: string;
 }) {
   const [previewRemito, setPreviewRemito] = useState(false);
+  const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
+  const fotosUrls = row.tipo === 'ingreso' ? (row.fotosUrls ?? []) : [];
 
   const remitoPreviewTitulo = row.numeroRemito?.trim()
     ? `Remito ${row.numeroRemito.trim()}`
@@ -84,24 +85,52 @@ export function MovimientoStockDetalleBody({
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal whitespace-pre-wrap">{row.observaciones ?? '—'}</dd>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-          <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            Remito escaneado
-          </dt>
-          <dd className="sm:col-span-2">
-            {row.remitoUrl ? (
-              <button
-                type="button"
-                onClick={() => setPreviewRemito(true)}
-                className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
-              >
-                Ver
-              </button>
-            ) : (
-              <span className="text-vialto-steel">Sin adjunto</span>
-            )}
-          </dd>
-        </div>
+        {/* Fotos (ingresos) */}
+        {row.tipo === 'ingreso' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+            <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+              Fotos
+            </dt>
+            <dd className="sm:col-span-2 flex flex-wrap gap-2">
+              {fotosUrls.length > 0 ? (
+                fotosUrls.map((url, idx) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setPreviewFotoIdx(idx)}
+                    className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    Foto {idx + 1}
+                  </button>
+                ))
+              ) : (
+                <span className="text-vialto-steel">Sin fotos</span>
+              )}
+            </dd>
+          </div>
+        )}
+
+        {/* Remito escaneado (egresos) */}
+        {row.tipo !== 'ingreso' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+            <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+              Remito escaneado
+            </dt>
+            <dd className="sm:col-span-2">
+              {row.remitoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewRemito(true)}
+                  className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
+                >
+                  Ver
+                </button>
+              ) : (
+                <span className="text-vialto-steel">Sin adjunto</span>
+              )}
+            </dd>
+          </div>
+        )}
         {row.tipo === 'egreso' && (
           <>
             <div className="col-span-full px-4 pt-4 pb-1">
@@ -155,10 +184,17 @@ export function MovimientoStockDetalleBody({
 
       {previewRemito && row.remitoUrl && (
         <AdjuntoPreviewModal
-          movimientoId={row.id}
-          tenantId={tenantId}
+          url={row.remitoUrl}
           title={remitoPreviewTitulo}
           onClose={() => setPreviewRemito(false)}
+        />
+      )}
+
+      {previewFotoIdx !== null && fotosUrls[previewFotoIdx] && (
+        <AdjuntoPreviewModal
+          url={fotosUrls[previewFotoIdx]}
+          title={`Foto ${previewFotoIdx + 1}`}
+          onClose={() => setPreviewFotoIdx(null)}
         />
       )}
     </>

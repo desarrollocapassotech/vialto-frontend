@@ -1,4 +1,4 @@
-/** Forma alineada con el modelo Prisma expuesto por el backend. */
+﻿/** Forma alineada con el modelo Prisma expuesto por el backend. */
 
 export interface PagoTransportista {
   monto: number;
@@ -71,12 +71,12 @@ export interface Viaje {
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
-  /** ARS | USD (omitido en respuestas antiguas → se trata como ARS). */
+  /** ARS | USD (omitido en respuestas antiguas â†’ se trata como ARS). */
   monedaMonto?: string;
   precioTransportistaExterno: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
-  /** Solo cuando monedaMonto ≠ monedaPrecioTransportistaExterno (transporte externo). */
+  /** Solo cuando monedaMonto â‰  monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;
   monedaGananciaBrutaManual?: string | null;
   observaciones: string | null;
@@ -309,19 +309,33 @@ export interface ImportTemplate {
   updatedAt: string;
 }
 
+export interface ProductoPresentacion {
+  id: string;
+  presentacionId: string;
+  presentacion?: { id: string; nombre: string };
+  unidadesPorBulto: number;
+  activo: boolean;
+}
+
 export interface Producto {
   id: string;
   tenantId: string;
   nombre: string;
   codigo: string | null;
   descripcion: string | null;
-  presentacion1Id: string | null;
-  presentacion2Id: string | null;
-  unidad1Nombre: string;
-  unidad2Nombre: string | null;
+  pesoUnitarioKg: number | null;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
+  productoPresentaciones: ProductoPresentacion[];
+  /** @deprecated Usar productoPresentaciones */
+  unidad1Nombre?: string;
+  /** @deprecated Usar productoPresentaciones */
+  unidad2Nombre?: string | null;
+  /** @deprecated Usar productoPresentaciones */
+  presentacion1Id?: string | null;
+  /** @deprecated Usar productoPresentaciones */
+  presentacion2Id?: string | null;
 }
 
 export interface PlatformUser {
@@ -346,29 +360,57 @@ export interface Presentacion {
 export interface MovimientoStock {
   id: string;
   tenantId: string;
+  operacionId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
-  clienteId: string;
-  cliente?: { id: string; nombre: string };
-  depositoId: string;
-  deposito?: { id: string; nombre: string };
-  tipo: 'ingreso' | 'egreso' | 'division';
-  cantidad1: number;
-  cantidad2: number;
-  numeroRemito?: string | null;
+  producto?: {
+    id: string;
+    nombre: string;
+    /** @deprecated Usar ProductoPresentacion */
+    unidad1Nombre?: string;
+    /** @deprecated Usar ProductoPresentacion */
+    unidad2Nombre?: string | null;
+  };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
+  bultos: number;
+  unidades: number;
+  fechaVencimiento?: string | null;
   lote?: string | null;
   observaciones: string | null;
-  remitoUrl: string | null;
-  /** ID del movimiento par en una división (origen ↔ destino). */
+  /** ID del movimiento par en una división (origen â†” destino). */
   movimientoVinculadoId?: string | null;
+  remitoId?: string | null;
   createdBy: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
   createdByLabel?: string | null;
   fecha: string;
   createdAt: string;
+  /** @deprecated Movido a StockOperacion */
+  clienteId?: string;
+  /** @deprecated Movido a StockOperacion */
+  cliente?: { id: string; nombre: string };
+  /** @deprecated Movido a StockOperacion */
+  depositoId?: string;
+  /** @deprecated Movido a StockOperacion */
+  deposito?: { id: string; nombre: string };
+  /** @deprecated Movido a StockOperacion */
+  tipo?: 'ingreso' | 'egreso' | 'division';
+  /** @deprecated Reemplazado por bultos/unidades */
+  cantidad1?: number;
+  /** @deprecated Reemplazado por bultos/unidades */
+  cantidad2?: number;
+  /** @deprecated Movido a StockOperacion */
+  remitoUrl?: string | null;
+  /** @deprecated Movido a StockOperacion */
+  numeroRemito?: string | null;
+  /** @deprecated Movido a StockOperacion */
   entregadoPor?: string | null;
+  /** @deprecated Movido a StockOperacion */
   destinatario?: string | null;
+  /** @deprecated Movido a StockOperacion */
   destinoFinal?: string | null;
+  /** URLs de fotos adjuntas al ingreso (hasta 2). Solo presente en ingresos. */
+  fotosUrls?: string[];
 }
 
 export interface StockEgresoRemitoConfig {
@@ -376,7 +418,42 @@ export interface StockEgresoRemitoConfig {
   remitoDigitos: number;
 }
 
-// ── ARCA / Liquidaciones ──────────────────────────────────────────────────────
+export interface StockOperacionLinea {
+  id: string;
+  productoId: string;
+  producto?: { id: string; nombre: string };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
+  bultos: number;
+  /** Unidades sueltas. */
+  unidades: number;
+  lote?: string | null;
+  fechaVencimiento?: string | null;
+}
+
+export interface StockOperacion {
+  id: string;
+  tenantId: string;
+  tipo: 'ingreso' | 'egreso' | 'division';
+  fecha: string;
+  clienteId: string;
+  cliente?: { id: string; nombre: string };
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
+  remitoUrl?: string | null;
+  /** Fotos adjuntas al ingreso (hasta 2). Vacío en egresos y datos anteriores. */
+  fotosUrls?: string[];
+  numeroRemito?: string | null;
+  entregadoPor?: string | null;
+  destinatario?: string | null;
+  destinoFinal?: string | null;
+  observaciones?: string | null;
+  createdBy: string;
+  createdAt: string;
+  movimientos: StockOperacionLinea[];
+}
+
+// â”€â”€ ARCA / Liquidaciones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface ArcaConfig {
   cuitEmisor: string;
@@ -443,7 +520,16 @@ export interface StockItem {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  producto?: {
+    id: string;
+    nombre: string;
+    /** @deprecated Usar ProductoPresentacion */
+    unidad1Nombre?: string;
+    /** @deprecated Usar ProductoPresentacion */
+    unidad2Nombre?: string | null;
+  };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;

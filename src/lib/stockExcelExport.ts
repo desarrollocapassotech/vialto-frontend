@@ -1,4 +1,4 @@
-import type { MovimientoStock, StockItem } from '@/types/api';
+﻿import type { MovimientoStock, StockItem, StockOperacion } from '@/types/api';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 export interface ExcelColDef<T> {
@@ -65,16 +65,16 @@ export function movimientoStockColumnas(
     {
       id: 'cant1',
       label: unidad1,
-      getValue: (m) => m.cantidad1,
+      getValue: (m) => m.cantidad1 ?? 0,
     },
   ];
 
   if (unidad2 !== null) {
-    cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 });
+    cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 ?? 0 });
   }
 
   cols.push(
-    { id: 'cliente', label: 'Cliente', getValue: (m) => m.cliente?.nombre ?? m.clienteId },
+    { id: 'cliente', label: 'Cliente', getValue: (m) => m.cliente?.nombre ?? m.clienteId ?? '' },
     { id: 'deposito', label: 'Depósito', getValue: (m) => m.deposito?.nombre ?? '' },
     { id: 'lote', label: 'Lote', getValue: (m) => m.lote ?? '' },
     { id: 'numeroRemito', label: 'N° Remito', getValue: (m) => m.numeroRemito ?? '' },
@@ -83,6 +83,86 @@ export function movimientoStockColumnas(
     { id: 'destino', label: 'Destino', getValue: (m) => m.destinoFinal ?? '' },
     { id: 'observaciones', label: 'Observaciones', getValue: (m) => m.observaciones ?? '' },
   );
+
+  return cols;
+}
+
+// â”€â”€ StockOperacion (nuevo modelo multi-producto) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+type OperacionFlatRow = {
+  fecha: string;
+  cliente: string;
+  deposito: string;
+  remito: string;
+  producto: string;
+  presentacion: string;
+  bultos: number;
+  sueltas: number;
+  lote: string;
+  vencimiento: string;
+  conductor: string;
+  destinatario: string;
+  destino: string;
+  observaciones: string;
+};
+
+export function flattenStockOperaciones(
+  operaciones: StockOperacion[],
+): OperacionFlatRow[] {
+  const rows: OperacionFlatRow[] = [];
+  for (const op of operaciones) {
+    for (const mov of op.movimientos) {
+      rows.push({
+        fecha: formatMovimientoStockFechaFromIso(op.fecha),
+        cliente: op.cliente?.nombre ?? op.clienteId,
+        deposito: op.deposito?.nombre ?? op.depositoId,
+        remito: op.numeroRemito ?? '',
+        producto: mov.producto?.nombre ?? mov.productoId,
+        presentacion: mov.presentacion?.presentacion?.nombre ?? mov.presentacionId ?? '',
+        bultos: mov.bultos,
+        sueltas: mov.unidades,
+        lote: mov.lote ?? '',
+        vencimiento: mov.fechaVencimiento
+          ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
+          : '',
+        conductor: op.entregadoPor ?? '',
+        destinatario: op.destinatario ?? '',
+        destino: op.destinoFinal ?? '',
+        observaciones: op.observaciones ?? '',
+      });
+    }
+  }
+  return rows;
+}
+
+export function stockOperacionColumnas(
+  tipo: 'ingreso' | 'egreso',
+): ExcelColDef<OperacionFlatRow>[] {
+  const cols: ExcelColDef<OperacionFlatRow>[] = [
+    { id: 'fecha', label: 'Fecha', getValue: (r) => r.fecha },
+    { id: 'cliente', label: 'Cliente', getValue: (r) => r.cliente },
+    { id: 'deposito', label: 'Depósito', getValue: (r) => r.deposito },
+    { id: 'producto', label: 'Producto', getValue: (r) => r.producto },
+    { id: 'presentacion', label: 'Presentación', getValue: (r) => r.presentacion },
+    { id: 'bultos', label: 'Bultos', getValue: (r) => r.bultos },
+    { id: 'sueltas', label: 'Sueltas', getValue: (r) => r.sueltas },
+    { id: 'lote', label: 'Lote', getValue: (r) => r.lote },
+  ];
+
+  if (tipo === 'ingreso') {
+    cols.push({ id: 'vencimiento', label: 'Vencimiento', getValue: (r) => r.vencimiento });
+  }
+
+  if (tipo === 'egreso') {
+    cols.push(
+      { id: 'remito', label: 'N° Remito', getValue: (r) => r.remito },
+      { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
+      { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
+      { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },
+    );
+  }
+
+  cols.push({ id: 'observaciones', label: 'Observaciones', getValue: (r) => r.observaciones });
 
   return cols;
 }

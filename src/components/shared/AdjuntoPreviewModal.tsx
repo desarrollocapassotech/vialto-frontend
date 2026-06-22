@@ -64,6 +64,15 @@ export function AdjuntoPreviewModal({
       return () => URL.revokeObjectURL(url);
     }
 
+    if (url) {
+      const isImage = /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url);
+      setObjectUrl(url);
+      setContentType(isImage ? 'image/jpeg' : 'application/pdf');
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     if (!movimientoId) {
       setError('No hay adjunto para mostrar.');
       setLoading(false);
@@ -98,7 +107,7 @@ export function AdjuntoPreviewModal({
       cancelled = true;
       if (revokeUrl) URL.revokeObjectURL(revokeUrl);
     };
-  }, [file, getToken, movimientoId, tenantId]);
+  }, [file, url, getToken, movimientoId, tenantId]);
 
   const tipo = objectUrl ? detectarTipoAdjuntoDesdeContentType(contentType) : 'pdf';
   const previewSrc = objectUrl && tipo !== 'imagen' ? pdfEmbedSrc(objectUrl) : objectUrl;
