@@ -15,6 +15,7 @@ import { clearMicCrtBorrador, loadMicCrtBorrador, saveMicCrtBorrador } from '@/l
 import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
 import { hasEditableViajeExportGroups, type ViajeExportMissingGroup } from '@/lib/viajeExportMissingFields';
 import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 
@@ -27,8 +28,9 @@ type Props = {
 };
 
 const inputClass =
-  'w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
-const labelClass = 'text-[10px] uppercase tracking-wide text-vialto-steel';
+  'box-border min-w-0 max-w-full w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
+const dateInputClass = `${inputClass} max-w-full appearance-none`;
+const labelClass = 'break-words text-[10px] uppercase tracking-wide text-vialto-steel';
 
 /** Solo dígitos y un separador decimal (`.` o `,`), máx. 2 decimales. */
 function sanitizeMicCrtMontoInput(raw: string): string {
@@ -105,7 +107,7 @@ function MicCrtMontoInput({
 }
 
 function FormGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-2 sm:grid-cols-2">{children}</div>;
+  return <div className="grid min-w-0 gap-2 sm:grid-cols-2">{children}</div>;
 }
 
 function Field({
@@ -120,7 +122,7 @@ function Field({
   const isRequired = label.endsWith(' *');
   const labelText = isRequired ? label.slice(0, -2) : label;
   return (
-    <label className={`grid gap-0.5 ${className ?? ''}`}>
+    <label className={`grid min-w-0 gap-0.5 ${className ?? ''}`}>
       <span className={labelClass}>
         {labelText}
         {isRequired && <span className="text-red-500"> *</span>}
@@ -161,7 +163,7 @@ function ActorBlock({
 }) {
   const set = (key: keyof MicCrtActor, val: string) => onChange({ ...actor, [key]: val });
   return (
-    <fieldset className="border border-black/10 p-3">
+    <fieldset className="min-w-0 border border-black/10 p-3">
       <legend className="px-1 text-xs font-semibold text-vialto-charcoal">{title}</legend>
       <FormGrid>
         <Field label="Razón social *">
@@ -364,16 +366,18 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
 
   const ocupado = loading || generando || guardandoBorrador;
 
+  useLockBodyScroll(true);
+
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[110] flex items-stretch justify-center overflow-hidden overscroll-none bg-black/40 p-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="mic-crt-title"
     >
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col border border-black/15 bg-white shadow-lg">
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 px-4 py-3">
-          <div>
+      <div className="relative flex h-full max-h-[100dvh] w-full min-w-0 max-w-[min(48rem,calc(100vw-1rem))] flex-col overflow-hidden border-0 bg-white shadow-lg sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15">
+        <div className="flex min-w-0 shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-3">
+          <div className="min-w-0">
             <h2 id="mic-crt-title" className="text-sm font-semibold text-vialto-charcoal">
               Documento aduanero MIC / CRT
             </h2>
@@ -383,7 +387,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
             className="text-vialto-steel hover:text-vialto-charcoal disabled:opacity-40" aria-label="Cerrar">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3">
           {loading && <p className="text-xs text-vialto-steel">Cargando datos…</p>}
 
           {form && !loading && <MicCrtLegalDisclaimer />}
@@ -394,7 +398,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">1 · Identificación</h3>
                 <FormGrid>
                   <Field label={`${labelCampo('Fecha de emisión', 6)} *`}>
-                    <input type="date" className={inputClass} value={form.fechaEmision} disabled={ocupado}
+                    <input type="date" className={dateInputClass} value={form.fechaEmision} disabled={ocupado}
                       onChange={(e) => patch('fechaEmision', e.target.value)} />
                   </Field>
                   <Field label={`${labelCampo('N° MIC', 4)} *`}>
@@ -505,7 +509,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
 
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">5 · Anexos y aduanas</h3>
-                <fieldset className="mb-3 border border-black/10 p-3">
+                <fieldset className="mb-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     {labelCampo('Partida', 7)}
                   </legend>
@@ -589,7 +593,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
                   </Field>
                 </FormGrid>
 
-                <fieldset className="mt-3 border border-black/10 p-3">
+                <fieldset className="mt-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     CRT · 2.ª hoja
                   </legend>
@@ -660,7 +664,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
                   </div>
                 </fieldset>
 
-                <fieldset className="mt-3 border border-black/10 p-3">
+                <fieldset className="mt-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     Semirremolque (Campos 13–15, opcional)
                   </legend>
@@ -724,21 +728,21 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
           )}
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-4 py-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
           <button type="button" disabled={ocupado} onClick={onClose}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50">
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto">
             Cancelar
           </button>
           <button
             type="button"
             disabled={ocupado || !form}
             onClick={guardarBorrador}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto"
           >
             {guardandoBorrador ? 'Guardando…' : 'Guardar borrador'}
           </button>
           <button type="button" disabled={ocupado || !form} onClick={() => void generarPdf()}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 bg-vialto-charcoal text-white hover:bg-black disabled:opacity-50">
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 bg-vialto-charcoal text-white hover:bg-black disabled:opacity-50 sm:w-auto">
             {generando ? 'Generando…' : 'Generar PDF'}
           </button>
         </div>
