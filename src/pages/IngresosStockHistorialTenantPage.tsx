@@ -1,23 +1,23 @@
 ﻿import { useAuth } from '@clerk/clerk-react';
 import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import { StockOperacionViewModal } from '@/components/stock/StockOperacionViewModal';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
+import { buildQs } from '@/lib/queryString';
+import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import {
   flattenStockOperaciones,
   stockOperacionColumnas,
 } from '@/lib/stockExcelExport';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { StockOperacion } from '@/types/api';
-
-function buildQsTenant(tenantId?: string): string {
-  return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
-}
+import type { StockOperacion, Cliente, Deposito, Producto } from '@/types/api';
+import { useEntityList } from '@/hooks/useEntityList';
 
 export function IngresosStockHistorialTenantPage({
   tenantId,
@@ -28,9 +28,28 @@ export function IngresosStockHistorialTenantPage({
 }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const clienteId = searchParams.get('clienteId') ?? '';
+  const depositoId = searchParams.get('depositoId') ?? '';
+  const productoId = searchParams.get('productoId') ?? '';
+  const fechaDesde = searchParams.get('fechaDesde') ?? '';
+  const fechaHasta = searchParams.get('fechaHasta') ?? '';
+
+  const params: Record<string, string> = {};
+  if (clienteId) params.clienteId = clienteId;
+  if (depositoId) params.depositoId = depositoId;
+  if (productoId) params.productoId = productoId;
+  if (fechaDesde) params.fechaDesde = fechaDesde;
+  if (fechaHasta) params.fechaHasta = fechaHasta;
+
+  const clientesBase = platform ? '/api/platform/clientes' : '/api/clientes';
+  const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
+  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+
   const ingresosUrl = platform
-    ? `/api/platform/stock/ingresos${buildQsTenant(tenantId)}`
-    : '/api/stock/ingresos';
+    ? `/api/platform/stock/ingresos${buildQs(params, tenantId)}`
+    : `/api/stock/ingresos${buildQs(params)}`;
 
   const [items, setItems] = useState<StockOperacion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +71,32 @@ export function IngresosStockHistorialTenantPage({
   }, [ingresosUrl, getToken]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const { items: clientes } = useEntityList<Cliente>(
+    `${clientesBase}${buildQs({}, tenantId)}`,
+    getToken,
+  );
+  const { items: depositos } = useEntityList<Deposito>(
+    `${depositosBase}${buildQs({}, tenantId)}`,
+    getToken,
+  );
+
+  const [productos, setProductos] = useState<Producto[]>([]);
+
+  const loadProductos = useCallback(async () => {
+    try {
+      const url = `${productosBase}/paginated${buildQs(
+        { page: '1', pageSize: '100', filtroActivo: 'activos' },
+        tenantId,
+      )}`;
+      const data = await apiJson<{ items: Producto[] }>(url, () => getToken());
+      setProductos(data.items);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [productosBase, tenantId, getToken]);
+
+  useEffect(() => { void loadProductos(); }, [loadProductos]);
 
   const volverHref = platform
     ? `/stock/ingresos?tenantId=${encodeURIComponent(tenantId!)}`
@@ -76,7 +121,7 @@ export function IngresosStockHistorialTenantPage({
               Descargar Excel
             </button>
             <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
-              ← Volver a ingresos
+              ← Volver a ingresos
             </Link>
           </div>
         </div>
@@ -93,7 +138,7 @@ export function IngresosStockHistorialTenantPage({
             Descargar Excel
           </button>
           <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
-            ← Volver a ingresos
+            ← Volver a ingresos
           </Link>
         </div>
       )}
@@ -109,26 +154,163 @@ export function IngresosStockHistorialTenantPage({
         columns={[
           {
             id: 'fecha',
-            header: 'Fecha',
             primary: true,
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Fecha"
+                filterActive={!!fechaDesde || !!fechaHasta}
+                filterSignature={`${fechaDesde}|${fechaHasta}`}
+              >
+                <div className="flex flex-col gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={fechaDesde}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (value) next.set('fechaDesde', value);
+                          else next.delete('fechaDesde');
+                          return next;
+                        });
+                      }}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={fechaHasta}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (value) next.set('fechaHasta', value);
+                          else next.delete('fechaHasta');
+                          return next;
+                        });
+                      }}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
-            tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
           },
           {
             id: 'cliente',
-            header: 'Cliente',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Cliente"
+                filterActive={!!clienteId}
+                filterSignature={clienteId}
+              >
+                <SearchableEntitySelect<Cliente>
+                  items={clientes}
+                  value={clienteId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('clienteId', id);
+                      else next.delete('clienteId');
+                      return next;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((c) => c.nombre.toLowerCase().includes(lq));
+                  }}
+                  getPrimaryLabel={(c) => c.nombre}
+                  searchAriaLabel="Filtrar clientes"
+                  aria-label="Filtrar por cliente"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (op) => op.cliente?.nombre ?? op.clienteId,
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'deposito',
-            header: 'Depósito',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Depósito"
+                filterActive={!!depositoId}
+                filterSignature={depositoId}
+              >
+                <SearchableEntitySelect<Deposito>
+                  items={depositos}
+                  value={depositoId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('depositoId', id);
+                      else next.delete('depositoId');
+                      return next;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((d) => d.nombre.toLowerCase().includes(lq));
+                  }}
+                  getPrimaryLabel={(d) => d.nombre}
+                  searchAriaLabel="Filtrar depósitos"
+                  aria-label="Filtrar por depósito"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (op) => op.deposito?.nombre ?? '—',
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'productos',
-            header: 'Productos',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Productos"
+                filterActive={!!productoId}
+                filterSignature={productoId}
+              >
+                <SearchableEntitySelect<Producto>
+                  items={productos}
+                  value={productoId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('productoId', id);
+                      else next.delete('productoId');
+                      return next;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((p) => p.nombre.toLowerCase().includes(lq));
+                  }}
+                  getPrimaryLabel={(p) => p.nombre}
+                  searchAriaLabel="Filtrar productos"
+                  aria-label="Filtrar por producto"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (op) => {
               const count = op.movimientos.length;
               if (count === 1) {
@@ -140,6 +322,7 @@ export function IngresosStockHistorialTenantPage({
           },
           {
             id: 'lotes',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: 'Lotes',
             cell: (op) => {
               const lotes = op.movimientos
@@ -164,6 +347,7 @@ export function IngresosStockHistorialTenantPage({
             Ver
           </button>
         )}
+        actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
 
