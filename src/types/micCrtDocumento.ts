@@ -90,10 +90,70 @@ export function normalizeMicCrtPayload(
   };
 }
 
-/** Body POST/PDF: siempre incluye los cuatro campos de partida (MIC campo 7), aunque estén vacíos. */
+function uppercaseMicCrtText(value: string): string {
+  return value.toUpperCase();
+}
+
+function uppercaseMicCrtOptionalText(value: string | undefined): string | undefined {
+  if (value == null) return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  return uppercaseMicCrtText(trimmed);
+}
+
+function uppercaseMicCrtActor(actor: MicCrtActor): MicCrtActor {
+  return {
+    razonSocial: uppercaseMicCrtText(actor.razonSocial),
+    idFiscal: uppercaseMicCrtText(actor.idFiscal),
+    calle: uppercaseMicCrtText(actor.calle),
+    numero: uppercaseMicCrtText(actor.numero),
+    ciudad: uppercaseMicCrtText(actor.ciudad),
+    pais: actor.pais,
+  };
+}
+
+function uppercaseMicCrtSemirremolque(
+  semirremolque: MicCrtSemirremolque | undefined,
+): MicCrtSemirremolque | undefined {
+  if (!semirremolque) return semirremolque;
+  return {
+    ...semirremolque,
+    propietario: uppercaseMicCrtOptionalText(semirremolque.propietario),
+    idFiscal: uppercaseMicCrtOptionalText(semirremolque.idFiscal),
+    patente: uppercaseMicCrtOptionalText(semirremolque.patente),
+    marca: uppercaseMicCrtOptionalText(semirremolque.marca),
+  };
+}
+
+/** Validación por campo del formulario MIC/CRT antes de exportar. */
+export function validateMicCrtForm(f: MicCrtExportPayload): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!f.micNumero.trim()) errs.micNumero = 'Indicá el N° de MIC.';
+  if (!f.crtNumero.trim()) errs.crtNumero = 'Indicá el N° de CRT.';
+  if (!f.fechaEmision.trim()) errs.fechaEmision = 'Indicá la fecha de emisión.';
+
+  for (const prefix of ['remitente', 'destinatario', 'consignatario'] as const) {
+    const actor = f[prefix];
+    if (!actor.razonSocial.trim()) errs[`${prefix}.razonSocial`] = 'Razón social obligatoria.';
+    if (!actor.idFiscal.trim()) errs[`${prefix}.idFiscal`] = 'CUIT/RUT obligatorio.';
+    if (!actor.calle.trim()) errs[`${prefix}.calle`] = 'Indicá la calle.';
+    if (!actor.ciudad.trim()) errs[`${prefix}.ciudad`] = 'Indicá la ciudad.';
+    if (!actor.pais.trim()) errs[`${prefix}.pais`] = 'Indicá el país.';
+  }
+
+  if (f.bultos <= 0) errs.bultos = 'La cantidad de bultos debe ser mayor a 0.';
+  if (!f.tipoBultos.trim()) errs.tipoBultos = 'Seleccioná el tipo de bultos.';
+  if (f.pesoBrutoKg <= 0) errs.pesoBrutoKg = 'El peso bruto debe ser mayor a 0.';
+  if (f.valorFot <= 0) errs.valorFot = 'El valor FOT debe ser mayor a 0.';
+  if (!f.aduanaPartida.trim()) errs.aduanaPartida = 'Indicá la ciudad o lugar de partida.';
+  if (!f.aduanaDestino.trim()) errs.aduanaDestino = 'Indicá la aduana de destino.';
+  return errs;
+}
+
+/** Body POST/PDF: normaliza, completa defaults y pasa textos a MAYÚSCULAS para impresión aduanera. */
 export function micCrtExportBodyForApi(payload: MicCrtExportPayload): MicCrtExportPayload {
   const n = normalizeMicCrtPayload(payload);
-  return {
+  const base: MicCrtExportPayload = {
     ...n,
     aduanaPartida: n.aduanaPartida ?? '',
     partidaPais: n.partidaPais ?? '',
@@ -108,6 +168,33 @@ export function micCrtExportBodyForApi(payload: MicCrtExportPayload): MicCrtExpo
     montoReembolsoContraEntrega: n.montoReembolsoContraEntrega,
     monedaReembolsoContraEntrega: n.monedaReembolsoContraEntrega,
     declaracionesObservaciones: n.declaracionesObservaciones ?? '',
+  };
+
+  return {
+    ...base,
+    micNumero: uppercaseMicCrtText(base.micNumero),
+    crtNumero: uppercaseMicCrtText(base.crtNumero),
+    remitente: uppercaseMicCrtActor(base.remitente),
+    destinatario: uppercaseMicCrtActor(base.destinatario),
+    consignatario: uppercaseMicCrtActor(base.consignatario),
+    notificarA: base.notificarA ? uppercaseMicCrtActor(base.notificarA) : undefined,
+    ncm: uppercaseMicCrtText(base.ncm),
+    tipoBultos: uppercaseMicCrtText(base.tipoBultos),
+    descripcionMercaderias: uppercaseMicCrtOptionalText(base.descripcionMercaderias),
+    origenComercial: uppercaseMicCrtOptionalText(base.origenComercial),
+    aduanaPartida: uppercaseMicCrtText(base.aduanaPartida),
+    aduanaEspecificaPartida: uppercaseMicCrtOptionalText(base.aduanaEspecificaPartida),
+    codigoLugarOperativoPartida: uppercaseMicCrtOptionalText(base.codigoLugarOperativoPartida),
+    aduanaDestino: uppercaseMicCrtText(base.aduanaDestino),
+    porteadoresSucesivos: uppercaseMicCrtOptionalText(base.porteadoresSucesivos),
+    instruccionesFormalidadesAduana: uppercaseMicCrtOptionalText(base.instruccionesFormalidadesAduana),
+    declaracionesObservaciones: uppercaseMicCrtOptionalText(base.declaracionesObservaciones),
+    documentosAnexos: uppercaseMicCrtOptionalText(base.documentosAnexos),
+    precintos: uppercaseMicCrtOptionalText(base.precintos),
+    cartaPorte: uppercaseMicCrtOptionalText(base.cartaPorte),
+    ruta: uppercaseMicCrtOptionalText(base.ruta),
+    porteadorDomicilio: uppercaseMicCrtOptionalText(base.porteadorDomicilio),
+    semirremolque: uppercaseMicCrtSemirremolque(base.semirremolque),
   };
 }
 
