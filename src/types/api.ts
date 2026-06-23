@@ -232,6 +232,13 @@ export interface ImportRowError {
   valor?: unknown;
 }
 
+export interface ImportCiudadAdvertencia {
+  fila: number;
+  campo: 'origen' | 'destino';
+  valor: string;
+  mensaje: string;
+}
+
 export interface ImportPreviewViaje {
   fila: number;
   cliente: string;
@@ -249,6 +256,8 @@ export interface ImportPreviewViaje {
   precioTransportistaExterno: number | null;
   monedaPrecioTransportistaExterno: string | null;
   nroFacturaTransporte: string | null;
+  /** Advertencias de validación de catálogo (no bloquean la importación). */
+  advertenciasCiudad?: ImportCiudadAdvertencia[];
 }
 
 export interface ImportPreviewFactura {
@@ -273,6 +282,9 @@ export interface ImportPreviewResult {
   exitosas: number;
   errores: number;
   detalleErrores: ImportRowError[];
+  /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
+  advertenciasCiudad?: ImportCiudadAdvertencia[];
+  totalAdvertenciasCiudad?: number;
   viajes?: ImportPreviewViaje[];
   facturas?: ImportPreviewFactura[];
   clientes?: ImportPreviewEntidad[];

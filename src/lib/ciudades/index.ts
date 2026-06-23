@@ -12,5 +12,10 @@ export {
   type CondicionTextInfo,
 } from './paises';
 export { buscarCiudades } from './buscarCiudades';
-export { esEtiquetaCiudadValida, normalizarEtiquetaCiudad } from './validarCiudad';
+export {
+  esEtiquetaCiudadValida,
+  normalizarEtiquetaCiudad,
+  resolverEtiquetaCiudadCatalogo,
+  type ResultadoResolverCiudad,
+} from './validarCiudad';
 export { soloCiudadDesdeEtiquetaUbicacion } from './soloCiudadDesdeEtiqueta';
