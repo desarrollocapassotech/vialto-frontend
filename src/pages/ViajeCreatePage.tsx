@@ -377,11 +377,18 @@ export function ViajeCreatePage() {
     const externo = modoOperacion === 'externo';
     const choferPropioId = choferIdRef.current.trim();
     const choferExternoSeleccionado = choferExternoIdRef.current.trim();
+
     const errs: Record<string, string> = {};
     if (!clienteId) errs.clienteId = 'Seleccioná un cliente.';
     if (externo && !transportistaId.trim()) errs.transportistaId = 'Seleccioná un transportista externo.';
-    if (Object.keys(errs).length > 0) { setFieldErrors(errs); return; }
+    if (!origen.trim()) errs.origen = 'Completá el origen.';
+    if (!destinosRows[0]?.etiqueta.trim()) errs.destinos = 'Ingresá el destino 1.';
+
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setFieldErrors({});
+    setError(null);
     const teErr = mensajeErrorTransportistaEfectivoExterno({
       operacionModo: modoOperacion,
       transportistaId,
@@ -408,18 +415,15 @@ export function ViajeCreatePage() {
       setError('En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).');
       return;
     }
-    if (!origen.trim()) {
-      setError('Completá el origen.');
-      return;
-    }
     const okOrigen = await esEtiquetaCiudadValida(paisOrigen, origen);
     if (!okOrigen) {
-      setError('El origen debe elegirse de la lista de ciudades (no se admite texto libre).');
+      setFieldErrors({ origen: 'El origen debe elegirse de la lista de ciudades (no se admite texto libre).' });
       return;
     }
+    setFieldErrors({});
     const destinosVal = await validarDestinosRows(destinosRows);
     if (!destinosVal.ok) {
-      setError(destinosVal.message);
+      setFieldErrors({ destinos: destinosVal.message });
       return;
     }
     const fcError = !fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
@@ -591,7 +595,7 @@ export function ViajeCreatePage() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={fieldLabelClass}>Origen</span>
             <div className="flex flex-wrap gap-2 items-start">
               <PaisUbicacionSelect
@@ -599,27 +603,41 @@ export function ViajeCreatePage() {
                 onChange={(p) => {
                   setPaisOrigen(p);
                   setOrigen('');
+                  setFieldErrors((prev) => ({ ...prev, origen: '' }));
                 }}
                 aria-label="País de origen"
+                className={`${inputClass} w-full sm:w-40`}
               />
               <div className="min-w-[200px] flex-1">
                 <CiudadCombobox
                   pais={paisOrigen}
                   value={origen}
-                  onChange={setOrigen}
+                  onChange={(next) => {
+                    setOrigen(next);
+                    if (next.trim()) setFieldErrors((prev) => ({ ...prev, origen: '' }));
+                  }}
                   inputClassName={inputClass}
                   disableBrowserAutocomplete
                 />
               </div>
             </div>
+            <CrudFieldError message={fieldErrors.origen} />
           </div>
-          <ViajeDestinosLista
-            groupId="viaje-create"
-            rows={destinosRows}
-            onChange={setDestinosRows}
-            inputClassName={inputClass}
-            disableBrowserAutocomplete
-          />
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <ViajeDestinosLista
+              groupId="viaje-create"
+              rows={destinosRows}
+              onChange={(rows) => {
+                setDestinosRows(rows);
+                if (rows[0]?.etiqueta.trim()) {
+                  setFieldErrors((prev) => ({ ...prev, destinos: '' }));
+                }
+              }}
+              inputClassName={inputClass}
+              disableBrowserAutocomplete
+            />
+            <CrudFieldError message={fieldErrors.destinos} />
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
             <div className="flex flex-col gap-1">
               <span className={fieldLabelClass}>Cliente <span className="text-red-500">*</span></span>
