@@ -1,4 +1,4 @@
-﻿import type { MovimientoStock, StockItem, StockOperacion } from '@/types/api';
+﻿import type { MovimientoStock, Producto, StockItem, StockOperacion } from '@/types/api';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 export interface ExcelColDef<T> {
@@ -21,6 +21,59 @@ export async function generarExcel<T>(
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
+function presentacionColId(nombre: string): string {
+  return `pres_${nombre.trim().toLowerCase().replace(/\s+/g, '_')}`;
+}
+
+function presentacionNombreFromMovimiento(m: MovimientoStock): string {
+  return m.presentacion?.presentacion?.nombre?.trim() ?? '';
+}
+
+function presentacionNombreFromStockItem(i: StockItem): string {
+  return i.presentacion?.presentacion?.nombre?.trim() ?? '';
+}
+
+/** Todas las presentaciones de los productos involucrados, sin límite de cantidad. */
+export function collectPresentacionNombres(
+  items: MovimientoStock[],
+  productos: Producto[],
+): string[] {
+  const productIds = new Set(items.map((m) => m.productoId));
+  const seen = new Set<string>();
+  const names: string[] = [];
+
+  for (const producto of productos) {
+    if (!productIds.has(producto.id)) continue;
+    for (const pp of producto.productoPresentaciones ?? []) {
+      const nombre = pp.presentacion?.nombre?.trim();
+      if (!nombre || seen.has(nombre)) continue;
+      seen.add(nombre);
+      names.push(nombre);
+    }
+  }
+
+  for (const m of items) {
+    const nombre = presentacionNombreFromMovimiento(m);
+    if (!nombre || seen.has(nombre)) continue;
+    seen.add(nombre);
+    names.push(nombre);
+  }
+
+  return names;
+}
+
+function collectPresentacionNombresFromStockItems(items: StockItem[]): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const item of items) {
+    const nombre = presentacionNombreFromStockItem(item);
+    if (!nombre || seen.has(nombre)) continue;
+    seen.add(nombre);
+    names.push(nombre);
+  }
+  return names;
+}
+
 function inferUnidad1(items: MovimientoStock[]): string {
   return items.find((m) => m.producto?.unidad1Nombre)?.producto?.unidad1Nombre ?? 'Cantidad 1';
 }
@@ -39,11 +92,23 @@ function inferUnidad2Stock(items: StockItem[]): string | null {
   return nombre ?? null;
 }
 
+function presentacionCantidadCols(
+  nombres: string[],
+  getNombre: (row: MovimientoStock) => string,
+  getCantidad: (row: MovimientoStock) => number,
+): ExcelColDef<MovimientoStock>[] {
+  return nombres.map((nombre) => ({
+    id: presentacionColId(nombre),
+    label: nombre,
+    getValue: (m) => (getNombre(m) === nombre ? getCantidad(m) : ''),
+  }));
+}
+
 export function movimientoStockColumnas(
   items: MovimientoStock[],
+  productos: Producto[] = [],
 ): ExcelColDef<MovimientoStock>[] {
-  const unidad1 = inferUnidad1(items);
-  const unidad2 = inferUnidad2(items);
+  const presentaciones = collectPresentacionNombres(items, productos);
 
   const cols: ExcelColDef<MovimientoStock>[] = [
     {
@@ -62,15 +127,27 @@ export function movimientoStockColumnas(
       label: 'Producto',
       getValue: (m) => m.producto?.nombre ?? m.productoId,
     },
-    {
+  ];
+
+  if (presentaciones.length > 0) {
+    cols.push(
+      ...presentacionCantidadCols(
+        presentaciones,
+        presentacionNombreFromMovimiento,
+        (m) => m.cantidad1 ?? 0,
+      ),
+    );
+  } else {
+    const unidad1 = inferUnidad1(items);
+    const unidad2 = inferUnidad2(items);
+    cols.push({
       id: 'cant1',
       label: unidad1,
       getValue: (m) => m.cantidad1 ?? 0,
-    },
-  ];
-
-  if (unidad2 !== null) {
-    cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 ?? 0 });
+    });
+    if (unidad2 !== null) {
+      cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 ?? 0 });
+    }
   }
 
   cols.push(
@@ -87,7 +164,7 @@ export function movimientoStockColumnas(
   return cols;
 }
 
-// â”€â”€ StockOperacion (nuevo modelo multi-producto) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── StockOperacion (nuevo modelo multi-producto) ─────────────────────────────
 
 type OperacionFlatRow = {
   fecha: string;
@@ -168,18 +245,30 @@ export function stockOperacionColumnas(
 }
 
 export function stockItemColumnas(items: StockItem[]): ExcelColDef<StockItem>[] {
-  const unidad1 = inferUnidad1Stock(items);
-  const unidad2 = inferUnidad2Stock(items);
+  const presentaciones = collectPresentacionNombresFromStockItems(items);
 
   const cols: ExcelColDef<StockItem>[] = [
     { id: 'deposito', label: 'Depósito', getValue: (i) => i.deposito?.nombre ?? i.depositoId },
     { id: 'cliente', label: 'Cliente', getValue: (i) => i.cliente?.nombre ?? i.clienteId },
     { id: 'producto', label: 'Producto', getValue: (i) => i.producto?.nombre ?? i.productoId },
-    { id: 'cant1', label: unidad1, getValue: (i) => i.cantidad1 },
   ];
 
-  if (unidad2 !== null) {
-    cols.push({ id: 'cant2', label: unidad2, getValue: (i) => i.cantidad2 });
+  if (presentaciones.length > 0) {
+    cols.push(
+      ...presentaciones.map((nombre) => ({
+        id: presentacionColId(nombre),
+        label: nombre,
+        getValue: (i: StockItem) =>
+          presentacionNombreFromStockItem(i) === nombre ? i.cantidad1 : '',
+      })),
+    );
+  } else {
+    const unidad1 = inferUnidad1Stock(items);
+    const unidad2 = inferUnidad2Stock(items);
+    cols.push({ id: 'cant1', label: unidad1, getValue: (i) => i.cantidad1 });
+    if (unidad2 !== null) {
+      cols.push({ id: 'cant2', label: unidad2, getValue: (i) => i.cantidad2 });
+    }
   }
 
   return cols;

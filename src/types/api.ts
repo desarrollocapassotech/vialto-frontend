@@ -366,6 +366,8 @@ export interface MovimientoStock {
   operacionId?: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
