@@ -18,6 +18,7 @@ import {
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion, Cliente, Deposito, Producto } from '@/types/api';
 import { useEntityList } from '@/hooks/useEntityList';
+import { useProductosPaginated } from '@/hooks/useProductosPaginated';
 
 export function IngresosStockHistorialTenantPage({
   tenantId,
@@ -80,23 +81,7 @@ export function IngresosStockHistorialTenantPage({
     `${depositosBase}${buildQs({}, tenantId)}`,
     getToken,
   );
-
-  const [productos, setProductos] = useState<Producto[]>([]);
-
-  const loadProductos = useCallback(async () => {
-    try {
-      const url = `${productosBase}/paginated${buildQs(
-        { page: '1', pageSize: '100', filtroActivo: 'activos' },
-        tenantId,
-      )}`;
-      const data = await apiJson<{ items: Producto[] }>(url, () => getToken());
-      setProductos(data.items);
-    } catch (e) {
-      setError(friendlyError(e, 'stock'));
-    }
-  }, [productosBase, tenantId, getToken]);
-
-  useEffect(() => { void loadProductos(); }, [loadProductos]);
+  const { productos } = useProductosPaginated(productosBase, tenantId, getToken);
 
   const volverHref = platform
     ? `/stock/ingresos?tenantId=${encodeURIComponent(tenantId!)}`
