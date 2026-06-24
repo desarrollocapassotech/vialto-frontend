@@ -17,7 +17,7 @@ import {
   movimientoStockTipoNumeroClass,
 } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { MovimientoStock, Producto, Cliente } from '@/types/api';
+import type { MovimientoStock, Producto, Cliente, Deposito } from '@/types/api';
 import { useSearchParams } from 'react-router-dom';
 
 type Usuario = {
@@ -44,6 +44,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [depositos, setDepositos] = useState<Deposito[]>([]);
 
   const productoId = searchParams.get('productoId') ?? '';
   const tipo = searchParams.get('tipo') ?? '';
@@ -51,6 +52,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const fechaHasta = searchParams.get('fechaHasta') ?? '';
   const clienteId = searchParams.get('clienteId') ?? '';
   const createdBy = searchParams.get('createdBy') ?? '';
+  const depositoId = searchParams.get('depositoId') ?? '';
 
   const params: Record<string, string> = {};
 
@@ -60,6 +62,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   if (productoId) params.productoId = productoId;
   if (clienteId) params.clienteId = clienteId;
   if (createdBy) params.createdBy = createdBy;
+  if (depositoId) params.depositoId = depositoId;
 
   const productosBase = platform
     ? '/api/platform/stock/productos'
@@ -76,6 +79,10 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const movimientosUrl = platform
     ? `/api/platform/stock/movimientos${buildQs(params, tenantId)}`
     : `/api/stock/movimientos${buildQs(params)}`;
+
+  const depositosBase = platform
+    ? '/api/platform/stock/depositos'
+    : '/api/stock/depositos';
 
   const [items, setItems] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +155,19 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
     }
   }, [usuariosBase, tenantId, getToken]);
 
+  const loadDepositos = useCallback(async () => {
+    try {
+      const data = await apiJson<Deposito[]>(
+        `${depositosBase}${buildQs({}, tenantId)}`,
+        () => getToken(),
+      );
+
+      setDepositos(data);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [depositosBase, tenantId, getToken]);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -163,6 +183,10 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   useEffect(() => {
     void loadUsuarios();
   }, [loadUsuarios]);
+
+  useEffect(() => {
+    void loadDepositos();
+  }, [loadDepositos]);
 
   const exportExcelButton = (
     <button
@@ -389,7 +413,41 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
           {
             id: 'deposito',
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Depósito',
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Depósito"
+                filterActive={!!depositoId}
+                filterSignature={depositoId}
+              >
+                <SearchableEntitySelect<Deposito>
+                  items={depositos}
+                  value={depositoId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (id) params.set('depositoId', id);
+                      else params.delete('depositoId');
+
+                      return params;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((d) =>
+                      d.nombre.toLowerCase().includes(lq),
+                    );
+                  }}
+                  getPrimaryLabel={(d) => d.nombre}
+                  searchAriaLabel="Filtrar depósitos"
+                  aria-label="Filtrar por depósito"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => m.deposito?.nombre ?? '—',
             tdClassName: listadoTablaTdClass,
           },
