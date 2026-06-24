@@ -1,7 +1,7 @@
 ﻿import { useAuth } from '@clerk/clerk-react';
 import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
@@ -18,8 +18,7 @@ import {
 } from '@/lib/stockExcelExport';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion, Cliente, Deposito, Producto } from '@/types/api';
-import { useEntityList } from '@/hooks/useEntityList';
-import { useProductosPaginated } from '@/hooks/useProductosPaginated';
+import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
 
 export function EgresosStockHistorialTenantPage({
   tenantId,
@@ -31,23 +30,11 @@ export function EgresosStockHistorialTenantPage({
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const clienteId = searchParams.get('clienteId') ?? '';
-  const depositoId = searchParams.get('depositoId') ?? '';
-  const productoId = searchParams.get('productoId') ?? '';
-  const fechaDesde = searchParams.get('fechaDesde') ?? '';
-  const fechaHasta = searchParams.get('fechaHasta') ?? '';
-
-  const params: Record<string, string> = {};
-  if (clienteId) params.clienteId = clienteId;
-  if (depositoId) params.depositoId = depositoId;
-  if (productoId) params.productoId = productoId;
-  if (fechaDesde) params.fechaDesde = fechaDesde;
-  if (fechaHasta) params.fechaHasta = fechaHasta;
-
-  const clientesBase = platform ? '/api/platform/clientes' : '/api/clientes';
-  const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
-  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+  const {
+    setSearchParams,
+    clienteId, depositoId, productoId, fechaDesde, fechaHasta,
+    params, clientes, depositos, productos,
+  } = useHistorialStockFiltros(platform, tenantId, getToken);
 
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs(params, tenantId)}`
@@ -73,16 +60,6 @@ export function EgresosStockHistorialTenantPage({
   }, [egresosUrl, getToken]);
 
   useEffect(() => { void load(); }, [load]);
-
-  const { items: clientes } = useEntityList<Cliente>(
-    `${clientesBase}${buildQs({}, tenantId)}`,
-    getToken,
-  );
-  const { items: depositos } = useEntityList<Deposito>(
-    `${depositosBase}${buildQs({}, tenantId)}`,
-    getToken,
-  );
-  const { productos } = useProductosPaginated(productosBase, tenantId, getToken);
 
   const volverHref = platform
     ? `/stock/egresos?tenantId=${encodeURIComponent(tenantId!)}`
