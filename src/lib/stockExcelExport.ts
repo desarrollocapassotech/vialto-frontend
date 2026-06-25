@@ -25,12 +25,32 @@ function presentacionColId(nombre: string): string {
   return `pres_${nombre.trim().toLowerCase().replace(/\s+/g, '_')}`;
 }
 
-function presentacionNombreFromMovimiento(m: MovimientoStock): string {
-  return m.presentacion?.presentacion?.nombre?.trim() ?? '';
+type PresentacionLike = {
+  nombre?: string | null;
+  presentacion?: { nombre?: string | null } | null;
+} | null | undefined;
+
+function getPresentacionNombre(presentacion: PresentacionLike): string {
+  return (
+    presentacion?.presentacion?.nombre?.trim() ??
+    presentacion?.nombre?.trim() ??
+    ''
+  );
 }
 
-function presentacionNombreFromStockItem(i: StockItem): string {
-  return i.presentacion?.presentacion?.nombre?.trim() ?? '';
+function presentacionNombreFromMovimiento(m: MovimientoStock): string {
+  return getPresentacionNombre(m.presentacion);
+}
+
+function presentacionNombreFromStockItem(i: StockItem, productos: Producto[] = []): string {
+  const directo = getPresentacionNombre(i.presentacion);
+  if (directo) return directo;
+
+  const producto = productos.find((p) => p.id === i.productoId);
+  const productoPresentacion = producto?.productoPresentaciones?.find(
+    (pp) => pp.id === i.presentacionId || pp.presentacionId === i.presentacionId,
+  );
+  return productoPresentacion?.presentacion?.nombre?.trim() ?? '';
 }
 
 /** Todas las presentaciones de los productos involucrados, sin límite de cantidad. */
@@ -62,11 +82,26 @@ export function collectPresentacionNombres(
   return names;
 }
 
-function collectPresentacionNombresFromStockItems(items: StockItem[]): string[] {
+function collectPresentacionNombresFromStockItems(
+  items: StockItem[],
+  productos: Producto[] = [],
+): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
+  const productIds = new Set(items.map((item) => item.productoId));
+
+  for (const producto of productos) {
+    if (!productIds.has(producto.id)) continue;
+    for (const pp of producto.productoPresentaciones ?? []) {
+      const nombre = pp.presentacion?.nombre?.trim();
+      if (!nombre || seen.has(nombre)) continue;
+      seen.add(nombre);
+      names.push(nombre);
+    }
+  }
+
   for (const item of items) {
-    const nombre = presentacionNombreFromStockItem(item);
+    const nombre = presentacionNombreFromStockItem(item, productos);
     if (!nombre || seen.has(nombre)) continue;
     seen.add(nombre);
     names.push(nombre);
@@ -195,7 +230,7 @@ export function flattenStockOperaciones(
         deposito: op.deposito?.nombre ?? op.depositoId,
         remito: op.numeroRemito ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
-        presentacion: mov.presentacion?.presentacion?.nombre ?? mov.presentacionId ?? '',
+        presentacion: getPresentacionNombre(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
         sueltas: mov.unidades,
         lote: mov.lote ?? '',
@@ -244,8 +279,11 @@ export function stockOperacionColumnas(
   return cols;
 }
 
-export function stockItemColumnas(items: StockItem[]): ExcelColDef<StockItem>[] {
-  const presentaciones = collectPresentacionNombresFromStockItems(items);
+export function stockItemColumnas(
+  items: StockItem[],
+  productos: Producto[] = [],
+): ExcelColDef<StockItem>[] {
+  const presentaciones = collectPresentacionNombresFromStockItems(items, productos);
 
   const cols: ExcelColDef<StockItem>[] = [
     { id: 'deposito', label: 'Depósito', getValue: (i) => i.deposito?.nombre ?? i.depositoId },
@@ -259,7 +297,7 @@ export function stockItemColumnas(items: StockItem[]): ExcelColDef<StockItem>[] 
         id: presentacionColId(nombre),
         label: nombre,
         getValue: (i: StockItem) =>
-          presentacionNombreFromStockItem(i) === nombre ? i.cantidad1 : '',
+          presentacionNombreFromStockItem(i, productos) === nombre ? i.cantidad1 : '',
       })),
     );
   } else {
