@@ -119,6 +119,13 @@ export function PresentacionesSuperadminPage() {
 
   return (
     <div className="w-full">
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+        Presentaciones
+      </h1>
+      <p className="mt-2 text-vialto-steel max-w-2xl">
+        Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
+      </p>
+
       <div className="mt-6">
         <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
       </div>
