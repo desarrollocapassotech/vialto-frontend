@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  formatNumberForMoneda,
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
   maskCurrencyForMoneda,
@@ -89,10 +90,11 @@ export function OtroGastoAutorDisplay({
 }
 
 export function otroGastoDraftFromApi(g: OtroGasto): OtroGastoDraft {
+  const moneda: ViajeMonedaCodigo = g.moneda === 'USD' ? 'USD' : 'ARS';
   return {
     descripcion: g.descripcion,
-    montoStr: String(g.monto),
-    moneda: g.moneda === 'USD' ? 'USD' : 'ARS',
+    montoStr: formatNumberForMoneda(g.monto, moneda),
+    moneda,
     fecha: g.fecha ?? '',
     createdBy: g.createdBy,
     createdByLabel: g.createdByLabel,

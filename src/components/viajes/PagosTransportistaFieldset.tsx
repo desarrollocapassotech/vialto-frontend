@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  formatNumberForMoneda,
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
   maskCurrencyForMoneda,
@@ -16,9 +17,10 @@ export interface PagoTransportistaDraft {
 }
 
 export function pagoTransportistaDraftFromApi(p: PagoTransportista): PagoTransportistaDraft {
+  const moneda: ViajeMonedaCodigo = p.moneda === 'USD' ? 'USD' : 'ARS';
   return {
-    montoStr: p.monto != null ? String(p.monto) : '',
-    moneda: p.moneda === 'USD' ? 'USD' : 'ARS',
+    montoStr: p.monto != null ? formatNumberForMoneda(p.monto, moneda) : '',
+    moneda,
     fecha: p.fecha ?? new Date().toISOString().slice(0, 10),
     observaciones: p.observaciones ?? '',
   };
