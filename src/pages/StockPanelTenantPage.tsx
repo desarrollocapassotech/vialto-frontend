@@ -82,6 +82,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
 
   const [items, setItems] = useState<StockItem[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
+  const [productosDetalle, setProductosDetalle] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,14 +121,25 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         apiJson<StockItem[]>(disponibleUrl, () => getToken()),
         apiJson<Deposito[]>(depositosUrl, () => getToken()),
       ]);
+      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+      const productoIds = [...new Set(stockData.map((item) => item.productoId))];
+      const productos = await Promise.all(
+        productoIds.map((productoId) =>
+          apiJson<Producto>(
+            `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
+            () => getToken(),
+          ).catch(() => null),
+        ),
+      );
       setItems(stockData);
+      setProductosDetalle(productos.filter((p): p is Producto => p !== null));
       setDepositos(depositosData.filter((d) => d.activo));
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     } finally {
       setLoading(false);
     }
-  }, [disponibleUrl, depositosUrl, getToken]);
+  }, [disponibleUrl, depositosUrl, productosBase, tenantId, getToken]);
 
   useEffect(() => {
     void load();
@@ -325,9 +337,21 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     </>
   );
 
+  const exportExcelButton = (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={filteredItems.length === 0}
+      className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+    >
+      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+      Descargar Excel
+    </button>
+  );
+
   return (
     <div className="w-full space-y-6">
-      {!platform && (
+      {!platform ? (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-vialto-charcoal">Inventario</h1>
@@ -335,16 +359,10 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
               Stock disponible en cada depósito, en tiempo real.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={filteredItems.length === 0}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-            Descargar Excel
-          </button>
+          {exportExcelButton}
         </div>
+      ) : (
+        <div className="flex justify-end">{exportExcelButton}</div>
       )}
 
       {error && (
@@ -603,10 +621,10 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
 
       {exportModalOpen && (
         <ExcelExportModal
-          columns={stockItemColumnas(filteredItems)}
+          columns={stockItemColumnas(filteredItems, productosDetalle)}
           rowCount={filteredItems.length}
           onExport={(selectedIds) => {
-            const allCols = stockItemColumnas(filteredItems);
+            const allCols = stockItemColumnas(filteredItems, productosDetalle);
             const cols = allCols.filter((c) => selectedIds.includes(c.id));
             const deposito = depositoActivo?.nombre ?? 'inventario';
             generarExcel(cols, filteredItems, `inventario-${deposito}`);
