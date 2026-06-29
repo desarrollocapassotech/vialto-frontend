@@ -17,7 +17,7 @@ import {
   movimientoStockTipoNumeroClass,
 } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { MovimientoStock, Producto, Cliente, Deposito } from '@/types/api';
+import type { MovimientoStock, Producto, Cliente, Deposito, PaginatedMeta } from '@/types/api';
 import { useSearchParams } from 'react-router-dom';
 
 type Usuario = {
@@ -27,6 +27,11 @@ type Usuario = {
 
 type ProductosResponse = {
   items: Producto[];
+};
+
+type MovimientosPaginatedResponse = {
+  items: MovimientoStock[];
+  meta: PaginatedMeta;
 };
 
 function buildQs(params: Record<string, string>, tenantId?: string): string {
@@ -54,6 +59,15 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const createdBy = searchParams.get('createdBy') ?? '';
   const depositoId = searchParams.get('depositoId') ?? '';
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [productoId, tipo, fechaDesde, fechaHasta, clienteId, createdBy, depositoId]);
+
   const params: Record<string, string> = {};
 
   if (tipo) params.tipo = tipo;
@@ -63,6 +77,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   if (clienteId) params.clienteId = clienteId;
   if (createdBy) params.createdBy = createdBy;
   if (depositoId) params.depositoId = depositoId;
+  
+  params.page = String(page);
+  params.pageSize = String(pageSize);
 
   const productosBase = platform
     ? '/api/platform/stock/productos'
@@ -95,8 +112,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<MovimientoStock[]>(movimientosUrl, () => getToken());
-      setItems(data);
+      const data = await apiJson<MovimientosPaginatedResponse>(movimientosUrl, () => getToken());
+      setItems(data.items);
+      setMeta(data.meta);
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     } finally {
@@ -553,6 +571,50 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
+
+      {meta && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-vialto-steel">
+              Página {meta.page} de {meta.totalPages} · {meta.total} registros
+            </p>
+            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
+              Mostrar
+              <select
+                value={pageSize}
+                disabled={loading}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              disabled={!meta.hasPrev || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={!meta.hasNext || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {detalleMovimientoId && (
         <MovimientoStockViewModal
