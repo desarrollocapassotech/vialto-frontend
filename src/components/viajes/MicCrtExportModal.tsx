@@ -2,16 +2,26 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Viaje } from '@/types/api';
 import type { MicCrtActor, MicCrtExportPayload, MicCrtPrefillResponse } from '@/types/micCrtDocumento';
-import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
 import {
   labelCampo,
   labelCampoCrt,
   MIC_CRT_LEGAL_DISCLAIMER,
 } from '@/lib/micCrtFieldLabels';
-import { micCrtExportBodyForApi, normalizeMicCrtPayload, TIPOS_BULTOS_MIC } from '@/types/micCrtDocumento';
+import {
+  micCrtExportBodyForApi,
+  normalizeMicCrtPayload,
+  TIPOS_BULTOS_MIC,
+  validateMicCrtForm,
+} from '@/types/micCrtDocumento';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { MonedaSelect } from '@/components/forms/MonedaSelect';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiFetch, apiJson } from '@/lib/api';
+import { clearMicCrtBorrador, loadMicCrtBorrador, saveMicCrtBorrador } from '@/lib/micCrtBorrador';
+import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
+import { hasEditableViajeExportGroups, type ViajeExportMissingGroup } from '@/lib/viajeExportMissingFields';
+import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 
@@ -20,11 +30,21 @@ type Props = {
   onClose: () => void;
   tenantId?: string;
   onGenerated?: () => void;
+  onViajeUpdated?: () => void | Promise<void>;
 };
 
 const inputClass =
-  'w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
-const labelClass = 'text-[10px] uppercase tracking-wide text-vialto-steel';
+  'box-border min-w-0 max-w-full w-full border border-black/15 bg-white px-2 py-1.5 text-xs text-vialto-charcoal focus:outline-none focus:border-vialto-charcoal disabled:opacity-50';
+const dateInputClass = `${inputClass} max-w-full appearance-none`;
+const labelClass = 'break-words text-[10px] uppercase tracking-wide text-vialto-steel';
+
+function micCrtInputClass(fieldError?: string) {
+  return fieldError ? inputClass.replace('border-black/15', 'border-red-400') : inputClass;
+}
+
+function micCrtDateInputClass(fieldError?: string) {
+  return fieldError ? dateInputClass.replace('border-black/15', 'border-red-400') : dateInputClass;
+}
 
 /** Solo dígitos y un separador decimal (`.` o `,`), máx. 2 decimales. */
 function sanitizeMicCrtMontoInput(raw: string): string {
@@ -101,27 +121,30 @@ function MicCrtMontoInput({
 }
 
 function FormGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-2 sm:grid-cols-2">{children}</div>;
+  return <div className="grid min-w-0 gap-2 sm:grid-cols-2">{children}</div>;
 }
 
 function Field({
   label,
   children,
   className,
+  error,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  error?: string;
 }) {
   const isRequired = label.endsWith(' *');
   const labelText = isRequired ? label.slice(0, -2) : label;
   return (
-    <label className={`grid gap-0.5 ${className ?? ''}`}>
+    <label className={`grid min-w-0 gap-0.5 ${className ?? ''}`}>
       <span className={labelClass}>
         {labelText}
         {isRequired && <span className="text-red-500"> *</span>}
       </span>
       {children}
+      <CrudFieldError message={error} />
     </label>
   );
 }
@@ -149,43 +172,48 @@ function ActorBlock({
   actor,
   onChange,
   disabled,
+  prefix,
+  fieldErrors,
 }: {
   title: string;
   actor: MicCrtActor;
   onChange: (a: MicCrtActor) => void;
   disabled: boolean;
+  prefix: 'remitente' | 'destinatario' | 'consignatario';
+  fieldErrors: Record<string, string>;
 }) {
   const set = (key: keyof MicCrtActor, val: string) => onChange({ ...actor, [key]: val });
+  const err = (key: keyof MicCrtActor) => fieldErrors[`${prefix}.${key}`];
   return (
-    <fieldset className="border border-black/10 p-3">
+    <fieldset className="min-w-0 border border-black/10 p-3">
       <legend className="px-1 text-xs font-semibold text-vialto-charcoal">{title}</legend>
       <FormGrid>
-        <Field label="Razón social *">
-          <input className={inputClass} value={actor.razonSocial} disabled={disabled}
+        <Field label="Razón social *" error={err('razonSocial')}>
+          <input className={micCrtInputClass(err('razonSocial'))} value={actor.razonSocial} disabled={disabled}
             onChange={(e) => set('razonSocial', e.target.value)} />
         </Field>
-        <Field label="CUIT / RUT *">
-          <input className={inputClass} value={actor.idFiscal} disabled={disabled}
+        <Field label="CUIT / RUT *" error={err('idFiscal')}>
+          <input className={micCrtInputClass(err('idFiscal'))} value={actor.idFiscal} disabled={disabled}
             onChange={(e) => set('idFiscal', e.target.value)} />
         </Field>
-        <Field label="Calle *">
-          <input className={inputClass} value={actor.calle} disabled={disabled}
+        <Field label="Calle *" error={err('calle')}>
+          <input className={micCrtInputClass(err('calle'))} value={actor.calle} disabled={disabled}
             onChange={(e) => set('calle', e.target.value)} />
         </Field>
         <Field label="Número de domicilio">
           <input className={inputClass} value={actor.numero} disabled={disabled}
             onChange={(e) => set('numero', e.target.value)} />
         </Field>
-        <Field label="Ciudad *">
-          <input className={inputClass} value={actor.ciudad} disabled={disabled}
+        <Field label="Ciudad *" error={err('ciudad')}>
+          <input className={micCrtInputClass(err('ciudad'))} value={actor.ciudad} disabled={disabled}
             onChange={(e) => set('ciudad', e.target.value)} />
         </Field>
-        <Field label="País *">
+        <Field label="País *" error={err('pais')}>
           <PaisUbicacionSelect
             value={(actor.pais?.trim() || 'AR') as PaisCodigo}
             onChange={(p) => set('pais', p)}
             disabled={disabled}
-            className={inputClass}
+            className={micCrtInputClass(err('pais'))}
           />
         </Field>
       </FormGrid>
@@ -193,33 +221,25 @@ function ActorBlock({
   );
 }
 
-function validateForm(f: MicCrtExportPayload): string | null {
-  if (!f.micNumero.trim()) return 'Indicá el N° de MIC.';
-  if (!f.crtNumero.trim()) return 'Indicá el N° de CRT.';
-  if (!f.fechaEmision.trim()) return 'Indicá la fecha de emisión.';
-  for (const [label, actor] of [
-    ['Remitente', f.remitente],
-    ['Destinatario', f.destinatario],
-    ['Consignatario', f.consignatario],
-  ] as const) {
-    if (!actor.razonSocial.trim()) return `${label}: razón social obligatoria.`;
-    if (!actor.idFiscal.trim()) return `${label}: CUIT/RUT obligatorio.`;
-    if (!actor.calle.trim()) return `${label}: indicá la calle.`;
-    if (!actor.ciudad.trim()) return `${label}: indicá la ciudad.`;
-    if (!actor.pais.trim()) return `${label}: indicá el país.`;
-  }
-  if (f.bultos <= 0) return 'La cantidad de bultos debe ser mayor a 0.';
-  if (!f.tipoBultos.trim()) return 'Seleccioná el tipo de bultos.';
-  if (f.pesoBrutoKg <= 0) return 'El peso bruto debe ser mayor a 0.';
-  if (f.valorFot <= 0) return 'El valor FOT debe ser mayor a 0.';
-  if (!f.aduanaPartida.trim() || !f.aduanaDestino.trim()) return 'Completá aduanas de partida y destino.';
-  return null;
+function mergeMicCrtConBorrador(
+  prefill: MicCrtExportPayload,
+  operativo: MicCrtPrefillResponse['operativo'],
+  borrador: MicCrtExportPayload | null,
+): MicCrtExportPayload {
+  const base = normalizeMicCrtPayload(prefill, operativo);
+  if (!borrador) return base;
+  return normalizeMicCrtPayload({ ...base, ...borrador }, operativo);
 }
 
-export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Props) {
+export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onViajeUpdated }: Props) {
   const { getToken } = useAuth();
   const tid = tenantId?.trim() ?? '';
   const platform = Boolean(tid);
+  const [viajeLocal, setViajeLocal] = useState(viaje);
+
+  useEffect(() => {
+    setViajeLocal(viaje);
+  }, [viaje]);
 
   function prefillUrl() {
     if (platform) {
@@ -238,16 +258,25 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
   const [form, setForm] = useState<MicCrtExportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
+  const [guardandoBorrador, setGuardandoBorrador] = useState(false);
+  const [borradorGuardado, setBorradorGuardado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [missingGroups, setMissingGroups] = useState<Record<string, ViajeExportMissingGroup> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
       setError(null);
+      setMissingGroups(null);
       try {
         const data = await apiJson<MicCrtPrefillResponse>(prefillUrl(), getToken);
-        if (!cancelled) setForm(normalizeMicCrtPayload(data.prefill, data.operativo));
+        const borrador = loadMicCrtBorrador(viaje.id);
+        if (!cancelled) {
+          setForm(mergeMicCrtConBorrador(data.prefill, data.operativo, borrador));
+          setBorradorGuardado(Boolean(borrador));
+        }
       } catch (e) {
         if (!cancelled) {
           const raw =
@@ -267,18 +296,43 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
 
   function patch<K extends keyof MicCrtExportPayload>(key: K, value: MicCrtExportPayload[K]) {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setBorradorGuardado(false);
+    setError(null);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      const keyStr = String(key);
+      for (const k of Object.keys(next)) {
+        if (k === keyStr || k.startsWith(`${keyStr}.`)) delete next[k];
+      }
+      return next;
+    });
+  }
+
+  function guardarBorrador() {
+    if (!form) return;
+    setGuardandoBorrador(true);
+    try {
+      saveMicCrtBorrador(viaje.id, normalizeMicCrtPayload(form));
+      setBorradorGuardado(true);
+      setError(null);
+    } finally {
+      setGuardandoBorrador(false);
+    }
   }
 
   async function generarPdf() {
     if (!form) return;
     const normalized = normalizeMicCrtPayload(form);
     setForm(normalized);
-    const validation = validateForm(normalized);
-    if (validation) {
-      setError(validation);
+    const validation = validateMicCrtForm(normalized);
+    if (Object.keys(validation).length > 0) {
+      setFieldErrors(validation);
+      setError('Completá los campos obligatorios marcados.');
       return;
     }
+    setFieldErrors({});
     setError(null);
+    setMissingGroups(null);
     setGenerando(true);
     try {
       const res = await apiFetch(pdfUrl(), getToken, {
@@ -290,9 +344,11 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as {
           message?: string | string[];
-          missingGroups?: Record<string, { fields: string[]; entityId?: string }>;
+          missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
-        setError(formatMicCrtExportError(data.message, data.missingGroups));
+        const groups = data.missingGroups ?? null;
+        setMissingGroups(groups && hasEditableViajeExportGroups(groups) ? groups : null);
+        setError(formatMicCrtExportError(data.message, groups));
         return;
       }
       const blob = await res.blob();
@@ -302,6 +358,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
       a.download = `MIC-CRT-${viaje.numero}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      clearMicCrtBorrador(viaje.id);
       onGenerated?.();
       onClose();
     } catch (e) {
@@ -311,18 +368,27 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
     }
   }
 
-  const ocupado = loading || generando;
+  async function corregirDatosYReintentar() {
+    setMissingGroups(null);
+    setError(null);
+    if (onViajeUpdated) await onViajeUpdated();
+    void generarPdf();
+  }
+
+  const ocupado = loading || generando || guardandoBorrador;
+
+  useLockBodyScroll(true);
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[110] flex items-stretch justify-center overflow-hidden overscroll-none bg-black/40 p-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="mic-crt-title"
     >
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col border border-black/15 bg-white shadow-lg">
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 px-4 py-3">
-          <div>
+      <div className="relative flex h-full max-h-[100dvh] w-full min-w-0 max-w-[min(48rem,calc(100vw-1rem))] flex-col overflow-hidden border-0 bg-white shadow-lg sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15">
+        <div className="flex min-w-0 shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-3">
+          <div className="min-w-0">
             <h2 id="mic-crt-title" className="text-sm font-semibold text-vialto-charcoal">
               Documento aduanero MIC / CRT
             </h2>
@@ -332,7 +398,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
             className="text-vialto-steel hover:text-vialto-charcoal disabled:opacity-40" aria-label="Cerrar">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3">
           {loading && <p className="text-xs text-vialto-steel">Cargando datos…</p>}
 
           {form && !loading && <MicCrtLegalDisclaimer />}
@@ -342,16 +408,16 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">1 · Identificación</h3>
                 <FormGrid>
-                  <Field label={`${labelCampo('Fecha de emisión', 6)} *`}>
-                    <input type="date" className={inputClass} value={form.fechaEmision} disabled={ocupado}
+                  <Field label={`${labelCampo('Fecha de emisión', 6)} *`} error={fieldErrors.fechaEmision}>
+                    <input type="date" className={micCrtDateInputClass(fieldErrors.fechaEmision)} value={form.fechaEmision} disabled={ocupado}
                       onChange={(e) => patch('fechaEmision', e.target.value)} />
                   </Field>
-                  <Field label={`${labelCampo('N° MIC', 4)} *`}>
-                    <input className={inputClass} value={form.micNumero} disabled={ocupado}
+                  <Field label={`${labelCampo('N° MIC', 4)} *`} error={fieldErrors.micNumero}>
+                    <input className={micCrtInputClass(fieldErrors.micNumero)} value={form.micNumero} disabled={ocupado}
                       onChange={(e) => patch('micNumero', e.target.value)} placeholder="Número aduanero" />
                   </Field>
-                  <Field label={`${labelCampoCrt('N° CRT', 2)} *`}>
-                    <input className={inputClass} value={form.crtNumero} disabled={ocupado}
+                  <Field label={`${labelCampoCrt('N° CRT', 2)} *`} error={fieldErrors.crtNumero}>
+                    <input className={micCrtInputClass(fieldErrors.crtNumero)} value={form.crtNumero} disabled={ocupado}
                       onChange={(e) => patch('crtNumero', e.target.value)} />
                   </Field>
                   <Field label={labelCampo('Moneda documento', 25)}>
@@ -365,10 +431,13 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">2 · Actores</h3>
                 <div className="space-y-3">
                   <ActorBlock title={labelCampo('Remitente', 33)} actor={form.remitente} disabled={ocupado}
+                    prefix="remitente" fieldErrors={fieldErrors}
                     onChange={(a) => patch('remitente', a)} />
                   <ActorBlock title={labelCampo('Destinatario', 34)} actor={form.destinatario} disabled={ocupado}
+                    prefix="destinatario" fieldErrors={fieldErrors}
                     onChange={(a) => patch('destinatario', a)} />
                   <ActorBlock title={labelCampo('Consignatario', 35)} actor={form.consignatario} disabled={ocupado}
+                    prefix="consignatario" fieldErrors={fieldErrors}
                     onChange={(a) => patch('consignatario', a)} />
                 </div>
               </section>
@@ -381,20 +450,20 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                       placeholder="Opcional"
                       onChange={(e) => patch('ncm', e.target.value)} />
                   </Field>
-                  <Field label={`${labelCampo('Cantidad de bultos', 31)} *`}>
-                    <input type="number" min={0} className={inputClass} value={form.bultos || ''} disabled={ocupado}
+                  <Field label={`${labelCampo('Cantidad de bultos', 31)} *`} error={fieldErrors.bultos}>
+                    <input type="number" min={0} className={micCrtInputClass(fieldErrors.bultos)} value={form.bultos || ''} disabled={ocupado}
                       onChange={(e) => patch('bultos', Number(e.target.value) || 0)} />
                   </Field>
-                  <Field label={`${labelCampo('Tipo de bultos', 30)} *`}>
-                    <select className={inputClass} value={form.tipoBultos} disabled={ocupado}
+                  <Field label={`${labelCampo('Tipo de bultos', 30)} *`} error={fieldErrors.tipoBultos}>
+                    <select className={micCrtInputClass(fieldErrors.tipoBultos)} value={form.tipoBultos} disabled={ocupado}
                       onChange={(e) => patch('tipoBultos', e.target.value)}>
                       {TIPOS_BULTOS_MIC.map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
                   </Field>
-                  <Field label={`${labelCampo('Peso bruto total (kg)', 32)} *`}>
-                    <input type="number" min={0} step="0.01" className={inputClass} value={form.pesoBrutoKg || ''} disabled={ocupado}
+                  <Field label={`${labelCampo('Peso bruto total (kg)', 32)} *`} error={fieldErrors.pesoBrutoKg}>
+                    <input type="number" min={0} step="0.01" className={micCrtInputClass(fieldErrors.pesoBrutoKg)} value={form.pesoBrutoKg || ''} disabled={ocupado}
                       onChange={(e) => patch('pesoBrutoKg', Number(e.target.value) || 0)} />
                   </Field>
                   <Field label={labelCampoCrt('Volumen (m³)', 13)}>
@@ -421,8 +490,8 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">4 · Valores comerciales</h3>
                 <FormGrid>
-                  <Field label={`${labelCampo('Valor FOT', 27)} *`}>
-                    <input type="number" min={0} step="0.01" className={inputClass} value={form.valorFot || ''} disabled={ocupado}
+                  <Field label={`${labelCampo('Valor FOT', 27)} *`} error={fieldErrors.valorFot}>
+                    <input type="number" min={0} step="0.01" className={micCrtInputClass(fieldErrors.valorFot)} value={form.valorFot || ''} disabled={ocupado}
                       onChange={(e) => patch('valorFot', Number(e.target.value) || 0)} />
                   </Field>
                   <Field label={labelCampo('Moneda FOT', 27)}>
@@ -454,14 +523,14 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
 
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-vialto-charcoal">5 · Anexos y aduanas</h3>
-                <fieldset className="mb-3 border border-black/10 p-3">
+                <fieldset className="mb-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     {labelCampo('Partida', 7)}
                   </legend>
                   <FormGrid>
-                    <Field label={`${labelCampo('Ciudad / lugar de partida', 7)} *`}>
+                    <Field label={`${labelCampo('Ciudad / lugar de partida', 7)} *`} error={fieldErrors.aduanaPartida}>
                       <input
-                        className={inputClass}
+                        className={micCrtInputClass(fieldErrors.aduanaPartida)}
                         value={form.aduanaPartida}
                         disabled={ocupado}
                         placeholder="Ej. Buenos Aires"
@@ -498,8 +567,8 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                   </FormGrid>
                 </fieldset>
                 <FormGrid>
-                  <Field label={`${labelCampo('Aduana destino', 8)} *`}>
-                    <input className={inputClass} value={form.aduanaDestino} disabled={ocupado}
+                  <Field label={`${labelCampo('Aduana destino', 8)} *`} error={fieldErrors.aduanaDestino}>
+                    <input className={micCrtInputClass(fieldErrors.aduanaDestino)} value={form.aduanaDestino} disabled={ocupado}
                       onChange={(e) => patch('aduanaDestino', e.target.value)} />
                   </Field>
                   <Field label={labelCampo('Documentos anexos', 36)}>
@@ -538,7 +607,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                   </Field>
                 </FormGrid>
 
-                <fieldset className="mt-3 border border-black/10 p-3">
+                <fieldset className="mt-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     CRT · 2.ª hoja
                   </legend>
@@ -609,7 +678,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
                   </div>
                 </fieldset>
 
-                <fieldset className="mt-3 border border-black/10 p-3">
+                <fieldset className="mt-3 min-w-0 border border-black/10 p-3">
                   <legend className="px-1 text-xs font-semibold text-vialto-charcoal">
                     Semirremolque (Campos 13–15, opcional)
                   </legend>
@@ -651,20 +720,43 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated }: Pro
             </>
           )}
 
-          {error && (
+          {missingGroups ? (
+            <ViajeExportMissingFieldsPanel
+              viaje={viajeLocal}
+              tenantId={tenantId}
+              message={error ?? 'Completá los datos faltantes para generar el documento.'}
+              groups={missingGroups}
+              disabled={ocupado}
+              onSaved={() => void corregirDatosYReintentar()}
+            />
+          ) : error ? (
             <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 leading-snug">
               <p>{error}</p>
             </div>
+          ) : null}
+
+          {borradorGuardado && !error && (
+            <p className="text-xs text-vialto-steel">
+              Borrador guardado en este dispositivo. Podés cerrar y continuar más tarde.
+            </p>
           )}
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-4 py-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-black/10 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
           <button type="button" disabled={ocupado} onClick={onClose}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50">
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto">
             Cancelar
           </button>
+          <button
+            type="button"
+            disabled={ocupado || !form}
+            onClick={guardarBorrador}
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50 sm:w-auto"
+          >
+            {guardandoBorrador ? 'Guardando…' : 'Guardar borrador'}
+          </button>
           <button type="button" disabled={ocupado || !form} onClick={() => void generarPdf()}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 bg-vialto-charcoal text-white hover:bg-black disabled:opacity-50">
+            className="inline-flex min-h-11 w-full items-center justify-center text-xs uppercase tracking-wider px-3 py-1.5 bg-vialto-charcoal text-white hover:bg-black disabled:opacity-50 sm:w-auto">
             {generando ? 'Generando…' : 'Generar PDF'}
           </button>
         </div>

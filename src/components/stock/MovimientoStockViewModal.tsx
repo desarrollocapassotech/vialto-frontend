@@ -4,6 +4,7 @@ import {
   ViewModalShell,
   viewModalBtnGhost,
 } from '@/components/ui/ViewModalShell';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import {
@@ -88,9 +89,18 @@ export function MovimientoStockViewModal({
       onOverlayClick={onClose}
       scrollBody
       footer={
-        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-          Cerrar
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {row?.tipo === 'egreso' && (
+            <ImprimirRemitoButton
+              egresoId={row.operacionId}
+              tenantId={tenantId}
+              titulo={row.numeroRemito ? `Remito ${row.numeroRemito}` : 'Remito interno'}
+            />
+          )}
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+            Cerrar
+          </button>
+        </div>
       }
     >
       {loading && (

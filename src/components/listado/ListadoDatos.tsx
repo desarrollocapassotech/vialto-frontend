@@ -13,7 +13,9 @@ import {
   listadoTablaEmptyCellClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
+  listadoTablaTbodyClass,
   listadoTablaThClass,
+  listadoTablaTheadClass,
   listadoTablaWrapperClass,
 } from '@/lib/listadoTabla';
 
@@ -169,7 +171,7 @@ export function ListadoDatos<T>({
 
       <div className={`${listadoTablaWrapperClass} hidden lg:block border-0 shadow-none rounded-none`}>
         <table className={listadoTablaClass}>
-          <thead>
+          <thead className={listadoTablaTheadClass}>
             {tableHead ?? (
               <tr className={listadoTablaHeadRowClass}>
                 {columns.map((col) => (
@@ -183,7 +185,7 @@ export function ListadoDatos<T>({
               </tr>
             )}
           </thead>
-          <tbody>
+          <tbody className={listadoTablaTbodyClass}>
             {loading && (
               <tr>
                 <td colSpan={colSpan} className={listadoTablaEmptyCellClass}>

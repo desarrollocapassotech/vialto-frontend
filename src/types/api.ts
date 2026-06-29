@@ -71,12 +71,12 @@ export interface Viaje {
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
-  /** ARS | USD (omitido en respuestas antiguas → se trata como ARS). */
+  /** ARS | USD (omitido en respuestas antiguas -> se trata como ARS). */
   monedaMonto?: string;
   precioTransportistaExterno: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
-  /** Solo cuando monedaMonto ≠ monedaPrecioTransportistaExterno (transporte externo). */
+  /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;
   monedaGananciaBrutaManual?: string | null;
   observaciones: string | null;
@@ -128,9 +128,8 @@ export interface Vehiculo {
   tipo: string;
   marca: string | null;
   modelo: string | null;
-  año: number | null;
-  /** Respuesta JSON de Prisma/Nest usa `anio`. */
-  anio?: number | null;
+  año?: number | null;
+  anio: number | null;
   kmActual: number;
   nroChasis: string | null;
   poliza: string | null;
@@ -152,7 +151,7 @@ export interface Transportista {
   domicilio: string | null;
   condicionIva: number | null;
   condicionTributaria: string | null;
-  /** En API siempre `externo` para subcontratistas; flota propia = sin vínculo en chofer/vehículo. */
+  /** En API siempre `externo` para subcontratistas; flota propia = sin vinculo en chofer/vehiculo. */
   tipo?: string;
   paut: string | null;
   permisoInternacional: string | null;
@@ -233,6 +232,13 @@ export interface ImportRowError {
   valor?: unknown;
 }
 
+export interface ImportCiudadAdvertencia {
+  fila: number;
+  campo: 'origen' | 'destino';
+  valor: string;
+  mensaje: string;
+}
+
 export interface ImportPreviewViaje {
   fila: number;
   cliente: string;
@@ -250,6 +256,8 @@ export interface ImportPreviewViaje {
   precioTransportistaExterno: number | null;
   monedaPrecioTransportistaExterno: string | null;
   nroFacturaTransporte: string | null;
+  /** Advertencias de validación de catálogo (no bloquean la importación). */
+  advertenciasCiudad?: ImportCiudadAdvertencia[];
 }
 
 export interface ImportPreviewFactura {
@@ -274,6 +282,9 @@ export interface ImportPreviewResult {
   exitosas: number;
   errores: number;
   detalleErrores: ImportRowError[];
+  /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
+  advertenciasCiudad?: ImportCiudadAdvertencia[];
+  totalAdvertenciasCiudad?: number;
   viajes?: ImportPreviewViaje[];
   facturas?: ImportPreviewFactura[];
   clientes?: ImportPreviewEntidad[];
@@ -309,19 +320,25 @@ export interface ImportTemplate {
   updatedAt: string;
 }
 
+export interface ProductoPresentacion {
+  id: string;
+  presentacionId: string;
+  presentacion?: { id: string; nombre: string };
+  unidadesPorBulto: number;
+  activo: boolean;
+}
+
 export interface Producto {
   id: string;
   tenantId: string;
   nombre: string;
   codigo: string | null;
   descripcion: string | null;
-  presentacion1Id: string | null;
-  presentacion2Id: string | null;
-  unidad1Nombre: string;
-  unidad2Nombre: string | null;
+  pesoUnitarioKg: number | null;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
+  productoPresentaciones: ProductoPresentacion[];
 }
 
 export interface PlatformUser {
@@ -346,8 +363,11 @@ export interface Presentacion {
 export interface MovimientoStock {
   id: string;
   tenantId: string;
+  operacionId?: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
@@ -358,17 +378,19 @@ export interface MovimientoStock {
   numeroRemito?: string | null;
   lote?: string | null;
   observaciones: string | null;
+  /** PDF del remito interno (solo egresos). */
   remitoUrl: string | null;
-  /** ID del movimiento par en una división (origen ↔ destino). */
   movimientoVinculadoId?: string | null;
   createdBy: string;
-  /** Nombre o correo resuelto vía Clerk (solo en detalle). */
+  /** Nombre o correo resuelto via Clerk (solo en detalle). */
   createdByLabel?: string | null;
   fecha: string;
   createdAt: string;
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  /** Fotos del producto (solo ingresos). */
+  fotosUrls?: string[];
 }
 
 export interface StockEgresoRemitoConfig {
@@ -376,7 +398,7 @@ export interface StockEgresoRemitoConfig {
   remitoDigitos: number;
 }
 
-// ── ARCA / Liquidaciones ──────────────────────────────────────────────────────
+// ARCA / Liquidaciones
 
 export interface ArcaConfig {
   cuitEmisor: string;
@@ -444,6 +466,8 @@ export interface StockItem {
   tenantId: string;
   productoId: string;
   producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  presentacionId: string;
+  presentacion?: ProductoPresentacion;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
@@ -451,4 +475,40 @@ export interface StockItem {
   cantidad1: number;
   cantidad2: number;
   updatedAt: string;
+}
+
+export interface StockOperacionLinea {
+  id: string;
+  productoId: string;
+  producto?: { id: string; nombre: string; unidad1Nombre?: string; unidad2Nombre?: string | null };
+  presentacionId?: string | null;
+  presentacion?: ProductoPresentacion | null;
+  bultos: number;
+  /** Unidades sueltas. */
+  unidades: number;
+  lote?: string | null;
+  fechaVencimiento?: string | null;
+}
+
+export interface StockOperacion {
+  id: string;
+  tenantId: string;
+  tipo: 'ingreso' | 'egreso' | 'division';
+  fecha: string;
+  clienteId: string;
+  cliente?: { id: string; nombre: string };
+  depositoId: string;
+  deposito?: { id: string; nombre: string };
+  /** PDF del remito interno generado al egresar. */
+  remitoUrl?: string | null;
+  numeroRemito?: string | null;
+  entregadoPor?: string | null;
+  destinatario?: string | null;
+  destinoFinal?: string | null;
+  observaciones?: string | null;
+  /** Fotos del producto (solo ingresos). */
+  fotosUrls?: string[];
+  createdBy: string;
+  createdAt: string;
+  movimientos: StockOperacionLinea[];
 }

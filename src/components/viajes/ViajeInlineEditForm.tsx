@@ -105,7 +105,7 @@ export function ViajeInlineEditForm({
 
   return (
     <>
-    <tr className="border-b border-black/10 bg-vialto-mist/40">
+    <tr className="bg-vialto-mist">
       <td colSpan={tableColSpan} className="px-4 py-4">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
 
