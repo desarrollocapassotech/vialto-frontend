@@ -142,24 +142,21 @@ export function DepositosPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-            Depósitos
-          </h1>
-          <p className="mt-2 text-vialto-steel">
-            Almancená y administrá los puntos de depósito para tu stock.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={openCreateForm}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Nuevo depósito
-          </button>
-        </div>
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+        Depósitos
+      </h1>
+      <p className="mt-2 text-vialto-steel">
+        Almancená y administrá los puntos de depósito para tu stock.
+      </p>
+
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={openCreateForm}
+          className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        >
+          Nuevo depósito
+        </button>
       </div>
 
       {error && (

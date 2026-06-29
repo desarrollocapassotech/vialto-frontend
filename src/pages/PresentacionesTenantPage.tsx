@@ -108,22 +108,21 @@ export function PresentacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-            Presentaciones
-          </h1>
-          <p className="mt-2 text-vialto-steel max-w-2xl">
-            Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
-          </p>
-        </div>
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+        Presentaciones
+      </h1>
+      <p className="mt-2 text-vialto-steel max-w-2xl">
+        Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
+      </p>
+
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => {
             setEditingId(null);
             setIsFormOpen(true);
           }}
-          className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+          className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
         >
           Nueva presentación
         </button>
