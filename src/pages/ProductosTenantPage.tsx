@@ -42,6 +42,7 @@ export function ProductosTenantPage() {
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
+    setRows(null);
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
@@ -411,7 +412,7 @@ export function ProductosTenantPage() {
           <div className="inline-flex gap-2">
             <button
               type="button"
-              disabled={!meta.hasPrev}
+              disabled={!meta.hasPrev || rows === null}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
             >
@@ -419,7 +420,7 @@ export function ProductosTenantPage() {
             </button>
             <button
               type="button"
-              disabled={!meta.hasNext}
+              disabled={!meta.hasNext || rows === null}
               onClick={() => setPage((p) => p + 1)}
               className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
             >
