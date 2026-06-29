@@ -1,7 +1,8 @@
-import { AuthenticateWithRedirectCallback, useAuth } from '@clerk/clerk-react';
+import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/clerk-react';
 import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
-import { MaestroDataProvider } from '@/hooks/useMaestroData';
+import { MaestroDataProvider, useMaestroData } from '@/hooks/useMaestroData';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { HomePage } from '@/pages/HomePage';
 import { ViajesPage } from '@/pages/ViajesPage';
 import { BaseDeDatosPage } from '@/pages/BaseDeDatosPage';
@@ -78,6 +79,46 @@ function RequireOrgAdmin() {
   return <Outlet />;
 }
 
+/**
+ * Bloquea el acceso a rutas de un módulo no contratado por la empresa.
+ * El superadmin de plataforma siempre tiene acceso. Mientras se resuelve la
+ * suscripción del tenant se muestra un estado de carga para evitar parpadeos.
+ */
+function RequireModule({ module }: { module: string }) {
+  const { user, isLoaded } = useUser();
+  const { tenant, tenantLoading } = useMaestroData();
+
+  if (!isLoaded || tenantLoading) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center text-vialto-steel">
+        Un momento…
+      </div>
+    );
+  }
+
+  const superadmin = isPlatformSuperadmin(user?.publicMetadata);
+  const moduleActivo = (tenant?.modules ?? []).some(
+    (m) => m.toLowerCase() === module.toLowerCase(),
+  );
+
+  if (!superadmin && !moduleActivo) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 text-center">
+        <p className="text-3xl font-semibold text-vialto-charcoal">403</p>
+        <p className="text-lg font-semibold text-vialto-charcoal">Módulo no contratado</p>
+        <p className="text-sm text-vialto-steel max-w-xs">
+          Tu empresa no tiene acceso a esta sección. Contactá al administrador si necesitás habilitarla.
+        </p>
+        <Link to="/" className="text-sm text-vialto-fire underline underline-offset-2">
+          Volver al inicio
+        </Link>
+      </div>
+    );
+  }
+
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -130,18 +171,25 @@ export default function App() {
             <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
             <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
             <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
-            <Route path="stock/inventario" element={<StockPanelPage />} />
-            <Route path="stock/divisiones" element={<DivisionesStockPage />} />
-            <Route path="stock/divisiones/historial" element={<DivisionesStockHistorialPage />} />
-            <Route path="stock/movimientos" element={<StockMovimientosPage />} />
-            <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
           </Route>
 
-          {/* rutas accesibles para todos los roles autenticados con módulo stock */}
-          <Route path="stock/ingresos" element={<IngresosStockPage />} />
-          <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
-          <Route path="stock/egresos" element={<EgresosStockPage />} />
-          <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
+          {/* rutas de stock — requieren módulo "stock" contratado */}
+          <Route element={<RequireModule module="stock" />}>
+            {/* stock: solo org:admin y superadmin */}
+            <Route element={<RequireOrgAdmin />}>
+              <Route path="stock/inventario" element={<StockPanelPage />} />
+              <Route path="stock/divisiones" element={<DivisionesStockPage />} />
+              <Route path="stock/divisiones/historial" element={<DivisionesStockHistorialPage />} />
+              <Route path="stock/movimientos" element={<StockMovimientosPage />} />
+              <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
+            </Route>
+
+            {/* stock: todos los roles autenticados */}
+            <Route path="stock/ingresos" element={<IngresosStockPage />} />
+            <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
+            <Route path="stock/egresos" element={<EgresosStockPage />} />
+            <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
+          </Route>
           <Route path="superadmin/empresas" element={<SuperadminEmpresasPage />} />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
