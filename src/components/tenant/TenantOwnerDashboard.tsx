@@ -899,7 +899,7 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
               simpleCount={dash.data?.stock?.ingresosHoy ?? 0}
               loading={dash.loading}
               valueTone="positiveCash"
-              linkTo="/stock/ingresos"
+              linkTo="/stock/ingresos/historial"
             />
             <MetricCard
               title="Egresos"
@@ -907,7 +907,7 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
               simpleCount={dash.data?.stock?.egresosHoy ?? 0}
               loading={dash.loading}
               valueTone="payable"
-              linkTo="/stock/egresos"
+              linkTo="/stock/egresos/historial"
             />
           </div>
         </section>

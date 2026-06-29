@@ -3,10 +3,13 @@ import { FileSpreadsheet } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
+import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
+import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
+import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { generarExcel, movimientoStockColumnas } from '@/lib/stockExcelExport';
 import {
   movimientoStockTipoBadgeClass,
@@ -14,7 +17,22 @@ import {
   movimientoStockTipoNumeroClass,
 } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { MovimientoStock } from '@/types/api';
+import type { MovimientoStock, Producto, Cliente, Deposito, PaginatedMeta } from '@/types/api';
+import { useSearchParams } from 'react-router-dom';
+
+type Usuario = {
+  id: string;
+  nombre: string;
+};
+
+type ProductosResponse = {
+  items: Producto[];
+};
+
+type MovimientosPaginatedResponse = {
+  items: MovimientoStock[];
+  meta: PaginatedMeta;
+};
 
 function buildQs(params: Record<string, string>, tenantId?: string): string {
   const parts: string[] = [];
@@ -26,9 +44,62 @@ function buildQs(params: Record<string, string>, tenantId?: string): string {
 export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [depositos, setDepositos] = useState<Deposito[]>([]);
+
+  const productoId = searchParams.get('productoId') ?? '';
+  const tipo = searchParams.get('tipo') ?? '';
+  const fechaDesde = searchParams.get('fechaDesde') ?? '';
+  const fechaHasta = searchParams.get('fechaHasta') ?? '';
+  const clienteId = searchParams.get('clienteId') ?? '';
+  const createdBy = searchParams.get('createdBy') ?? '';
+  const depositoId = searchParams.get('depositoId') ?? '';
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [productoId, tipo, fechaDesde, fechaHasta, clienteId, createdBy, depositoId]);
+
+  const params: Record<string, string> = {};
+
+  if (tipo) params.tipo = tipo;
+  if (fechaDesde) params.fechaDesde = fechaDesde;
+  if (fechaHasta) params.fechaHasta = fechaHasta;
+  if (productoId) params.productoId = productoId;
+  if (clienteId) params.clienteId = clienteId;
+  if (createdBy) params.createdBy = createdBy;
+  if (depositoId) params.depositoId = depositoId;
+  
+  params.page = String(page);
+  params.pageSize = String(pageSize);
+
+  const productosBase = platform
+    ? '/api/platform/stock/productos'
+    : '/api/stock/productos';
+
+  const clientesBase = platform
+    ? '/api/platform/clientes'
+    : '/api/clientes';
+
+  const usuariosBase = platform
+    ? '/api/platform/users'
+    : '/api/users';
+
   const movimientosUrl = platform
-    ? `/api/platform/stock/movimientos${buildQs({ soloIngresoEgreso: 'true' }, tenantId)}`
-    : '/api/stock/movimientos?soloIngresoEgreso=true';
+    ? `/api/platform/stock/movimientos${buildQs(params, tenantId)}`
+    : `/api/stock/movimientos${buildQs(params)}`;
+
+  const depositosBase = platform
+    ? '/api/platform/stock/depositos'
+    : '/api/stock/depositos';
 
   const [items, setItems] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +112,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<MovimientoStock[]>(movimientosUrl, () => getToken());
-      setItems(data);
+      const data = await apiJson<MovimientosPaginatedResponse>(movimientosUrl, () => getToken());
+      setItems(data.items);
+      setMeta(data.meta);
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     } finally {
@@ -50,13 +122,105 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
     }
   }, [movimientosUrl, getToken]);
 
+  const loadProductos = useCallback(async () => {
+    try {
+      const url =
+        `${productosBase}/paginated${buildQs(
+          {
+            page: '1',
+            pageSize: '100',
+            filtroActivo: 'activos',
+          },
+          tenantId,
+        )}`;
+
+      const data = await apiJson<ProductosResponse>(url, () => getToken());
+
+      setProductos(data.items);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [productosBase, tenantId, getToken]);
+
+  const loadClientes = useCallback(async () => {
+    try {
+      const data = await apiJson<Cliente[]>(
+        `${clientesBase}${buildQs({}, tenantId)}`,
+        () => getToken(),
+      );
+
+      setClientes(data);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [clientesBase, tenantId, getToken]);
+
+  const loadUsuarios = useCallback(async () => {
+    try {
+      const data = await apiJson<any[]>(
+        `${usuariosBase}${buildQs({}, tenantId)}`,
+        () => getToken(),
+      );
+
+      setUsuarios(
+        data.map((u) => ({
+          id: u.userId,
+          nombre: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim(),
+        })),
+      );
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [usuariosBase, tenantId, getToken]);
+
+  const loadDepositos = useCallback(async () => {
+    try {
+      const data = await apiJson<Deposito[]>(
+        `${depositosBase}${buildQs({}, tenantId)}`,
+        () => getToken(),
+      );
+
+      setDepositos(data);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    }
+  }, [depositosBase, tenantId, getToken]);
+
   useEffect(() => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void loadProductos();
+  }, [loadProductos]);
+
+  useEffect(() => {
+    void loadClientes();
+  }, [loadClientes]);
+
+  useEffect(() => {
+    void loadUsuarios();
+  }, [loadUsuarios]);
+
+  useEffect(() => {
+    void loadDepositos();
+  }, [loadDepositos]);
+
+  const exportExcelButton = (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={items.length === 0}
+      className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+    >
+      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+      Descargar Excel
+    </button>
+  );
+
   return (
     <div className="w-full space-y-6">
-      {!platform && (
+      {!platform ? (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimientos</h1>
@@ -64,16 +228,10 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
               Ingresos y egresos al depósito, ordenados por fecha de movimiento (más reciente primero).
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={items.length === 0}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-            Descargar Excel
-          </button>
+          {exportExcelButton}
         </div>
+      ) : (
+        <div className="flex justify-end">{exportExcelButton}</div>
       )}
 
       {error && (
@@ -85,47 +243,235 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
         columns={[
           {
             id: 'fecha',
-            header: 'Fecha',
             primary: true,
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Fecha"
+                filterActive={!!fechaDesde || !!fechaHasta}
+                filterSignature={`${fechaDesde}|${fechaHasta}`}
+              >
+                <div className="flex flex-col gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={fechaDesde}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        setSearchParams((prev) => {
+                          const params = new URLSearchParams(prev);
+
+                          if (value) params.set('fechaDesde', value);
+                          else params.delete('fechaDesde');
+
+                          return params;
+                        });
+                      }}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={fechaHasta}
+                      onChange={(e) => {
+                        setSearchParams((prev) => {
+                          const params = new URLSearchParams(prev);
+
+                          if (e.target.value) {
+                            params.set('fechaHasta', e.target.value);
+                          } else {
+                            params.delete('fechaHasta');
+                          }
+
+                          return params;
+                        });
+                      }}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => formatMovimientoStockFechaFromIso(m.fecha),
-            tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
           },
           {
             id: 'tipo',
-            header: 'Tipo',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Tipo"
+                filterActive={!!tipo}
+                filterSignature={tipo}
+              >
+                <select
+                  value={tipo}
+                  onChange={(e) => {
+                    const value = e.target.value;
+
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (value) params.set('tipo', value);
+                      else params.delete('tipo');
+
+                      return params;
+                    });
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    tipo ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                  }`}
+                >
+                  <option value="">Todos</option>
+                  <option value="ingreso">Ingreso</option>
+                  <option value="egreso">Egreso</option>
+                  <option value="division">División</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => (
               <span className={movimientoStockTipoBadgeClass(m.tipo)}>
                 {movimientoStockTipoLabel(m.tipo)}
               </span>
             ),
-            tdClassName: listadoTablaTdClass,
           },
           {
             id: 'remito',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: 'Remito',
             cell: (m) => m.numeroRemito ?? '—',
             tdClassName: `${listadoTablaTdClass} font-mono`,
           },
           {
             id: 'producto',
-            header: 'Producto',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Producto"
+                filterActive={!!productoId}
+                filterSignature={productoId}
+              >
+                <SearchableEntitySelect<Producto>
+                  items={productos}
+                  value={productoId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (id) params.set('productoId', id);
+                      else params.delete('productoId');
+
+                      return params;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((p) =>
+                      p.nombre.toLowerCase().includes(lq),
+                    );
+                  }}
+                  getPrimaryLabel={(p) => p.nombre}
+                  searchAriaLabel="Filtrar productos"
+                  aria-label="Filtrar por producto"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => m.producto?.nombre ?? m.productoId,
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'cliente',
-            header: 'Cliente',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Cliente"
+                filterActive={!!clienteId}
+                filterSignature={clienteId}
+              >
+                <SearchableEntitySelect<Cliente>
+                  items={clientes}
+                  value={clienteId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (id) params.set('clienteId', id);
+                      else params.delete('clienteId');
+
+                      return params;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((c) =>
+                      c.nombre.toLowerCase().includes(lq),
+                    );
+                  }}
+                  getPrimaryLabel={(c) => c.nombre}
+                  searchAriaLabel="Filtrar clientes"
+                  aria-label="Filtrar por cliente"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => m.cliente?.nombre ?? m.clienteId,
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'deposito',
-            header: 'Depósito',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Depósito"
+                filterActive={!!depositoId}
+                filterSignature={depositoId}
+              >
+                <SearchableEntitySelect<Deposito>
+                  items={depositos}
+                  value={depositoId}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (id) params.set('depositoId', id);
+                      else params.delete('depositoId');
+
+                      return params;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar por nombre…"
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+                    return lista.filter((d) =>
+                      d.nombre.toLowerCase().includes(lq),
+                    );
+                  }}
+                  getPrimaryLabel={(d) => d.nombre}
+                  searchAriaLabel="Filtrar depósitos"
+                  aria-label="Filtrar por depósito"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
             cell: (m) => m.deposito?.nombre ?? '—',
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'cant1',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: 'Cant. 1',
             cell: (m) => (
               <>
@@ -138,6 +484,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
           },
           {
             id: 'cant2',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: 'Cant. 2',
             cell: (m) =>
               m.producto?.unidad2Nombre !== null ? (
@@ -151,25 +498,123 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
               ),
             tdClassName: `${listadoTablaTdClass} text-right`,
           },
+          {
+            id: 'usuario',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: (
+              <ViajesListadoHeaderFiltro
+                title="Usuario"
+                filterActive={!!createdBy}
+                filterSignature={createdBy}
+              >
+                <SearchableEntitySelect<Usuario>
+                  items={usuarios}
+                  value={createdBy}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const params = new URLSearchParams(prev);
+
+                      if (id) params.set('createdBy', id);
+                      else params.delete('createdBy');
+
+                      return params;
+                    });
+                  }}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  placeholderBuscar="Buscar usuario..."
+                  filterItems={(lista, q) => {
+                    const lq = q.toLowerCase();
+
+                    return lista.filter((u) =>
+                      u.nombre.toLowerCase().includes(lq),
+                    );
+                  }}
+                  getPrimaryLabel={(u) => u.nombre}
+                  searchAriaLabel="Filtrar usuarios"
+                  aria-label="Filtrar por usuario"
+                />
+              </ViajesListadoHeaderFiltro>
+            ),
+            cell: (m) => m.createdByLabel ?? '—',
+            tdClassName: listadoTablaTdClass,
+          },
         ]}
         rows={loading ? null : items}
         rowKey={(m) => m.id}
         emptyMessage="No hay movimientos para mostrar."
         loadingMessage="Cargando…"
         renderActions={(m) => (
-          <button
-            type="button"
-            onClick={() => {
-              setDetalleMovimientoId(m.id);
-              setDetalleMovimientoTipo(m.tipo);
-            }}
-            className={listadoTablaAccionClass}
-          >
-            Ver
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {m.tipo === 'egreso' && (
+              <ImprimirRemitoButton
+                variant="listado"
+                className={listadoTablaAccionClass}
+                egresoId={m.operacionId}
+                tenantId={tenantId}
+                titulo={m.numeroRemito ? `Remito ${m.numeroRemito}` : 'Remito interno'}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setDetalleMovimientoId(m.id);
+                setDetalleMovimientoTipo(m.tipo);
+              }}
+              className={listadoTablaAccionClass}
+            >
+              Ver
+            </button>
+          </div>
         )}
+        actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
+
+      {meta && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-vialto-steel">
+              Página {meta.page} de {meta.totalPages} · {meta.total} registros
+            </p>
+            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
+              Mostrar
+              <select
+                value={pageSize}
+                disabled={loading}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              disabled={!meta.hasPrev || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={!meta.hasNext || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {detalleMovimientoId && (
         <MovimientoStockViewModal
@@ -185,10 +630,10 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
 
       {exportModalOpen && (
         <ExcelExportModal
-          columns={movimientoStockColumnas(items)}
+          columns={movimientoStockColumnas(items, productos)}
           rowCount={items.length}
           onExport={(selectedIds) => {
-            const allCols = movimientoStockColumnas(items);
+            const allCols = movimientoStockColumnas(items, productos);
             const cols = allCols.filter((c) => selectedIds.includes(c.id));
             generarExcel(cols, items, 'movimientos-stock');
           }}

@@ -103,13 +103,21 @@ export function SearchableEntitySelect<T extends { id: string }>({
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setMenuStyle({
+    const PANEL_MAX_H = 288; // max-h-72
+    const GAP = 4;
+    const spaceBelow = window.innerHeight - r.bottom - GAP;
+    const spaceAbove = r.top - GAP;
+    const base: CSSProperties = {
       position: 'fixed',
-      top: r.bottom + 4,
       left: r.left,
       width: Math.max(r.width, 260),
       zIndex: 9999,
-    });
+    };
+    if (spaceBelow >= PANEL_MAX_H || spaceBelow >= spaceAbove) {
+      setMenuStyle({ ...base, top: r.bottom + GAP });
+    } else {
+      setMenuStyle({ ...base, bottom: window.innerHeight - r.top + GAP });
+    }
   }
 
   useLayoutEffect(() => {

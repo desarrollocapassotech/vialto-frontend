@@ -37,7 +37,7 @@ export function ViajeDestinosLista({
   }
 
   return (
-    <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <span className={LABEL}>Destinos</span>
         <button

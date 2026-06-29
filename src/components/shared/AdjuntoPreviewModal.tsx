@@ -10,9 +10,13 @@ import {
 import { fetchRemitoAdjuntoBlob } from '@/lib/stockRemitoAdjunto';
 import { AdjuntoImagenZoomView } from './AdjuntoImagenZoomView';
 
-/** Ancho del panel según alto útil y proporción A4 vertical. */
-const PDF_PANEL_WIDTH =
+/** Ancho del panel de imágenes según alto útil y proporción A4 vertical. */
+const IMAGEN_PANEL_WIDTH =
   'min(calc((100vh - 5.5rem) * 210 / 297), calc(100vw - 2rem))';
+
+function esUrlImagen(url: string): boolean {
+  return /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url);
+}
 
 export function AdjuntoPreviewModal({
   movimientoId,
@@ -64,6 +68,15 @@ export function AdjuntoPreviewModal({
       return () => URL.revokeObjectURL(url);
     }
 
+    if (url) {
+      const isImage = esUrlImagen(url);
+      setObjectUrl(url);
+      setContentType(isImage ? 'image/jpeg' : 'application/pdf');
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     if (!movimientoId) {
       setError('No hay adjunto para mostrar.');
       setLoading(false);
@@ -98,15 +111,22 @@ export function AdjuntoPreviewModal({
       cancelled = true;
       if (revokeUrl) URL.revokeObjectURL(revokeUrl);
     };
-  }, [file, getToken, movimientoId, tenantId]);
+  }, [file, url, getToken, movimientoId, tenantId]);
 
   const tipo = objectUrl ? detectarTipoAdjuntoDesdeContentType(contentType) : 'pdf';
   const previewSrc = objectUrl && tipo !== 'imagen' ? pdfEmbedSrc(objectUrl) : objectUrl;
   const isPdf = tipo !== 'imagen';
+  const esPantallaCompleta =
+    isPdf ||
+    Boolean(movimientoId) ||
+    (file ? detectarTipoAdjuntoDesdeContentType(contentTypeFromFile(file)) === 'pdf' : false) ||
+    (url ? !esUrlImagen(url) : false);
 
   const modal = (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+      className={`fixed inset-0 z-[70] flex bg-black/60 ${
+        esPantallaCompleta ? '' : 'items-center justify-center p-4'
+      }`}
       onClick={onClose}
       role="presentation"
     >
@@ -115,10 +135,18 @@ export function AdjuntoPreviewModal({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-full max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-black/10 bg-white shadow-2xl"
-        style={{ width: PDF_PANEL_WIDTH }}
+        className={`flex flex-col overflow-hidden bg-white shadow-2xl ${
+          esPantallaCompleta
+            ? 'h-screen w-screen max-h-screen max-w-none rounded-none'
+            : 'h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-full max-w-[calc(100vw-2rem)] rounded-lg border border-black/10'
+        }`}
+        style={esPantallaCompleta ? undefined : { width: IMAGEN_PANEL_WIDTH }}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 py-3">
+        <div
+          className={`flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 ${
+            esPantallaCompleta ? 'py-2.5' : 'py-3'
+          }`}
+        >
           <h2 className="font-[family-name:var(--font-display)] text-base sm:text-lg tracking-wide truncate min-w-0">
             {title}
           </h2>

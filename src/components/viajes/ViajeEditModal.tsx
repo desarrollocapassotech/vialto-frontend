@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { Spinner } from '@/components/ui/Spinner';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import {
   ChoferSearchSelect,
   ClienteSearchSelect,
@@ -108,6 +109,8 @@ export type ViajeEditModalProps = {
   viajeEditHint: string | null;
   fechaCargaError: string | null;
   fechaDescargaError: string | null;
+  destinosError?: string | null;
+  onClearDestinosError?: () => void;
   transportistaEfectivoError?: string | null;
   onClearTransportistaEfectivoError?: () => void;
   onDraftFechasPatch: (
@@ -153,6 +156,8 @@ export function ViajeEditModal({
   viajeEditHint,
   fechaCargaError,
   fechaDescargaError,
+  destinosError,
+  onClearDestinosError,
   transportistaEfectivoError,
   onClearTransportistaEfectivoError,
   onDraftFechasPatch,
@@ -321,14 +326,18 @@ export function ViajeEditModal({
               </div>
             </div>
 
-            <ViajeDestinosLista
-              groupId={`viaje-edit-${draft.numero || 'e'}`}
-              rows={draft.destinosRows}
-              onChange={(destinosRows) =>
-                setDraft((prev) => (prev ? { ...prev, destinosRows } : prev))
-              }
-              inputClassName={inputClass}
-            />
+            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <ViajeDestinosLista
+                groupId={`viaje-edit-${draft.numero || 'e'}`}
+                rows={draft.destinosRows}
+                onChange={(destinosRows) => {
+                  setDraft((prev) => (prev ? { ...prev, destinosRows } : prev));
+                  if (destinosRows[0]?.etiqueta.trim()) onClearDestinosError?.();
+                }}
+                inputClassName={inputClass}
+              />
+              <CrudFieldError message={destinosError} />
+            </div>
 
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Cliente</span>

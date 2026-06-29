@@ -108,6 +108,7 @@ import {
   type ViajePagoTransportistaFiltro,
 } from "@/lib/viajesFiltroPagoTransportista";
 import {
+  listadoTablaBodyRowClass,
   listadoTablaHeadRowClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -209,12 +210,18 @@ export function ViajesTenantPage({
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
+<<<<<<< HEAD
   const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<
     string | null
   >(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(
     null,
   );
+=======
+  const [destinosError, setDestinosError] = useState<string | null>(null);
+  const [transportistaEfectivoError, setTransportistaEfectivoError] = useState<string | null>(null);
+  const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(null);
+>>>>>>> origin/develop
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
@@ -1067,6 +1074,7 @@ export function ViajesTenantPage({
     else setViajeSnapshotRemoto(v);
     setEstadoQuickId(null);
     setError(null);
+    setDestinosError(null);
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? "").trim();
     const chRow = listas.choferes.find((c) => c.id === v.choferId);
@@ -1172,6 +1180,7 @@ export function ViajesTenantPage({
     setViajeEditHint(null);
     setFechaCargaError(null);
     setFechaDescargaError(null);
+    setDestinosError(null);
     setTransportistaEfectivoError(null);
   }
 
@@ -1392,7 +1401,15 @@ export function ViajesTenantPage({
       setError("Ingresá el número de viaje.");
       return;
     }
+<<<<<<< HEAD
     const externo = draft.operacionModo === "externo";
+=======
+    if (!draft.destinosRows[0]?.etiqueta.trim()) {
+      setDestinosError('Ingresá el destino 1.');
+      return;
+    }
+    const externo = draft.operacionModo === 'externo';
+>>>>>>> origin/develop
     if (externo && !draft.transportistaId.trim()) {
       setError("Seleccioná un transportista externo.");
       return;
@@ -1437,15 +1454,21 @@ export function ViajesTenantPage({
     }
     const destinosVal = await validarDestinosRows(draft.destinosRows);
     if (!destinosVal.ok) {
-      setError(destinosVal.message);
+      setDestinosError(destinosVal.message);
       return;
     }
+<<<<<<< HEAD
     const fcError = !draft.fechaCarga.trim()
       ? "Ingresá la fecha de carga."
       : null;
     const fdError = !draft.fechaDescarga.trim()
       ? "Ingresá la fecha de descarga."
       : null;
+=======
+    setDestinosError(null);
+    const fcError = !draft.fechaCarga.trim() ? 'Ingresá la fecha de carga.' : null;
+    const fdError = !draft.fechaDescarga.trim() ? 'Ingresá la fecha de descarga.' : null;
+>>>>>>> origin/develop
     setFechaCargaError(fcError);
     setFechaDescargaError(fdError);
     if (fcError || fdError) return;
@@ -2145,6 +2168,7 @@ export function ViajesTenantPage({
             transportistas,
           );
           return (
+<<<<<<< HEAD
             <tr
               key={v.id}
               className="border-b border-black/5 hover:bg-vialto-mist/80"
@@ -2181,6 +2205,21 @@ export function ViajesTenantPage({
                   >
                     Ejecuta: {nombreTranspEfectivo}
                   </span>
+=======
+              <tr key={v.id} className={listadoTablaBodyRowClass}>
+                {mostrarColumnaFacturarLote && (
+                  <td className="px-2 py-3 align-middle text-center">
+                    {esElegibleFacturarLote(v) ? (
+                      <input
+                        type="checkbox"
+                        checked={idsFacturarSeleccion.includes(v.id)}
+                        onChange={() => toggleFacturarLote(v.id)}
+                        className="accent-vialto-charcoal"
+                        aria-label={`Incluir viaje ${v.numero} en facturación conjunta`}
+                      />
+                    ) : null}
+                  </td>
+>>>>>>> origin/develop
                 )}
               </td>
               <td className="px-4 py-3">
@@ -2595,6 +2634,8 @@ export function ViajesTenantPage({
           viajeEditHint={viajeEditHint}
           fechaCargaError={fechaCargaError}
           fechaDescargaError={fechaDescargaError}
+          destinosError={destinosError}
+          onClearDestinosError={() => setDestinosError(null)}
           transportistaEfectivoError={transportistaEfectivoError}
           onClearTransportistaEfectivoError={() =>
             setTransportistaEfectivoError(null)

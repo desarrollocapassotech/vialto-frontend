@@ -63,7 +63,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
     ['viajes', 'clientes', 'choferes', 'vehiculos'].includes(m),
   );
 
-  const { step, modulo, setModulo, file, setFile, loading, error, preview, log, submitPreview, confirm, reset } = importacion;
+  const { step, modulo, setModulo, file, setFile, loading, validandoCiudades, error, preview, log, submitPreview, confirm, reset } = importacion;
 
   return (
     <div
@@ -144,11 +144,19 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   </div>
 
                   {modulo === 'viajes' && (
-                    <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
-                      <span className="mt-0.5 shrink-0 text-base leading-none">💡</span>
-                      <span>
-                        El módulo Viajes requiere las columnas <code className="font-mono bg-blue-100 px-0.5">MONEDA MONTO</code> y <code className="font-mono bg-blue-100 px-0.5">MONEDA FLETE</code> con valores <strong>ARS</strong> o <strong>USD</strong>. Si el campo está vacío o tiene un valor distinto, la fila será rechazada.
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
+                        <span className="mt-0.5 shrink-0 text-base leading-none">💡</span>
+                        <span>
+                          El módulo Viajes requiere las columnas <code className="font-mono bg-blue-100 px-0.5">MONEDA MONTO</code> y <code className="font-mono bg-blue-100 px-0.5">MONEDA FLETE</code> con valores <strong>ARS</strong> o <strong>USD</strong>. Si el campo está vacío o tiene un valor distinto, la fila será rechazada.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2 rounded border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-900">
+                        <span className="mt-0.5 shrink-0 text-base leading-none">📍</span>
+                        <span>
+                          Origen y destino se validan contra el catálogo de ciudades (mismo criterio que al crear un viaje manual). Las ciudades reconocidas se normalizan; las no reconocidas generan advertencia pero no bloquean la importación.
+                        </span>
+                      </div>
                     </div>
                   )}
                   
@@ -223,7 +231,11 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                 <button type="button" disabled={!modulo || !file || loading} onClick={submitPreview}
                   className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
                   {loading && <Spinner className="h-3.5 w-3.5" />}
-                  {loading ? 'Procesando…' : 'Ver previsualización'}
+                  {loading
+                    ? validandoCiudades
+                      ? 'Validando ciudades…'
+                      : 'Procesando…'
+                    : 'Ver previsualización'}
                 </button>
               )}
               {step === 'preview' && preview && (
@@ -347,17 +359,19 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   );
 }
 
-function StatBox({ label, value, highlight }: { label: string; value: number; highlight?: 'ok' | 'error' }) {
+function StatBox({ label, value, highlight }: { label: string; value: number; highlight?: 'ok' | 'error' | 'warn' }) {
   return (
     <div className={['rounded border px-4 py-3 text-center',
       highlight === 'ok' ? 'border-green-200 bg-green-50' : '',
       highlight === 'error' && value > 0 ? 'border-red-200 bg-red-50' : '',
-      !highlight || (highlight === 'error' && value === 0) ? 'border-black/10 bg-vialto-mist' : '',
+      highlight === 'warn' && value > 0 ? 'border-amber-200 bg-amber-50' : '',
+      !highlight || ((highlight === 'error' || highlight === 'warn') && value === 0) ? 'border-black/10 bg-vialto-mist' : '',
     ].join(' ')}>
       <p className={['text-2xl font-bold',
         highlight === 'ok' ? 'text-green-700' : '',
         highlight === 'error' && value > 0 ? 'text-red-700' : '',
-        !highlight || (highlight === 'error' && value === 0) ? 'text-vialto-charcoal' : '',
+        highlight === 'warn' && value > 0 ? 'text-amber-700' : '',
+        !highlight || ((highlight === 'error' || highlight === 'warn') && value === 0) ? 'text-vialto-charcoal' : '',
       ].join(' ')}>{value}</p>
       <p className="mt-0.5 text-[11px] uppercase tracking-wider text-vialto-steel">{label}</p>
     </div>
@@ -373,6 +387,8 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
   const hasFacturas = (preview.facturas?.length ?? 0) > 0;
   const hasClientes = (preview.clientes?.length ?? 0) > 0;
   const hasTransportistas = (preview.transportistas?.length ?? 0) > 0;
+  const advertenciasCiudad = preview.advertenciasCiudad ?? [];
+  const totalAdvertenciasCiudad = preview.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
 
   const nuevosClientes = preview.clientes?.filter((c) => c.esNuevo).length ?? 0;
   const nuevosTransp = preview.transportistas?.filter((t) => t.esNuevo).length ?? 0;
@@ -380,11 +396,18 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className={`grid gap-2 ${hasViajes ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-4'}`}>
         <StatBox label="Filas totales" value={preview.totalFilas} />
         <StatBox label="Viajes a crear" value={preview.exitosas} highlight="ok" />
         <StatBox label="Facturas" value={preview.facturas?.length ?? 0} />
         <StatBox label="Errores" value={preview.errores} highlight={preview.errores > 0 ? 'error' : undefined} />
+        {hasViajes && (
+          <StatBox
+            label="Adv. ciudades"
+            value={totalAdvertenciasCiudad}
+            highlight={totalAdvertenciasCiudad > 0 ? 'warn' : undefined}
+          />
+        )}
       </div>
 
       {/* Errores */}
@@ -395,6 +418,25 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
             {preview.detalleErrores.map((e, i) => (
               <div key={i} className="px-3 py-1.5 text-red-800">
                 <span className="font-medium">Fila {e.fila}</span>{e.campo && <span> · {e.campo}</span>} — {e.error}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Advertencias de ciudades */}
+      {advertenciasCiudad.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
+            Advertencias de ciudades (no bloquean la importación)
+          </p>
+          <div className="max-h-28 overflow-y-auto rounded border border-amber-200 bg-amber-50 text-xs divide-y divide-amber-100">
+            {advertenciasCiudad.map((a, i) => (
+              <div key={i} className="px-3 py-1.5 text-amber-900">
+                <span className="font-medium">Fila {a.fila}</span>
+                <span> · {a.campo === 'origen' ? 'Origen' : 'Destino'}</span>
+                {' — '}
+                {a.mensaje}
               </div>
             ))}
           </div>
@@ -440,6 +482,24 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
   const hasChofer = viajes.some((v) => v.chofer);
   const hasVehiculo = viajes.some((v) => v.vehiculo);
 
+  function advertenciaCampo(v: ImportPreviewViaje, campo: 'origen' | 'destino') {
+    return v.advertenciasCiudad?.find((a) => a.campo === campo);
+  }
+
+  function celdaUbicacion(v: ImportPreviewViaje, campo: 'origen' | 'destino') {
+    const valor = fmt(v[campo]);
+    const adv = advertenciaCampo(v, campo);
+    if (!adv) return valor;
+    return (
+      <span className="inline-flex flex-col gap-0.5">
+        <span>{valor}</span>
+        <span className="text-[10px] font-medium text-amber-700" title={adv.mensaje}>
+          ⚠ {adv.mensaje}
+        </span>
+      </span>
+    );
+  }
+
   const columns: ListadoColumn<ImportPreviewViaje>[] = [
     {
       id: 'fila',
@@ -450,8 +510,8 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
     },
     { id: 'cliente', header: 'Cliente', cell: (v) => fmt(v.cliente) },
     { id: 'transporte', header: 'Transporte', cell: (v) => fmt(v.transporte) },
-    { id: 'origen', header: 'Origen', cell: (v) => fmt(v.origen) },
-    { id: 'destino', header: 'Destino', cell: (v) => fmt(v.destino) },
+    { id: 'origen', header: 'Origen', cell: (v) => celdaUbicacion(v, 'origen') },
+    { id: 'destino', header: 'Destino', cell: (v) => celdaUbicacion(v, 'destino') },
     ...(hasChofer
       ? [{ id: 'chofer', header: 'Chofer', cell: (v: ImportPreviewViaje) => fmt(v.chofer) }]
       : []),
@@ -475,13 +535,30 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
       rows={viajes}
       rowKey={(v) => String(v.fila)}
       emptyMessage="No hay viajes en la vista previa."
-      renderMobileCard={(v) => (
+      renderMobileCard={(v) => {
+        const advOrigen = advertenciaCampo(v, 'origen');
+        const advDestino = advertenciaCampo(v, 'destino');
+        return (
         <ListadoCard
           primary={`Fila ${v.fila} · ${fmt(v.cliente)}`}
           fields={[
             { label: 'Transporte', value: fmt(v.transporte) },
-            { label: 'Origen', value: fmt(v.origen) },
-            { label: 'Destino', value: fmt(v.destino) },
+            {
+              label: 'Origen',
+              value: advOrigen ? (
+                <span className="text-amber-700">{fmt(v.origen)} — {advOrigen.mensaje}</span>
+              ) : (
+                fmt(v.origen)
+              ),
+            },
+            {
+              label: 'Destino',
+              value: advDestino ? (
+                <span className="text-amber-700">{fmt(v.destino)} — {advDestino.mensaje}</span>
+              ) : (
+                fmt(v.destino)
+              ),
+            },
             ...(hasChofer ? [{ label: 'Chofer', value: fmt(v.chofer) }] : []),
             ...(hasVehiculo ? [{ label: 'Vehículo', value: fmt(v.vehiculo) }] : []),
             { label: 'F. Carga', value: fmt(v.fechaCarga) },
@@ -495,7 +572,8 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
             { label: 'FC Flete', value: fmt(v.nroFacturaTransporte) },
           ]}
         />
-      )}
+        );
+      }}
     />
   );
 }

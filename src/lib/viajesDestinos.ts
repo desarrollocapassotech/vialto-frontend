@@ -110,23 +110,31 @@ export function textoRutaViaje(
 
 export async function validarDestinosRows(
   rows: ViajeDestinoRowDraft[],
-): Promise<{ ok: true; destinos: ViajeDestinoApiItem[] } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; destinos: ViajeDestinoApiItem[] }
+  | { ok: false; message: string; rowErrors: Record<number, string> }
+> {
   if (!rows[0]?.etiqueta.trim()) {
-    return { ok: false, message: 'Ingresá el destino 1.' };
+    const msg = 'Ingresá el destino 1.';
+    return { ok: false, message: msg, rowErrors: { 0: msg } };
   }
   const destinos = destinosApiDesdeRows(rows);
   if (destinos.length === 0) {
-    return { ok: false, message: 'Ingresá al menos un destino.' };
+    const msg = 'Ingresá al menos un destino.';
+    return { ok: false, message: msg, rowErrors: { 0: msg } };
   }
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const etiqueta = row.etiqueta.trim();
     if (!etiqueta) continue;
     const ok = await esEtiquetaCiudadValida(row.pais, etiqueta);
     if (!ok) {
+      const msg = 'Elegí el destino de la lista de ciudades (no se admite texto libre).';
       return {
         ok: false,
         message:
           'Todos los destinos deben elegirse de la lista de ciudades (no se admite texto libre).',
+        rowErrors: { [i]: msg },
       };
     }
   }

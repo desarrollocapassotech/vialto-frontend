@@ -12,6 +12,12 @@ function fmtDate(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function fmtImporte(moneda: string, importe: number, minDecimals?: number) {
+  const prefix = moneda === 'USD' ? 'USD ' : '$ ';
+  const opts = minDecimals != null ? { minimumFractionDigits: minDecimals } : undefined;
+  return `${prefix}${importe.toLocaleString('es-AR', opts)}`;
+}
+
 const TIPO_LABEL: Record<string, string> = {
   cliente: 'Cliente',
   transportista_externo: 'Transportista externo',
@@ -48,7 +54,29 @@ export function FacturaViewModal({
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const importeFormato = `${factura.moneda === 'USD' ? 'USD ' : '$ '}${factura.importe.toLocaleString('es-AR')}`;
+  const importeFormato = fmtImporte(factura.moneda, factura.importe);
+  const ivaN = factura.ivaPct ?? 0;
+  const muestraIva = ivaN > 0 && factura.importe > 0;
+  const totalConIva = factura.importe * (1 + ivaN / 100);
+
+  const campos: { label: string; value: string | null | undefined }[] = [
+    { label: 'Número', value: factura.numero },
+    { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
+    { label: 'Cliente', value: clienteNombre },
+    { label: 'Importe', value: importeFormato },
+    ...(muestraIva
+      ? [
+          { label: 'IVA', value: `${ivaN}%` },
+          { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
+        ]
+      : []),
+    { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
+    { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
+    {
+      label: 'Diferencia',
+      value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null,
+    },
+  ];
 
   return (
     <ViewModalShell
@@ -78,15 +106,7 @@ export function FacturaViewModal({
       }
     >
       <div className={viewModalGridClass}>
-        {[
-          { label: 'Número', value: factura.numero },
-          { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
-          { label: 'Cliente', value: clienteNombre },
-          { label: 'Importe', value: importeFormato },
-          { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
-          { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
-          { label: 'Diferencia', value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null },
-        ].filter(c => c.value != null && c.value !== '').map((c, i) => (
+        {campos.filter((c) => c.value != null && c.value !== '').map((c, i) => (
           <div key={i}>
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
             <p className="mt-1 text-sm">{c.value}</p>
