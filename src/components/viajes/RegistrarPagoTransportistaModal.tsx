@@ -11,7 +11,10 @@ import {
 } from '@/lib/currencyMask';
 import { modalOverlayClass } from '@/lib/modalLayers';
 import { formatViajeImporteForListado } from '@/lib/viajesFlota';
-import { calcularSaldoTransportista } from '@/lib/viajesTransportistaPagos';
+import {
+  PAGO_TRANSPORTISTA_SALDO_ERROR,
+  calcularSaldoTransportista,
+} from '@/lib/viajesTransportistaPagos';
 import type { Viaje } from '@/types/api';
 
 type Props = {
@@ -65,7 +68,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         return;
       }
       if (monto > saldo.saldo) {
-        setFieldErrors({ monto: `El monto supera el saldo pendiente (${formatViajeImporteForListado(saldo.saldo, saldo.moneda)}).` });
+        setFieldErrors({ monto: PAGO_TRANSPORTISTA_SALDO_ERROR });
         return;
       }
     }

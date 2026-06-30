@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   formatNumberForMoneda,
   parseCurrencyForMoneda,
@@ -6,8 +6,25 @@ import {
   maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { isoToFechaHora } from '@/lib/viajeFechaHora';
+import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import {
+  PAGO_TRANSPORTISTA_SALDO_ERROR,
+  calcularSaldoTransportistaDesdeDraft,
+  validarPagosTransportistaDraftForm,
+  type PagosTransportistaDraftFormInput,
+} from '@/lib/viajesTransportistaPagos';
 import type { PagoTransportista } from '@/types/api';
+
+function fechaPagoToInputValue(fecha: string | undefined | null): string {
+  const t = fecha?.trim();
+  if (!t) return new Date().toISOString().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const { fecha: local } = isoToFechaHora(t);
+  return local || new Date().toISOString().slice(0, 10);
+}
 
 export interface PagoTransportistaDraft {
   montoStr: string;
@@ -21,7 +38,7 @@ export function pagoTransportistaDraftFromApi(p: PagoTransportista): PagoTranspo
   return {
     montoStr: p.monto != null ? formatNumberForMoneda(p.monto, moneda) : '',
     moneda,
-    fecha: p.fecha ?? new Date().toISOString().slice(0, 10),
+    fecha: fechaPagoToInputValue(p.fecha),
     observaciones: p.observaciones ?? '',
   };
 }
@@ -31,20 +48,32 @@ export function pagoTransportistaDraftToApi(
 ): PagoTransportista | null {
   const monto = parseCurrencyForMoneda(d.montoStr, d.moneda);
   if (monto == null || monto <= 0) return null;
-  if (!d.fecha.trim()) return null;
+
+  const fechaRaw = d.fecha.trim();
+  const fecha =
+    (fechaRaw ? fechaPagoToInputValue(fechaRaw) : null) ??
+    new Date().toISOString().slice(0, 10);
 
   return {
     monto,
     moneda: d.moneda,
-    fecha: d.fecha.trim(),
+    fecha,
     observaciones: d.observaciones.trim() || undefined,
   };
 }
 
-export function emptyPagoTransportista(): PagoTransportistaDraft {
+export function pagosTransportistaDraftsToApi(
+  rows: PagoTransportistaDraft[],
+): PagoTransportista[] {
+  return rows
+    .map(pagoTransportistaDraftToApi)
+    .filter((p): p is PagoTransportista => p != null);
+}
+
+export function emptyPagoTransportista(moneda: ViajeMonedaCodigo = 'ARS'): PagoTransportistaDraft {
   return {
     montoStr: '',
-    moneda: 'ARS',
+    moneda,
     fecha: new Date().toISOString().slice(0, 10),
     observaciones: '',
   };
@@ -63,14 +92,45 @@ function pagoFieldLabel(label: string, rowIndex: number) {
   );
 }
 
+export type PagosTransportistaSaldoContext = Omit<
+  PagosTransportistaDraftFormInput,
+  'pagosTransportista'
+>;
+
 interface Props {
   rows: PagoTransportistaDraft[];
   onChange: (rows: PagoTransportistaDraft[]) => void;
   className?: string;
+  /** Activa saldo en tiempo real y validación (crear/editar viaje con transportista externo). */
+  saldoContext?: PagosTransportistaSaldoContext | null;
 }
 
-export function PagosTransportistaFieldset({ rows, onChange, className }: Props) {
+export function PagosTransportistaFieldset({ rows, onChange, className, saldoContext }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
+  const monedaAcordada = saldoContext
+    ? (saldoContext.monedaPrecioTransportistaExterno === 'USD' ? 'USD' : 'ARS')
+    : null;
+
+  const draftFormInput = useMemo((): PagosTransportistaDraftFormInput | null => {
+    if (!saldoContext) return null;
+    const monedaFija = saldoContext.monedaPrecioTransportistaExterno === 'USD' ? 'USD' : 'ARS';
+    return {
+      ...saldoContext,
+      pagosTransportista: rows.map((r) => ({ ...r, moneda: monedaFija })),
+    };
+  }, [saldoContext, rows]);
+
+  const saldo = useMemo(
+    () => (draftFormInput ? calcularSaldoTransportistaDesdeDraft(draftFormInput) : null),
+    [draftFormInput],
+  );
+
+  const saldoError = useMemo(
+    () => (draftFormInput ? validarPagosTransportistaDraftForm(draftFormInput) : null),
+    [draftFormInput],
+  );
+
+  const saldoExcedido = saldoError === PAGO_TRANSPORTISTA_SALDO_ERROR;
 
   function update(i: number, patch: Partial<PagoTransportistaDraft>) {
     const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
@@ -90,11 +150,53 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
         <span className={fieldLabelClass}>Pagos al transportista</span>
       </div>
 
+      {saldo && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded border border-black/10 bg-vialto-mist/60 px-3 py-2 text-xs">
+          <span className="text-vialto-steel">
+            Acordado:{' '}
+            <span className="font-medium text-vialto-charcoal">
+              {formatViajeImporteForListado(saldo.totalAcordado, saldo.moneda)}
+            </span>
+          </span>
+          <span className="text-vialto-steel">
+            Pagado:{' '}
+            <span className="font-medium text-vialto-charcoal tabular-nums">
+              {formatViajeImporteForListado(saldo.totalPagado, saldo.moneda)}
+            </span>
+          </span>
+          <span className="text-vialto-steel">
+            Saldo:{' '}
+            <span
+              className={`font-medium tabular-nums ${
+                saldoExcedido ? 'text-red-700' : saldo.pagado ? 'text-emerald-700' : 'text-red-700'
+              }`}
+            >
+              {saldoExcedido
+                ? formatViajeImporteForListado(Math.max(0, saldo.saldo), saldo.moneda)
+                : saldo.pagado
+                  ? 'Pagado'
+                  : formatViajeImporteForListado(saldo.saldo, saldo.moneda)}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {saldoError && (
+        <p
+          role="alert"
+          className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"
+        >
+          {saldoError}
+        </p>
+      )}
+
       {rows.length === 0 && (
         <p className="text-xs text-vialto-steel">Sin pagos registrados.</p>
       )}
 
-      {rows.map((row, i) => (
+      {rows.map((row, i) => {
+        const monedaFila = monedaAcordada ?? row.moneda;
+        return (
         <div key={i} className={pagoRowGridClass}>
           {/* Observaciones (misma posición que descripción en otros gastos) */}
           <div className="flex min-w-0 flex-col gap-1">
@@ -116,31 +218,48 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
               type="text"
               inputMode="decimal"
               value={row.montoStr}
-              onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
+              onChange={(e) =>
+                update(i, {
+                  montoStr: maskCurrencyForMoneda(e.target.value, monedaFila),
+                  ...(monedaAcordada ? { moneda: monedaAcordada } : {}),
+                })
+              }
               placeholder="0.00"
-              className={`${smallInputClass} text-right tabular-nums lg:w-36`}
+              className={`${smallInputClass} text-right tabular-nums lg:w-36 ${
+                saldoExcedido && row.montoStr.trim() ? 'border-red-400' : ''
+              }`}
               aria-label={`Monto pago ${i + 1}`}
+              aria-invalid={saldoExcedido && row.montoStr.trim() ? true : undefined}
             />
+            {saldoExcedido && row.montoStr.trim() ? (
+              <CrudFieldError message={PAGO_TRANSPORTISTA_SALDO_ERROR} />
+            ) : null}
           </div>
 
           {/* Moneda */}
           <div className="flex flex-col gap-1 lg:w-20">
             {pagoFieldLabel('Moneda', i)}
-            <select
-              value={row.moneda}
-              onChange={(e) => {
-                const m = e.target.value as ViajeMonedaCodigo;
-                update(i, {
-                  moneda: m,
-                  montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
-                });
-              }}
-              className={`${smallInputClass} lg:w-20`}
-              aria-label={`Moneda pago ${i + 1}`}
-            >
-              <option value="ARS">ARS</option>
-              <option value="USD">USD</option>
-            </select>
+            {monedaAcordada ? (
+              <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal lg:w-20">
+                {monedaAcordada}
+              </span>
+            ) : (
+              <select
+                value={row.moneda}
+                onChange={(e) => {
+                  const m = e.target.value as ViajeMonedaCodigo;
+                  update(i, {
+                    moneda: m,
+                    montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
+                  });
+                }}
+                className={`${smallInputClass} lg:w-20`}
+                aria-label={`Moneda pago ${i + 1}`}
+              >
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            )}
           </div>
 
           {/* Fecha */}
@@ -172,7 +291,8 @@ export function PagosTransportistaFieldset({ rows, onChange, className }: Props)
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
       <ConfirmDialog
         open={removeIndex !== null}
         title="Eliminar pago"

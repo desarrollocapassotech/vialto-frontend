@@ -48,7 +48,7 @@ import {
   viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
-import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
+import { viajeRequierePagosTransportista, validarPagosTransportistaDraftForm } from '@/lib/viajesTransportistaPagos';
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
@@ -234,6 +234,31 @@ export function ViajeEditModal({
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId: draft.operacionModo === 'externo' ? draft.transportistaId : '',
   });
+
+  const pagosSaldoContext = useMemo(() => {
+    if (!muestraPagosTransportista) return null;
+    return {
+      transportistaId: draft.transportistaId,
+      precioTransportistaExterno: draft.precioTransportistaExterno,
+      monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
+    };
+  }, [
+    muestraPagosTransportista,
+    draft.transportistaId,
+    draft.precioTransportistaExterno,
+    draft.monedaPrecioTransportistaExterno,
+  ]);
+
+  const pagosSaldoError = useMemo(
+    () =>
+      pagosSaldoContext
+        ? validarPagosTransportistaDraftForm({
+            ...pagosSaldoContext,
+            pagosTransportista: draft.pagosTransportista,
+          })
+        : null,
+    [pagosSaldoContext, draft.pagosTransportista],
+  );
 
   return (
     <>
@@ -692,13 +717,20 @@ export function ViajeEditModal({
                   onChange={(rows) =>
                     setDraft((p) => (p ? { ...p, pagosTransportista: rows } : p))
                   }
+                  saldoContext={pagosSaldoContext}
                 />
                 <button
                   type="button"
                   onClick={() =>
                     setDraft((p) =>
                       p
-                        ? { ...p, pagosTransportista: [...p.pagosTransportista, emptyPagoTransportista()] }
+                        ? {
+                            ...p,
+                            pagosTransportista: [
+                              ...p.pagosTransportista,
+                              emptyPagoTransportista(p.monedaPrecioTransportistaExterno),
+                            ],
+                          }
                         : p,
                     )
                   }
@@ -762,7 +794,8 @@ export function ViajeEditModal({
             <button
               type="button"
               onClick={onSave}
-              disabled={saving}
+              disabled={saving || !!pagosSaldoError}
+              title={pagosSaldoError ?? undefined}
               className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
             >
               {saving && <Spinner className="h-3.5 w-3.5" />}
