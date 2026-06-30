@@ -235,7 +235,7 @@ export function IngresosStockTenantPage({
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
-      if (!row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Ingresá el lote.';
+      if (!row.sinLote && !row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Ingresá el lote.';
       if (!row.fechaVencimiento)
         ferrs[`row_${idx}_fechaVencimiento`] = 'Ingresá la fecha de vencimiento.';
       const b = parseFloat(row.bultos) || 0;
@@ -273,7 +273,8 @@ export function IngresosStockTenantPage({
             presentacionId: row.presentacionId,
             bultos: parseFloat(row.bultos) || 0,
             sueltas: parseFloat(row.sueltas) || 0,
-            lote: row.lote.trim(),
+            sinLote: row.sinLote,
+            lote: row.sinLote ? undefined : row.lote.trim(),
             fechaVencimiento: row.fechaVencimiento,
           })),
         }),

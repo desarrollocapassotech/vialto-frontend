@@ -17,6 +17,7 @@ export type IngresoRow = {
   bultos: string;
   sueltas: string;
   lote: string;
+  sinLote: boolean;
   fechaVencimiento: string;
 };
 
@@ -28,6 +29,7 @@ export function emptyRow(): IngresoRow {
     bultos: '',
     sueltas: '',
     lote: '',
+    sinLote: false,
     fechaVencimiento: '',
   };
 }
@@ -42,7 +44,7 @@ function isRowComplete(row: IngresoRow): boolean {
   return (
     Boolean(row.productoId) &&
     Boolean(row.presentacionId) &&
-    row.lote.trim().length > 0 &&
+    (row.sinLote || row.lote.trim().length > 0) &&
     Boolean(row.fechaVencimiento) &&
     (b > 0 || s > 0)
   );
@@ -259,21 +261,50 @@ export function IngresoWizardStep3({
               {/* Lote y vencimiento */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className={LABEL}>
-                    Lote <span className="text-red-500">*</span>
-                  </label>
-                  <LoteDatalistInput
-                    productoId={row.productoId}
-                    clienteId={clienteId}
-                    depositoId={depositoId}
-                    lotesBase={lotesBase}
-                    tenantId={tenantId}
-                    value={row.lote}
-                    onChange={(v) => onUpdateRow(row._key, { lote: v })}
-                    className={INPUT}
-                    error={Boolean(fieldErrors[`row_${idx}_lote`])}
-                  />
-                  <CrudFieldError message={fieldErrors[`row_${idx}_lote`]} />
+                  <div className="flex items-center justify-between">
+                    <label className={LABEL}>
+                      Lote {!row.sinLote && <span className="text-red-500">*</span>}
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-vialto-steel cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={row.sinLote}
+                        onChange={(e) =>
+                          onUpdateRow(row._key, {
+                            sinLote: e.target.checked,
+                            lote: e.target.checked ? '' : row.lote,
+                          })
+                        }
+                        className="h-3.5 w-3.5"
+                      />
+                      Sin lote
+                    </label>
+                  </div>
+
+                  {row.sinLote ? (
+                    <input
+                      type="text"
+                      value=""
+                      disabled
+                      placeholder="Escribí o seleccioná un lote…"
+                      className={`${INPUT} disabled:bg-vialto-mist/40 disabled:text-vialto-steel disabled:cursor-not-allowed`}
+                    />
+                  ) : (
+                    <>
+                      <LoteDatalistInput
+                        productoId={row.productoId}
+                        clienteId={clienteId}
+                        depositoId={depositoId}
+                        lotesBase={lotesBase}
+                        tenantId={tenantId}
+                        value={row.lote}
+                        onChange={(v) => onUpdateRow(row._key, { lote: v })}
+                        className={INPUT}
+                        error={Boolean(fieldErrors[`row_${idx}_lote`])}
+                      />
+                      <CrudFieldError message={fieldErrors[`row_${idx}_lote`]} />
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-1">
