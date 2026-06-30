@@ -1,44 +1,50 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
-} from '@/lib/listadoTabla';
-import type { Producto, PaginatedMeta } from '@/types/api';
-import { ProductoModal } from '@/components/stock/ProductoModal';
-import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
+} from "@/lib/listadoTabla";
+import type { Producto, PaginatedMeta } from "@/types/api";
+import { ProductoModal } from "@/components/stock/ProductoModal";
+import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 
 type Paginated = { items: Producto[]; meta: PaginatedMeta };
 
 type ModalState =
-  | { mode: 'closed' }
-  | { mode: 'create' }
-  | { mode: 'view'; producto: Producto }
-  | { mode: 'edit'; producto: Producto };
+  | { mode: "closed" }
+  | { mode: "create" }
+  | { mode: "view"; producto: Producto }
+  | { mode: "edit"; producto: Producto };
 
 export function ProductosTenantPage() {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
   const { user } = useUser();
-  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(
+    orgRole,
+    user?.publicMetadata,
+  );
 
   const [rows, setRows] = useState<Producto[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [codigoFiltroInput, setCodigoFiltroInput] = useState('');
-  const [codigoFiltro, setCodigoFiltro] = useState('');
-  const [nombreFiltroInput, setNombreFiltroInput] = useState('');
-  const [nombreFiltro, setNombreFiltro] = useState('');
-  const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
-  const [modal, setModal] = useState<ModalState>({ mode: 'closed' });
+  const [codigoFiltroInput, setCodigoFiltroInput] = useState("");
+  const [codigoFiltro, setCodigoFiltro] = useState("");
+  const [nombreFiltroInput, setNombreFiltroInput] = useState("");
+  const [nombreFiltro, setNombreFiltro] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
+  const [modal, setModal] = useState<ModalState>({ mode: "closed" });
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -48,15 +54,24 @@ export function ProductosTenantPage() {
       pageSize: String(pageSize),
       filtroActivo,
     });
-    if (codigoFiltro) params.set('codigo', codigoFiltro);
-    if (nombreFiltro) params.set('q', nombreFiltro);
+    if (codigoFiltro) params.set("codigo", codigoFiltro);
+    if (nombreFiltro) params.set("q", nombreFiltro);
     const data = await apiJson<Paginated>(
       `/api/stock/productos/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
     setMeta(data.meta);
-  }, [getToken, isLoaded, isSignedIn, page, pageSize, codigoFiltro, nombreFiltro, filtroActivo]);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    codigoFiltro,
+    nombreFiltro,
+    filtroActivo,
+  ]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -69,7 +84,7 @@ export function ProductosTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'stock'));
+          setError(friendlyError(e, "stock"));
         }
       }
     })();
@@ -92,11 +107,11 @@ export function ProductosTenantPage() {
       await apiJson<Producto>(
         `/api/stock/productos/${encodeURIComponent(row.id)}`,
         () => getToken(),
-        { method: 'PATCH', body: JSON.stringify({ activo: !row.activo }) },
+        { method: "PATCH", body: JSON.stringify({ activo: !row.activo }) },
       );
       await load();
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }
 
@@ -104,16 +119,16 @@ export function ProductosTenantPage() {
     let n = 0;
     if (codigoFiltro.trim()) n += 1;
     if (nombreFiltro.trim()) n += 1;
-    if (filtroActivo !== 'todos') n += 1;
+    if (filtroActivo !== "todos") n += 1;
     return n;
   }, [codigoFiltro, nombreFiltro, filtroActivo]);
 
   function limpiarFiltros() {
-    setCodigoFiltroInput('');
-    setCodigoFiltro('');
-    setNombreFiltroInput('');
-    setNombreFiltro('');
-    setFiltroActivo('todos');
+    setCodigoFiltroInput("");
+    setCodigoFiltro("");
+    setNombreFiltroInput("");
+    setNombreFiltro("");
+    setFiltroActivo("todos");
   }
 
   const productosListadoFiltros = (
@@ -125,11 +140,11 @@ export function ProductosTenantPage() {
             value={codigoFiltroInput}
             onChange={(e) => setCodigoFiltroInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') setCodigoFiltro(codigoFiltroInput.trim());
+              if (e.key === "Enter") setCodigoFiltro(codigoFiltroInput.trim());
             }}
             placeholder="Buscar…"
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
-              codigoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+              codigoFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
             aria-label="Filtrar por código de producto"
           />
@@ -149,11 +164,11 @@ export function ProductosTenantPage() {
             value={nombreFiltroInput}
             onChange={(e) => setNombreFiltroInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') setNombreFiltro(nombreFiltroInput.trim());
+              if (e.key === "Enter") setNombreFiltro(nombreFiltroInput.trim());
             }}
             placeholder="Buscar…"
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              nombreFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+              nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
             aria-label="Filtrar por nombre de producto"
           />
@@ -166,14 +181,16 @@ export function ProductosTenantPage() {
           </button>
         </div>
       </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Estado" active={filtroActivo !== 'todos'}>
+      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
         <select
           value={filtroActivo}
           onChange={(e) =>
-            setFiltroActivo(e.target.value as 'todos' | 'activos' | 'inactivos')
+            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
           }
           className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            filtroActivo !== 'todos' ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            filtroActivo !== "todos"
+              ? "text-vialto-fire"
+              : "text-vialto-charcoal"
           }`}
           aria-label="Filtrar por estado del producto"
         >
@@ -191,14 +208,14 @@ export function ProductosTenantPage() {
         Productos
       </h1>
       <p className="mt-2 text-vialto-steel max-w-2xl">
-        {'Catálogo de productos del depósito.'}
+        {"Catálogo de productos del depósito."}
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
         {puedeGestionar && (
           <button
             type="button"
-            onClick={() => setModal({ mode: 'create' })}
+            onClick={() => setModal({ mode: "create" })}
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
             Nuevo producto
@@ -231,11 +248,14 @@ export function ProductosTenantPage() {
                     value={codigoFiltroInput}
                     onChange={(e) => setCodigoFiltroInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') setCodigoFiltro(codigoFiltroInput.trim());
+                      if (e.key === "Enter")
+                        setCodigoFiltro(codigoFiltroInput.trim());
                     }}
                     placeholder="Buscar…"
                     className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
-                      codigoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      codigoFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
                     }`}
                     aria-label="Filtrar por código de producto"
                   />
@@ -261,11 +281,14 @@ export function ProductosTenantPage() {
                     value={nombreFiltroInput}
                     onChange={(e) => setNombreFiltroInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') setNombreFiltro(nombreFiltroInput.trim());
+                      if (e.key === "Enter")
+                        setNombreFiltro(nombreFiltroInput.trim());
                     }}
                     placeholder="Buscar…"
                     className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      nombreFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      nombreFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
                     }`}
                     aria-label="Filtrar por nombre de producto"
                   />
@@ -282,16 +305,20 @@ export function ProductosTenantPage() {
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Estado"
-                filterActive={filtroActivo !== 'todos'}
+                filterActive={filtroActivo !== "todos"}
                 filterSignature={filtroActivo}
               >
                 <select
                   value={filtroActivo}
                   onChange={(e) =>
-                    setFiltroActivo(e.target.value as 'todos' | 'activos' | 'inactivos')
+                    setFiltroActivo(
+                      e.target.value as "todos" | "activos" | "inactivos",
+                    )
                   }
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroActivo !== 'todos' ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    filtroActivo !== "todos"
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
                   }`}
                   aria-label="Filtrar por estado del producto"
                 >
@@ -301,19 +328,24 @@ export function ProductosTenantPage() {
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>Acciones</th>
+            <th
+              scope="col"
+              className={`${listadoTablaThClass} text-right align-top`}
+            >
+              Acciones
+            </th>
           </tr>
         }
         columns={[
           {
-            id: 'codigo',
-            header: 'Código',
-            cell: (r) => r.codigo ?? '—',
+            id: "codigo",
+            header: "Código",
+            cell: (r) => r.codigo ?? "—",
             tdClassName: `${listadoTablaTdClass} font-mono text-sm text-vialto-steel`,
           },
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (r) => (
               <>
@@ -321,24 +353,26 @@ export function ProductosTenantPage() {
                   {r.nombre}
                 </div>
                 {r.descripcion?.trim() ? (
-                  <div className="mt-0.5 text-xs text-vialto-steel line-clamp-2">{r.descripcion}</div>
+                  <div className="mt-0.5 text-xs text-vialto-steel line-clamp-2">
+                    {r.descripcion}
+                  </div>
                 ) : null}
               </>
             ),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'estado',
-            header: 'Estado',
+            id: "estado",
+            header: "Estado",
             cell: (r) => (
               <span
                 className={
                   r.activo
-                    ? 'text-xs uppercase tracking-wider text-emerald-800'
-                    : 'text-xs uppercase tracking-wider text-vialto-steel'
+                    ? "text-xs uppercase tracking-wider text-emerald-800"
+                    : "text-xs uppercase tracking-wider text-vialto-steel"
                 }
               >
-                {r.activo ? 'Activo' : 'Inactivo'}
+                {r.activo ? "Activo" : "Inactivo"}
               </span>
             ),
             tdClassName: listadoTablaTdClass,
@@ -348,15 +382,15 @@ export function ProductosTenantPage() {
         rowKey={(r) => r.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los productos.'
-            : 'No hay productos que coincidan con el criterio.'
+            ? "No se pudieron cargar los productos."
+            : "No hay productos que coincidan con el criterio."
         }
         loadingMessage="Cargando…"
         renderActions={(r) => (
           <>
             <button
               type="button"
-              onClick={() => setModal({ mode: 'view', producto: r })}
+              onClick={() => setModal({ mode: "view", producto: r })}
               className={listadoTablaAccionClass}
             >
               Ver
@@ -387,85 +421,59 @@ export function ProductosTenantPage() {
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
       />
 
-      {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || rows === null}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || rows === null}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
+      {meta && rows !== null && (
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 
-      {modal.mode === 'create' && (
+      {modal.mode === "create" && (
         <ProductoModal
           modo="create"
           getToken={getToken}
-          onClose={() => setModal({ mode: 'closed' })}
+          onClose={() => setModal({ mode: "closed" })}
           onSaved={async () => {
-            setModal({ mode: 'closed' });
+            setModal({ mode: "closed" });
             await load();
           }}
         />
       )}
 
-      {modal.mode === 'view' && (
+      {modal.mode === "view" && (
         <ProductoModal
           modo="view"
           productoInicial={modal.producto}
           getToken={getToken}
-          onClose={() => setModal({ mode: 'closed' })}
+          onClose={() => setModal({ mode: "closed" })}
           onSaved={() => {}}
-          onEdit={puedeGestionar ? () => setModal({ mode: 'edit', producto: modal.producto }) : undefined}
+          onEdit={
+            puedeGestionar
+              ? () => setModal({ mode: "edit", producto: modal.producto })
+              : undefined
+          }
         />
       )}
 
-      {modal.mode === 'edit' && (
+      {modal.mode === "edit" && (
         <ProductoModal
           modo="edit"
           productoInicial={modal.producto}
           getToken={getToken}
-          onClose={() => setModal({ mode: 'closed' })}
+          onClose={() => setModal({ mode: "closed" })}
           onSaved={async () => {
-            setModal({ mode: 'closed' });
+            setModal({ mode: "closed" });
             await load();
           }}
         />
       )}
-
     </div>
   );
 }

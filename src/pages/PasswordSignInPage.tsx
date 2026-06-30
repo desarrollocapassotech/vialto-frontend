@@ -1,25 +1,25 @@
-import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useAuth, useClerk, useSignIn } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 type ClerkLikeError = {
   errors?: Array<{ code?: string; longMessage?: string; message?: string }>;
 };
 
 function getClerkErrorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null) {
+  if (typeof error === "object" && error !== null) {
     const maybe = error as ClerkLikeError;
     const first = maybe.errors?.[0];
     if (first?.longMessage) return first.longMessage;
     if (first?.message) return first.message;
   }
-  return 'No se pudo iniciar sesión. Revisá las credenciales e intentá de nuevo.';
+  return "No se pudo iniciar sesión. Revisá las credenciales e intentá de nuevo.";
 }
 
 function isAlreadySignedInError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const code = (error as ClerkLikeError).errors?.[0]?.code ?? '';
-  return code.includes('session') || code.includes('signed_in');
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as ClerkLikeError).errors?.[0]?.code ?? "";
+  return code.includes("session") || code.includes("signed_in");
 }
 
 export function PasswordSignInPage() {
@@ -27,20 +27,20 @@ export function PasswordSignInPage() {
   const { isLoaded, signIn, setActive } = useSignIn();
   const clerk = useClerk();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [mfaActivo, setMfaActivo] = useState(false);
-  const [mfaCodigo, setMfaCodigo] = useState('');
+  const [mfaCodigo, setMfaCodigo] = useState("");
 
   // Si ya está autenticado, ir al home
   useEffect(() => {
     if (authLoaded && isSignedIn) {
-      navigate('/', { replace: true });
+      navigate("/", { replace: true });
     }
   }, [authLoaded, isSignedIn]);
 
@@ -48,12 +48,14 @@ export function PasswordSignInPage() {
   useEffect(() => {
     if (!isLoaded) return;
     const allSessions: any[] = (clerk.client as any)?.sessions ?? [];
-    const pending = allSessions.find((s) => s.status === 'pending' && s.currentTask?.key);
+    const pending = allSessions.find(
+      (s) => s.status === "pending" && s.currentTask?.key,
+    );
     if (pending) {
       const taskRoutes: Record<string, string> = {
-        'setup-mfa': '/tasks/setup-mfa',
-        'choose-organization': '/tasks/choose-organization',
-        'reset-password': '/tasks/reset-password',
+        "setup-mfa": "/tasks/setup-mfa",
+        "choose-organization": "/tasks/choose-organization",
+        "reset-password": "/tasks/reset-password",
       };
       const path = taskRoutes[pending.currentTask.key];
       if (path) navigate(path, { replace: true });
@@ -63,9 +65,11 @@ export function PasswordSignInPage() {
   // Si hay un sign-in previo en estado needs_second_factor (MFA pendiente), retomarlo
   useEffect(() => {
     if (!isLoaded || !signIn) return;
-    if (signIn.status === 'needs_second_factor') {
+    if (signIn.status === "needs_second_factor") {
       setMfaActivo(true);
-      setInfo('Hay un inicio de sesión pendiente. Ingresá el código de verificación.');
+      setInfo(
+        "Hay un inicio de sesión pendiente. Ingresá el código de verificación.",
+      );
     }
   }, [isLoaded, signIn?.status]);
 
@@ -75,49 +79,64 @@ export function PasswordSignInPage() {
       password,
     });
 
-    if (result.status === 'complete') {
+    if (result.status === "complete") {
       if (result.createdSessionId) {
         await setActive!({ session: result.createdSessionId });
       }
-      navigate('/', { replace: true });
+      navigate("/", { replace: true });
       return;
     }
 
-    if (result.status === 'needs_second_factor') {
-      const hasEmailFactor = signIn!.supportedSecondFactors?.some((f) => f.strategy === 'email_code');
+    if (result.status === "needs_second_factor") {
+      const hasEmailFactor = signIn!.supportedSecondFactors?.some(
+        (f) => f.strategy === "email_code",
+      );
       if (!hasEmailFactor) {
-        setError('Se requiere un segundo factor, pero no está disponible el envío por email.');
+        setError(
+          "Se requiere un segundo factor, pero no está disponible el envío por email.",
+        );
         return;
       }
-      await signIn!.prepareSecondFactor({ strategy: 'email_code' });
-      setMfaCodigo('');
+      await signIn!.prepareSecondFactor({ strategy: "email_code" });
+      setMfaCodigo("");
       setMfaActivo(true);
-      setInfo('Te enviamos un código de verificación por email.');
+      setInfo("Te enviamos un código de verificación por email.");
       setError(null);
       return;
     }
 
-    if (result.status === 'needs_first_factor') {
-      setError('Se requiere información adicional para iniciar sesión.');
+    if (result.status === "needs_first_factor") {
+      setError("Se requiere información adicional para iniciar sesión.");
       return;
     }
-    if (result.status === 'needs_new_password') {
-      setError('Debes establecer una nueva contraseña.');
+    if (result.status === "needs_new_password") {
+      setError("Debes establecer una nueva contraseña.");
       return;
     }
-    if (result.status === 'needs_identifier') {
-      setError('Se requiere un identificador válido.');
+    if (result.status === "needs_identifier") {
+      setError("Se requiere un identificador válido.");
       return;
     }
 
-    setError(`Estado de autenticación inesperado: ${result.status}. Revisá tus credenciales.`);
+    setError(
+      `Estado de autenticación inesperado: ${result.status}. Revisá tus credenciales.`,
+    );
   }
 
   async function onSubmit() {
     if (!isLoaded) return;
-    if (authLoaded && isSignedIn) { navigate('/', { replace: true }); return; }
-    if (!email.trim()) { setError('Ingresá un email.'); return; }
-    if (!password) { setError('Ingresá una contraseña.'); return; }
+    if (authLoaded && isSignedIn) {
+      navigate("/", { replace: true });
+      return;
+    }
+    if (!email.trim()) {
+      setError("Ingresá un email.");
+      return;
+    }
+    if (!password) {
+      setError("Ingresá una contraseña.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -132,9 +151,11 @@ export function PasswordSignInPage() {
         if (existing && setActive) {
           try {
             await setActive({ session: existing.id });
-            navigate('/', { replace: true });
+            navigate("/", { replace: true });
             return;
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
         }
         // Destruir todas las sesiones del cliente y reintentar
         try {
@@ -144,17 +165,21 @@ export function PasswordSignInPage() {
           if (isAlreadySignedInError(retryErr)) {
             // Hay una sesión pending con tarea que no se puede limpiar — redirigir a la tarea
             const allSessions: any[] = (clerk.client as any)?.sessions ?? [];
-            const pending = allSessions.find((s) => s.status === 'pending' && s.currentTask?.key);
+            const pending = allSessions.find(
+              (s) => s.status === "pending" && s.currentTask?.key,
+            );
             const taskRoutes: Record<string, string> = {
-              'setup-mfa': '/tasks/setup-mfa',
-              'choose-organization': '/tasks/choose-organization',
-              'reset-password': '/tasks/reset-password',
+              "setup-mfa": "/tasks/setup-mfa",
+              "choose-organization": "/tasks/choose-organization",
+              "reset-password": "/tasks/reset-password",
             };
             const path = pending ? taskRoutes[pending.currentTask.key] : null;
             if (path) {
               navigate(path, { replace: true });
             } else {
-              setError('Hay una sesión activa que no se puede limpiar. Borrá las cookies del sitio (DevTools → Application → Cookies → obliging-sunfish-91.clerk.accounts.dev) e intentá de nuevo.');
+              setError(
+                "Hay una sesión activa que no se puede limpiar. Borrá las cookies del sitio (DevTools → Application → Cookies → obliging-sunfish-91.clerk.accounts.dev) e intentá de nuevo.",
+              );
             }
           } else {
             setError(getClerkErrorMessage(retryErr));
@@ -171,7 +196,7 @@ export function PasswordSignInPage() {
   async function onMfaSubmit() {
     if (!isLoaded || !signIn) return;
     if (!mfaCodigo.trim()) {
-      setError('Ingresá el código de verificación que recibiste por email.');
+      setError("Ingresá el código de verificación que recibiste por email.");
       return;
     }
 
@@ -179,19 +204,19 @@ export function PasswordSignInPage() {
     setError(null);
     try {
       const result = await signIn.attemptSecondFactor({
-        strategy: 'email_code',
+        strategy: "email_code",
         code: mfaCodigo.trim(),
       });
 
-      if (result.status === 'complete') {
+      if (result.status === "complete") {
         if (result.createdSessionId) {
           await setActive({ session: result.createdSessionId });
         }
-        navigate('/', { replace: true });
+        navigate("/", { replace: true });
         return;
       }
 
-      setError('No se pudo completar la verificación por email.');
+      setError("No se pudo completar la verificación por email.");
     } catch (e) {
       setError(getClerkErrorMessage(e));
     } finally {
@@ -205,9 +230,9 @@ export function PasswordSignInPage() {
     setGoogleLoading(true);
     try {
       await signIn.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: '/#/sso-callback',
-        redirectUrlComplete: '/#/',
+        strategy: "oauth_google",
+        redirectUrl: "/#/sso-callback",
+        redirectUrlComplete: "/#/",
       });
     } catch (e) {
       setError(getClerkErrorMessage(e));
@@ -265,7 +290,7 @@ export function PasswordSignInPage() {
               disabled={loading}
               className="h-10 bg-vialto-fire hover:bg-vialto-bright text-sm uppercase tracking-wider text-white disabled:opacity-60"
             >
-              {loading ? 'Verificando…' : 'Verificar'}
+              {loading ? "Verificando…" : "Verificar"}
             </button>
           </form>
 
@@ -273,7 +298,7 @@ export function PasswordSignInPage() {
             type="button"
             onClick={() => {
               setMfaActivo(false);
-              setMfaCodigo('');
+              setMfaCodigo("");
               setError(null);
               setInfo(null);
             }}
@@ -305,8 +330,13 @@ export function PasswordSignInPage() {
           disabled={googleLoading}
           className="mt-5 h-10 w-full inline-flex items-center justify-center gap-2 border border-white/20 bg-white text-sm uppercase tracking-wider text-vialto-charcoal hover:bg-white/90"
         >
-          <img src="/google-logo.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
-          {googleLoading ? 'Redirigiendo…' : 'Ingresar con Google'}
+          <img
+            src="/google-logo.png"
+            alt=""
+            aria-hidden="true"
+            className="h-4 w-4 object-contain"
+          />
+          {googleLoading ? "Redirigiendo…" : "Ingresar con Google"}
         </button>
         <p className="mt-2 text-center text-[11px] text-white/55">
           Serás redirigido a Google para continuar.
@@ -345,7 +375,7 @@ export function PasswordSignInPage() {
             </span>
             <div className="relative">
               <input
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 className="h-10 w-full border border-white/15 bg-white px-3 pr-24 text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -357,7 +387,7 @@ export function PasswordSignInPage() {
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal"
               >
-                {showPassword ? 'Ocultar' : 'Mostrar'}
+                {showPassword ? "Ocultar" : "Mostrar"}
               </button>
             </div>
           </label>
@@ -367,12 +397,15 @@ export function PasswordSignInPage() {
             disabled={loading}
             className="h-10 bg-vialto-fire hover:bg-vialto-bright text-sm uppercase tracking-wider text-white disabled:opacity-60"
           >
-            {loading ? 'Ingresando…' : 'Ingresar'}
+            {loading ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
 
         <div className="mt-4 flex items-center justify-between text-sm">
-          <Link to="/sign-up" className="text-vialto-bright hover:text-vialto-light">
+          <Link
+            to="/sign-up"
+            className="text-vialto-bright hover:text-vialto-light"
+          >
             Crear cuenta
           </Link>
         </div>

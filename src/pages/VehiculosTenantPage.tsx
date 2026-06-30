@@ -1,13 +1,17 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
-import { apiJson } from '@/lib/api';
-import { labelVehiculoTipo } from '@/lib/labels';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { PaginatedMeta, Vehiculo } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
+import { apiJson } from "@/lib/api";
+import { labelVehiculoTipo } from "@/lib/labels";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { PaginatedMeta, Vehiculo } from "@/types/api";
 
 type VehiculosPaginatedResponse = {
   items: Vehiculo[];
@@ -21,8 +25,10 @@ export function VehiculosTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(null);
-  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState('');
+  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(
+    null,
+  );
+  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -42,7 +48,7 @@ export function VehiculosTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'vehiculos'));
+          setError(friendlyError(e, "vehiculos"));
         }
       }
     })();
@@ -76,28 +82,28 @@ export function VehiculosTenantPage() {
         className="mt-8"
         columns={[
           {
-            id: 'patente',
-            header: 'Patente',
+            id: "patente",
+            header: "Patente",
             primary: true,
             cell: (v) => v.patente,
             tdClassName: `${listadoTablaTdClass} font-[family-name:var(--font-ui)] tracking-wider font-semibold`,
           },
           {
-            id: 'tipo',
-            header: 'Tipo',
+            id: "tipo",
+            header: "Tipo",
             cell: (v) => labelVehiculoTipo(v.tipo),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'marca',
-            header: 'Marca',
-            cell: (v) => v.marca ?? '—',
+            id: "marca",
+            header: "Marca",
+            cell: (v) => v.marca ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'modelo',
-            header: 'Modelo',
-            cell: (v) => v.modelo ?? '—',
+            id: "modelo",
+            header: "Modelo",
+            cell: (v) => v.modelo ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
@@ -105,8 +111,8 @@ export function VehiculosTenantPage() {
         rowKey={(v) => v.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los vehículos.'
-            : 'Todavía no tenés vehículos cargados.'
+            ? "No se pudieron cargar los vehículos."
+            : "Todavía no tenés vehículos cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(v) => (
@@ -132,45 +138,16 @@ export function VehiculosTenantPage() {
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 
@@ -180,7 +157,7 @@ export function VehiculosTenantPage() {
           patenteTitulo={viewingVehiculoPatente}
           onClose={() => {
             setViewingVehiculoId(null);
-            setViewingVehiculoPatente('');
+            setViewingVehiculoPatente("");
           }}
           editTo={`/vehiculos/${encodeURIComponent(viewingVehiculoId)}/editar`}
         />

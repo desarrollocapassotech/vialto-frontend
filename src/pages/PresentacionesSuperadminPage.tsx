@@ -1,14 +1,24 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Presentacion } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  useMemo,
+} from "react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { Presentacion } from "@/types/api";
 
 type FormState = { nombre: string; activo: boolean };
 
@@ -21,16 +31,23 @@ export function PresentacionesSuperadminPage() {
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ nombre: '', activo: true });
+  const [form, setForm] = useState<FormState>({ nombre: "", activo: true });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const editing = rows?.find((r) => r.id === editingId) ?? null;
-  const baseUrl = '/api/platform/stock/presentaciones';
-  const qs = filtroEmpresa ? `?tenantId=${encodeURIComponent(filtroEmpresa)}` : '';
+  const baseUrl = "/api/platform/stock/presentaciones";
+  const qs = filtroEmpresa
+    ? `?tenantId=${encodeURIComponent(filtroEmpresa)}`
+    : "";
 
   const load = useCallback(async () => {
     if (!filtroEmpresa) return;
-    const data = await apiJson<Presentacion[]>(`${baseUrl}${qs}`, () => getToken());
+    const data = await apiJson<Presentacion[]>(`${baseUrl}${qs}`, () =>
+      getToken(),
+    );
     setRows(data);
   }, [baseUrl, qs, filtroEmpresa, getToken]);
 
@@ -49,7 +66,7 @@ export function PresentacionesSuperadminPage() {
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'plataforma'));
+          setError(friendlyError(e, "plataforma"));
         }
       }
     })();
@@ -67,14 +84,18 @@ export function PresentacionesSuperadminPage() {
       setForm({ nombre: editing.nombre, activo: editing.activo });
       return;
     }
-    setForm({ nombre: '', activo: true });
+    setForm({ nombre: "", activo: true });
   }, [editing, isFormOpen]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtroEmpresa]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!filtroEmpresa) return;
     if (!form.nombre.trim()) {
-      setFieldErrors({ nombre: 'Ingresá el nombre de la presentación.' });
+      setFieldErrors({ nombre: "Ingresá el nombre de la presentación." });
       return;
     }
     setFieldErrors({});
@@ -86,11 +107,11 @@ export function PresentacionesSuperadminPage() {
         await apiJson<Presentacion>(
           `${baseUrl}/${encodeURIComponent(editingId)}${qs}`,
           () => getToken(),
-          { method: 'PATCH', body: JSON.stringify(payload) },
+          { method: "PATCH", body: JSON.stringify(payload) },
         );
       } else {
         await apiJson<Presentacion>(`${baseUrl}${qs}`, () => getToken(), {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(payload),
         });
       }
@@ -98,24 +119,52 @@ export function PresentacionesSuperadminPage() {
       setIsFormOpen(false);
       setEditingId(null);
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
     } finally {
       setSaving(false);
     }
   }
 
   async function eliminar(row: Presentacion) {
-    if (!filtroEmpresa || !window.confirm(`¿Eliminar la presentación "${row.nombre}"?`)) return;
+    if (
+      !filtroEmpresa ||
+      !window.confirm(`¿Eliminar la presentación "${row.nombre}"?`)
+    )
+      return;
     setError(null);
     try {
-      await apiJson(`${baseUrl}/${encodeURIComponent(row.id)}${qs}`, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(
+        `${baseUrl}/${encodeURIComponent(row.id)}${qs}`,
+        () => getToken(),
+        {
+          method: "DELETE",
+        },
+      );
       await load();
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
     }
   }
+
+  const meta = useMemo(() => {
+    if (!rows) return null;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [rows, page, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (!rows) return null;
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -127,7 +176,11 @@ export function PresentacionesSuperadminPage() {
       </p>
 
       <div className="mt-6">
-        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
+        <EmpresaFilterBar
+          tenants={tenants}
+          value={filtroEmpresa}
+          onChange={onChangeTenant}
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
@@ -151,57 +204,75 @@ export function PresentacionesSuperadminPage() {
       )}
 
       {!filtroEmpresa && (
-        <p className="mt-8 text-sm text-vialto-steel">Elegí una empresa para ver sus presentaciones.</p>
+        <p className="mt-8 text-sm text-vialto-steel">
+          Elegí una empresa para ver sus presentaciones.
+        </p>
       )}
 
       {filtroEmpresa && (
-        <ListadoDatos
-          className="mt-4"
-          columns={[
-            {
-              id: 'nombre',
-              header: 'Nombre',
-              primary: true,
-              cell: (row) => row.nombre,
-              tdClassName: `${listadoTablaTdClass} font-medium`,
-            },
-            {
-              id: 'estado',
-              header: 'Estado',
-              cell: (row) => (row.activo ? 'Activa' : 'Inactiva'),
-              tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-            },
-          ]}
-          rows={error ? [] : rows}
-          rowKey={(row) => row.id}
-          emptyMessage={
-            error
-              ? 'No se pudieron cargar las presentaciones.'
-              : 'No hay presentaciones para esta empresa.'
-          }
-          loadingMessage="Cargando…"
-          renderActions={(row) => (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingId(row.id);
-                  setIsFormOpen(true);
+        <>
+          <ListadoDatos
+            className="mt-4"
+            columns={[
+              {
+                id: "nombre",
+                header: "Nombre",
+                primary: true,
+                cell: (row) => row.nombre,
+                tdClassName: `${listadoTablaTdClass} font-medium`,
+              },
+              {
+                id: "estado",
+                header: "Estado",
+                cell: (row) => (row.activo ? "Activa" : "Inactiva"),
+                tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+              },
+            ]}
+            rows={error ? [] : paginatedRows}
+            rowKey={(row) => row.id}
+            emptyMessage={
+              error
+                ? "No se pudieron cargar las presentaciones."
+                : "No hay presentaciones para esta empresa."
+            }
+            loadingMessage="Cargando…"
+            renderActions={(row) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(row.id);
+                    setIsFormOpen(true);
+                  }}
+                  className={listadoTablaAccionClass}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void eliminar(row)}
+                  className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+                >
+                  Eliminar
+                </button>
+              </>
+            )}
+          />
+
+          {meta && (rows?.length ?? 0) > 0 && (
+            <div className="mt-4">
+              <ListadoPagination
+                meta={meta}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
                 }}
-                className={listadoTablaAccionClass}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => void eliminar(row)}
-                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-              >
-                Eliminar
-              </button>
-            </>
+              />
+            </div>
           )}
-        />
+        </>
       )}
 
       {isFormOpen && filtroEmpresa && (
@@ -211,14 +282,16 @@ export function PresentacionesSuperadminPage() {
             className="w-full max-w-md rounded border border-black/10 bg-white p-5 shadow-lg"
           >
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide mb-4">
-              {editingId ? 'Editar presentación' : 'Nueva presentación'}
+              {editingId ? "Editar presentación" : "Nueva presentación"}
             </h2>
             <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
               Nombre <span className="text-red-500">*</span>
               <input
                 value={form.nombre}
-                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                className={`h-9 border px-2 text-sm normal-case tracking-normal ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, nombre: e.target.value }))
+                }
+                className={`h-9 border px-2 text-sm normal-case tracking-normal ${fieldErrors.nombre ? "border-red-400" : "border-black/15"}`}
                 autoFocus
               />
             </label>
@@ -228,7 +301,9 @@ export function PresentacionesSuperadminPage() {
                 <input
                   type="checkbox"
                   checked={form.activo}
-                  onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, activo: e.target.checked }))
+                  }
                   className="h-4 w-4"
                 />
                 Activa
@@ -238,7 +313,10 @@ export function PresentacionesSuperadminPage() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => { setIsFormOpen(false); setFieldErrors({}); }}
+                onClick={() => {
+                  setIsFormOpen(false);
+                  setFieldErrors({});
+                }}
                 className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
               >
                 Cancelar
@@ -248,7 +326,7 @@ export function PresentacionesSuperadminPage() {
                 disabled={saving}
                 className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
               >
-                {saving ? 'Guardando…' : 'Guardar'}
+                {saving ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </form>
