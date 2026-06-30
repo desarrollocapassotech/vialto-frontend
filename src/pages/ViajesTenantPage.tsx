@@ -529,24 +529,55 @@ export function ViajesTenantPage({
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
         const pageApi = Math.max(1, Math.floor(page));
         const pageSizeApi = pageSizeApiValido(pageSize);
-        const data = await apiJson<ViajesPaginatedResponse>(
-          `${listBase}page=${pageApi}&pageSize=${pageSizeApi}`,
-          () => getTokenRef.current(),
-        );
+
         const pagoFiltroActivo =
           pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
             ? pagoTranspF
             : null;
-        const items = pagoFiltroActivo
-          ? filtrarViajesPorPagoTransportista(data.items, pagoFiltroActivo)
-          : data.items;
+
+        //Se filtra el lote grande de viajes para obtener los viajes pagados
+        const reqPage = pagoFiltroActivo ? 1 : pageApi;
+        const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
+
+        const data = await apiJson<ViajesPaginatedResponse>(
+          `${listBase}page=${reqPage}&pageSize=${reqPageSize}`,
+          () => getTokenRef.current(),
+        );
+
+        let items = data.items;
         let meta = data.meta;
-        if (pagoFiltroActivo && pageApi === 1) {
-          const totalReal = await contarViajesPagoTransportistaDesdeApi(
-            listBase,
+
+        if (pagoFiltroActivo) {
+          // Filtro local del lote grande
+          const itemsFiltrados = filtrarViajesPorPagoTransportista(
+            data.items,
             pagoFiltroActivo,
-            () => getTokenRef.current(),
           );
+          const totalReal = itemsFiltrados.length;
+
+          // Cáculo de inicio y fin para la página actual
+          const startIndex = (pageApi - 1) * pageSizeApi;
+          items = itemsFiltrados.slice(startIndex, startIndex + pageSizeApi);
+
+          // Ajuste de metadatos de la paginación con el total real
+          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
+
+          // Actualizacion del resumen en la primer página
+          if (pageApi === 1 && !cancelled) {
+            setResumen((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    sinPagar:
+                      pagoFiltroActivo === "sin_pagar"
+                        ? totalReal
+                        : prev.sinPagar,
+                    pagados:
+                      pagoFiltroActivo === "pagado" ? totalReal : prev.pagados,
+                  }
+                : prev,
+            );
+          }
           meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
           if (!cancelled) {
             setResumen((prev) =>
