@@ -272,20 +272,19 @@ export function EgresosStockTenantPage({
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
+      if (!row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Seleccioná el lote de origen.';
       const b = parseFloat(row.bultos) || 0;
       const s = parseFloat(row.sueltas) || 0;
       if (b <= 0 && s <= 0) {
         ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (row.productoId && row.presentacionId) {
-        const disponible =
-          stockItems.find(
-            (si) => si.productoId === row.productoId && si.presentacionId === row.presentacionId,
-          ) ?? null;
-        if (disponible) {
-          if (b > disponible.cantidad1)
-            ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${disponible.cantidad1} bultos.`;
-          if (s > disponible.cantidad2)
-            ferrs[`row_${idx}_sueltas`] = `Stock insuficiente. Disponible: ${disponible.cantidad2} sueltas.`;
+      } else if (row.lote.trim() && row.loteStock) {
+        if (b > row.loteStock.bultos) {
+          ferrs[`row_${idx}_bultos`] =
+            `Stock insuficiente en el lote. Disponible: ${row.loteStock.bultos} bultos.`;
+        }
+        if (s > row.loteStock.sueltas) {
+          ferrs[`row_${idx}_sueltas`] =
+            `Stock insuficiente en el lote. Disponible: ${row.loteStock.sueltas} sueltas.`;
         }
       }
     });
@@ -453,7 +452,6 @@ export function EgresosStockTenantPage({
           onUpdateRow={updateRow}
           productos={productos}
           productosLoading={productosLoading}
-          stockItems={stockItems}
           fieldErrors={fieldErrors}
           formError={formError}
           saving={saving}

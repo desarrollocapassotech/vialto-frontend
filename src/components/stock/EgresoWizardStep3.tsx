@@ -1,9 +1,12 @@
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { LoteSelect } from '@/components/stock/LoteSelect';
+import {
+  EgresoProductoLoteBloque,
+  type LoteStockDisponible,
+} from '@/components/stock/EgresoProductoLoteBloque';
 import { Spinner } from '@/components/ui/Spinner';
-import type { Producto, ProductoPresentacion, StockItem } from '@/types/api';
+import type { Producto, ProductoPresentacion } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -12,9 +15,10 @@ export type EgresoRow = {
   _key: string;
   productoId: string;
   presentacionId: string;
+  lote: string;
   bultos: string;
   sueltas: string;
-  lote: string;
+  loteStock: LoteStockDisponible | null;
 };
 
 export function emptyEgresoRow(): EgresoRow {
@@ -25,6 +29,7 @@ export function emptyEgresoRow(): EgresoRow {
     bultos: '',
     sueltas: '',
     lote: '',
+    loteStock: null,
   };
 }
 
@@ -32,21 +37,15 @@ function getPresentaciones(productos: Producto[], productoId: string): ProductoP
   return productos.find((p) => p.id === productoId)?.productoPresentaciones ?? [];
 }
 
-function getDisponible(
-  stockItems: StockItem[],
-  productoId: string,
-  presentacionId: string,
-): StockItem | null {
-  if (!productoId || !presentacionId) return null;
-  return stockItems.find(
-    (s) => s.productoId === productoId && s.presentacionId === presentacionId,
-  ) ?? null;
-}
-
 export function isEgresoRowComplete(row: EgresoRow): boolean {
   const b = parseFloat(row.bultos) || 0;
   const s = parseFloat(row.sueltas) || 0;
-  return Boolean(row.productoId) && Boolean(row.presentacionId) && (b > 0 || s > 0);
+  return (
+    Boolean(row.productoId) &&
+    Boolean(row.presentacionId) &&
+    Boolean(row.lote.trim()) &&
+    (b > 0 || s > 0)
+  );
 }
 
 export function EgresoWizardStep3({
@@ -56,7 +55,6 @@ export function EgresoWizardStep3({
   onUpdateRow,
   productos,
   productosLoading,
-  stockItems,
   fieldErrors,
   formError,
   saving,
@@ -76,7 +74,6 @@ export function EgresoWizardStep3({
   onUpdateRow: (key: string, patch: Partial<EgresoRow>) => void;
   productos: Producto[];
   productosLoading: boolean;
-  stockItems: StockItem[];
   fieldErrors: Record<string, string>;
   formError: string | null;
   saving: boolean;
@@ -92,7 +89,6 @@ export function EgresoWizardStep3({
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      {/* Resumen pasos 1 y 2 */}
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
           <span className="text-vialto-steel text-xs uppercase tracking-[0.08em] mr-1.5">Cliente</span>
@@ -110,7 +106,6 @@ export function EgresoWizardStep3({
         )}
       </div>
 
-      {/* Listado de productos */}
       <div className="space-y-3">
         <div>
           <h2 className="text-base font-semibold text-vialto-charcoal">
@@ -118,14 +113,13 @@ export function EgresoWizardStep3({
             <span className="ml-1 text-sm font-normal text-vialto-steel">({rows.length})</span>
           </h2>
           <p className="text-xs text-vialto-steel mt-0.5">
-            Indicá qué y cuánto sale del depósito. El stock disponible se muestra por fila.
+            Elegí producto y presentación; luego el lote de origen y cuánto extraer de ese lote.
           </p>
         </div>
 
         {rows.map((row, idx) => {
           const pps = getPresentaciones(productos, row.productoId);
           const selectedPP = pps.find((pp) => pp.id === row.presentacionId);
-          const disponible = getDisponible(stockItems, row.productoId, row.presentacionId);
 
           return (
             <div key={row._key} className="bg-white rounded-lg border border-black/10 p-4 space-y-4">
@@ -143,7 +137,6 @@ export function EgresoWizardStep3({
                 </button>
               </div>
 
-              {/* Producto y presentación */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={LABEL}>
@@ -153,7 +146,14 @@ export function EgresoWizardStep3({
                     items={productos}
                     value={row.productoId}
                     onChange={(id) =>
-                      onUpdateRow(row._key, { productoId: id, presentacionId: '' })
+                      onUpdateRow(row._key, {
+                        productoId: id,
+                        presentacionId: '',
+                        lote: '',
+                        bultos: '',
+                        sueltas: '',
+                        loteStock: null,
+                      })
                     }
                     loading={productosLoading}
                     filterItems={(items, q) => {
@@ -183,7 +183,13 @@ export function EgresoWizardStep3({
                   <select
                     value={row.presentacionId}
                     onChange={(e) =>
-                      onUpdateRow(row._key, { presentacionId: e.target.value })
+                      onUpdateRow(row._key, {
+                        presentacionId: e.target.value,
+                        lote: '',
+                        bultos: '',
+                        sueltas: '',
+                        loteStock: null,
+                      })
                     }
                     disabled={!row.productoId || pps.length === 0}
                     className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
@@ -213,77 +219,33 @@ export function EgresoWizardStep3({
                 </div>
               </div>
 
-              {/* Cantidades con stock disponible */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className={LABEL}>
-                    Bultos <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={row.bultos}
-                    onChange={(e) => onUpdateRow(row._key, { bultos: e.target.value })}
-                    className={`${INPUT} ${
-                      fieldErrors[`row_${idx}_bultos`] ? 'border-red-400' : ''
-                    }`}
-                    placeholder="0"
-                  />
-                  {disponible !== null && (
-                    <p className="text-xs text-vialto-steel">
-                      Disponible:{' '}
-                      <span className="font-semibold text-vialto-charcoal">
-                        {disponible.cantidad1}
-                      </span>{' '}
-                      bultos
-                    </p>
-                  )}
-                  <CrudFieldError message={fieldErrors[`row_${idx}_bultos`]} />
-                </div>
-
-                <div className="space-y-1">
-                  <label className={LABEL}>Sueltas</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={row.sueltas}
-                    onChange={(e) => onUpdateRow(row._key, { sueltas: e.target.value })}
-                    className={`${INPUT} ${
-                      fieldErrors[`row_${idx}_sueltas`] ? 'border-red-400' : ''
-                    }`}
-                    placeholder="0"
-                  />
-                  {disponible !== null && (
-                    <p className="text-xs text-vialto-steel">
-                      Disponible:{' '}
-                      <span className="font-semibold text-vialto-charcoal">
-                        {disponible.cantidad2}
-                      </span>{' '}
-                      sueltas
-                    </p>
-                  )}
-                  <CrudFieldError message={fieldErrors[`row_${idx}_sueltas`]} />
-                </div>
-              </div>
-
-              {/* Lote */}
-              <div className="space-y-1">
-                <label className={LABEL}>Lote</label>
-                <LoteSelect
-                  productoId={row.productoId}
-                  clienteId={clienteId}
-                  depositoId={depositoId}
-                  presentacionId={row.presentacionId}
-                  value={row.lote}
-                  onLoteChange={(lote) => onUpdateRow(row._key, { lote })}
-                  lotesBase={lotesBase}
-                  tenantId={tenantId}
-                  className={INPUT}
-                  disabled={!row.productoId}
-                />
-              </div>
+              <EgresoProductoLoteBloque
+                productoId={row.productoId}
+                presentacionId={row.presentacionId}
+                clienteId={clienteId}
+                depositoId={depositoId}
+                lote={row.lote}
+                bultos={row.bultos}
+                sueltas={row.sueltas}
+                loteStock={row.loteStock}
+                onLoteChange={(lote, stock) =>
+                  onUpdateRow(row._key, {
+                    lote,
+                    loteStock: stock,
+                    bultos: '',
+                    sueltas: '',
+                  })
+                }
+                onBultosChange={(bultos) => onUpdateRow(row._key, { bultos })}
+                onSueltasChange={(sueltas) => onUpdateRow(row._key, { sueltas })}
+                fieldErrors={{
+                  lote: fieldErrors[`row_${idx}_lote`],
+                  bultos: fieldErrors[`row_${idx}_bultos`],
+                  sueltas: fieldErrors[`row_${idx}_sueltas`],
+                }}
+                lotesBase={lotesBase}
+                tenantId={tenantId}
+              />
             </div>
           );
         })}
@@ -298,7 +260,7 @@ export function EgresoWizardStep3({
               disabled={!canAdd}
               title={
                 !canAdd
-                  ? 'Completá los campos obligatorios del producto anterior antes de agregar otro.'
+                  ? 'Completá producto, lote y cantidades antes de agregar otro.'
                   : undefined
               }
               className={`w-full py-3 rounded text-sm font-medium transition-colors ${
