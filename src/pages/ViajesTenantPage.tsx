@@ -101,9 +101,10 @@ import {
 import {
   contarViajesPagoTransportistaDesdeApi,
   esFiltroPagoTransportistaValido,
-  filtrarViajesPorPagoTransportista,
-  metaPaginacionAjustada,
+  listarViajesOrdenadosClienteDesdeApi,
+  listarViajesPorPagoTransportistaDesdeApi,
   pageSizeApiValido,
+  viajeListadoRequiereOrdenCliente,
   VIAJE_PAGO_TRANSPORTISTA_QUERY,
   type ViajePagoTransportistaFiltro,
 } from "@/lib/viajesFiltroPagoTransportista";
@@ -143,6 +144,7 @@ import {
 import {
   VIAJE_SORT_DEFAULT,
   appendViajeSortQuery,
+  sortViajesListado,
   type ViajeSortDir,
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
@@ -234,6 +236,11 @@ export function ViajesTenantPage({
   const [sortDir, setSortDir] = useState<ViajeSortDir>(
     VIAJE_SORT_DEFAULT.sortDir,
   );
+  /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
+  const ordenamientoAplicadoRef = useRef({
+    sortBy: VIAJE_SORT_DEFAULT.sortBy,
+    sortDir: VIAJE_SORT_DEFAULT.sortDir,
+  });
   const initialEstadoFromUrl = searchParams.get("estado")?.trim() ?? "";
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? "";
@@ -521,7 +528,11 @@ export function ViajesTenantPage({
         if (per === "desde_hoy" || per === "anteriores") {
           filtros.set("periodo", per);
         }
-        appendViajeSortQuery(filtros, sortBy, sortDir);
+        appendViajeSortQuery(
+          filtros,
+          ordenamientoAplicadoRef.current.sortBy,
+          ordenamientoAplicadoRef.current.sortDir,
+        );
         const filtrosQs = filtros.toString();
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
@@ -534,66 +545,43 @@ export function ViajesTenantPage({
             ? pagoTranspF
             : null;
 
-        //Se filtra el lote grande de viajes para obtener los viajes pagados
-        const reqPage = pagoFiltroActivo ? 1 : pageApi;
-        const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
+        let items: Viaje[];
+        let meta: PaginatedMeta;
 
-        const data = await apiJson<ViajesPaginatedResponse>(
-          `${listBase}page=${reqPage}&pageSize=${reqPageSize}`,
-          () => getTokenRef.current(),
-        );
-
-        let items = data.items;
-        let meta = data.meta;
+        const sortFetch = ordenamientoAplicadoRef.current;
 
         if (pagoFiltroActivo) {
-          // Filtro local del lote grande
-          const itemsFiltrados = filtrarViajesPorPagoTransportista(
-            data.items,
+          const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
+            listBase,
             pagoFiltroActivo,
+            pageApi,
+            pageSizeApi,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+            () => getTokenRef.current(),
           );
-          const totalReal = itemsFiltrados.length;
-
-          // Cáculo de inicio y fin para la página actual
-          const startIndex = (pageApi - 1) * pageSizeApi;
-          items = itemsFiltrados.slice(startIndex, startIndex + pageSizeApi);
-
-          // Ajuste de metadatos de la paginación con el total real
-          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
-
-          // Actualizacion del resumen en la primer página
-          if (pageApi === 1 && !cancelled) {
-            setResumen((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    sinPagar:
-                      pagoFiltroActivo === "sin_pagar"
-                        ? totalReal
-                        : prev.sinPagar,
-                    pagados:
-                      pagoFiltroActivo === "pagado" ? totalReal : prev.pagados,
-                  }
-                : prev,
-            );
-          }
-          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
-          if (!cancelled) {
-            setResumen((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    sinPagar:
-                      pagoFiltroActivo === "sin_pagar"
-                        ? totalReal
-                        : prev.sinPagar,
-                    pagados:
-                      pagoFiltroActivo === "pagado" ? totalReal : prev.pagados,
-                  }
-                : prev,
-            );
-          }
+          items = pagoData.items;
+          meta = pagoData.meta;
+        } else if (viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)) {
+          const ordenData = await listarViajesOrdenadosClienteDesdeApi(
+            listBase,
+            pageApi,
+            pageSizeApi,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+            () => getTokenRef.current(),
+          );
+          items = ordenData.items;
+          meta = ordenData.meta;
+        } else {
+          const data = await apiJson<ViajesPaginatedResponse>(
+            `${listBase}page=${pageApi}&pageSize=${pageSizeApi}`,
+            () => getTokenRef.current(),
+          );
+          items = sortViajesListado(data.items, sortFetch.sortBy, sortFetch.sortDir);
+          meta = data.meta;
         }
+
         if (!cancelled) {
           setRows(items);
           setMeta(meta);
@@ -628,6 +616,10 @@ export function ViajesTenantPage({
     nuevoSortBy: ViajeSortField,
     nuevoSortDir: ViajeSortDir,
   ) {
+    ordenamientoAplicadoRef.current = {
+      sortBy: nuevoSortBy,
+      sortDir: nuevoSortDir,
+    };
     setListadoRefetching(true);
     setSortBy(nuevoSortBy);
     setSortDir(nuevoSortDir);
@@ -693,7 +685,12 @@ export function ViajesTenantPage({
     fh: string,
   ) {
     if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
-      setSortBy(tf === "carga" ? "fecha_carga" : "fecha_descarga");
+      const sortByFecha = tf === "carga" ? "fecha_carga" : "fecha_descarga";
+      ordenamientoAplicadoRef.current = {
+        sortBy: sortByFecha,
+        sortDir: "asc",
+      };
+      setSortBy(sortByFecha);
       setSortDir("asc");
     }
   }
