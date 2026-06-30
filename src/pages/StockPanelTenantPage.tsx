@@ -1,29 +1,30 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
-import { ChevronDown, FileSpreadsheet, Warehouse } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { ListadoCard } from '@/components/listado/ListadoCard';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
-import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
-import { ProductoModal } from '@/components/stock/ProductoModal';
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { ChevronDown, FileSpreadsheet, Warehouse } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { ListadoCard } from "@/components/listado/ListadoCard";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import { ProductoModal } from "@/components/stock/ProductoModal";
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
   type SelectorOpcion,
-} from '@/components/ui/SelectorOpcionesSheet';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { generarExcel, stockItemColumnas } from '@/lib/stockExcelExport';
-import { puedeGestionarComoAdminEmpresa } from '@/lib/roleLabels';
-import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+} from "@/components/ui/SelectorOpcionesSheet";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { generarExcel, stockItemColumnas } from "@/lib/stockExcelExport";
+import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
+import type { Cliente, Deposito, Producto, StockItem } from "@/types/api";
 
 type ProductoModalState =
-  | { mode: 'closed' }
-  | { mode: 'view'; producto: Producto }
-  | { mode: 'edit'; producto: Producto };
+  | { mode: "closed" }
+  | { mode: "view"; producto: Producto }
+  | { mode: "edit"; producto: Producto };
 
 type ProductoFiltro = { id: string; nombre: string };
 import {
@@ -31,21 +32,26 @@ import {
   listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
-} from '@/lib/listadoTabla';
+} from "@/lib/listadoTabla";
 
 function buildQs(tenantId?: string) {
-  return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+  return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
 }
 
 function cantidad1Cell(item: StockItem) {
   return (
     <>
-      <span className={item.cantidad1 === 0 ? 'text-vialto-steel' : 'font-semibold text-vialto-charcoal'}>
+      <span
+        className={
+          item.cantidad1 === 0
+            ? "text-vialto-steel"
+            : "font-semibold text-vialto-charcoal"
+        }
+      >
         {item.cantidad1}
-      </span>
-      {' '}
+      </span>{" "}
       <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad1Nombre ?? 'Pallets'}
+        {item.producto?.unidad1Nombre ?? "Pallets"}
       </span>
     </>
   );
@@ -57,12 +63,17 @@ function cantidad2Cell(item: StockItem) {
   }
   return (
     <>
-      <span className={item.cantidad2 === 0 ? 'text-vialto-steel' : 'font-semibold text-vialto-charcoal'}>
+      <span
+        className={
+          item.cantidad2 === 0
+            ? "text-vialto-steel"
+            : "font-semibold text-vialto-charcoal"
+        }
+      >
         {item.cantidad2}
-      </span>
-      {' '}
+      </span>{" "}
       <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad2Nombre ?? 'Unidad'}
+        {item.producto?.unidad2Nombre ?? "Unidad"}
       </span>
     </>
   );
@@ -71,14 +82,17 @@ function cantidad2Cell(item: StockItem) {
 export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   const { getToken, orgRole } = useAuth();
   const { user } = useUser();
-  const puedeGestionar = puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
+  const puedeGestionar = puedeGestionarComoAdminEmpresa(
+    orgRole,
+    user?.publicMetadata,
+  );
   const platform = Boolean(tenantId);
   const disponibleUrl = platform
     ? `/api/platform/stock/disponible${buildQs(tenantId)}`
-    : '/api/stock/disponible';
+    : "/api/stock/disponible";
   const depositosUrl = platform
     ? `/api/platform/stock/depositos${buildQs(tenantId)}`
-    : '/api/stock/depositos';
+    : "/api/stock/depositos";
 
   const [items, setItems] = useState<StockItem[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
@@ -86,26 +100,33 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [depositoActivoId, setDepositoActivoId] = useState<string | null>(null);
   const [depositoSheetOpen, setDepositoSheetOpen] = useState(false);
-  const [filtroClienteId, setFiltroClienteId] = useState('');
-  const [filtroProductoId, setFiltroProductoId] = useState('');
+  const [filtroClienteId, setFiltroClienteId] = useState("");
+  const [filtroProductoId, setFiltroProductoId] = useState("");
   const [soloConStockCant1, setSoloConStockCant1] = useState(false);
   const [soloConStockCant2, setSoloConStockCant2] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [productoModal, setProductoModal] = useState<ProductoModalState>({ mode: 'closed' });
+  const [productoModal, setProductoModal] = useState<ProductoModalState>({
+    mode: "closed",
+  });
 
-  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+  const productosBase = platform
+    ? "/api/platform/stock/productos"
+    : "/api/stock/productos";
 
   const abrirProducto = useCallback(
     async (productoId: string) => {
-      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
       try {
         const producto = await apiJson<Producto>(
           `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
           () => getToken(),
         );
-        setProductoModal({ mode: 'view', producto });
+        setProductoModal({ mode: "view", producto });
       } catch {
         // sin feedback: el listado ya muestra el nombre del producto
       }
@@ -121,8 +142,10 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         apiJson<StockItem[]>(disponibleUrl, () => getToken()),
         apiJson<Deposito[]>(depositosUrl, () => getToken()),
       ]);
-      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
-      const productoIds = [...new Set(stockData.map((item) => item.productoId))];
+      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+      const productoIds = [
+        ...new Set(stockData.map((item) => item.productoId)),
+      ];
       const productos = await Promise.all(
         productoIds.map((productoId) =>
           apiJson<Producto>(
@@ -135,7 +158,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       setProductosDetalle(productos.filter((p): p is Producto => p !== null));
       setDepositos(depositosData.filter((d) => d.activo));
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     } finally {
       setLoading(false);
     }
@@ -145,20 +168,25 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     void load();
   }, [load]);
 
-  // Seleccionar primer depósito si no hay uno activo o si el activo ya no existe
   useEffect(() => {
-    if (depositos.length > 0 && (depositoActivoId === null || !depositos.find((d) => d.id === depositoActivoId))) {
+    if (
+      depositos.length > 0 &&
+      (depositoActivoId === null ||
+        !depositos.find((d) => d.id === depositoActivoId))
+    ) {
       setDepositoActivoId(depositos[0].id);
+      setPage(1);
     }
   }, [depositos, depositoActivoId]);
 
   const handleCambiarTab = (id: string) => {
     setDepositoActivoId(id);
-    setFiltroClienteId('');
-    setFiltroProductoId('');
+    setFiltroClienteId("");
+    setFiltroProductoId("");
     setSoloConStockCant1(false);
     setSoloConStockCant2(false);
     setDepositoSheetOpen(false);
+    setPage(1);
   };
 
   const clientesEnDeposito = useMemo(() => {
@@ -178,7 +206,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           pais: null,
           condicionIva: null,
           condicionTributaria: null,
-          createdAt: '',
+          createdAt: "",
         });
       }
     }
@@ -205,7 +233,8 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     return items.filter((item) => {
       if (item.depositoId !== depositoActivoId) return false;
       if (filtroClienteId && item.clienteId !== filtroClienteId) return false;
-      if (filtroProductoId && item.productoId !== filtroProductoId) return false;
+      if (filtroProductoId && item.productoId !== filtroProductoId)
+        return false;
       if (soloConStockCant1 && item.cantidad1 === 0) return false;
       if (
         soloConStockCant2 &&
@@ -216,7 +245,32 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       }
       return true;
     });
-  }, [items, depositoActivoId, filtroClienteId, filtroProductoId, soloConStockCant1, soloConStockCant2]);
+  }, [
+    items,
+    depositoActivoId,
+    filtroClienteId,
+    filtroProductoId,
+    soloConStockCant1,
+    soloConStockCant2,
+  ]);
+
+  const paginatedItems = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredItems.slice(startIndex, startIndex + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const meta = useMemo(() => {
+    const total = filteredItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [filteredItems.length, page, pageSize]);
 
   const countByDeposito = useMemo(() => {
     const map: Record<string, number> = {};
@@ -227,7 +281,9 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   }, [items]);
 
   const depositoActivo = depositos.find((d) => d.id === depositoActivoId);
-  const depositoActivoCount = depositoActivoId ? (countByDeposito[depositoActivoId] ?? 0) : 0;
+  const depositoActivoCount = depositoActivoId
+    ? (countByDeposito[depositoActivoId] ?? 0)
+    : 0;
 
   const depositoOptions: SelectorOpcion[] = depositos.map((dep) => {
     const count = countByDeposito[dep.id] ?? 0;
@@ -242,13 +298,17 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     };
   });
 
-  // Mostrar columna 2 si algún producto del tab activo tiene unidad2Nombre
   const showUnidad2 = useMemo(
-    () => items.some((i) => i.depositoId === depositoActivoId && i.producto?.unidad2Nombre !== null),
+    () =>
+      items.some(
+        (i) =>
+          i.depositoId === depositoActivoId &&
+          i.producto?.unidad2Nombre !== null,
+      ),
     [items, depositoActivoId],
   );
 
-  const colSpan = 2 + 1 + (showUnidad2 ? 1 : 0); // cliente + producto + cant1 [+ cant2]
+  const colSpan = 2 + 1 + (showUnidad2 ? 1 : 0);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -260,16 +320,24 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
   }, [filtroClienteId, filtroProductoId, soloConStockCant1, soloConStockCant2]);
 
   function limpiarFiltros() {
-    setFiltroClienteId('');
-    setFiltroProductoId('');
+    setFiltroClienteId("");
+    setFiltroProductoId("");
     setSoloConStockCant1(false);
     setSoloConStockCant2(false);
+    setPage(1);
   }
 
+  useEffect(() => {
+    setPage(1);
+  }, [filtroClienteId, filtroProductoId, soloConStockCant1, soloConStockCant2]);
+
   const stockEmptyMessage =
-    filtroClienteId || filtroProductoId || soloConStockCant1 || soloConStockCant2
-      ? 'Sin resultados para los filtros aplicados.'
-      : 'Sin stock registrado en este depósito.';
+    filtroClienteId ||
+    filtroProductoId ||
+    soloConStockCant1 ||
+    soloConStockCant2
+      ? "Sin resultados para los filtros aplicados."
+      : "Sin stock registrado en este depósito.";
 
   const filterToolbar = (
     <>
@@ -285,7 +353,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           placeholderBuscar="Buscar por nombre…"
           aria-label="Filtrar por cliente"
           inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            filtroClienteId.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            filtroClienteId.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
           }`}
         />
       </ListadoFiltroCampo>
@@ -306,7 +374,9 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           searchAriaLabel="Filtrar productos"
           aria-label="Filtrar por producto"
           inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            filtroProductoId.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            filtroProductoId.trim()
+              ? "text-vialto-fire"
+              : "text-vialto-charcoal"
           }`}
         />
       </ListadoFiltroCampo>
@@ -354,7 +424,9 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       {!platform ? (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-vialto-charcoal">Inventario</h1>
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">
+              Inventario
+            </h1>
             <p className="mt-1 text-sm text-vialto-steel">
               Stock disponible en cada depósito, en tiempo real.
             </p>
@@ -366,15 +438,17 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       )}
 
       {error && (
-        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
-      {loading && (
-        <p className="text-sm text-vialto-steel">Cargando…</p>
-      )}
+      {loading && <p className="text-sm text-vialto-steel">Cargando…</p>}
 
       {!loading && depositos.length === 0 && (
-        <p className="text-sm text-vialto-steel">No hay depósitos activos configurados.</p>
+        <p className="text-sm text-vialto-steel">
+          No hay depósitos activos configurados.
+        </p>
       )}
 
       {!loading && depositos.length > 0 && (
@@ -393,14 +467,22 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                   Depósito
                 </span>
                 <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                  <Warehouse className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />
+                  <Warehouse
+                    className="h-4 w-4 shrink-0 text-vialto-steel"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
                   <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
-                    {depositoActivo?.nombre ?? 'Depósito'}
+                    {depositoActivo?.nombre ?? "Depósito"}
                   </span>
                   <span className="shrink-0 rounded-full bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
                     {depositoActivoCount}
                   </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={2} aria-hidden />
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 text-vialto-steel"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
                 </span>
               </button>
               <SelectorOpcionesSheet
@@ -413,7 +495,10 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
               />
             </div>
 
-            <nav className="-mb-px hidden flex-wrap gap-0 lg:flex" aria-label="Depósitos">
+            <nav
+              className="-mb-px hidden flex-wrap gap-0 lg:flex"
+              aria-label="Depósitos"
+            >
               {depositos.map((dep) => {
                 const activo = depositoActivoId === dep.id;
                 const count = countByDeposito[dep.id] ?? 0;
@@ -423,21 +508,25 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                     type="button"
                     onClick={() => handleCambiarTab(dep.id)}
                     className={[
-                      'flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                      "flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                       activo
-                        ? 'border-vialto-fire text-vialto-charcoal'
-                        : 'border-transparent text-vialto-steel hover:text-vialto-charcoal hover:border-black/20',
-                    ].join(' ')}
+                        ? "border-vialto-fire text-vialto-charcoal"
+                        : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:border-black/20",
+                    ].join(" ")}
                   >
-                    <Warehouse className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                    <Warehouse
+                      className="h-3.5 w-3.5 shrink-0"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
                     {dep.nombre}
                     <span
                       className={[
-                        'rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none',
+                        "rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none",
                         activo
-                          ? 'bg-vialto-fire/15 text-vialto-fire'
-                          : 'bg-black/8 text-vialto-steel',
-                      ].join(' ')}
+                          ? "bg-vialto-fire/15 text-vialto-fire"
+                          : "bg-black/8 text-vialto-steel",
+                      ].join(" ")}
                     >
                       {count}
                     </span>
@@ -449,7 +538,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
 
           <ListadoDatos
             columns={[]}
-            rows={filteredItems}
+            rows={paginatedItems}
             rowKey={(item) => item.id}
             emptyMessage={stockEmptyMessage}
             tableColSpan={colSpan}
@@ -475,7 +564,9 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                       placeholderBuscar="Buscar por nombre…"
                       aria-label="Filtrar por cliente"
                       inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        filtroClienteId.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                        filtroClienteId.trim()
+                          ? "text-vialto-fire"
+                          : "text-vialto-charcoal"
                       }`}
                     />
                   </ViajesListadoHeaderFiltro>
@@ -496,23 +587,30 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                       placeholderBuscar="Buscar por nombre…"
                       filterItems={(lista, q) => {
                         const lq = q.toLowerCase();
-                        return lista.filter((p) => p.nombre.toLowerCase().includes(lq));
+                        return lista.filter((p) =>
+                          p.nombre.toLowerCase().includes(lq),
+                        );
                       }}
                       getPrimaryLabel={(p) => p.nombre}
                       searchAriaLabel="Filtrar productos"
                       aria-label="Filtrar por producto"
                       inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        filtroProductoId.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                        filtroProductoId.trim()
+                          ? "text-vialto-fire"
+                          : "text-vialto-charcoal"
                       }`}
                     />
                   </ViajesListadoHeaderFiltro>
                 </th>
-                <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>
+                <th
+                  scope="col"
+                  className={`${listadoTablaThClass} text-right align-top`}
+                >
                   <ViajesListadoHeaderFiltro
                     title="Bultos"
                     alignRight
                     filterActive={soloConStockCant1}
-                    filterSignature={soloConStockCant1 ? '1' : ''}
+                    filterSignature={soloConStockCant1 ? "1" : ""}
                   >
                     <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
                       <input
@@ -526,18 +624,23 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
                   </ViajesListadoHeaderFiltro>
                 </th>
                 {showUnidad2 && (
-                  <th scope="col" className={`${listadoTablaThClass} text-right align-top`}>
+                  <th
+                    scope="col"
+                    className={`${listadoTablaThClass} text-right align-top`}
+                  >
                     <ViajesListadoHeaderFiltro
                       title="Sueltas"
                       alignRight
                       filterActive={soloConStockCant2}
-                      filterSignature={soloConStockCant2 ? '1' : ''}
+                      filterSignature={soloConStockCant2 ? "1" : ""}
                     >
                       <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
                         <input
                           type="checkbox"
                           checked={soloConStockCant2}
-                          onChange={(e) => setSoloConStockCant2(e.target.checked)}
+                          onChange={(e) =>
+                            setSoloConStockCant2(e.target.checked)
+                          }
                           className="h-4 w-4 accent-vialto-charcoal"
                         />
                         Solo con stock
@@ -553,20 +656,24 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
               return (
                 <tr key={item.id} className={listadoTablaBodyRowClass}>
                   <td className={listadoTablaTdClass}>
-                    <span className={sinStock ? 'text-vialto-steel' : ''}>
+                    <span className={sinStock ? "text-vialto-steel" : ""}>
                       {item.cliente?.nombre ?? item.clienteId}
                     </span>
                   </td>
                   <td className={listadoTablaTdClass}>
-                    <span className={sinStock ? 'text-vialto-steel' : ''}>
+                    <span className={sinStock ? "text-vialto-steel" : ""}>
                       {item.producto?.nombre ?? item.productoId}
                     </span>
                   </td>
-                  <td className={`${listadoTablaTdClass} text-right tabular-nums`}>
+                  <td
+                    className={`${listadoTablaTdClass} text-right tabular-nums`}
+                  >
                     {cantidad1Cell(item)}
                   </td>
                   {showUnidad2 && (
-                    <td className={`${listadoTablaTdClass} text-right tabular-nums`}>
+                    <td
+                      className={`${listadoTablaTdClass} text-right tabular-nums`}
+                    >
                       {cantidad2Cell(item)}
                     </td>
                   )}
@@ -588,20 +695,28 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
               const productoNombre = item.producto?.nombre ?? item.productoId;
               const fields = [
                 {
-                  label: 'Producto',
-                  value: <span className={sinStock ? 'text-vialto-steel' : ''}>{productoNombre}</span>,
+                  label: "Producto",
+                  value: (
+                    <span className={sinStock ? "text-vialto-steel" : ""}>
+                      {productoNombre}
+                    </span>
+                  ),
                 },
                 {
-                  label: 'Bultos',
+                  label: "Bultos",
                   value: cantidad1Cell(item),
                 },
               ];
               if (showUnidad2) {
-                fields.push({ label: 'Sueltas', value: cantidad2Cell(item) });
+                fields.push({ label: "Sueltas", value: cantidad2Cell(item) });
               }
               return (
                 <ListadoCard
-                  primary={<span className={sinStock ? 'text-vialto-steel' : ''}>{clienteNombre}</span>}
+                  primary={
+                    <span className={sinStock ? "text-vialto-steel" : ""}>
+                      {clienteNombre}
+                    </span>
+                  }
                   fields={fields}
                   actions={
                     <button
@@ -616,6 +731,20 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
               );
             }}
           />
+
+          {filteredItems.length > 0 && (
+            <div className="mt-4">
+              <ListadoPagination
+                meta={meta}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
+                }}
+              />
+            </div>
+          )}
         </>
       )}
 
@@ -626,40 +755,44 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           onExport={(selectedIds) => {
             const allCols = stockItemColumnas(filteredItems, productosDetalle);
             const cols = allCols.filter((c) => selectedIds.includes(c.id));
-            const deposito = depositoActivo?.nombre ?? 'inventario';
+            const deposito = depositoActivo?.nombre ?? "inventario";
             generarExcel(cols, filteredItems, `inventario-${deposito}`);
           }}
           onClose={() => setExportModalOpen(false)}
         />
       )}
 
-      {productoModal.mode === 'view' && (
+      {productoModal.mode === "view" && (
         <ProductoModal
           modo="view"
           productoInicial={productoModal.producto}
           getToken={getToken}
           baseUrl={productosBase}
           tenantId={tenantId}
-          onClose={() => setProductoModal({ mode: 'closed' })}
+          onClose={() => setProductoModal({ mode: "closed" })}
           onSaved={() => {}}
           onEdit={
             puedeGestionar
-              ? () => setProductoModal({ mode: 'edit', producto: productoModal.producto })
+              ? () =>
+                  setProductoModal({
+                    mode: "edit",
+                    producto: productoModal.producto,
+                  })
               : undefined
           }
         />
       )}
 
-      {productoModal.mode === 'edit' && (
+      {productoModal.mode === "edit" && (
         <ProductoModal
           modo="edit"
           productoInicial={productoModal.producto}
           getToken={getToken}
           baseUrl={productosBase}
           tenantId={tenantId}
-          onClose={() => setProductoModal({ mode: 'closed' })}
+          onClose={() => setProductoModal({ mode: "closed" })}
           onSaved={async () => {
-            setProductoModal({ mode: 'closed' });
+            setProductoModal({ mode: "closed" });
             await load();
           }}
         />

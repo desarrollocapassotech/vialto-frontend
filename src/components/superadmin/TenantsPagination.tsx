@@ -1,4 +1,4 @@
-import type { PaginatedMeta } from '@/types/api';
+import type { PaginatedMeta } from "@/types/api";
 
 interface TenantsPaginationProps {
   meta: PaginatedMeta;

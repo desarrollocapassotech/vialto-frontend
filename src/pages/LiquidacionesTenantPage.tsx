@@ -1,48 +1,53 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Landmark, Receipt } from 'lucide-react';
-import { ListadoCard } from '@/components/listado/ListadoCard';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { EmitirLiquidacionModal } from '@/components/liquidaciones/EmitirLiquidacionModal';
-import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
-import { apiFetch, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Landmark, Receipt } from "lucide-react";
+import { ListadoCard } from "@/components/listado/ListadoCard";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
+import { apiFetch, apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
-} from '@/lib/listadoTabla';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { canAccessIntegracionArca } from '@/lib/tenantModules';
-import type { ArcaConfig, Liquidacion, LiquidacionEstado } from '@/types/api';
+} from "@/lib/listadoTabla";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import type { ArcaConfig, Liquidacion, LiquidacionEstado } from "@/types/api";
 
 type LiquidacionConTransportista = Liquidacion & {
-  transportista?: { id: string; nombre: string; idFiscal: string | null } | null;
+  transportista?: {
+    id: string;
+    nombre: string;
+    idFiscal: string | null;
+  } | null;
 };
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
-  borrador: 'Borrador',
-  pendiente_cae: 'Pendiente CAE',
-  autorizado: 'Autorizado',
-  error: 'Error',
-  anulado: 'Anulado',
+  borrador: "Borrador",
+  pendiente_cae: "Pendiente CAE",
+  autorizado: "Autorizado",
+  error: "Error",
+  anulado: "Anulado",
 };
 
 const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
-  borrador: 'bg-gray-100 text-gray-700',
-  pendiente_cae: 'bg-amber-100 text-amber-800',
-  autorizado: 'bg-emerald-100 text-emerald-800',
-  error: 'bg-red-100 text-red-800',
-  anulado: 'bg-gray-100 text-gray-500 line-through',
+  borrador: "bg-gray-100 text-gray-700",
+  pendiente_cae: "bg-amber-100 text-amber-800",
+  autorizado: "bg-emerald-100 text-emerald-800",
+  error: "bg-red-100 text-red-800",
+  anulado: "bg-gray-100 text-gray-500 line-through",
 };
 
 function fmtMoney(n: number) {
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtDate(iso: string) {
-  if (!iso) return '—';
+  if (!iso) return "—";
   const s = iso.slice(0, 10);
-  const [y, m, d] = s.split('-');
+  const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 }
 
@@ -63,12 +68,15 @@ function caeCell(liq: LiquidacionConTransportista) {
   }
   if (liq.arcaError) {
     return (
-      <p className="text-red-600 text-[11px] max-w-[180px] truncate" title={liq.arcaError}>
+      <p
+        className="text-red-600 text-[11px] max-w-[180px] truncate"
+        title={liq.arcaError}
+      >
         {liq.arcaError}
       </p>
     );
   }
-  return '—';
+  return "—";
 }
 
 function LiquidacionAcciones({
@@ -92,10 +100,15 @@ function LiquidacionAcciones({
   onAnular: () => void;
   onEliminar: () => void;
 }) {
-  const puedeEmitir = hasArca && (liq.estado === 'borrador' || liq.estado === 'error');
-  const puedeEliminar = liq.estado === 'borrador' || liq.estado === 'error' || liq.estado === 'pendiente_cae';
-  const puedeAnular = hasArca && liq.estado === 'autorizado';
-  const tienePdf = hasArca && (liq.estado === 'autorizado' || liq.estado === 'anulado');
+  const puedeEmitir =
+    hasArca && (liq.estado === "borrador" || liq.estado === "error");
+  const puedeEliminar =
+    liq.estado === "borrador" ||
+    liq.estado === "error" ||
+    liq.estado === "pendiente_cae";
+  const puedeAnular = hasArca && liq.estado === "autorizado";
+  const tienePdf =
+    hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
 
   return (
     <div>
@@ -107,8 +120,12 @@ function LiquidacionAcciones({
             onClick={onEmitir}
             className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 h-7 px-3`}
           >
-            <Receipt className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-            {isBusy ? '…' : 'Emitir'}
+            <Receipt
+              className="h-3.5 w-3.5 shrink-0"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            {isBusy ? "…" : "Emitir"}
           </button>
         )}
         {tienePdf && (
@@ -118,7 +135,7 @@ function LiquidacionAcciones({
             onClick={onPdf}
             className={`${listadoTablaAccionClass} h-7 px-3`}
           >
-            {isDownloading ? '…' : 'PDF'}
+            {isDownloading ? "…" : "PDF"}
           </button>
         )}
         {puedeAnular && (
@@ -128,7 +145,7 @@ function LiquidacionAcciones({
             onClick={onAnular}
             className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
           >
-            {isBusy ? '…' : 'Anular'}
+            {isBusy ? "…" : "Anular"}
           </button>
         )}
         {puedeEliminar && (
@@ -138,7 +155,7 @@ function LiquidacionAcciones({
             onClick={onEliminar}
             className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
           >
-            {isBusy ? '…' : 'Eliminar'}
+            {isBusy ? "…" : "Eliminar"}
           </button>
         )}
       </div>
@@ -153,13 +170,22 @@ export function LiquidacionesTenantPage() {
   const { getToken } = useAuth();
   const { tenant, transportistas } = useMaestroData();
   const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
+
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<{ id: string; msg: string } | null>(null);
+  const [actionError, setActionError] = useState<{
+    id: string;
+    msg: string;
+  } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [pendingEmitir, setPendingEmitir] = useState<LiquidacionConTransportista | null>(null);
+  const [pendingEmitir, setPendingEmitir] =
+    useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
 
   useEffect(() => {
@@ -167,56 +193,82 @@ export function LiquidacionesTenantPage() {
     void (async () => {
       try {
         const [data, cfg] = await Promise.all([
-          apiJson<LiquidacionConTransportista[]>('/api/integracion-arca/liquidaciones', () => getToken()),
-          apiJson<ArcaConfig | null>('/api/integracion-arca/config', () => getToken()).catch(() => null),
+          apiJson<LiquidacionConTransportista[]>(
+            "/api/integracion-arca/liquidaciones",
+            () => getToken(),
+          ),
+          apiJson<ArcaConfig | null>("/api/integracion-arca/config", () =>
+            getToken(),
+          ).catch(() => null),
         ]);
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
         }
       } catch (err) {
-        if (!cancelled) setError(friendlyError(err, 'arca'));
+        if (!cancelled) setError(friendlyError(err, "arca"));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [getToken]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
-    setRows((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+    setRows(
+      (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+    );
     setPendingEmitir(null);
   }
 
   async function eliminar(liq: LiquidacionConTransportista) {
-    if (!confirm(`¿Eliminar la liquidación de ${transportistaNombre(liq)}? Esta acción no se puede deshacer.`)) return;
+    if (
+      !confirm(
+        `¿Eliminar la liquidación de ${transportistaNombre(liq)}? Esta acción no se puede deshacer.`,
+      )
+    )
+      return;
     setActionError(null);
     setBusyId(liq.id);
     try {
       await apiFetch(
         `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
         () => getToken(),
-        { method: 'DELETE' },
+        { method: "DELETE" },
       );
       setRows((prev) => prev?.filter((r) => r.id !== liq.id) ?? prev);
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, 'arca') });
+      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
     } finally {
       setBusyId(null);
     }
   }
 
   async function anular(liq: LiquidacionConTransportista) {
-    if (!confirm(`¿Anular la liquidación de ${transportistaNombre(liq)}? Esta acción emite un comprobante negativo en ARCA.`)) return;
+    if (
+      !confirm(
+        `¿Anular la liquidación de ${transportistaNombre(liq)}? Esta acción emite un comprobante negativo en ARCA.`,
+      )
+    )
+      return;
     setActionError(null);
     setBusyId(liq.id);
     try {
       const updated = await apiJson<LiquidacionConTransportista>(
         `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular`,
         () => getToken(),
-        { method: 'POST' },
+        { method: "POST" },
       );
-      setRows((prev) => prev?.map((r) => (r.id === updated.id ? { ...updated, transportista: r.transportista } : r)) ?? prev);
+      setRows(
+        (prev) =>
+          prev?.map((r) =>
+            r.id === updated.id
+              ? { ...updated, transportista: r.transportista }
+              : r,
+          ) ?? prev,
+      );
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, 'arca') });
+      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
     } finally {
       setBusyId(null);
     }
@@ -229,16 +281,16 @@ export function LiquidacionesTenantPage() {
         `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf`,
         () => getToken(),
       );
-      if (!res.ok) throw new Error('Error al generar el PDF');
+      if (!res.ok) throw new Error("Error al generar el PDF");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `liquidacion-${liq.id}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, 'arca') });
+      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
     } finally {
       setDownloading(null);
     }
@@ -258,13 +310,33 @@ export function LiquidacionesTenantPage() {
     };
   }
 
+  const totalItems = rows ? rows.length : 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Meta que pasa al componente de paginación
+  const meta = {
+    total: totalItems,
+    page,
+    pageSize,
+    totalPages,
+    hasPrev: page > 1,
+    hasNext: page < totalPages,
+  };
+
+  // Reducimos los datos de la pagina actual para la tabla
+  const paginatedRows = rows
+    ? rows.slice((page - 1) * pageSize, page * pageSize)
+    : null;
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Liquidaciones
       </h1>
       <p className="mt-1 text-sm text-vialto-steel">
-        {hasArca ? 'Comprobantes CVLP tipo 60 emitidos a transportistas.' : 'Liquidaciones emitidas a transportistas.'}
+        {hasArca
+          ? "Comprobantes CVLP tipo 60 emitidos a transportistas."
+          : "Liquidaciones emitidas a transportistas."}
       </p>
       {hasArca && (
         <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
@@ -272,7 +344,6 @@ export function LiquidacionesTenantPage() {
           Emisión electrónica vía ARCA
         </div>
       )}
-
       <div className="mt-4">
         {error && (
           <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -291,45 +362,47 @@ export function LiquidacionesTenantPage() {
           )}
         </div>
       </div>
-
       <ListadoDatos
         className="mt-6"
         columns={[
           {
-            id: 'transportista',
-            header: 'Transportista',
+            id: "transportista",
+            header: "Transportista",
             primary: true,
             cell: (liq) => (
               <>
                 <p className="font-medium">{transportistaNombre(liq)}</p>
                 {liq.transportista?.idFiscal && (
-                  <p className="text-xs text-vialto-steel">{liq.transportista.idFiscal}</p>
+                  <p className="text-xs text-vialto-steel">
+                    {liq.transportista.idFiscal}
+                  </p>
                 )}
               </>
             ),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'periodo',
-            header: 'Período',
-            cell: (liq) => `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+            id: "periodo",
+            header: "Período",
+            cell: (liq) =>
+              `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
             tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
           },
           {
-            id: 'viajes',
-            header: 'Viajes',
+            id: "viajes",
+            header: "Viajes",
             cell: (liq) => liq.cantViajes,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
-            id: 'bruto',
-            header: 'Bruto',
+            id: "bruto",
+            header: "Bruto",
             cell: (liq) => fmtMoney(liq.bruto),
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
-            id: 'comision',
-            header: 'Comisión',
+            id: "comision",
+            header: "Comisión",
             cell: (liq) => (
               <>
                 {fmtMoney(liq.comision)}
@@ -339,34 +412,36 @@ export function LiquidacionesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
           },
           {
-            id: 'liquido',
-            header: 'Líquido',
+            id: "liquido",
+            header: "Líquido",
             cell: (liq) => fmtMoney(liq.liquido),
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
           },
           {
-            id: 'estado',
-            header: 'Estado',
+            id: "estado",
+            header: "Estado",
             cell: (liq) => (
-              <span className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}>
+              <span
+                className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+              >
                 {ESTADO_LABEL[liq.estado]}
               </span>
             ),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'cae',
-            header: 'CAE',
+            id: "cae",
+            header: "CAE",
             cell: (liq) => caeCell(liq),
             tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : paginatedRows}
         rowKey={(liq) => liq.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar las liquidaciones.'
-            : 'Todavía no hay liquidaciones. Creá una desde las acciones de un viaje.'
+            ? "No se pudieron cargar las liquidaciones."
+            : "Todavía no hay liquidaciones. Creá una desde las acciones de un viaje."
         }
         loadingMessage="Cargando…"
         renderActions={(liq) => <LiquidacionAcciones {...accionesProps(liq)} />}
@@ -376,13 +451,13 @@ export function LiquidacionesTenantPage() {
             primary={transportistaNombre(liq)}
             fields={[
               {
-                label: 'Período',
+                label: "Período",
                 value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
               },
-              { label: 'Viajes', value: liq.cantViajes },
-              { label: 'Bruto', value: fmtMoney(liq.bruto) },
+              { label: "Viajes", value: liq.cantViajes },
+              { label: "Bruto", value: fmtMoney(liq.bruto) },
               {
-                label: 'Comisión',
+                label: "Comisión",
                 value: (
                   <>
                     {fmtMoney(liq.comision)}
@@ -390,22 +465,35 @@ export function LiquidacionesTenantPage() {
                   </>
                 ),
               },
-              { label: 'Líquido', value: fmtMoney(liq.liquido) },
+              { label: "Líquido", value: fmtMoney(liq.liquido) },
               {
-                label: 'Estado',
+                label: "Estado",
                 value: (
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}>
+                  <span
+                    className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                  >
                     {ESTADO_LABEL[liq.estado]}
                   </span>
                 ),
               },
-              { label: 'CAE', value: caeCell(liq) },
+              { label: "CAE", value: caeCell(liq) },
             ]}
             actions={<LiquidacionAcciones {...accionesProps(liq)} />}
           />
         )}
       />
-
+      {/*Componente de paginación */}
+      {rows && rows.length > 0 && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+        />
+      )}
       {pendingEmitir && hasArca && (
         <EmitirLiquidacionModal
           liq={pendingEmitir}
@@ -415,13 +503,25 @@ export function LiquidacionesTenantPage() {
           ivaPct={config?.ivaGastosAdmin}
         />
       )}
-
       {showCrear && (
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           getToken={getToken}
           onSuccess={(liq) => {
-            setRows((prev) => (prev ? [{ ...liq, transportista: transportistas.find((t) => t.id === liq.transportistaId) ?? null }, ...prev] : [{ ...liq, transportista: null }]));
+            setRows((prev) =>
+              prev
+                ? [
+                    {
+                      ...liq,
+                      transportista:
+                        transportistas.find(
+                          (t) => t.id === liq.transportistaId,
+                        ) ?? null,
+                    },
+                    ...prev,
+                  ]
+                : [{ ...liq, transportista: null }],
+            );
             setShowCrear(false);
           }}
           onClose={() => setShowCrear(false)}

@@ -1,5 +1,8 @@
-import { LISTADO_PAGE_SIZE_OPTIONS, paginasVisibles } from '@/lib/listadoPaginacion';
-import type { PaginatedMeta } from '@/types/api';
+import {
+  LISTADO_PAGE_SIZE_OPTIONS,
+  paginasVisibles,
+} from "@/lib/listadoPaginacion";
+import type { PaginatedMeta } from "@/types/api";
 
 type Props = {
   meta: PaginatedMeta;
@@ -11,13 +14,13 @@ type Props = {
 };
 
 const navBtnClass =
-  'h-9 min-w-9 px-2 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed hover:bg-vialto-mist/80';
+  "h-9 min-w-9 px-2 border border-black/20 text-xs uppercase tracking-wider cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-vialto-mist/80";
 
 export function ListadoPagination({
   meta,
   pageSize,
   loading = false,
-  totalLabel = 'registros',
+  totalLabel = "registros",
   onPageChange,
   onPageSizeChange,
 }: Props) {
@@ -57,7 +60,7 @@ export function ListadoPagination({
           aria-label="Primera página"
           title="Primera página"
         >
-          {'<<'}
+          {"<<"}
         </button>
         <button
           type="button"
@@ -74,11 +77,11 @@ export function ListadoPagination({
             type="button"
             disabled={disabled}
             onClick={() => onPageChange(p)}
-            aria-current={p === meta.page ? 'page' : undefined}
+            aria-current={p === meta.page ? "page" : undefined}
             className={`h-9 min-w-9 px-2 border text-xs tabular-nums disabled:opacity-40 ${
               p === meta.page
-                ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                : 'border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80'
+                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80"
             }`}
           >
             {p}
@@ -101,7 +104,7 @@ export function ListadoPagination({
           aria-label="Última página"
           title="Última página"
         >
-          {'>>'}
+          {">>"}
         </button>
       </div>
     </div>

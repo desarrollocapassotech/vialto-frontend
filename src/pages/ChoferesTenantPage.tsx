@@ -1,12 +1,17 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChoferViewModal } from '@/components/choferes/ChoferViewModal';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Chofer, PaginatedMeta } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+// 👇 1. Importamos el componente de paginación
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { Chofer, PaginatedMeta } from "@/types/api";
 
 type ChoferesPaginatedResponse = {
   items: Chofer[];
@@ -21,7 +26,7 @@ export function ChoferesTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
-  const [viewingChoferNombre, setViewingChoferNombre] = useState('');
+  const [viewingChoferNombre, setViewingChoferNombre] = useState("");
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -41,7 +46,7 @@ export function ChoferesTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'choferes'));
+          setError(friendlyError(e, "choferes"));
         }
       }
     })();
@@ -75,28 +80,28 @@ export function ChoferesTenantPage() {
         className="mt-8"
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (c) => c.nombre,
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
           {
-            id: 'dni',
-            header: 'DNI',
-            cell: (c) => c.dni ?? '—',
+            id: "dni",
+            header: "DNI",
+            cell: (c) => c.dni ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'licencia',
-            header: 'Licencia',
-            cell: (c) => c.licencia ?? '—',
+            id: "licencia",
+            header: "Licencia",
+            cell: (c) => c.licencia ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'telefono',
-            header: 'Teléfono',
-            cell: (c) => c.telefono ?? '—',
+            id: "telefono",
+            header: "Teléfono",
+            cell: (c) => c.telefono ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
@@ -104,8 +109,8 @@ export function ChoferesTenantPage() {
         rowKey={(c) => c.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los choferes.'
-            : 'Todavía no tenés choferes cargados.'
+            ? "No se pudieron cargar los choferes."
+            : "Todavía no tenés choferes cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(c) => (
@@ -130,46 +135,18 @@ export function ChoferesTenantPage() {
         )}
       />
 
+      {/* 👇 2. Reemplazamos el HTML gigante de paginación por esto: */}
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 
@@ -179,7 +156,7 @@ export function ChoferesTenantPage() {
           nombreTitulo={viewingChoferNombre}
           onClose={() => {
             setViewingChoferId(null);
-            setViewingChoferNombre('');
+            setViewingChoferNombre("");
           }}
           editTo={`/choferes/${encodeURIComponent(viewingChoferId)}/editar`}
         />
