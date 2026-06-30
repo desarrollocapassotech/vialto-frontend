@@ -87,6 +87,7 @@ export interface Viaje {
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
   factura?: { id: string; numero: string } | null;
+  liquidacionesViaje?: { liquidacionId: string }[];
   createdAt: string;
   createdBy: string;
 }
