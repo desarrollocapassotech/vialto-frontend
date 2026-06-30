@@ -16,8 +16,15 @@ import {
   stockOperacionColumnas,
 } from '@/lib/stockExcelExport';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { StockOperacion, Cliente, Deposito, Producto } from '@/types/api';
+import type { StockOperacion, Cliente, Deposito, Producto, PaginatedMeta } from '@/types/api';
 import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
+
+type IngresosPaginatedResponse = {
+  items: StockOperacion[];
+  meta: PaginatedMeta;
+};
+
+const EXPORT_PAGE_SIZE = '500';
 
 export function IngresosStockHistorialTenantPage({
   tenantId,
@@ -35,22 +42,38 @@ export function IngresosStockHistorialTenantPage({
     params, clientes, depositos, productos,
   } = useHistorialStockFiltros(platform, tenantId, getToken);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [clienteId, depositoId, productoId, fechaDesde, fechaHasta]);
+
   const ingresosUrl = platform
-    ? `/api/platform/stock/ingresos${buildQs(params, tenantId)}`
-    : `/api/stock/ingresos${buildQs(params)}`;
+    ? `/api/platform/stock/ingresos${buildQs(
+        { ...params, page: String(page), pageSize: String(pageSize) },
+        tenantId,
+      )}`
+    : `/api/stock/ingresos${buildQs({ ...params, page: String(page), pageSize: String(pageSize) })}`;
 
   const [items, setItems] = useState<StockOperacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viendo, setViendo] = useState<StockOperacion | null>(null);
+
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportRows, setExportRows] = useState<StockOperacion[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<StockOperacion[]>(ingresosUrl, () => getToken());
-      setItems(data);
+      const data = await apiJson<IngresosPaginatedResponse>(ingresosUrl, () => getToken());
+      setItems(data.items);
+      setMeta(data.meta);
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     } finally {
@@ -58,14 +81,48 @@ export function IngresosStockHistorialTenantPage({
     }
   }, [ingresosUrl, getToken]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleAbrirExport = useCallback(async () => {
+    setExportLoading(true);
+    setError(null);
+    try {
+      const allUrl = platform
+        ? `/api/platform/stock/ingresos${buildQs(
+            { ...params, page: '1', pageSize: EXPORT_PAGE_SIZE },
+            tenantId,
+          )}`
+        : `/api/stock/ingresos${buildQs({ ...params, page: '1', pageSize: EXPORT_PAGE_SIZE })}`;
+      const data = await apiJson<IngresosPaginatedResponse>(allUrl, () => getToken());
+      setExportRows(data.items);
+      setExportModalOpen(true);
+    } catch (e) {
+      setError(friendlyError(e, 'stock'));
+    } finally {
+      setExportLoading(false);
+    }
+  }, [platform, params, tenantId, getToken]);
 
   const volverHref = platform
     ? `/stock/ingresos?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/ingresos';
 
   const excelCols = stockOperacionColumnas('ingreso');
-  const excelRows = flattenStockOperaciones(items);
+  const excelRows = flattenStockOperaciones(exportRows);
+
+  const exportButton = (
+    <button
+      type="button"
+      onClick={() => void handleAbrirExport()}
+      disabled={exportLoading || (items.length === 0 && !meta)}
+      className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
+    >
+      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+      {exportLoading ? 'Preparando…' : 'Descargar Excel'}
+    </button>
+  );
 
   return (
     <div className="w-full space-y-6">
@@ -73,15 +130,7 @@ export function IngresosStockHistorialTenantPage({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-vialto-charcoal">Historial de ingresos</h1>
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setExportModalOpen(true)}
-              disabled={excelRows.length === 0}
-              className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-              Descargar Excel
-            </button>
+            {exportButton}
             <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
               ← Volver a ingresos
             </Link>
@@ -91,14 +140,7 @@ export function IngresosStockHistorialTenantPage({
 
       {embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={excelRows.length === 0}
-            className="text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
-          >
-            Descargar Excel
-          </button>
+          {exportButton}
           <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
             ← Volver a ingresos
           </Link>
@@ -312,6 +354,50 @@ export function IngresosStockHistorialTenantPage({
         actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
+
+      {meta && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-vialto-steel">
+              Página {meta.page} de {meta.totalPages} · {meta.total} registros
+            </p>
+            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
+              Mostrar
+              <select
+                value={pageSize}
+                disabled={loading}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              disabled={!meta.hasPrev || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={!meta.hasNext || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {viendo && (
         <StockOperacionViewModal
