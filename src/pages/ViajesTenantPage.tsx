@@ -94,7 +94,11 @@ import {
   estadoViajeLabel,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
-  viajeEstadoPermiteBotonFacturar,
+  viajePermiteBotonFacturar,
+  viajePendienteComprobanteCliente,
+  viajePendienteComprobanteTransportista,
+  viajeRequiereComprobanteDual,
+} from "@/lib/viajesComprobantes";
   estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from "@/lib/viajesEstados";
@@ -897,9 +901,7 @@ export function ViajesTenantPage({
   }, [clienteIdFiltroActivo]);
 
   function esElegibleFacturarLote(v: Viaje): boolean {
-    return (
-      viajeEstadoPermiteBotonFacturar(v.estado) && !viajesConFactura.has(v.id)
-    );
+    return viajePermiteBotonFacturar(v) && !viajesConFactura.has(v.id);
   }
 
   function toggleFacturarLote(id: string) {
@@ -1289,6 +1291,17 @@ export function ViajesTenantPage({
     } finally {
       setSavingEstadoId(null);
     }
+  }
+
+  function openFacturarFlow(v: Viaje) {
+    if (
+      viajeRequiereComprobanteDual(v) &&
+      (hasFacturacionSinArca || hasLiquidacionesArca)
+    ) {
+      setSelectorViaje(v);
+      return;
+    }
+    void navigateToFacturacion(v);
   }
 
   async function navigateToFacturacion(v: Viaje) {
@@ -2279,7 +2292,7 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                  onFacturar={() => void navigateToFacturacion(v)}
+                  onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
@@ -2298,13 +2311,6 @@ export function ViajesTenantPage({
                               : undefined,
                           )
                       : undefined
-                  }
-                  onEmitirCvlp={
-                    hasLiquidacionesArca && v.transportistaId
-                      ? () => setEmitirCvlpViaje(v)
-                      : hasFacturacionSinArca && v.transportistaId
-                        ? () => setSelectorViaje(v)
-                        : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
@@ -2476,7 +2482,7 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                  onFacturar={() => void navigateToFacturacion(v)}
+                  onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
@@ -2495,13 +2501,6 @@ export function ViajesTenantPage({
                               : undefined,
                           )
                       : undefined
-                  }
-                  onEmitirCvlp={
-                    hasLiquidacionesArca && v.transportistaId
-                      ? () => setEmitirCvlpViaje(v)
-                      : hasFacturacionSinArca && v.transportistaId
-                        ? () => setSelectorViaje(v)
-                        : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
@@ -2620,7 +2619,7 @@ export function ViajesTenantPage({
               clienteId:
                 draft.clienteId.trim() || viajeEdicionSnapshot.clienteId,
             };
-            void navigateToFacturacion(v);
+            openFacturarFlow(v);
           }}
           onEliminar={() => requestDeleteViaje(viajeEdicionSnapshot)}
           saving={savingId === editingId}
@@ -2726,9 +2725,17 @@ export function ViajesTenantPage({
       {selectorViaje && (
         <FacturarSelectorModal
           onClose={() => setSelectorViaje(null)}
+          clienteCompletado={!viajePendienteComprobanteCliente(selectorViaje)}
+          transportistaCompletado={
+            !viajePendienteComprobanteTransportista(selectorViaje)
+          }
           onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
           onLiquidacion={() => {
-            setCrearLiqViaje(selectorViaje);
+            if (hasLiquidacionesArca) {
+              setEmitirCvlpViaje(selectorViaje);
+            } else {
+              setCrearLiqViaje(selectorViaje);
+            }
             setSelectorViaje(null);
           }}
         />

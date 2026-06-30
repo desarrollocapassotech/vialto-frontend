@@ -45,8 +45,8 @@ import {
   estadosDisponiblesParaViaje,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
-  viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
+import { viajePermiteBotonFacturar } from '@/lib/viajesComprobantes';
 import { numeroFacturaVisibleViaje } from '@/lib/viajesFlota';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo, Viaje } from '@/types/api';
@@ -228,7 +228,15 @@ export function ViajeEditModal({
   if (!open) return null;
 
   const muestraBotonFacturar =
-    typeof onFacturar === 'function' && viajeEstadoPermiteBotonFacturar(draft.estado);
+    typeof onFacturar === 'function' &&
+    viajePermiteBotonFacturar({
+      ...snapshotViaje,
+      estado: draft.estado,
+      transportistaId:
+        draft.operacionModo === 'externo'
+          ? draft.transportistaId
+          : snapshotViaje.transportistaId,
+    });
   const facturarDeshabilitado = saving || !draft.clienteId.trim();
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
