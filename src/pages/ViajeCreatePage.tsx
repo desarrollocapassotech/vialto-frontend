@@ -35,7 +35,7 @@ import {
 import {
   PagosTransportistaFieldset,
   emptyPagoTransportista,
-  pagoTransportistaDraftToApi,
+  pagosTransportistaDraftsToApi,
   type PagoTransportistaDraft,
 } from '@/components/viajes/PagosTransportistaFieldset';
 import { apiJson } from '@/lib/api';
@@ -82,6 +82,7 @@ import {
   parseKmLitrosOpcionales,
   VIAJE_ESTADOS_ALTA,
 } from '@/lib/viajesEstados';
+import { validarPagosTransportistaDraftForm } from '@/lib/viajesTransportistaPagos';
 import { fechaHoraToIso } from '@/lib/viajeFechaHora';
 import type { Chofer, Cliente, Producto, Transportista, Vehiculo } from '@/types/api';
 import { useMaestroData } from '@/hooks/useMaestroData';
@@ -460,6 +461,23 @@ export function ViajeCreatePage() {
         return;
       }
     }
+    const precioTransportistaNum = parseCurrencyForMoneda(
+      precioTransportistaExterno,
+      monedaPrecioTransportista,
+    );
+    const pagosTransportistaApi = pagosTransportistaDraftsToApi(pagosTransportista);
+    const pagoTransportistaError = externo
+      ? validarPagosTransportistaDraftForm({
+          transportistaId: transportistaId.trim(),
+          precioTransportistaExterno,
+          monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          pagosTransportista,
+        })
+      : null;
+    if (pagoTransportistaError) {
+      setError(pagoTransportistaError);
+      return;
+    }
     if (
       !opts?.kmLitrosFromModal &&
       estadoMuestraKmLitros(estado) &&
@@ -520,14 +538,11 @@ export function ViajeCreatePage() {
             litNum !== undefined && Number.isFinite(litNum) ? litNum : undefined,
           monto: montoNum,
           monedaMonto,
-          precioTransportistaExterno: parseCurrencyForMoneda(
-            precioTransportistaExterno,
-            monedaPrecioTransportista,
-          ),
+          precioTransportistaExterno: precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
-          pagosTransportista: pagosTransportista.map(pagoTransportistaDraftToApi).filter(Boolean),
+          pagosTransportista: externo ? pagosTransportistaApi : [],
         }),
       });
       navigate(`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`, {
@@ -956,10 +971,23 @@ export function ViajeCreatePage() {
           </div>
           {modoOperacion === 'externo' && (
             <div className="md:col-span-2 lg:col-span-3">
-              <PagosTransportistaFieldset rows={pagosTransportista} onChange={setPagosTransportista} />
+              <PagosTransportistaFieldset
+                rows={pagosTransportista}
+                onChange={setPagosTransportista}
+                saldoContext={{
+                  transportistaId,
+                  precioTransportistaExterno,
+                  monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+                }}
+              />
               <button
                 type="button"
-                onClick={() => setPagosTransportista((prev) => [...prev, emptyPagoTransportista()])}
+                onClick={() =>
+                  setPagosTransportista((prev) => [
+                    ...prev,
+                    emptyPagoTransportista(monedaPrecioTransportista),
+                  ])
+                }
                 className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
               >
                 + Agregar pago al transportista

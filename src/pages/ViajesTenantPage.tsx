@@ -76,7 +76,7 @@ import {
 } from "@/components/viajes/OtrosGastosFieldset";
 import {
   pagoTransportistaDraftFromApi,
-  pagoTransportistaDraftToApi,
+  pagosTransportistaDraftsToApi,
 } from "@/components/viajes/PagosTransportistaFieldset";
 import {
   esEtiquetaCiudadValida,
@@ -107,6 +107,7 @@ import {
   VIAJE_PAGO_TRANSPORTISTA_QUERY,
   type ViajePagoTransportistaFiltro,
 } from "@/lib/viajesFiltroPagoTransportista";
+import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import {
   listadoTablaBodyRowClass,
   listadoTablaHeadRowClass,
@@ -1379,6 +1380,7 @@ export function ViajesTenantPage({
                   realizaFlete: true,
                   transportistaEfectivoId: "",
                   choferExternoId: "",
+                  pagosTransportista: [],
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0
@@ -1473,6 +1475,23 @@ export function ViajesTenantPage({
         return;
       }
     }
+    const precioTransportistaNum = parseCurrencyForMoneda(
+      draft.precioTransportistaExterno,
+      draft.monedaPrecioTransportistaExterno,
+    );
+    const pagosTransportistaApi = pagosTransportistaDraftsToApi(draft.pagosTransportista);
+    const pagoTransportistaError = externo
+      ? validarPagosTransportistaDraftForm({
+          transportistaId: draft.transportistaId.trim(),
+          precioTransportistaExterno: draft.precioTransportistaExterno,
+          monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
+          pagosTransportista: draft.pagosTransportista,
+        })
+      : null;
+    if (pagoTransportistaError) {
+      setError(pagoTransportistaError);
+      return;
+    }
 
     const kmResolved = draft.kmRecorridos.trim()
       ? Number(draft.kmRecorridos.replace(",", "."))
@@ -1525,19 +1544,14 @@ export function ViajesTenantPage({
             monedaMonto: draft.monedaMonto,
             kmRecorridos: kmResolved,
             litrosConsumidos: litResolved,
-            precioTransportistaExterno: parseCurrencyForMoneda(
-              draft.precioTransportistaExterno,
-              draft.monedaPrecioTransportistaExterno,
-            ),
+            precioTransportistaExterno: precioTransportistaNum,
             monedaPrecioTransportistaExterno:
               draft.monedaPrecioTransportistaExterno,
             ...gananciaBrutaManualPayloadFromDraft(draft),
             otrosGastos: draft.otrosGastos
               .map(otroGastoDraftToApi)
               .filter(Boolean),
-            pagosTransportista: draft.pagosTransportista
-              .map(pagoTransportistaDraftToApi)
-              .filter(Boolean),
+            pagosTransportista: externo ? pagosTransportistaApi : [],
           }),
         },
       );
