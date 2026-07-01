@@ -522,10 +522,7 @@ export function ViajesTenantPage({
           filtros.set("periodo", per);
         }
         appendViajeSortQuery(filtros, sortBy, sortDir);
-        const filtrosQs = filtros.toString();
-        const listBase = platform
-          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
-          : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
         const pageApi = Math.max(1, Math.floor(page));
         const pageSizeApi = pageSizeApiValido(pageSize);
 
@@ -534,12 +531,25 @@ export function ViajesTenantPage({
             ? pagoTranspF
             : null;
 
-        //Se filtra el lote grande de viajes para obtener los viajes pagados
+        // Se calcula la página que realmente se enviará al backend
         const reqPage = pagoFiltroActivo ? 1 : pageApi;
         const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
 
+        // Inyectamos la paginación y el tenantId directamente en los URLSearchParams
+        filtros.set("page", String(reqPage));
+        filtros.set("pageSize", String(reqPageSize));
+
+        if (platform && tid) {
+          filtros.set("tenantId", tid);
+        }
+
+        const basePath = platform
+          ? "/api/platform/viajes/paginated"
+          : "/api/viajes/paginated";
+
+        // Fetch unificado y seguro
         const data = await apiJson<ViajesPaginatedResponse>(
-          `${listBase}page=${reqPage}&pageSize=${reqPageSize}`,
+          `${basePath}?${filtros.toString()}`,
           () => getTokenRef.current(),
         );
 
