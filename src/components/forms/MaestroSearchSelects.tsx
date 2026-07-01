@@ -87,30 +87,41 @@ export function ChoferSearchSelect({
   id,
   'aria-label': ariaLabel,
   onNuevo,
+  allowEmptyValue = false,
+  emptyListChoiceLabel = 'Sin conductor',
+  loading = false,
+  placeholderCerrado = 'Elegí un chofer…',
 }: BaseProps & {
   choferes: Chofer[];
   value: string;
   onChange: (id: string) => void;
   onNuevo?: () => void;
+  allowEmptyValue?: boolean;
+  emptyListChoiceLabel?: string;
+  loading?: boolean;
+  placeholderCerrado?: string;
 }) {
   return (
     <SearchableEntitySelect<Chofer>
       items={choferes}
       value={value}
       onChange={onChange}
-      disabled={disabled || (choferes.length === 0 && !onNuevo)}
+      disabled={disabled || (choferes.length === 0 && !onNuevo && !allowEmptyValue)}
+      loading={loading}
       className={className}
       inputClassName={inputClassName}
       filterItems={filtrarChoferes}
       getPrimaryLabel={(c) => c.nombre}
       getSecondaryLabel={(c) => (c.dni ? `DNI ${c.dni}` : c.telefono) ?? null}
-      placeholderCerrado="Elegí un chofer…"
+      placeholderCerrado={placeholderCerrado}
       placeholderBuscar="Buscar chofer…"
+      allowEmptyValue={allowEmptyValue}
+      emptyListChoiceLabel={emptyListChoiceLabel}
       searchAriaLabel="Filtrar choferes"
       noItemsSlot={
         !onNuevo ? (
           <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
-            Sin choferes de flota propia
+            Sin choferes cargados
           </div>
         ) : undefined
       }
