@@ -10,10 +10,12 @@ import { apiJson } from '@/lib/api';
 import {
   choferWritePayloadFromForm,
   validarDniForm,
+  validarPinForm,
   type ChoferFormState,
 } from '@/lib/choferForm';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { canAccessCombustible } from '@/lib/tenantModules';
 
 const emptyForm = (): ChoferFormState => ({
   nombre: '',
@@ -28,6 +30,8 @@ export function ChoferCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
+  // Superadmin (tenantId en URL) siempre puede configurar PIN; tenant solo si tiene módulo combustible.
+  const showPinField = !!tenantId || canAccessCombustible(maestro.tenant?.modules ?? []);
   const [form, setForm] = useState<ChoferFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +46,8 @@ export function ChoferCreatePage() {
     if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre del chofer.';
     const dniError = validarDniForm(form.dni);
     if (dniError) errs.dni = dniError;
+    const pinError = showPinField ? validarPinForm(form.pin) : null;
+    if (pinError) errs.pin = pinError;
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -111,6 +117,21 @@ export function ChoferCreatePage() {
             onChange={(e) => patch({ telefono: e.target.value })}
           />
         </label>
+        {showPinField && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>PIN app combustible</CrudFieldLabel>
+            <CrudInput
+              type="password"
+              inputMode="numeric"
+              placeholder="4 dígitos (opcional)"
+              value={form.pin ?? ''}
+              error={fieldErrors.pin}
+              maxLength={4}
+              onChange={(e) => patch({ pin: e.target.value.replace(/\D/g, '') })}
+            />
+            <CrudFieldError message={fieldErrors.pin} />
+          </label>
+        )}
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear chofer" />
       </form>

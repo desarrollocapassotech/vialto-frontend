@@ -5,6 +5,8 @@ export type ChoferFormState = {
   dni: string;
   cuit: string;
   telefono: string;
+  /** PIN para la app vialto-combustible. Vacío = no cambiar (edit) / no configurar (create). */
+  pin?: string;
 };
 
 export function choferFormStateFromApi(row: Chofer): ChoferFormState {
@@ -13,6 +15,7 @@ export function choferFormStateFromApi(row: Chofer): ChoferFormState {
     dni: row.dni ?? '',
     cuit: row.cuit ?? '',
     telefono: row.telefono ?? '',
+    // pin nunca viene en la respuesta; se deja vacío para que el admin lo establezca si quiere
   };
 }
 
@@ -30,6 +33,13 @@ export function validarDniForm(dni: string): string | null {
   return null;
 }
 
+/** Valida el PIN solo si el campo no está vacío (siempre es opcional). */
+export function validarPinForm(pin: string | undefined): string | null {
+  if (!pin) return null;
+  if (!/^\d{4}$/.test(pin)) return 'El PIN debe tener exactamente 4 dígitos numéricos.';
+  return null;
+}
+
 /**
  * Cuerpo POST/PATCH alineado con CreateChoferDto / UpdateChoferDto.
  * Opcionales vacíos van como `null` (el backend debe preservar `null` en PATCH para borrar el valor).
@@ -42,11 +52,14 @@ export function choferWritePayloadFromForm(
   const cuit = form.cuit.trim();
   const telefono = form.telefono.trim();
   const tid = transportistaId?.trim() ?? '';
+  const pin = form.pin?.trim();
   return {
     nombre: form.nombre.trim(),
     dni: dni || null,
     cuit: cuit || null,
     telefono: telefono || null,
     ...(tid ? { transportistaId: tid } : {}),
+    // pin solo se incluye si el admin ingresó un valor; vacío = no tocar el PIN existente
+    ...(pin ? { pin } : {}),
   };
 }

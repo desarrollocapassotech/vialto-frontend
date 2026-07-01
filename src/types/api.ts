@@ -118,6 +118,8 @@ export interface Chofer {
   licenciaVence: string | null;
   telefono: string | null;
   transportistaId: string | null;
+  /** true si el chofer tiene PIN configurado para la app vialto-combustible. El hash nunca se expone. */
+  pinConfigured?: boolean;
   createdAt: string;
 }
 
