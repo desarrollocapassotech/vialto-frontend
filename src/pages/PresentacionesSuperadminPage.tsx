@@ -1,14 +1,18 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Presentacion } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { Presentacion } from "@/types/api";
+import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
 
 type FormState = { nombre: string; activo: boolean };
 
@@ -21,16 +25,22 @@ export function PresentacionesSuperadminPage() {
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ nombre: '', activo: true });
+  const [form, setForm] = useState<FormState>({ nombre: "", activo: true });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [confirmTarget, setConfirmTarget] = useState<Presentacion | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const editing = rows?.find((r) => r.id === editingId) ?? null;
-  const baseUrl = '/api/platform/stock/presentaciones';
-  const qs = filtroEmpresa ? `?tenantId=${encodeURIComponent(filtroEmpresa)}` : '';
+  const baseUrl = "/api/platform/stock/presentaciones";
+  const qs = filtroEmpresa
+    ? `?tenantId=${encodeURIComponent(filtroEmpresa)}`
+    : "";
 
   const load = useCallback(async () => {
     if (!filtroEmpresa) return;
-    const data = await apiJson<Presentacion[]>(`${baseUrl}${qs}`, () => getToken());
+    const data = await apiJson<Presentacion[]>(`${baseUrl}${qs}`, () =>
+      getToken(),
+    );
     setRows(data);
   }, [baseUrl, qs, filtroEmpresa, getToken]);
 
@@ -49,7 +59,7 @@ export function PresentacionesSuperadminPage() {
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'plataforma'));
+          setError(friendlyError(e, "plataforma"));
         }
       }
     })();
@@ -67,14 +77,14 @@ export function PresentacionesSuperadminPage() {
       setForm({ nombre: editing.nombre, activo: editing.activo });
       return;
     }
-    setForm({ nombre: '', activo: true });
+    setForm({ nombre: "", activo: true });
   }, [editing, isFormOpen]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!filtroEmpresa) return;
     if (!form.nombre.trim()) {
-      setFieldErrors({ nombre: 'Ingresá el nombre de la presentación.' });
+      setFieldErrors({ nombre: "Ingresá el nombre de la presentación." });
       return;
     }
     setFieldErrors({});
@@ -86,11 +96,11 @@ export function PresentacionesSuperadminPage() {
         await apiJson<Presentacion>(
           `${baseUrl}/${encodeURIComponent(editingId)}${qs}`,
           () => getToken(),
-          { method: 'PATCH', body: JSON.stringify(payload) },
+          { method: "PATCH", body: JSON.stringify(payload) },
         );
       } else {
         await apiJson<Presentacion>(`${baseUrl}${qs}`, () => getToken(), {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(payload),
         });
       }
@@ -98,22 +108,30 @@ export function PresentacionesSuperadminPage() {
       setIsFormOpen(false);
       setEditingId(null);
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
     } finally {
       setSaving(false);
     }
   }
 
-  async function eliminar(row: Presentacion) {
-    if (!filtroEmpresa || !window.confirm(`¿Eliminar la presentación "${row.nombre}"?`)) return;
+  async function confirmarEliminar() {
+    if (!confirmTarget || !filtroEmpresa) return;
+    const row = confirmTarget;
+    setDeleting(true);
     setError(null);
     try {
-      await apiJson(`${baseUrl}/${encodeURIComponent(row.id)}${qs}`, () => getToken(), {
-        method: 'DELETE',
-      });
+      await apiJson(
+        `${baseUrl}/${encodeURIComponent(row.id)}${qs}`,
+        () => getToken(),
+        { method: "DELETE" },
+      );
       await load();
+      setConfirmTarget(null);
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
+      setConfirmTarget(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -127,7 +145,11 @@ export function PresentacionesSuperadminPage() {
       </p>
 
       <div className="mt-6">
-        <EmpresaFilterBar tenants={tenants} value={filtroEmpresa} onChange={onChangeTenant} />
+        <EmpresaFilterBar
+          tenants={tenants}
+          value={filtroEmpresa}
+          onChange={onChangeTenant}
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
@@ -151,7 +173,9 @@ export function PresentacionesSuperadminPage() {
       )}
 
       {!filtroEmpresa && (
-        <p className="mt-8 text-sm text-vialto-steel">Elegí una empresa para ver sus presentaciones.</p>
+        <p className="mt-8 text-sm text-vialto-steel">
+          Elegí una empresa para ver sus presentaciones.
+        </p>
       )}
 
       {filtroEmpresa && (
@@ -159,16 +183,16 @@ export function PresentacionesSuperadminPage() {
           className="mt-4"
           columns={[
             {
-              id: 'nombre',
-              header: 'Nombre',
+              id: "nombre",
+              header: "Nombre",
               primary: true,
               cell: (row) => row.nombre,
               tdClassName: `${listadoTablaTdClass} font-medium`,
             },
             {
-              id: 'estado',
-              header: 'Estado',
-              cell: (row) => (row.activo ? 'Activa' : 'Inactiva'),
+              id: "estado",
+              header: "Estado",
+              cell: (row) => (row.activo ? "Activa" : "Inactiva"),
               tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
             },
           ]}
@@ -176,8 +200,8 @@ export function PresentacionesSuperadminPage() {
           rowKey={(row) => row.id}
           emptyMessage={
             error
-              ? 'No se pudieron cargar las presentaciones.'
-              : 'No hay presentaciones para esta empresa.'
+              ? "No se pudieron cargar las presentaciones."
+              : "No hay presentaciones para esta empresa."
           }
           loadingMessage="Cargando…"
           renderActions={(row) => (
@@ -194,7 +218,7 @@ export function PresentacionesSuperadminPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void eliminar(row)}
+                onClick={() => setConfirmTarget(row)}
                 className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
               >
                 Eliminar
@@ -211,14 +235,16 @@ export function PresentacionesSuperadminPage() {
             className="w-full max-w-md rounded border border-black/10 bg-white p-5 shadow-lg"
           >
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide mb-4">
-              {editingId ? 'Editar presentación' : 'Nueva presentación'}
+              {editingId ? "Editar presentación" : "Nueva presentación"}
             </h2>
             <label className="flex flex-col gap-1 text-sm uppercase tracking-[0.08em] text-vialto-steel">
               Nombre <span className="text-red-500">*</span>
               <input
                 value={form.nombre}
-                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                className={`h-9 border px-2 text-sm normal-case tracking-normal ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, nombre: e.target.value }))
+                }
+                className={`h-9 border px-2 text-sm normal-case tracking-normal ${fieldErrors.nombre ? "border-red-400" : "border-black/15"}`}
                 autoFocus
               />
             </label>
@@ -228,7 +254,9 @@ export function PresentacionesSuperadminPage() {
                 <input
                   type="checkbox"
                   checked={form.activo}
-                  onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, activo: e.target.checked }))
+                  }
                   className="h-4 w-4"
                 />
                 Activa
@@ -238,7 +266,10 @@ export function PresentacionesSuperadminPage() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => { setIsFormOpen(false); setFieldErrors({}); }}
+                onClick={() => {
+                  setIsFormOpen(false);
+                  setFieldErrors({});
+                }}
                 className="h-9 px-3 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
               >
                 Cancelar
@@ -248,12 +279,30 @@ export function PresentacionesSuperadminPage() {
                 disabled={saving}
                 className="h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
               >
-                {saving ? 'Guardando…' : 'Guardar'}
+                {saving ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </form>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        destructive
+        busy={deleting}
+        title="Eliminar presentación"
+        confirmLabel="Eliminar"
+        onConfirm={() => void confirmarEliminar()}
+        onCancel={() => setConfirmTarget(null)}
+        message={
+          <>
+            ¿Seguro que querés eliminar la presentación{" "}
+            <span className="font-medium text-vialto-charcoal">
+              “{confirmTarget?.nombre}”
+            </span>
+            ? Esta acción no se puede deshacer.
+          </>
+        }
+      />
     </div>
   );
 }
