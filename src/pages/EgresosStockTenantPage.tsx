@@ -4,6 +4,7 @@ import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
@@ -121,6 +122,7 @@ export function EgresosStockTenantPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [stockItemsLoading, setStockItemsLoading] = useState(false);
   // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con stock
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allStockLoading, setAllStockLoading] = useState(true);
@@ -195,19 +197,26 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Cargar stock disponible para el cliente+depósito seleccionados (para mostrar disponible en paso 3)
+  // Stock disponible para cliente + depósito (paso 3: productos y validación)
   useEffect(() => {
     if (!clienteId || !depositoId) {
       setStockItems([]);
+      setStockItemsLoading(false);
       return;
     }
+    setStockItemsLoading(true);
     void apiJson<StockItem[]>(
-      `${disponibleBase}${buildQs({ clienteId }, tenantId)}`,
+      `${disponibleBase}${buildQs({ clienteId, depositoId }, tenantId)}`,
       () => getToken(),
     )
       .then(setStockItems)
-      .catch(() => setStockItems([]));
+      .catch(() => setStockItems([]))
+      .finally(() => setStockItemsLoading(false));
   }, [clienteId, depositoId, disponibleBase, tenantId, getToken]);
+
+  useEffect(() => {
+    setRows([emptyEgresoRow()]);
+  }, [clienteId, depositoId]);
 
   function updateRow(key: string, patch: Partial<EgresoRow>) {
     setRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...patch } : r)));
@@ -270,6 +279,9 @@ export function EgresosStockTenantPage({
     const ferrs: Record<string, string> = {};
     rows.forEach((row, idx) => {
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
+      else if (!productosParaEgreso.some((p) => p.id === row.productoId)) {
+        ferrs[`row_${idx}_productoId`] = 'El producto no tiene stock para este cliente y depósito.';
+      }
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
       const b = parseFloat(row.bultos) || 0;
@@ -354,6 +366,11 @@ export function EgresosStockTenantPage({
     const ids = new Set(items.map((s) => s.depositoId));
     return depositos.filter((d) => ids.has(d.id));
   }, [depositos, allStockItems, allStockLoading, clienteId]);
+
+  const productosParaEgreso = useMemo(
+    () => productosConStockParaCliente(productos, stockItems, clienteId, depositoId),
+    [productos, stockItems, clienteId, depositoId],
+  );
 
   const clienteNombre = clientes.find((c) => c.id === clienteId)?.nombre ?? '';
   const depositoNombre = depositos.find((d) => d.id === depositoId)?.nombre ?? '';
@@ -451,8 +468,8 @@ export function EgresosStockTenantPage({
           onAddRow={addRow}
           onRemoveRow={removeRow}
           onUpdateRow={updateRow}
-          productos={productos}
-          productosLoading={productosLoading}
+          productos={productosParaEgreso}
+          productosLoading={productosLoading || stockItemsLoading}
           stockItems={stockItems}
           fieldErrors={fieldErrors}
           formError={formError}
