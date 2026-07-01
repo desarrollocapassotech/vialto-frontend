@@ -1,4 +1,9 @@
 ﻿import type { MovimientoStock, Producto, StockItem, StockOperacion } from '@/types/api';
+import {
+  presentacionNombreFromLike,
+  presentacionNombreFromMovimiento,
+  presentacionNombreFromStockItem,
+} from '@/lib/stockPresentacion';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 export interface ExcelColDef<T> {
@@ -23,34 +28,6 @@ export async function generarExcel<T>(
 
 function presentacionColId(nombre: string): string {
   return `pres_${nombre.trim().toLowerCase().replace(/\s+/g, '_')}`;
-}
-
-type PresentacionLike = {
-  nombre?: string | null;
-  presentacion?: { nombre?: string | null } | null;
-} | null | undefined;
-
-function getPresentacionNombre(presentacion: PresentacionLike): string {
-  return (
-    presentacion?.presentacion?.nombre?.trim() ??
-    presentacion?.nombre?.trim() ??
-    ''
-  );
-}
-
-function presentacionNombreFromMovimiento(m: MovimientoStock): string {
-  return getPresentacionNombre(m.presentacion);
-}
-
-function presentacionNombreFromStockItem(i: StockItem, productos: Producto[] = []): string {
-  const directo = getPresentacionNombre(i.presentacion);
-  if (directo) return directo;
-
-  const producto = productos.find((p) => p.id === i.productoId);
-  const productoPresentacion = producto?.productoPresentaciones?.find(
-    (pp) => pp.id === i.presentacionId || pp.presentacionId === i.presentacionId,
-  );
-  return productoPresentacion?.presentacion?.nombre?.trim() ?? '';
 }
 
 /** Todas las presentaciones de los productos involucrados, sin límite de cantidad. */
@@ -230,7 +207,7 @@ export function flattenStockOperaciones(
         deposito: op.deposito?.nombre ?? op.depositoId,
         remito: op.numeroRemito ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
-        presentacion: getPresentacionNombre(mov.presentacion) || mov.presentacionId || '',
+        presentacion: presentacionNombreFromLike(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
         sueltas: mov.unidades,
         lote: mov.lote ?? '',

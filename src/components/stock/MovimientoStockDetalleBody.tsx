@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import {
-  movimientoStockTipoNumeroClass,
-} from '@/lib/stockMovimientoTipo';
+import { movimientoStockTipoNumeroClass } from '@/lib/stockMovimientoTipo';
+import { presentacionNombreFromMovimiento } from '@/lib/stockPresentacion';
 import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetalleBody({
@@ -20,6 +19,8 @@ export function MovimientoStockDetalleBody({
   const remitoTitulo = row.numeroRemito?.trim()
     ? `Remito ${row.numeroRemito.trim()}`
     : 'Remito interno';
+
+  const presentacionNombre = presentacionNombreFromMovimiento(row);
 
   return (
     <>
@@ -58,16 +59,16 @@ export function MovimientoStockDetalleBody({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            {row.producto?.unidad1Nombre ?? 'Pallets'}
+            {presentacionNombre || 'Bultos'}
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">
             <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad1}</span>
           </dd>
         </div>
-        {row.producto?.unidad2Nombre !== null && (
+        {row.cantidad2 > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
             <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-              {row.producto?.unidad2Nombre ?? 'Unidad'}
+              Sueltas
             </dt>
             <dd className="sm:col-span-2 text-vialto-charcoal">
               <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad2}</span>
