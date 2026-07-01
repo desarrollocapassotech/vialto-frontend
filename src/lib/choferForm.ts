@@ -7,6 +7,8 @@ export type ChoferFormState = {
   telefono: string;
   /** PIN para la app vialto-combustible. Vacío = no cambiar (edit) / no configurar (create). */
   pin?: string;
+  /** Solo lectura. Indica si el chofer ya tiene PIN configurado en la BD. */
+  pinConfigured?: boolean;
 };
 
 export function choferFormStateFromApi(row: Chofer): ChoferFormState {
@@ -15,6 +17,7 @@ export function choferFormStateFromApi(row: Chofer): ChoferFormState {
     dni: row.dni ?? '',
     cuit: row.cuit ?? '',
     telefono: row.telefono ?? '',
+    pinConfigured: row.pinConfigured ?? false,
     // pin nunca viene en la respuesta; se deja vacío para que el admin lo establezca si quiere
   };
 }

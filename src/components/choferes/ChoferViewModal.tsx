@@ -130,9 +130,13 @@ export function ChoferViewModal({
           {showPin && (
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">PIN combustible</p>
-              <p className="mt-1 text-sm">
-                {chofer.pinConfigured ? 'Configurado' : 'No configurado'}
-              </p>
+              <div className="mt-1">
+                {chofer.pinConfigured ? (
+                  <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">Configurado ✓</span>
+                ) : (
+                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Sin PIN</span>
+                )}
+              </div>
             </div>
           )}
         </div>

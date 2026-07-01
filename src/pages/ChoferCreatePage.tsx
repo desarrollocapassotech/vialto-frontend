@@ -121,7 +121,7 @@ export function ChoferCreatePage() {
           <label className="grid gap-1.5">
             <CrudFieldLabel>PIN app combustible</CrudFieldLabel>
             <CrudInput
-              type="password"
+              type="text"
               inputMode="numeric"
               placeholder="4 dígitos (opcional)"
               value={form.pin ?? ''}
