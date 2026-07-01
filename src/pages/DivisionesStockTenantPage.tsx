@@ -418,9 +418,9 @@ export function DivisionesStockTenantPage({
                 depositoId={depositoId}
                 presentacionId={presentacionId}
                 value={lote}
-                onLoteChange={(l, d) => {
+                onLoteChange={(l, meta) => {
                   setLote(l);
-                  setLoteDisponible(d);
+                  setLoteDisponible(meta?.cantidad1 ?? null);
                   setBultos(1);
                 }}
                 lotesBase={lotesBase}
