@@ -247,6 +247,36 @@ export function flattenStockOperaciones(
   return rows;
 }
 
+export function stockOperacionesMixtasColumnas(): ExcelColDef<OperacionFlatRow & { tipo: string }>[] {
+  return [
+    { id: 'fecha', label: 'Fecha', getValue: (r) => r.fecha },
+    { id: 'tipo', label: 'Tipo', getValue: (r) => r.tipo },
+    { id: 'cliente', label: 'Cliente', getValue: (r) => r.cliente },
+    { id: 'deposito', label: 'Depósito', getValue: (r) => r.deposito },
+    { id: 'producto', label: 'Producto', getValue: (r) => r.producto },
+    { id: 'presentacion', label: 'Presentación', getValue: (r) => r.presentacion },
+    { id: 'bultos', label: 'Bultos', getValue: (r) => r.bultos },
+    { id: 'sueltas', label: 'Sueltas', getValue: (r) => r.sueltas },
+    { id: 'lote', label: 'Lote', getValue: (r) => r.lote },
+    { id: 'vencimiento', label: 'Vencimiento', getValue: (r) => r.vencimiento },
+    { id: 'remito', label: 'N° Remito', getValue: (r) => r.remito },
+    { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
+    { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
+    { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },
+    { id: 'observaciones', label: 'Observaciones', getValue: (r) => r.observaciones },
+  ];
+}
+
+export function flattenOperacionesMixtas(
+  operaciones: StockOperacion[],
+): Array<OperacionFlatRow & { tipo: string }> {
+  return operaciones.flatMap((op) => {
+    const tipo =
+      op.tipo === 'ingreso' ? 'Ingreso' : op.tipo === 'egreso' ? 'Egreso' : 'División';
+  return flattenStockOperaciones([op]).map((row) => ({ ...row, tipo }));
+  });
+}
+
 export function stockOperacionColumnas(
   tipo: 'ingreso' | 'egreso',
 ): ExcelColDef<OperacionFlatRow>[] {
