@@ -206,6 +206,7 @@ type OperacionFlatRow = {
   cliente: string;
   deposito: string;
   remito: string;
+  remitoProveedor: string;
   producto: string;
   presentacion: string;
   bultos: number;
@@ -229,6 +230,7 @@ export function flattenStockOperaciones(
         cliente: op.cliente?.nombre ?? op.clienteId,
         deposito: op.deposito?.nombre ?? op.depositoId,
         remito: op.numeroRemito ?? '',
+        remitoProveedor: op.numeroRemitoProveedor ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
         presentacion: getPresentacionNombre(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
@@ -252,6 +254,17 @@ export function stockOperacionColumnas(
 ): ExcelColDef<OperacionFlatRow>[] {
   const cols: ExcelColDef<OperacionFlatRow>[] = [
     { id: 'fecha', label: 'Fecha', getValue: (r) => r.fecha },
+  ];
+
+  if (tipo === 'ingreso') {
+    cols.push({ id: 'remitoProveedor', label: 'N° Remito Proveedor', getValue: (r) => r.remitoProveedor });
+  }
+
+  if (tipo === 'egreso') {
+    cols.push({ id: 'remito', label: 'N° Remito', getValue: (r) => r.remito });
+  }
+
+  cols.push(
     { id: 'cliente', label: 'Cliente', getValue: (r) => r.cliente },
     { id: 'deposito', label: 'Depósito', getValue: (r) => r.deposito },
     { id: 'producto', label: 'Producto', getValue: (r) => r.producto },
@@ -259,7 +272,7 @@ export function stockOperacionColumnas(
     { id: 'bultos', label: 'Bultos', getValue: (r) => r.bultos },
     { id: 'sueltas', label: 'Sueltas', getValue: (r) => r.sueltas },
     { id: 'lote', label: 'Lote', getValue: (r) => r.lote },
-  ];
+  );
 
   if (tipo === 'ingreso') {
     cols.push({ id: 'vencimiento', label: 'Vencimiento', getValue: (r) => r.vencimiento });
@@ -267,7 +280,6 @@ export function stockOperacionColumnas(
 
   if (tipo === 'egreso') {
     cols.push(
-      { id: 'remito', label: 'N° Remito', getValue: (r) => r.remito },
       { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
       { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
       { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },
