@@ -135,6 +135,7 @@ export function IngresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [numeroRemitoProveedor, setNumeroRemitoProveedor] = useState('');
   const [fotoFiles, setFotoFiles] = useState<File[]>([]);
   const [previewFoto, setPreviewFoto] = useState<File | null>(null);
 
@@ -195,6 +196,7 @@ export function IngresosStockTenantPage({
     setHoraMov(p.hora);
     setFechaMovError(null);
     setObservaciones('');
+    setNumeroRemitoProveedor('');
     setFotoFiles([]);
     setRows([emptyRow()]);
     setFormError(null);
@@ -268,6 +270,7 @@ export function IngresosStockTenantPage({
           fecha: fechaIso,
           fotosUrls,
           observaciones: observaciones.trim() || undefined,
+          numeroRemitoProveedor: numeroRemitoProveedor.trim() || undefined,
           lineas: rows.map((row) => ({
             productoId: row.productoId,
             presentacionId: row.presentacionId,
@@ -352,6 +355,8 @@ export function IngresosStockTenantPage({
           }}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
+          numeroRemitoProveedor={numeroRemitoProveedor}
+          onNumeroRemitoProveedorChange={setNumeroRemitoProveedor}
           fotoFiles={fotoFiles}
           onFotosChange={setFotoFiles}
           onFotoPreview={setPreviewFoto}

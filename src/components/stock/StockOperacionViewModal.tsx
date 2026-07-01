@@ -87,6 +87,10 @@ export function StockOperacionViewModal({
           <Campo label="N° Remito" value={operacion.numeroRemito} mono />
         )}
 
+        {operacion.tipo === 'ingreso' && operacion.numeroRemitoProveedor && (
+          <Campo label="N° Remito Proveedor" value={operacion.numeroRemitoProveedor} mono />
+        )}
+
         {operacion.tipo === 'egreso' && (
           <>
             <Campo label="Conductor" value={operacion.entregadoPor ?? '—'} />

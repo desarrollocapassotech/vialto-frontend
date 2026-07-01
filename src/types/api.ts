@@ -504,6 +504,8 @@ export interface StockOperacion {
   /** PDF del remito interno generado al egresar. */
   remitoUrl?: string | null;
   numeroRemito?: string | null;
+  /** Número de remito del proveedor, informado manualmente al registrar un ingreso. */
+  numeroRemitoProveedor?: string | null; 
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
