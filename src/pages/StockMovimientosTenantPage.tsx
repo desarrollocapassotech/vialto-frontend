@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
+import { MovimientoCantidadLinea } from '@/components/stock/MovimientoCantidadLinea';
 import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
@@ -11,10 +12,10 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { generarExcel, movimientoStockColumnas } from '@/lib/stockExcelExport';
+import { presentacionNombreFromMovimiento } from '@/lib/stockPresentacion';
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
-  movimientoStockTipoNumeroClass,
 } from '@/lib/stockMovimientoTipo';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { MovimientoStock, Producto, Cliente, Deposito, PaginatedMeta } from '@/types/api';
@@ -474,11 +475,11 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             thClassName: `${listadoTablaThClass} align-top`,
             header: 'Cant. 1',
             cell: (m) => (
-              <>
-                <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad1}</span>
-                {' '}
-                <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
-              </>
+              <MovimientoCantidadLinea
+                cantidad={m.cantidad1}
+                etiqueta={presentacionNombreFromMovimiento(m)}
+                tipo={m.tipo}
+              />
             ),
             tdClassName: `${listadoTablaTdClass} text-right`,
           },
@@ -487,12 +488,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             thClassName: `${listadoTablaThClass} align-top`,
             header: 'Cant. 2',
             cell: (m) =>
-              m.producto?.unidad2Nombre !== null ? (
-                <>
-                  <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad2}</span>
-                  {' '}
-                  <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
-                </>
+              m.cantidad2 > 0 ? (
+                <MovimientoCantidadLinea cantidad={m.cantidad2} etiqueta="Sueltas" tipo={m.tipo} />
               ) : (
                 '—'
               ),
