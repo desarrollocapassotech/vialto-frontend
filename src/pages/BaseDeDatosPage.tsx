@@ -50,8 +50,8 @@ export function BaseDeDatosPage() {
     switch (tab.id) {
       case 'clientes': return true;
       case 'transportistas':
-      case 'choferes':
       case 'vehiculos': return hasViajes;
+      case 'choferes': return hasViajes || hasStock;
       case 'productos': return hasViajes || hasStock;
       case 'presentaciones': return hasStock;
       case 'depositos': return hasStock;

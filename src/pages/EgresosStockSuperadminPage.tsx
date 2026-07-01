@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import type { Cliente } from '@/types/api';
+import type { Chofer, Cliente } from '@/types/api';
 import { EgresosStockTenantPage } from './EgresosStockTenantPage';
 
 export function EgresosStockSuperadminPage() {
@@ -14,6 +14,8 @@ export function EgresosStockSuperadminPage() {
   const [tenantId, setTenantId] = useState(() => searchParams.get('tenantId') ?? '');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesLoading, setClientesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
+  const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [choferesLoading, setChoferesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
 
   useEffect(() => {
     const t = searchParams.get('tenantId') ?? '';
@@ -27,10 +29,14 @@ export function EgresosStockSuperadminPage() {
         setSearchParams({ tenantId: v });
         setClientes([]);
         setClientesLoading(true);
+        setChoferes([]);
+        setChoferesLoading(true);
       } else {
         setSearchParams({});
         setClientes([]);
         setClientesLoading(false);
+        setChoferes([]);
+        setChoferesLoading(false);
       }
     },
     [setSearchParams],
@@ -40,23 +46,37 @@ export function EgresosStockSuperadminPage() {
     if (!tenantId) {
       setClientes([]);
       setClientesLoading(false);
+      setChoferes([]);
+      setChoferesLoading(false);
       return;
     }
     setClientes([]);
     setClientesLoading(true);
+    setChoferes([]);
+    setChoferesLoading(true);
     let cancelled = false;
-    void apiJson<Cliente[]>(
-      `/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`,
-      () => getToken(),
-    )
-      .then((data) => {
-        if (!cancelled) setClientes(data);
+    const q = `tenantId=${encodeURIComponent(tenantId)}`;
+    void Promise.all([
+      apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
+      apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
+    ])
+      .then(([clientesData, choferesData]) => {
+        if (!cancelled) {
+          setClientes(clientesData);
+          setChoferes(choferesData);
+        }
       })
       .catch(() => {
-        if (!cancelled) setClientes([]);
+        if (!cancelled) {
+          setClientes([]);
+          setChoferes([]);
+        }
       })
       .finally(() => {
-        if (!cancelled) setClientesLoading(false);
+        if (!cancelled) {
+          setClientesLoading(false);
+          setChoferesLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -79,6 +99,8 @@ export function EgresosStockSuperadminPage() {
           tenantId={tenantId}
           clientesExternos={clientes}
           clientesExternosLoading={clientesLoading}
+          choferesExternos={choferes}
+          choferesExternosLoading={choferesLoading}
         />
       )}
     </div>
