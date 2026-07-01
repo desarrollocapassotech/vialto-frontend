@@ -3,18 +3,25 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { LoteSelect } from '@/components/stock/LoteSelect';
 import { Spinner } from '@/components/ui/Spinner';
-import type { Producto, ProductoPresentacion, StockItem } from '@/types/api';
+import { STOCK_SIN_LOTE_VALUE, loteEgresoSeleccionValida } from '@/lib/stockLote';
+import { formatMovimientoStockFechaFromIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import type { Producto, ProductoPresentacion } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const INPUT_READONLY =
+  'h-9 w-full border border-black/10 bg-vialto-mist/30 px-2 text-sm text-vialto-charcoal';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 export type EgresoRow = {
   _key: string;
   productoId: string;
   presentacionId: string;
+  lote: string;
+  fechaVencimiento: string;
+  loteStockBultos: number | null;
+  loteStockSueltas: number | null;
   bultos: string;
   sueltas: string;
-  lote: string;
 };
 
 export function emptyEgresoRow(): EgresoRow {
@@ -22,9 +29,26 @@ export function emptyEgresoRow(): EgresoRow {
     _key: crypto.randomUUID(),
     productoId: '',
     presentacionId: '',
+    lote: '',
+    fechaVencimiento: '',
+    loteStockBultos: null,
+    loteStockSueltas: null,
     bultos: '',
     sueltas: '',
+  };
+}
+
+function resetLoteFields(): Pick<
+  EgresoRow,
+  'lote' | 'fechaVencimiento' | 'loteStockBultos' | 'loteStockSueltas' | 'bultos' | 'sueltas'
+> {
+  return {
     lote: '',
+    fechaVencimiento: '',
+    loteStockBultos: null,
+    loteStockSueltas: null,
+    bultos: '',
+    sueltas: '',
   };
 }
 
@@ -32,21 +56,15 @@ function getPresentaciones(productos: Producto[], productoId: string): ProductoP
   return productos.find((p) => p.id === productoId)?.productoPresentaciones ?? [];
 }
 
-function getDisponible(
-  stockItems: StockItem[],
-  productoId: string,
-  presentacionId: string,
-): StockItem | null {
-  if (!productoId || !presentacionId) return null;
-  return stockItems.find(
-    (s) => s.productoId === productoId && s.presentacionId === presentacionId,
-  ) ?? null;
-}
-
 export function isEgresoRowComplete(row: EgresoRow): boolean {
   const b = parseFloat(row.bultos) || 0;
   const s = parseFloat(row.sueltas) || 0;
-  return Boolean(row.productoId) && Boolean(row.presentacionId) && (b > 0 || s > 0);
+  return (
+    Boolean(row.productoId) &&
+    Boolean(row.presentacionId) &&
+    loteEgresoSeleccionValida(row.lote) &&
+    (b > 0 || s > 0)
+  );
 }
 
 export function EgresoWizardStep3({
@@ -56,7 +74,6 @@ export function EgresoWizardStep3({
   onUpdateRow,
   productos,
   productosLoading,
-  stockItems,
   fieldErrors,
   formError,
   saving,
@@ -76,7 +93,6 @@ export function EgresoWizardStep3({
   onUpdateRow: (key: string, patch: Partial<EgresoRow>) => void;
   productos: Producto[];
   productosLoading: boolean;
-  stockItems: StockItem[];
   fieldErrors: Record<string, string>;
   formError: string | null;
   saving: boolean;
@@ -92,7 +108,6 @@ export function EgresoWizardStep3({
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      {/* Resumen pasos 1 y 2 */}
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
           <span className="text-vialto-steel text-xs uppercase tracking-[0.08em] mr-1.5">Cliente</span>
@@ -110,7 +125,6 @@ export function EgresoWizardStep3({
         )}
       </div>
 
-      {/* Listado de productos */}
       <div className="space-y-3">
         <div>
           <h2 className="text-base font-semibold text-vialto-charcoal">
@@ -118,14 +132,29 @@ export function EgresoWizardStep3({
             <span className="ml-1 text-sm font-normal text-vialto-steel">({rows.length})</span>
           </h2>
           <p className="text-xs text-vialto-steel mt-0.5">
-            Indicá qué y cuánto sale del depósito. El stock disponible se muestra por fila.
+            Elegí el lote antes de indicar cantidades. El vencimiento se completa solo al seleccionar
+            un lote.
           </p>
         </div>
+
+        {!productosLoading && productos.length === 0 && (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Este cliente no tiene productos con stock en el depósito seleccionado.
+          </p>
+        )}
 
         {rows.map((row, idx) => {
           const pps = getPresentaciones(productos, row.productoId);
           const selectedPP = pps.find((pp) => pp.id === row.presentacionId);
-          const disponible = getDisponible(stockItems, row.productoId, row.presentacionId);
+          const loteElegido = loteEgresoSeleccionValida(row.lote);
+          const vencimientoLabel =
+            row.lote === STOCK_SIN_LOTE_VALUE
+              ? '—'
+              : row.fechaVencimiento
+                ? formatMovimientoStockFechaFromIso(row.fechaVencimiento)
+                : loteElegido
+                  ? '—'
+                  : '';
 
           return (
             <div key={row._key} className="bg-white rounded-lg border border-black/10 p-4 space-y-4">
@@ -143,7 +172,6 @@ export function EgresoWizardStep3({
                 </button>
               </div>
 
-              {/* Producto y presentación */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={LABEL}>
@@ -153,9 +181,14 @@ export function EgresoWizardStep3({
                     items={productos}
                     value={row.productoId}
                     onChange={(id) =>
-                      onUpdateRow(row._key, { productoId: id, presentacionId: '' })
+                      onUpdateRow(row._key, {
+                        productoId: id,
+                        presentacionId: '',
+                        ...resetLoteFields(),
+                      })
                     }
                     loading={productosLoading}
+                    disabled={productos.length === 0}
                     filterItems={(items, q) => {
                       const lq = q.toLowerCase();
                       return items.filter(
@@ -167,7 +200,9 @@ export function EgresoWizardStep3({
                     getPrimaryLabel={(p) =>
                       p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
                     }
-                    placeholderCerrado="Elegí un producto…"
+                    placeholderCerrado={
+                      productos.length === 0 ? 'Sin productos con stock' : 'Elegí un producto…'
+                    }
                     placeholderBuscar="Buscar por nombre o código…"
                     inputClassName={`${INPUT} ${
                       fieldErrors[`row_${idx}_productoId`] ? 'border-red-400' : ''
@@ -183,7 +218,10 @@ export function EgresoWizardStep3({
                   <select
                     value={row.presentacionId}
                     onChange={(e) =>
-                      onUpdateRow(row._key, { presentacionId: e.target.value })
+                      onUpdateRow(row._key, {
+                        presentacionId: e.target.value,
+                        ...resetLoteFields(),
+                      })
                     }
                     disabled={!row.productoId || pps.length === 0}
                     className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
@@ -213,7 +251,52 @@ export function EgresoWizardStep3({
                 </div>
               </div>
 
-              {/* Cantidades con stock disponible */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className={LABEL}>
+                    Lote <span className="text-red-500">*</span>
+                  </label>
+                  <LoteSelect
+                    productoId={row.productoId}
+                    clienteId={clienteId}
+                    depositoId={depositoId}
+                    presentacionId={row.presentacionId}
+                    value={row.lote}
+                    required
+                    onLoteChange={(lote, meta) =>
+                      onUpdateRow(row._key, {
+                        lote,
+                        fechaVencimiento: meta?.fechaVencimiento
+                          ? isoToFechaHora(meta.fechaVencimiento).fecha
+                          : '',
+                        loteStockBultos: meta?.cantidad1 ?? null,
+                        loteStockSueltas: meta?.cantidad2 ?? null,
+                        bultos: '',
+                        sueltas: '',
+                      })
+                    }
+                    lotesBase={lotesBase}
+                    tenantId={tenantId}
+                    className={INPUT}
+                    disabled={!row.productoId || !row.presentacionId}
+                    error={Boolean(fieldErrors[`row_${idx}_lote`])}
+                  />
+                  <CrudFieldError message={fieldErrors[`row_${idx}_lote`]} />
+                </div>
+
+                <div className="space-y-1">
+                  <label className={LABEL}>Vencimiento</label>
+                  <input
+                    type="text"
+                    readOnly
+                    tabIndex={-1}
+                    value={vencimientoLabel}
+                    placeholder={loteElegido ? '—' : 'Elegí un lote primero'}
+                    className={INPUT_READONLY}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={LABEL}>
@@ -225,16 +308,18 @@ export function EgresoWizardStep3({
                     step="any"
                     value={row.bultos}
                     onChange={(e) => onUpdateRow(row._key, { bultos: e.target.value })}
+                    disabled={!loteElegido}
                     className={`${INPUT} ${
                       fieldErrors[`row_${idx}_bultos`] ? 'border-red-400' : ''
-                    }`}
+                    } disabled:opacity-50`}
                     placeholder="0"
                   />
-                  {disponible !== null && (
+                  {loteElegido && row.loteStockBultos !== null && (
                     <p className="text-xs text-vialto-steel">
-                      Disponible:{' '}
+                      Disponible en{' '}
+                      {row.lote === STOCK_SIN_LOTE_VALUE ? 'sin lote' : `lote ${row.lote}`}:{' '}
                       <span className="font-semibold text-vialto-charcoal">
-                        {disponible.cantidad1}
+                        {row.loteStockBultos}
                       </span>{' '}
                       bultos
                     </p>
@@ -250,16 +335,17 @@ export function EgresoWizardStep3({
                     step="any"
                     value={row.sueltas}
                     onChange={(e) => onUpdateRow(row._key, { sueltas: e.target.value })}
+                    disabled={!loteElegido}
                     className={`${INPUT} ${
                       fieldErrors[`row_${idx}_sueltas`] ? 'border-red-400' : ''
-                    }`}
+                    } disabled:opacity-50`}
                     placeholder="0"
                   />
-                  {disponible !== null && (
+                  {loteElegido && row.loteStockSueltas !== null && row.loteStockSueltas > 0 && (
                     <p className="text-xs text-vialto-steel">
                       Disponible:{' '}
                       <span className="font-semibold text-vialto-charcoal">
-                        {disponible.cantidad2}
+                        {row.loteStockSueltas}
                       </span>{' '}
                       sueltas
                     </p>
@@ -267,30 +353,18 @@ export function EgresoWizardStep3({
                   <CrudFieldError message={fieldErrors[`row_${idx}_sueltas`]} />
                 </div>
               </div>
-
-              {/* Lote */}
-              <div className="space-y-1">
-                <label className={LABEL}>Lote</label>
-                <LoteSelect
-                  productoId={row.productoId}
-                  clienteId={clienteId}
-                  depositoId={depositoId}
-                  presentacionId={row.presentacionId}
-                  value={row.lote}
-                  onLoteChange={(lote) => onUpdateRow(row._key, { lote })}
-                  lotesBase={lotesBase}
-                  tenantId={tenantId}
-                  className={INPUT}
-                  disabled={!row.productoId}
-                />
-              </div>
             </div>
           );
         })}
 
         {(() => {
           const lastRow = rows[rows.length - 1];
-          const canAdd = lastRow ? isEgresoRowComplete(lastRow) : false;
+          const canAdd =
+            productos.length > 0 &&
+            !productosLoading &&
+            lastRow
+              ? isEgresoRowComplete(lastRow)
+              : false;
           return (
             <button
               type="button"

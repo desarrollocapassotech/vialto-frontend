@@ -379,6 +379,7 @@ export interface MovimientoStock {
   cantidad2: number;
   numeroRemito?: string | null;
   lote?: string | null;
+  fechaVencimiento?: string | null;
   observaciones: string | null;
   /** PDF del remito interno (solo egresos). */
   remitoUrl: string | null;
