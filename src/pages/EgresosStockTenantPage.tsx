@@ -120,7 +120,6 @@ export function EgresosStockTenantPage({
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con stock
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allStockLoading, setAllStockLoading] = useState(true);
@@ -195,20 +194,6 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Cargar stock disponible para el cliente+depósito seleccionados (para mostrar disponible en paso 3)
-  useEffect(() => {
-    if (!clienteId || !depositoId) {
-      setStockItems([]);
-      return;
-    }
-    void apiJson<StockItem[]>(
-      `${disponibleBase}${buildQs({ clienteId }, tenantId)}`,
-      () => getToken(),
-    )
-      .then(setStockItems)
-      .catch(() => setStockItems([]));
-  }, [clienteId, depositoId, disponibleBase, tenantId, getToken]);
-
   function updateRow(key: string, patch: Partial<EgresoRow>) {
     setRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...patch } : r)));
   }
@@ -233,7 +218,6 @@ export function EgresosStockTenantPage({
     setDestinoFinal('');
     setObservaciones('');
     setRows([emptyEgresoRow()]);
-    setStockItems([]);
     setFormError(null);
     setFieldErrors({});
     setStep(1);
@@ -393,7 +377,6 @@ export function EgresosStockTenantPage({
           clienteId={clienteId}
           onClienteChange={(id) => {
             setClienteId(id);
-            setStockItems([]);
             // Si el depósito actual no tiene stock para el nuevo cliente, lo limpiamos
             const depositosParaCliente = new Set(
               allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
@@ -405,7 +388,6 @@ export function EgresosStockTenantPage({
           depositoId={depositoId}
           onDepositoChange={(id) => {
             setDepositoId(id);
-            setStockItems([]);
           }}
           fieldErrors={fieldErrors}
           onNuevoCliente={() => setModalCliente(true)}

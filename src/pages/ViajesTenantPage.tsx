@@ -89,17 +89,18 @@ import {
   isoToFechaHora,
 } from "@/lib/viajeFechaHora";
 import {
-  estadoViajeBadgeClass,
-  estadoViajeBadgeClassDefault,
-  estadoViajeLabel,
-  tooltipEstadoViaje,
-  viajeEstadoEsFacturadoOCobrado,
   viajePermiteBotonFacturar,
   viajePendienteComprobanteCliente,
   viajePendienteComprobanteTransportista,
   viajeRequiereComprobanteDual,
 } from "@/lib/viajesComprobantes";
+import {
+  estadoViajeBadgeClass,
+  estadoViajeBadgeClassDefault,
+  estadoViajeLabel,
   estadosDisponiblesParaViaje,
+  tooltipEstadoViaje,
+  viajeEstadoEsFacturadoOCobrado,
   VIAJE_ESTADOS_TODOS,
 } from "@/lib/viajesEstados";
 import {
