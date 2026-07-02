@@ -6,8 +6,9 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { DestinatarioModal } from '@/components/destinatarios/DestinatarioModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
-import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+import type { Cliente, Deposito, Destinatario, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
@@ -90,10 +91,14 @@ export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
   clientesExternosLoading,
+  destinatariosExternos,
+  destinatariosExternosLoading,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
+  destinatariosExternos?: Destinatario[];
+  destinatariosExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -108,7 +113,15 @@ export function EgresosStockTenantPage({
     return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
   }, [clientesExternos, maestro.clientes, sessionClientes]);
 
+  const [sessionDestinatarios, setSessionDestinatarios] = useState<Destinatario[]>([]);
+  const destinatarios = useMemo(() => {
+    const base = destinatariosExternos ?? maestro.destinatarios;
+    const ids = new Set(base.map((d) => d.id));
+    return [...base, ...sessionDestinatarios.filter((d) => !ids.has(d.id))];
+  }, [destinatariosExternos, maestro.destinatarios, sessionDestinatarios]);
+
   const clientesLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+  const destinatariosLoading = platform ? Boolean(destinatariosExternosLoading) : maestro.loading;
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
@@ -138,7 +151,7 @@ export function EgresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [entregadoPor, setEntregadoPor] = useState('');
-  const [destinatario, setDestinatario] = useState('');
+  const [destinatarioId, setDestinatarioId] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
@@ -150,6 +163,7 @@ export function EgresosStockTenantPage({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
+  const [modalDestinatario, setModalDestinatario] = useState(false);
 
   // Pre-completar conductor con el nombre del usuario logueado
   useEffect(() => {
@@ -229,7 +243,7 @@ export function EgresosStockTenantPage({
     setHoraMov(p.hora);
     setFechaMovError(null);
     setEntregadoPor('');
-    setDestinatario('');
+    setDestinatarioId('');
     setDestinoFinal('');
     setObservaciones('');
     setRows([emptyEgresoRow()]);
@@ -300,6 +314,10 @@ export function EgresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    const destinatario = destinatarioId.trim()
+      ? destinatarios.find((d) => d.id === destinatarioId)?.nombre.trim()
+      : undefined;
+
     setSaving(true);
     try {
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
@@ -309,7 +327,7 @@ export function EgresosStockTenantPage({
           depositoId,
           fecha: fechaIso,
           entregadoPor: entregadoPor.trim() || undefined,
-          destinatario: destinatario.trim() || undefined,
+          destinatario: destinatario || undefined,
           destinoFinal: destinoFinal.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           lineas: rows.map((row) => ({
@@ -426,10 +444,13 @@ export function EgresosStockTenantPage({
             }
             if (p.horaCarga !== undefined) setHoraMov(p.horaCarga);
           }}
+          destinatarios={destinatarios}
+          destinatariosLoading={destinatariosLoading}
+          destinatarioId={destinatarioId}
+          onDestinatarioIdChange={setDestinatarioId}
+          onNuevoDestinatario={() => setModalDestinatario(true)}
           entregadoPor={entregadoPor}
           onEntregadoPorChange={setEntregadoPor}
-          destinatario={destinatario}
-          onDestinatarioChange={setDestinatario}
           destinoFinal={destinoFinal}
           onDestinoFinalChange={setDestinoFinal}
           observaciones={observaciones}
@@ -470,6 +491,20 @@ export function EgresosStockTenantPage({
             setFormError(null);
           }}
           onSubmit={handleSubmit}
+        />
+      )}
+
+      {modalDestinatario && (
+        <DestinatarioModal
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => setModalDestinatario(false)}
+          onSaved={(d) => {
+            setSessionDestinatarios((prev) => [...prev, d]);
+            setDestinatarioId(d.id);
+            setModalDestinatario(false);
+            if (!tenantId) void maestro.refreshDestinatarios();
+          }}
         />
       )}
 

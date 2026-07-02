@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { Car, ChevronDown, Layers, Package, ShieldCheck, Truck, UserCheck, Users, Warehouse, type LucideIcon } from 'lucide-react';
+import { Car, ChevronDown, Layers, MapPin, Package, ShieldCheck, Truck, UserCheck, Users, Warehouse, type LucideIcon } from 'lucide-react';
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
@@ -10,6 +10,7 @@ import {
 import { ClientesPage } from './ClientesPage';
 import { TransportistasPage } from './TransportistasPage';
 import { ChoferesPage } from './ChoferesPage';
+import { DestinatariosPage } from './DestinatariosPage';
 import { VehiculosPage } from './VehiculosPage';
 import { ProductosPage } from './ProductosPage';
 import { DepositosPage } from './DepositosPage';
@@ -20,12 +21,13 @@ import { canAccessViajes, canAccessStock } from '@/lib/tenantModules';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import { useAuth } from '@clerk/clerk-react';
 
-type Tab = 'clientes' | 'transportistas' | 'choferes' | 'vehiculos' | 'productos' | 'presentaciones' | 'depositos' | 'usuarios';
+type Tab = 'clientes' | 'transportistas' | 'choferes' | 'destinatarios' | 'vehiculos' | 'productos' | 'presentaciones' | 'depositos' | 'usuarios';
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'clientes',       label: 'Clientes',       icon: Users        },
   { id: 'transportistas', label: 'Transportistas',  icon: Truck        },
   { id: 'choferes',       label: 'Choferes',        icon: UserCheck    },
+  { id: 'destinatarios',  label: 'Destinatarios',   icon: MapPin       },
   { id: 'vehiculos',      label: 'Vehículos',       icon: Car          },
   { id: 'productos',      label: 'Productos',       icon: Package      },
   { id: 'presentaciones', label: 'Presentaciones',  icon: Layers       },
@@ -52,6 +54,7 @@ export function BaseDeDatosPage() {
       case 'transportistas':
       case 'choferes':
       case 'vehiculos': return hasViajes;
+      case 'destinatarios': return hasStock;
       case 'productos': return hasViajes || hasStock;
       case 'presentaciones': return hasStock;
       case 'depositos': return hasStock;
@@ -157,6 +160,7 @@ export function BaseDeDatosPage() {
         {activeTab === 'clientes' && <ClientesPage />}
         {activeTab === 'transportistas' && <TransportistasPage />}
         {activeTab === 'choferes' && <ChoferesPage />}
+        {activeTab === 'destinatarios' && <DestinatariosPage />}
         {activeTab === 'vehiculos' && <VehiculosPage />}
         {activeTab === 'productos' && <ProductosPage />}
         {activeTab === 'presentaciones' && <PresentacionesPage />}

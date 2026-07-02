@@ -14,6 +14,8 @@ import { TransportistaCreatePage } from '@/pages/TransportistaCreatePage';
 import { TransportistaEditPage } from '@/pages/TransportistaEditPage';
 import { ChoferCreatePage } from '@/pages/ChoferCreatePage';
 import { ChoferEditPage } from '@/pages/ChoferEditPage';
+import { DestinatarioCreatePage } from '@/pages/DestinatarioCreatePage';
+import { DestinatarioEditPage } from '@/pages/DestinatarioEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
@@ -157,6 +159,7 @@ export default function App() {
           <Route path="clientes" element={<Navigate to="/base-de-datos?tab=clientes" replace />} />
           <Route path="transportistas" element={<Navigate to="/base-de-datos?tab=transportistas" replace />} />
           <Route path="choferes" element={<Navigate to="/base-de-datos?tab=choferes" replace />} />
+          <Route path="destinatarios" element={<Navigate to="/base-de-datos?tab=destinatarios" replace />} />
           <Route path="vehiculos" element={<Navigate to="/base-de-datos?tab=vehiculos" replace />} />
 
           {/* rutas accesibles solo para org:admin y superadmin */}
@@ -169,6 +172,8 @@ export default function App() {
             <Route path="transportistas/:id/editar" element={<TransportistaEditPage />} />
             <Route path="choferes/nuevo" element={<ChoferCreatePage />} />
             <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
+            <Route path="destinatarios/nuevo" element={<DestinatarioCreatePage />} />
+            <Route path="destinatarios/:id/editar" element={<DestinatarioEditPage />} />
             <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
             <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
           </Route>

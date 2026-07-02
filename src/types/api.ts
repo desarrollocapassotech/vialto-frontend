@@ -123,6 +123,13 @@ export interface Chofer {
   createdAt: string;
 }
 
+export interface Destinatario {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  createdAt: string;
+}
+
 export interface Vehiculo {
   id: string;
   tenantId: string;
