@@ -113,9 +113,16 @@ export function EgresoWizardStep3({
             <span className="ml-1 text-sm font-normal text-vialto-steel">({rows.length})</span>
           </h2>
           <p className="text-xs text-vialto-steel mt-0.5">
-            Elegí producto y presentación; luego el lote de origen y cuánto extraer de ese lote.
+            Solo se listan productos con stock en el cliente y depósito elegidos. Elegí producto y
+            presentación; luego el lote de origen y cuánto extraer de ese lote.
           </p>
         </div>
+
+        {!productosLoading && productos.length === 0 && (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Este cliente no tiene productos con stock en el depósito seleccionado.
+          </p>
+        )}
 
         {rows.map((row, idx) => {
           const pps = getPresentaciones(productos, row.productoId);
@@ -156,6 +163,7 @@ export function EgresoWizardStep3({
                       })
                     }
                     loading={productosLoading}
+                    disabled={productos.length === 0}
                     filterItems={(items, q) => {
                       const lq = q.toLowerCase();
                       return items.filter(
@@ -167,7 +175,11 @@ export function EgresoWizardStep3({
                     getPrimaryLabel={(p) =>
                       p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
                     }
-                    placeholderCerrado="Elegí un producto…"
+                    placeholderCerrado={
+                      productos.length === 0
+                        ? 'Sin productos con stock'
+                        : 'Elegí un producto…'
+                    }
                     placeholderBuscar="Buscar por nombre o código…"
                     inputClassName={`${INPUT} ${
                       fieldErrors[`row_${idx}_productoId`] ? 'border-red-400' : ''
@@ -252,7 +264,10 @@ export function EgresoWizardStep3({
 
         {(() => {
           const lastRow = rows[rows.length - 1];
-          const canAdd = lastRow ? isEgresoRowComplete(lastRow) : false;
+          const canAdd =
+            productos.length > 0 && !productosLoading && lastRow
+              ? isEgresoRowComplete(lastRow)
+              : false;
           return (
             <button
               type="button"

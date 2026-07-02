@@ -1,7 +1,8 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ViewModalShell,
@@ -355,6 +356,9 @@ export function UsuariosTenantPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TenantUser | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const load = useCallback(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -443,6 +447,26 @@ export function UsuariosTenantPage() {
     }
   }
 
+  const meta = useMemo(() => {
+    if (!rows) return null;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [rows, page, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (!rows) return null;
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
@@ -507,7 +531,7 @@ export function UsuariosTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : paginatedRows}
         rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
         emptyMessage="No hay usuarios en esta organización."
         loadingMessage="Cargando…"
@@ -528,6 +552,20 @@ export function UsuariosTenantPage() {
           )
         }
       />
+
+      {meta && (rows?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       {modal && modal.mode !== "invite" && (
         <UsuarioModal

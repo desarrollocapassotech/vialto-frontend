@@ -2,10 +2,10 @@ import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
-import { MovimientoCantidadLinea } from "@/components/stock/MovimientoCantidadLinea";
-import { MovimientoStockViewModal } from "@/components/stock/MovimientoStockViewModal";
+import { StockOperacionViewModal } from "@/components/stock/StockOperacionViewModal";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { apiJson } from "@/lib/api";
@@ -15,15 +15,18 @@ import {
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
-import { generarExcel, movimientoStockColumnas } from "@/lib/stockExcelExport";
-import { presentacionNombreFromMovimiento } from "@/lib/stockPresentacion";
+import {
+  generarExcel,
+  flattenOperacionesMixtas,
+  stockOperacionesMixtasColumnas,
+} from "@/lib/stockExcelExport";
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
 } from "@/lib/stockMovimientoTipo";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
 import type {
-  MovimientoStock,
+  StockOperacion,
   Producto,
   Cliente,
   Deposito,
@@ -40,8 +43,8 @@ type ProductosResponse = {
   items: Producto[];
 };
 
-type MovimientosPaginatedResponse = {
-  items: MovimientoStock[];
+type OperacionesPaginatedResponse = {
+  items: StockOperacion[];
   meta: PaginatedMeta;
 };
 
@@ -118,31 +121,31 @@ export function StockMovimientosTenantPage({
 
   const usuariosBase = platform ? "/api/platform/users" : "/api/users";
 
-  const movimientosUrl = platform
-    ? `/api/platform/stock/movimientos${buildQs(params, tenantId)}`
-    : `/api/stock/movimientos${buildQs(params)}`;
+  const operacionesUrl = platform
+    ? `/api/platform/stock/operaciones/paginated${buildQs(params, tenantId)}`
+    : `/api/stock/operaciones/paginated${buildQs(params)}`;
 
   const depositosBase = platform
     ? "/api/platform/stock/depositos"
     : "/api/stock/depositos";
 
-  const [items, setItems] = useState<MovimientoStock[]>([]);
+  const [items, setItems] = useState<StockOperacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(
+  const [viendoOperacion, setViendoOperacion] = useState<StockOperacion | null>(
     null,
   );
-  const [detalleMovimientoTipo, setDetalleMovimientoTipo] = useState<
-    MovimientoStock["tipo"] | undefined
-  >();
   const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  const excelRows = flattenOperacionesMixtas(items);
+  const excelCols = stockOperacionesMixtasColumnas();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<MovimientosPaginatedResponse>(
-        movimientosUrl,
+      const data = await apiJson<OperacionesPaginatedResponse>(
+        operacionesUrl,
         () => getToken(),
       );
       setItems(data.items);
@@ -152,7 +155,7 @@ export function StockMovimientosTenantPage({
     } finally {
       setLoading(false);
     }
-  }, [movimientosUrl, getToken]);
+  }, [operacionesUrl, getToken]);
 
   const loadProductos = useCallback(async () => {
     try {
@@ -258,8 +261,8 @@ export function StockMovimientosTenantPage({
               Movimientos
             </h1>
             <p className="mt-1 text-sm text-vialto-steel">
-              Ingresos y egresos al depósito, ordenados por fecha de movimiento
-              (más reciente primero).
+              Ingresos, egresos y divisiones consolidados por comprobante (una
+              fila por operación).
             </p>
           </div>
           {exportExcelButton}
@@ -333,7 +336,7 @@ export function StockMovimientosTenantPage({
                 </div>
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => formatMovimientoStockFechaFromIso(m.fecha),
+            cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
           },
           {
             id: "tipo",
@@ -369,9 +372,9 @@ export function StockMovimientosTenantPage({
                 </select>
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => (
-              <span className={movimientoStockTipoBadgeClass(m.tipo)}>
-                {movimientoStockTipoLabel(m.tipo)}
+            cell: (op) => (
+              <span className={movimientoStockTipoBadgeClass(op.tipo)}>
+                {movimientoStockTipoLabel(op.tipo)}
               </span>
             ),
           },
@@ -379,7 +382,7 @@ export function StockMovimientosTenantPage({
             id: "remito",
             thClassName: `${listadoTablaThClass} align-top`,
             header: "Remito",
-            cell: (m) => m.numeroRemito ?? "—",
+            cell: (op) => op.numeroRemito ?? "—",
             tdClassName: `${listadoTablaTdClass} font-mono`,
           },
           {
@@ -387,7 +390,7 @@ export function StockMovimientosTenantPage({
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
-                title="Producto"
+                title="Productos"
                 filterActive={!!productoId}
                 filterSignature={productoId}
               >
@@ -420,7 +423,13 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.producto?.nombre ?? m.productoId,
+            cell: (op) => {
+              const count = op.movimientos.length;
+              if (count === 1) {
+                return op.movimientos[0].producto?.nombre ?? "1 producto";
+              }
+              return `${count} productos`;
+            },
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -461,7 +470,7 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.cliente?.nombre ?? m.clienteId,
+            cell: (op) => op.cliente?.nombre ?? op.clienteId,
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -502,37 +511,21 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.deposito?.nombre ?? "—",
+            cell: (op) => op.deposito?.nombre ?? "—",
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: "cant1",
+            id: "lotes",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: "Cant. 1",
-            cell: (m) => (
-              <MovimientoCantidadLinea
-                cantidad={m.cantidad1}
-                etiqueta={presentacionNombreFromMovimiento(m)}
-                tipo={m.tipo}
-              />
-            ),
-            tdClassName: `${listadoTablaTdClass} text-right`,
-          },
-          {
-            id: "cant2",
-            thClassName: `${listadoTablaThClass} align-top`,
-            header: "Cant. 2",
-            cell: (m) =>
-              m.cantidad2 > 0 ? (
-                <MovimientoCantidadLinea
-                  cantidad={m.cantidad2}
-                  etiqueta={m.producto?.unidad2Nombre ?? "Sueltas"}
-                  tipo={m.tipo}
-                />
-              ) : (
-                "—"
-              ),
-            tdClassName: `${listadoTablaTdClass} text-right`,
+            header: "Lotes",
+            cell: (op) => {
+              const lotes = op.movimientos
+                .map((mov) => mov.lote)
+                .filter(Boolean)
+                .join(", ");
+              return lotes || "—";
+            },
+            tdClassName: `${listadoTablaTdClass} text-xs`,
           },
           {
             id: "usuario",
@@ -573,34 +566,31 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) =>
-              usuariosById.get(m.createdBy)?.nombre ?? m.createdByLabel ?? "—",
+            cell: (op) =>
+              usuariosById.get(op.createdBy)?.nombre ?? op.createdBy ?? "—",
             tdClassName: listadoTablaTdClass,
           },
         ]}
         rows={loading ? null : items}
-        rowKey={(m) => m.id}
+        rowKey={(op) => op.id}
         emptyMessage="No hay movimientos para mostrar."
         loadingMessage="Cargando…"
-        renderActions={(m) => (
+        renderActions={(op) => (
           <div className="flex flex-wrap justify-end gap-2">
-            {m.tipo === "egreso" && (
+            {op.tipo === "egreso" && (
               <ImprimirRemitoButton
                 variant="listado"
                 className={listadoTablaAccionClass}
-                egresoId={m.operacionId}
+                egresoId={op.id}
                 tenantId={tenantId}
                 titulo={
-                  m.numeroRemito ? `Remito ${m.numeroRemito}` : "Remito interno"
+                  op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno"
                 }
               />
             )}
             <button
               type="button"
-              onClick={() => {
-                setDetalleMovimientoId(m.id);
-                setDetalleMovimientoTipo(m.tipo);
-              }}
+              onClick={() => setViendoOperacion(op)}
               className={listadoTablaAccionClass}
             >
               Ver
@@ -612,69 +602,34 @@ export function StockMovimientosTenantPage({
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                disabled={loading}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || loading}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+          }}
+          onPageSizeChange={(newPageSize) => {
+            setPageSize(newPageSize);
+            setPage(1);
+          }}
+        />
       )}
 
-      {detalleMovimientoId && (
-        <MovimientoStockViewModal
-          movimientoId={detalleMovimientoId}
+      {viendoOperacion && (
+        <StockOperacionViewModal
+          operacion={viendoOperacion}
           tenantId={tenantId}
-          tipoTitulo={detalleMovimientoTipo}
-          onClose={() => {
-            setDetalleMovimientoId(null);
-            setDetalleMovimientoTipo(undefined);
-          }}
+          onClose={() => setViendoOperacion(null)}
         />
       )}
 
       {exportModalOpen && (
         <ExcelExportModal
-          columns={movimientoStockColumnas(items, productos)}
-          rowCount={items.length}
+          columns={excelCols}
+          rowCount={excelRows.length}
           onExport={(selectedIds) => {
-            const allCols = movimientoStockColumnas(items, productos);
-            const cols = allCols.filter((c) => selectedIds.includes(c.id));
-            generarExcel(cols, items, "movimientos-stock");
+            const cols = excelCols.filter((c) => selectedIds.includes(c.id));
+            generarExcel(cols, excelRows, "movimientos-stock");
           }}
           onClose={() => setExportModalOpen(false)}
         />
