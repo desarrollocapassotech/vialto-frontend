@@ -25,7 +25,7 @@ import { VehiculosPage } from "./VehiculosPage";
 import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
-import { UsuariosTenantPage } from "./UsuariosTenantPage";
+import { SuperadminUsersPage } from "./SuperadminUsersPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
 import { isPlatformSuperadmin } from "@/lib/roleLabels";
@@ -200,7 +200,7 @@ export function BaseDeDatosPage() {
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
-        {activeTab === "usuarios" && <UsuariosTenantPage />}
+        {activeTab === "usuarios" && <SuperadminUsersPage />}
       </div>
     </div>
   );
