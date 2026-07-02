@@ -45,6 +45,18 @@ export function gananciaBrutaManualEnPatchParcial(
   };
 }
 
+/** Valor numérico para ordenar el listado por ganancia bruta (null = sin dato, va al final). */
+export function gananciaBrutaValorOrdenable(v: Viaje): number | null {
+  const resumen = resumenDesdeViaje(v);
+  if (resumen.gananciaCalculada != null) return resumen.gananciaCalculada;
+  if (resumen.gananciaBrutaManual != null) return resumen.gananciaBrutaManual;
+  if (resumen.balance.length === 1) return resumen.balance[0]!.monto;
+  if (resumen.balance.length > 1) {
+    return resumen.balance.reduce((sum, linea) => sum + linea.monto, 0);
+  }
+  return null;
+}
+
 function resumenDesdeViaje(v: Viaje): GananciaBrutaResumen {
   return buildGananciaBrutaResumen({
     monto: v.monto,
