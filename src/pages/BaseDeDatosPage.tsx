@@ -165,7 +165,7 @@ export function BaseDeDatosPage() {
             </div>
 
             <nav
-              className="-mb-px hidden gap-1 lg:flex"
+              className="-mb-px hidden gap-1 overflow-x-auto lg:flex"
               aria-label="Secciones de base de datos"
             >
               {visibleTabs.map((tab) => (
@@ -174,7 +174,7 @@ export function BaseDeDatosPage() {
                   type="button"
                   onClick={() => setTab(tab.id)}
                   className={[
-                    "flex items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                    "flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
                     activeTab === tab.id
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
