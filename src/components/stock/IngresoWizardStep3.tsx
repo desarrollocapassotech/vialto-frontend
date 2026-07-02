@@ -19,6 +19,7 @@ export type IngresoRow = {
   bultos: string;
   sueltas: string;
   lote: string;
+  sinLote: boolean;
   fechaVencimiento: string;
 };
 
@@ -31,6 +32,7 @@ export function emptyRow(): IngresoRow {
     sueltas: "",
     lote: "",
     fechaVencimiento: "",
+    sinLote: false,
   };
 }
 
@@ -49,7 +51,7 @@ function isRowComplete(row: IngresoRow): boolean {
   return (
     Boolean(row.productoId) &&
     Boolean(row.presentacionId) &&
-    row.lote.trim().length > 0 &&
+    (row.sinLote || row.lote.trim().length > 0) &&
     Boolean(row.fechaVencimiento) &&
     (b > 0 || s > 0)
   );
