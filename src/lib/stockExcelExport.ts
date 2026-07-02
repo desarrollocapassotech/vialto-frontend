@@ -5,6 +5,7 @@ export interface ExcelColDef<T> {
   id: string;
   label: string;
   getValue: (row: T) => string | number;
+  required?: boolean;
 }
 
 export async function generarExcel<T>(
@@ -161,6 +162,7 @@ export function movimientoStockColumnas(
       id: 'producto',
       label: 'Producto',
       getValue: (m) => m.producto?.nombre ?? m.productoId,
+      required: true,
     },
   ];
 
@@ -170,7 +172,7 @@ export function movimientoStockColumnas(
         presentaciones,
         presentacionNombreFromMovimiento,
         (m) => m.cantidad1 ?? 0,
-      ),
+      ).map((c) => ({ ...c, required: true })),
     );
   } else {
     const unidad1 = inferUnidad1(items);
@@ -179,9 +181,10 @@ export function movimientoStockColumnas(
       id: 'cant1',
       label: unidad1,
       getValue: (m) => m.cantidad1 ?? 0,
+      required: true,
     });
     if (unidad2 !== null) {
-      cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 ?? 0 });
+      cols.push({ id: 'cant2', label: unidad2, getValue: (m) => m.cantidad2 ?? 0, required: true });
     }
   }
 
@@ -207,6 +210,7 @@ type OperacionFlatRow = {
   cliente: string;
   deposito: string;
   remito: string;
+  remitoProveedor: string;
   producto: string;
   presentacion: string;
   bultos: number;
@@ -231,6 +235,7 @@ export function flattenStockOperaciones(
         cliente: op.cliente?.nombre ?? op.clienteId,
         deposito: op.deposito?.nombre ?? op.depositoId,
         remito: op.numeroRemito ?? '',
+        remitoProveedor: op.numeroRemitoProveedor ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
         presentacion: getPresentacionNombre(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
@@ -250,11 +255,10 @@ export function flattenStockOperaciones(
   return rows;
 }
 
-export function stockOperacionColumnas(
-  tipo: 'ingreso' | 'egreso',
-): ExcelColDef<OperacionFlatRow>[] {
-  const cols: ExcelColDef<OperacionFlatRow>[] = [
+export function stockOperacionesMixtasColumnas(): ExcelColDef<OperacionFlatRow & { tipo: string }>[] {
+  return [
     { id: 'fecha', label: 'Fecha', getValue: (r) => r.fecha },
+    { id: 'tipo', label: 'Tipo', getValue: (r) => r.tipo },
     { id: 'cliente', label: 'Cliente', getValue: (r) => r.cliente },
     { id: 'deposito', label: 'Depósito', getValue: (r) => r.deposito },
     { id: 'producto', label: 'Producto', getValue: (r) => r.producto },
@@ -262,7 +266,49 @@ export function stockOperacionColumnas(
     { id: 'bultos', label: 'Bultos', getValue: (r) => r.bultos },
     { id: 'sueltas', label: 'Sueltas', getValue: (r) => r.sueltas },
     { id: 'lote', label: 'Lote', getValue: (r) => r.lote },
+    { id: 'vencimiento', label: 'Vencimiento', getValue: (r) => r.vencimiento },
+    { id: 'remito', label: 'N° Remito', getValue: (r) => r.remito },
+    { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
+    { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
+    { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },
+    { id: 'observaciones', label: 'Observaciones', getValue: (r) => r.observaciones },
   ];
+}
+
+export function flattenOperacionesMixtas(
+  operaciones: StockOperacion[],
+): Array<OperacionFlatRow & { tipo: string }> {
+  return operaciones.flatMap((op) => {
+    const tipo =
+      op.tipo === 'ingreso' ? 'Ingreso' : op.tipo === 'egreso' ? 'Egreso' : 'División';
+  return flattenStockOperaciones([op]).map((row) => ({ ...row, tipo }));
+  });
+}
+
+export function stockOperacionColumnas(
+  tipo: 'ingreso' | 'egreso',
+): ExcelColDef<OperacionFlatRow>[] {
+  const cols: ExcelColDef<OperacionFlatRow>[] = [
+    { id: 'fecha', label: 'Fecha', getValue: (r) => r.fecha },
+  ];
+
+  if (tipo === 'ingreso') {
+    cols.push({ id: 'remitoProveedor', label: 'N° Remito Proveedor', getValue: (r) => r.remitoProveedor });
+  }
+
+  if (tipo === 'egreso') {
+    cols.push({ id: 'remito', label: 'N° Remito', getValue: (r) => r.remito });
+  }
+
+  cols.push(
+    { id: 'cliente', label: 'Cliente', getValue: (r) => r.cliente },
+    { id: 'deposito', label: 'Depósito', getValue: (r) => r.deposito },
+    { id: 'producto', label: 'Producto', getValue: (r) => r.producto, required: true },
+    { id: 'presentacion', label: 'Presentación', getValue: (r) => r.presentacion, required: true },
+    { id: 'bultos', label: 'Bultos', getValue: (r) => r.bultos, required: true },
+    { id: 'sueltas', label: 'Sueltas', getValue: (r) => r.sueltas, required: true },
+    { id: 'lote', label: 'Lote', getValue: (r) => r.lote },
+  );
 
   if (tipo === 'ingreso') {
     cols.push({ id: 'vencimiento', label: 'Vencimiento', getValue: (r) => r.vencimiento });
@@ -270,7 +316,6 @@ export function stockOperacionColumnas(
 
   if (tipo === 'egreso') {
     cols.push(
-      { id: 'remito', label: 'N° Remito', getValue: (r) => r.remito },
       { id: 'documentoExterno', label: 'Nº doc. externo', getValue: (r) => r.documentoExterno },
       { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
       { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
@@ -292,7 +337,12 @@ export function stockItemColumnas(
   const cols: ExcelColDef<StockItem>[] = [
     { id: 'deposito', label: 'Depósito', getValue: (i) => i.deposito?.nombre ?? i.depositoId },
     { id: 'cliente', label: 'Cliente', getValue: (i) => i.cliente?.nombre ?? i.clienteId },
-    { id: 'producto', label: 'Producto', getValue: (i) => i.producto?.nombre ?? i.productoId },
+    {
+      id: 'producto',
+      label: 'Producto',
+      getValue: (i) => i.producto?.nombre ?? i.productoId,
+      required: true,
+    },
   ];
 
   if (presentaciones.length > 0) {
@@ -302,14 +352,15 @@ export function stockItemColumnas(
         label: nombre,
         getValue: (i: StockItem) =>
           presentacionNombreFromStockItem(i, productos) === nombre ? i.cantidad1 : '',
+        required: true,
       })),
     );
   } else {
     const unidad1 = inferUnidad1Stock(items);
     const unidad2 = inferUnidad2Stock(items);
-    cols.push({ id: 'cant1', label: unidad1, getValue: (i) => i.cantidad1 });
+    cols.push({ id: 'cant1', label: unidad1, getValue: (i) => i.cantidad1, required: true });
     if (unidad2 !== null) {
-      cols.push({ id: 'cant2', label: unidad2, getValue: (i) => i.cantidad2 });
+      cols.push({ id: 'cant2', label: unidad2, getValue: (i) => i.cantidad2, required: true });
     }
   }
 

@@ -88,6 +88,10 @@ export function StockOperacionViewModal({
           <Campo label="N° Remito" value={operacion.numeroRemito} mono />
         )}
 
+        {operacion.tipo === 'ingreso' && operacion.numeroRemitoProveedor && (
+          <Campo label="N° Remito Proveedor" value={operacion.numeroRemitoProveedor} mono />
+        )}
+
         {operacion.tipo === 'egreso' && (
           <>
             <Campo
@@ -178,7 +182,7 @@ export function StockOperacionViewModal({
                   </td>
                   <td className={`${TD} text-right tabular-nums`}>{mov.bultos}</td>
                   <td className={`${TD} text-right tabular-nums`}>{mov.unidades}</td>
-                  <td className={TD}>{mov.lote ?? '—'}</td>
+                  <td className={TD}>{mov.lote ?? <span className="text-vialto-steel">Sin lote</span>}</td>
                   {operacion.tipo === 'ingreso' && (
                     <td className={TD}>
                       {mov.fechaVencimiento

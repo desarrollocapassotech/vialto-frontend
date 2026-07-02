@@ -87,6 +87,7 @@ export interface Viaje {
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
   factura?: { id: string; numero: string } | null;
+  liquidacionesViaje?: { liquidacionId: string }[];
   createdAt: string;
   createdBy: string;
 }
@@ -379,6 +380,7 @@ export interface MovimientoStock {
   cantidad2: number;
   numeroRemito?: string | null;
   lote?: string | null;
+  fechaVencimiento?: string | null;
   observaciones: string | null;
   /** PDF del remito interno (solo egresos). */
   remitoUrl: string | null;
@@ -505,6 +507,8 @@ export interface StockOperacion {
   /** PDF del remito interno generado al egresar. */
   remitoUrl?: string | null;
   numeroRemito?: string | null;
+  /** Número de remito del proveedor, informado manualmente al registrar un ingreso. */
+  numeroRemitoProveedor?: string | null; 
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
