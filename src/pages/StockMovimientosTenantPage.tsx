@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
 import { MovimientoStockViewModal } from "@/components/stock/MovimientoStockViewModal";
@@ -617,47 +618,17 @@ export function StockMovimientosTenantPage({
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                disabled={loading}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || loading}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+          }}
+          onPageSizeChange={(newPageSize) => {
+            setPageSize(newPageSize);
+            setPage(1);
+          }}
+        />
       )}
 
       {detalleMovimientoId && (

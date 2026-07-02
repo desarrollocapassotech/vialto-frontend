@@ -1,8 +1,15 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  useMemo,
+} from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
@@ -29,6 +36,9 @@ export function PresentacionesSuperadminPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmTarget, setConfirmTarget] = useState<Presentacion | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const editing = rows?.find((r) => r.id === editingId) ?? null;
   const baseUrl = "/api/platform/stock/presentaciones";
@@ -79,6 +89,10 @@ export function PresentacionesSuperadminPage() {
     }
     setForm({ nombre: "", activo: true });
   }, [editing, isFormOpen]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtroEmpresa]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,6 +149,26 @@ export function PresentacionesSuperadminPage() {
     }
   }
 
+  const meta = useMemo(() => {
+    if (!rows) return null;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [rows, page, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (!rows) return null;
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
@@ -179,53 +213,69 @@ export function PresentacionesSuperadminPage() {
       )}
 
       {filtroEmpresa && (
-        <ListadoDatos
-          className="mt-4"
-          columns={[
-            {
-              id: "nombre",
-              header: "Nombre",
-              primary: true,
-              cell: (row) => row.nombre,
-              tdClassName: `${listadoTablaTdClass} font-medium`,
-            },
-            {
-              id: "estado",
-              header: "Estado",
-              cell: (row) => (row.activo ? "Activa" : "Inactiva"),
-              tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-            },
-          ]}
-          rows={error ? [] : rows}
-          rowKey={(row) => row.id}
-          emptyMessage={
-            error
-              ? "No se pudieron cargar las presentaciones."
-              : "No hay presentaciones para esta empresa."
-          }
-          loadingMessage="Cargando…"
-          renderActions={(row) => (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingId(row.id);
-                  setIsFormOpen(true);
+        <>
+          <ListadoDatos
+            className="mt-4"
+            columns={[
+              {
+                id: "nombre",
+                header: "Nombre",
+                primary: true,
+                cell: (row) => row.nombre,
+                tdClassName: `${listadoTablaTdClass} font-medium`,
+              },
+              {
+                id: "estado",
+                header: "Estado",
+                cell: (row) => (row.activo ? "Activa" : "Inactiva"),
+                tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+              },
+            ]}
+            rows={error ? [] : paginatedRows}
+            rowKey={(row) => row.id}
+            emptyMessage={
+              error
+                ? "No se pudieron cargar las presentaciones."
+                : "No hay presentaciones para esta empresa."
+            }
+            loadingMessage="Cargando…"
+            renderActions={(row) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(row.id);
+                    setIsFormOpen(true);
+                  }}
+                  className={listadoTablaAccionClass}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmTarget(row)}
+                  className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+                >
+                  Eliminar
+                </button>
+              </>
+            )}
+          />
+
+          {meta && (rows?.length ?? 0) > 0 && (
+            <div className="mt-4">
+              <ListadoPagination
+                meta={meta}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
                 }}
-                className={listadoTablaAccionClass}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmTarget(row)}
-                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
-              >
-                Eliminar
-              </button>
-            </>
+              />
+            </div>
           )}
-        />
+        </>
       )}
 
       {isFormOpen && filtroEmpresa && (
