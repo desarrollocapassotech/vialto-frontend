@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 
-type LoteItem = { lote: string; cantidad1: number };
+export type LoteDisponible = { lote: string; cantidad1: number; cantidad2: number };
 
 function buildLotesUrl(
   base: string,
@@ -32,21 +32,29 @@ export function LoteSelect({
   tenantId,
   className,
   disabled,
+  requiereLote,
+  placeholder,
 }: {
   productoId: string;
   clienteId: string;
   depositoId: string;
   presentacionId: string;
   value: string;
-  /** Callback con lote seleccionado y sus bultos disponibles (null si sin lote) */
-  onLoteChange: (lote: string, cantidad1: number | null) => void;
+  /** Lote elegido y saldo disponible en ese lote (null si no hay selección válida). */
+  onLoteChange: (
+    lote: string,
+    stock: { bultos: number; sueltas: number } | null,
+  ) => void;
   lotesBase: string;
   tenantId?: string;
   className?: string;
   disabled?: boolean;
+  /** En egresos el lote es obligatorio: no se ofrece «sin lote». */
+  requiereLote?: boolean;
+  placeholder?: string;
 }) {
   const { getToken } = useAuth();
-  const [lotes, setLotes] = useState<LoteItem[]>([]);
+  const [lotes, setLotes] = useState<LoteDisponible[]>([]);
 
   const ready = Boolean(productoId && clienteId && depositoId);
 
@@ -56,15 +64,23 @@ export function LoteSelect({
       return;
     }
     const url = buildLotesUrl(lotesBase, productoId, clienteId, depositoId, presentacionId, tenantId);
-    void apiJson<LoteItem[]>(url, () => getToken())
+    void apiJson<LoteDisponible[]>(url, () => getToken())
       .then(setLotes)
       .catch(() => setLotes([]));
   }, [productoId, clienteId, depositoId, presentacionId, lotesBase, tenantId, getToken, ready]);
 
-  function handleChange(selectedLote: string) {
-    const item = lotes.find((l) => l.lote === selectedLote) ?? null;
-    onLoteChange(selectedLote, item?.cantidad1 ?? null);
+  function stockDesdeLote(selectedLote: string): { bultos: number; sueltas: number } | null {
+    if (!selectedLote.trim()) return null;
+    const item = lotes.find((l) => l.lote === selectedLote);
+    if (!item) return null;
+    return { bultos: item.cantidad1, sueltas: item.cantidad2 };
   }
+
+  function handleChange(selectedLote: string) {
+    onLoteChange(selectedLote, stockDesdeLote(selectedLote));
+  }
+
+  const emptyLabel = placeholder ?? (requiereLote ? 'Elegí un lote…' : '— Sin lote —');
 
   return (
     <select
@@ -73,10 +89,11 @@ export function LoteSelect({
       disabled={disabled || !ready}
       className={className}
     >
-      <option value="">— Sin lote —</option>
+      <option value="">{emptyLabel}</option>
       {lotes.map((l) => (
         <option key={l.lote} value={l.lote}>
-          {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''})
+          {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
+          {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
         </option>
       ))}
     </select>
