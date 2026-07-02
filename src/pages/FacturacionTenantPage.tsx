@@ -1,40 +1,50 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   emptyFacturaDraft,
   FacturaCreateModal,
   FacturaEditModal,
   facturaToEditDraft,
   type FacturaDraft,
-} from '@/components/facturacion/FacturaEditModal';
-import { FacturaAccionesMenu } from '@/components/facturacion/FacturaAccionesMenu';
-import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
-import { ListadoCard } from '@/components/listado/ListadoCard';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ListadoPagination } from '@/components/listado/ListadoPagination';
-import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { canAccessIntegracionArca } from '@/lib/tenantModules';
-import { Landmark } from 'lucide-react';
+} from "@/components/facturacion/FacturaEditModal";
+import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
+import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
+import { ListadoCard } from "@/components/listado/ListadoCard";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
+import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import { Landmark } from "lucide-react";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
   viajesFiltradosParaFactura,
-} from '@/lib/viajesFlota';
+} from "@/lib/viajesFlota";
 import {
   metaPaginacionCliente,
   pageSizeListadoValido,
   slicePaginaCliente,
-} from '@/lib/listadoPaginacion';
-import { listadoTablaBodyRowClass, listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import type { Cliente, Factura, PaginatedMeta, Transportista, Viaje } from '@/types/api';
+} from "@/lib/listadoPaginacion";
+import {
+  listadoTablaBodyRowClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
+} from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import type {
+  Cliente,
+  Factura,
+  PaginatedMeta,
+  Transportista,
+  Viaje,
+} from "@/types/api";
 
 type FacturasPaginatedResponse = {
   items: Factura[];
@@ -42,7 +52,7 @@ type FacturasPaginatedResponse = {
 };
 
 function facturaPayloadFromDraft(draft: FacturaDraft) {
-  const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : undefined;
+  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
   const base = {
     numero: draft.numero.trim(),
     tipo: draft.tipo,
@@ -51,7 +61,7 @@ function facturaPayloadFromDraft(draft: FacturaDraft) {
     fechaVencimiento: draft.fechaVencimiento || undefined,
     ivaPct: ivaN,
   };
-  if (draft.tipo === 'transportista_externo') {
+  if (draft.tipo === "transportista_externo") {
     return {
       ...base,
       transportistaId: draft.transportistaId || undefined,
@@ -68,25 +78,29 @@ function facturaPayloadFromDraft(draft: FacturaDraft) {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'PENDIENTE',
-  cobrada: 'COBRADA',
-  vencida: 'VENCIDA',
+  pendiente: "PENDIENTE",
+  cobrada: "COBRADA",
+  vencida: "VENCIDA",
 };
 
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: 'bg-amber-100 text-amber-950 border-amber-300/90',
-  cobrada: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
-  vencida: 'bg-red-100 text-red-950 border-red-400/80',
+  pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
+  cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
+  vencida: "bg-red-100 text-red-950 border-red-400/80",
 };
 
 const TIPO_LABEL: Record<string, string> = {
-  cliente: 'Cliente',
-  transportista_externo: 'Transportista externo',
+  cliente: "Cliente",
+  transportista_externo: "Transportista externo",
 };
 
 function fmtFecha(iso: string | null) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 type FacturaNuevaNavState = {
@@ -111,20 +125,25 @@ export function FacturacionTenantPage({
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId?.trim());
-  const hasArca = !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
-  const tid = tenantId?.trim() ?? '';
+  const hasArca =
+    !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
+  const tid = tenantId?.trim() ?? "";
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
-  const [transportistasPlatform, setTransportistasPlatform] = useState<Transportista[]>([]);
+  const [transportistasPlatform, setTransportistasPlatform] = useState<
+    Transportista[]
+  >([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
-  const transportistas = platform ? transportistasPlatform : maestro.transportistas;
+  const transportistas = platform
+    ? transportistasPlatform
+    : maestro.transportistas;
 
   const facturasListUrl = useMemo(() => {
-    if (!platform) return '/api/facturacion/facturas';
+    if (!platform) return "/api/facturacion/facturas";
     return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}`;
   }, [platform, tid]);
 
   const viajesListUrl = useMemo(() => {
-    if (!platform) return '/api/viajes';
+    if (!platform) return "/api/viajes";
     return `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`;
   }, [platform, tid]);
 
@@ -134,7 +153,7 @@ export function FacturacionTenantPage({
   }
 
   function facturasCreateUrl() {
-    if (!platform) return '/api/facturacion/facturas';
+    if (!platform) return "/api/facturacion/facturas";
     return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}`;
   }
 
@@ -161,19 +180,20 @@ export function FacturacionTenantPage({
 
   // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [facturaDeleteConfirm, setFacturaDeleteConfirm] = useState<Factura | null>(null);
+  const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
+    useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
 
   // filtros de columna (client-side)
-  const [numFiltro, setNumFiltro] = useState('');
-  const [numFiltroInput, setNumFiltroInput] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState('');
-  const [clienteIdFiltro, setClienteIdFiltro] = useState('');
-  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState('');
-  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState('');
-  const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState('');
-  const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [numFiltro, setNumFiltro] = useState("");
+  const [numFiltroInput, setNumFiltroInput] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
+  const [clienteIdFiltro, setClienteIdFiltro] = useState("");
+  const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState("");
+  const [emisionHastaFiltro, setEmisionHastaFiltro] = useState("");
+  const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
+  const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("");
 
   const fetchRef = useRef(0);
   const expandFacturaHandledRef = useRef(false);
@@ -205,7 +225,10 @@ export function FacturacionTenantPage({
   }, [viajes, editDraft, editingId]);
 
   const facturaEdicionSnapshot = useMemo(
-    () => (editingId && facturas ? facturas.find((r) => r.id === editingId) ?? null : null),
+    () =>
+      editingId && facturas
+        ? (facturas.find((r) => r.id === editingId) ?? null)
+        : null,
     [editingId, facturas],
   );
 
@@ -269,15 +292,23 @@ export function FacturacionTenantPage({
   const facturasFiltradas = useMemo(() => {
     if (!platform || !facturas) return null;
     return facturas.filter((f) => {
-      if (numFiltro.trim() && !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())) return false;
+      if (
+        numFiltro.trim() &&
+        !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())
+      )
+        return false;
       if (tipoFiltro && f.tipo !== tipoFiltro) return false;
       if (clienteIdFiltro && f.clienteId !== clienteIdFiltro) return false;
-      const emision = f.fechaEmision ? f.fechaEmision.substring(0, 10) : '';
+      const emision = f.fechaEmision ? f.fechaEmision.substring(0, 10) : "";
       if (emisionDesdeFiltro && emision < emisionDesdeFiltro) return false;
       if (emisionHastaFiltro && emision > emisionHastaFiltro) return false;
-      const vence = f.fechaVencimiento ? f.fechaVencimiento.substring(0, 10) : '';
-      if (vencimientoDesdeFiltro && (!vence || vence < vencimientoDesdeFiltro)) return false;
-      if (vencimientoHastaFiltro && (!vence || vence > vencimientoHastaFiltro)) return false;
+      const vence = f.fechaVencimiento
+        ? f.fechaVencimiento.substring(0, 10)
+        : "";
+      if (vencimientoDesdeFiltro && (!vence || vence < vencimientoDesdeFiltro))
+        return false;
+      if (vencimientoHastaFiltro && (!vence || vence > vencimientoHastaFiltro))
+        return false;
       if (estadoFiltro && f.estado !== estadoFiltro) return false;
       return true;
     });
@@ -341,16 +372,18 @@ export function FacturacionTenantPage({
 
   function buildFacturasPaginatedQuery(pageApi: number, pageSizeApi: number) {
     const params = new URLSearchParams();
-    params.set('page', String(pageApi));
-    params.set('pageSize', String(pageSizeApi));
-    if (numFiltro.trim()) params.set('numero', numFiltro.trim());
-    if (tipoFiltro) params.set('tipo', tipoFiltro);
-    if (clienteIdFiltro) params.set('clienteId', clienteIdFiltro);
-    if (emisionDesdeFiltro) params.set('emisionDesde', emisionDesdeFiltro);
-    if (emisionHastaFiltro) params.set('emisionHasta', emisionHastaFiltro);
-    if (vencimientoDesdeFiltro) params.set('vencimientoDesde', vencimientoDesdeFiltro);
-    if (vencimientoHastaFiltro) params.set('vencimientoHasta', vencimientoHastaFiltro);
-    if (estadoFiltro) params.set('estado', estadoFiltro);
+    params.set("page", String(pageApi));
+    params.set("pageSize", String(pageSizeApi));
+    if (numFiltro.trim()) params.set("numero", numFiltro.trim());
+    if (tipoFiltro) params.set("tipo", tipoFiltro);
+    if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
+    if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
+    if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
+    if (vencimientoDesdeFiltro)
+      params.set("vencimientoDesde", vencimientoDesdeFiltro);
+    if (vencimientoHastaFiltro)
+      params.set("vencimientoHasta", vencimientoHastaFiltro);
+    if (estadoFiltro) params.set("estado", estadoFiltro);
     return params.toString();
   }
 
@@ -363,7 +396,9 @@ export function FacturacionTenantPage({
     (async () => {
       try {
         if (platform) {
-          const facturasData = await apiJson<Factura[]>(facturasListUrl, () => getToken());
+          const facturasData = await apiJson<Factura[]>(facturasListUrl, () =>
+            getToken(),
+          );
           if (!cancelled) {
             setFacturas(facturasData);
             setMeta(null);
@@ -389,7 +424,7 @@ export function FacturacionTenantPage({
         if (!cancelled) {
           setFacturas(null);
           setMeta(null);
-          setError(friendlyError(e, platform ? 'plataforma' : 'facturacion'));
+          setError(friendlyError(e, platform ? "plataforma" : "facturacion"));
           setListadoRefetching(false);
         }
       }
@@ -418,7 +453,7 @@ export function FacturacionTenantPage({
 
   /** Abrir factura desde enlace (p. ej. alertas): `?factura=id` */
   useEffect(() => {
-    const id = searchParams.get('factura')?.trim();
+    const id = searchParams.get("factura")?.trim();
     if (!id) return;
     let cancelled = false;
     void (async () => {
@@ -429,7 +464,7 @@ export function FacturacionTenantPage({
         setSearchParams(
           (p) => {
             const next = new URLSearchParams(p);
-            next.delete('factura');
+            next.delete("factura");
             return next;
           },
           { replace: true },
@@ -439,7 +474,7 @@ export function FacturacionTenantPage({
           setSearchParams(
             (p) => {
               const next = new URLSearchParams(p);
-              next.delete('factura');
+              next.delete("factura");
               return next;
             },
             { replace: true },
@@ -459,8 +494,11 @@ export function FacturacionTenantPage({
     try {
       const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
       setViajes(data);
-    } catch { /* silencioso — el form mostrará lista vacía */ }
-    finally { setViajesLoading(false); }
+    } catch {
+      /* silencioso — el form mostrará lista vacía */
+    } finally {
+      setViajesLoading(false);
+    }
   }
 
   // ── pre-fill desde navegación ──────────────────────────────────────────────
@@ -471,17 +509,23 @@ export function FacturacionTenantPage({
     if (state.expandFacturaId?.trim()) return;
     if (!state.newFacturaDraft) return;
     const { clienteId, viajeIds } = state.newFacturaDraft;
-    setDraft({ ...emptyFacturaDraft(), clienteId: clienteId ?? '', viajeIds: viajeIds ?? [] });
+    setDraft({
+      ...emptyFacturaDraft(),
+      clienteId: clienteId ?? "",
+      viajeIds: viajeIds ?? [],
+    });
     setCreating(true);
     void ensureViajesLoaded();
-    window.history.replaceState({}, '');
+    window.history.replaceState({}, "");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const expand = (location.state as FacturaNuevaNavState | null)?.expandFacturaId?.trim();
+    const expand = (
+      location.state as FacturaNuevaNavState | null
+    )?.expandFacturaId?.trim();
     if (!expand || expandFacturaHandledRef.current) return;
     expandFacturaHandledRef.current = true;
-    window.history.replaceState({}, '');
+    window.history.replaceState({}, "");
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
@@ -494,10 +538,12 @@ export function FacturacionTenantPage({
   }, [location.state, getToken]);
 
   useEffect(() => {
-    const viewId = (location.state as FacturaNuevaNavState | null)?.viewFacturaId?.trim();
+    const viewId = (
+      location.state as FacturaNuevaNavState | null
+    )?.viewFacturaId?.trim();
     if (!viewId || viewFacturaHandledRef.current) return;
     viewFacturaHandledRef.current = true;
-    window.history.replaceState({}, '');
+    window.history.replaceState({}, "");
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
@@ -514,7 +560,9 @@ export function FacturacionTenantPage({
     const gen = ++fetchRef.current;
     try {
       if (platform) {
-        const data = await apiJson<Factura[]>(facturasListUrl, () => getToken());
+        const data = await apiJson<Factura[]>(facturasListUrl, () =>
+          getToken(),
+        );
         if (gen === fetchRef.current) setFacturas(data);
         return;
       }
@@ -528,30 +576,42 @@ export function FacturacionTenantPage({
         setFacturas(data.items);
         setMeta(data.meta);
       }
-    } catch { /* silencioso */ }
+    } catch {
+      /* silencioso */
+    }
   }
 
   // ── crear ──────────────────────────────────────────────────────────────────
 
   async function handleCreate() {
     setDraftError(null);
-    if (!draft.numero.trim()) { setDraftError('Ingresá el número de factura.'); return; }
-    if (!draft.fechaEmision) { setDraftError('Ingresá la fecha de emisión.'); return; }
+    if (!draft.numero.trim()) {
+      setDraftError("Ingresá el número de factura.");
+      return;
+    }
+    if (!draft.fechaEmision) {
+      setDraftError("Ingresá la fecha de emisión.");
+      return;
+    }
     if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
-      setDraftError('Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.');
+      setDraftError(
+        "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.",
+      );
       return;
     }
     setSaving(true);
     try {
       await apiJson<Factura>(facturasCreateUrl(), () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(facturaPayloadFromDraft(draft)),
       });
       setCreating(false);
       setDraft(emptyFacturaDraft());
       await refetchFacturas();
     } catch (e) {
-      setDraftError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+      setDraftError(
+        e instanceof Error ? e.message : "No se pudo guardar la factura.",
+      );
     } finally {
       setSaving(false);
     }
@@ -576,10 +636,18 @@ export function FacturacionTenantPage({
   async function saveEdit() {
     if (!editingId || !editDraft) return;
     setEditError(null);
-    if (!editDraft.numero.trim()) { setEditError('Ingresá el número de factura.'); return; }
-    if (!editDraft.fechaEmision) { setEditError('Ingresá la fecha de emisión.'); return; }
+    if (!editDraft.numero.trim()) {
+      setEditError("Ingresá el número de factura.");
+      return;
+    }
+    if (!editDraft.fechaEmision) {
+      setEditError("Ingresá la fecha de emisión.");
+      return;
+    }
     if (monedaUnicaDeViajes(editDraft.viajeIds, viajes) === null) {
-      setEditError('Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.');
+      setEditError(
+        "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.",
+      );
       return;
     }
     setSavingEditId(editingId);
@@ -588,15 +656,19 @@ export function FacturacionTenantPage({
         facturaUrl(editingId),
         () => getToken(),
         {
-          method: 'PATCH',
+          method: "PATCH",
           body: JSON.stringify(facturaPayloadFromDraft(editDraft)),
         },
       );
-      setFacturas((prev) => prev ? prev.map((r) => r.id === editingId ? updated : r) : prev);
+      setFacturas((prev) =>
+        prev ? prev.map((r) => (r.id === editingId ? updated : r)) : prev,
+      );
       cancelEdit();
       if (!platform) void refetchFacturas();
     } catch (e) {
-      setEditError(e instanceof Error ? e.message : 'No se pudo guardar la factura.');
+      setEditError(
+        e instanceof Error ? e.message : "No se pudo guardar la factura.",
+      );
     } finally {
       setSavingEditId(null);
     }
@@ -609,7 +681,7 @@ export function FacturacionTenantPage({
     if (!f || deletingId) return;
     setDeletingId(f.id);
     try {
-      await apiJson(facturaUrl(f.id), () => getToken(), { method: 'DELETE' });
+      await apiJson(facturaUrl(f.id), () => getToken(), { method: "DELETE" });
       if (platform) {
         setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
       } else if (meta && facturas?.length === 1 && meta.page > 1) {
@@ -629,31 +701,31 @@ export function FacturacionTenantPage({
   // ── helpers ────────────────────────────────────────────────────────────────
 
   function nombreCliente(id: string | null | undefined) {
-    if (!id) return '—';
+    if (!id) return "—";
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
   function nombreContraparte(f: Factura) {
-    if (f.tipo === 'transportista_externo') {
+    if (f.tipo === "transportista_externo") {
       const id = f.transportistaId;
-      if (!id) return '—';
+      if (!id) return "—";
       return transportistas.find((t) => t.id === id)?.nombre ?? id;
     }
     const id = f.clienteId;
-    if (!id) return '—';
+    if (!id) return "—";
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
   function limpiarFiltros() {
-    setNumFiltro('');
-    setNumFiltroInput('');
-    setTipoFiltro('');
-    setClienteIdFiltro('');
-    setEmisionDesdeFiltro('');
-    setEmisionHastaFiltro('');
-    setVencimientoDesdeFiltro('');
-    setVencimientoHastaFiltro('');
-    setEstadoFiltro('');
+    setNumFiltro("");
+    setNumFiltroInput("");
+    setTipoFiltro("");
+    setClienteIdFiltro("");
+    setEmisionDesdeFiltro("");
+    setEmisionHastaFiltro("");
+    setVencimientoDesdeFiltro("");
+    setVencimientoHastaFiltro("");
+    setEstadoFiltro("");
     setListadoRefetching(true);
     setPage(1);
   }
@@ -682,7 +754,7 @@ export function FacturacionTenantPage({
     !anyFiltroActivo &&
     !(platform && (facturas?.length ?? 0) > 0)
       ? 'Todavía no hay facturas. Hacé clic en "Nueva factura" para empezar.'
-      : 'No hay facturas que coincidan con los filtros aplicados.';
+      : "No hay facturas que coincidan con los filtros aplicados.";
 
   const facturasListadoFiltros = (
     <>
@@ -692,10 +764,12 @@ export function FacturacionTenantPage({
             type="text"
             value={numFiltroInput}
             onChange={(e) => setNumFiltroInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') aplicarFiltroNumero(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") aplicarFiltroNumero();
+            }}
             placeholder="Buscar…"
             className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+              numFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
             }`}
             aria-label="Filtrar por número de factura"
           />
@@ -711,9 +785,13 @@ export function FacturacionTenantPage({
       <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro}>
         <select
           value={tipoFiltro}
-          onChange={(e) => { setListadoRefetching(true); setPage(1); setTipoFiltro(e.target.value); }}
+          onChange={(e) => {
+            setListadoRefetching(true);
+            setPage(1);
+            setTipoFiltro(e.target.value);
+          }}
           className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            tipoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
           }`}
           aria-label="Filtrar por tipo de factura"
         >
@@ -726,24 +804,35 @@ export function FacturacionTenantPage({
           id="facturas-filtro-cliente"
           clientes={clientes}
           value={clienteIdFiltro}
-          onChange={(id) => { setListadoRefetching(true); setPage(1); setClienteIdFiltro(id); }}
+          onChange={(id) => {
+            setListadoRefetching(true);
+            setPage(1);
+            setClienteIdFiltro(id);
+          }}
           allowEmptyValue
           emptyListChoiceLabel="Todos"
           placeholderCerrado="Todos"
           aria-label="Filtrar por cliente"
           inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            clienteIdFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
           }`}
         />
       </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Emisión" active={!!emisionDesdeFiltro || !!emisionHastaFiltro}>
+      <ListadoFiltroCampo
+        label="Emisión"
+        active={!!emisionDesdeFiltro || !!emisionHastaFiltro}
+      >
         <div className="flex flex-col gap-1.5">
           <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
             Desde
             <input
               type="date"
               value={emisionDesdeFiltro}
-              onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionDesdeFiltro(e.target.value); }}
+              onChange={(e) => {
+                setListadoRefetching(true);
+                setPage(1);
+                setEmisionDesdeFiltro(e.target.value);
+              }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -752,20 +841,31 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={emisionHastaFiltro}
-              onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionHastaFiltro(e.target.value); }}
+              onChange={(e) => {
+                setListadoRefetching(true);
+                setPage(1);
+                setEmisionHastaFiltro(e.target.value);
+              }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
         </div>
       </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Vencimiento" active={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}>
+      <ListadoFiltroCampo
+        label="Vencimiento"
+        active={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
+      >
         <div className="flex flex-col gap-1.5">
           <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
             Desde
             <input
               type="date"
               value={vencimientoDesdeFiltro}
-              onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoDesdeFiltro(e.target.value); }}
+              onChange={(e) => {
+                setListadoRefetching(true);
+                setPage(1);
+                setVencimientoDesdeFiltro(e.target.value);
+              }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -774,7 +874,11 @@ export function FacturacionTenantPage({
             <input
               type="date"
               value={vencimientoHastaFiltro}
-              onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoHastaFiltro(e.target.value); }}
+              onChange={(e) => {
+                setListadoRefetching(true);
+                setPage(1);
+                setVencimientoHastaFiltro(e.target.value);
+              }}
               className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
             />
           </label>
@@ -783,9 +887,13 @@ export function FacturacionTenantPage({
       <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
         <select
           value={estadoFiltro}
-          onChange={(e) => { setListadoRefetching(true); setPage(1); setEstadoFiltro(e.target.value); }}
+          onChange={(e) => {
+            setListadoRefetching(true);
+            setPage(1);
+            setEstadoFiltro(e.target.value);
+          }}
           className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+            estadoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
           }`}
           aria-label="Filtrar por estado"
         >
@@ -802,8 +910,12 @@ export function FacturacionTenantPage({
     <div className="w-full">
       {!embeddedInSuperadmin && (
         <>
-          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">Facturas</h1>
-          <p className="mt-2 text-vialto-steel">Facturas emitidas a clientes.</p>
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+            Facturas
+          </h1>
+          <p className="mt-2 text-vialto-steel">
+            Facturas emitidas a clientes.
+          </p>
           {hasArca && (
             <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
               <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
@@ -846,7 +958,9 @@ export function FacturacionTenantPage({
         columns={[]}
         rows={error ? [] : filasListado}
         rowKey={(f) => f.id}
-        emptyMessage={error ? 'No se pudieron cargar las facturas.' : facturasEmptyMessage}
+        emptyMessage={
+          error ? "No se pudieron cargar las facturas." : facturasEmptyMessage
+        }
         loadingMessage="Cargando…"
         tableColSpan={8}
         filters={facturasListadoFiltros}
@@ -865,10 +979,14 @@ export function FacturacionTenantPage({
                     type="text"
                     value={numFiltroInput}
                     onChange={(e) => setNumFiltroInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') aplicarFiltroNumero(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") aplicarFiltroNumero();
+                    }}
                     placeholder="Buscar…"
                     className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      numFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                      numFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
                     }`}
                     aria-label="Filtrar por número de factura"
                   />
@@ -890,15 +1008,21 @@ export function FacturacionTenantPage({
               >
                 <select
                   value={tipoFiltro}
-                  onChange={(e) => { setListadoRefetching(true); setPage(1); setTipoFiltro(e.target.value); }}
+                  onChange={(e) => {
+                    setListadoRefetching(true);
+                    setPage(1);
+                    setTipoFiltro(e.target.value);
+                  }}
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    tipoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    tipoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
                   }`}
                   aria-label="Filtrar por tipo de factura"
                 >
                   <option value="">Todos</option>
                   <option value="cliente">Cliente</option>
-                  <option value="transportista_externo">Transportista externo</option>
+                  <option value="transportista_externo">
+                    Transportista externo
+                  </option>
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
@@ -912,13 +1036,19 @@ export function FacturacionTenantPage({
                   id="facturas-col-filtro-cliente"
                   clientes={clientes}
                   value={clienteIdFiltro}
-                  onChange={(id) => { setListadoRefetching(true); setPage(1); setClienteIdFiltro(id); }}
+                  onChange={(id) => {
+                    setListadoRefetching(true);
+                    setPage(1);
+                    setClienteIdFiltro(id);
+                  }}
                   allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
                   aria-label="Filtrar por cliente"
                   inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    clienteIdFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    clienteIdFiltro
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
                   }`}
                 />
               </ViajesListadoHeaderFiltro>
@@ -935,7 +1065,11 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={emisionDesdeFiltro}
-                      onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionDesdeFiltro(e.target.value); }}
+                      onChange={(e) => {
+                        setListadoRefetching(true);
+                        setPage(1);
+                        setEmisionDesdeFiltro(e.target.value);
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -944,7 +1078,11 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={emisionHastaFiltro}
-                      onChange={(e) => { setListadoRefetching(true); setPage(1); setEmisionHastaFiltro(e.target.value); }}
+                      onChange={(e) => {
+                        setListadoRefetching(true);
+                        setPage(1);
+                        setEmisionHastaFiltro(e.target.value);
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -954,7 +1092,9 @@ export function FacturacionTenantPage({
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Vencimiento"
-                filterActive={!!vencimientoDesdeFiltro || !!vencimientoHastaFiltro}
+                filterActive={
+                  !!vencimientoDesdeFiltro || !!vencimientoHastaFiltro
+                }
                 filterSignature={`${vencimientoDesdeFiltro}|${vencimientoHastaFiltro}`}
               >
                 <div className="flex flex-col gap-1.5">
@@ -963,7 +1103,11 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={vencimientoDesdeFiltro}
-                      onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoDesdeFiltro(e.target.value); }}
+                      onChange={(e) => {
+                        setListadoRefetching(true);
+                        setPage(1);
+                        setVencimientoDesdeFiltro(e.target.value);
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -972,7 +1116,11 @@ export function FacturacionTenantPage({
                     <input
                       type="date"
                       value={vencimientoHastaFiltro}
-                      onChange={(e) => { setListadoRefetching(true); setPage(1); setVencimientoHastaFiltro(e.target.value); }}
+                      onChange={(e) => {
+                        setListadoRefetching(true);
+                        setPage(1);
+                        setVencimientoHastaFiltro(e.target.value);
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -987,9 +1135,13 @@ export function FacturacionTenantPage({
               >
                 <select
                   value={estadoFiltro}
-                  onChange={(e) => { setListadoRefetching(true); setPage(1); setEstadoFiltro(e.target.value); }}
+                  onChange={(e) => {
+                    setListadoRefetching(true);
+                    setPage(1);
+                    setEstadoFiltro(e.target.value);
+                  }}
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    estadoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
                   }`}
                   aria-label="Filtrar por estado"
                 >
@@ -1000,15 +1152,23 @@ export function FacturacionTenantPage({
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>Importe</th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Importe
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
           </tr>
         }
         renderTableRow={(f) => (
           <tr key={f.id} className={listadoTablaBodyRowClass}>
             <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
-            <td className="px-4 py-3 leading-snug">{TIPO_LABEL[f.tipo] ?? f.tipo}</td>
-            <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>{nombreContraparte(f)}</td>
+            <td className="px-4 py-3 leading-snug">
+              {TIPO_LABEL[f.tipo] ?? f.tipo}
+            </td>
+            <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
+              {nombreContraparte(f)}
+            </td>
             <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaEmision)}
             </td>
@@ -1016,7 +1176,12 @@ export function FacturacionTenantPage({
               {fmtFecha(f.fechaVencimiento)}
             </td>
             <td className="px-4 py-3">
-              <span className={['border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
+              <span
+                className={[
+                  "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+                  ESTADO_BADGE[f.estado] ?? "",
+                ].join(" ")}
+              >
                 {ESTADO_LABEL[f.estado] ?? f.estado}
               </span>
             </td>
@@ -1037,19 +1202,27 @@ export function FacturacionTenantPage({
           <ListadoCard
             primary={f.numero}
             fields={[
-              { label: 'Tipo', value: TIPO_LABEL[f.tipo] ?? f.tipo },
-              { label: 'Cliente', value: nombreContraparte(f) },
-              { label: 'Emisión', value: fmtFecha(f.fechaEmision) },
-              { label: 'Vencimiento', value: fmtFecha(f.fechaVencimiento) },
+              { label: "Tipo", value: TIPO_LABEL[f.tipo] ?? f.tipo },
+              { label: "Cliente", value: nombreContraparte(f) },
+              { label: "Emisión", value: fmtFecha(f.fechaEmision) },
+              { label: "Vencimiento", value: fmtFecha(f.fechaVencimiento) },
               {
-                label: 'Estado',
+                label: "Estado",
                 value: (
-                  <span className={['border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTADO_BADGE[f.estado] ?? ''].join(' ')}>
+                  <span
+                    className={[
+                      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+                      ESTADO_BADGE[f.estado] ?? "",
+                    ].join(" ")}
+                  >
                     {ESTADO_LABEL[f.estado] ?? f.estado}
                   </span>
                 ),
               },
-              { label: 'Importe', value: textoImporteFacturaListado(f, viajes) },
+              {
+                label: "Importe",
+                value: textoImporteFacturaListado(f, viajes),
+              },
             ]}
             actions={
               <FacturaAccionesMenu
@@ -1083,7 +1256,10 @@ export function FacturacionTenantPage({
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
-        onClose={() => { setCreating(false); setDraftError(null); }}
+        onClose={() => {
+          setCreating(false);
+          setDraftError(null);
+        }}
         onSave={() => void handleCreate()}
         saving={saving}
         error={draftError}
@@ -1126,11 +1302,15 @@ export function FacturacionTenantPage({
         message={
           facturaDeleteConfirm
             ? `¿Eliminás la factura ${facturaDeleteConfirm.numero}? Esta acción no se puede deshacer.`
-            : ''
+            : ""
         }
         confirmLabel="Eliminar"
         tone="danger"
-        busy={!!deletingId && facturaDeleteConfirm != null && deletingId === facturaDeleteConfirm.id}
+        busy={
+          !!deletingId &&
+          facturaDeleteConfirm != null &&
+          deletingId === facturaDeleteConfirm.id
+        }
         onCancel={() => {
           if (!deletingId) setFacturaDeleteConfirm(null);
         }}
