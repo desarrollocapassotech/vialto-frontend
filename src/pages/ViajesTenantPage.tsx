@@ -545,6 +545,7 @@ export function ViajesTenantPage({
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
         const pageApi = Math.max(1, Math.floor(page));
         const pageSizeApi = pageSizeApiValido(pageSize);
 
