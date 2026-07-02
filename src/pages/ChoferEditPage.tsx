@@ -12,10 +12,12 @@ import {
   choferFormStateFromApi,
   choferWritePayloadFromForm,
   validarDniForm,
+  validarPinForm,
   type ChoferFormState,
 } from '@/lib/choferForm';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { canAccessCombustible } from '@/lib/tenantModules';
 import type { Chofer } from '@/types/api';
 
 function choferDetailUrl(id: string, tenantId: string): string {
@@ -32,6 +34,7 @@ export function ChoferEditPage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get('tenantId')?.trim() ?? '';
   const maestro = useMaestroData();
+  const showPinField = !!tenantId || canAccessCombustible(maestro.tenant?.modules ?? []);
   const [form, setForm] = useState<ChoferFormState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export function ChoferEditPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showPinInput, setShowPinInput] = useState(false);
 
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
@@ -53,6 +57,7 @@ export function ChoferEditPage() {
         const row = await apiJson<Chofer>(choferDetailUrl(id, tenantId), () => getToken());
         if (!cancelled) {
           setForm(choferFormStateFromApi(row));
+          setShowPinInput(false);
           setError(null);
         }
       } catch (e) {
@@ -72,6 +77,8 @@ export function ChoferEditPage() {
     if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre del chofer.';
     const dniError = validarDniForm(form.dni);
     if (dniError) errs.dni = dniError;
+    const pinError = showPinField ? validarPinForm(form.pin) : null;
+    if (pinError) errs.pin = pinError;
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -157,6 +164,45 @@ export function ChoferEditPage() {
                 onChange={(e) => patch({ telefono: e.target.value })}
               />
             </label>
+            {showPinField && (
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <CrudFieldLabel>PIN app combustible</CrudFieldLabel>
+                  {form.pinConfigured ? (
+                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">Configurado ✓</span>
+                  ) : (
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Sin PIN</span>
+                  )}
+                  {!showPinInput && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPinInput(true)}
+                      className="text-xs font-medium px-2.5 py-1 rounded border border-black/20 bg-white hover:bg-vialto-mist"
+                    >
+                      {form.pinConfigured ? 'Cambiar PIN' : 'Agregar PIN'}
+                    </button>
+                  )}
+                </div>
+                {showPinInput && (
+                  <div className="grid gap-1.5">
+                    {form.pinConfigured && (
+                      <p className="text-xs text-vialto-steel">El nuevo PIN reemplazará al actual.</p>
+                    )}
+                    <CrudInput
+                      type="text"
+                      inputMode="numeric"
+                      autoFocus
+                      placeholder="4 dígitos"
+                      value={form.pin ?? ''}
+                      error={fieldErrors.pin}
+                      maxLength={4}
+                      onChange={(e) => patch({ pin: e.target.value.replace(/\D/g, '') })}
+                    />
+                    <CrudFieldError message={fieldErrors.pin} />
+                  </div>
+                )}
+              </div>
+            )}
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton loading={loading} label="Guardar cambios" />
           </form>

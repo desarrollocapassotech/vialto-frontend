@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
@@ -79,6 +79,12 @@ export function StockMovimientosTenantPage({
   const [pageSize, setPageSize] = useState(10);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
 
+  const usuariosById = useMemo(
+    () => new Map(usuarios.map((u) => [u.id, u])),
+    [usuarios],
+  );
+
+  // Resetear página al cambiar filtros
   useEffect(() => {
     setPage(1);
   }, [
@@ -573,7 +579,8 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.createdByLabel ?? "—",
+            cell: (m) =>
+              usuariosById.get(m.createdBy)?.nombre ?? m.createdByLabel ?? "—",
             tdClassName: listadoTablaTdClass,
           },
         ]}

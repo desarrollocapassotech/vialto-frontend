@@ -19,6 +19,7 @@ import {
   listadoTablaTdClass,
 } from "@/lib/listadoTabla";
 import type { Presentacion } from "@/types/api";
+import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
 
 type FormState = { nombre: string; activo: boolean };
 
@@ -33,6 +34,8 @@ export function PresentacionesSuperadminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ nombre: "", activo: true });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [confirmTarget, setConfirmTarget] = useState<Presentacion | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -125,24 +128,24 @@ export function PresentacionesSuperadminPage() {
     }
   }
 
-  async function eliminar(row: Presentacion) {
-    if (
-      !filtroEmpresa ||
-      !window.confirm(`¿Eliminar la presentación "${row.nombre}"?`)
-    )
-      return;
+  async function confirmarEliminar() {
+    if (!confirmTarget || !filtroEmpresa) return;
+    const row = confirmTarget;
+    setDeleting(true);
     setError(null);
     try {
       await apiJson(
         `${baseUrl}/${encodeURIComponent(row.id)}${qs}`,
         () => getToken(),
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" },
       );
       await load();
+      setConfirmTarget(null);
     } catch (e) {
       setError(friendlyError(e, "plataforma"));
+      setConfirmTarget(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -250,7 +253,7 @@ export function PresentacionesSuperadminPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void eliminar(row)}
+                  onClick={() => setConfirmTarget(row)}
                   className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
                 >
                   Eliminar
@@ -332,6 +335,24 @@ export function PresentacionesSuperadminPage() {
           </form>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        destructive
+        busy={deleting}
+        title="Eliminar presentación"
+        confirmLabel="Eliminar"
+        onConfirm={() => void confirmarEliminar()}
+        onCancel={() => setConfirmTarget(null)}
+        message={
+          <>
+            ¿Seguro que querés eliminar la presentación{" "}
+            <span className="font-medium text-vialto-charcoal">
+              “{confirmTarget?.nombre}”
+            </span>
+            ? Esta acción no se puede deshacer.
+          </>
+        }
+      />
     </div>
   );
 }

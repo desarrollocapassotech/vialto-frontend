@@ -3,15 +3,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-// 👇 1. Importamos el componente de paginación
-import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
 } from "@/lib/listadoTabla";
+import { canAccessCombustible } from "@/lib/tenantModules";
 import type { Chofer, PaginatedMeta } from "@/types/api";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 
 type ChoferesPaginatedResponse = {
   items: Chofer[];
@@ -20,6 +21,8 @@ type ChoferesPaginatedResponse = {
 
 export function ChoferesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const maestro = useMaestroData();
+  const hasCombustible = canAccessCombustible(maestro.tenant?.modules ?? []);
   const [rows, setRows] = useState<Chofer[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +138,6 @@ export function ChoferesTenantPage() {
         )}
       />
 
-      {/* 👇 2. Reemplazamos el HTML gigante de paginación por esto: */}
       {meta && (
         <div className="mt-4">
           <ListadoPagination
@@ -154,6 +156,7 @@ export function ChoferesTenantPage() {
         <ChoferViewModal
           choferId={viewingChoferId}
           nombreTitulo={viewingChoferNombre}
+          showPin={hasCombustible}
           onClose={() => {
             setViewingChoferId(null);
             setViewingChoferNombre("");
