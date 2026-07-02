@@ -2,6 +2,7 @@
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
+import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion } from '@/types/api';
 
@@ -89,6 +90,10 @@ export function StockOperacionViewModal({
 
         {operacion.tipo === 'egreso' && (
           <>
+            <Campo
+              label="Nº documento externo"
+              value={etiquetaStockDocumentoExterno(operacion.numeroDocumentoExterno)}
+            />
             <Campo label="Conductor" value={operacion.entregadoPor ?? '—'} />
             <Campo label="Destinatario" value={operacion.destinatario ?? '—'} />
             <Campo label="Dirección / Ruta" value={operacion.destinoFinal ?? '—'} />

@@ -391,6 +391,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
@@ -507,6 +508,7 @@ export interface StockOperacion {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   observaciones?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];

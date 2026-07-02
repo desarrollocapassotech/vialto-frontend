@@ -7,6 +7,11 @@ import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import {
+  stockDocumentoExternoParaApi,
+  validarStockDocumentoExterno,
+  type StockDocumentoExternoModo,
+} from '@/lib/stockDocumentoExterno';
 import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
@@ -140,6 +145,9 @@ export function EgresosStockTenantPage({
   const [entregadoPor, setEntregadoPor] = useState('');
   const [destinatario, setDestinatario] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
+  const [documentoExternoModo, setDocumentoExternoModo] = useState<StockDocumentoExternoModo | ''>('');
+  const [documentoExternoNumero, setDocumentoExternoNumero] = useState('');
+  const [documentoExternoError, setDocumentoExternoError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
 
   // Paso 3
@@ -231,6 +239,9 @@ export function EgresosStockTenantPage({
     setEntregadoPor('');
     setDestinatario('');
     setDestinoFinal('');
+    setDocumentoExternoModo('');
+    setDocumentoExternoNumero('');
+    setDocumentoExternoError(null);
     setObservaciones('');
     setRows([emptyEgresoRow()]);
     setStockItems([]);
@@ -257,7 +268,13 @@ export function EgresosStockTenantPage({
       setFechaMovError('Ingresá la fecha del movimiento.');
       return;
     }
+    const docErr = validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero);
+    if (docErr) {
+      setDocumentoExternoError(docErr);
+      return;
+    }
     setFechaMovError(null);
+    setDocumentoExternoError(null);
     setFieldErrors({});
     setFormError(null);
     setStep(3);
@@ -300,6 +317,18 @@ export function EgresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    const numeroDocumentoExterno = stockDocumentoExternoParaApi(
+      documentoExternoModo,
+      documentoExternoNumero,
+    );
+    if (!numeroDocumentoExterno) {
+      setStep(2);
+      setDocumentoExternoError(
+        validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero),
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
@@ -311,6 +340,7 @@ export function EgresosStockTenantPage({
           entregadoPor: entregadoPor.trim() || undefined,
           destinatario: destinatario.trim() || undefined,
           destinoFinal: destinoFinal.trim() || undefined,
+          numeroDocumentoExterno,
           observaciones: observaciones.trim() || undefined,
           lineas: rows.map((row) => ({
             productoId: row.productoId,
@@ -432,6 +462,18 @@ export function EgresosStockTenantPage({
           onDestinatarioChange={setDestinatario}
           destinoFinal={destinoFinal}
           onDestinoFinalChange={setDestinoFinal}
+          documentoExternoModo={documentoExternoModo}
+          onDocumentoExternoModoChange={(modo) => {
+            setDocumentoExternoModo(modo);
+            setDocumentoExternoError(null);
+            if (modo === 'no_tiene') setDocumentoExternoNumero('');
+          }}
+          documentoExternoNumero={documentoExternoNumero}
+          onDocumentoExternoNumeroChange={(v) => {
+            setDocumentoExternoNumero(v);
+            if (documentoExternoError) setDocumentoExternoError(null);
+          }}
+          documentoExternoError={documentoExternoError}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
           clienteNombre={clienteNombre}

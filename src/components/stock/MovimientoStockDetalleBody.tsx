@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
+import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
   movimientoStockTipoNumeroClass,
@@ -132,6 +133,14 @@ export function MovimientoStockDetalleBody({
               <p className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider text-vialto-steel">
                 Datos de entrega
               </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+              <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+                Nº documento externo
+              </dt>
+              <dd className="sm:col-span-2 text-vialto-charcoal">
+                {etiquetaStockDocumentoExterno(row.numeroDocumentoExterno)}
+              </dd>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
               <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
