@@ -1,4 +1,4 @@
-import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, Destinatario, Transportista, Vehiculo } from '@/types/api';
 
 export function filtrarClientesPorQuery(clientes: Cliente[], q: string): Cliente[] {
   const s = q.trim().toLowerCase();
@@ -29,6 +29,12 @@ export function filtrarChoferes(choferes: Chofer[], q: string): Chofer[] {
       (qd.length >= 3 && tel.includes(qd))
     );
   });
+}
+
+export function filtrarDestinatarios(destinatarios: Destinatario[], q: string): Destinatario[] {
+  const s = q.trim().toLowerCase();
+  if (!s) return destinatarios;
+  return destinatarios.filter((d) => (d.nombre ?? '').toLowerCase().includes(s));
 }
 
 export function filtrarTransportistas(transportistas: Transportista[], q: string): Transportista[] {

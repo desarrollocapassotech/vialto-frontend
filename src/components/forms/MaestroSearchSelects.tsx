@@ -2,10 +2,11 @@ import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelec
 import {
   filtrarChoferes,
   filtrarClientesPorQuery,
+  filtrarDestinatarios,
   filtrarTransportistas,
   filtrarVehiculos,
 } from '@/components/forms/maestroSearchFilters';
-import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, Destinatario, Transportista, Vehiculo } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 
@@ -118,6 +119,62 @@ export function ChoferSearchSelect({
       aria-label={ariaLabel}
       onNuevo={onNuevo}
       onNuevoLabel="+ Nuevo chofer"
+    />
+  );
+}
+
+export function DestinatarioSearchSelect({
+  destinatarios,
+  value,
+  onChange,
+  disabled,
+  className,
+  inputClassName = INPUT,
+  id,
+  'aria-label': ariaLabel,
+  onNuevo,
+  allowEmptyValue = false,
+  emptyListChoiceLabel = 'Sin destinatario',
+  loading = false,
+  placeholderCerrado = 'Elegí un destinatario…',
+}: BaseProps & {
+  destinatarios: Destinatario[];
+  value: string;
+  onChange: (id: string) => void;
+  onNuevo?: () => void;
+  allowEmptyValue?: boolean;
+  emptyListChoiceLabel?: string;
+  loading?: boolean;
+  placeholderCerrado?: string;
+}) {
+  return (
+    <SearchableEntitySelect<Destinatario>
+      items={destinatarios}
+      value={value}
+      onChange={onChange}
+      disabled={disabled || (destinatarios.length === 0 && !onNuevo && !allowEmptyValue)}
+      loading={loading}
+      className={className}
+      inputClassName={inputClassName}
+      filterItems={filtrarDestinatarios}
+      getPrimaryLabel={(d) => d.nombre}
+      getSecondaryLabel={() => null}
+      placeholderCerrado={placeholderCerrado}
+      placeholderBuscar="Buscar destinatario…"
+      allowEmptyValue={allowEmptyValue}
+      emptyListChoiceLabel={emptyListChoiceLabel}
+      searchAriaLabel="Filtrar destinatarios"
+      noItemsSlot={
+        !onNuevo ? (
+          <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
+            Sin destinatarios cargados
+          </div>
+        ) : undefined
+      }
+      id={id}
+      aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nuevo destinatario"
     />
   );
 }
