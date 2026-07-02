@@ -1,24 +1,34 @@
-import { useAuth } from '@clerk/clerk-react';
-import { FileSpreadsheet } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
-import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
-import { MovimientoStockViewModal } from '@/components/stock/MovimientoStockViewModal';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
-import { generarExcel, movimientoStockColumnas } from '@/lib/stockExcelExport';
+import { useAuth } from "@clerk/clerk-react";
+import { FileSpreadsheet } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
+import { MovimientoStockViewModal } from "@/components/stock/MovimientoStockViewModal";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+  listadoTablaThClass,
+} from "@/lib/listadoTabla";
+import { generarExcel, movimientoStockColumnas } from "@/lib/stockExcelExport";
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
   movimientoStockTipoNumeroClass,
-} from '@/lib/stockMovimientoTipo';
-import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { MovimientoStock, Producto, Cliente, Deposito, PaginatedMeta } from '@/types/api';
-import { useSearchParams } from 'react-router-dom';
+} from "@/lib/stockMovimientoTipo";
+import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
+import type {
+  MovimientoStock,
+  Producto,
+  Cliente,
+  Deposito,
+  PaginatedMeta,
+} from "@/types/api";
+import { useSearchParams } from "react-router-dom";
 
 type Usuario = {
   id: string;
@@ -37,11 +47,16 @@ type MovimientosPaginatedResponse = {
 function buildQs(params: Record<string, string>, tenantId?: string): string {
   const parts: string[] = [];
   if (tenantId) parts.push(`tenantId=${encodeURIComponent(tenantId)}`);
-  for (const [k, v] of Object.entries(params)) parts.push(`${k}=${encodeURIComponent(v)}`);
-  return parts.length ? `?${parts.join('&')}` : '';
+  for (const [k, v] of Object.entries(params))
+    parts.push(`${k}=${encodeURIComponent(v)}`);
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
-export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) {
+export function StockMovimientosTenantPage({
+  tenantId,
+}: {
+  tenantId?: string;
+}) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
 
@@ -51,22 +66,35 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
 
-  const productoId = searchParams.get('productoId') ?? '';
-  const tipo = searchParams.get('tipo') ?? '';
-  const fechaDesde = searchParams.get('fechaDesde') ?? '';
-  const fechaHasta = searchParams.get('fechaHasta') ?? '';
-  const clienteId = searchParams.get('clienteId') ?? '';
-  const createdBy = searchParams.get('createdBy') ?? '';
-  const depositoId = searchParams.get('depositoId') ?? '';
+  const productoId = searchParams.get("productoId") ?? "";
+  const tipo = searchParams.get("tipo") ?? "";
+  const fechaDesde = searchParams.get("fechaDesde") ?? "";
+  const fechaHasta = searchParams.get("fechaHasta") ?? "";
+  const clienteId = searchParams.get("clienteId") ?? "";
+  const createdBy = searchParams.get("createdBy") ?? "";
+  const depositoId = searchParams.get("depositoId") ?? "";
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
 
+  const usuariosById = useMemo(
+    () => new Map(usuarios.map((u) => [u.id, u])),
+    [usuarios],
+  );
+
   // Resetear página al cambiar filtros
   useEffect(() => {
     setPage(1);
-  }, [productoId, tipo, fechaDesde, fechaHasta, clienteId, createdBy, depositoId]);
+  }, [
+    productoId,
+    tipo,
+    fechaDesde,
+    fechaHasta,
+    clienteId,
+    createdBy,
+    depositoId,
+  ]);
 
   const params: Record<string, string> = {};
 
@@ -77,46 +105,49 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
   if (clienteId) params.clienteId = clienteId;
   if (createdBy) params.createdBy = createdBy;
   if (depositoId) params.depositoId = depositoId;
-  
+
   params.page = String(page);
   params.pageSize = String(pageSize);
 
   const productosBase = platform
-    ? '/api/platform/stock/productos'
-    : '/api/stock/productos';
+    ? "/api/platform/stock/productos"
+    : "/api/stock/productos";
 
-  const clientesBase = platform
-    ? '/api/platform/clientes'
-    : '/api/clientes';
+  const clientesBase = platform ? "/api/platform/clientes" : "/api/clientes";
 
-  const usuariosBase = platform
-    ? '/api/platform/users'
-    : '/api/users';
+  const usuariosBase = platform ? "/api/platform/users" : "/api/users";
 
   const movimientosUrl = platform
     ? `/api/platform/stock/movimientos${buildQs(params, tenantId)}`
     : `/api/stock/movimientos${buildQs(params)}`;
 
   const depositosBase = platform
-    ? '/api/platform/stock/depositos'
-    : '/api/stock/depositos';
+    ? "/api/platform/stock/depositos"
+    : "/api/stock/depositos";
 
   const [items, setItems] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(null);
-  const [detalleMovimientoTipo, setDetalleMovimientoTipo] = useState<MovimientoStock['tipo'] | undefined>();
+  const [detalleMovimientoId, setDetalleMovimientoId] = useState<string | null>(
+    null,
+  );
+  const [detalleMovimientoTipo, setDetalleMovimientoTipo] = useState<
+    MovimientoStock["tipo"] | undefined
+  >();
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<MovimientosPaginatedResponse>(movimientosUrl, () => getToken());
+      const data = await apiJson<MovimientosPaginatedResponse>(
+        movimientosUrl,
+        () => getToken(),
+      );
       setItems(data.items);
       setMeta(data.meta);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     } finally {
       setLoading(false);
     }
@@ -124,21 +155,20 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
 
   const loadProductos = useCallback(async () => {
     try {
-      const url =
-        `${productosBase}/paginated${buildQs(
-          {
-            page: '1',
-            pageSize: '100',
-            filtroActivo: 'activos',
-          },
-          tenantId,
-        )}`;
+      const url = `${productosBase}/paginated${buildQs(
+        {
+          page: "1",
+          pageSize: "100",
+          filtroActivo: "activos",
+        },
+        tenantId,
+      )}`;
 
       const data = await apiJson<ProductosResponse>(url, () => getToken());
 
       setProductos(data.items);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }, [productosBase, tenantId, getToken]);
 
@@ -151,7 +181,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
 
       setClientes(data);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }, [clientesBase, tenantId, getToken]);
 
@@ -165,11 +195,11 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
       setUsuarios(
         data.map((u) => ({
           id: u.userId,
-          nombre: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim(),
+          nombre: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
         })),
       );
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }, [usuariosBase, tenantId, getToken]);
 
@@ -182,7 +212,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
 
       setDepositos(data);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }, [depositosBase, tenantId, getToken]);
 
@@ -223,9 +253,12 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
       {!platform ? (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimientos</h1>
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">
+              Movimientos
+            </h1>
             <p className="mt-1 text-sm text-vialto-steel">
-              Ingresos y egresos al depósito, ordenados por fecha de movimiento (más reciente primero).
+              Ingresos y egresos al depósito, ordenados por fecha de movimiento
+              (más reciente primero).
             </p>
           </div>
           {exportExcelButton}
@@ -235,14 +268,16 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
       )}
 
       {error && (
-        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
       <ListadoDatos
-        className={!platform ? 'mt-4' : ''}
+        className={!platform ? "mt-4" : ""}
         columns={[
           {
-            id: 'fecha',
+            id: "fecha",
             primary: true,
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
@@ -263,8 +298,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                         setSearchParams((prev) => {
                           const params = new URLSearchParams(prev);
 
-                          if (value) params.set('fechaDesde', value);
-                          else params.delete('fechaDesde');
+                          if (value) params.set("fechaDesde", value);
+                          else params.delete("fechaDesde");
 
                           return params;
                         });
@@ -283,9 +318,9 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                           const params = new URLSearchParams(prev);
 
                           if (e.target.value) {
-                            params.set('fechaHasta', e.target.value);
+                            params.set("fechaHasta", e.target.value);
                           } else {
-                            params.delete('fechaHasta');
+                            params.delete("fechaHasta");
                           }
 
                           return params;
@@ -300,7 +335,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             cell: (m) => formatMovimientoStockFechaFromIso(m.fecha),
           },
           {
-            id: 'tipo',
+            id: "tipo",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -316,14 +351,14 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     setSearchParams((prev) => {
                       const params = new URLSearchParams(prev);
 
-                      if (value) params.set('tipo', value);
-                      else params.delete('tipo');
+                      if (value) params.set("tipo", value);
+                      else params.delete("tipo");
 
                       return params;
                     });
                   }}
                   className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    tipo ? 'text-vialto-fire' : 'text-vialto-charcoal'
+                    tipo ? "text-vialto-fire" : "text-vialto-charcoal"
                   }`}
                 >
                   <option value="">Todos</option>
@@ -340,14 +375,14 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             ),
           },
           {
-            id: 'remito',
+            id: "remito",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Remito',
-            cell: (m) => m.numeroRemito ?? '—',
+            header: "Remito",
+            cell: (m) => m.numeroRemito ?? "—",
             tdClassName: `${listadoTablaTdClass} font-mono`,
           },
           {
-            id: 'producto',
+            id: "producto",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -362,8 +397,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     setSearchParams((prev) => {
                       const params = new URLSearchParams(prev);
 
-                      if (id) params.set('productoId', id);
-                      else params.delete('productoId');
+                      if (id) params.set("productoId", id);
+                      else params.delete("productoId");
 
                       return params;
                     });
@@ -388,7 +423,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'cliente',
+            id: "cliente",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -403,8 +438,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     setSearchParams((prev) => {
                       const params = new URLSearchParams(prev);
 
-                      if (id) params.set('clienteId', id);
-                      else params.delete('clienteId');
+                      if (id) params.set("clienteId", id);
+                      else params.delete("clienteId");
 
                       return params;
                     });
@@ -429,7 +464,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'deposito',
+            id: "deposito",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -444,8 +479,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     setSearchParams((prev) => {
                       const params = new URLSearchParams(prev);
 
-                      if (id) params.set('depositoId', id);
-                      else params.delete('depositoId');
+                      if (id) params.set("depositoId", id);
+                      else params.delete("depositoId");
 
                       return params;
                     });
@@ -466,40 +501,46 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.deposito?.nombre ?? '—',
+            cell: (m) => m.deposito?.nombre ?? "—",
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'cant1',
+            id: "cant1",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Cant. 1',
+            header: "Cant. 1",
             cell: (m) => (
               <>
-                <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad1}</span>
-                {' '}
-                <span className="text-xs text-vialto-steel">{m.producto?.unidad1Nombre ?? 'Pallets'}</span>
+                <span className={movimientoStockTipoNumeroClass(m.tipo)}>
+                  {m.cantidad1}
+                </span>{" "}
+                <span className="text-xs text-vialto-steel">
+                  {m.producto?.unidad1Nombre ?? "Pallets"}
+                </span>
               </>
             ),
             tdClassName: `${listadoTablaTdClass} text-right`,
           },
           {
-            id: 'cant2',
+            id: "cant2",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Cant. 2',
+            header: "Cant. 2",
             cell: (m) =>
               m.producto?.unidad2Nombre !== null ? (
                 <>
-                  <span className={movimientoStockTipoNumeroClass(m.tipo)}>{m.cantidad2}</span>
-                  {' '}
-                  <span className="text-xs text-vialto-steel">{m.producto?.unidad2Nombre ?? 'Unidad'}</span>
+                  <span className={movimientoStockTipoNumeroClass(m.tipo)}>
+                    {m.cantidad2}
+                  </span>{" "}
+                  <span className="text-xs text-vialto-steel">
+                    {m.producto?.unidad2Nombre ?? "Unidad"}
+                  </span>
                 </>
               ) : (
-                '—'
+                "—"
               ),
             tdClassName: `${listadoTablaTdClass} text-right`,
           },
           {
-            id: 'usuario',
+            id: "usuario",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -514,8 +555,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                     setSearchParams((prev) => {
                       const params = new URLSearchParams(prev);
 
-                      if (id) params.set('createdBy', id);
-                      else params.delete('createdBy');
+                      if (id) params.set("createdBy", id);
+                      else params.delete("createdBy");
 
                       return params;
                     });
@@ -537,7 +578,8 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (m) => m.createdByLabel ?? '—',
+            cell: (m) =>
+              usuariosById.get(m.createdBy)?.nombre ?? m.createdByLabel ?? "—",
             tdClassName: listadoTablaTdClass,
           },
         ]}
@@ -547,13 +589,15 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
         loadingMessage="Cargando…"
         renderActions={(m) => (
           <div className="flex flex-wrap justify-end gap-2">
-            {m.tipo === 'egreso' && (
+            {m.tipo === "egreso" && (
               <ImprimirRemitoButton
                 variant="listado"
                 className={listadoTablaAccionClass}
                 egresoId={m.operacionId}
                 tenantId={tenantId}
-                titulo={m.numeroRemito ? `Remito ${m.numeroRemito}` : 'Remito interno'}
+                titulo={
+                  m.numeroRemito ? `Remito ${m.numeroRemito}` : "Remito interno"
+                }
               />
             )}
             <button
@@ -635,7 +679,7 @@ export function StockMovimientosTenantPage({ tenantId }: { tenantId?: string }) 
           onExport={(selectedIds) => {
             const allCols = movimientoStockColumnas(items, productos);
             const cols = allCols.filter((c) => selectedIds.includes(c.id));
-            generarExcel(cols, items, 'movimientos-stock');
+            generarExcel(cols, items, "movimientos-stock");
           }}
           onClose={() => setExportModalOpen(false)}
         />

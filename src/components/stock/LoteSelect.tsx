@@ -6,9 +6,9 @@ import {
   type LotesDisponiblesResponse,
 } from '@/lib/stockLote';
 
-export type LoteSelectMeta = {
-  cantidad1: number | null;
-  cantidad2: number | null;
+export type LoteSelectStock = {
+  bultos: number;
+  sueltas: number;
   fechaVencimiento: string | null;
 };
 
@@ -41,6 +41,8 @@ export function LoteSelect({
   className,
   disabled,
   required = false,
+  requiereLote,
+  placeholder,
   error,
 }: {
   productoId: string;
@@ -48,19 +50,24 @@ export function LoteSelect({
   depositoId: string;
   presentacionId: string;
   value: string;
-  onLoteChange: (lote: string, meta: LoteSelectMeta | null) => void;
+  /** Lote elegido y saldo disponible en ese lote (null si no hay selección válida). */
+  onLoteChange: (lote: string, stock: LoteSelectStock | null) => void;
   lotesBase: string;
   tenantId?: string;
   className?: string;
   disabled?: boolean;
-  /** Si true, «Sin lote» solo aparece cuando hay stock sin lote; no hay opción vacía válida. */
+  /** Si true, la opción vacía no es válida. «Sin lote» sigue disponible si hay stock sin lote. */
   required?: boolean;
+  /** En egresos estrictos no se ofrece «sin lote». */
+  requiereLote?: boolean;
+  placeholder?: string;
   error?: boolean;
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<LotesDisponiblesResponse>({ lotes: [], sinLote: null });
 
   const ready = Boolean(productoId && clienteId && depositoId && presentacionId);
+  const isRequired = required || requiereLote;
 
   useEffect(() => {
     if (!ready) {
@@ -73,27 +80,27 @@ export function LoteSelect({
       .catch(() => setData({ lotes: [], sinLote: null }));
   }, [productoId, clienteId, depositoId, presentacionId, lotesBase, tenantId, getToken, ready]);
 
-  function metaForValue(selected: string): LoteSelectMeta | null {
+  function stockForValue(selected: string): LoteSelectStock | null {
     if (!selected) return null;
     if (selected === STOCK_SIN_LOTE_VALUE) {
       if (!data.sinLote) return null;
       return {
-        cantidad1: data.sinLote.cantidad1,
-        cantidad2: data.sinLote.cantidad2,
+        bultos: data.sinLote.cantidad1,
+        sueltas: data.sinLote.cantidad2,
         fechaVencimiento: null,
       };
     }
     const item = data.lotes.find((l) => l.lote === selected);
     if (!item) return null;
     return {
-      cantidad1: item.cantidad1,
-      cantidad2: item.cantidad2,
+      bultos: item.cantidad1,
+      sueltas: item.cantidad2,
       fechaVencimiento: item.fechaVencimiento,
     };
   }
 
   function handleChange(selectedLote: string) {
-    onLoteChange(selectedLote, metaForValue(selectedLote));
+    onLoteChange(selectedLote, stockForValue(selectedLote));
   }
 
   const sinLoteLabel = data.sinLote
@@ -102,6 +109,8 @@ export function LoteSelect({
       })`
     : 'Sin lote';
 
+  const emptyLabel = placeholder ?? (isRequired ? 'Elegí un lote…' : '— Sin lote —');
+
   return (
     <select
       value={value}
@@ -109,16 +118,16 @@ export function LoteSelect({
       disabled={disabled || !ready}
       className={`${className ?? ''} ${error ? 'border-red-400' : ''}`}
     >
-      <option value="" disabled={required}>
-        {required ? 'Elegí un lote…' : '— Sin lote —'}
+      <option value="" disabled={isRequired}>
+        {emptyLabel}
       </option>
-      {data.sinLote && (
+      {data.sinLote && !requiereLote && (
         <option value={STOCK_SIN_LOTE_VALUE}>{sinLoteLabel}</option>
       )}
       {data.lotes.map((l) => (
         <option key={l.lote} value={l.lote}>
           {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
-          {l.cantidad2 > 0 ? `, ${l.cantidad2} sueltas` : ''})
+          {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
         </option>
       ))}
     </select>

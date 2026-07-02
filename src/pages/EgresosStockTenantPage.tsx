@@ -264,12 +264,14 @@ export function EgresosStockTenantPage({
       const s = parseFloat(row.sueltas) || 0;
       if (b <= 0 && s <= 0) {
         ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (loteEgresoSeleccionValida(row.lote)) {
-        if (row.loteStockBultos !== null && b > row.loteStockBultos) {
-          ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${row.loteStockBultos} bultos.`;
+      } else if (loteEgresoSeleccionValida(row.lote) && row.loteStock) {
+        if (b > row.loteStock.bultos) {
+          ferrs[`row_${idx}_bultos`] =
+            `Stock insuficiente. Disponible: ${row.loteStock.bultos} bultos.`;
         }
-        if (row.loteStockSueltas !== null && s > row.loteStockSueltas) {
-          ferrs[`row_${idx}_sueltas`] = `Stock insuficiente. Disponible: ${row.loteStockSueltas} sueltas.`;
+        if (s > row.loteStock.sueltas) {
+          ferrs[`row_${idx}_sueltas`] =
+            `Stock insuficiente. Disponible: ${row.loteStock.sueltas} sueltas.`;
         }
       }
     });
