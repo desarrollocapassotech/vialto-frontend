@@ -1,10 +1,5 @@
-import { useState } from 'react';
-import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import {
-  movimientoStockTipoNumeroClass,
-} from '@/lib/stockMovimientoTipo';
 import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetalleBody({
@@ -14,15 +9,16 @@ export function MovimientoStockDetalleBody({
   row: MovimientoStock;
   tenantId?: string;
 }) {
-  const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
-  const fotosUrls = row.tipo === 'ingreso' ? (row.fotosUrls ?? []) : [];
-
   const remitoTitulo = row.numeroRemito?.trim()
     ? `Remito ${row.numeroRemito.trim()}`
     : 'Remito interno';
 
   return (
     <>
+      <p className="mb-3 px-4 text-xs text-vialto-steel">
+        Vista por línea de producto. Las fotos y el detalle completo del comprobante están en la
+        operación consolidada (historial de ingresos/egresos o listado de movimientos → Ver).
+      </p>
       <dl className="divide-y divide-black/5 text-sm">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
@@ -61,7 +57,7 @@ export function MovimientoStockDetalleBody({
             {row.producto?.unidad1Nombre ?? 'Pallets'}
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">
-            <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad1}</span>
+            {row.cantidad1}
           </dd>
         </div>
         {row.producto?.unidad2Nombre !== null && (
@@ -70,7 +66,7 @@ export function MovimientoStockDetalleBody({
               {row.producto?.unidad2Nombre ?? 'Unidad'}
             </dt>
             <dd className="sm:col-span-2 text-vialto-charcoal">
-              <span className={movimientoStockTipoNumeroClass(row.tipo)}>{row.cantidad2}</span>
+              {row.cantidad2}
             </dd>
           </div>
         )}
@@ -86,30 +82,6 @@ export function MovimientoStockDetalleBody({
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal whitespace-pre-wrap">{row.observaciones ?? '—'}</dd>
         </div>
-        {/* Fotos (ingresos) */}
-        {row.tipo === 'ingreso' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
-            <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-              Fotos del producto
-            </dt>
-            <dd className="sm:col-span-2 flex flex-wrap gap-2">
-              {fotosUrls.length > 0 ? (
-                fotosUrls.map((url, idx) => (
-                  <button
-                    key={url}
-                    type="button"
-                    onClick={() => setPreviewFotoIdx(idx)}
-                    className="h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    Foto {idx + 1}
-                  </button>
-                ))
-              ) : (
-                <span className="text-vialto-steel">Sin fotos</span>
-              )}
-            </dd>
-          </div>
-        )}
 
         {row.tipo === 'egreso' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
@@ -176,14 +148,6 @@ export function MovimientoStockDetalleBody({
           <dd className="sm:col-span-2 text-vialto-charcoal">{formatInstantEsAr24h(row.createdAt)}</dd>
         </div>
       </dl>
-
-      {previewFotoIdx !== null && fotosUrls[previewFotoIdx] && (
-        <AdjuntoPreviewModal
-          url={fotosUrls[previewFotoIdx]}
-          title={`Foto ${previewFotoIdx + 1}`}
-          onClose={() => setPreviewFotoIdx(null)}
-        />
-      )}
     </>
   );
 }

@@ -22,6 +22,8 @@ import {
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
 import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
+import { TelefonoInput } from "@/components/forms/TelefonoInput";
+import { isValidPhoneNumber } from "libphonenumber-js";
 
 export function TransportistaCreatePage() {
   const { getToken } = useAuth();
@@ -48,6 +50,7 @@ export function TransportistaCreatePage() {
     setPais(newPais);
     setCondicionIva(null);
     setCondicionTributaria("");
+    setTelefono("");
   }
 
   async function onSubmit() {
@@ -57,6 +60,9 @@ export function TransportistaCreatePage() {
     if (!idFiscal.trim()) {
       const label = pais ? idFiscalPorPais(pais).label : "ID fiscal";
       errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
+    }
+    if (telefono.trim() && !isValidPhoneNumber(telefono)) {
+      errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -81,7 +87,7 @@ export function TransportistaCreatePage() {
           pais,
           idFiscal: idFiscal.trim(),
           email: email.trim() || undefined,
-          telefono: telefono.trim() || undefined,
+          telefono: telefono || undefined,
           domicilio: domicilio.trim() || undefined,
           condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
           condicionTributaria:
@@ -203,11 +209,13 @@ export function TransportistaCreatePage() {
         </label>
         <label className="grid gap-1.5">
           <span className={labelClass}>Teléfono</span>
-          <CrudInput
-            placeholder="Ej: +54 9 11 1234-5678"
+          <TelefonoInput
+            pais={pais}
             value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
+            onChange={setTelefono}
+            error={fieldErrors.telefono}
           />
+          <CrudFieldError message={fieldErrors.telefono} />
         </label>
 
         <div className={sectionClass}>

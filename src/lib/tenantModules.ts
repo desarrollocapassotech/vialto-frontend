@@ -50,3 +50,7 @@ export function canAccessStock(modules: string[]): boolean {
 export function canAccessIntegracionArca(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'integracion-arca');
 }
+
+export function canAccessCombustible(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'combustible');
+}

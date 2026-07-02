@@ -12,6 +12,7 @@ import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { LoteSelect } from '@/components/stock/LoteSelect';
+import type { LoteStockDisponible } from '@/components/stock/EgresoProductoLoteBloque';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import type { Cliente, Deposito, Producto, ProductoPresentacion, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
@@ -68,7 +69,7 @@ export function DivisionesStockTenantPage({
   const [presentacionId, setPresentacionId] = useState('');
   const [bultos, setBultos] = useState(1);
   const [lote, setLote] = useState('');
-  const [loteDisponible, setLoteDisponible] = useState<number | null>(null);
+  const [loteDisponible, setLoteDisponible] = useState<LoteStockDisponible | null>(null);
 
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
@@ -120,7 +121,7 @@ export function DivisionesStockTenantPage({
 
   // Si hay lote seleccionado, usar su balance específico; si no, el total del StockItem
   const bultosDisponibles = lote
-    ? (loteDisponible ?? 0)
+    ? (loteDisponible?.bultos ?? 0)
     : (stockDisponible?.cantidad1 ?? 0);
 
   const clientesFiltrados = useMemo(() => {
@@ -418,9 +419,9 @@ export function DivisionesStockTenantPage({
                 depositoId={depositoId}
                 presentacionId={presentacionId}
                 value={lote}
-                onLoteChange={(l, d) => {
+                onLoteChange={(l, stock) => {
                   setLote(l);
-                  setLoteDisponible(d);
+                  setLoteDisponible(stock);
                   setBultos(1);
                 }}
                 lotesBase={lotesBase}
@@ -453,6 +454,9 @@ export function DivisionesStockTenantPage({
                   {lote && (
                     <span className="font-normal text-vialto-steel ml-2 text-xs">
                       lote {lote}
+                      {(loteDisponible?.sueltas ?? 0) > 0 && (
+                        <> · {loteDisponible!.sueltas} sueltas</>
+                      )}
                     </span>
                   )}
                 </span>

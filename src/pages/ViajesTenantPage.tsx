@@ -15,6 +15,7 @@ import {
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import type { ViajeOperacionModo } from "@/components/viajes/ViajeOperacionTipoFieldset";
@@ -76,7 +77,7 @@ import {
 } from "@/components/viajes/OtrosGastosFieldset";
 import {
   pagoTransportistaDraftFromApi,
-  pagoTransportistaDraftToApi,
+  pagosTransportistaDraftsToApi,
 } from "@/components/viajes/PagosTransportistaFieldset";
 import {
   esEtiquetaCiudadValida,
@@ -89,24 +90,31 @@ import {
   isoToFechaHora,
 } from "@/lib/viajeFechaHora";
 import {
+  viajePermiteBotonFacturar,
+  viajePendienteComprobanteCliente,
+  viajePendienteComprobanteTransportista,
+  viajeRequiereComprobanteDual,
+} from "@/lib/viajesComprobantes";
+import {
   estadoViajeBadgeClass,
   estadoViajeBadgeClassDefault,
   estadoViajeLabel,
+  estadosDisponiblesParaViaje,
   tooltipEstadoViaje,
   viajeEstadoEsFacturadoOCobrado,
-  viajeEstadoPermiteBotonFacturar,
-  estadosDisponiblesParaViaje,
   VIAJE_ESTADOS_TODOS,
 } from "@/lib/viajesEstados";
 import {
   contarViajesPagoTransportistaDesdeApi,
   esFiltroPagoTransportistaValido,
-  filtrarViajesPorPagoTransportista,
-  metaPaginacionAjustada,
+  listarViajesOrdenadosClienteDesdeApi,
+  listarViajesPorPagoTransportistaDesdeApi,
   pageSizeApiValido,
+  viajeListadoRequiereOrdenCliente,
   VIAJE_PAGO_TRANSPORTISTA_QUERY,
   type ViajePagoTransportistaFiltro,
 } from "@/lib/viajesFiltroPagoTransportista";
+import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import {
   listadoTablaBodyRowClass,
   listadoTablaHeadRowClass,
@@ -143,6 +151,7 @@ import {
 import {
   VIAJE_SORT_DEFAULT,
   appendViajeSortQuery,
+  sortViajesListado,
   type ViajeSortDir,
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
@@ -234,6 +243,11 @@ export function ViajesTenantPage({
   const [sortDir, setSortDir] = useState<ViajeSortDir>(
     VIAJE_SORT_DEFAULT.sortDir,
   );
+  /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
+  const ordenamientoAplicadoRef = useRef({
+    sortBy: VIAJE_SORT_DEFAULT.sortBy,
+    sortDir: VIAJE_SORT_DEFAULT.sortDir,
+  });
   const initialEstadoFromUrl = searchParams.get("estado")?.trim() ?? "";
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? "";
@@ -521,11 +535,17 @@ export function ViajesTenantPage({
         if (per === "desde_hoy" || per === "anteriores") {
           filtros.set("periodo", per);
         }
-        appendViajeSortQuery(filtros, sortBy, sortDir);
+
+        appendViajeSortQuery(
+          filtros,
+          ordenamientoAplicadoRef.current.sortBy,
+          ordenamientoAplicadoRef.current.sortDir,
+        );
         const filtrosQs = filtros.toString();
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
         const pageApi = Math.max(1, Math.floor(page));
         const pageSizeApi = pageSizeApiValido(pageSize);
 
@@ -534,66 +554,71 @@ export function ViajesTenantPage({
             ? pagoTranspF
             : null;
 
-        //Se filtra el lote grande de viajes para obtener los viajes pagados
+        // Se calcula la página que realmente se enviará al backend
         const reqPage = pagoFiltroActivo ? 1 : pageApi;
         const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
 
+        // Inyectamos la paginación y el tenantId directamente en los URLSearchParams
+        filtros.set("page", String(reqPage));
+        filtros.set("pageSize", String(reqPageSize));
+
+        if (platform && tid) {
+          filtros.set("tenantId", tid);
+        }
+
+        const basePath = platform
+          ? "/api/platform/viajes/paginated"
+          : "/api/viajes/paginated";
+
+        // Fetch unificado y seguro
         const data = await apiJson<ViajesPaginatedResponse>(
-          `${listBase}page=${reqPage}&pageSize=${reqPageSize}`,
+          `${basePath}?${filtros.toString()}`,
           () => getTokenRef.current(),
         );
 
-        let items = data.items;
-        let meta = data.meta;
+        let items: Viaje[];
+        let meta: PaginatedMeta;
+
+        const sortFetch = ordenamientoAplicadoRef.current;
 
         if (pagoFiltroActivo) {
-          // Filtro local del lote grande
-          const itemsFiltrados = filtrarViajesPorPagoTransportista(
-            data.items,
+          const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
+            listBase,
             pagoFiltroActivo,
+            pageApi,
+            pageSizeApi,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+            () => getTokenRef.current(),
           );
-          const totalReal = itemsFiltrados.length;
-
-          // Cáculo de inicio y fin para la página actual
-          const startIndex = (pageApi - 1) * pageSizeApi;
-          items = itemsFiltrados.slice(startIndex, startIndex + pageSizeApi);
-
-          // Ajuste de metadatos de la paginación con el total real
-          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
-
-          // Actualizacion del resumen en la primer página
-          if (pageApi === 1 && !cancelled) {
-            setResumen((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    sinPagar:
-                      pagoFiltroActivo === "sin_pagar"
-                        ? totalReal
-                        : prev.sinPagar,
-                    pagados:
-                      pagoFiltroActivo === "pagado" ? totalReal : prev.pagados,
-                  }
-                : prev,
-            );
-          }
-          meta = metaPaginacionAjustada(totalReal, pageApi, pageSizeApi);
-          if (!cancelled) {
-            setResumen((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    sinPagar:
-                      pagoFiltroActivo === "sin_pagar"
-                        ? totalReal
-                        : prev.sinPagar,
-                    pagados:
-                      pagoFiltroActivo === "pagado" ? totalReal : prev.pagados,
-                  }
-                : prev,
-            );
-          }
+          items = pagoData.items;
+          meta = pagoData.meta;
+        } else if (
+          viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)
+        ) {
+          const ordenData = await listarViajesOrdenadosClienteDesdeApi(
+            listBase,
+            pageApi,
+            pageSizeApi,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+            () => getTokenRef.current(),
+          );
+          items = ordenData.items;
+          meta = ordenData.meta;
+        } else {
+          const data = await apiJson<ViajesPaginatedResponse>(
+            `${listBase}page=${pageApi}&pageSize=${pageSizeApi}`,
+            () => getTokenRef.current(),
+          );
+          items = sortViajesListado(
+            data.items,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+          );
+          meta = data.meta;
         }
+
         if (!cancelled) {
           setRows(items);
           setMeta(meta);
@@ -628,6 +653,10 @@ export function ViajesTenantPage({
     nuevoSortBy: ViajeSortField,
     nuevoSortDir: ViajeSortDir,
   ) {
+    ordenamientoAplicadoRef.current = {
+      sortBy: nuevoSortBy,
+      sortDir: nuevoSortDir,
+    };
     setListadoRefetching(true);
     setSortBy(nuevoSortBy);
     setSortDir(nuevoSortDir);
@@ -693,7 +722,12 @@ export function ViajesTenantPage({
     fh: string,
   ) {
     if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
-      setSortBy(tf === "carga" ? "fecha_carga" : "fecha_descarga");
+      const sortByFecha = tf === "carga" ? "fecha_carga" : "fecha_descarga";
+      ordenamientoAplicadoRef.current = {
+        sortBy: sortByFecha,
+        sortDir: "asc",
+      };
+      setSortBy(sortByFecha);
       setSortDir("asc");
     }
   }
@@ -897,9 +931,7 @@ export function ViajesTenantPage({
   }, [clienteIdFiltroActivo]);
 
   function esElegibleFacturarLote(v: Viaje): boolean {
-    return (
-      viajeEstadoPermiteBotonFacturar(v.estado) && !viajesConFactura.has(v.id)
-    );
+    return viajePermiteBotonFacturar(v) && !viajesConFactura.has(v.id);
   }
 
   function toggleFacturarLote(id: string) {
@@ -1291,6 +1323,17 @@ export function ViajesTenantPage({
     }
   }
 
+  function openFacturarFlow(v: Viaje) {
+    if (
+      viajeRequiereComprobanteDual(v) &&
+      (hasFacturacionSinArca || hasLiquidacionesArca)
+    ) {
+      setSelectorViaje(v);
+      return;
+    }
+    void navigateToFacturacion(v);
+  }
+
   async function navigateToFacturacion(v: Viaje) {
     try {
       const facturasCliente = await apiJson<Factura[]>(
@@ -1379,6 +1422,7 @@ export function ViajesTenantPage({
                   realizaFlete: true,
                   transportistaEfectivoId: "",
                   choferExternoId: "",
+                  pagosTransportista: [],
                   choferId: normalizarIdEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0
@@ -1473,6 +1517,26 @@ export function ViajesTenantPage({
         return;
       }
     }
+    const precioTransportistaNum = parseCurrencyForMoneda(
+      draft.precioTransportistaExterno,
+      draft.monedaPrecioTransportistaExterno,
+    );
+    const pagosTransportistaApi = pagosTransportistaDraftsToApi(
+      draft.pagosTransportista,
+    );
+    const pagoTransportistaError = externo
+      ? validarPagosTransportistaDraftForm({
+          transportistaId: draft.transportistaId.trim(),
+          precioTransportistaExterno: draft.precioTransportistaExterno,
+          monedaPrecioTransportistaExterno:
+            draft.monedaPrecioTransportistaExterno,
+          pagosTransportista: draft.pagosTransportista,
+        })
+      : null;
+    if (pagoTransportistaError) {
+      setError(pagoTransportistaError);
+      return;
+    }
 
     const kmResolved = draft.kmRecorridos.trim()
       ? Number(draft.kmRecorridos.replace(",", "."))
@@ -1525,19 +1589,14 @@ export function ViajesTenantPage({
             monedaMonto: draft.monedaMonto,
             kmRecorridos: kmResolved,
             litrosConsumidos: litResolved,
-            precioTransportistaExterno: parseCurrencyForMoneda(
-              draft.precioTransportistaExterno,
-              draft.monedaPrecioTransportistaExterno,
-            ),
+            precioTransportistaExterno: precioTransportistaNum,
             monedaPrecioTransportistaExterno:
               draft.monedaPrecioTransportistaExterno,
             ...gananciaBrutaManualPayloadFromDraft(draft),
             otrosGastos: draft.otrosGastos
               .map(otroGastoDraftToApi)
               .filter(Boolean),
-            pagosTransportista: draft.pagosTransportista
-              .map(pagoTransportistaDraftToApi)
-              .filter(Boolean),
+            pagosTransportista: externo ? pagosTransportistaApi : [],
           }),
         },
       );
@@ -2279,7 +2338,7 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                  onFacturar={() => void navigateToFacturacion(v)}
+                  onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
@@ -2298,13 +2357,6 @@ export function ViajesTenantPage({
                               : undefined,
                           )
                       : undefined
-                  }
-                  onEmitirCvlp={
-                    hasLiquidacionesArca && v.transportistaId
-                      ? () => setEmitirCvlpViaje(v)
-                      : hasFacturacionSinArca && v.transportistaId
-                        ? () => setSelectorViaje(v)
-                        : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
@@ -2476,7 +2528,7 @@ export function ViajesTenantPage({
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                  onFacturar={() => void navigateToFacturacion(v)}
+                  onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
@@ -2496,13 +2548,6 @@ export function ViajesTenantPage({
                           )
                       : undefined
                   }
-                  onEmitirCvlp={
-                    hasLiquidacionesArca && v.transportistaId
-                      ? () => setEmitirCvlpViaje(v)
-                      : hasFacturacionSinArca && v.transportistaId
-                        ? () => setSelectorViaje(v)
-                        : undefined
-                  }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
               }
@@ -2512,54 +2557,17 @@ export function ViajesTenantPage({
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                disabled={listadoRefetching}
-                onChange={(e) => {
-                  setListadoRefetching(true);
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || listadoRefetching}
-              onClick={() => {
-                setListadoRefetching(true);
-                setPage((p) => Math.max(1, p - 1));
-              }}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || listadoRefetching}
-              onClick={() => {
-                setListadoRefetching(true);
-                setPage((p) => p + 1);
-              }}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+          }}
+          onPageSizeChange={(newPageSize) => {
+            setPageSize(newPageSize);
+            setPage(1);
+          }}
+        />
       )}
 
       {viewingViaje && (
@@ -2620,7 +2628,7 @@ export function ViajesTenantPage({
               clienteId:
                 draft.clienteId.trim() || viajeEdicionSnapshot.clienteId,
             };
-            void navigateToFacturacion(v);
+            openFacturarFlow(v);
           }}
           onEliminar={() => requestDeleteViaje(viajeEdicionSnapshot)}
           saving={savingId === editingId}
@@ -2726,9 +2734,17 @@ export function ViajesTenantPage({
       {selectorViaje && (
         <FacturarSelectorModal
           onClose={() => setSelectorViaje(null)}
+          clienteCompletado={!viajePendienteComprobanteCliente(selectorViaje)}
+          transportistaCompletado={
+            !viajePendienteComprobanteTransportista(selectorViaje)
+          }
           onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
           onLiquidacion={() => {
-            setCrearLiqViaje(selectorViaje);
+            if (hasLiquidacionesArca) {
+              setEmitirCvlpViaje(selectorViaje);
+            } else {
+              setCrearLiqViaje(selectorViaje);
+            }
             setSelectorViaje(null);
           }}
         />
