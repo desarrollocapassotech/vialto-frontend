@@ -1,17 +1,18 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
-import { useListadoFiltros } from '@/hooks/useListadoFiltros';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoToolbar } from "@/components/listado/ListadoToolbar";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { useListadoFiltros } from "@/hooks/useListadoFiltros";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
-} from '@/lib/listadoTabla';
-import type { Cliente, PaginatedMeta } from '@/types/api';
+} from "@/lib/listadoTabla";
+import type { Cliente, PaginatedMeta } from "@/types/api";
 
 type ClientesPaginatedResponse = {
   items: Cliente[];
@@ -26,7 +27,17 @@ export function ClientesTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
-  const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows, ['nombre', 'idFiscal']);
+
+  const {
+    busqueda,
+    setBusqueda,
+    filtroPais,
+    setFiltroPais,
+    paisesList,
+    rowsFiltradas,
+    onClear,
+    activeFilterCount,
+  } = useListadoFiltros(rows, ["nombre", "idFiscal"]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -46,7 +57,7 @@ export function ClientesTenantPage() {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'clientes'));
+          setError(friendlyError(e, "clientes"));
         }
       }
     })();
@@ -85,7 +96,7 @@ export function ClientesTenantPage() {
           {
             value: filtroPais,
             onChange: setFiltroPais,
-            placeholder: 'Todos los países',
+            placeholder: "Todos los países",
             opciones: paisesList.map((p) => ({ value: p, label: p })),
           },
         ]}
@@ -96,34 +107,34 @@ export function ClientesTenantPage() {
         className="mt-8"
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (c) => c.nombre,
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
           {
-            id: 'idFiscal',
-            header: 'ID Fiscal',
-            cell: (c) => c.idFiscal ?? '—',
+            id: "idFiscal",
+            header: "ID Fiscal",
+            cell: (c) => c.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'pais',
-            header: 'País',
-            cell: (c) => c.pais ?? '—',
+            id: "pais",
+            header: "País",
+            cell: (c) => c.pais ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'email',
-            header: 'Email',
-            cell: (c) => c.email ?? '—',
+            id: "email",
+            header: "Email",
+            cell: (c) => c.email ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'telefono',
-            header: 'Teléfono',
-            cell: (c) => c.telefono ?? '—',
+            id: "telefono",
+            header: "Teléfono",
+            cell: (c) => c.telefono ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
@@ -131,10 +142,10 @@ export function ClientesTenantPage() {
         rowKey={(c) => c.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los clientes.'
+            ? "No se pudieron cargar los clientes."
             : activeFilterCount > 0
-              ? 'No hay clientes que coincidan con los filtros aplicados.'
-              : 'Todavía no tenés clientes cargados.'
+              ? "No hay clientes que coincidan con los filtros aplicados."
+              : "Todavía no tenés clientes cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(c) => (
@@ -149,45 +160,16 @@ export function ClientesTenantPage() {
       />
 
       {meta && (
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-11 min-h-11 border border-black/20 bg-white px-2 text-xs sm:h-8 sm:min-h-0"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex min-h-11 flex-1 items-center justify-center border border-black/20 px-3 text-xs uppercase tracking-wider disabled:opacity-40 sm:min-h-0 sm:h-9 sm:flex-none"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="inline-flex min-h-11 flex-1 items-center justify-center border border-black/20 px-3 text-xs uppercase tracking-wider disabled:opacity-40 sm:min-h-0 sm:h-9 sm:flex-none"
-            >
-              Siguiente
-            </button>
-          </div>
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 
