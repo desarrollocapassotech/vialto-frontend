@@ -421,7 +421,9 @@ export function DivisionesStockTenantPage({
                 value={lote}
                 onLoteChange={(l, stock) => {
                   setLote(l);
-                  setLoteDisponible(stock);
+                  setLoteDisponible(
+                    stock ? { bultos: stock.bultos, sueltas: stock.sueltas } : null,
+                  );
                   setBultos(1);
                 }}
                 lotesBase={lotesBase}

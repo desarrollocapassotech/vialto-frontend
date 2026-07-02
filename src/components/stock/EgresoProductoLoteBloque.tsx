@@ -1,7 +1,14 @@
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { LoteSelect } from '@/components/stock/LoteSelect';
+import {
+  STOCK_SIN_LOTE_VALUE,
+  loteEgresoSeleccionValida,
+} from '@/lib/stockLote';
+import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const INPUT_READONLY =
+  'h-9 w-full border border-black/10 bg-vialto-mist/30 px-2 text-sm text-vialto-charcoal';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 export type LoteStockDisponible = {
@@ -15,10 +22,15 @@ type Props = {
   clienteId: string;
   depositoId: string;
   lote: string;
+  fechaVencimiento: string;
   bultos: string;
   sueltas: string;
   loteStock: LoteStockDisponible | null;
-  onLoteChange: (lote: string, stock: LoteStockDisponible | null) => void;
+  onLoteChange: (
+    lote: string,
+    stock: LoteStockDisponible | null,
+    fechaVencimiento: string,
+  ) => void;
   onBultosChange: (value: string) => void;
   onSueltasChange: (value: string) => void;
   fieldErrors: {
@@ -32,15 +44,15 @@ type Props = {
 };
 
 function etiquetaDisponibleLote(
+  lote: string,
   stock: LoteStockDisponible,
   labels: { bultos: string; sueltas: string },
 ): string {
-  const b = stock.bultos;
-  const s = stock.sueltas;
+  const origen = lote === STOCK_SIN_LOTE_VALUE ? 'sin lote' : `lote ${lote}`;
   const partes: string[] = [];
-  partes.push(`${b} ${labels.bultos}`);
-  partes.push(`${s} ${labels.sueltas}`);
-  return `Disponible en este lote: ${partes.join(' y ')}`;
+  partes.push(`${stock.bultos} ${labels.bultos}`);
+  partes.push(`${stock.sueltas} ${labels.sueltas}`);
+  return `Disponible en ${origen}: ${partes.join(' y ')}`;
 }
 
 /** Bloque modular: Lote → stock del lote → cantidades a extraer (preparado para multi-lote). */
@@ -50,6 +62,7 @@ export function EgresoProductoLoteBloque({
   clienteId,
   depositoId,
   lote,
+  fechaVencimiento,
   bultos,
   sueltas,
   loteStock,
@@ -62,7 +75,16 @@ export function EgresoProductoLoteBloque({
   labels = { bultos: 'bultos', sueltas: 'sueltas' },
 }: Props) {
   const listoParaLote = Boolean(productoId && presentacionId && clienteId && depositoId);
-  const cantidadesHabilitadas = listoParaLote && Boolean(lote.trim());
+  const loteElegido = loteEgresoSeleccionValida(lote);
+  const cantidadesHabilitadas = listoParaLote && loteElegido;
+  const vencimientoLabel =
+    lote === STOCK_SIN_LOTE_VALUE
+      ? '—'
+      : fechaVencimiento
+        ? formatMovimientoStockFechaFromIso(fechaVencimiento)
+        : loteElegido
+          ? '—'
+          : '';
 
   return (
     <div className="space-y-3 rounded border border-black/10 bg-vialto-mist/20 p-3">
@@ -70,36 +92,57 @@ export function EgresoProductoLoteBloque({
         Extracción por lote
       </p>
 
-      <div className="space-y-1">
-        <label className={LABEL}>
-          Lote de origen <span className="text-red-500">*</span>
-        </label>
-        <LoteSelect
-          productoId={productoId}
-          clienteId={clienteId}
-          depositoId={depositoId}
-          presentacionId={presentacionId}
-          value={lote}
-          onLoteChange={(selectedLote, stock) => onLoteChange(selectedLote, stock)}
-          lotesBase={lotesBase}
-          tenantId={tenantId}
-          className={`${INPUT} ${fieldErrors.lote ? 'border-red-400' : ''}`}
-          disabled={!listoParaLote}
-          requiereLote
-          placeholder={
-            !productoId
-              ? 'Primero elegí un producto'
-              : !presentacionId
-                ? 'Primero elegí una presentación'
-                : 'Elegí un lote con stock…'
-          }
-        />
-        <CrudFieldError message={fieldErrors.lote} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className={LABEL}>
+            Lote de origen <span className="text-red-500">*</span>
+          </label>
+          <LoteSelect
+            productoId={productoId}
+            clienteId={clienteId}
+            depositoId={depositoId}
+            presentacionId={presentacionId}
+            value={lote}
+            onLoteChange={(selectedLote, stock) =>
+              onLoteChange(
+                selectedLote,
+                stock ? { bultos: stock.bultos, sueltas: stock.sueltas } : null,
+                stock?.fechaVencimiento ?? '',
+              )
+            }
+            lotesBase={lotesBase}
+            tenantId={tenantId}
+            className={`${INPUT} ${fieldErrors.lote ? 'border-red-400' : ''}`}
+            disabled={!listoParaLote}
+            required
+            error={Boolean(fieldErrors.lote)}
+            placeholder={
+              !productoId
+                ? 'Primero elegí un producto'
+                : !presentacionId
+                  ? 'Primero elegí una presentación'
+                  : 'Elegí un lote con stock…'
+            }
+          />
+          <CrudFieldError message={fieldErrors.lote} />
+        </div>
+
+        <div className="space-y-1">
+          <label className={LABEL}>Vencimiento</label>
+          <input
+            type="text"
+            readOnly
+            tabIndex={-1}
+            value={vencimientoLabel}
+            placeholder={loteElegido ? '—' : 'Elegí un lote primero'}
+            className={INPUT_READONLY}
+          />
+        </div>
       </div>
 
-      {lote.trim() && loteStock !== null && (
+      {loteElegido && loteStock !== null && (
         <p className="text-sm text-vialto-charcoal">
-          {etiquetaDisponibleLote(loteStock, labels)}
+          {etiquetaDisponibleLote(lote, loteStock, labels)}
         </p>
       )}
 

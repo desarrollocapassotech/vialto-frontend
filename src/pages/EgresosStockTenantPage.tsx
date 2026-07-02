@@ -8,6 +8,7 @@ import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
 import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
@@ -283,19 +284,21 @@ export function EgresosStockTenantPage({
       }
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
-      if (!row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Seleccioná el lote de origen.';
+      if (!loteEgresoSeleccionValida(row.lote)) {
+        ferrs[`row_${idx}_lote`] = 'Seleccioná un lote o Sin lote.';
+      }
       const b = parseFloat(row.bultos) || 0;
       const s = parseFloat(row.sueltas) || 0;
       if (b <= 0 && s <= 0) {
         ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (row.lote.trim() && row.loteStock) {
+      } else if (loteEgresoSeleccionValida(row.lote) && row.loteStock) {
         if (b > row.loteStock.bultos) {
           ferrs[`row_${idx}_bultos`] =
-            `Stock insuficiente en el lote. Disponible: ${row.loteStock.bultos} bultos.`;
+            `Stock insuficiente. Disponible: ${row.loteStock.bultos} bultos.`;
         }
         if (s > row.loteStock.sueltas) {
           ferrs[`row_${idx}_sueltas`] =
-            `Stock insuficiente en el lote. Disponible: ${row.loteStock.sueltas} sueltas.`;
+            `Stock insuficiente. Disponible: ${row.loteStock.sueltas} sueltas.`;
         }
       }
     });
@@ -327,7 +330,13 @@ export function EgresosStockTenantPage({
             presentacionId: row.presentacionId,
             bultos: parseFloat(row.bultos) || 0,
             sueltas: parseFloat(row.sueltas) || 0,
-            lote: row.lote.trim() || undefined,
+            lote: loteEgresoParaApi(row.lote),
+            ...(row.fechaVencimiento
+              ? {
+                  fechaVencimiento:
+                    fechaHoraToIso(row.fechaVencimiento, '00:00') ?? undefined,
+                }
+              : {}),
           })),
         }),
       });
@@ -409,6 +418,7 @@ export function EgresosStockTenantPage({
           clienteId={clienteId}
           onClienteChange={(id) => {
             setClienteId(id);
+            setRows([emptyEgresoRow()]);
             // Si el depósito actual no tiene stock para el nuevo cliente, lo limpiamos
             const depositosParaCliente = new Set(
               allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
@@ -420,6 +430,7 @@ export function EgresosStockTenantPage({
           depositoId={depositoId}
           onDepositoChange={(id) => {
             setDepositoId(id);
+            setRows([emptyEgresoRow()]);
           }}
           fieldErrors={fieldErrors}
           onNuevoCliente={() => setModalCliente(true)}

@@ -6,6 +6,8 @@ import {
   type LoteStockDisponible,
 } from '@/components/stock/EgresoProductoLoteBloque';
 import { Spinner } from '@/components/ui/Spinner';
+import { loteEgresoSeleccionValida } from '@/lib/stockLote';
+import { isoToFechaHora } from '@/lib/viajeFechaHora';
 import type { Producto, ProductoPresentacion } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
@@ -16,6 +18,7 @@ export type EgresoRow = {
   productoId: string;
   presentacionId: string;
   lote: string;
+  fechaVencimiento: string;
   bultos: string;
   sueltas: string;
   loteStock: LoteStockDisponible | null;
@@ -26,10 +29,24 @@ export function emptyEgresoRow(): EgresoRow {
     _key: crypto.randomUUID(),
     productoId: '',
     presentacionId: '',
+    lote: '',
+    fechaVencimiento: '',
     bultos: '',
     sueltas: '',
-    lote: '',
     loteStock: null,
+  };
+}
+
+function resetLoteFields(): Pick<
+  EgresoRow,
+  'lote' | 'fechaVencimiento' | 'loteStock' | 'bultos' | 'sueltas'
+> {
+  return {
+    lote: '',
+    fechaVencimiento: '',
+    loteStock: null,
+    bultos: '',
+    sueltas: '',
   };
 }
 
@@ -43,7 +60,7 @@ export function isEgresoRowComplete(row: EgresoRow): boolean {
   return (
     Boolean(row.productoId) &&
     Boolean(row.presentacionId) &&
-    Boolean(row.lote.trim()) &&
+    loteEgresoSeleccionValida(row.lote) &&
     (b > 0 || s > 0)
   );
 }
@@ -114,7 +131,8 @@ export function EgresoWizardStep3({
           </h2>
           <p className="text-xs text-vialto-steel mt-0.5">
             Solo se listan productos con stock en el cliente y depósito elegidos. Elegí producto y
-            presentación; luego el lote de origen y cuánto extraer de ese lote.
+            presentación; luego el lote de origen (el vencimiento se completa solo) y las cantidades
+            a extraer.
           </p>
         </div>
 
@@ -156,10 +174,7 @@ export function EgresoWizardStep3({
                       onUpdateRow(row._key, {
                         productoId: id,
                         presentacionId: '',
-                        lote: '',
-                        bultos: '',
-                        sueltas: '',
-                        loteStock: null,
+                        ...resetLoteFields(),
                       })
                     }
                     loading={productosLoading}
@@ -197,10 +212,7 @@ export function EgresoWizardStep3({
                     onChange={(e) =>
                       onUpdateRow(row._key, {
                         presentacionId: e.target.value,
-                        lote: '',
-                        bultos: '',
-                        sueltas: '',
-                        loteStock: null,
+                        ...resetLoteFields(),
                       })
                     }
                     disabled={!row.productoId || pps.length === 0}
@@ -237,13 +249,17 @@ export function EgresoWizardStep3({
                 clienteId={clienteId}
                 depositoId={depositoId}
                 lote={row.lote}
+                fechaVencimiento={row.fechaVencimiento}
                 bultos={row.bultos}
                 sueltas={row.sueltas}
                 loteStock={row.loteStock}
-                onLoteChange={(lote, stock) =>
+                onLoteChange={(lote, stock, fechaVencimiento) =>
                   onUpdateRow(row._key, {
                     lote,
                     loteStock: stock,
+                    fechaVencimiento: fechaVencimiento
+                      ? isoToFechaHora(fechaVencimiento).fecha
+                      : '',
                     bultos: '',
                     sueltas: '',
                   })
