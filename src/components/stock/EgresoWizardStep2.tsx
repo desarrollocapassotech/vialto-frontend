@@ -1,4 +1,6 @@
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
+import { DireccionEntregaSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import type { DireccionEntrega } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -19,8 +21,11 @@ export function EgresoWizardStep2({
   onEntregadoPorChange,
   destinatario,
   onDestinatarioChange,
-  destinoFinal,
-  onDestinoFinalChange,
+  direccionesEntrega,
+  direccionesEntregaLoading,
+  direccionEntregaId,
+  onDireccionEntregaChange,
+  onNuevaDireccionEntrega,
   observaciones,
   onObservacionesChange,
   clienteNombre,
@@ -36,8 +41,11 @@ export function EgresoWizardStep2({
   onEntregadoPorChange: (v: string) => void;
   destinatario: string;
   onDestinatarioChange: (v: string) => void;
-  destinoFinal: string;
-  onDestinoFinalChange: (v: string) => void;
+  direccionesEntrega: DireccionEntrega[];
+  direccionesEntregaLoading?: boolean;
+  direccionEntregaId: string;
+  onDireccionEntregaChange: (id: string) => void;
+  onNuevaDireccionEntrega?: () => void;
   observaciones: string;
   onObservacionesChange: (v: string) => void;
   clienteNombre: string;
@@ -105,13 +113,15 @@ export function EgresoWizardStep2({
 
           <div className="space-y-1 sm:col-span-2">
             <label className={LABEL}>Dirección / Ruta de entrega</label>
-            <input
-              type="text"
-              value={destinoFinal}
-              onChange={(e) => onDestinoFinalChange(e.target.value)}
-              className={INPUT}
-              placeholder="Ej: Pampa 1087, San Fernando…"
-              maxLength={300}
+            <DireccionEntregaSearchSelect
+              direcciones={direccionesEntrega}
+              value={direccionEntregaId}
+              onChange={onDireccionEntregaChange}
+              loading={direccionesEntregaLoading}
+              inputClassName={INPUT}
+              allowEmptyValue
+              emptyListChoiceLabel="Sin dirección"
+              onNuevo={onNuevaDireccionEntrega}
             />
           </div>
 

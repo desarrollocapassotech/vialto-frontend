@@ -16,6 +16,8 @@ import { ChoferCreatePage } from '@/pages/ChoferCreatePage';
 import { ChoferEditPage } from '@/pages/ChoferEditPage';
 import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
 import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
+import { DireccionEntregaCreatePage } from '@/pages/DireccionEntregaCreatePage';
+import { DireccionEntregaEditPage } from '@/pages/DireccionEntregaEditPage';
 import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
 import { IngresosStockPage } from '@/pages/IngresosStockPage';
 import { IngresosStockHistorialPage } from '@/pages/IngresosStockHistorialPage';
@@ -158,6 +160,7 @@ export default function App() {
           <Route path="transportistas" element={<Navigate to="/base-de-datos?tab=transportistas" replace />} />
           <Route path="choferes" element={<Navigate to="/base-de-datos?tab=choferes" replace />} />
           <Route path="vehiculos" element={<Navigate to="/base-de-datos?tab=vehiculos" replace />} />
+          <Route path="direcciones-entrega" element={<Navigate to="/base-de-datos?tab=direcciones-entrega" replace />} />
 
           {/* rutas accesibles solo para org:admin y superadmin */}
           <Route element={<RequireOrgAdmin />}>
@@ -171,6 +174,8 @@ export default function App() {
             <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
             <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
             <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
+            <Route path="direcciones-entrega/nuevo" element={<DireccionEntregaCreatePage />} />
+            <Route path="direcciones-entrega/:id/editar" element={<DireccionEntregaEditPage />} />
           </Route>
 
           {/* rutas de stock — requieren módulo "stock" contratado */}

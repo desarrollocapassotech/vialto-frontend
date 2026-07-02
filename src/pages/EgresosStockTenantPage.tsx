@@ -6,8 +6,9 @@ import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { DireccionEntregaModal } from '@/components/direcciones-entrega/DireccionEntregaModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
-import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+import type { Cliente, Deposito, DireccionEntrega, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
@@ -90,10 +91,14 @@ export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
   clientesExternosLoading,
+  direccionesEntregaExternos,
+  direccionesEntregaExternosLoading,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
+  direccionesEntregaExternos?: DireccionEntrega[];
+  direccionesEntregaExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -109,6 +114,18 @@ export function EgresosStockTenantPage({
   }, [clientesExternos, maestro.clientes, sessionClientes]);
 
   const clientesLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+
+  const [sessionDireccionesEntrega, setSessionDireccionesEntrega] = useState<DireccionEntrega[]>([]);
+  const direccionesEntrega = useMemo(() => {
+    const base = direccionesEntregaExternos ?? maestro.direccionesEntrega;
+    const ids = new Set(base.map((d) => d.id));
+    return [...base, ...sessionDireccionesEntrega.filter((d) => !ids.has(d.id))];
+  }, [direccionesEntregaExternos, maestro.direccionesEntrega, sessionDireccionesEntrega]);
+
+  const direccionesEntregaLoading = platform
+    ? Boolean(direccionesEntregaExternosLoading)
+    : maestro.loading;
+
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
@@ -139,7 +156,7 @@ export function EgresosStockTenantPage({
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [entregadoPor, setEntregadoPor] = useState('');
   const [destinatario, setDestinatario] = useState('');
-  const [destinoFinal, setDestinoFinal] = useState('');
+  const [direccionEntregaId, setDireccionEntregaId] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
   // Paso 3
@@ -150,6 +167,7 @@ export function EgresosStockTenantPage({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
+  const [modalDireccionEntrega, setModalDireccionEntrega] = useState(false);
 
   // Pre-completar conductor con el nombre del usuario logueado
   useEffect(() => {
@@ -230,7 +248,7 @@ export function EgresosStockTenantPage({
     setFechaMovError(null);
     setEntregadoPor('');
     setDestinatario('');
-    setDestinoFinal('');
+    setDireccionEntregaId('');
     setObservaciones('');
     setRows([emptyEgresoRow()]);
     setStockItems([]);
@@ -300,6 +318,11 @@ export function EgresosStockTenantPage({
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
     if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
 
+    const destinoFinal =
+      direccionEntregaId.trim()
+        ? direccionesEntrega.find((d) => d.id === direccionEntregaId)?.direccion?.trim()
+        : undefined;
+
     setSaving(true);
     try {
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
@@ -310,7 +333,7 @@ export function EgresosStockTenantPage({
           fecha: fechaIso,
           entregadoPor: entregadoPor.trim() || undefined,
           destinatario: destinatario.trim() || undefined,
-          destinoFinal: destinoFinal.trim() || undefined,
+          destinoFinal: destinoFinal || undefined,
           observaciones: observaciones.trim() || undefined,
           lineas: rows.map((row) => ({
             productoId: row.productoId,
@@ -430,8 +453,11 @@ export function EgresosStockTenantPage({
           onEntregadoPorChange={setEntregadoPor}
           destinatario={destinatario}
           onDestinatarioChange={setDestinatario}
-          destinoFinal={destinoFinal}
-          onDestinoFinalChange={setDestinoFinal}
+          direccionesEntrega={direccionesEntrega}
+          direccionesEntregaLoading={direccionesEntregaLoading}
+          direccionEntregaId={direccionEntregaId}
+          onDireccionEntregaChange={setDireccionEntregaId}
+          onNuevaDireccionEntrega={() => setModalDireccionEntrega(true)}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
           clienteNombre={clienteNombre}
@@ -483,6 +509,21 @@ export function EgresosStockTenantPage({
             setClienteId(c.id);
             setModalCliente(false);
             if (!tenantId) void maestro.refreshClientes();
+          }}
+        />
+      )}
+
+      {modalDireccionEntrega && (
+        <DireccionEntregaModal
+          getToken={getToken}
+          tenantId={tenantId}
+          stacked
+          onClose={() => setModalDireccionEntrega(false)}
+          onSaved={(d) => {
+            setSessionDireccionesEntrega((prev) => [...prev, d]);
+            setDireccionEntregaId(d.id);
+            setModalDireccionEntrega(false);
+            if (!tenantId) void maestro.refreshDireccionesEntrega();
           }}
         />
       )}
