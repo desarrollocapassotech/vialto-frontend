@@ -208,6 +208,13 @@ export function IngresosStockHistorialTenantPage({
             cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
           },
           {
+            id: 'numeroRemitoProveedor',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: 'N° Remito Proveedor',
+            cell: (op) => op.numeroRemitoProveedor || '—',
+            tdClassName: `${listadoTablaTdClass} font-mono`,
+          },
+          {
             id: 'cliente',
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
