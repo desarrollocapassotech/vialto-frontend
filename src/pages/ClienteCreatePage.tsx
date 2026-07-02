@@ -1,48 +1,56 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
-import type { PaisCodigo } from '@/lib/ciudades';
+import { useAuth } from "@clerk/clerk-react";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import {
+  CrudFieldLabel,
+  CrudInput,
+  CrudSelect,
+} from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import {
+  idFiscalPorPais,
+  validarIdFiscal,
+  condicionTributariaPorPais,
+} from "@/lib/ciudades";
+import type { PaisCodigo } from "@/lib/ciudades";
 
 export function ClienteCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
-  const [nombre, setNombre] = useState('');
-  const [pais, setPais] = useState<PaisCodigo | ''>('');
-  const [idFiscal, setIdFiscal] = useState('');
+  const [nombre, setNombre] = useState("");
+  const [pais, setPais] = useState<PaisCodigo | "">("");
+  const [idFiscal, setIdFiscal] = useState("");
   const [condicionIva, setCondicionIva] = useState<number | null>(null);
-  const [condicionTributaria, setCondicionTributaria] = useState('');
-  const [email, setEmail] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [direccion, setDireccion] = useState('');
+  const [condicionTributaria, setCondicionTributaria] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  function handlePaisChange(newPais: PaisCodigo | '') {
+  function handlePaisChange(newPais: PaisCodigo | "") {
     setPais(newPais);
     setCondicionIva(null);
-    setCondicionTributaria('');
+    setCondicionTributaria("");
   }
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del cliente.';
-    if (!pais) errs.pais = 'Seleccioná el país del cliente.';
+    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del cliente.";
+    if (!pais) errs.pais = "Seleccioná el país del cliente.";
     if (!idFiscal.trim()) {
-      const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
+      const label = pais ? idFiscalPorPais(pais).label : "ID fiscal";
       errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
     }
     if (Object.keys(errs).length > 0) {
@@ -60,43 +68,53 @@ export function ClienteCreatePage() {
     try {
       const path = tenantId
         ? `/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/clientes';
+        : "/api/clientes";
       await apiJson(path, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({
           nombre: nombre.trim(),
           pais,
           idFiscal: idFiscal.trim(),
-          condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
-          condicionTributaria: pais !== 'AR' ? (condicionTributaria.trim() || undefined) : undefined,
+          condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
+          condicionTributaria:
+            pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
-      navigate(`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+      navigate(
+        `/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
+        { replace: true },
+      );
     } catch (e) {
-      setError(friendlyError(e, 'clientes'));
+      setError(friendlyError(e, "clientes"));
     } finally {
       setLoading(false);
     }
   }
 
-  const labelClass = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+  const labelClass =
+    "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
   const condInfo = condicionTributariaPorPais(pais);
-  const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
+  const errorFiscal = idFiscal.trim()
+    ? validarIdFiscal(pais, idFiscal.trim())
+    : null;
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
   return (
     <CrudPageLayout
       title="Crear cliente"
-      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
+      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
       backLabel="← Volver a clientes"
     >
       <form
         className="mt-6 grid gap-4"
-        onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
       >
         <label className="grid gap-1.5">
           <CrudFieldLabel required>Nombre</CrudFieldLabel>
@@ -119,7 +137,9 @@ export function ClienteCreatePage() {
         </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="grid gap-1.5">
-            <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
+            <CrudFieldLabel required>
+              {idFiscalPorPais(pais).label}
+            </CrudFieldLabel>
             <CrudInput
               placeholder={idFiscalPorPais(pais).placeholder}
               value={idFiscal}
@@ -130,14 +150,20 @@ export function ClienteCreatePage() {
           </label>
           <label className="grid gap-1.5">
             <span className={labelClass}>{condInfo.label}</span>
-            {condInfo.type === 'select' ? (
+            {condInfo.type === "select" ? (
               <CrudSelect
-                value={condicionIva ?? ''}
-                onChange={(e) => setCondicionIva(e.target.value ? Number(e.target.value) : null)}
+                value={condicionIva ?? ""}
+                onChange={(e) =>
+                  setCondicionIva(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
+                }
               >
                 <option value="">Seleccioná una opción</option>
                 {condInfo.options.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </CrudSelect>
             ) : (
@@ -174,7 +200,11 @@ export function ClienteCreatePage() {
           />
         </label>
         <CrudFormErrorAlert message={error} />
-        <CrudSubmitButton loading={loading} label="Crear cliente" disabled={!!errorFiscal} />
+        <CrudSubmitButton
+          loading={loading}
+          label="Crear cliente"
+          disabled={!!errorFiscal}
+        />
       </form>
     </CrudPageLayout>
   );
