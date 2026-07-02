@@ -554,28 +554,6 @@ export function ViajesTenantPage({
             ? pagoTranspF
             : null;
 
-        // Se calcula la página que realmente se enviará al backend
-        const reqPage = pagoFiltroActivo ? 1 : pageApi;
-        const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
-
-        // Inyectamos la paginación y el tenantId directamente en los URLSearchParams
-        filtros.set("page", String(reqPage));
-        filtros.set("pageSize", String(reqPageSize));
-
-        if (platform && tid) {
-          filtros.set("tenantId", tid);
-        }
-
-        const basePath = platform
-          ? "/api/platform/viajes/paginated"
-          : "/api/viajes/paginated";
-
-        // Fetch unificado y seguro
-        const data = await apiJson<ViajesPaginatedResponse>(
-          `${basePath}?${filtros.toString()}`,
-          () => getTokenRef.current(),
-        );
-
         let items: Viaje[];
         let meta: PaginatedMeta;
 
