@@ -26,8 +26,8 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
 
 const STEPS: { label: string }[] = [
   { label: 'Empresa' },
-  { label: 'Entrega' },
   { label: 'Productos' },
+  { label: 'Entrega' },
 ];
 
 function StepIndicator({ step }: { step: WizardStep }) {
@@ -69,21 +69,6 @@ function StepIndicator({ step }: { step: WizardStep }) {
       })}
     </div>
   );
-}
-
-function formatFechaLabel(fecha: string, hora: string): string {
-  if (!fecha) return '';
-  try {
-    const d = new Date(`${fecha}T${hora || '00:00'}`);
-    const f = d.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    return hora ? `${f} ${hora}` : f;
-  } catch {
-    return fecha;
-  }
 }
 
 export function EgresosStockTenantPage({
@@ -132,7 +117,10 @@ export function EgresosStockTenantPage({
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
 
-  // Paso 2
+  // Paso 2 — productos
+  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
+
+  // Paso 3 — entrega / logística
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
@@ -141,9 +129,6 @@ export function EgresosStockTenantPage({
   const [destinatario, setDestinatario] = useState('');
   const [destinoFinal, setDestinoFinal] = useState('');
   const [observaciones, setObservaciones] = useState('');
-
-  // Paso 3
-  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
 
   // Estado compartido
   const [formError, setFormError] = useState<string | null>(null);
@@ -195,14 +180,14 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Cargar stock disponible para el cliente+depósito seleccionados (para mostrar disponible en paso 3)
+  // Cargar stock disponible para el cliente+depósito seleccionados (paso 2 — productos)
   useEffect(() => {
     if (!clienteId || !depositoId) {
       setStockItems([]);
       return;
     }
     void apiJson<StockItem[]>(
-      `${disponibleBase}${buildQs({ clienteId }, tenantId)}`,
+      `${disponibleBase}${buildQs({ clienteId, depositoId }, tenantId)}`,
       () => getToken(),
     )
       .then(setStockItems)
@@ -252,21 +237,7 @@ export function EgresosStockTenantPage({
     setStep(2);
   }
 
-  function handleContinuar2() {
-    if (!fechaMov.trim()) {
-      setFechaMovError('Ingresá la fecha del movimiento.');
-      return;
-    }
-    setFechaMovError(null);
-    setFieldErrors({});
-    setFormError(null);
-    setStep(3);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-
+  function validateProductRows(): Record<string, string> {
     const ferrs: Record<string, string> = {};
     rows.forEach((row, idx) => {
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
@@ -279,9 +250,16 @@ export function EgresosStockTenantPage({
       } else if (row.productoId && row.presentacionId) {
         const disponible =
           stockItems.find(
-            (si) => si.productoId === row.productoId && si.presentacionId === row.presentacionId,
+            (si) =>
+              si.productoId === row.productoId &&
+              si.presentacionId === row.presentacionId &&
+              si.clienteId === clienteId &&
+              si.depositoId === depositoId,
           ) ?? null;
-        if (disponible) {
+        if (!disponible) {
+          ferrs[`row_${idx}_productoId`] =
+            'No hay stock de este producto en el depósito seleccionado.';
+        } else {
           if (b > disponible.cantidad1)
             ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${disponible.cantidad1} bultos.`;
           if (s > disponible.cantidad2)
@@ -289,16 +267,39 @@ export function EgresosStockTenantPage({
         }
       }
     });
+    return ferrs;
+  }
 
+  function handleContinuar2() {
+    const ferrs = validateProductRows();
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
       setFormError('Revisá los campos marcados en rojo.');
       return;
     }
     setFieldErrors({});
+    setFormError(null);
+    setStep(3);
+  }
+
+  function handleContinuar3() {
+    if (!fechaMov.trim()) {
+      setFechaMovError('Ingresá la fecha del movimiento.');
+      return;
+    }
+    setFechaMovError(null);
+    void handleRegistrarEgreso();
+  }
+
+  async function handleRegistrarEgreso() {
+    setFormError(null);
+    setFieldErrors({});
 
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
-    if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
+    if (!fechaIso) {
+      setFormError('Revisá la fecha y hora del movimiento.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -334,6 +335,11 @@ export function EgresosStockTenantPage({
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    handleContinuar2();
+  }
+
   const historialHref = platform
     ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/egresos/historial';
@@ -357,7 +363,6 @@ export function EgresosStockTenantPage({
 
   const clienteNombre = clientes.find((c) => c.id === clienteId)?.nombre ?? '';
   const depositoNombre = depositos.find((d) => d.id === depositoId)?.nombre ?? '';
-  const fechaLabel = formatFechaLabel(fechaMov, horaMov);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -415,6 +420,33 @@ export function EgresosStockTenantPage({
       )}
 
       {step === 2 && (
+        <EgresoWizardStep3
+          rows={rows}
+          onAddRow={addRow}
+          onRemoveRow={removeRow}
+          onUpdateRow={updateRow}
+          productos={productos}
+          productosLoading={productosLoading}
+          stockItems={stockItems}
+          fieldErrors={fieldErrors}
+          formError={formError}
+          clienteId={clienteId}
+          depositoId={depositoId}
+          clienteNombre={clienteNombre}
+          depositoNombre={depositoNombre}
+          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
+          tenantId={tenantId}
+          primaryAction="continuar"
+          onVolver={() => {
+            setStep(1);
+            setFieldErrors({});
+            setFormError(null);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {step === 3 && (
         <EgresoWizardStep2
           fechaMov={fechaMov}
           horaMov={horaMov}
@@ -436,40 +468,16 @@ export function EgresosStockTenantPage({
           onObservacionesChange={setObservaciones}
           clienteNombre={clienteNombre}
           depositoNombre={depositoNombre}
-          onVolver={() => {
-            setStep(1);
-            setFieldErrors({});
-            setFormError(null);
-          }}
-          onContinuar={handleContinuar2}
-        />
-      )}
-
-      {step === 3 && (
-        <EgresoWizardStep3
-          rows={rows}
-          onAddRow={addRow}
-          onRemoveRow={removeRow}
-          onUpdateRow={updateRow}
-          productos={productos}
-          productosLoading={productosLoading}
-          stockItems={stockItems}
-          fieldErrors={fieldErrors}
           formError={formError}
-          saving={saving}
-          clienteId={clienteId}
-          depositoId={depositoId}
-          clienteNombre={clienteNombre}
-          depositoNombre={depositoNombre}
-          fechaLabel={fechaLabel}
-          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
-          tenantId={tenantId}
+          continuarLoading={saving}
+          continuarLabel={saving ? 'Guardando…' : 'Registrar egreso'}
           onVolver={() => {
             setStep(2);
             setFieldErrors({});
             setFormError(null);
+            setFechaMovError(null);
           }}
-          onSubmit={handleSubmit}
+          onContinuar={handleContinuar3}
         />
       )}
 

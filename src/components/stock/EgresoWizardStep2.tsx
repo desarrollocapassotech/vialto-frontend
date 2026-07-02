@@ -1,4 +1,6 @@
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
+import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
+import { Spinner } from '@/components/ui/Spinner';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -25,6 +27,9 @@ export function EgresoWizardStep2({
   onObservacionesChange,
   clienteNombre,
   depositoNombre,
+  formError,
+  continuarLabel = 'Continuar →',
+  continuarLoading = false,
   onVolver,
   onContinuar,
 }: {
@@ -42,6 +47,9 @@ export function EgresoWizardStep2({
   onObservacionesChange: (v: string) => void;
   clienteNombre: string;
   depositoNombre: string;
+  formError?: string | null;
+  continuarLabel?: string;
+  continuarLoading?: boolean;
   onVolver: () => void;
   onContinuar: () => void;
 }) {
@@ -128,20 +136,25 @@ export function EgresoWizardStep2({
         </div>
       </div>
 
+      <CrudFormErrorAlert message={formError} />
+
       <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onVolver}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 bg-white text-sm font-medium text-vialto-charcoal rounded hover:bg-vialto-mist/60 transition-colors"
+          disabled={continuarLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 bg-white text-sm font-medium text-vialto-charcoal rounded hover:bg-vialto-mist/60 transition-colors disabled:opacity-50"
         >
           ← Volver
         </button>
         <button
           type="button"
           onClick={onContinuar}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-vialto-charcoal text-white text-sm font-semibold rounded hover:bg-vialto-charcoal/90 transition-colors"
+          disabled={continuarLoading}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
         >
-          Continuar →
+          {continuarLoading && <Spinner className="h-4 w-4" />}
+          {continuarLabel}
         </button>
       </div>
     </div>

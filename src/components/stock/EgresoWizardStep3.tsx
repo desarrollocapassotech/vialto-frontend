@@ -36,11 +36,19 @@ function getDisponible(
   stockItems: StockItem[],
   productoId: string,
   presentacionId: string,
+  clienteId: string,
+  depositoId: string,
 ): StockItem | null {
-  if (!productoId || !presentacionId) return null;
-  return stockItems.find(
-    (s) => s.productoId === productoId && s.presentacionId === presentacionId,
-  ) ?? null;
+  if (!productoId || !presentacionId || !clienteId || !depositoId) return null;
+  return (
+    stockItems.find(
+      (s) =>
+        s.productoId === productoId &&
+        s.presentacionId === presentacionId &&
+        s.clienteId === clienteId &&
+        s.depositoId === depositoId,
+    ) ?? null
+  );
 }
 
 export function isEgresoRowComplete(row: EgresoRow): boolean {
@@ -67,6 +75,7 @@ export function EgresoWizardStep3({
   fechaLabel,
   lotesBase,
   tenantId,
+  primaryAction = 'registrar',
   onVolver,
   onSubmit,
 }: {
@@ -79,20 +88,21 @@ export function EgresoWizardStep3({
   stockItems: StockItem[];
   fieldErrors: Record<string, string>;
   formError: string | null;
-  saving: boolean;
+  saving?: boolean;
   clienteId: string;
   depositoId: string;
   clienteNombre: string;
   depositoNombre: string;
-  fechaLabel: string;
+  fechaLabel?: string;
   lotesBase: string;
   tenantId?: string;
+  primaryAction?: 'continuar' | 'registrar';
   onVolver: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      {/* Resumen pasos 1 y 2 */}
+      {/* Resumen paso 1 */}
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
           <span className="text-vialto-steel text-xs uppercase tracking-[0.08em] mr-1.5">Cliente</span>
@@ -125,7 +135,13 @@ export function EgresoWizardStep3({
         {rows.map((row, idx) => {
           const pps = getPresentaciones(productos, row.productoId);
           const selectedPP = pps.find((pp) => pp.id === row.presentacionId);
-          const disponible = getDisponible(stockItems, row.productoId, row.presentacionId);
+          const disponible = getDisponible(
+            stockItems,
+            row.productoId,
+            row.presentacionId,
+            clienteId,
+            depositoId,
+          );
 
           return (
             <div key={row._key} className="bg-white rounded-lg border border-black/10 p-4 space-y-4">
@@ -319,18 +335,26 @@ export function EgresoWizardStep3({
         <button
           type="button"
           onClick={onVolver}
-          disabled={saving}
+          disabled={primaryAction === 'registrar' && saving}
           className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 bg-white text-sm font-medium text-vialto-charcoal rounded hover:bg-vialto-mist/60 transition-colors disabled:opacity-50"
         >
           ← Volver
         </button>
         <button
           type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
+          disabled={primaryAction === 'registrar' && saving}
+          className={`inline-flex items-center gap-2 px-6 py-2.5 text-white text-sm font-semibold rounded transition-colors disabled:opacity-50 ${
+            primaryAction === 'continuar'
+              ? 'bg-vialto-charcoal hover:bg-vialto-charcoal/90'
+              : 'bg-vialto-fire hover:bg-vialto-fire/90'
+          }`}
         >
-          {saving && <Spinner />}
-          {saving ? 'Guardando…' : 'Registrar egreso'}
+          {primaryAction === 'registrar' && saving && <Spinner />}
+          {primaryAction === 'continuar'
+            ? 'Continuar →'
+            : saving
+              ? 'Guardando…'
+              : 'Registrar egreso'}
         </button>
       </div>
     </form>
