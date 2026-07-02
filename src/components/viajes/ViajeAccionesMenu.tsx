@@ -5,8 +5,8 @@ import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/Accion
 import type { Viaje } from '@/types/api';
 import {
   viajePermiteAgregarGasto,
-  viajeEstadoPermiteBotonFacturar,
 } from '@/lib/viajesEstados';
+import { viajePermiteBotonFacturar } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 
 function fmtDate(iso: string) {
@@ -22,8 +22,6 @@ interface Props {
   onFacturar: () => void;
   onExportar: () => void;
   onVerFactura?: () => void;
-  /** Si se provee, reemplaza "Facturar" con "Emitir CVLP" cuando el módulo integracion-arca está activo. */
-  onEmitirCvlp?: () => void;
   onEliminar?: () => void;
 }
 
@@ -35,14 +33,13 @@ export function ViajeAccionesMenu({
   onFacturar,
   onExportar,
   onVerFactura,
-  onEmitirCvlp,
   onEliminar,
 }: Props) {
   const [open, setOpen] = useState(false);
 
   const permitePago = viajeRequierePagosTransportista(viaje) && viaje.estado !== 'cancelado';
   const permiteGasto = viajePermiteAgregarGasto(viaje.estado);
-  const permiteFacturar = viajeEstadoPermiteBotonFacturar(viaje.estado);
+  const permiteFacturar = viajePermiteBotonFacturar(viaje);
   const permiteExportar = viaje.estado !== 'cancelado';
 
   const options = useMemo(() => {
@@ -56,7 +53,7 @@ export function ViajeAccionesMenu({
         id: 'facturar',
         label: 'Facturar',
         icon: Receipt,
-        onClick: onEmitirCvlp ?? onFacturar,
+        onClick: onFacturar,
       });
     }
     if (permiteGasto) {
@@ -83,7 +80,6 @@ export function ViajeAccionesMenu({
     onVer,
     onVerFactura,
     permiteFacturar,
-    onEmitirCvlp,
     onFacturar,
     permiteGasto,
     onAgregarGasto,
