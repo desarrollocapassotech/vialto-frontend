@@ -130,8 +130,9 @@ export function EgresoWizardStep3({
             <span className="ml-1 text-sm font-normal text-vialto-steel">({rows.length})</span>
           </h2>
           <p className="text-xs text-vialto-steel mt-0.5">
-            Elegí el lote antes de indicar cantidades. El vencimiento se completa solo al seleccionar
-            un lote.
+            Solo se listan productos con stock en el cliente y depósito elegidos. Elegí producto y
+            presentación; luego el lote de origen (el vencimiento se completa solo) y las cantidades
+            a extraer.
           </p>
         </div>
 
@@ -190,7 +191,9 @@ export function EgresoWizardStep3({
                       p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
                     }
                     placeholderCerrado={
-                      productos.length === 0 ? 'Sin productos con stock' : 'Elegí un producto…'
+                      productos.length === 0
+                        ? 'Sin productos con stock'
+                        : 'Elegí un producto…'
                     }
                     placeholderBuscar="Buscar por nombre o código…"
                     inputClassName={`${INPUT} ${
@@ -278,9 +281,7 @@ export function EgresoWizardStep3({
         {(() => {
           const lastRow = rows[rows.length - 1];
           const canAdd =
-            productos.length > 0 &&
-            !productosLoading &&
-            lastRow
+            productos.length > 0 && !productosLoading && lastRow
               ? isEgresoRowComplete(lastRow)
               : false;
           return (

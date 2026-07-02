@@ -15,6 +15,7 @@ import {
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import type { ViajeOperacionModo } from "@/components/viajes/ViajeOperacionTipoFieldset";
@@ -534,6 +535,7 @@ export function ViajesTenantPage({
         if (per === "desde_hoy" || per === "anteriores") {
           filtros.set("periodo", per);
         }
+
         appendViajeSortQuery(
           filtros,
           ordenamientoAplicadoRef.current.sortBy,
@@ -543,6 +545,7 @@ export function ViajesTenantPage({
         const listBase = platform
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
         const pageApi = Math.max(1, Math.floor(page));
         const pageSizeApi = pageSizeApiValido(pageSize);
 
@@ -550,6 +553,28 @@ export function ViajesTenantPage({
           pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
             ? pagoTranspF
             : null;
+
+        // Se calcula la página que realmente se enviará al backend
+        const reqPage = pagoFiltroActivo ? 1 : pageApi;
+        const reqPageSize = pagoFiltroActivo ? 100 : pageSizeApi;
+
+        // Inyectamos la paginación y el tenantId directamente en los URLSearchParams
+        filtros.set("page", String(reqPage));
+        filtros.set("pageSize", String(reqPageSize));
+
+        if (platform && tid) {
+          filtros.set("tenantId", tid);
+        }
+
+        const basePath = platform
+          ? "/api/platform/viajes/paginated"
+          : "/api/viajes/paginated";
+
+        // Fetch unificado y seguro
+        const data = await apiJson<ViajesPaginatedResponse>(
+          `${basePath}?${filtros.toString()}`,
+          () => getTokenRef.current(),
+        );
 
         let items: Viaje[];
         let meta: PaginatedMeta;
@@ -568,7 +593,9 @@ export function ViajesTenantPage({
           );
           items = pagoData.items;
           meta = pagoData.meta;
-        } else if (viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)) {
+        } else if (
+          viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)
+        ) {
           const ordenData = await listarViajesOrdenadosClienteDesdeApi(
             listBase,
             pageApi,
@@ -584,7 +611,11 @@ export function ViajesTenantPage({
             `${listBase}page=${pageApi}&pageSize=${pageSizeApi}`,
             () => getTokenRef.current(),
           );
-          items = sortViajesListado(data.items, sortFetch.sortBy, sortFetch.sortDir);
+          items = sortViajesListado(
+            data.items,
+            sortFetch.sortBy,
+            sortFetch.sortDir,
+          );
           meta = data.meta;
         }
 
@@ -1490,12 +1521,15 @@ export function ViajesTenantPage({
       draft.precioTransportistaExterno,
       draft.monedaPrecioTransportistaExterno,
     );
-    const pagosTransportistaApi = pagosTransportistaDraftsToApi(draft.pagosTransportista);
+    const pagosTransportistaApi = pagosTransportistaDraftsToApi(
+      draft.pagosTransportista,
+    );
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: draft.transportistaId.trim(),
           precioTransportistaExterno: draft.precioTransportistaExterno,
-          monedaPrecioTransportistaExterno: draft.monedaPrecioTransportistaExterno,
+          monedaPrecioTransportistaExterno:
+            draft.monedaPrecioTransportistaExterno,
           pagosTransportista: draft.pagosTransportista,
         })
       : null;
@@ -2523,54 +2557,17 @@ export function ViajesTenantPage({
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                disabled={listadoRefetching}
-                onChange={(e) => {
-                  setListadoRefetching(true);
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || listadoRefetching}
-              onClick={() => {
-                setListadoRefetching(true);
-                setPage((p) => Math.max(1, p - 1));
-              }}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || listadoRefetching}
-              onClick={() => {
-                setListadoRefetching(true);
-                setPage((p) => p + 1);
-              }}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+          }}
+          onPageSizeChange={(newPageSize) => {
+            setPageSize(newPageSize);
+            setPage(1);
+          }}
+        />
       )}
 
       {viewingViaje && (

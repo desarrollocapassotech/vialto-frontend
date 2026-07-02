@@ -1,11 +1,16 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Deposito } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+// 👇 1. Importamos el componente de paginación
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { Deposito } from "@/types/api";
 
 type DepositoFormState = {
   nombre: string;
@@ -20,12 +25,18 @@ export function DepositosPage() {
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [editingDepositoId, setEditingDepositoId] = useState<string | null>(null);
+  const [editingDepositoId, setEditingDepositoId] = useState<string | null>(
+    null,
+  );
   const [form, setForm] = useState<DepositoFormState>({
-    nombre: '',
-    direccion: '',
+    nombre: "",
+    direccion: "",
     activo: true,
   });
+
+  // 👇 2. Agregamos los estados para manejar la página
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const editarDeposito = useMemo(
     () => depositos?.find((d) => d.id === editingDepositoId) ?? null,
@@ -38,7 +49,9 @@ export function DepositosPage() {
 
     (async () => {
       try {
-        const data = await apiJson<Deposito[]>('/api/stock/depositos', () => getToken());
+        const data = await apiJson<Deposito[]>("/api/stock/depositos", () =>
+          getToken(),
+        );
         if (!cancelled) {
           setDepositos(data);
           setError(null);
@@ -46,7 +59,7 @@ export function DepositosPage() {
       } catch (e) {
         if (!cancelled) {
           setDepositos(null);
-          setError(friendlyError(e, 'stock'));
+          setError(friendlyError(e, "stock"));
         }
       }
     })();
@@ -65,23 +78,25 @@ export function DepositosPage() {
     if (editarDeposito) {
       setForm({
         nombre: editarDeposito.nombre,
-        direccion: editarDeposito.descripcion ?? '',
+        direccion: editarDeposito.descripcion ?? "",
         activo: editarDeposito.activo,
       });
       return;
     }
 
-    setForm({ nombre: '', direccion: '', activo: true });
+    setForm({ nombre: "", direccion: "", activo: true });
   }, [editarDeposito, isFormOpen]);
 
   async function refresh() {
     try {
-      const data = await apiJson<Deposito[]>('/api/stock/depositos', () => getToken());
+      const data = await apiJson<Deposito[]>("/api/stock/depositos", () =>
+        getToken(),
+      );
       setDepositos(data);
       setError(null);
     } catch (e) {
       setDepositos(null);
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     }
   }
 
@@ -90,7 +105,7 @@ export function DepositosPage() {
     if (!isLoaded || !isSignedIn) return;
 
     if (!form.nombre.trim()) {
-      setFieldErrors({ nombre: 'Ingresá el nombre del depósito.' });
+      setFieldErrors({ nombre: "Ingresá el nombre del depósito." });
       return;
     }
     setFieldErrors({});
@@ -109,13 +124,13 @@ export function DepositosPage() {
           `/api/stock/depositos/${editingDepositoId}`,
           () => getToken(),
           {
-            method: 'PATCH',
+            method: "PATCH",
             body: JSON.stringify(payload),
           },
         );
       } else {
-        await apiJson<Deposito>('/api/stock/depositos', () => getToken(), {
-          method: 'POST',
+        await apiJson<Deposito>("/api/stock/depositos", () => getToken(), {
+          method: "POST",
           body: JSON.stringify(payload),
         });
       }
@@ -124,7 +139,7 @@ export function DepositosPage() {
       setIsFormOpen(false);
       setEditingDepositoId(null);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     } finally {
       setSaving(false);
     }
@@ -139,6 +154,27 @@ export function DepositosPage() {
     setEditingDepositoId(deposito.id);
     setIsFormOpen(true);
   }
+
+  // 👇 3. Lógica para cortar el array y generar la metadata del paginador
+  const meta = useMemo(() => {
+    if (!depositos) return null;
+    const total = depositos.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [depositos, page, pageSize]);
+
+  const paginatedDepositos = useMemo(() => {
+    if (!depositos) return null;
+    const start = (page - 1) * pageSize;
+    return depositos.slice(start, start + pageSize);
+  }, [depositos, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -169,31 +205,32 @@ export function DepositosPage() {
         className="mt-8"
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (deposito) => deposito.nombre,
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
           {
-            id: 'direccion',
-            header: 'Dirección',
-            cell: (deposito) => deposito.descripcion ?? '—',
+            id: "direccion",
+            header: "Dirección",
+            cell: (deposito) => deposito.descripcion ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'activo',
-            header: 'Activo',
-            cell: (deposito) => (deposito.activo ? 'Sí' : 'No'),
+            id: "activo",
+            header: "Activo",
+            cell: (deposito) => (deposito.activo ? "Sí" : "No"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : depositos}
+        // 👇 4. Usamos el array cortado para mostrar en la tabla
+        rows={error ? [] : paginatedDepositos}
         rowKey={(deposito) => deposito.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los depósitos.'
-            : 'Todavía no tenés depósitos cargados.'
+            ? "No se pudieron cargar los depósitos."
+            : "Todavía no tenés depósitos cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(deposito) => (
@@ -207,15 +244,30 @@ export function DepositosPage() {
         )}
       />
 
+      {/* 👇 5. Renderizamos el paginador si hay resultados */}
+      {meta && (depositos?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
+
       {isFormOpen && (
         <div className="mt-8 rounded border border-black/5 bg-white p-6 shadow-sm">
           <h2 className="text-2xl font-semibold">
-            {editingDepositoId ? 'Editar depósito' : 'Nuevo depósito'}
+            {editingDepositoId ? "Editar depósito" : "Nuevo depósito"}
           </h2>
           <p className="mt-1 text-sm text-vialto-steel">
             {editingDepositoId
-              ? 'Actualizá los datos del depósito.'
-              : 'Cargá un depósito para aplicar stock.'}
+              ? "Actualizá los datos del depósito."
+              : "Cargá un depósito para aplicar stock."}
           </p>
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -225,8 +277,13 @@ export function DepositosPage() {
               </label>
               <input
                 value={form.nombre}
-                onChange={(event) => setForm((current) => ({ ...current, nombre: event.target.value }))}
-                className={`mt-2 w-full rounded border px-3 py-2 text-sm ${fieldErrors.nombre ? 'border-red-400' : 'border-black/10'}`}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    nombre: event.target.value,
+                  }))
+                }
+                className={`mt-2 w-full rounded border px-3 py-2 text-sm ${fieldErrors.nombre ? "border-red-400" : "border-black/10"}`}
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </div>
@@ -237,7 +294,12 @@ export function DepositosPage() {
               </label>
               <input
                 value={form.direccion}
-                onChange={(event) => setForm((current) => ({ ...current, direccion: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    direccion: event.target.value,
+                  }))
+                }
                 className="mt-2 w-full rounded border border-black/10 px-3 py-2 text-sm"
               />
             </div>
@@ -247,7 +309,12 @@ export function DepositosPage() {
                 <input
                   type="checkbox"
                   checked={form.activo}
-                  onChange={(event) => setForm((current) => ({ ...current, activo: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      activo: event.target.checked,
+                    }))
+                  }
                 />
                 Activo
               </label>
