@@ -330,7 +330,7 @@ export function IngresosStockHistorialTenantPage({
             header: 'Lotes',
             cell: (op) => {
               const lotes = op.movimientos
-                .map((m) => m.lote)
+                .map((m) => m.lote ?? 'Sin lote')
                 .filter(Boolean)
                 .join(', ');
               return lotes || '—';
