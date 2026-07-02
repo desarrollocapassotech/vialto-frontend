@@ -1,9 +1,9 @@
-import { resolverEtiquetaCiudadCatalogo } from '@/lib/ciudades';
+import { resolverEtiquetaCiudadCatalogo } from "@/lib/ciudades";
 import type {
   ImportCiudadAdvertencia,
   ImportPreviewResult,
   ImportPreviewViaje,
-} from '@/types/api';
+} from "@/types/api";
 
 export type CiudadNormalizadaConfirm = {
   fila: number;
@@ -15,7 +15,10 @@ const CONCURRENCY = 4;
 
 async function resolverCampoCached(
   value: string | null | undefined,
-  cache: Map<string, Awaited<ReturnType<typeof resolverEtiquetaCiudadCatalogo>>>,
+  cache: Map<
+    string,
+    Awaited<ReturnType<typeof resolverEtiquetaCiudadCatalogo>>
+  >,
   signal?: AbortSignal,
 ) {
   if (value == null || !value.trim()) {
@@ -44,7 +47,9 @@ async function mapWithConcurrency<T, R>(
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
   return out;
 }
 
@@ -60,61 +65,69 @@ export async function enriquecerPreviewImportacionViajes(
     return { preview, ciudadesNormalizadas: [] };
   }
 
-  const cache = new Map<string, Awaited<ReturnType<typeof resolverEtiquetaCiudadCatalogo>>>();
+  const cache = new Map<
+    string,
+    Awaited<ReturnType<typeof resolverEtiquetaCiudadCatalogo>>
+  >();
   const ciudadesNormalizadas: CiudadNormalizadaConfirm[] = [];
   const detalleAdvertencias: ImportCiudadAdvertencia[] = [];
 
-  const enriched = await mapWithConcurrency(viajes, CONCURRENCY, async (viaje) => {
-    const advertenciasCiudad: ImportCiudadAdvertencia[] = [];
-    let origen = viaje.origen;
-    let destino = viaje.destino;
-    const patch: CiudadNormalizadaConfirm = { fila: viaje.fila };
+  const enriched = await mapWithConcurrency(
+    viajes,
+    CONCURRENCY,
+    async (viaje) => {
+      const advertenciasCiudad: ImportCiudadAdvertencia[] = [];
+      let origen = viaje.origen;
+      let destino = viaje.destino;
+      const patch: CiudadNormalizadaConfirm = { fila: viaje.fila };
 
-    for (const campo of ['origen', 'destino'] as const) {
-      const raw = viaje[campo];
-      const resolved = await resolverCampoCached(raw, cache, signal);
-      if (!resolved.original) continue;
+      for (const campo of ["origen", "destino"] as const) {
+        const raw = viaje[campo];
+        const resolved = await resolverCampoCached(raw, cache, signal);
+        if (!resolved.original) continue;
 
-      const finalValue = resolved.canonica ?? resolved.original;
-      if (campo === 'origen') origen = finalValue;
-      else destino = finalValue;
+        const finalValue = resolved.canonica ?? resolved.original;
+        if (campo === "origen") origen = finalValue;
+        else destino = finalValue;
 
-      patch[campo] = finalValue;
+        patch[campo] = finalValue;
 
-      if (resolved.advertencia) {
-        advertenciasCiudad.push({
-          fila: viaje.fila,
-          campo,
-          valor: resolved.original,
-          mensaje: resolved.advertencia,
-        });
-        detalleAdvertencias.push({
-          fila: viaje.fila,
-          campo,
-          valor: resolved.original,
-          mensaje: resolved.advertencia,
-        });
+        if (resolved.advertencia) {
+          advertenciasCiudad.push({
+            fila: viaje.fila,
+            campo,
+            valor: resolved.original,
+            mensaje: resolved.advertencia,
+          });
+          detalleAdvertencias.push({
+            fila: viaje.fila,
+            campo,
+            valor: resolved.original,
+            mensaje: resolved.advertencia,
+          });
+        }
       }
-    }
 
-    if (patch.origen !== undefined || patch.destino !== undefined) {
-      ciudadesNormalizadas.push(patch);
-    }
+      if (patch.origen !== undefined || patch.destino !== undefined) {
+        ciudadesNormalizadas.push(patch);
+      }
 
-    const row: ImportPreviewViaje = {
-      ...viaje,
-      origen,
-      destino,
-      ...(advertenciasCiudad.length > 0 ? { advertenciasCiudad } : {}),
-    };
-    return row;
-  });
+      const row: ImportPreviewViaje = {
+        ...viaje,
+        origen,
+        destino,
+        ...(advertenciasCiudad.length > 0 ? { advertenciasCiudad } : {}),
+      };
+      return row;
+    },
+  );
 
   return {
     preview: {
       ...preview,
       viajes: enriched,
-      advertenciasCiudad: detalleAdvertencias.length > 0 ? detalleAdvertencias : undefined,
+      advertenciasCiudad:
+        detalleAdvertencias.length > 0 ? detalleAdvertencias : undefined,
       totalAdvertenciasCiudad: detalleAdvertencias.length,
     },
     ciudadesNormalizadas,

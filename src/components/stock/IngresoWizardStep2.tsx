@@ -19,6 +19,8 @@ export function IngresoWizardStep2({
   onFechaHoraPatch,
   observaciones,
   onObservacionesChange,
+  numeroRemitoProveedor,
+  onNumeroRemitoProveedorChange,
   fotoFiles,
   onFotosChange,
   onFotoPreview,
@@ -35,6 +37,8 @@ export function IngresoWizardStep2({
   onFechaHoraPatch: (patch: FechaHoraPatch) => void;
   observaciones: string;
   onObservacionesChange: (v: string) => void;
+  numeroRemitoProveedor: string;
+  onNumeroRemitoProveedorChange: (v: string) => void;
   fotoFiles: File[];
   onFotosChange: (files: File[]) => void;
   onFotoPreview: (file: File) => void;
@@ -79,6 +83,17 @@ export function IngresoWizardStep2({
             errorFechaCarga={fechaMovError}
           />
           <CrudFieldError message={fieldErrors.fechaMov} />
+        </div>
+
+        <div className="space-y-1">
+          <label className={LABEL}>N° de remito del proveedor</label>
+          <input
+            type="text"
+            value={numeroRemitoProveedor}
+            onChange={(e) => onNumeroRemitoProveedorChange(e.target.value)}
+            className={INPUT}
+            placeholder="Opcional"
+          />
         </div>
 
         <div className="space-y-1">

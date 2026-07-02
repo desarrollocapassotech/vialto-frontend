@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   OrganizationSwitcher,
   UserButton,
@@ -6,8 +6,8 @@ import {
   useClerk,
   useOrganization,
   useUser,
-} from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
+} from "@clerk/clerk-react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
   Building2,
@@ -22,21 +22,31 @@ import {
   Receipt,
   Truck,
   Warehouse,
-  Users,
   LogOut,
   X,
   type LucideIcon,
-} from 'lucide-react';
-import { Logo } from './Logo';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { canAccessFacturacion, canAccessIntegracionArca, canAccessStock, canAccessViajes } from '@/lib/tenantModules';
-import { isPlatformSuperadmin, userRoleDisplay } from '@/lib/roleLabels';
+} from "lucide-react";
+import { Logo } from "./Logo";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import {
+  canAccessFacturacion,
+  canAccessIntegracionArca,
+  canAccessStock,
+  canAccessViajes,
+} from "@/lib/tenantModules";
+import { isPlatformSuperadmin, userRoleDisplay } from "@/lib/roleLabels";
 import {
   orgSwitcherSidebarAppearance,
   userButtonSidebarAppearance,
-} from './clerkSidebarAppearance';
+} from "./clerkSidebarAppearance";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; extraActivePaths?: string[] };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+  extraActivePaths?: string[];
+};
 
 type NavGroup = {
   /** `null` = sin rótulo (p. ej. solo inicio). */
@@ -45,7 +55,7 @@ type NavGroup = {
 };
 
 const sidebarAsideClass =
-  'w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto';
+  "w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto";
 
 export function AppShell() {
   const { organization } = useOrganization();
@@ -56,8 +66,7 @@ export function AppShell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const superadmin =
-    userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
 
   async function handleSignOut() {
     await signOut();
@@ -70,7 +79,7 @@ export function AppShell() {
   useEffect(() => {
     if (!sidebarOpen) return;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
@@ -79,88 +88,113 @@ export function AppShell() {
   const navLoading = !userLoaded || tenantLoading;
 
   const navGroups = useMemo((): NavGroup[] => {
-    const isMember = orgRole === 'org:member';
+    const isMember = orgRole === "org:member";
 
     // org:member: solo ve Ingresos y Egresos del módulo de stock
     if (isMember) {
       if (canAccessStock(tenant?.modules ?? [])) {
-        return [{
-          title: 'Stock',
-          items: [
-            { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
-            { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
-          ],
-        }];
+        return [
+          {
+            title: "Stock",
+            items: [
+              { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+              { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+            ],
+          },
+        ];
       }
       return [];
     }
 
-    const homeLabel = superadmin ? 'Panorama' : 'Inicio';
+    const homeLabel = superadmin ? "Panorama" : "Inicio";
     const groups: NavGroup[] = [
-      { title: null, items: [{ to: '/', label: homeLabel, icon: House, end: true }] },
+      {
+        title: null,
+        items: [{ to: "/", label: homeLabel, icon: House, end: true }],
+      },
     ];
 
     if (superadmin) {
       groups.push({
-        title: 'Plataforma',
+        title: "Plataforma",
         items: [
-          { to: '/superadmin/empresas', label: 'Empresas', icon: Building2 },
-          { to: '/superadmin/usuarios', label: 'Usuarios', icon: Users },
-          { to: '/superadmin/arca', label: 'ARCA / AFIP', icon: Landmark },
+          { to: "/superadmin/empresas", label: "Empresas", icon: Building2 },
+          { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
         ],
       });
     }
 
     if (superadmin || canAccessViajes(tenant?.modules ?? [])) {
       groups.push({
-        title: 'Viajes y flota',
-        items: [{ to: '/viajes', label: 'Viajes', icon: Truck }],
+        title: "Viajes y flota",
+        items: [{ to: "/viajes", label: "Viajes", icon: Truck }],
       });
     }
 
-    const hasFacturacion = superadmin || canAccessFacturacion(tenant?.modules ?? []);
+    const hasFacturacion =
+      superadmin || canAccessFacturacion(tenant?.modules ?? []);
     const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
     const hasLiquidaciones = superadmin || hasFacturacion || hasArca;
     if (hasFacturacion || hasArca) {
       const facturacionItems: NavItem[] = [];
       if (hasFacturacion) {
-        facturacionItems.push({ to: '/facturacion', label: 'Facturas', icon: Receipt, end: true });
+        facturacionItems.push({
+          to: "/facturacion",
+          label: "Facturas",
+          icon: Receipt,
+          end: true,
+        });
       }
       if (hasLiquidaciones) {
-        facturacionItems.push({ to: '/liquidaciones', label: 'Liquidaciones', icon: Calculator, end: true });
+        facturacionItems.push({
+          to: "/liquidaciones",
+          label: "Liquidaciones",
+          icon: Calculator,
+          end: true,
+        });
         if (!superadmin && hasArca) {
-          facturacionItems.push({ to: '/liquidaciones/configuracion', label: 'Configuración ARCA', icon: Landmark });
+          facturacionItems.push({
+            to: "/liquidaciones/configuracion",
+            label: "Configuración ARCA",
+            icon: Landmark,
+          });
         }
       }
-      groups.push({ title: 'Facturación', items: facturacionItems });
+      groups.push({ title: "Facturación", items: facturacionItems });
     }
 
     if (superadmin || canAccessStock(tenant?.modules ?? [])) {
       groups.push({
-        title: 'Stock',
+        title: "Stock",
         items: [
-          { to: '/stock/inventario', label: 'Inventario', icon: Warehouse },
-          { to: '/stock/ingresos', label: 'Ingresos', icon: PackagePlus },
-          { to: '/stock/egresos', label: 'Egresos', icon: PackageMinus },
-          { to: '/stock/divisiones', label: 'Divisiones', icon: Split },
-          { to: '/stock/movimientos', label: 'Movimientos', icon: ArrowLeftRight, end: true },
+          { to: "/stock/inventario", label: "Inventario", icon: Warehouse },
+          { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+          { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+          { to: "/stock/divisiones", label: "Divisiones", icon: Split },
+          {
+            to: "/stock/movimientos",
+            label: "Movimientos",
+            icon: ArrowLeftRight,
+            end: true,
+          },
         ],
       });
     }
 
     groups.push({
-      title: 'Base de datos',
+      title: "Base de datos",
       items: [
         {
-          to: '/base-de-datos',
-          label: 'Base de datos',
+          to: "/base-de-datos",
+          label: "Base de datos",
           icon: Database,
           extraActivePaths: [
-            '/clientes',
-            '/transportistas',
-            '/choferes',
-            '/vehiculos',
-            '/stock/productos',
+            "/clientes",
+            "/transportistas",
+            "/choferes",
+            "/vehiculos",
+            "/stock/productos",
+            "/usuarios",
           ],
         },
       ],
@@ -170,7 +204,7 @@ export function AppShell() {
   }, [superadmin, tenant?.modules, orgRole]);
 
   const platformRole =
-    typeof user?.publicMetadata?.vialtoRole === 'string'
+    typeof user?.publicMetadata?.vialtoRole === "string"
       ? user.publicMetadata.vialtoRole
       : null;
 
@@ -180,11 +214,11 @@ export function AppShell() {
         platformRole,
         hasOrganization: Boolean(organization),
       })
-    : '…';
+    : "…";
 
   const accountAvatarUrl = useMemo(() => {
     const googleAccount = user?.externalAccounts?.find(
-      (account) => account.provider === 'google',
+      (account) => account.provider === "google",
     );
     const hasClerkImage = Boolean(user?.hasImage && user?.imageUrl);
     if (hasClerkImage) return user?.imageUrl ?? null;
@@ -194,38 +228,48 @@ export function AppShell() {
   const accountName =
     user?.fullName?.trim() ||
     user?.primaryEmailAddress?.emailAddress ||
-    'Cuenta';
+    "Cuenta";
 
-  const accountInitial =
-    accountName.trim().charAt(0).toUpperCase() || 'U';
+  const accountInitial = accountName.trim().charAt(0).toUpperCase() || "U";
 
   const clickableAvatarUserButtonAppearance = {
     ...userButtonSidebarAppearance,
     elements: {
       ...userButtonSidebarAppearance.elements,
-      rootBox: 'h-8 w-8 shrink-0',
+      rootBox: "h-8 w-8 shrink-0",
       userButtonTrigger:
-        'h-8 w-8 rounded-full border border-white/15 bg-transparent hover:bg-white/10 transition-colors',
-      userButtonAvatarBox: 'opacity-0',
+        "h-8 w-8 rounded-full border border-white/15 bg-transparent hover:bg-white/10 transition-colors",
+      userButtonAvatarBox: "opacity-0",
     },
   } as const;
 
-  const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_');
+  const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith(
+    "pk_test_",
+  );
   const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
-  const isLocal = !apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+  const isLocal =
+    !apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1");
   const neonBranch = import.meta.env.VITE_NEON_BRANCH as string | undefined;
-  const clerkEnv = isTestKey ? 'Clerk Dev' : 'Clerk Prod';
+  const clerkEnv = isTestKey ? "Clerk Dev" : "Clerk Prod";
 
   const envBadge = isTestKey
     ? isLocal
-      ? { label: 'Backend: LOCAL', cls: 'text-sky-900 bg-sky-400 border-sky-500' }
-      : { label: 'Backend: QA', cls: 'text-amber-900 bg-amber-400 border-amber-500' }
+      ? {
+          label: "Backend: LOCAL",
+          cls: "text-sky-900 bg-sky-400 border-sky-500",
+        }
+      : {
+          label: "Backend: QA",
+          cls: "text-amber-900 bg-amber-400 border-amber-500",
+        }
     : null;
 
   function renderSidebar(showCloseButton: boolean) {
     return (
       <>
-        <div className={`px-1 ${showCloseButton ? 'flex items-start justify-between gap-2' : ''}`}>
+        <div
+          className={`px-1 ${showCloseButton ? "flex items-start justify-between gap-2" : ""}`}
+        >
           <div className="min-w-0">
             <Logo heightClass="h-14 max-w-[11rem]" />
             <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
@@ -255,37 +299,46 @@ export function AppShell() {
                 />
               ))}
             </div>
-          ) : navGroups.map((group, gi) => (
-            <div key={group.title ?? `g-${gi}`} className="flex flex-col gap-0.5">
-              {gi > 0 && (
-                <div className="mb-2 border-t border-white/[0.12]" />
-              )}
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end === true}
-                  onClick={() => setSidebarOpen(false)}
-                  className={({ isActive }) => {
-                    const active =
-                      isActive ||
-                      (item.extraActivePaths?.some((p) =>
-                        location.pathname.startsWith(p),
-                      ) ?? false);
-                    return [
-                      'flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border',
-                      active
-                        ? 'border-vialto-fire bg-vialto-fire text-white shadow-sm'
-                        : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white',
-                    ].join(' ');
-                  }}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          ))}
+          ) : (
+            navGroups.map((group, gi) => (
+              <div
+                key={group.title ?? `g-${gi}`}
+                className="flex flex-col gap-0.5"
+              >
+                {gi > 0 && (
+                  <div className="mb-2 border-t border-white/[0.12]" />
+                )}
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end === true}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) => {
+                      const active =
+                        isActive ||
+                        (item.extraActivePaths?.some((p) =>
+                          location.pathname.startsWith(p),
+                        ) ??
+                          false);
+                      return [
+                        "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border",
+                        active
+                          ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
+                          : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                      ].join(" ");
+                    }}
+                  >
+                    <item.icon
+                      className="h-4 w-4 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ))
+          )}
         </nav>
 
         <div className="mt-auto flex flex-col gap-5 pt-4 border-t border-white/10">
@@ -303,15 +356,15 @@ export function AppShell() {
                 />
               ) : (
                 <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80">
-                  {organization?.name ?? 'Empresa no disponible'}
+                  {organization?.name ?? "Empresa no disponible"}
                 </div>
               )}
             </div>
             {!organization && (
               <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
                 {superadmin
-                  ? 'Elegí o creá una empresa para ver los datos de tu equipo.'
-                  : 'No podés cambiar la empresa con este rol.'}
+                  ? "Elegí o creá una empresa para ver los datos de tu equipo."
+                  : "No podés cambiar la empresa con este rol."}
               </p>
             )}
           </div>
@@ -342,7 +395,9 @@ export function AppShell() {
                   />
                 )}
               </div>
-              <p className="text-sm text-white/90 truncate flex-1">{accountName}</p>
+              <p className="text-sm text-white/90 truncate flex-1">
+                {accountName}
+              </p>
             </div>
             {!superadmin && (
               <button
@@ -358,7 +413,9 @@ export function AppShell() {
               <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
                 Rol
               </p>
-              <p className="text-sm text-white/90 leading-snug pr-1">{roleText}</p>
+              <p className="text-sm text-white/90 leading-snug pr-1">
+                {roleText}
+              </p>
             </div>
           </div>
         </div>
@@ -378,7 +435,9 @@ export function AppShell() {
           <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
             {clerkEnv}
           </span>
-          <span className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}>
+          <span
+            className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}
+          >
             {envBadge.label}
           </span>
         </div>
@@ -401,9 +460,11 @@ export function AppShell() {
         aria-hidden={!sidebarOpen}
         className={[
           sidebarAsideClass,
-          'lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none',
-        ].join(' ')}
+          "lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
+          sidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full pointer-events-none",
+        ].join(" ")}
       >
         {renderSidebar(true)}
       </aside>

@@ -120,7 +120,6 @@ export function EgresosStockTenantPage({
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productosLoading, setProductosLoading] = useState(true);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con stock
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allStockLoading, setAllStockLoading] = useState(true);
@@ -195,20 +194,6 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Cargar stock disponible para el cliente+depósito seleccionados (para mostrar disponible en paso 3)
-  useEffect(() => {
-    if (!clienteId || !depositoId) {
-      setStockItems([]);
-      return;
-    }
-    void apiJson<StockItem[]>(
-      `${disponibleBase}${buildQs({ clienteId }, tenantId)}`,
-      () => getToken(),
-    )
-      .then(setStockItems)
-      .catch(() => setStockItems([]));
-  }, [clienteId, depositoId, disponibleBase, tenantId, getToken]);
-
   function updateRow(key: string, patch: Partial<EgresoRow>) {
     setRows((prev) => prev.map((r) => (r._key === key ? { ...r, ...patch } : r)));
   }
@@ -233,7 +218,6 @@ export function EgresosStockTenantPage({
     setDestinoFinal('');
     setObservaciones('');
     setRows([emptyEgresoRow()]);
-    setStockItems([]);
     setFormError(null);
     setFieldErrors({});
     setStep(1);
@@ -272,20 +256,19 @@ export function EgresosStockTenantPage({
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
+      if (!row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Seleccioná el lote de origen.';
       const b = parseFloat(row.bultos) || 0;
       const s = parseFloat(row.sueltas) || 0;
       if (b <= 0 && s <= 0) {
         ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (row.productoId && row.presentacionId) {
-        const disponible =
-          stockItems.find(
-            (si) => si.productoId === row.productoId && si.presentacionId === row.presentacionId,
-          ) ?? null;
-        if (disponible) {
-          if (b > disponible.cantidad1)
-            ferrs[`row_${idx}_bultos`] = `Stock insuficiente. Disponible: ${disponible.cantidad1} bultos.`;
-          if (s > disponible.cantidad2)
-            ferrs[`row_${idx}_sueltas`] = `Stock insuficiente. Disponible: ${disponible.cantidad2} sueltas.`;
+      } else if (row.lote.trim() && row.loteStock) {
+        if (b > row.loteStock.bultos) {
+          ferrs[`row_${idx}_bultos`] =
+            `Stock insuficiente en el lote. Disponible: ${row.loteStock.bultos} bultos.`;
+        }
+        if (s > row.loteStock.sueltas) {
+          ferrs[`row_${idx}_sueltas`] =
+            `Stock insuficiente en el lote. Disponible: ${row.loteStock.sueltas} sueltas.`;
         }
       }
     });
@@ -394,7 +377,6 @@ export function EgresosStockTenantPage({
           clienteId={clienteId}
           onClienteChange={(id) => {
             setClienteId(id);
-            setStockItems([]);
             // Si el depósito actual no tiene stock para el nuevo cliente, lo limpiamos
             const depositosParaCliente = new Set(
               allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
@@ -406,7 +388,6 @@ export function EgresosStockTenantPage({
           depositoId={depositoId}
           onDepositoChange={(id) => {
             setDepositoId(id);
-            setStockItems([]);
           }}
           fieldErrors={fieldErrors}
           onNuevoCliente={() => setModalCliente(true)}
@@ -453,7 +434,6 @@ export function EgresosStockTenantPage({
           onUpdateRow={updateRow}
           productos={productos}
           productosLoading={productosLoading}
-          stockItems={stockItems}
           fieldErrors={fieldErrors}
           formError={formError}
           saving={saving}
