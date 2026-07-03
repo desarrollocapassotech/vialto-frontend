@@ -1,20 +1,20 @@
-import { MonedaSelect } from '@/components/forms/MonedaSelect';
+import { MonedaSelect } from "@/components/forms/MonedaSelect";
 import {
   otroGastoDraftToApi,
   type OtroGastoDraft,
-} from '@/components/viajes/OtrosGastosFieldset';
+} from "@/components/viajes/OtrosGastosFieldset";
 import {
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
   type ViajeMonedaCodigo,
-} from '@/lib/currencyMask';
-import { buildGananciaBrutaResumen } from '@/lib/viajeGananciaBrutaResumen';
-import { draftRequiereGananciaBrutaManual } from '@/lib/viajesGananciaBruta';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
-import type { OtroGasto } from '@/types/api';
+} from "@/lib/currencyMask";
+import { buildGananciaBrutaResumen } from "@/lib/viajeGananciaBrutaResumen";
+import { draftRequiereGananciaBrutaManual } from "@/lib/viajesGananciaBruta";
+import { formatViajeImporteForListado } from "@/lib/viajesFlota";
+import type { OtroGasto } from "@/types/api";
 
 export type GananciaBrutaManualDraftSlice = {
-  operacionModo: 'externo' | 'propio';
+  operacionModo: "externo" | "propio" | null;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
   precioTransportistaExterno: string;
@@ -50,7 +50,9 @@ export function gananciaBrutaResumenDesdeDraft(
   });
 }
 
-export function gananciaBrutaManualPayloadFromDraft(draft: GananciaBrutaManualDraftSlice): {
+export function gananciaBrutaManualPayloadFromDraft(
+  draft: GananciaBrutaManualDraftSlice,
+): {
   gananciaBrutaManual: number | null;
   monedaGananciaBrutaManual: string | null;
 } {
@@ -72,7 +74,14 @@ export function gananciaBrutaManualPayloadFromDraft(draft: GananciaBrutaManualDr
 
 type Props = {
   draft: GananciaBrutaManualDraftSlice;
-  onPatch: (p: Partial<Pick<GananciaBrutaManualDraftSlice, 'gananciaBrutaManual' | 'monedaGananciaBrutaManual'>>) => void;
+  onPatch: (
+    p: Partial<
+      Pick<
+        GananciaBrutaManualDraftSlice,
+        "gananciaBrutaManual" | "monedaGananciaBrutaManual"
+      >
+    >,
+  ) => void;
   labelClassName: string;
   inputClassName: string;
 };
@@ -99,14 +108,16 @@ export function ViajeGananciaBrutaManualFieldset({
   return (
     <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-3 rounded border border-amber-200/80 bg-amber-50/40 px-3 py-3">
       <p className="text-xs text-amber-900/90 leading-snug">
-        El monto a facturar y el pago al transportista están en monedas distintas. Ingresá la
-        ganancia bruta manual; los gastos extra en la misma moneda se descuentan del valor
-        ingresado. Si un gasto está en otra divisa, el resultado se muestra como balance
-        bimonetario.
+        El monto a facturar y el pago al transportista están en monedas
+        distintas. Ingresá la ganancia bruta manual; los gastos extra en la
+        misma moneda se descuentan del valor ingresado. Si un gasto está en otra
+        divisa, el resultado se muestra como balance bimonetario.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-xl">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className={labelClassName}>Ganancia bruta manual <span className="text-red-500">*</span></span>
+          <span className={labelClassName}>
+            Ganancia bruta manual <span className="text-red-500">*</span>
+          </span>
           <div className="flex min-w-0 gap-2">
             <input
               type="text"
