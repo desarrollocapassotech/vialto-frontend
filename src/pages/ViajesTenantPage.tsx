@@ -40,7 +40,6 @@ import {
   mantenerIdSiEnLista,
   mergeMaestroPorId,
   mensajesAyudaFlotaPropia,
-  normalizarIdEnLista,
   nombreClienteListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
