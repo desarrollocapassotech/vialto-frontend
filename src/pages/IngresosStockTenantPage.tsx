@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,7 @@ import type { Cliente, Deposito, Producto } from '@/types/api';
 import { IngresoWizardStep1 } from '@/components/stock/IngresoWizardStep1';
 import { IngresoWizardStep2 } from '@/components/stock/IngresoWizardStep2';
 import { IngresoWizardStep3, emptyRow, type IngresoRow } from '@/components/stock/IngresoWizardStep3';
+import { isOrgAdmin } from '@/lib/roleLabels';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type WizardStep = 1 | 2 | 3;
@@ -97,10 +98,12 @@ export function IngresosStockTenantPage({
   clientesExternosLoading?: boolean;
 }) {
   const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
-  const canCreateProducto = platform || orgRole === 'org:admin';
+  const canCreateProducto =
+    platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {

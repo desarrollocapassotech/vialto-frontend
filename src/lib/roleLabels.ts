@@ -5,6 +5,42 @@ export function isPlatformSuperadmin(
   return publicMetadata?.vialtoRole === 'superadmin';
 }
 
+export type VialtoTenantRole = 'admin' | 'member' | 'stock_viewer';
+
+export type RoleContext = {
+  orgRole?: string | null;
+  publicMetadata?: { vialtoRole?: unknown } | null;
+};
+
+/**
+ * Rol efectivo del usuario en la empresa.
+ * Fuente de verdad: `publicMetadata.vialtoRole` (admin | member | stock_viewer).
+ * Fallback: rol de organización Clerk (`org:admin`, `org:member`).
+ */
+export function getVialtoTenantRole({
+  orgRole,
+  publicMetadata,
+}: RoleContext): VialtoTenantRole | null {
+  const vr = publicMetadata?.vialtoRole;
+  if (vr === 'admin' || vr === 'member' || vr === 'stock_viewer') return vr;
+  if (orgRole === 'org:admin') return 'admin';
+  if (orgRole === 'org:stock_viewer') return 'stock_viewer';
+  if (orgRole === 'org:member') return 'member';
+  return null;
+}
+
+export function isStockViewer(ctx: RoleContext): boolean {
+  return getVialtoTenantRole(ctx) === 'stock_viewer';
+}
+
+export function isOrgMember(ctx: RoleContext): boolean {
+  return getVialtoTenantRole(ctx) === 'member';
+}
+
+export function isOrgAdmin(ctx: RoleContext): boolean {
+  return getVialtoTenantRole(ctx) === 'admin';
+}
+
 /**
  * Misma capacidad de gestión en UI que un admin u operador de la organización.
  * El superadmin de plataforma suele no tener `org:admin` en la sesión activa de Clerk
@@ -15,7 +51,7 @@ export function puedeGestionarComoAdminEmpresa(
   publicMetadata: { vialtoRole?: unknown } | null | undefined,
 ): boolean {
   if (isPlatformSuperadmin(publicMetadata)) return true;
-  return orgRole === 'org:admin';
+  return getVialtoTenantRole({ orgRole, publicMetadata }) === 'admin';
 }
 
 type RoleSource = {
@@ -41,22 +77,19 @@ export function userRoleDisplay({
     return 'Elegí una empresa para ver tu rol';
   }
 
-  if (!orgRole) {
-    return 'Rol pendiente de asignar';
-  }
+  const tenantRole = getVialtoTenantRole({
+    orgRole,
+    publicMetadata: platformRole ? { vialtoRole: platformRole } : null,
+  });
 
-  switch (orgRole) {
-    case 'org:admin':
+  switch (tenantRole) {
+    case 'admin':
       return 'Administrador';
-    case 'org:member':
+    case 'member':
       return 'Miembro';
-    default: {
-      const raw = orgRole.replace(/^org:/, '').replace(/_/g, ' ');
-      return raw
-        .split(' ')
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-    }
+    case 'stock_viewer':
+      return 'Consulta de stock';
+    default:
+      return orgRole ? 'Rol pendiente de asignar' : 'Rol pendiente de asignar';
   }
 }

@@ -21,11 +21,13 @@ type TenantUser = Pick<PlatformUser, 'userId' | 'firstName' | 'lastName' | 'emai
 
 type ModalState =
   | { mode: 'view'; user: TenantUser }
-  | { mode: 'edit-role'; user: TenantUser; selectedRole: 'admin' | 'member' }
+  | { mode: 'edit-role'; user: TenantUser; selectedRole: 'admin' | 'member' | 'stock_viewer' }
   | { mode: 'invite' };
 
 function formatRole(role: string) {
-  return role === 'org:admin' ? 'Administrador' : 'Miembro';
+  if (role === 'org:admin') return 'Administrador';
+  if (role === 'org:stock_viewer') return 'Consulta de stock';
+  return 'Miembro';
 }
 
 function formatDate(value: number | string) {
@@ -40,8 +42,10 @@ function formatDate(value: number | string) {
   }
 }
 
-function toApiRole(role: string): 'admin' | 'member' {
-  return role === 'org:admin' ? 'admin' : 'member';
+function toApiRole(role: string): 'admin' | 'member' | 'stock_viewer' {
+  if (role === 'org:admin') return 'admin';
+  if (role === 'org:stock_viewer') return 'stock_viewer';
+  return 'member';
 }
 
 // ─── Modal de usuario (ver / editar rol) ────────────────────────────────────
@@ -62,7 +66,7 @@ function UsuarioModal({
   onClose: () => void;
   onStartEditRole: () => void;
   onSaveRole: () => void;
-  onSetSelectedRole: (role: 'admin' | 'member') => void;
+  onSetSelectedRole: (role: 'admin' | 'member' | 'stock_viewer') => void;
   onDelete: () => void;
 }) {
   const user = modal.user;
@@ -101,7 +105,7 @@ function UsuarioModal({
             Elegí el nuevo rol para <strong className="text-vialto-charcoal">{nombre}</strong>.
           </p>
           <div className="flex flex-col gap-2">
-            {(['admin', 'member'] as const).map((r) => (
+            {(['admin', 'member', 'stock_viewer'] as const).map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -115,7 +119,11 @@ function UsuarioModal({
                   className="accent-vialto-fire"
                 />
                 <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === 'admin' ? 'Administrador' : 'Miembro'}
+                  {r === 'admin'
+                    ? 'Administrador'
+                    : r === 'stock_viewer'
+                      ? 'Consulta de stock'
+                      : 'Miembro'}
                 </span>
               </label>
             ))}
@@ -189,12 +197,12 @@ function CreateUserModal({
   busy: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (name: string, email: string, password: string, role: 'admin' | 'member') => void;
+  onSubmit: (name: string, email: string, password: string, role: 'admin' | 'member' | 'stock_viewer') => void;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'member'>('member');
+  const [role, setRole] = useState<'admin' | 'member' | 'stock_viewer'>('member');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handleSubmit() {
@@ -275,7 +283,7 @@ function CreateUserModal({
         <div>
           <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">Rol</p>
           <div className="flex flex-col gap-2">
-            {(['member', 'admin'] as const).map((r) => (
+            {(['member', 'admin', 'stock_viewer'] as const).map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -289,7 +297,11 @@ function CreateUserModal({
                   className="accent-vialto-fire"
                 />
                 <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === 'admin' ? 'Administrador' : 'Miembro'}
+                  {r === 'admin'
+                    ? 'Administrador'
+                    : r === 'stock_viewer'
+                      ? 'Consulta de stock'
+                      : 'Miembro'}
                 </span>
               </label>
             ))}
@@ -382,7 +394,7 @@ export function UsuariosTenantPage() {
     }
   }
 
-  async function handleCreate(name: string, email: string, password: string, role: 'admin' | 'member') {
+  async function handleCreate(name: string, email: string, password: string, role: 'admin' | 'member' | 'stock_viewer') {
     setBusy(true);
     setActionError(null);
     try {
