@@ -1,45 +1,23 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoPagination } from '@/components/listado/ListadoPagination';
 import { StockOperacionViewModal } from '@/components/stock/StockOperacionViewModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { buildQs } from '@/lib/queryString';
 import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
-import {
-  coerceMovimientoStockFechaIso,
-  formatMovimientoStockFechaFromIso,
-  isoToFechaHora,
-} from '@/lib/viajeFechaHora';
-import type { Cliente, Deposito, Producto, StockOperacion } from '@/types/api';
+import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import type { StockOperacion, Cliente, Deposito, Producto, PaginatedMeta } from '@/types/api';
+import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
 
-type ProductosResponse = { items: Producto[] };
-
-function buildQs(params: Record<string, string>, tenantId?: string): string {
-  const parts: string[] = [];
-  if (tenantId) parts.push(`tenantId=${encodeURIComponent(tenantId)}`);
-  for (const [k, v] of Object.entries(params)) {
-    if (v) parts.push(`${k}=${encodeURIComponent(v)}`);
-  }
-  return parts.length ? `?${parts.join('&')}` : '';
-}
-
-function operacionEnRangoFechas(
-  op: StockOperacion,
-  fechaDesde: string,
-  fechaHasta: string,
-): boolean {
-  if (!fechaDesde && !fechaHasta) return true;
-  const iso = coerceMovimientoStockFechaIso(op.fecha);
-  if (!iso) return false;
-  const { fecha } = isoToFechaHora(iso);
-  if (!fecha) return false;
-  if (fechaDesde && fecha < fechaDesde) return false;
-  if (fechaHasta && fecha > fechaHasta) return false;
-  return true;
-}
+type DivisionesPaginatedResponse = {
+  items: StockOperacion[];
+  meta: PaginatedMeta;
+};
 
 export function DivisionesStockHistorialTenantPage({
   tenantId,
@@ -50,31 +28,29 @@ export function DivisionesStockHistorialTenantPage({
 }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  const clienteId = searchParams.get('clienteId') ?? '';
-  const productoId = searchParams.get('productoId') ?? '';
-  const depositoId = searchParams.get('depositoId') ?? '';
-  const fechaDesde = searchParams.get('fechaDesde') ?? '';
-  const fechaHasta = searchParams.get('fechaHasta') ?? '';
+  const {
+    setSearchParams,
+    clienteId, depositoId, productoId, fechaDesde, fechaHasta,
+    params, clientes, depositos, productos,
+  } = useHistorialStockFiltros(platform, tenantId, getToken);
 
-  const apiParams: Record<string, string> = {};
-  if (clienteId) apiParams.clienteId = clienteId;
-  if (productoId) apiParams.productoId = productoId;
-  if (depositoId) apiParams.depositoId = depositoId;
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [clienteId, depositoId, productoId, fechaDesde, fechaHasta]);
 
   const divisionesUrl = platform
-    ? `/api/platform/stock/divisiones${buildQs(apiParams, tenantId)}`
-    : `/api/stock/divisiones${buildQs(apiParams)}`;
-
-  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
-  const clientesBase = platform ? '/api/platform/clientes' : '/api/clientes';
-  const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
+    ? `/api/platform/stock/divisiones${buildQs(
+        { ...params, page: String(page), pageSize: String(pageSize) },
+        tenantId,
+      )}`
+    : `/api/stock/divisiones${buildQs({ ...params, page: String(page), pageSize: String(pageSize) })}`;
 
   const [items, setItems] = useState<StockOperacion[]>([]);
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viendo, setViendo] = useState<StockOperacion | null>(null);
@@ -83,8 +59,9 @@ export function DivisionesStockHistorialTenantPage({
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<StockOperacion[]>(divisionesUrl, () => getToken());
-      setItems(data);
+      const data = await apiJson<DivisionesPaginatedResponse>(divisionesUrl, () => getToken());
+      setItems(data.items);
+      setMeta(data.meta);
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     } finally {
@@ -92,80 +69,13 @@ export function DivisionesStockHistorialTenantPage({
     }
   }, [divisionesUrl, getToken]);
 
-  const loadProductos = useCallback(async () => {
-    try {
-      const url = `${productosBase}/paginated${buildQs(
-        { page: '1', pageSize: '100', filtroActivo: 'activos' },
-        tenantId,
-      )}`;
-      const data = await apiJson<ProductosResponse>(url, () => getToken());
-      setProductos(data.items);
-    } catch (e) {
-      setError(friendlyError(e, 'stock'));
-    }
-  }, [productosBase, tenantId, getToken]);
-
-  const loadClientes = useCallback(async () => {
-    try {
-      const data = await apiJson<Cliente[]>(
-        `${clientesBase}${buildQs({}, tenantId)}`,
-        () => getToken(),
-      );
-      setClientes(data);
-    } catch (e) {
-      setError(friendlyError(e, 'stock'));
-    }
-  }, [clientesBase, tenantId, getToken]);
-
-  const loadDepositos = useCallback(async () => {
-    try {
-      const data = await apiJson<Deposito[]>(
-        `${depositosBase}${buildQs({}, tenantId)}`,
-        () => getToken(),
-      );
-      setDepositos(data);
-    } catch (e) {
-      setError(friendlyError(e, 'stock'));
-    }
-  }, [depositosBase, tenantId, getToken]);
-
   useEffect(() => {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    void loadProductos();
-  }, [loadProductos]);
-
-  useEffect(() => {
-    void loadClientes();
-  }, [loadClientes]);
-
-  useEffect(() => {
-    void loadDepositos();
-  }, [loadDepositos]);
-
-  const filteredItems = useMemo(
-    () => items.filter((op) => operacionEnRangoFechas(op, fechaDesde, fechaHasta)),
-    [items, fechaDesde, fechaHasta],
-  );
-
-  const hasActiveFilters = Boolean(
-    clienteId || productoId || depositoId || fechaDesde || fechaHasta,
-  );
-
   const volverHref = platform
     ? `/stock/divisiones?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/divisiones';
-
-  function patchSearchParam(key: string, value: string) {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      if (value) params.set(key, value);
-      else params.delete(key);
-      return params;
-    });
-  }
 
   return (
     <div className="w-full space-y-6">
@@ -197,6 +107,8 @@ export function DivisionesStockHistorialTenantPage({
         columns={[
           {
             id: 'fecha',
+            primary: true,
+            thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
                 title="Fecha"
@@ -209,7 +121,15 @@ export function DivisionesStockHistorialTenantPage({
                     <input
                       type="date"
                       value={fechaDesde}
-                      onChange={(e) => patchSearchParam('fechaDesde', e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (value) next.set('fechaDesde', value);
+                          else next.delete('fechaDesde');
+                          return next;
+                        });
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
@@ -218,20 +138,27 @@ export function DivisionesStockHistorialTenantPage({
                     <input
                       type="date"
                       value={fechaHasta}
-                      onChange={(e) => patchSearchParam('fechaHasta', e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (value) next.set('fechaHasta', value);
+                          else next.delete('fechaHasta');
+                          return next;
+                        });
+                      }}
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
                     />
                   </label>
                 </div>
               </ViajesListadoHeaderFiltro>
             ),
-            primary: true,
-            thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
             tdClassName: `${listadoTablaTdClass} whitespace-nowrap`,
           },
           {
             id: 'cliente',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
                 title="Cliente"
@@ -241,7 +168,14 @@ export function DivisionesStockHistorialTenantPage({
                 <SearchableEntitySelect<Cliente>
                   items={clientes}
                   value={clienteId}
-                  onChange={(id) => patchSearchParam('clienteId', id)}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('clienteId', id);
+                      else next.delete('clienteId');
+                      return next;
+                    });
+                  }}
                   allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
@@ -256,12 +190,12 @@ export function DivisionesStockHistorialTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => op.cliente?.nombre ?? op.clienteId,
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'deposito',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
                 title="Depósito"
@@ -271,7 +205,14 @@ export function DivisionesStockHistorialTenantPage({
                 <SearchableEntitySelect<Deposito>
                   items={depositos}
                   value={depositoId}
-                  onChange={(id) => patchSearchParam('depositoId', id)}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('depositoId', id);
+                      else next.delete('depositoId');
+                      return next;
+                    });
+                  }}
                   allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
@@ -286,12 +227,12 @@ export function DivisionesStockHistorialTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => op.deposito?.nombre ?? '—',
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'producto',
+            thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
                 title="Producto"
@@ -301,7 +242,14 @@ export function DivisionesStockHistorialTenantPage({
                 <SearchableEntitySelect<Producto>
                   items={productos}
                   value={productoId}
-                  onChange={(id) => patchSearchParam('productoId', id)}
+                  onChange={(id) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (id) next.set('productoId', id);
+                      else next.delete('productoId');
+                      return next;
+                    });
+                  }}
                   allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
@@ -316,14 +264,13 @@ export function DivisionesStockHistorialTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => op.movimientos[0]?.producto?.nombre ?? op.movimientos[0]?.productoId ?? '—',
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'bultos',
             header: 'Bultos',
-            thClassName: listadoTablaThClass,
+            thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => {
               const bultos = op.movimientos[0]?.bultos;
               return bultos != null ? String(bultos) : '—';
@@ -331,32 +278,34 @@ export function DivisionesStockHistorialTenantPage({
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
         ]}
-        rows={loading ? null : filteredItems}
+        rows={loading ? null : items}
         rowKey={(op) => op.id}
-        emptyMessage={
-          hasActiveFilters
-            ? 'Sin resultados para los filtros aplicados.'
-            : 'No hay divisiones registradas.'
-        }
+        emptyMessage="No hay divisiones registradas."
         loadingMessage="Cargando…"
         renderActions={(op) => (
-          <button
-            type="button"
-            onClick={() => setViendo(op)}
-            className={listadoTablaAccionClass}
-          >
+          <button type="button" onClick={() => setViendo(op)} className={listadoTablaAccionClass}>
             Ver
           </button>
         )}
+        actionsThClassName={`${listadoTablaThClass} align-top text-right`}
         actionsTdClassName={`${listadoTablaTdClass} text-right whitespace-nowrap`}
       />
 
-      {viendo && (
-        <StockOperacionViewModal
-          operacion={viendo}
-          onClose={() => setViendo(null)}
+      {meta && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="divisiones"
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
         />
       )}
+
+      {viendo && <StockOperacionViewModal operacion={viendo} onClose={() => setViendo(null)} />}
     </div>
   );
 }
