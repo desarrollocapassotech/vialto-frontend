@@ -21,6 +21,7 @@ import {
   condicionTributariaPorPais,
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
+import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
 import { isValidPhoneNumber } from "libphonenumber-js";
 
@@ -240,10 +241,9 @@ export function TransportistaCreatePage() {
               <span className={labelClass}>
                 Vencimiento Permiso Internacional
               </span>
-              <CrudInput
-                type="date"
+              <VencimientoPermisoInput
                 value={fechaVencimientoPermiso}
-                onChange={(e) => setFechaVencimientoPermiso(e.target.value)}
+                onChange={setFechaVencimientoPermiso}
               />
             </label>
           </div>
