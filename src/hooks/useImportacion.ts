@@ -1,19 +1,19 @@
-import { useRef, useState } from 'react';
-import { apiFetch, apiJson } from '@/lib/api';
+import { useRef, useState } from "react";
+import { apiFetch, apiJson } from "@/lib/api";
 import {
   enriquecerPreviewImportacionViajes,
   type CiudadNormalizadaConfirm,
-} from '@/lib/importacionViajesCiudades';
-import type { ImportLog, ImportPreviewResult } from '@/types/api';
+} from "@/lib/importacionViajesCiudades";
+import type { ImportLog, ImportPreviewResult } from "@/types/api";
 
-type Step = 'upload' | 'preview' | 'result';
+type Step = "upload" | "preview" | "result";
 
 export function useImportacion(
   tenantId: string,
   getToken: () => Promise<string | null>,
 ) {
-  const [step, setStep] = useState<Step>('upload');
-  const [modulo, setModulo] = useState('');
+  const [step, setStep] = useState<Step>("upload");
+  const [modulo, setModulo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [validandoCiudades, setValidandoCiudades] = useState(false);
@@ -30,12 +30,12 @@ export function useImportacion(
     ciudadesNormalizadasRef.current = [];
     try {
       const form = new FormData();
-      form.append('file', file);
+      form.append("file", file);
 
       const res = await apiFetch(
         `/api/importaciones/preview?modulo=${encodeURIComponent(modulo)}&tenantId=${encodeURIComponent(tenantId)}`,
         getToken,
-        { method: 'POST', body: form },
+        { method: "POST", body: form },
       );
 
       const text = await res.text();
@@ -43,7 +43,7 @@ export function useImportacion(
 
       if (!res.ok) {
         const msg =
-          typeof data === 'object' && data !== null && 'message' in data
+          typeof data === "object" && data !== null && "message" in data
             ? String((data as { message: unknown }).message)
             : res.statusText;
         throw new Error(msg);
@@ -51,13 +51,16 @@ export function useImportacion(
 
       let previewResult = data as ImportPreviewResult;
 
-      if (modulo === 'viajes' && (previewResult.viajes?.length ?? 0) > 0) {
+      if (modulo === "viajes" && (previewResult.viajes?.length ?? 0) > 0) {
         setValidandoCiudades(true);
         ciudadesAbortRef.current?.abort();
         const ac = new AbortController();
         ciudadesAbortRef.current = ac;
         try {
-          const enriched = await enriquecerPreviewImportacionViajes(previewResult, ac.signal);
+          const enriched = await enriquecerPreviewImportacionViajes(
+            previewResult,
+            ac.signal,
+          );
           previewResult = enriched.preview;
           ciudadesNormalizadasRef.current = enriched.ciudadesNormalizadas;
         } finally {
@@ -66,10 +69,10 @@ export function useImportacion(
       }
 
       setPreview(previewResult);
-      setStep('preview');
+      setStep("preview");
     } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return;
-      setError(e instanceof Error ? e.message : 'Error al procesar el archivo');
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Error al procesar el archivo");
     } finally {
       setLoading(false);
     }
@@ -89,22 +92,27 @@ export function useImportacion(
         tenantId,
       };
 
-      if (preview.modulo === 'viajes' && ciudadesNormalizadasRef.current.length > 0) {
+      if (
+        preview.modulo === "viajes" &&
+        ciudadesNormalizadasRef.current.length > 0
+      ) {
         body.ciudadesNormalizadas = ciudadesNormalizadasRef.current;
       }
 
       const result = await apiJson<ImportLog>(
-        '/api/importaciones/confirm',
+        "/api/importaciones/confirm",
         getToken,
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(body),
         },
       );
       setLog(result);
-      setStep('result');
+      setStep("result");
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al confirmar la importación');
+      setError(
+        e instanceof Error ? e.message : "Error al confirmar la importación",
+      );
     } finally {
       setLoading(false);
     }
@@ -113,8 +121,8 @@ export function useImportacion(
   function reset() {
     ciudadesAbortRef.current?.abort();
     ciudadesNormalizadasRef.current = [];
-    setStep('upload');
-    setModulo('');
+    setStep("upload");
+    setModulo("");
     setFile(null);
     setError(null);
     setPreview(null);

@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
-export type ViajeOperacionModo = 'propio' | 'externo';
+export type ViajeOperacionModo = "propio" | "externo";
 
 const legendClass =
-  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
+  "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
 
 type Props = {
-  modo: ViajeOperacionModo;
+  // 1. Permitimos que 'modo' pueda ser null o undefined para el estado inicial/vacío
+  modo?: ViajeOperacionModo | null;
   onModoChange: (modo: ViajeOperacionModo) => void;
   externoContent: ReactNode;
   propioContent: ReactNode;
@@ -20,24 +21,29 @@ export function ViajeOperacionTipoFieldset({
   onModoChange,
   externoContent,
   propioContent,
-  groupName = 'viaje-operacion-tipo',
+  groupName = "viaje-operacion-tipo",
   className,
 }: Props) {
+  console.log(modo);
   return (
     <fieldset
       className={
-        className ?? 'min-w-0 space-y-3 border-0 p-0 md:col-span-2 lg:col-span-3 [&:disabled]:opacity-60'
+        className ??
+        "min-w-0 space-y-3 border-0 p-0 md:col-span-2 lg:col-span-3 [&:disabled]:opacity-60"
       }
     >
-      <legend className={`${legendClass} mb-2`}>¿Quién realiza el transporte?</legend>
+      <legend className={`${legendClass} mb-2`}>
+        ¿Quién realiza el transporte?
+      </legend>
       <div className="flex flex-wrap gap-4 sm:gap-6">
         <label className="flex cursor-pointer items-center gap-2 text-base text-vialto-charcoal">
           <input
             type="radio"
             name={groupName}
             className="h-4 w-4 accent-vialto-charcoal"
-            checked={modo === 'externo'}
-            onChange={() => onModoChange('externo')}
+            // Se marcará solo si 'modo' es estrictamente 'externo'
+            checked={modo === "externo"}
+            onChange={() => onModoChange("externo")}
           />
           <span>Transporte externo</span>
         </label>
@@ -46,13 +52,18 @@ export function ViajeOperacionTipoFieldset({
             type="radio"
             name={groupName}
             className="h-4 w-4 accent-vialto-charcoal"
-            checked={modo === 'propio'}
-            onChange={() => onModoChange('propio')}
+            // Se marcará solo si 'modo' es estrictamente 'propio'
+            checked={modo === "propio"}
+            onChange={() => onModoChange("propio")}
           />
           <span>Flota propia</span>
         </label>
       </div>
-      <div className="pt-1">{modo === 'externo' ? externoContent : propioContent}</div>
+      <div className="pt-1">
+        {/* 2. Reemplazamos el ternario por condiciones lógicas exactas */}
+        {modo === "externo" && externoContent}
+        {modo === "propio" && propioContent}
+      </div>
     </fieldset>
   );
 }

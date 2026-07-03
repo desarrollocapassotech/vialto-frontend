@@ -1,51 +1,59 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState } from 'react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
-} from '@/components/ui/ViewModalShell';
-import { apiFetch, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
+} from "@/components/ui/ViewModalShell";
+import { apiFetch, apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
-} from '@/lib/listadoTabla';
-import type { PlatformUser } from '@/types/api';
+} from "@/lib/listadoTabla";
+import type { PlatformUser } from "@/types/api";
 
-type TenantUser = Pick<PlatformUser, 'userId' | 'firstName' | 'lastName' | 'email' | 'role' | 'createdAt'>;
+type TenantUser = Pick<
+  PlatformUser,
+  "userId" | "firstName" | "lastName" | "email" | "role" | "createdAt"
+>;
 
 type ModalState =
-  | { mode: 'view'; user: TenantUser }
-  | { mode: 'edit-role'; user: TenantUser; selectedRole: 'admin' | 'member' | 'stock_viewer' }
-  | { mode: 'invite' };
+  | { mode: "view"; user: TenantUser }
+  | {
+      mode: "edit-role";
+      user: TenantUser;
+      selectedRole: "admin" | "member" | "stock_viewer";
+    }
+  | { mode: "invite" };
 
 function formatRole(role: string) {
-  if (role === 'org:admin') return 'Administrador';
-  if (role === 'org:stock_viewer') return 'Consulta de stock';
-  return 'Miembro';
+  if (role === "org:admin") return "Administrador";
+  if (role === "org:stock_viewer") return "Consulta de stock";
+  return "Miembro";
 }
 
 function formatDate(value: number | string) {
   try {
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    return new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     }).format(new Date(value));
   } catch {
-    return '—';
+    return "—";
   }
 }
 
-function toApiRole(role: string): 'admin' | 'member' | 'stock_viewer' {
-  if (role === 'org:admin') return 'admin';
-  if (role === 'org:stock_viewer') return 'stock_viewer';
-  return 'member';
+function toApiRole(role: string): "admin" | "member" | "stock_viewer" {
+  if (role === "org:admin") return "admin";
+  if (role === "org:stock_viewer") return "stock_viewer";
+  return "member";
 }
 
 // ─── Modal de usuario (ver / editar rol) ────────────────────────────────────
@@ -60,20 +68,21 @@ function UsuarioModal({
   onSetSelectedRole,
   onDelete,
 }: {
-  modal: Extract<ModalState, { mode: 'view' | 'edit-role' }>;
+  modal: Extract<ModalState, { mode: "view" | "edit-role" }>;
   currentUserId: string | null | undefined;
   busy: boolean;
   onClose: () => void;
   onStartEditRole: () => void;
   onSaveRole: () => void;
-  onSetSelectedRole: (role: 'admin' | 'member' | 'stock_viewer') => void;
+  onSetSelectedRole: (role: "admin" | "member" | "stock_viewer") => void;
   onDelete: () => void;
 }) {
   const user = modal.user;
-  const nombre = [user.firstName, user.lastName].filter(Boolean).join(' ') || '—';
+  const nombre =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
   const esMismoUsuario = user.userId === currentUserId;
 
-  if (modal.mode === 'edit-role') {
+  if (modal.mode === "edit-role") {
     return (
       <ViewModalShell
         title={nombre}
@@ -95,17 +104,18 @@ function UsuarioModal({
               disabled={busy}
               className={viewModalBtnPrimary}
             >
-              {busy ? 'Guardando…' : 'Guardar rol'}
+              {busy ? "Guardando…" : "Guardar rol"}
             </button>
           </>
         }
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm text-vialto-steel">
-            Elegí el nuevo rol para <strong className="text-vialto-charcoal">{nombre}</strong>.
+            Elegí el nuevo rol para{" "}
+            <strong className="text-vialto-charcoal">{nombre}</strong>.
           </p>
           <div className="flex flex-col gap-2">
-            {(['admin', 'member', 'stock_viewer'] as const).map((r) => (
+            {(["admin", "member", "stock_viewer"] as const).map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -119,11 +129,11 @@ function UsuarioModal({
                   className="accent-vialto-fire"
                 />
                 <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === 'admin'
-                    ? 'Administrador'
-                    : r === 'stock_viewer'
-                      ? 'Consulta de stock'
-                      : 'Miembro'}
+                  {r === "admin"
+                    ? "Administrador"
+                    : r === "stock_viewer"
+                      ? "Consulta de stock"
+                      : "Miembro"}
                 </span>
               </label>
             ))}
@@ -166,13 +176,15 @@ function UsuarioModal({
     >
       <div className={viewModalGridClass}>
         {[
-          { label: 'Nombre', value: nombre },
-          { label: 'Email', value: user.email ?? '—' },
-          { label: 'Rol', value: formatRole(user.role) },
-          { label: 'Alta', value: formatDate(user.createdAt) },
+          { label: "Nombre", value: nombre },
+          { label: "Email", value: user.email ?? "—" },
+          { label: "Rol", value: formatRole(user.role) },
+          { label: "Alta", value: formatDate(user.createdAt) },
         ].map((c) => (
           <div key={c.label}>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              {c.label}
+            </p>
             <p className="mt-1 text-sm">{c.value}</p>
           </div>
         ))}
@@ -197,26 +209,37 @@ function CreateUserModal({
   busy: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (name: string, email: string, password: string, role: 'admin' | 'member' | 'stock_viewer') => void;
+  onSubmit: (
+    name: string,
+    email: string,
+    password: string,
+    role: "admin" | "member" | "stock_viewer",
+  ) => void;
 }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'member' | 'stock_viewer'>('member');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"admin" | "member" | "stock_viewer">(
+    "member",
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handleSubmit() {
     const errors: Record<string, string> = {};
-    if (!name.trim()) errors.name = 'Ingresá el nombre del usuario.';
-    if (!email.trim()) errors.email = 'Ingresá el email del usuario.';
-    if (!password || password.length < 8) errors.password = 'La contraseña debe tener al menos 8 caracteres.';
-    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+    if (!name.trim()) errors.name = "Ingresá el nombre del usuario.";
+    if (!email.trim()) errors.email = "Ingresá el email del usuario.";
+    if (!password || password.length < 8)
+      errors.password = "La contraseña debe tener al menos 8 caracteres.";
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
     setFieldErrors({});
     onSubmit(name, email, password, role);
   }
 
   const inputClass = (field: string) =>
-    `mt-1 w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire ${fieldErrors[field] ? 'border-red-400' : 'border-black/15'}`;
+    `mt-1 w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-fire ${fieldErrors[field] ? "border-red-400" : "border-black/15"}`;
 
   return (
     <ViewModalShell
@@ -225,18 +248,31 @@ function CreateUserModal({
       maxWidthClass="sm:max-w-sm"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={busy} className={viewModalBtnGhost}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className={viewModalBtnGhost}
+          >
             Cancelar
           </button>
-          <button type="button" onClick={handleSubmit} disabled={busy} className={viewModalBtnPrimary}>
-            {busy ? 'Creando…' : 'Crear usuario'}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={busy}
+            className={viewModalBtnPrimary}
+          >
+            {busy ? "Creando…" : "Crear usuario"}
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <div>
-          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-name">
+          <label
+            className="text-xs uppercase tracking-[0.08em] text-vialto-steel"
+            htmlFor="cu-name"
+          >
             Nombre <span className="text-red-500">*</span>
           </label>
           <input
@@ -245,13 +281,16 @@ function CreateUserModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Juan Pérez"
-            className={inputClass('name')}
+            className={inputClass("name")}
             disabled={busy}
           />
           <CrudFieldError message={fieldErrors.name} />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-email">
+          <label
+            className="text-xs uppercase tracking-[0.08em] text-vialto-steel"
+            htmlFor="cu-email"
+          >
             Email <span className="text-red-500">*</span>
           </label>
           <input
@@ -260,13 +299,16 @@ function CreateUserModal({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="nombre@empresa.com"
-            className={inputClass('email')}
+            className={inputClass("email")}
             disabled={busy}
           />
           <CrudFieldError message={fieldErrors.email} />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-[0.08em] text-vialto-steel" htmlFor="cu-password">
+          <label
+            className="text-xs uppercase tracking-[0.08em] text-vialto-steel"
+            htmlFor="cu-password"
+          >
             Contraseña <span className="text-red-500">*</span>
           </label>
           <input
@@ -275,15 +317,17 @@ function CreateUserModal({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Mínimo 8 caracteres"
-            className={inputClass('password')}
+            className={inputClass("password")}
             disabled={busy}
           />
           <CrudFieldError message={fieldErrors.password} />
         </div>
         <div>
-          <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">Rol</p>
+          <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            Rol
+          </p>
           <div className="flex flex-col gap-2">
-            {(['member', 'admin', 'stock_viewer'] as const).map((r) => (
+            {(["member", "admin", "stock_viewer"] as const).map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -297,11 +341,11 @@ function CreateUserModal({
                   className="accent-vialto-fire"
                 />
                 <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === 'admin'
-                    ? 'Administrador'
-                    : r === 'stock_viewer'
-                      ? 'Consulta de stock'
-                      : 'Miembro'}
+                  {r === "admin"
+                    ? "Administrador"
+                    : r === "stock_viewer"
+                      ? "Consulta de stock"
+                      : "Miembro"}
                 </span>
               </label>
             ))}
@@ -330,13 +374,18 @@ export function UsuariosTenantPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TenantUser | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const load = useCallback(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     setRows(null);
     (async () => {
       try {
-        const data = await apiJson<TenantUser[]>('/api/users', () => getToken());
+        const data = await apiJson<TenantUser[]>("/api/users", () =>
+          getToken(),
+        );
         if (!cancelled) {
           setRows(data);
           setError(null);
@@ -344,7 +393,7 @@ export function UsuariosTenantPage() {
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'usuarios'));
+          setError(friendlyError(e, "usuarios"));
         }
       }
     })();
@@ -359,18 +408,18 @@ export function UsuariosTenantPage() {
   }, [load]);
 
   async function handleSaveRole() {
-    if (!modal || modal.mode !== 'edit-role' || !modal.user.userId) return;
+    if (!modal || modal.mode !== "edit-role" || !modal.user.userId) return;
     setBusy(true);
     setActionError(null);
     try {
       await apiJson(`/api/users/${modal.user.userId}/role`, () => getToken(), {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ role: modal.selectedRole }),
       });
       setModal(null);
       load();
     } catch (e) {
-      setActionError(friendlyError(e, 'usuarios'));
+      setActionError(friendlyError(e, "usuarios"));
     } finally {
       setBusy(false);
     }
@@ -381,35 +430,60 @@ export function UsuariosTenantPage() {
     setBusy(true);
     try {
       await apiFetch(`/api/users/${confirmDelete.userId}`, () => getToken(), {
-        method: 'DELETE',
+        method: "DELETE",
       });
       setConfirmDelete(null);
       setModal(null);
       load();
     } catch (e) {
-      setActionError(friendlyError(e, 'usuarios'));
+      setActionError(friendlyError(e, "usuarios"));
       setConfirmDelete(null);
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleCreate(name: string, email: string, password: string, role: 'admin' | 'member' | 'stock_viewer') {
+  async function handleCreate(
+    name: string,
+    email: string,
+    password: string,
+    role: "admin" | "member" | "stock_viewer",
+  ) {
     setBusy(true);
     setActionError(null);
     try {
-      await apiJson('/api/users', () => getToken(), {
-        method: 'POST',
+      await apiJson("/api/users", () => getToken(), {
+        method: "POST",
         body: JSON.stringify({ name, email, password, role }),
       });
       setModal(null);
       load();
     } catch (e) {
-      setActionError(friendlyError(e, 'usuarios'));
+      setActionError(friendlyError(e, "usuarios"));
     } finally {
       setBusy(false);
     }
   }
+
+  const meta = useMemo(() => {
+    if (!rows) return null;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return {
+      total,
+      page,
+      pageSize,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    };
+  }, [rows, page, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (!rows) return null;
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -423,7 +497,10 @@ export function UsuariosTenantPage() {
       <div className="mt-4 flex justify-end">
         <button
           type="button"
-          onClick={() => { setActionError(null); setModal({ mode: 'invite' }); }}
+          onClick={() => {
+            setActionError(null);
+            setModal({ mode: "invite" });
+          }}
           className="inline-flex min-h-11 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite md:min-h-0 md:h-10"
         >
           Crear usuario
@@ -446,32 +523,33 @@ export function UsuariosTenantPage() {
         className="mt-8"
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
-            cell: (u) => [u.firstName, u.lastName].filter(Boolean).join(' ') || '—',
+            cell: (u) =>
+              [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'email',
-            header: 'Email',
-            cell: (u) => u.email ?? '—',
+            id: "email",
+            header: "Email",
+            cell: (u) => u.email ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'rol',
-            header: 'Rol',
+            id: "rol",
+            header: "Rol",
             cell: (u) => formatRole(u.role),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'alta',
-            header: 'Alta',
+            id: "alta",
+            header: "Alta",
             cell: (u) => formatDate(u.createdAt),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : paginatedRows}
         rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
         emptyMessage="No hay usuarios en esta organización."
         loadingMessage="Cargando…"
@@ -479,7 +557,10 @@ export function UsuariosTenantPage() {
           u.userId ? (
             <button
               type="button"
-              onClick={() => { setActionError(null); setModal({ mode: 'view', user: u }); }}
+              onClick={() => {
+                setActionError(null);
+                setModal({ mode: "view", user: u });
+              }}
               className={listadoTablaAccionClass}
             >
               Ver
@@ -490,7 +571,21 @@ export function UsuariosTenantPage() {
         }
       />
 
-      {modal && modal.mode !== 'invite' && (
+      {meta && (rows?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
+
+      {modal && modal.mode !== "invite" && (
         <UsuarioModal
           modal={modal}
           currentUserId={user?.id}
@@ -498,20 +593,20 @@ export function UsuariosTenantPage() {
           onClose={() => setModal(null)}
           onStartEditRole={() =>
             setModal({
-              mode: 'edit-role',
+              mode: "edit-role",
               user: modal.user,
               selectedRole: toApiRole(modal.user.role),
             })
           }
           onSaveRole={handleSaveRole}
           onSetSelectedRole={(r) =>
-            setModal({ mode: 'edit-role', user: modal.user, selectedRole: r })
+            setModal({ mode: "edit-role", user: modal.user, selectedRole: r })
           }
           onDelete={() => setConfirmDelete(modal.user)}
         />
       )}
 
-      {modal?.mode === 'invite' && (
+      {modal?.mode === "invite" && (
         <CreateUserModal
           busy={busy}
           error={actionError}
@@ -523,7 +618,7 @@ export function UsuariosTenantPage() {
       <ConfirmDialog
         open={!!confirmDelete}
         title="Eliminar usuario"
-        message={`¿Eliminás a ${[confirmDelete?.firstName, confirmDelete?.lastName].filter(Boolean).join(' ') || confirmDelete?.email} de la organización? Perderá acceso de inmediato.`}
+        message={`¿Eliminás a ${[confirmDelete?.firstName, confirmDelete?.lastName].filter(Boolean).join(" ") || confirmDelete?.email} de la organización? Perderá acceso de inmediato.`}
         confirmLabel="Eliminar"
         tone="danger"
         busy={busy}

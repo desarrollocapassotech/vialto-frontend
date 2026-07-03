@@ -2,13 +2,21 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { apiJson } from '@/lib/api';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
-import type { Cliente, Chofer, Transportista, Vehiculo, Tenant } from '@/types/api';
+import type {
+  Cliente,
+  Chofer,
+  DireccionEntrega,
+  Transportista,
+  Vehiculo,
+  Tenant,
+} from '@/types/api';
 
 type MaestroDataContextValue = {
   clientes: Cliente[];
   choferes: Chofer[];
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
+  direccionesEntrega: DireccionEntrega[];
   loading: boolean;
   tenant: Tenant | null;
   tenantLoading: boolean;
@@ -16,6 +24,7 @@ type MaestroDataContextValue = {
   refreshChoferes: () => Promise<Chofer[]>;
   refreshTransportistas: () => Promise<Transportista[]>;
   refreshVehiculos: () => Promise<Vehiculo[]>;
+  refreshDireccionesEntrega: () => Promise<DireccionEntrega[]>;
 };
 
 const MaestroDataContext = createContext<MaestroDataContextValue | null>(null);
@@ -33,6 +42,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
   const [choferes, setChoferes] = useState<Chofer[]>([]);
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
+  const [direccionesEntrega, setDireccionesEntrega] = useState<DireccionEntrega[]>([]);
   const [loading, setLoading] = useState(false);
 
   /** Evita un frame con listas vacías y `loading: false` antes del fetch. */
@@ -52,22 +62,25 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
       setChoferes([]);
       setTransportistas([]);
       setVehiculos([]);
+      setDireccionesEntrega([]);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const [c, ch, t, v] = await Promise.all([
+        const [c, ch, t, v, de] = await Promise.all([
           apiJson<Cliente[]>('/api/clientes', () => getTokenRef.current()),
           apiJson<Chofer[]>('/api/choferes', () => getTokenRef.current()),
           apiJson<Transportista[]>('/api/transportistas', () => getTokenRef.current()),
           apiJson<Vehiculo[]>('/api/vehiculos', () => getTokenRef.current()),
+          apiJson<DireccionEntrega[]>('/api/direcciones-entrega', () => getTokenRef.current()),
         ]);
         if (!cancelled) {
           setClientes(c);
           setChoferes(ch);
           setTransportistas(t);
           setVehiculos(v);
+          setDireccionesEntrega(de);
         }
       } catch { /* silencioso — las páginas muestran listas vacías */ }
       finally {
@@ -103,9 +116,29 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
     return data;
   };
 
+  const refreshDireccionesEntrega = async (): Promise<DireccionEntrega[]> => {
+    const data = await apiJson<DireccionEntrega[]>('/api/direcciones-entrega', () => getTokenRef.current());
+    setDireccionesEntrega(data);
+    return data;
+  };
+
   return (
     <MaestroDataContext.Provider
-      value={{ clientes, choferes, transportistas, vehiculos, loading, tenant, tenantLoading, refreshClientes, refreshChoferes, refreshTransportistas, refreshVehiculos }}
+      value={{
+        clientes,
+        choferes,
+        transportistas,
+        vehiculos,
+        direccionesEntrega,
+        loading,
+        tenant,
+        tenantLoading,
+        refreshClientes,
+        refreshChoferes,
+        refreshTransportistas,
+        refreshVehiculos,
+        refreshDireccionesEntrega,
+      }}
     >
       {children}
     </MaestroDataContext.Provider>
