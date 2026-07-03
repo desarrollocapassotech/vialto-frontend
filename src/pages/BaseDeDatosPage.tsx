@@ -5,6 +5,7 @@ import {
   Car,
   ChevronDown,
   Layers,
+  MapPin,
   Package,
   ShieldCheck,
   Truck,
@@ -25,7 +26,8 @@ import { VehiculosPage } from "./VehiculosPage";
 import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
-import { SuperadminUsersPage } from "./SuperadminUsersPage";
+import { UsuariosTenantPage } from "./UsuariosTenantPage";
+import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
 import { isPlatformSuperadmin } from "@/lib/roleLabels";
@@ -39,6 +41,7 @@ type Tab =
   | "productos"
   | "presentaciones"
   | "depositos"
+  | "direcciones-entrega"
   | "usuarios";
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
@@ -49,6 +52,11 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "productos", label: "Productos", icon: Package },
   { id: "presentaciones", label: "Presentaciones", icon: Layers },
   { id: "depositos", label: "Depósitos", icon: Warehouse },
+  {
+    id: "direcciones-entrega",
+    label: "Direcciones / Ruta de entrega",
+    icon: MapPin,
+  },
   { id: "usuarios", label: "Usuarios", icon: ShieldCheck },
 ];
 
@@ -79,6 +87,8 @@ export function BaseDeDatosPage() {
       case "presentaciones":
         return hasStock;
       case "depositos":
+        return hasStock;
+      case "direcciones-entrega":
         return hasStock;
       case "usuarios":
         return isOrgAdmin;
@@ -201,7 +211,8 @@ export function BaseDeDatosPage() {
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
-        {activeTab === "usuarios" && <SuperadminUsersPage />}
+        {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
+        {activeTab === "usuarios" && <UsuariosTenantPage />}
       </div>
     </div>
   );
