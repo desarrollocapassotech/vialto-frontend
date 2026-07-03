@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import type { Cliente, DireccionEntrega } from '@/types/api';
+import type { Chofer, Cliente, DireccionEntrega } from '@/types/api';
 import { EgresosStockTenantPage } from './EgresosStockTenantPage';
 
 export function EgresosStockSuperadminPage() {
@@ -14,6 +14,8 @@ export function EgresosStockSuperadminPage() {
   const [tenantId, setTenantId] = useState(() => searchParams.get('tenantId') ?? '');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesLoading, setClientesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
+  const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [choferesLoading, setChoferesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
   const [direccionesEntrega, setDireccionesEntrega] = useState<DireccionEntrega[]>([]);
   const [direccionesEntregaLoading, setDireccionesEntregaLoading] = useState(() =>
     Boolean(searchParams.get('tenantId')),
@@ -31,12 +33,16 @@ export function EgresosStockSuperadminPage() {
         setSearchParams({ tenantId: v });
         setClientes([]);
         setClientesLoading(true);
+        setChoferes([]);
+        setChoferesLoading(true);
         setDireccionesEntrega([]);
         setDireccionesEntregaLoading(true);
       } else {
         setSearchParams({});
         setClientes([]);
         setClientesLoading(false);
+        setChoferes([]);
+        setChoferesLoading(false);
         setDireccionesEntrega([]);
         setDireccionesEntregaLoading(false);
       }
@@ -48,40 +54,43 @@ export function EgresosStockSuperadminPage() {
     if (!tenantId) {
       setClientes([]);
       setClientesLoading(false);
+      setChoferes([]);
+      setChoferesLoading(false);
       setDireccionesEntrega([]);
       setDireccionesEntregaLoading(false);
       return;
     }
     setClientes([]);
     setClientesLoading(true);
+    setChoferes([]);
+    setChoferesLoading(true);
     setDireccionesEntrega([]);
     setDireccionesEntregaLoading(true);
     let cancelled = false;
+    const q = `tenantId=${encodeURIComponent(tenantId)}`;
     void Promise.all([
-      apiJson<Cliente[]>(
-        `/api/platform/clientes?tenantId=${encodeURIComponent(tenantId)}`,
-        () => getToken(),
-      ),
-      apiJson<DireccionEntrega[]>(
-        `/api/platform/direcciones-entrega?tenantId=${encodeURIComponent(tenantId)}`,
-        () => getToken(),
-      ),
+      apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
+      apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
+      apiJson<DireccionEntrega[]>(`/api/platform/direcciones-entrega?${q}`, () => getToken()),
     ])
-      .then(([clientesData, direccionesData]) => {
+      .then(([clientesData, choferesData, direccionesData]) => {
         if (!cancelled) {
           setClientes(clientesData);
+          setChoferes(choferesData);
           setDireccionesEntrega(direccionesData);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setClientes([]);
+          setChoferes([]);
           setDireccionesEntrega([]);
         }
       })
       .finally(() => {
         if (!cancelled) {
           setClientesLoading(false);
+          setChoferesLoading(false);
           setDireccionesEntregaLoading(false);
         }
       });
@@ -106,6 +115,8 @@ export function EgresosStockSuperadminPage() {
           tenantId={tenantId}
           clientesExternos={clientes}
           clientesExternosLoading={clientesLoading}
+          choferesExternos={choferes}
+          choferesExternosLoading={choferesLoading}
           direccionesEntregaExternos={direccionesEntrega}
           direccionesEntregaExternosLoading={direccionesEntregaLoading}
         />

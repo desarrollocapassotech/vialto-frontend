@@ -78,9 +78,10 @@ export function BaseDeDatosPage() {
       case "clientes":
         return true;
       case "transportistas":
-      case "choferes":
       case "vehiculos":
         return hasViajes;
+      case "choferes":
+        return hasViajes || hasStock;
       case "productos":
         return hasViajes || hasStock;
       case "presentaciones":
