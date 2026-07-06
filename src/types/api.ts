@@ -218,6 +218,23 @@ export interface PaginatedTenantsResponse {
   meta: PaginatedMeta;
 }
 
+export interface CargaCombustible {
+  id: string;
+  tenantId: string;
+  vehiculoId: string | null;
+  vehiculo: { patente: string } | null;
+  choferId: string | null;
+  chofer: { nombre: string } | null;
+  estacion: string;
+  litros: number;
+  importe: number;
+  km: number;
+  formaPago: string | null;
+  fecha: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface Pago {
   id: string;
   tenantId: string;

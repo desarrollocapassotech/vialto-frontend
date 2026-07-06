@@ -38,6 +38,7 @@ import { SuperadminUserEditPage } from '@/pages/SuperadminUserEditPage';
 import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
 import { LiquidacionesTenantPage } from '@/pages/LiquidacionesTenantPage';
 import { ArcaConfigTenantPage } from '@/pages/ArcaConfigTenantPage';
+import { CombustiblePage } from '@/pages/CombustiblePage';
 import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
 import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
 import { TaskSetupMFAPage } from '@/pages/TaskSetupMFAPage';
@@ -269,6 +270,13 @@ export default function App() {
             <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
             <Route path="direcciones-entrega/nuevo" element={<DireccionEntregaCreatePage />} />
             <Route path="direcciones-entrega/:id/editar" element={<DireccionEntregaEditPage />} />
+          </Route>
+
+          {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
+          <Route element={<RequireModule module="combustible" />}>
+            <Route element={<RequireOrgAdmin />}>
+              <Route path="combustible" element={<CombustiblePage />} />
+            </Route>
           </Route>
 
           {/* rutas de stock — requieren módulo "stock" contratado */}

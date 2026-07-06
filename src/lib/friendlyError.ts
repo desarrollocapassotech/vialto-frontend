@@ -12,6 +12,7 @@ export type FriendlyErrorContext =
   | "direccionesEntrega"
   | "facturacion"
   | "stock"
+  | "combustible"
   | "plataforma"
   | "arca"
   | "usuarios";
@@ -33,6 +34,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
   facturacion: "No pudimos cargar las facturas. Probá de nuevo en un momento.",
   stock:
     "No pudimos cargar el catálogo de productos. Probá de nuevo en un momento.",
+  combustible:
+    "No pudimos cargar las cargas de combustible. Probá de nuevo en un momento.",
   plataforma:
     "No pudimos cargar el panorama de empresas. Probá de nuevo en un momento.",
   arca: "No pudimos conectar con ARCA / AFIP SDK. Revisá la configuración e intentá de nuevo.",
