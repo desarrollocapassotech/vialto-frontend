@@ -10,6 +10,7 @@ import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHead
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { paginatedItems } from "@/lib/paginatedItems";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
@@ -31,6 +32,7 @@ import type {
   Cliente,
   Deposito,
   PaginatedMeta,
+  PaginatedResponse,
 } from "@/types/api";
 import { useSearchParams } from "react-router-dom";
 
@@ -209,12 +211,12 @@ export function StockMovimientosTenantPage({
 
   const loadDepositos = useCallback(async () => {
     try {
-      const data = await apiJson<Deposito[]>(
-        `${depositosBase}${buildQs({}, tenantId)}`,
+      const data = await apiJson<PaginatedResponse<Deposito>>(
+        `${depositosBase}${buildQs({ page: "1", pageSize: "500" }, tenantId)}`,
         () => getToken(),
       );
 
-      setDepositos(data);
+      setDepositos(paginatedItems(data));
     } catch (e) {
       setError(friendlyError(e, "stock"));
     }

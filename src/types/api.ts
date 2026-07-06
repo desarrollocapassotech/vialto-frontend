@@ -201,6 +201,11 @@ export interface PaginatedMeta {
   hasNext: boolean;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginatedMeta;
+}
+
 export interface PaginatedTenantsResponse {
   items: Tenant[];
   meta: PaginatedMeta;

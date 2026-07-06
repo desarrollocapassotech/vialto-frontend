@@ -39,7 +39,7 @@ export function useHistorialStockFiltros(
     getToken,
   );
   const { items: depositos } = useEntityList<Deposito>(
-    `${depositosBase}${buildQs({}, tenantId)}`,
+    `${depositosBase}${buildQs({ page: '1', pageSize: '500' }, tenantId)}`,
     getToken,
   );
   const { productos } = useProductosPaginated(productosBase, tenantId, getToken);
