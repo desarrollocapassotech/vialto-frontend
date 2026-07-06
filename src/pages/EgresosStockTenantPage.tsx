@@ -4,6 +4,7 @@ import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
@@ -11,7 +12,6 @@ import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { DireccionEntregaModal } from '@/components/direcciones-entrega/DireccionEntregaModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
-import { paginatedItems } from '@/lib/paginatedItems';
 import type {
   Chofer,
   Cliente,
