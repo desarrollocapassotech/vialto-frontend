@@ -3,8 +3,10 @@ import {
   DireccionEntregaSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
+import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
+import type { StockDocumentoExternoModo } from '@/lib/stockDocumentoExterno';
 import type { Chofer, DireccionEntrega } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
@@ -34,6 +36,11 @@ export function EgresoWizardStep2({
   direccionEntregaId,
   onDireccionEntregaChange,
   onNuevaDireccionEntrega,
+  documentoExternoModo,
+  onDocumentoExternoModoChange,
+  documentoExternoNumero,
+  onDocumentoExternoNumeroChange,
+  documentoExternoError,
   observaciones,
   onObservacionesChange,
   clienteNombre,
@@ -60,6 +67,11 @@ export function EgresoWizardStep2({
   direccionEntregaId: string;
   onDireccionEntregaChange: (id: string) => void;
   onNuevaDireccionEntrega?: () => void;
+  documentoExternoModo: StockDocumentoExternoModo | '';
+  onDocumentoExternoModoChange: (modo: StockDocumentoExternoModo) => void;
+  documentoExternoNumero: string;
+  onDocumentoExternoNumeroChange: (v: string) => void;
+  documentoExternoError?: string | null;
   observaciones: string;
   onObservacionesChange: (v: string) => void;
   clienteNombre: string;
@@ -127,6 +139,49 @@ export function EgresoWizardStep2({
               placeholder="Ej: Luvi SRL, Myca SRL…"
               maxLength={200}
             />
+          </div>
+
+          <div className="space-y-1 sm:col-span-2">
+            <p className={LABEL}>
+              Nº documento externo <span className="text-red-500">*</span>
+            </p>
+            <p className="text-xs text-vialto-steel">
+              Pedido del cliente, nota de despacho u otro comprobante que acompaña la entrega.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-1">
+              <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal cursor-pointer">
+                <input
+                  type="radio"
+                  name="documentoExternoModo"
+                  checked={documentoExternoModo === 'numero'}
+                  onChange={() => onDocumentoExternoModoChange('numero')}
+                  className="accent-vialto-charcoal"
+                />
+                Ingresar número
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal cursor-pointer">
+                <input
+                  type="radio"
+                  name="documentoExternoModo"
+                  checked={documentoExternoModo === 'no_tiene'}
+                  onChange={() => onDocumentoExternoModoChange('no_tiene')}
+                  className="accent-vialto-charcoal"
+                />
+                No tiene
+              </label>
+            </div>
+            {documentoExternoModo === 'numero' && (
+              <input
+                type="text"
+                value={documentoExternoNumero}
+                onChange={(e) => onDocumentoExternoNumeroChange(e.target.value)}
+                className={`${INPUT} ${documentoExternoError ? 'border-red-400' : ''}`}
+                placeholder="Ej: PD-10452, ND 8831…"
+                maxLength={100}
+                autoFocus
+              />
+            )}
+            <CrudFieldError message={documentoExternoError} />
           </div>
 
           <div className="space-y-1 sm:col-span-2">

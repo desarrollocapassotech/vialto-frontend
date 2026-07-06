@@ -170,6 +170,7 @@ export function movimientoStockColumnas(
     { id: 'deposito', label: 'Depósito', getValue: (m) => m.deposito?.nombre ?? '' },
     { id: 'lote', label: 'Lote', getValue: (m) => m.lote ?? '' },
     { id: 'numeroRemito', label: 'N° Remito', getValue: (m) => m.numeroRemito ?? '' },
+    { id: 'documentoExterno', label: 'Nº doc. externo', getValue: (m) => m.numeroDocumentoExterno ?? '' },
     { id: 'destinatario', label: 'Destinatario', getValue: (m) => m.destinatario ?? '' },
     { id: 'entregadoPor', label: 'Entregado por', getValue: (m) => m.entregadoPor ?? '' },
     { id: 'destino', label: 'Destino', getValue: (m) => m.destinoFinal ?? '' },
@@ -194,6 +195,7 @@ type OperacionFlatRow = {
   lote: string;
   vencimiento: string;
   conductor: string;
+  documentoExterno: string;
   destinatario: string;
   destino: string;
   observaciones: string;
@@ -220,6 +222,7 @@ export function flattenStockOperaciones(
           ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
           : '',
         conductor: op.entregadoPor ?? '',
+        documentoExterno: op.numeroDocumentoExterno ?? '',
         destinatario: op.destinatario ?? '',
         destino: op.destinoFinal ?? '',
         observaciones: op.observaciones ?? '',
@@ -290,6 +293,7 @@ export function stockOperacionColumnas(
 
   if (tipo === 'egreso') {
     cols.push(
+      { id: 'documentoExterno', label: 'Nº doc. externo', getValue: (r) => r.documentoExterno },
       { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
       { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
       { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },
