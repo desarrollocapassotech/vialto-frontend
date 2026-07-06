@@ -30,7 +30,10 @@ import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
-import { isPlatformSuperadmin } from "@/lib/roleLabels";
+import {
+  isPlatformSuperadmin,
+  isOrgAdmin as userIsOrgAdmin,
+} from "@/lib/roleLabels";
 import { useAuth } from "@clerk/clerk-react";
 
 type Tab =
@@ -71,7 +74,9 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
-  const isOrgAdmin = superadmin || orgRole === "org:admin";
+  const isOrgAdmin =
+    superadmin ||
+    userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const visibleTabs = ALL_TABS.filter((tab) => {
     switch (tab.id) {
