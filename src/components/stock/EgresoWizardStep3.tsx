@@ -82,6 +82,7 @@ export function EgresoWizardStep3({
   fechaLabel,
   lotesBase,
   tenantId,
+  primaryAction = 'registrar',
   onVolver,
   onSubmit,
 }: {
@@ -93,14 +94,15 @@ export function EgresoWizardStep3({
   productosLoading: boolean;
   fieldErrors: Record<string, string>;
   formError: string | null;
-  saving: boolean;
+  saving?: boolean;
   clienteId: string;
   depositoId: string;
   clienteNombre: string;
   depositoNombre: string;
-  fechaLabel: string;
+  fechaLabel?: string;
   lotesBase: string;
   tenantId?: string;
+  primaryAction?: 'continuar' | 'registrar';
   onVolver: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
@@ -312,18 +314,26 @@ export function EgresoWizardStep3({
         <button
           type="button"
           onClick={onVolver}
-          disabled={saving}
+          disabled={primaryAction === 'registrar' && saving}
           className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 bg-white text-sm font-medium text-vialto-charcoal rounded hover:bg-vialto-mist/60 transition-colors disabled:opacity-50"
         >
           ← Volver
         </button>
         <button
           type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
+          disabled={primaryAction === 'registrar' && saving}
+          className={`inline-flex items-center gap-2 px-6 py-2.5 text-white text-sm font-semibold rounded transition-colors disabled:opacity-50 ${
+            primaryAction === 'continuar'
+              ? 'bg-vialto-charcoal hover:bg-vialto-charcoal/90'
+              : 'bg-vialto-fire hover:bg-vialto-fire/90'
+          }`}
         >
-          {saving && <Spinner />}
-          {saving ? 'Guardando…' : 'Registrar egreso'}
+          {primaryAction === 'registrar' && saving && <Spinner />}
+          {primaryAction === 'continuar'
+            ? 'Continuar →'
+            : saving
+              ? 'Guardando…'
+              : 'Registrar egreso'}
         </button>
       </div>
     </form>
