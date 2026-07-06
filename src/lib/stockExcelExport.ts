@@ -1,4 +1,9 @@
 ﻿import type { MovimientoStock, Producto, StockItem, StockOperacion } from '@/types/api';
+import {
+  presentacionNombreFromLike,
+  presentacionNombreFromMovimiento,
+  presentacionNombreFromStockItem,
+} from '@/lib/stockPresentacion';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
 export interface ExcelColDef<T> {
@@ -24,34 +29,6 @@ export async function generarExcel<T>(
 
 function presentacionColId(nombre: string): string {
   return `pres_${nombre.trim().toLowerCase().replace(/\s+/g, '_')}`;
-}
-
-type PresentacionLike = {
-  nombre?: string | null;
-  presentacion?: { nombre?: string | null } | null;
-} | null | undefined;
-
-function getPresentacionNombre(presentacion: PresentacionLike): string {
-  return (
-    presentacion?.presentacion?.nombre?.trim() ??
-    presentacion?.nombre?.trim() ??
-    ''
-  );
-}
-
-function presentacionNombreFromMovimiento(m: MovimientoStock): string {
-  return getPresentacionNombre(m.presentacion);
-}
-
-function presentacionNombreFromStockItem(i: StockItem, productos: Producto[] = []): string {
-  const directo = getPresentacionNombre(i.presentacion);
-  if (directo) return directo;
-
-  const producto = productos.find((p) => p.id === i.productoId);
-  const productoPresentacion = producto?.productoPresentaciones?.find(
-    (pp) => pp.id === i.presentacionId || pp.presentacionId === i.presentacionId,
-  );
-  return productoPresentacion?.presentacion?.nombre?.trim() ?? '';
 }
 
 /** Todas las presentaciones de los productos involucrados, sin límite de cantidad. */
@@ -193,6 +170,7 @@ export function movimientoStockColumnas(
     { id: 'deposito', label: 'Depósito', getValue: (m) => m.deposito?.nombre ?? '' },
     { id: 'lote', label: 'Lote', getValue: (m) => m.lote ?? '' },
     { id: 'numeroRemito', label: 'N° Remito', getValue: (m) => m.numeroRemito ?? '' },
+    { id: 'documentoExterno', label: 'Nº doc. externo', getValue: (m) => m.numeroDocumentoExterno ?? '' },
     { id: 'destinatario', label: 'Destinatario', getValue: (m) => m.destinatario ?? '' },
     { id: 'entregadoPor', label: 'Entregado por', getValue: (m) => m.entregadoPor ?? '' },
     { id: 'destino', label: 'Destino', getValue: (m) => m.destinoFinal ?? '' },
@@ -217,6 +195,7 @@ type OperacionFlatRow = {
   lote: string;
   vencimiento: string;
   conductor: string;
+  documentoExterno: string;
   destinatario: string;
   destino: string;
   observaciones: string;
@@ -235,7 +214,7 @@ export function flattenStockOperaciones(
         remito: op.numeroRemito ?? '',
         remitoProveedor: op.numeroRemitoProveedor ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
-        presentacion: getPresentacionNombre(mov.presentacion) || mov.presentacionId || '',
+        presentacion: presentacionNombreFromLike(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
         sueltas: mov.unidades,
         lote: mov.lote ?? '',
@@ -243,6 +222,7 @@ export function flattenStockOperaciones(
           ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
           : '',
         conductor: op.entregadoPor ?? '',
+        documentoExterno: op.numeroDocumentoExterno ?? '',
         destinatario: op.destinatario ?? '',
         destino: op.destinoFinal ?? '',
         observaciones: op.observaciones ?? '',
@@ -313,6 +293,7 @@ export function stockOperacionColumnas(
 
   if (tipo === 'egreso') {
     cols.push(
+      { id: 'documentoExterno', label: 'Nº doc. externo', getValue: (r) => r.documentoExterno },
       { id: 'conductor', label: 'Conductor', getValue: (r) => r.conductor },
       { id: 'destinatario', label: 'Destinatario', getValue: (r) => r.destinatario },
       { id: 'destino', label: 'Destino / Ruta', getValue: (r) => r.destino },

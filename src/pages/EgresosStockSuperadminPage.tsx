@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import type { Cliente, Destinatario } from '@/types/api';
+import type { Chofer, Cliente, Destinatario, DireccionEntrega } from '@/types/api';
 import { EgresosStockTenantPage } from './EgresosStockTenantPage';
 
 export function EgresosStockSuperadminPage() {
@@ -16,6 +16,12 @@ export function EgresosStockSuperadminPage() {
   const [clientesLoading, setClientesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
   const [destinatarios, setDestinatarios] = useState<Destinatario[]>([]);
   const [destinatariosLoading, setDestinatariosLoading] = useState(() =>
+    Boolean(searchParams.get('tenantId')),
+  );
+  const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [choferesLoading, setChoferesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
+  const [direccionesEntrega, setDireccionesEntrega] = useState<DireccionEntrega[]>([]);
+  const [direccionesEntregaLoading, setDireccionesEntregaLoading] = useState(() =>
     Boolean(searchParams.get('tenantId')),
   );
 
@@ -33,12 +39,20 @@ export function EgresosStockSuperadminPage() {
         setClientesLoading(true);
         setDestinatarios([]);
         setDestinatariosLoading(true);
+        setChoferes([]);
+        setChoferesLoading(true);
+        setDireccionesEntrega([]);
+        setDireccionesEntregaLoading(true);
       } else {
         setSearchParams({});
         setClientes([]);
         setClientesLoading(false);
         setDestinatarios([]);
         setDestinatariosLoading(false);
+        setChoferes([]);
+        setChoferesLoading(false);
+        setDireccionesEntrega([]);
+        setDireccionesEntregaLoading(false);
       }
     },
     [setSearchParams],
@@ -50,34 +64,50 @@ export function EgresosStockSuperadminPage() {
       setClientesLoading(false);
       setDestinatarios([]);
       setDestinatariosLoading(false);
+      setChoferes([]);
+      setChoferesLoading(false);
+      setDireccionesEntrega([]);
+      setDireccionesEntregaLoading(false);
       return;
     }
     setClientes([]);
     setClientesLoading(true);
     setDestinatarios([]);
     setDestinatariosLoading(true);
+    setChoferes([]);
+    setChoferesLoading(true);
+    setDireccionesEntrega([]);
+    setDireccionesEntregaLoading(true);
     let cancelled = false;
     const q = `tenantId=${encodeURIComponent(tenantId)}`;
     void Promise.all([
       apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
       apiJson<Destinatario[]>(`/api/platform/destinatarios?${q}`, () => getToken()),
+      apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
+      apiJson<DireccionEntrega[]>(`/api/platform/direcciones-entrega?${q}`, () => getToken()),
     ])
-      .then(([clientesData, destinatariosData]) => {
+      .then(([clientesData, destinatariosData, choferesData, direccionesData]) => {
         if (!cancelled) {
           setClientes(clientesData);
           setDestinatarios(destinatariosData);
+          setChoferes(choferesData);
+          setDireccionesEntrega(direccionesData);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setClientes([]);
           setDestinatarios([]);
+          setChoferes([]);
+          setDireccionesEntrega([]);
         }
       })
       .finally(() => {
         if (!cancelled) {
           setClientesLoading(false);
           setDestinatariosLoading(false);
+          setChoferesLoading(false);
+          setDireccionesEntregaLoading(false);
         }
       });
     return () => {
@@ -103,6 +133,10 @@ export function EgresosStockSuperadminPage() {
           clientesExternosLoading={clientesLoading}
           destinatariosExternos={destinatarios}
           destinatariosExternosLoading={destinatariosLoading}
+          choferesExternos={choferes}
+          choferesExternosLoading={choferesLoading}
+          direccionesEntregaExternos={direccionesEntrega}
+          direccionesEntregaExternosLoading={direccionesEntregaLoading}
         />
       )}
     </div>

@@ -14,10 +14,12 @@ import type { PlatformUser } from '@/types/api';
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Miembro' },
+  { value: 'stock_viewer', label: 'Consulta de stock' },
 ] as const;
 
 function fromOrgRole(role: string): (typeof ROLE_OPTIONS)[number]['value'] {
   if (role === 'org:admin') return 'admin';
+  if (role === 'org:stock_viewer') return 'stock_viewer';
   return 'member';
 }
 

@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
   formatNumberForMoneda,
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
   maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
-} from '@/lib/currencyMask';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { isoToFechaHora } from '@/lib/viajeFechaHora';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+} from "@/lib/currencyMask";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { isoToFechaHora } from "@/lib/viajeFechaHora";
+import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import {
   PAGO_TRANSPORTISTA_SALDO_ERROR,
   calcularSaldoTransportistaDesdeDraft,
   validarPagosTransportistaDraftForm,
   type PagosTransportistaDraftFormInput,
-} from '@/lib/viajesTransportistaPagos';
-import type { PagoTransportista } from '@/types/api';
+} from "@/lib/viajesTransportistaPagos";
+import type { PagoTransportista } from "@/types/api";
 
 function fechaPagoToInputValue(fecha: string | undefined | null): string {
   const t = fecha?.trim();
@@ -33,13 +33,15 @@ export interface PagoTransportistaDraft {
   observaciones: string;
 }
 
-export function pagoTransportistaDraftFromApi(p: PagoTransportista): PagoTransportistaDraft {
-  const moneda: ViajeMonedaCodigo = p.moneda === 'USD' ? 'USD' : 'ARS';
+export function pagoTransportistaDraftFromApi(
+  p: PagoTransportista,
+): PagoTransportistaDraft {
+  const moneda: ViajeMonedaCodigo = p.moneda === "USD" ? "USD" : "ARS";
   return {
-    montoStr: p.monto != null ? formatNumberForMoneda(p.monto, moneda) : '',
+    montoStr: p.monto != null ? formatNumberForMoneda(p.monto, moneda) : "",
     moneda,
     fecha: fechaPagoToInputValue(p.fecha),
-    observaciones: p.observaciones ?? '',
+    observaciones: p.observaciones ?? "",
   };
 }
 
@@ -70,31 +72,36 @@ export function pagosTransportistaDraftsToApi(
     .filter((p): p is PagoTransportista => p != null);
 }
 
-export function emptyPagoTransportista(moneda: ViajeMonedaCodigo = 'ARS'): PagoTransportistaDraft {
+export function emptyPagoTransportista(
+  moneda: ViajeMonedaCodigo = "ARS",
+): PagoTransportistaDraft {
   return {
-    montoStr: '',
+    montoStr: "",
     moneda,
     fecha: new Date().toISOString().slice(0, 10),
-    observaciones: '',
+    observaciones: "",
   };
 }
 
 const fieldLabelClass =
-  'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
-const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+  "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
+const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
+const smallInputClass =
+  "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 const pagoRowGridClass =
-  'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
+  "grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0";
 
 function pagoFieldLabel(label: string, rowIndex: number) {
   return (
-    <span className={`${fieldLabelClass} ${rowIndex > 0 ? 'lg:hidden' : ''}`}>{label}</span>
+    <span className={`${fieldLabelClass} ${rowIndex > 0 ? "lg:hidden" : ""}`}>
+      {label}
+    </span>
   );
 }
 
 export type PagosTransportistaSaldoContext = Omit<
   PagosTransportistaDraftFormInput,
-  'pagosTransportista'
+  "pagosTransportista"
 >;
 
 interface Props {
@@ -105,28 +112,43 @@ interface Props {
   saldoContext?: PagosTransportistaSaldoContext | null;
 }
 
-export function PagosTransportistaFieldset({ rows, onChange, className, saldoContext }: Props) {
+export function PagosTransportistaFieldset({
+  rows,
+  onChange,
+  className,
+  saldoContext,
+}: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const monedaAcordada = saldoContext
-    ? (saldoContext.monedaPrecioTransportistaExterno === 'USD' ? 'USD' : 'ARS')
+    ? saldoContext.monedaPrecioTransportistaExterno === "USD"
+      ? "USD"
+      : "ARS"
     : null;
 
-  const draftFormInput = useMemo((): PagosTransportistaDraftFormInput | null => {
-    if (!saldoContext) return null;
-    const monedaFija = saldoContext.monedaPrecioTransportistaExterno === 'USD' ? 'USD' : 'ARS';
-    return {
-      ...saldoContext,
-      pagosTransportista: rows.map((r) => ({ ...r, moneda: monedaFija })),
-    };
-  }, [saldoContext, rows]);
+  const draftFormInput =
+    useMemo((): PagosTransportistaDraftFormInput | null => {
+      if (!saldoContext) return null;
+      const monedaFija =
+        saldoContext.monedaPrecioTransportistaExterno === "USD" ? "USD" : "ARS";
+      return {
+        ...saldoContext,
+        pagosTransportista: rows.map((r) => ({ ...r, moneda: monedaFija })),
+      };
+    }, [saldoContext, rows]);
 
   const saldo = useMemo(
-    () => (draftFormInput ? calcularSaldoTransportistaDesdeDraft(draftFormInput) : null),
+    () =>
+      draftFormInput
+        ? calcularSaldoTransportistaDesdeDraft(draftFormInput)
+        : null,
     [draftFormInput],
   );
 
   const saldoError = useMemo(
-    () => (draftFormInput ? validarPagosTransportistaDraftForm(draftFormInput) : null),
+    () =>
+      draftFormInput
+        ? validarPagosTransportistaDraftForm(draftFormInput)
+        : null,
     [draftFormInput],
   );
 
@@ -153,28 +175,35 @@ export function PagosTransportistaFieldset({ rows, onChange, className, saldoCon
       {saldo && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded border border-black/10 bg-vialto-mist/60 px-3 py-2 text-xs">
           <span className="text-vialto-steel">
-            Acordado:{' '}
+            Acordado:{" "}
             <span className="font-medium text-vialto-charcoal">
               {formatViajeImporteForListado(saldo.totalAcordado, saldo.moneda)}
             </span>
           </span>
           <span className="text-vialto-steel">
-            Pagado:{' '}
+            Pagado:{" "}
             <span className="font-medium text-vialto-charcoal tabular-nums">
               {formatViajeImporteForListado(saldo.totalPagado, saldo.moneda)}
             </span>
           </span>
           <span className="text-vialto-steel">
-            Saldo:{' '}
+            Saldo:{" "}
             <span
               className={`font-medium tabular-nums ${
-                saldoExcedido ? 'text-red-700' : saldo.pagado ? 'text-emerald-700' : 'text-red-700'
+                saldoExcedido
+                  ? "text-red-700"
+                  : saldo.pagado
+                    ? "text-emerald-700"
+                    : "text-red-700"
               }`}
             >
               {saldoExcedido
-                ? formatViajeImporteForListado(Math.max(0, saldo.saldo), saldo.moneda)
+                ? formatViajeImporteForListado(
+                    Math.max(0, saldo.saldo),
+                    saldo.moneda,
+                  )
                 : saldo.pagado
-                  ? 'Pagado'
+                  ? "Pagado"
                   : formatViajeImporteForListado(saldo.saldo, saldo.moneda)}
             </span>
           </span>
@@ -197,100 +226,108 @@ export function PagosTransportistaFieldset({ rows, onChange, className, saldoCon
       {rows.map((row, i) => {
         const monedaFila = monedaAcordada ?? row.moneda;
         return (
-        <div key={i} className={pagoRowGridClass}>
-          {/* Observaciones (misma posición que descripción en otros gastos) */}
-          <div className="flex min-w-0 flex-col gap-1">
-            {pagoFieldLabel('Observaciones', i)}
-            <input
-              type="text"
-              value={row.observaciones}
-              onChange={(e) => update(i, { observaciones: e.target.value })}
-              placeholder="Ej. transferencia, comprobante…"
-              className={inputClass}
-              aria-label={`Observaciones pago ${i + 1}`}
-            />
-          </div>
+          <div key={i} className={pagoRowGridClass}>
+            {/* Observaciones (misma posición que descripción en otros gastos) */}
+            <div className="flex min-w-0 flex-col gap-1">
+              {pagoFieldLabel("Observaciones", i)}
+              <input
+                type="text"
+                value={row.observaciones}
+                onChange={(e) => update(i, { observaciones: e.target.value })}
+                placeholder="Ej. transferencia, comprobante…"
+                className={inputClass}
+                aria-label={`Observaciones pago ${i + 1}`}
+              />
+            </div>
 
-          {/* Monto */}
-          <div className="flex flex-col gap-1 lg:w-36">
-            {pagoFieldLabel('Monto', i)}
-            <input
-              type="text"
-              inputMode="decimal"
-              value={row.montoStr}
-              onChange={(e) =>
-                update(i, {
-                  montoStr: maskCurrencyForMoneda(e.target.value, monedaFila),
-                  ...(monedaAcordada ? { moneda: monedaAcordada } : {}),
-                })
-              }
-              placeholder="0.00"
-              className={`${smallInputClass} text-right tabular-nums lg:w-36 ${
-                saldoExcedido && row.montoStr.trim() ? 'border-red-400' : ''
-              }`}
-              aria-label={`Monto pago ${i + 1}`}
-              aria-invalid={saldoExcedido && row.montoStr.trim() ? true : undefined}
-            />
-            {saldoExcedido && row.montoStr.trim() ? (
-              <CrudFieldError message={PAGO_TRANSPORTISTA_SALDO_ERROR} />
-            ) : null}
-          </div>
-
-          {/* Moneda */}
-          <div className="flex flex-col gap-1 lg:w-20">
-            {pagoFieldLabel('Moneda', i)}
-            {monedaAcordada ? (
-              <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal lg:w-20">
-                {monedaAcordada}
-              </span>
-            ) : (
-              <select
-                value={row.moneda}
-                onChange={(e) => {
-                  const m = e.target.value as ViajeMonedaCodigo;
+            {/* Monto */}
+            <div className="flex flex-col gap-1 lg:w-36">
+              {pagoFieldLabel("Monto", i)}
+              <input
+                type="text"
+                inputMode="decimal"
+                value={row.montoStr}
+                onChange={(e) =>
                   update(i, {
-                    moneda: m,
-                    montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
-                  });
-                }}
-                className={`${smallInputClass} lg:w-20`}
-                aria-label={`Moneda pago ${i + 1}`}
+                    montoStr: maskCurrencyForMoneda(e.target.value, monedaFila),
+                    ...(monedaAcordada ? { moneda: monedaAcordada } : {}),
+                  })
+                }
+                placeholder="0.00"
+                className={`${smallInputClass} text-right tabular-nums lg:w-36 ${
+                  saldoExcedido && row.montoStr.trim() ? "border-red-400" : ""
+                }`}
+                aria-label={`Monto pago ${i + 1}`}
+                aria-invalid={
+                  saldoExcedido && row.montoStr.trim() ? true : undefined
+                }
+              />
+              {saldoExcedido && row.montoStr.trim() ? (
+                <CrudFieldError message={PAGO_TRANSPORTISTA_SALDO_ERROR} />
+              ) : null}
+            </div>
+
+            {/* Moneda */}
+            <div className="flex flex-col gap-1 lg:w-20">
+              {pagoFieldLabel("Moneda", i)}
+              {monedaAcordada ? (
+                <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal lg:w-20">
+                  {monedaAcordada}
+                </span>
+              ) : (
+                <select
+                  value={row.moneda}
+                  onChange={(e) => {
+                    const m = e.target.value as ViajeMonedaCodigo;
+                    update(i, {
+                      moneda: m,
+                      montoStr: preserveAmountOnMonedaChange(
+                        row.montoStr,
+                        row.moneda,
+                        m,
+                      ),
+                    });
+                  }}
+                  className={`${smallInputClass} lg:w-20`}
+                  aria-label={`Moneda pago ${i + 1}`}
+                >
+                  <option value="ARS">ARS</option>
+                  <option value="USD">USD</option>
+                </select>
+              )}
+            </div>
+
+            {/* Fecha */}
+            <div className="flex flex-col gap-1 lg:w-36">
+              {pagoFieldLabel("Fecha (opc.)", i)}
+              <input
+                type="date"
+                value={row.fecha}
+                onChange={(e) => update(i, { fecha: e.target.value })}
+                className={`${smallInputClass} lg:w-36`}
+                aria-label={`Fecha pago ${i + 1}`}
+              />
+            </div>
+
+            {/* Eliminar */}
+            <div className="flex flex-col gap-1">
+              {i === 0 ? (
+                <span className={`${fieldLabelClass} hidden lg:block`}>
+                  &nbsp;
+                </span>
+              ) : (
+                pagoFieldLabel("Eliminar", i)
+              )}
+              <button
+                type="button"
+                onClick={() => setRemoveIndex(i)}
+                className="h-9 w-full px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100 lg:w-auto"
+                aria-label={`Eliminar pago ${i + 1}`}
               >
-                <option value="ARS">ARS</option>
-                <option value="USD">USD</option>
-              </select>
-            )}
+                ✕
+              </button>
+            </div>
           </div>
-
-          {/* Fecha */}
-          <div className="flex flex-col gap-1 lg:w-36">
-            {pagoFieldLabel('Fecha (opc.)', i)}
-            <input
-              type="date"
-              value={row.fecha}
-              onChange={(e) => update(i, { fecha: e.target.value })}
-              className={`${smallInputClass} lg:w-36`}
-              aria-label={`Fecha pago ${i + 1}`}
-            />
-          </div>
-
-          {/* Eliminar */}
-          <div className="flex flex-col gap-1">
-            {i === 0 ? (
-              <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
-            ) : (
-              pagoFieldLabel('Eliminar', i)
-            )}
-            <button
-              type="button"
-              onClick={() => setRemoveIndex(i)}
-              className="h-9 w-full px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100 lg:w-auto"
-              aria-label={`Eliminar pago ${i + 1}`}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
         );
       })}
       <ConfirmDialog

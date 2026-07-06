@@ -131,6 +131,13 @@ export interface Destinatario {
   createdAt: string;
 }
 
+export interface DireccionEntrega {
+  id: string;
+  tenantId: string;
+  direccion: string;
+  createdAt: string;
+}
+
 export interface Vehiculo {
   id: string;
   tenantId: string;
@@ -199,6 +206,11 @@ export interface PaginatedMeta {
   totalPages: number;
   hasPrev: boolean;
   hasNext: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginatedMeta;
 }
 
 export interface PaginatedTenantsResponse {
@@ -400,6 +412,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
@@ -518,6 +531,7 @@ export interface StockOperacion {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   observaciones?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];

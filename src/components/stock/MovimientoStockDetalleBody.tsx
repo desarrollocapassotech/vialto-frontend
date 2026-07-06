@@ -1,5 +1,7 @@
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
+import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import { presentacionNombreFromMovimiento } from '@/lib/stockPresentacion';
 import type { MovimientoStock } from '@/types/api';
 
 export function MovimientoStockDetalleBody({
@@ -12,6 +14,8 @@ export function MovimientoStockDetalleBody({
   const remitoTitulo = row.numeroRemito?.trim()
     ? `Remito ${row.numeroRemito.trim()}`
     : 'Remito interno';
+
+  const presentacionNombre = presentacionNombreFromMovimiento(row);
 
   return (
     <>
@@ -54,16 +58,16 @@ export function MovimientoStockDetalleBody({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
           <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-            {row.producto?.unidad1Nombre ?? 'Pallets'}
+            {presentacionNombre || 'Bultos'}
           </dt>
           <dd className="sm:col-span-2 text-vialto-charcoal">
             {row.cantidad1}
           </dd>
         </div>
-        {row.producto?.unidad2Nombre !== null && (
+        {row.cantidad2 > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
             <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
-              {row.producto?.unidad2Nombre ?? 'Unidad'}
+              Sueltas
             </dt>
             <dd className="sm:col-span-2 text-vialto-charcoal">
               {row.cantidad2}
@@ -114,6 +118,14 @@ export function MovimientoStockDetalleBody({
               <p className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider text-vialto-steel">
                 Datos de entrega
               </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+              <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">
+                Nº documento externo
+              </dt>
+              <dd className="sm:col-span-2 text-vialto-charcoal">
+                {etiquetaStockDocumentoExterno(row.numeroDocumentoExterno)}
+              </dd>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
               <dt className="text-vialto-steel font-[family-name:var(--font-ui)] uppercase text-xs tracking-wide">

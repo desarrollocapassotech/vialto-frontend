@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
+import type { PaginatedResponse } from '@/types/api';
 
 export function useEntityList<T>(url: string, getToken: () => Promise<string | null>) {
   const [items, setItems] = useState<T[]>([]);
@@ -8,8 +10,8 @@ export function useEntityList<T>(url: string, getToken: () => Promise<string | n
 
   const load = useCallback(async () => {
     try {
-      const data = await apiJson<T[]>(url, getToken);
-      setItems(data);
+      const data = await apiJson<T[] | PaginatedResponse<T>>(url, getToken);
+      setItems(paginatedItems(data));
     } catch (e) {
       setError(friendlyError(e, 'stock'));
     }
