@@ -542,7 +542,7 @@ export function ViajesTenantPage({
         );
         const filtrosQs = filtros.toString();
         const listBase = platform
-          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}` : "&"}`
+          ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
 
         const pageApi = Math.max(1, Math.floor(page));
@@ -2541,11 +2541,15 @@ export function ViajesTenantPage({
           meta={meta}
           pageSize={pageSize}
           onPageChange={(newPage) => {
+            setListadoRefetching(true);
             setPage(newPage);
+            setListadoQueryVersion((v) => v + 1); //
           }}
           onPageSizeChange={(newPageSize) => {
+            setListadoRefetching(true);
             setPageSize(newPageSize);
             setPage(1);
+            setListadoQueryVersion((v) => v + 1); //
           }}
         />
       )}
