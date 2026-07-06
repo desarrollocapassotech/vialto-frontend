@@ -140,7 +140,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     try {
       const [stockData, depositosData] = await Promise.all([
         apiJson<StockItem[]>(disponibleUrl, () => getToken()),
-        apiJson<Deposito[]>(depositosUrl, () => getToken()),
+        apiJson<{ items: Deposito[]; meta: unknown }>(depositosUrl, () => getToken()),
       ]);
       const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
       const productoIds = [
@@ -156,7 +156,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       );
       setItems(stockData);
       setProductosDetalle(productos.filter((p): p is Producto => p !== null));
-      setDepositos(depositosData.filter((d) => d.activo));
+      setDepositos(depositosData.items.filter((d) => d.activo));
     } catch (e) {
       setError(friendlyError(e, "stock"));
     } finally {
