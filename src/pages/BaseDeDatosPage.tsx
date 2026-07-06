@@ -27,9 +27,15 @@ import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
 import { SuperadminUsersPage } from "./SuperadminUsersPage";
+import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
-import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
+import {
+  canAccessViajes,
+  canAccessStock,
+  canAccessFacturacion,
+  canAccessCombustible,
+} from "@/lib/tenantModules";
 import {
   isPlatformSuperadmin,
   isOrgAdmin as userIsOrgAdmin,
@@ -74,6 +80,8 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
+  const hasFacturacion = superadmin || canAccessFacturacion(modules);
+  const hasCombustible = superadmin || canAccessCombustible(modules);
   const isOrgAdmin =
     superadmin ||
     userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
@@ -81,12 +89,13 @@ export function BaseDeDatosPage() {
   const visibleTabs = ALL_TABS.filter((tab) => {
     switch (tab.id) {
       case "clientes":
-        return true;
+        return hasViajes || hasStock || hasFacturacion;
       case "transportistas":
-      case "vehiculos":
         return hasViajes;
+      case "vehiculos":
+        return hasViajes || hasCombustible;
       case "choferes":
-        return hasViajes || hasStock;
+        return hasViajes || hasStock || hasCombustible;
       case "productos":
         return hasViajes || hasStock;
       case "presentaciones":
@@ -217,7 +226,8 @@ export function BaseDeDatosPage() {
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
-        {activeTab === "usuarios" && <SuperadminUsersPage />}
+        {activeTab === "usuarios" &&
+          (superadmin ? <SuperadminUsersPage /> : <UsuariosTenantPage />)}
       </div>
     </div>
   );
