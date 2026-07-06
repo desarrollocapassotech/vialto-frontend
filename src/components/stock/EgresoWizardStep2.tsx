@@ -1,5 +1,6 @@
 import {
   ChoferSearchSelect,
+  DestinatarioSearchSelect,
   DireccionEntregaSearchSelect,
 } from '@/components/forms/MaestroSearchSelects';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
@@ -7,7 +8,7 @@ import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
 import type { StockDocumentoExternoModo } from '@/lib/stockDocumentoExterno';
-import type { Chofer, DireccionEntrega } from '@/types/api';
+import type { Chofer, Destinatario, DireccionEntrega } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -29,8 +30,11 @@ export function EgresoWizardStep2({
   choferId,
   onChoferIdChange,
   onNuevoChofer,
-  destinatario,
-  onDestinatarioChange,
+  destinatarios,
+  destinatariosLoading,
+  destinatarioId,
+  onDestinatarioIdChange,
+  onNuevoDestinatario,
   direccionesEntrega,
   direccionesEntregaLoading,
   direccionEntregaId,
@@ -60,8 +64,11 @@ export function EgresoWizardStep2({
   choferId: string;
   onChoferIdChange: (id: string) => void;
   onNuevoChofer?: () => void;
-  destinatario: string;
-  onDestinatarioChange: (v: string) => void;
+  destinatarios: Destinatario[];
+  destinatariosLoading?: boolean;
+  destinatarioId: string;
+  onDestinatarioIdChange: (id: string) => void;
+  onNuevoDestinatario?: () => void;
   direccionesEntrega: DireccionEntrega[];
   direccionesEntregaLoading?: boolean;
   direccionEntregaId: string;
@@ -131,13 +138,17 @@ export function EgresoWizardStep2({
 
           <div className="space-y-1">
             <label className={LABEL}>Destinatario</label>
-            <input
-              type="text"
-              value={destinatario}
-              onChange={(e) => onDestinatarioChange(e.target.value)}
-              className={INPUT}
-              placeholder="Ej: Luvi SRL, Myca SRL…"
-              maxLength={200}
+            <DestinatarioSearchSelect
+              destinatarios={destinatarios}
+              value={destinatarioId}
+              onChange={onDestinatarioIdChange}
+              loading={destinatariosLoading}
+              allowEmptyValue
+              emptyListChoiceLabel="Sin destinatario"
+              placeholderCerrado="Sin destinatario"
+              inputClassName={INPUT}
+              aria-label="Destinatario del egreso"
+              onNuevo={onNuevoDestinatario}
             />
           </div>
 

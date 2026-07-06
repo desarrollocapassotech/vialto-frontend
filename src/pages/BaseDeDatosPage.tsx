@@ -22,11 +22,12 @@ import {
 import { ClientesPage } from "./ClientesPage";
 import { TransportistasPage } from "./TransportistasPage";
 import { ChoferesPage } from "./ChoferesPage";
+import { DestinatariosPage } from "./DestinatariosPage";
 import { VehiculosPage } from "./VehiculosPage";
 import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
-import { SuperadminUsersPage } from "./SuperadminUsersPage";
+import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
@@ -40,6 +41,7 @@ type Tab =
   | "clientes"
   | "transportistas"
   | "choferes"
+  | "destinatarios"
   | "vehiculos"
   | "productos"
   | "presentaciones"
@@ -51,6 +53,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "transportistas", label: "Transportistas", icon: Truck },
   { id: "choferes", label: "Choferes", icon: UserCheck },
+  { id: "destinatarios", label: "Destinatarios", icon: MapPin },
   { id: "vehiculos", label: "Vehículos", icon: Car },
   { id: "productos", label: "Productos", icon: Package },
   { id: "presentaciones", label: "Presentaciones", icon: Layers },
@@ -85,6 +88,8 @@ export function BaseDeDatosPage() {
       case "transportistas":
       case "vehiculos":
         return hasViajes;
+      case "destinatarios":
+        return hasStock;
       case "choferes":
         return hasViajes || hasStock;
       case "productos":
@@ -212,12 +217,13 @@ export function BaseDeDatosPage() {
         {activeTab === "clientes" && <ClientesPage />}
         {activeTab === "transportistas" && <TransportistasPage />}
         {activeTab === "choferes" && <ChoferesPage />}
+        {activeTab === "destinatarios" && <DestinatariosPage />}
         {activeTab === "vehiculos" && <VehiculosPage />}
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
-        {activeTab === "usuarios" && <SuperadminUsersPage />}
+        {activeTab === "usuarios" && <UsuariosTenantPage />}
       </div>
     </div>
   );
