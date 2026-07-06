@@ -4,6 +4,7 @@ import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
@@ -11,7 +12,7 @@ import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { DireccionEntregaModal } from '@/components/direcciones-entrega/DireccionEntregaModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
-import type { Chofer, Cliente, Deposito, DireccionEntrega, Producto, StockItem } from '@/types/api';
+import type { Chofer, Cliente, Deposito, DireccionEntrega, PaginatedResponse, Producto, StockItem } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
@@ -206,9 +207,9 @@ export function EgresosStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
