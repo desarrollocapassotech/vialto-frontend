@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import { ListadoPagination } from '@/components/listado/ListadoPagination';
+import { DivisionImpactoLinea } from '@/components/stock/DivisionImpactoLinea';
+import { StockOperacionTipoCelda } from '@/components/stock/StockOperacionTipoCelda';
 import { StockOperacionViewModal } from '@/components/stock/StockOperacionViewModal';
 import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { apiJson } from '@/lib/api';
@@ -11,6 +13,7 @@ import { friendlyError } from '@/lib/friendlyError';
 import { buildQs } from '@/lib/queryString';
 import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import { getDivisionImpacto, stockOperacionProductoLabel } from '@/lib/stockDivision';
 import type { StockOperacion, Cliente, Deposito, Producto, PaginatedMeta } from '@/types/api';
 import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
 
@@ -264,18 +267,26 @@ export function DivisionesStockHistorialTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => op.movimientos[0]?.producto?.nombre ?? op.movimientos[0]?.productoId ?? '—',
+            cell: (op) => stockOperacionProductoLabel(op),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'bultos',
-            header: 'Bultos',
+            id: 'transformacion',
+            header: 'Transformación',
             thClassName: `${listadoTablaThClass} align-top`,
             cell: (op) => {
-              const bultos = op.movimientos[0]?.bultos;
-              return bultos != null ? String(bultos) : '—';
+              const impacto = getDivisionImpacto(op);
+              return impacto ? <DivisionImpactoLinea impacto={impacto} /> : '—';
             },
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'tipo',
+            header: 'Tipo',
+            thClassName: `${listadoTablaThClass} align-top`,
+            cell: () => <StockOperacionTipoCelda tipo="division" />,
+            tdClassName: listadoTablaTdClass,
+            showInCard: false,
           },
         ]}
         rows={loading ? null : items}

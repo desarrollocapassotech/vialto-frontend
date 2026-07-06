@@ -1,7 +1,10 @@
 import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { DivisionImpactoLinea } from "@/components/stock/DivisionImpactoLinea";
+import { StockOperacionTipoCelda } from "@/components/stock/StockOperacionTipoCelda";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
@@ -22,9 +25,11 @@ import {
   stockOperacionesMixtasColumnas,
 } from "@/lib/stockExcelExport";
 import {
-  movimientoStockTipoBadgeClass,
-  movimientoStockTipoLabel,
-} from "@/lib/stockMovimientoTipo";
+  getDivisionImpacto,
+  stockOperacionLotesLabel,
+  stockOperacionProductoLabel,
+} from "@/lib/stockDivision";
+import { movimientoStockTipoNumeroClass } from "@/lib/stockMovimientoTipo";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
 import type {
   StockOperacion,
@@ -125,7 +130,7 @@ export function StockMovimientosTenantPage({
 
   const operacionesUrl = platform
     ? `/api/platform/stock/operaciones/paginated${buildQs(params, tenantId)}`
-    : `/api/stock/operaciones/paginated${buildQs(params)}`;
+    : `/api/stock/movimientos${buildQs(params)}`;
 
   const depositosBase = platform
     ? "/api/platform/stock/depositos"
@@ -374,11 +379,55 @@ export function StockMovimientosTenantPage({
                 </select>
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => (
-              <span className={movimientoStockTipoBadgeClass(op.tipo)}>
-                {movimientoStockTipoLabel(op.tipo)}
-              </span>
-            ),
+            cell: (op) => <StockOperacionTipoCelda tipo={op.tipo} />,
+          },
+          {
+            id: "impacto",
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: "Impacto",
+            cell: (op) => {
+              if (op.tipo === "division") {
+                const impacto = getDivisionImpacto(op);
+                return impacto ? <DivisionImpactoLinea impacto={impacto} /> : "—";
+              }
+              const totalBultos = op.movimientos.reduce((s, m) => s + m.bultos, 0);
+              const totalUnidades = op.movimientos.reduce(
+                (s, m) => s + m.unidades,
+                0,
+              );
+              if (totalBultos === 0 && totalUnidades === 0) return "—";
+              const ref = op.movimientos[0];
+              const u1 = ref?.producto?.unidad1Nombre ?? "Bultos";
+              const u2 = ref?.producto?.unidad2Nombre ?? "Sueltas";
+              const sign = op.tipo === "egreso" ? "−" : "+";
+              return (
+                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                  {totalBultos > 0 && (
+                    <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                      <span className={movimientoStockTipoNumeroClass(op.tipo)}>
+                        {sign}
+                        {totalBultos}
+                      </span>
+                      <span className="text-xs font-normal text-vialto-steel">
+                        {u1}
+                      </span>
+                    </span>
+                  )}
+                  {totalUnidades > 0 && (
+                    <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                      <span className={movimientoStockTipoNumeroClass(op.tipo)}>
+                        {sign}
+                        {totalUnidades}
+                      </span>
+                      <span className="text-xs font-normal text-vialto-steel">
+                        {u2}
+                      </span>
+                    </span>
+                  )}
+                </span>
+              );
+            },
+            tdClassName: listadoTablaTdClass,
           },
           {
             id: "remito",
@@ -425,13 +474,7 @@ export function StockMovimientosTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => {
-              const count = op.movimientos.length;
-              if (count === 1) {
-                return op.movimientos[0].producto?.nombre ?? "1 producto";
-              }
-              return `${count} productos`;
-            },
+            cell: (op) => stockOperacionProductoLabel(op),
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -520,13 +563,7 @@ export function StockMovimientosTenantPage({
             id: "lotes",
             thClassName: `${listadoTablaThClass} align-top`,
             header: "Lotes",
-            cell: (op) => {
-              const lotes = op.movimientos
-                .map((mov) => mov.lote)
-                .filter(Boolean)
-                .join(", ");
-              return lotes || "—";
-            },
+            cell: (op) => stockOperacionLotesLabel(op),
             tdClassName: `${listadoTablaTdClass} text-xs`,
           },
           {
@@ -577,6 +614,69 @@ export function StockMovimientosTenantPage({
         rowKey={(op) => op.id}
         emptyMessage="No hay movimientos para mostrar."
         loadingMessage="Cargando…"
+        renderMobileCard={(op) => {
+          const impacto =
+            op.tipo === "division" ? getDivisionImpacto(op) : null;
+          return (
+            <ListadoCard
+              primary={
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{formatMovimientoStockFechaFromIso(op.fecha)}</span>
+                  <StockOperacionTipoCelda tipo={op.tipo} />
+                </div>
+              }
+              fields={[
+                ...(impacto
+                  ? [
+                      {
+                        label: "Transformación",
+                        value: <DivisionImpactoLinea impacto={impacto} />,
+                      },
+                    ]
+                  : []),
+                {
+                  label: "Producto",
+                  value: stockOperacionProductoLabel(op),
+                },
+                {
+                  label: "Cliente",
+                  value: op.cliente?.nombre ?? op.clienteId,
+                },
+                {
+                  label: "Depósito",
+                  value: op.deposito?.nombre ?? "—",
+                },
+                ...(op.numeroRemito
+                  ? [{ label: "Remito", value: op.numeroRemito }]
+                  : []),
+              ]}
+              actions={
+                <div className="flex flex-wrap justify-end gap-2">
+                  {op.tipo === "egreso" && (
+                    <ImprimirRemitoButton
+                      variant="listado"
+                      className={listadoTablaAccionClass}
+                      egresoId={op.id}
+                      tenantId={tenantId}
+                      titulo={
+                        op.numeroRemito
+                          ? `Remito ${op.numeroRemito}`
+                          : "Remito interno"
+                      }
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setViendoOperacion(op)}
+                    className={listadoTablaAccionClass}
+                  >
+                    Ver
+                  </button>
+                </div>
+              }
+            />
+          );
+        }}
         renderActions={(op) => (
           <div className="flex flex-wrap justify-end gap-2">
             {op.tipo === "egreso" && (
