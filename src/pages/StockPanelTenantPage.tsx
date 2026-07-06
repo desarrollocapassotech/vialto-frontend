@@ -17,9 +17,10 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { paginatedItems as extractPaginatedItems } from "@/lib/paginatedItems";
 import { generarExcel, stockItemColumnas } from "@/lib/stockExcelExport";
 import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
-import type { Cliente, Deposito, Producto, StockItem } from "@/types/api";
+import type { Cliente, Deposito, PaginatedResponse, Producto, StockItem } from "@/types/api";
 
 type ProductoModalState =
   | { mode: "closed" }
@@ -91,8 +92,8 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     ? `/api/platform/stock/disponible${buildQs(tenantId)}`
     : "/api/stock/disponible";
   const depositosUrl = platform
-    ? `/api/platform/stock/depositos${buildQs(tenantId)}`
-    : "/api/stock/depositos";
+    ? `/api/platform/stock/depositos${buildQs(tenantId)}${tenantId ? "&" : "?"}page=1&pageSize=500`
+    : "/api/stock/depositos?page=1&pageSize=500";
 
   const [items, setItems] = useState<StockItem[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
@@ -140,7 +141,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     try {
       const [stockData, depositosData] = await Promise.all([
         apiJson<StockItem[]>(disponibleUrl, () => getToken()),
-        apiJson<Deposito[]>(depositosUrl, () => getToken()),
+        apiJson<PaginatedResponse<Deposito>>(depositosUrl, () => getToken()),
       ]);
       const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
       const productoIds = [
@@ -156,7 +157,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       );
       setItems(stockData);
       setProductosDetalle(productos.filter((p): p is Producto => p !== null));
-      setDepositos(depositosData.filter((d) => d.activo));
+      setDepositos(extractPaginatedItems(depositosData).filter((d) => d.activo));
     } catch (e) {
       setError(friendlyError(e, "stock"));
     } finally {

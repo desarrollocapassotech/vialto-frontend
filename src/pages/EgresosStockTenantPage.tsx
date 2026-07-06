@@ -1,12 +1,15 @@
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { ChoferModal } from '@/components/viajes/ChoferModal';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { DireccionEntregaModal } from '@/components/direcciones-entrega/DireccionEntregaModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import {
   stockDocumentoExternoParaApi,
@@ -14,7 +17,15 @@ import {
   type StockDocumentoExternoModo,
 } from '@/lib/stockDocumentoExterno';
 import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
-import type { Cliente, Deposito, Producto, StockItem } from '@/types/api';
+import type {
+  Chofer,
+  Cliente,
+  Deposito,
+  DireccionEntrega,
+  PaginatedResponse,
+  Producto,
+  StockItem,
+} from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
@@ -33,8 +44,8 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
 
 const STEPS: { label: string }[] = [
   { label: 'Empresa' },
-  { label: 'Entrega' },
   { label: 'Productos' },
+  { label: 'Entrega' },
 ];
 
 function StepIndicator({ step }: { step: WizardStep }) {
@@ -78,32 +89,24 @@ function StepIndicator({ step }: { step: WizardStep }) {
   );
 }
 
-function formatFechaLabel(fecha: string, hora: string): string {
-  if (!fecha) return '';
-  try {
-    const d = new Date(`${fecha}T${hora || '00:00'}`);
-    const f = d.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    return hora ? `${f} ${hora}` : f;
-  } catch {
-    return fecha;
-  }
-}
-
 export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
   clientesExternosLoading,
+  choferesExternos,
+  choferesExternosLoading,
+  direccionesEntregaExternos,
+  direccionesEntregaExternosLoading,
 }: {
   tenantId?: string;
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
+  choferesExternos?: Chofer[];
+  choferesExternosLoading?: boolean;
+  direccionesEntregaExternos?: DireccionEntrega[];
+  direccionesEntregaExternosLoading?: boolean;
 }) {
   const { getToken } = useAuth();
-  const { user } = useUser();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
@@ -115,7 +118,26 @@ export function EgresosStockTenantPage({
     return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
   }, [clientesExternos, maestro.clientes, sessionClientes]);
 
+  const [sessionChoferes, setSessionChoferes] = useState<Chofer[]>([]);
+  const choferes = useMemo(() => {
+    const base = choferesExternos ?? maestro.choferes;
+    const ids = new Set(base.map((c) => c.id));
+    return [...base, ...sessionChoferes.filter((c) => !ids.has(c.id))];
+  }, [choferesExternos, maestro.choferes, sessionChoferes]);
+
   const clientesLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+  const choferesLoading = platform ? Boolean(choferesExternosLoading) : maestro.loading;
+
+  const [sessionDireccionesEntrega, setSessionDireccionesEntrega] = useState<DireccionEntrega[]>([]);
+  const direccionesEntrega = useMemo(() => {
+    const base = direccionesEntregaExternos ?? maestro.direccionesEntrega;
+    const ids = new Set(base.map((d) => d.id));
+    return [...base, ...sessionDireccionesEntrega.filter((d) => !ids.has(d.id))];
+  }, [direccionesEntregaExternos, maestro.direccionesEntrega, sessionDireccionesEntrega]);
+
+  const direccionesEntregaLoading = platform
+    ? Boolean(direccionesEntregaExternosLoading)
+    : maestro.loading;
   const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
   const egresosUrl = platform
     ? `/api/platform/stock/egresos${buildQs({}, tenantId)}`
@@ -140,34 +162,29 @@ export function EgresosStockTenantPage({
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
 
-  // Paso 2
+  // Paso 2 — productos
+  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
+
+  // Paso 3 — entrega / logística
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
-  const [entregadoPor, setEntregadoPor] = useState('');
+  const [choferId, setChoferId] = useState('');
   const [destinatario, setDestinatario] = useState('');
-  const [destinoFinal, setDestinoFinal] = useState('');
+  const [direccionEntregaId, setDireccionEntregaId] = useState('');
   const [documentoExternoModo, setDocumentoExternoModo] = useState<StockDocumentoExternoModo | ''>('');
   const [documentoExternoNumero, setDocumentoExternoNumero] = useState('');
   const [documentoExternoError, setDocumentoExternoError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
-
-  // Paso 3
-  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
 
   // Estado compartido
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
-
-  // Pre-completar conductor con el nombre del usuario logueado
-  useEffect(() => {
-    if (!user) return;
-    const nombre = user.fullName?.trim() || user.firstName?.trim() || '';
-    setEntregadoPor((prev) => prev || nombre);
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [modalChofer, setModalChofer] = useState(false);
+  const [modalDireccionEntrega, setModalDireccionEntrega] = useState(false);
 
   const loadProductos = useCallback(async () => {
     setProductosLoading(true);
@@ -191,9 +208,9 @@ export function EgresosStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
@@ -206,7 +223,7 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Stock disponible para cliente + depósito (paso 3: productos y validación)
+  // Stock disponible para cliente + depósito (paso 2: productos y validación)
   useEffect(() => {
     if (!clienteId || !depositoId) {
       setStockItems([]);
@@ -246,9 +263,9 @@ export function EgresosStockTenantPage({
     setFechaMov(p.fecha);
     setHoraMov(p.hora);
     setFechaMovError(null);
-    setEntregadoPor('');
+    setChoferId('');
     setDestinatario('');
-    setDestinoFinal('');
+    setDireccionEntregaId('');
     setDocumentoExternoModo('');
     setDocumentoExternoNumero('');
     setDocumentoExternoError(null);
@@ -272,27 +289,7 @@ export function EgresosStockTenantPage({
     setStep(2);
   }
 
-  function handleContinuar2() {
-    if (!fechaMov.trim()) {
-      setFechaMovError('Ingresá la fecha del movimiento.');
-      return;
-    }
-    const docErr = validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero);
-    if (docErr) {
-      setDocumentoExternoError(docErr);
-      return;
-    }
-    setFechaMovError(null);
-    setDocumentoExternoError(null);
-    setFieldErrors({});
-    setFormError(null);
-    setStep(3);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-
+  function validateProductRows(): Record<string, string> {
     const ferrs: Record<string, string> = {};
     rows.forEach((row, idx) => {
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
@@ -319,23 +316,61 @@ export function EgresosStockTenantPage({
         }
       }
     });
+    return ferrs;
+  }
 
+  function handleContinuar2() {
+    const ferrs = validateProductRows();
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
       setFormError('Revisá los campos marcados en rojo.');
       return;
     }
     setFieldErrors({});
+    setFormError(null);
+    setStep(3);
+  }
+
+  function handleContinuar3() {
+    if (!fechaMov.trim()) {
+      setFechaMovError('Ingresá la fecha del movimiento.');
+      return;
+    }
+    const docErr = validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero);
+    if (docErr) {
+      setDocumentoExternoError(docErr);
+      return;
+    }
+    setFechaMovError(null);
+    setDocumentoExternoError(null);
+    void handleRegistrarEgreso();
+  }
+
+  async function handleRegistrarEgreso() {
+    setFormError(null);
+    setFieldErrors({});
 
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
-    if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
+    if (!fechaIso) {
+      setFormError('Revisá la fecha y hora del movimiento.');
+      return;
+    }
+
+    const entregadoPor = choferId.trim()
+      ? choferes.find((c) => c.id === choferId)?.nombre.trim()
+      : undefined;
+
+    const destinoFinal =
+      direccionEntregaId.trim()
+        ? direccionesEntrega.find((d) => d.id === direccionEntregaId)?.direccion?.trim()
+        : undefined;
 
     const numeroDocumentoExterno = stockDocumentoExternoParaApi(
       documentoExternoModo,
       documentoExternoNumero,
     );
     if (!numeroDocumentoExterno) {
-      setStep(2);
+      setStep(3);
       setDocumentoExternoError(
         validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero),
       );
@@ -350,9 +385,9 @@ export function EgresosStockTenantPage({
           clienteId,
           depositoId,
           fecha: fechaIso,
-          entregadoPor: entregadoPor.trim() || undefined,
+          entregadoPor: entregadoPor || undefined,
           destinatario: destinatario.trim() || undefined,
-          destinoFinal: destinoFinal.trim() || undefined,
+          destinoFinal: destinoFinal || undefined,
           numeroDocumentoExterno,
           observaciones: observaciones.trim() || undefined,
           lineas: rows.map((row) => ({
@@ -383,6 +418,11 @@ export function EgresosStockTenantPage({
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    handleContinuar2();
+  }
+
   const historialHref = platform
     ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/egresos/historial';
@@ -411,7 +451,6 @@ export function EgresosStockTenantPage({
 
   const clienteNombre = clientes.find((c) => c.id === clienteId)?.nombre ?? '';
   const depositoNombre = depositos.find((d) => d.id === depositoId)?.nombre ?? '';
-  const fechaLabel = formatFechaLabel(fechaMov, horaMov);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -469,6 +508,32 @@ export function EgresosStockTenantPage({
       )}
 
       {step === 2 && (
+        <EgresoWizardStep3
+          rows={rows}
+          onAddRow={addRow}
+          onRemoveRow={removeRow}
+          onUpdateRow={updateRow}
+          productos={productosParaEgreso}
+          productosLoading={productosLoading || stockItemsLoading}
+          fieldErrors={fieldErrors}
+          formError={formError}
+          clienteId={clienteId}
+          depositoId={depositoId}
+          clienteNombre={clienteNombre}
+          depositoNombre={depositoNombre}
+          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
+          tenantId={tenantId}
+          primaryAction="continuar"
+          onVolver={() => {
+            setStep(1);
+            setFieldErrors({});
+            setFormError(null);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {step === 3 && (
         <EgresoWizardStep2
           fechaMov={fechaMov}
           horaMov={horaMov}
@@ -480,12 +545,18 @@ export function EgresosStockTenantPage({
             }
             if (p.horaCarga !== undefined) setHoraMov(p.horaCarga);
           }}
-          entregadoPor={entregadoPor}
-          onEntregadoPorChange={setEntregadoPor}
+          choferes={choferes}
+          choferesLoading={choferesLoading}
+          choferId={choferId}
+          onChoferIdChange={setChoferId}
+          onNuevoChofer={() => setModalChofer(true)}
           destinatario={destinatario}
           onDestinatarioChange={setDestinatario}
-          destinoFinal={destinoFinal}
-          onDestinoFinalChange={setDestinoFinal}
+          direccionesEntrega={direccionesEntrega}
+          direccionesEntregaLoading={direccionesEntregaLoading}
+          direccionEntregaId={direccionEntregaId}
+          onDireccionEntregaChange={setDireccionEntregaId}
+          onNuevaDireccionEntrega={() => setModalDireccionEntrega(true)}
           documentoExternoModo={documentoExternoModo}
           onDocumentoExternoModoChange={(modo) => {
             setDocumentoExternoModo(modo);
@@ -502,39 +573,30 @@ export function EgresosStockTenantPage({
           onObservacionesChange={setObservaciones}
           clienteNombre={clienteNombre}
           depositoNombre={depositoNombre}
-          onVolver={() => {
-            setStep(1);
-            setFieldErrors({});
-            setFormError(null);
-          }}
-          onContinuar={handleContinuar2}
-        />
-      )}
-
-      {step === 3 && (
-        <EgresoWizardStep3
-          rows={rows}
-          onAddRow={addRow}
-          onRemoveRow={removeRow}
-          onUpdateRow={updateRow}
-          productos={productosParaEgreso}
-          productosLoading={productosLoading || stockItemsLoading}
-          fieldErrors={fieldErrors}
           formError={formError}
-          saving={saving}
-          clienteId={clienteId}
-          depositoId={depositoId}
-          clienteNombre={clienteNombre}
-          depositoNombre={depositoNombre}
-          fechaLabel={fechaLabel}
-          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
-          tenantId={tenantId}
+          continuarLoading={saving}
+          continuarLabel={saving ? 'Guardando…' : 'Registrar egreso'}
           onVolver={() => {
             setStep(2);
             setFieldErrors({});
             setFormError(null);
+            setFechaMovError(null);
           }}
-          onSubmit={handleSubmit}
+          onContinuar={handleContinuar3}
+        />
+      )}
+
+      {modalChofer && (
+        <ChoferModal
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => setModalChofer(false)}
+          onSaved={(c) => {
+            setSessionChoferes((prev) => [...prev, c]);
+            setChoferId(c.id);
+            setModalChofer(false);
+            if (!tenantId) void maestro.refreshChoferes();
+          }}
         />
       )}
 
@@ -548,6 +610,21 @@ export function EgresosStockTenantPage({
             setClienteId(c.id);
             setModalCliente(false);
             if (!tenantId) void maestro.refreshClientes();
+          }}
+        />
+      )}
+
+      {modalDireccionEntrega && (
+        <DireccionEntregaModal
+          getToken={getToken}
+          tenantId={tenantId}
+          stacked
+          onClose={() => setModalDireccionEntrega(false)}
+          onSaved={(d) => {
+            setSessionDireccionesEntrega((prev) => [...prev, d]);
+            setDireccionEntregaId(d.id);
+            setModalDireccionEntrega(false);
+            if (!tenantId) void maestro.refreshDireccionesEntrega();
           }}
         />
       )}

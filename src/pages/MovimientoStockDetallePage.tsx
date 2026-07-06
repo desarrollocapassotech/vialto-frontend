@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { MovimientoStockDetalleBody } from '@/components/stock/MovimientoStockDetalleBody';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { isPlatformSuperadmin } from '@/lib/roleLabels';
+import { isPlatformSuperadmin, isStockViewer } from '@/lib/roleLabels';
 import {
   movimientoStockTipoBadgeClass,
   movimientoStockTipoLabel,
@@ -19,6 +19,9 @@ export function MovimientoStockDetallePage() {
   const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  const stockViewer = isStockViewer({
+    publicMetadata: user?.publicMetadata,
+  });
 
   const [row, setRow] = useState<MovimientoStock | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,12 +76,12 @@ export function MovimientoStockDetallePage() {
     return `/stock/movimientos${s ? `?${s}` : ''}`;
   })();
 
-  const volverHref = fromMovimientosList
+  const volverHref = stockViewer || fromMovimientosList
     ? volverMovimientosHref
     : row.tipo === 'egreso'
       ? '/stock/egresos'
       : '/stock/ingresos';
-  const volverLabel = fromMovimientosList
+  const volverLabel = stockViewer || fromMovimientosList
     ? 'Volver a movimientos'
     : row.tipo === 'egreso'
       ? 'Volver a egresos'

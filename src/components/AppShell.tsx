@@ -34,7 +34,12 @@ import {
   canAccessStock,
   canAccessViajes,
 } from "@/lib/tenantModules";
-import { isPlatformSuperadmin, userRoleDisplay } from "@/lib/roleLabels";
+import {
+  isPlatformSuperadmin,
+  isOrgMember,
+  isStockViewer,
+  userRoleDisplay,
+} from "@/lib/roleLabels";
 import {
   orgSwitcherSidebarAppearance,
   userButtonSidebarAppearance,
@@ -86,12 +91,10 @@ export function AppShell() {
   }, [sidebarOpen]);
 
   const navLoading = !userLoaded || tenantLoading;
+  const roleCtx = { orgRole, publicMetadata: user?.publicMetadata };
 
   const navGroups = useMemo((): NavGroup[] => {
-    const isMember = orgRole === "org:member";
-
-    // org:member: solo ve Ingresos y Egresos del módulo de stock
-    if (isMember) {
+    if (isOrgMember(roleCtx)) {
       if (canAccessStock(tenant?.modules ?? [])) {
         return [
           {
@@ -99,6 +102,30 @@ export function AppShell() {
             items: [
               { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
               { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+            ],
+          },
+        ];
+      }
+      return [];
+    }
+
+    if (isStockViewer(roleCtx)) {
+      if (canAccessStock(tenant?.modules ?? [])) {
+        return [
+          {
+            title: "Stock",
+            items: [
+              {
+                to: "/stock/inventario",
+                label: "Inventario",
+                icon: Warehouse,
+              },
+              {
+                to: "/stock/movimientos",
+                label: "Movimientos",
+                icon: ArrowLeftRight,
+                end: true,
+              },
             ],
           },
         ];
@@ -201,7 +228,7 @@ export function AppShell() {
     });
 
     return groups;
-  }, [superadmin, tenant?.modules, orgRole]);
+  }, [superadmin, tenant?.modules, orgRole, user?.publicMetadata]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === "string"

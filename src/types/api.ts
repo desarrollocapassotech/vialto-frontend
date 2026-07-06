@@ -124,6 +124,13 @@ export interface Chofer {
   createdAt: string;
 }
 
+export interface DireccionEntrega {
+  id: string;
+  tenantId: string;
+  direccion: string;
+  createdAt: string;
+}
+
 export interface Vehiculo {
   id: string;
   tenantId: string;
@@ -192,6 +199,11 @@ export interface PaginatedMeta {
   totalPages: number;
   hasPrev: boolean;
   hasNext: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginatedMeta;
 }
 
 export interface PaginatedTenantsResponse {

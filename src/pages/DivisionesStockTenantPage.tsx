@@ -8,13 +8,14 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { LoteSelect } from '@/components/stock/LoteSelect';
 import type { LoteStockDisponible } from '@/components/stock/EgresoProductoLoteBloque';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Deposito, Producto, ProductoPresentacion, StockItem } from '@/types/api';
+import type { Cliente, Deposito, PaginatedResponse, Producto, ProductoPresentacion, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -161,9 +162,9 @@ export function DivisionesStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 

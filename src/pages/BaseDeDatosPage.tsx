@@ -5,6 +5,7 @@ import {
   Car,
   ChevronDown,
   Layers,
+  MapPin,
   Package,
   ShieldCheck,
   Truck,
@@ -26,9 +27,13 @@ import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
 import { SuperadminUsersPage } from "./SuperadminUsersPage";
+import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
-import { isPlatformSuperadmin } from "@/lib/roleLabels";
+import {
+  isPlatformSuperadmin,
+  isOrgAdmin as userIsOrgAdmin,
+} from "@/lib/roleLabels";
 import { useAuth } from "@clerk/clerk-react";
 
 type Tab =
@@ -39,6 +44,7 @@ type Tab =
   | "productos"
   | "presentaciones"
   | "depositos"
+  | "direcciones-entrega"
   | "usuarios";
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
@@ -49,6 +55,11 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "productos", label: "Productos", icon: Package },
   { id: "presentaciones", label: "Presentaciones", icon: Layers },
   { id: "depositos", label: "Depósitos", icon: Warehouse },
+  {
+    id: "direcciones-entrega",
+    label: "Direcciones / Ruta de entrega",
+    icon: MapPin,
+  },
   { id: "usuarios", label: "Usuarios", icon: ShieldCheck },
 ];
 
@@ -63,21 +74,26 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
-  const isOrgAdmin = superadmin || orgRole === "org:admin";
+  const isOrgAdmin =
+    superadmin ||
+    userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const visibleTabs = ALL_TABS.filter((tab) => {
     switch (tab.id) {
       case "clientes":
         return true;
       case "transportistas":
-      case "choferes":
       case "vehiculos":
         return hasViajes;
+      case "choferes":
+        return hasViajes || hasStock;
       case "productos":
         return hasViajes || hasStock;
       case "presentaciones":
         return hasStock;
       case "depositos":
+        return hasStock;
+      case "direcciones-entrega":
         return hasStock;
       case "usuarios":
         return isOrgAdmin;
@@ -200,6 +216,7 @@ export function BaseDeDatosPage() {
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
+        {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
         {activeTab === "usuarios" && <SuperadminUsersPage />}
       </div>
     </div>

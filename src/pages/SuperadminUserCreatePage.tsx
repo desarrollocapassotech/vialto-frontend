@@ -13,6 +13,7 @@ import { friendlyError } from '@/lib/friendlyError';
 const ROLES = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Miembro' },
+  { value: 'stock_viewer', label: 'Consulta de stock' },
 ] as const;
 
 const labelClass =
