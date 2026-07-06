@@ -17,7 +17,7 @@ import {
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { paginatedItems } from "@/lib/paginatedItems";
+import { paginatedItems as extractPaginatedItems } from "@/lib/paginatedItems";
 import { generarExcel, stockItemColumnas } from "@/lib/stockExcelExport";
 import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
 import type { Cliente, Deposito, PaginatedResponse, Producto, StockItem } from "@/types/api";
@@ -157,7 +157,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       );
       setItems(stockData);
       setProductosDetalle(productos.filter((p): p is Producto => p !== null));
-      setDepositos(paginatedItems(depositosData).filter((d) => d.activo));
+      setDepositos(extractPaginatedItems(depositosData).filter((d) => d.activo));
     } catch (e) {
       setError(friendlyError(e, "stock"));
     } finally {
