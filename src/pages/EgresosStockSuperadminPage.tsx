@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson } from '@/lib/api';
-import type { Chofer, Cliente, DireccionEntrega } from '@/types/api';
+import type { Chofer, Cliente, Destinatario, DireccionEntrega } from '@/types/api';
 import { EgresosStockTenantPage } from './EgresosStockTenantPage';
 
 export function EgresosStockSuperadminPage() {
@@ -14,6 +14,10 @@ export function EgresosStockSuperadminPage() {
   const [tenantId, setTenantId] = useState(() => searchParams.get('tenantId') ?? '');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesLoading, setClientesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
+  const [destinatarios, setDestinatarios] = useState<Destinatario[]>([]);
+  const [destinatariosLoading, setDestinatariosLoading] = useState(() =>
+    Boolean(searchParams.get('tenantId')),
+  );
   const [choferes, setChoferes] = useState<Chofer[]>([]);
   const [choferesLoading, setChoferesLoading] = useState(() => Boolean(searchParams.get('tenantId')));
   const [direccionesEntrega, setDireccionesEntrega] = useState<DireccionEntrega[]>([]);
@@ -33,6 +37,8 @@ export function EgresosStockSuperadminPage() {
         setSearchParams({ tenantId: v });
         setClientes([]);
         setClientesLoading(true);
+        setDestinatarios([]);
+        setDestinatariosLoading(true);
         setChoferes([]);
         setChoferesLoading(true);
         setDireccionesEntrega([]);
@@ -41,6 +47,8 @@ export function EgresosStockSuperadminPage() {
         setSearchParams({});
         setClientes([]);
         setClientesLoading(false);
+        setDestinatarios([]);
+        setDestinatariosLoading(false);
         setChoferes([]);
         setChoferesLoading(false);
         setDireccionesEntrega([]);
@@ -54,6 +62,8 @@ export function EgresosStockSuperadminPage() {
     if (!tenantId) {
       setClientes([]);
       setClientesLoading(false);
+      setDestinatarios([]);
+      setDestinatariosLoading(false);
       setChoferes([]);
       setChoferesLoading(false);
       setDireccionesEntrega([]);
@@ -62,6 +72,8 @@ export function EgresosStockSuperadminPage() {
     }
     setClientes([]);
     setClientesLoading(true);
+    setDestinatarios([]);
+    setDestinatariosLoading(true);
     setChoferes([]);
     setChoferesLoading(true);
     setDireccionesEntrega([]);
@@ -70,12 +82,14 @@ export function EgresosStockSuperadminPage() {
     const q = `tenantId=${encodeURIComponent(tenantId)}`;
     void Promise.all([
       apiJson<Cliente[]>(`/api/platform/clientes?${q}`, () => getToken()),
+      apiJson<Destinatario[]>(`/api/platform/destinatarios?${q}`, () => getToken()),
       apiJson<Chofer[]>(`/api/platform/choferes?${q}`, () => getToken()),
       apiJson<DireccionEntrega[]>(`/api/platform/direcciones-entrega?${q}`, () => getToken()),
     ])
-      .then(([clientesData, choferesData, direccionesData]) => {
+      .then(([clientesData, destinatariosData, choferesData, direccionesData]) => {
         if (!cancelled) {
           setClientes(clientesData);
+          setDestinatarios(destinatariosData);
           setChoferes(choferesData);
           setDireccionesEntrega(direccionesData);
         }
@@ -83,6 +97,7 @@ export function EgresosStockSuperadminPage() {
       .catch(() => {
         if (!cancelled) {
           setClientes([]);
+          setDestinatarios([]);
           setChoferes([]);
           setDireccionesEntrega([]);
         }
@@ -90,6 +105,7 @@ export function EgresosStockSuperadminPage() {
       .finally(() => {
         if (!cancelled) {
           setClientesLoading(false);
+          setDestinatariosLoading(false);
           setChoferesLoading(false);
           setDireccionesEntregaLoading(false);
         }
@@ -115,6 +131,8 @@ export function EgresosStockSuperadminPage() {
           tenantId={tenantId}
           clientesExternos={clientes}
           clientesExternosLoading={clientesLoading}
+          destinatariosExternos={destinatarios}
+          destinatariosExternosLoading={destinatariosLoading}
           choferesExternos={choferes}
           choferesExternosLoading={choferesLoading}
           direccionesEntregaExternos={direccionesEntrega}

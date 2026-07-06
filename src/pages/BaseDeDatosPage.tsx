@@ -22,6 +22,7 @@ import {
 import { ClientesPage } from "./ClientesPage";
 import { TransportistasPage } from "./TransportistasPage";
 import { ChoferesPage } from "./ChoferesPage";
+import { DestinatariosPage } from "./DestinatariosPage";
 import { VehiculosPage } from "./VehiculosPage";
 import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
@@ -46,6 +47,7 @@ type Tab =
   | "clientes"
   | "transportistas"
   | "choferes"
+  | "destinatarios"
   | "vehiculos"
   | "productos"
   | "presentaciones"
@@ -57,6 +59,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "transportistas", label: "Transportistas", icon: Truck },
   { id: "choferes", label: "Choferes", icon: UserCheck },
+  { id: "destinatarios", label: "Destinatarios", icon: MapPin },
   { id: "vehiculos", label: "Vehículos", icon: Car },
   { id: "productos", label: "Productos", icon: Package },
   { id: "presentaciones", label: "Presentaciones", icon: Layers },
@@ -94,6 +97,8 @@ export function BaseDeDatosPage() {
         return hasViajes;
       case "vehiculos":
         return hasViajes || hasCombustible;
+      case "destinatarios":
+        return hasStock;
       case "choferes":
         return hasViajes || hasStock || hasCombustible;
       case "productos":
@@ -221,6 +226,7 @@ export function BaseDeDatosPage() {
         {activeTab === "clientes" && <ClientesPage />}
         {activeTab === "transportistas" && <TransportistasPage />}
         {activeTab === "choferes" && <ChoferesPage />}
+        {activeTab === "destinatarios" && <DestinatariosPage />}
         {activeTab === "vehiculos" && <VehiculosPage />}
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}

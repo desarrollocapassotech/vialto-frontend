@@ -124,6 +124,13 @@ export interface Chofer {
   createdAt: string;
 }
 
+export interface Destinatario {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  createdAt: string;
+}
+
 export interface DireccionEntrega {
   id: string;
   tenantId: string;
@@ -405,6 +412,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
@@ -523,6 +531,7 @@ export interface StockOperacion {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   observaciones?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
