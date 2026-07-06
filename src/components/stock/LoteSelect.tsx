@@ -44,6 +44,7 @@ export function LoteSelect({
   requiereLote,
   placeholder,
   error,
+  refreshKey,
 }: {
   productoId: string;
   clienteId: string;
@@ -62,6 +63,8 @@ export function LoteSelect({
   requiereLote?: boolean;
   placeholder?: string;
   error?: boolean;
+  /** Incrementar tras una división u otro movimiento que altere saldos por lote. */
+  refreshKey?: number;
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<LotesDisponiblesResponse>({ lotes: [], sinLote: null });
@@ -78,7 +81,17 @@ export function LoteSelect({
     void apiJson<LotesDisponiblesResponse>(url, () => getToken())
       .then(setData)
       .catch(() => setData({ lotes: [], sinLote: null }));
-  }, [productoId, clienteId, depositoId, presentacionId, lotesBase, tenantId, getToken, ready]);
+  }, [
+    productoId,
+    clienteId,
+    depositoId,
+    presentacionId,
+    lotesBase,
+    tenantId,
+    getToken,
+    ready,
+    refreshKey,
+  ]);
 
   function stockForValue(selected: string): LoteSelectStock | null {
     if (!selected) return null;
