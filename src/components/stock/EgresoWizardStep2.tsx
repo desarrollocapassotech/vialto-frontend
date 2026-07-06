@@ -1,6 +1,11 @@
+import {
+  ChoferSearchSelect,
+  DireccionEntregaSearchSelect,
+} from '@/components/forms/MaestroSearchSelects';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
+import type { Chofer, DireccionEntrega } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
@@ -17,12 +22,18 @@ export function EgresoWizardStep2({
   horaMov,
   fechaMovError,
   onFechaHoraPatch,
-  entregadoPor,
-  onEntregadoPorChange,
+  choferes,
+  choferesLoading,
+  choferId,
+  onChoferIdChange,
+  onNuevoChofer,
   destinatario,
   onDestinatarioChange,
-  destinoFinal,
-  onDestinoFinalChange,
+  direccionesEntrega,
+  direccionesEntregaLoading,
+  direccionEntregaId,
+  onDireccionEntregaChange,
+  onNuevaDireccionEntrega,
   observaciones,
   onObservacionesChange,
   clienteNombre,
@@ -37,12 +48,18 @@ export function EgresoWizardStep2({
   horaMov: string;
   fechaMovError: string | null;
   onFechaHoraPatch: (patch: FechaHoraPatch) => void;
-  entregadoPor: string;
-  onEntregadoPorChange: (v: string) => void;
+  choferes: Chofer[];
+  choferesLoading?: boolean;
+  choferId: string;
+  onChoferIdChange: (id: string) => void;
+  onNuevoChofer?: () => void;
   destinatario: string;
   onDestinatarioChange: (v: string) => void;
-  destinoFinal: string;
-  onDestinoFinalChange: (v: string) => void;
+  direccionesEntrega: DireccionEntrega[];
+  direccionesEntregaLoading?: boolean;
+  direccionEntregaId: string;
+  onDireccionEntregaChange: (id: string) => void;
+  onNuevaDireccionEntrega?: () => void;
   observaciones: string;
   onObservacionesChange: (v: string) => void;
   clienteNombre: string;
@@ -55,7 +72,6 @@ export function EgresoWizardStep2({
 }) {
   return (
     <div className="space-y-6">
-      {/* Resumen paso 1 */}
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
           <span className="text-vialto-steel text-xs uppercase tracking-[0.08em] mr-1.5">Cliente</span>
@@ -72,7 +88,6 @@ export function EgresoWizardStep2({
           Completá la fecha y los datos de entrega.
         </p>
 
-        {/* Fecha */}
         <ViajeFechaHoraFields
           mode="cargaOnly"
           fechaCarga={fechaMov}
@@ -85,17 +100,20 @@ export function EgresoWizardStep2({
           errorFechaCarga={fechaMovError}
         />
 
-        {/* Datos de entrega */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           <div className="space-y-1">
             <label className={LABEL}>Conductor</label>
-            <input
-              type="text"
-              value={entregadoPor}
-              onChange={(e) => onEntregadoPorChange(e.target.value)}
-              className={INPUT}
-              placeholder="Ej: Cacho, Gustavo…"
-              maxLength={200}
+            <ChoferSearchSelect
+              choferes={choferes}
+              value={choferId}
+              onChange={onChoferIdChange}
+              loading={choferesLoading}
+              allowEmptyValue
+              emptyListChoiceLabel="Sin conductor"
+              placeholderCerrado="Sin conductor"
+              inputClassName={INPUT}
+              aria-label="Conductor del egreso"
+              onNuevo={onNuevoChofer}
             />
           </div>
 
@@ -113,13 +131,15 @@ export function EgresoWizardStep2({
 
           <div className="space-y-1 sm:col-span-2">
             <label className={LABEL}>Dirección / Ruta de entrega</label>
-            <input
-              type="text"
-              value={destinoFinal}
-              onChange={(e) => onDestinoFinalChange(e.target.value)}
-              className={INPUT}
-              placeholder="Ej: Pampa 1087, San Fernando…"
-              maxLength={300}
+            <DireccionEntregaSearchSelect
+              direcciones={direccionesEntrega}
+              value={direccionEntregaId}
+              onChange={onDireccionEntregaChange}
+              loading={direccionesEntregaLoading}
+              inputClassName={INPUT}
+              allowEmptyValue
+              emptyListChoiceLabel="Sin dirección"
+              onNuevo={onNuevaDireccionEntrega}
             />
           </div>
 

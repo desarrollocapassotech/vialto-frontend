@@ -40,7 +40,6 @@ import {
   mantenerIdSiEnLista,
   mergeMaestroPorId,
   mensajesAyudaFlotaPropia,
-  normalizarIdEnLista,
   nombreClienteListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
@@ -953,7 +952,7 @@ export function ViajesTenantPage({
     if (!editingId || !draft || draft.operacionModo !== "propio") return;
     setDraft((p) => {
       if (!p || p.operacionModo !== "propio") return p;
-      const cid = normalizarIdEnLista(p.choferId, choferesPropios);
+      const cid = mantenerIdSiEnLista(p.choferId, choferesPropios);
       if (cid === p.choferId) return p;
       return { ...p, choferId: cid };
     });
@@ -1082,6 +1081,9 @@ export function ViajesTenantPage({
     setDestinosError(null);
     setEditingId(v.id);
     const esExterno = !!(v.transportistaId ?? "").trim();
+    const esPropio =
+      !!(v.choferId ?? "").trim() ||
+      (v.vehiculosViaje && v.vehiculosViaje.length > 0);
     const chRow = listas.choferes.find((c) => c.id === v.choferId);
     const choferesPropiosEdit = choferesFlotaPropia(listas.choferes);
     const vehiculosPropiosEdit = vehiculosFlotaPropia(listas.vehiculos);
@@ -1108,7 +1110,7 @@ export function ViajesTenantPage({
     setDraft({
       numero: v.numero ?? "",
       estado: v.estado ?? "pendiente",
-      operacionModo: esExterno ? "externo" : "propio",
+      operacionModo: esExterno ? "externo" : esPropio ? "propio" : null,
       choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
       choferExternoId: esExterno
         ? mantenerIdSiEnLista(v.choferId, listas.choferes)
@@ -1125,7 +1127,7 @@ export function ViajesTenantPage({
                 tipo: (x.vehiculo?.tipo ?? "tractor").toLowerCase(),
                 vehiculoId: esExterno
                   ? String(x.vehiculoId ?? "").trim()
-                  : normalizarIdEnLista(x.vehiculoId, vehiculosPropiosEdit),
+                  : mantenerIdSiEnLista(x.vehiculoId, vehiculosPropiosEdit),
               }))
           : !esExterno
             ? [{ tipo: "tractor", vehiculoId: "" }]
@@ -1401,7 +1403,7 @@ export function ViajesTenantPage({
                   transportistaEfectivoId: "",
                   choferExternoId: "",
                   pagosTransportista: [],
-                  choferId: normalizarIdEnLista(p.choferId, choferesPropios),
+                  choferId: mantenerIdSiEnLista(p.choferId, choferesPropios),
                   vehiculosRows:
                     p.vehiculosRows.length > 0
                       ? p.vehiculosRows
@@ -1548,7 +1550,7 @@ export function ViajesTenantPage({
               : {
                   transportistaId: null,
                   transportistaEfectivoId: null,
-                  choferId: draft.choferId.trim(),
+                  choferId: draft.choferId.trim() || null,
                   vehiculoIds: vids,
                 }),
             origen: draft.origen.trim() || undefined,

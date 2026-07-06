@@ -124,6 +124,13 @@ export interface Chofer {
   createdAt: string;
 }
 
+export interface DireccionEntrega {
+  id: string;
+  tenantId: string;
+  direccion: string;
+  createdAt: string;
+}
+
 export interface Vehiculo {
   id: string;
   tenantId: string;

@@ -2,10 +2,11 @@ import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelec
 import {
   filtrarChoferes,
   filtrarClientesPorQuery,
+  filtrarDireccionesEntrega,
   filtrarTransportistas,
   filtrarVehiculos,
 } from '@/components/forms/maestroSearchFilters';
-import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
+import type { Chofer, Cliente, DireccionEntrega, Transportista, Vehiculo } from '@/types/api';
 
 const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 
@@ -87,30 +88,41 @@ export function ChoferSearchSelect({
   id,
   'aria-label': ariaLabel,
   onNuevo,
+  allowEmptyValue = false,
+  emptyListChoiceLabel = 'Sin conductor',
+  loading = false,
+  placeholderCerrado = 'Elegí un chofer…',
 }: BaseProps & {
   choferes: Chofer[];
   value: string;
   onChange: (id: string) => void;
   onNuevo?: () => void;
+  allowEmptyValue?: boolean;
+  emptyListChoiceLabel?: string;
+  loading?: boolean;
+  placeholderCerrado?: string;
 }) {
   return (
     <SearchableEntitySelect<Chofer>
       items={choferes}
       value={value}
       onChange={onChange}
-      disabled={disabled || (choferes.length === 0 && !onNuevo)}
+      disabled={disabled || (choferes.length === 0 && !onNuevo && !allowEmptyValue)}
+      loading={loading}
       className={className}
       inputClassName={inputClassName}
       filterItems={filtrarChoferes}
       getPrimaryLabel={(c) => c.nombre}
       getSecondaryLabel={(c) => (c.dni ? `DNI ${c.dni}` : c.telefono) ?? null}
-      placeholderCerrado="Elegí un chofer…"
+      placeholderCerrado={placeholderCerrado}
       placeholderBuscar="Buscar chofer…"
+      allowEmptyValue={allowEmptyValue}
+      emptyListChoiceLabel={emptyListChoiceLabel}
       searchAriaLabel="Filtrar choferes"
       noItemsSlot={
         !onNuevo ? (
           <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
-            Sin choferes de flota propia
+            Sin choferes cargados
           </div>
         ) : undefined
       }
@@ -118,6 +130,62 @@ export function ChoferSearchSelect({
       aria-label={ariaLabel}
       onNuevo={onNuevo}
       onNuevoLabel="+ Nuevo chofer"
+    />
+  );
+}
+
+export function DireccionEntregaSearchSelect({
+  direcciones,
+  value,
+  onChange,
+  disabled,
+  className,
+  inputClassName = INPUT,
+  id,
+  'aria-label': ariaLabel,
+  onNuevo,
+  allowEmptyValue = false,
+  emptyListChoiceLabel = 'Sin dirección',
+  loading = false,
+  placeholderCerrado = 'Elegí una dirección…',
+}: BaseProps & {
+  direcciones: DireccionEntrega[];
+  value: string;
+  onChange: (id: string) => void;
+  onNuevo?: () => void;
+  allowEmptyValue?: boolean;
+  emptyListChoiceLabel?: string;
+  loading?: boolean;
+  placeholderCerrado?: string;
+}) {
+  return (
+    <SearchableEntitySelect<DireccionEntrega>
+      items={direcciones}
+      value={value}
+      onChange={onChange}
+      disabled={disabled || (direcciones.length === 0 && !onNuevo && !allowEmptyValue)}
+      loading={loading}
+      className={className}
+      inputClassName={inputClassName}
+      filterItems={filtrarDireccionesEntrega}
+      getPrimaryLabel={(d) => d.direccion}
+      getSecondaryLabel={() => null}
+      placeholderCerrado={placeholderCerrado}
+      placeholderBuscar="Buscar dirección o ruta…"
+      allowEmptyValue={allowEmptyValue}
+      emptyListChoiceLabel={emptyListChoiceLabel}
+      searchAriaLabel="Filtrar direcciones de entrega"
+      noItemsSlot={
+        !onNuevo ? (
+          <div className={`${inputClassName} flex items-center text-vialto-steel`} aria-label={ariaLabel}>
+            Sin direcciones cargadas
+          </div>
+        ) : undefined
+      }
+      id={id}
+      aria-label={ariaLabel}
+      onNuevo={onNuevo}
+      onNuevoLabel="+ Nueva dirección"
     />
   );
 }
