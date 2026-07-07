@@ -22,21 +22,32 @@ import {
 import { ClientesPage } from "./ClientesPage";
 import { TransportistasPage } from "./TransportistasPage";
 import { ChoferesPage } from "./ChoferesPage";
+import { DestinatariosPage } from "./DestinatariosPage";
 import { VehiculosPage } from "./VehiculosPage";
 import { ProductosPage } from "./ProductosPage";
 import { DepositosPage } from "./DepositosPage";
 import { PresentacionesPage } from "./PresentacionesPage";
+import { SuperadminUsersPage } from "./SuperadminUsersPage";
 import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
-import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
-import { isPlatformSuperadmin } from "@/lib/roleLabels";
+import {
+  canAccessViajes,
+  canAccessStock,
+  canAccessFacturacion,
+  canAccessCombustible,
+} from "@/lib/tenantModules";
+import {
+  isPlatformSuperadmin,
+  isOrgAdmin as userIsOrgAdmin,
+} from "@/lib/roleLabels";
 import { useAuth } from "@clerk/clerk-react";
 
 type Tab =
   | "clientes"
   | "transportistas"
   | "choferes"
+  | "destinatarios"
   | "vehiculos"
   | "productos"
   | "presentaciones"
@@ -48,6 +59,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "transportistas", label: "Transportistas", icon: Truck },
   { id: "choferes", label: "Choferes", icon: UserCheck },
+  { id: "destinatarios", label: "Destinatarios", icon: MapPin },
   { id: "vehiculos", label: "Vehículos", icon: Car },
   { id: "productos", label: "Productos", icon: Package },
   { id: "presentaciones", label: "Presentaciones", icon: Layers },
@@ -71,17 +83,24 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
-  const isOrgAdmin = superadmin || orgRole === "org:admin";
+  const hasFacturacion = superadmin || canAccessFacturacion(modules);
+  const hasCombustible = superadmin || canAccessCombustible(modules);
+  const isOrgAdmin =
+    superadmin ||
+    userIsOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const visibleTabs = ALL_TABS.filter((tab) => {
     switch (tab.id) {
       case "clientes":
-        return true;
+        return hasViajes || hasStock || hasFacturacion;
       case "transportistas":
-      case "vehiculos":
         return hasViajes;
+      case "vehiculos":
+        return hasViajes || hasCombustible;
+      case "destinatarios":
+        return hasStock;
       case "choferes":
-        return hasViajes || hasStock;
+        return hasViajes || hasStock || hasCombustible;
       case "productos":
         return hasViajes || hasStock;
       case "presentaciones":
@@ -207,12 +226,14 @@ export function BaseDeDatosPage() {
         {activeTab === "clientes" && <ClientesPage />}
         {activeTab === "transportistas" && <TransportistasPage />}
         {activeTab === "choferes" && <ChoferesPage />}
+        {activeTab === "destinatarios" && <DestinatariosPage />}
         {activeTab === "vehiculos" && <VehiculosPage />}
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
         {activeTab === "depositos" && <DepositosPage />}
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
-        {activeTab === "usuarios" && <UsuariosTenantPage />}
+        {activeTab === "usuarios" &&
+          (superadmin ? <SuperadminUsersPage /> : <UsuariosTenantPage />)}
       </div>
     </div>
   );

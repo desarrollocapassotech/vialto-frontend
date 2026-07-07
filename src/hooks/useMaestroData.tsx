@@ -5,6 +5,7 @@ import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import type {
   Cliente,
   Chofer,
+  Destinatario,
   DireccionEntrega,
   Transportista,
   Vehiculo,
@@ -14,6 +15,7 @@ import type {
 type MaestroDataContextValue = {
   clientes: Cliente[];
   choferes: Chofer[];
+  destinatarios: Destinatario[];
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
   direccionesEntrega: DireccionEntrega[];
@@ -22,6 +24,7 @@ type MaestroDataContextValue = {
   tenantLoading: boolean;
   refreshClientes: () => Promise<Cliente[]>;
   refreshChoferes: () => Promise<Chofer[]>;
+  refreshDestinatarios: () => Promise<Destinatario[]>;
   refreshTransportistas: () => Promise<Transportista[]>;
   refreshVehiculos: () => Promise<Vehiculo[]>;
   refreshDireccionesEntrega: () => Promise<DireccionEntrega[]>;
@@ -40,6 +43,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [choferes, setChoferes] = useState<Chofer[]>([]);
+  const [destinatarios, setDestinatarios] = useState<Destinatario[]>([]);
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [direccionesEntrega, setDireccionesEntrega] = useState<DireccionEntrega[]>([]);
@@ -60,6 +64,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
       setLoading(false);
       setClientes([]);
       setChoferes([]);
+      setDestinatarios([]);
       setTransportistas([]);
       setVehiculos([]);
       setDireccionesEntrega([]);
@@ -68,9 +73,10 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
     let cancelled = false;
     (async () => {
       try {
-        const [c, ch, t, v, de] = await Promise.all([
+        const [c, ch, d, t, v, de] = await Promise.all([
           apiJson<Cliente[]>('/api/clientes', () => getTokenRef.current()),
           apiJson<Chofer[]>('/api/choferes', () => getTokenRef.current()),
+          apiJson<Destinatario[]>('/api/destinatarios', () => getTokenRef.current()),
           apiJson<Transportista[]>('/api/transportistas', () => getTokenRef.current()),
           apiJson<Vehiculo[]>('/api/vehiculos', () => getTokenRef.current()),
           apiJson<DireccionEntrega[]>('/api/direcciones-entrega', () => getTokenRef.current()),
@@ -78,6 +84,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
         if (!cancelled) {
           setClientes(c);
           setChoferes(ch);
+          setDestinatarios(d);
           setTransportistas(t);
           setVehiculos(v);
           setDireccionesEntrega(de);
@@ -104,6 +111,12 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
     return data;
   };
 
+  const refreshDestinatarios = async (): Promise<Destinatario[]> => {
+    const data = await apiJson<Destinatario[]>('/api/destinatarios', () => getTokenRef.current());
+    setDestinatarios(data);
+    return data;
+  };
+
   const refreshTransportistas = async (): Promise<Transportista[]> => {
     const data = await apiJson<Transportista[]>('/api/transportistas', () => getTokenRef.current());
     setTransportistas(data);
@@ -127,6 +140,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
       value={{
         clientes,
         choferes,
+        destinatarios,
         transportistas,
         vehiculos,
         direccionesEntrega,
@@ -135,6 +149,7 @@ export function MaestroDataProvider({ children }: { children: React.ReactNode })
         tenantLoading,
         refreshClientes,
         refreshChoferes,
+        refreshDestinatarios,
         refreshTransportistas,
         refreshVehiculos,
         refreshDireccionesEntrega,

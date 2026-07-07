@@ -40,6 +40,7 @@ export function VehiculoEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function patch(p: Partial<VehiculoFormState>) {
@@ -94,12 +95,14 @@ export function VehiculoEditPage() {
     }
   }
 
+  const deleteConfirmWord = form?.patente.trim() || 'ELIMINAR';
+
   async function onDelete() {
-    if (!id || !form || confirmDelete.trim().toUpperCase() !== form.patente.trim().toUpperCase()) {
+    if (!id || !form || confirmDelete.trim().toUpperCase() !== deleteConfirmWord.toUpperCase()) {
       return;
     }
     setDeleting(true);
-    setError(null);
+    setDeleteError(null);
     try {
       await apiJson(vehiculoDetailUrl(id, tenantId), () => getToken(), {
         method: 'DELETE',
@@ -107,7 +110,7 @@ export function VehiculoEditPage() {
       if (!tenantId) void maestro.refreshVehiculos();
       navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setDeleteError(friendlyError(e, 'vehiculos'));
     } finally {
       setDeleting(false);
     }
@@ -229,16 +232,25 @@ export function VehiculoEditPage() {
             </div>
           </form>
           <CrudDangerZone
-            message="Escribí la patente para eliminar este vehículo."
+            message={
+              form.patente.trim()
+                ? 'Escribí la patente para eliminar este vehículo.'
+                : 'Escribí ELIMINAR para confirmar.'
+            }
             confirmValue={confirmDelete}
             onConfirmValueChange={setConfirmDelete}
             canDelete={
-              confirmDelete.trim().toUpperCase() === form.patente.trim().toUpperCase()
+              confirmDelete.trim().toUpperCase() === deleteConfirmWord.toUpperCase()
             }
             deleting={deleting}
             onDelete={onDelete}
             deleteLabel="Eliminar vehículo"
           />
+          {deleteError && (
+            <div className="mt-2">
+              <CrudFormErrorAlert message={deleteError} />
+            </div>
+          )}
         </>
       ) : (
         <CrudFormErrorAlert message={error ?? 'No se pudo cargar el vehículo.'} />

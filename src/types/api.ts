@@ -124,6 +124,13 @@ export interface Chofer {
   createdAt: string;
 }
 
+export interface Destinatario {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  createdAt: string;
+}
+
 export interface DireccionEntrega {
   id: string;
   tenantId: string;
@@ -201,9 +208,31 @@ export interface PaginatedMeta {
   hasNext: boolean;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginatedMeta;
+}
+
 export interface PaginatedTenantsResponse {
   items: Tenant[];
   meta: PaginatedMeta;
+}
+
+export interface CargaCombustible {
+  id: string;
+  tenantId: string;
+  vehiculoId: string | null;
+  vehiculo: { patente: string } | null;
+  choferId: string | null;
+  chofer: { nombre: string } | null;
+  estacion: string;
+  litros: number;
+  importe: number;
+  km: number;
+  formaPago: string | null;
+  fecha: string;
+  createdAt: string;
+  createdBy: string;
 }
 
 export interface Pago {
@@ -400,6 +429,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
@@ -518,6 +548,7 @@ export interface StockOperacion {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   observaciones?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];

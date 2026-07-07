@@ -4,14 +4,30 @@ import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { productosConStockParaCliente } from '@/lib/stockProductosCliente';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ChoferModal } from '@/components/viajes/ChoferModal';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { DestinatarioModal } from '@/components/destinatarios/DestinatarioModal';
 import { DireccionEntregaModal } from '@/components/direcciones-entrega/DireccionEntregaModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import {
+  stockDocumentoExternoParaApi,
+  validarStockDocumentoExterno,
+  type StockDocumentoExternoModo,
+} from '@/lib/stockDocumentoExterno';
 import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
-import type { Chofer, Cliente, Deposito, DireccionEntrega, Producto, StockItem } from '@/types/api';
+import type {
+  Chofer,
+  Cliente,
+  Deposito,
+  Destinatario,
+  DireccionEntrega,
+  PaginatedResponse,
+  Producto,
+  StockItem,
+} from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
@@ -30,8 +46,8 @@ function buildQs(params: Record<string, string | number>, tenantId?: string): st
 
 const STEPS: { label: string }[] = [
   { label: 'Empresa' },
-  { label: 'Entrega' },
   { label: 'Productos' },
+  { label: 'Entrega' },
 ];
 
 function StepIndicator({ step }: { step: WizardStep }) {
@@ -75,25 +91,12 @@ function StepIndicator({ step }: { step: WizardStep }) {
   );
 }
 
-function formatFechaLabel(fecha: string, hora: string): string {
-  if (!fecha) return '';
-  try {
-    const d = new Date(`${fecha}T${hora || '00:00'}`);
-    const f = d.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    return hora ? `${f} ${hora}` : f;
-  } catch {
-    return fecha;
-  }
-}
-
 export function EgresosStockTenantPage({
   tenantId,
   clientesExternos,
   clientesExternosLoading,
+  destinatariosExternos,
+  destinatariosExternosLoading,
   choferesExternos,
   choferesExternosLoading,
   direccionesEntregaExternos,
@@ -102,6 +105,8 @@ export function EgresosStockTenantPage({
   tenantId?: string;
   clientesExternos?: Cliente[];
   clientesExternosLoading?: boolean;
+  destinatariosExternos?: Destinatario[];
+  destinatariosExternosLoading?: boolean;
   choferesExternos?: Chofer[];
   choferesExternosLoading?: boolean;
   direccionesEntregaExternos?: DireccionEntrega[];
@@ -119,6 +124,13 @@ export function EgresosStockTenantPage({
     return [...base, ...sessionClientes.filter((c) => !ids.has(c.id))];
   }, [clientesExternos, maestro.clientes, sessionClientes]);
 
+  const [sessionDestinatarios, setSessionDestinatarios] = useState<Destinatario[]>([]);
+  const destinatarios = useMemo(() => {
+    const base = destinatariosExternos ?? maestro.destinatarios;
+    const ids = new Set(base.map((d) => d.id));
+    return [...base, ...sessionDestinatarios.filter((d) => !ids.has(d.id))];
+  }, [destinatariosExternos, maestro.destinatarios, sessionDestinatarios]);
+
   const [sessionChoferes, setSessionChoferes] = useState<Chofer[]>([]);
   const choferes = useMemo(() => {
     const base = choferesExternos ?? maestro.choferes;
@@ -127,6 +139,7 @@ export function EgresosStockTenantPage({
   }, [choferesExternos, maestro.choferes, sessionChoferes]);
 
   const clientesLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+  const destinatariosLoading = platform ? Boolean(destinatariosExternosLoading) : maestro.loading;
   const choferesLoading = platform ? Boolean(choferesExternosLoading) : maestro.loading;
 
   const [sessionDireccionesEntrega, setSessionDireccionesEntrega] = useState<DireccionEntrega[]>([]);
@@ -152,35 +165,33 @@ export function EgresosStockTenantPage({
   const [productosLoading, setProductosLoading] = useState(true);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [stockItemsLoading, setStockItemsLoading] = useState(false);
-  // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con stock
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allStockLoading, setAllStockLoading] = useState(true);
 
-  // Wizard
   const [step, setStep] = useState<WizardStep>(1);
 
-  // Paso 1
   const [clienteId, setClienteId] = useState('');
   const [depositoId, setDepositoId] = useState('');
 
-  // Paso 2
+  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
+
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [choferId, setChoferId] = useState('');
-  const [destinatario, setDestinatario] = useState('');
+  const [destinatarioId, setDestinatarioId] = useState('');
   const [direccionEntregaId, setDireccionEntregaId] = useState('');
+  const [documentoExternoModo, setDocumentoExternoModo] = useState<StockDocumentoExternoModo | ''>('');
+  const [documentoExternoNumero, setDocumentoExternoNumero] = useState('');
+  const [documentoExternoError, setDocumentoExternoError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
 
-  // Paso 3
-  const [rows, setRows] = useState<EgresoRow[]>([emptyEgresoRow()]);
-
-  // Estado compartido
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [modalCliente, setModalCliente] = useState(false);
+  const [modalDestinatario, setModalDestinatario] = useState(false);
   const [modalChofer, setModalChofer] = useState(false);
   const [modalDireccionEntrega, setModalDireccionEntrega] = useState(false);
 
@@ -206,13 +217,12 @@ export function EgresosStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
-  // Cargar todo el stock del tenant para filtrar clientes/depósitos en paso 1
   useEffect(() => {
     setAllStockLoading(true);
     void apiJson<StockItem[]>(`${disponibleBase}${buildQs({}, tenantId)}`, () => getToken())
@@ -221,7 +231,6 @@ export function EgresosStockTenantPage({
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
 
-  // Stock disponible para cliente + depósito (paso 3: productos y validación)
   useEffect(() => {
     if (!clienteId || !depositoId) {
       setStockItems([]);
@@ -262,8 +271,11 @@ export function EgresosStockTenantPage({
     setHoraMov(p.hora);
     setFechaMovError(null);
     setChoferId('');
-    setDestinatario('');
+    setDestinatarioId('');
     setDireccionEntregaId('');
+    setDocumentoExternoModo('');
+    setDocumentoExternoNumero('');
+    setDocumentoExternoError(null);
     setObservaciones('');
     setRows([emptyEgresoRow()]);
     setFormError(null);
@@ -284,21 +296,7 @@ export function EgresosStockTenantPage({
     setStep(2);
   }
 
-  function handleContinuar2() {
-    if (!fechaMov.trim()) {
-      setFechaMovError('Ingresá la fecha del movimiento.');
-      return;
-    }
-    setFechaMovError(null);
-    setFieldErrors({});
-    setFormError(null);
-    setStep(3);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-
+  function validateProductRows(): Record<string, string> {
     const ferrs: Record<string, string> = {};
     rows.forEach((row, idx) => {
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
@@ -325,16 +323,45 @@ export function EgresosStockTenantPage({
         }
       }
     });
+    return ferrs;
+  }
 
+  function handleContinuar2() {
+    const ferrs = validateProductRows();
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
       setFormError('Revisá los campos marcados en rojo.');
       return;
     }
     setFieldErrors({});
+    setFormError(null);
+    setStep(3);
+  }
+
+  function handleContinuar3() {
+    if (!fechaMov.trim()) {
+      setFechaMovError('Ingresá la fecha del movimiento.');
+      return;
+    }
+    const docErr = validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero);
+    if (docErr) {
+      setDocumentoExternoError(docErr);
+      return;
+    }
+    setFechaMovError(null);
+    setDocumentoExternoError(null);
+    void handleRegistrarEgreso();
+  }
+
+  async function handleRegistrarEgreso() {
+    setFormError(null);
+    setFieldErrors({});
 
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
-    if (!fechaIso) return setFormError('Revisá la fecha y hora del movimiento.');
+    if (!fechaIso) {
+      setFormError('Revisá la fecha y hora del movimiento.');
+      return;
+    }
 
     const entregadoPor = choferId.trim()
       ? choferes.find((c) => c.id === choferId)?.nombre.trim()
@@ -345,6 +372,22 @@ export function EgresosStockTenantPage({
         ? direccionesEntrega.find((d) => d.id === direccionEntregaId)?.direccion?.trim()
         : undefined;
 
+    const numeroDocumentoExterno = stockDocumentoExternoParaApi(
+      documentoExternoModo,
+      documentoExternoNumero,
+    );
+    if (!numeroDocumentoExterno) {
+      setStep(3);
+      setDocumentoExternoError(
+        validarStockDocumentoExterno(documentoExternoModo, documentoExternoNumero),
+      );
+      return;
+    }
+
+    const destinatario = destinatarioId.trim()
+      ? destinatarios.find((d) => d.id === destinatarioId)?.nombre.trim()
+      : undefined;
+
     setSaving(true);
     try {
       const result = await apiJson<EgresoResult>(egresosUrl, () => getToken(), {
@@ -354,8 +397,9 @@ export function EgresosStockTenantPage({
           depositoId,
           fecha: fechaIso,
           entregadoPor: entregadoPor || undefined,
-          destinatario: destinatario.trim() || undefined,
+          destinatario: destinatario || undefined,
           destinoFinal: destinoFinal || undefined,
+          numeroDocumentoExterno,
           observaciones: observaciones.trim() || undefined,
           lineas: rows.map((row) => ({
             productoId: row.productoId,
@@ -385,18 +429,21 @@ export function EgresosStockTenantPage({
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    handleContinuar2();
+  }
+
   const historialHref = platform
     ? `/stock/egresos/historial?tenantId=${encodeURIComponent(tenantId!)}`
     : '/stock/egresos/historial';
 
-  // Clientes que tienen al menos un item con stock > 0
   const clientesFiltrados = useMemo(() => {
     if (allStockLoading) return [];
     const ids = new Set(allStockItems.map((s) => s.clienteId));
     return clientes.filter((c) => ids.has(c.id));
   }, [clientes, allStockItems, allStockLoading]);
 
-  // Depósitos que tienen stock para el cliente seleccionado (o cualquiera si no hay cliente)
   const depositosFiltrados = useMemo(() => {
     if (allStockLoading) return [];
     const items = clienteId
@@ -413,7 +460,6 @@ export function EgresosStockTenantPage({
 
   const clienteNombre = clientes.find((c) => c.id === clienteId)?.nombre ?? '';
   const depositoNombre = depositos.find((d) => d.id === depositoId)?.nombre ?? '';
-  const fechaLabel = formatFechaLabel(fechaMov, horaMov);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -451,7 +497,6 @@ export function EgresosStockTenantPage({
           onClienteChange={(id) => {
             setClienteId(id);
             setRows([emptyEgresoRow()]);
-            // Si el depósito actual no tiene stock para el nuevo cliente, lo limpiamos
             const depositosParaCliente = new Set(
               allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
             );
@@ -471,6 +516,32 @@ export function EgresosStockTenantPage({
       )}
 
       {step === 2 && (
+        <EgresoWizardStep3
+          rows={rows}
+          onAddRow={addRow}
+          onRemoveRow={removeRow}
+          onUpdateRow={updateRow}
+          productos={productosParaEgreso}
+          productosLoading={productosLoading || stockItemsLoading}
+          fieldErrors={fieldErrors}
+          formError={formError}
+          clienteId={clienteId}
+          depositoId={depositoId}
+          clienteNombre={clienteNombre}
+          depositoNombre={depositoNombre}
+          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
+          tenantId={tenantId}
+          primaryAction="continuar"
+          onVolver={() => {
+            setStep(1);
+            setFieldErrors({});
+            setFormError(null);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {step === 3 && (
         <EgresoWizardStep2
           fechaMov={fechaMov}
           horaMov={horaMov}
@@ -487,50 +558,42 @@ export function EgresosStockTenantPage({
           choferId={choferId}
           onChoferIdChange={setChoferId}
           onNuevoChofer={() => setModalChofer(true)}
-          destinatario={destinatario}
-          onDestinatarioChange={setDestinatario}
+          destinatarios={destinatarios}
+          destinatariosLoading={destinatariosLoading}
+          destinatarioId={destinatarioId}
+          onDestinatarioIdChange={setDestinatarioId}
+          onNuevoDestinatario={() => setModalDestinatario(true)}
           direccionesEntrega={direccionesEntrega}
           direccionesEntregaLoading={direccionesEntregaLoading}
           direccionEntregaId={direccionEntregaId}
           onDireccionEntregaChange={setDireccionEntregaId}
           onNuevaDireccionEntrega={() => setModalDireccionEntrega(true)}
+          documentoExternoModo={documentoExternoModo}
+          onDocumentoExternoModoChange={(modo) => {
+            setDocumentoExternoModo(modo);
+            setDocumentoExternoError(null);
+            if (modo === 'no_tiene') setDocumentoExternoNumero('');
+          }}
+          documentoExternoNumero={documentoExternoNumero}
+          onDocumentoExternoNumeroChange={(v) => {
+            setDocumentoExternoNumero(v);
+            if (documentoExternoError) setDocumentoExternoError(null);
+          }}
+          documentoExternoError={documentoExternoError}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
           clienteNombre={clienteNombre}
           depositoNombre={depositoNombre}
-          onVolver={() => {
-            setStep(1);
-            setFieldErrors({});
-            setFormError(null);
-          }}
-          onContinuar={handleContinuar2}
-        />
-      )}
-
-      {step === 3 && (
-        <EgresoWizardStep3
-          rows={rows}
-          onAddRow={addRow}
-          onRemoveRow={removeRow}
-          onUpdateRow={updateRow}
-          productos={productosParaEgreso}
-          productosLoading={productosLoading || stockItemsLoading}
-          fieldErrors={fieldErrors}
           formError={formError}
-          saving={saving}
-          clienteId={clienteId}
-          depositoId={depositoId}
-          clienteNombre={clienteNombre}
-          depositoNombre={depositoNombre}
-          fechaLabel={fechaLabel}
-          lotesBase={platform ? '/api/platform/stock/lotes' : '/api/stock/lotes'}
-          tenantId={tenantId}
+          continuarLoading={saving}
+          continuarLabel={saving ? 'Guardando…' : 'Registrar egreso'}
           onVolver={() => {
             setStep(2);
             setFieldErrors({});
             setFormError(null);
+            setFechaMovError(null);
           }}
-          onSubmit={handleSubmit}
+          onContinuar={handleContinuar3}
         />
       )}
 
@@ -544,6 +607,20 @@ export function EgresosStockTenantPage({
             setChoferId(c.id);
             setModalChofer(false);
             if (!tenantId) void maestro.refreshChoferes();
+          }}
+        />
+      )}
+
+      {modalDestinatario && (
+        <DestinatarioModal
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => setModalDestinatario(false)}
+          onSaved={(d) => {
+            setSessionDestinatarios((prev) => [...prev, d]);
+            setDestinatarioId(d.id);
+            setModalDestinatario(false);
+            if (!tenantId) void maestro.refreshDestinatarios();
           }}
         />
       )}

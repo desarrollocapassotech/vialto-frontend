@@ -16,6 +16,7 @@ import {
   flattenStockOperaciones,
   stockOperacionColumnas,
 } from '@/lib/stockExcelExport';
+import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion, Cliente, Deposito, Producto, PaginatedMeta } from '@/types/api';
 import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
@@ -287,6 +288,13 @@ export function EgresosStockHistorialTenantPage({
               </ViajesListadoHeaderFiltro>
             ),
             cell: (op) => op.deposito?.nombre ?? '—',
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: 'documentoExterno',
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: 'Nº doc. externo',
+            cell: (op) => etiquetaStockDocumentoExterno(op.numeroDocumentoExterno),
             tdClassName: listadoTablaTdClass,
           },
           {
