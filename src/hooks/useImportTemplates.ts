@@ -1,44 +1,150 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { apiJson } from '@/lib/api';
-import type { ImportTemplate } from '@/types/api';
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { apiJson } from "@/lib/api";
+import type { ImportTemplate } from "@/types/api";
 
 const TEMPLATE_EXAMPLES: Record<string, object> = {
   viajes: {
     sheet: 0,
     headerRow: 1,
     columns: [
-      { excelHeader: 'CLIENTE', field: 'clienteId', type: 'lookup', lookupModel: 'clientes', lookupField: 'nombre', required: true, createIfNotFound: true },
-      { excelHeader: 'TRANSPORTE', field: 'transportistaId', type: 'lookup', lookupModel: 'transportistas', lookupField: 'nombre', createIfNotFound: true },
-      { excelHeader: 'ORIGEN', field: 'origen', type: 'string' },
-      { excelHeader: 'DESTINO', field: 'destino', type: 'string' },
-      { excelHeader: 'FECHA D/C', field: 'fechaCarga', type: 'date', format: 'DD/MM/YYYY', required: true },
-      { excelHeader: 'FECHA D/D', field: 'fechaDescarga', type: 'date', format: 'DD/MM/YYYY', required: true },
-      { excelHeader: 'DETALLE DE CARGA', field: 'detalleCarga', type: 'string' },
-      { excelHeader: 'TOTAL A FC CLIENTE', field: 'monto', type: 'number' },
-      { excelHeader: 'MONEDA MONTO', field: 'monedaMonto', type: 'enum', allowedValues: ['ARS', 'USD'], required: true },
-      { excelHeader: 'N DE FACT EXPO', field: 'nroFactura', type: 'string' },
-      { excelHeader: 'FECHA EMISION FC', field: 'fechaEmisionFactura', type: 'date', format: 'DD/MM/YYYY' },
-      { excelHeader: 'FECHA VENC FC', field: 'fechaVencimientoFactura', type: 'date', format: 'DD/MM/YYYY' },
-      { excelHeader: 'VALOR FLETERO', field: 'precioTransportistaExterno', type: 'number' },
-      { excelHeader: 'MONEDA FLETE', field: 'monedaPrecioTransportistaExterno', type: 'enum', allowedValues: ['ARS', 'USD'], required: true },
-      { excelHeader: 'FC FLETERO', field: 'nroFacturaTransporte', type: 'string' },
-      { excelHeader: 'EMISION FLETERO', field: 'fechaEmisionFacturaTransp', type: 'date', format: 'DD/MM/YYYY' },
-      { excelHeader: 'VENCIMIENTO', field: 'fechaVencimientoFacturaTransp', type: 'date', format: 'DD/MM/YYYY' },
-      { excelHeader: 'OBSERVACIONES', field: 'observaciones', type: 'string' },
-      { excelHeader: 'CHOFER', field: 'choferId', type: 'lookup', lookupModel: 'choferes', lookupField: 'dni', required: false, createIfNotFound: false },
-      { excelHeader: 'VEHICULO', field: 'vehiculoId', type: 'lookup', lookupModel: 'vehiculos', lookupField: 'patente', required: false, createIfNotFound: false },
+      {
+        excelHeader: "CLIENTE",
+        field: "clienteId",
+        type: "lookup",
+        lookupModel: "clientes",
+        lookupField: "nombre",
+        required: true,
+        createIfNotFound: true,
+      },
+      {
+        excelHeader: "TRANSPORTE",
+        field: "transportistaId",
+        type: "lookup",
+        lookupModel: "transportistas",
+        lookupField: "nombre",
+        createIfNotFound: true,
+      },
+      {
+        field: "origen",
+        excelHeader: "ORIGEN",
+        type: "lookup",
+        lookupModel: "ciudades",
+        lookupField: "nombre",
+        softLookup: true,
+      },
+      {
+        field: "destino",
+        excelHeader: "DESTINO",
+        type: "lookup",
+        lookupModel: "ciudades",
+        lookupField: "nombre",
+        softLookup: true,
+      },
+      {
+        excelHeader: "FECHA D/C",
+        field: "fechaCarga",
+        type: "date",
+        format: "DD/MM/YYYY",
+        required: true,
+      },
+      {
+        excelHeader: "FECHA D/D",
+        field: "fechaDescarga",
+        type: "date",
+        format: "DD/MM/YYYY",
+        required: true,
+      },
+      {
+        excelHeader: "DETALLE DE CARGA",
+        field: "detalleCarga",
+        type: "string",
+      },
+      { excelHeader: "TOTAL A FC CLIENTE", field: "monto", type: "number" },
+      {
+        excelHeader: "MONEDA MONTO",
+        field: "monedaMonto",
+        type: "enum",
+        allowedValues: ["ARS", "USD"],
+        required: true,
+      },
+      { excelHeader: "N DE FACT EXPO", field: "nroFactura", type: "string" },
+      {
+        excelHeader: "FECHA EMISION FC",
+        field: "fechaEmisionFactura",
+        type: "date",
+        format: "DD/MM/YYYY",
+      },
+      {
+        excelHeader: "FECHA VENC FC",
+        field: "fechaVencimientoFactura",
+        type: "date",
+        format: "DD/MM/YYYY",
+      },
+      {
+        excelHeader: "VALOR FLETERO",
+        field: "precioTransportistaExterno",
+        type: "number",
+      },
+      {
+        excelHeader: "MONEDA FLETE",
+        field: "monedaPrecioTransportistaExterno",
+        type: "enum",
+        allowedValues: ["ARS", "USD"],
+        required: true,
+      },
+      {
+        excelHeader: "FC FLETERO",
+        field: "nroFacturaTransporte",
+        type: "string",
+      },
+      {
+        excelHeader: "EMISION FLETERO",
+        field: "fechaEmisionFacturaTransp",
+        type: "date",
+        format: "DD/MM/YYYY",
+      },
+      {
+        excelHeader: "VENCIMIENTO",
+        field: "fechaVencimientoFacturaTransp",
+        type: "date",
+        format: "DD/MM/YYYY",
+      },
+      { excelHeader: "OBSERVACIONES", field: "observaciones", type: "string" },
+      {
+        excelHeader: "CHOFER",
+        field: "choferId",
+        type: "lookup",
+        lookupModel: "choferes",
+        lookupField: "dni",
+        required: false,
+        createIfNotFound: false,
+      },
+      {
+        excelHeader: "VEHICULO",
+        field: "vehiculoId",
+        type: "lookup",
+        lookupModel: "vehiculos",
+        lookupField: "patente",
+        required: false,
+        createIfNotFound: false,
+      },
     ],
   },
   clientes: {
     sheet: 0,
     headerRow: 1,
     columns: [
-      { excelHeader: 'Nombre', field: 'nombre', type: 'string', required: true },
-      { excelHeader: 'CUIT', field: 'cuit', type: 'string' },
-      { excelHeader: 'Email', field: 'email', type: 'string' },
-      { excelHeader: 'Teléfono', field: 'telefono', type: 'string' },
-      { excelHeader: 'Dirección', field: 'direccion', type: 'string' },
+      {
+        excelHeader: "Nombre",
+        field: "nombre",
+        type: "string",
+        required: true,
+      },
+      { excelHeader: "CUIT", field: "cuit", type: "string" },
+      { excelHeader: "Email", field: "email", type: "string" },
+      { excelHeader: "Teléfono", field: "telefono", type: "string" },
+      { excelHeader: "Dirección", field: "direccion", type: "string" },
     ],
   },
 };
@@ -48,7 +154,12 @@ export function getTemplateExample(modulo: string): string {
     sheet: 0,
     headerRow: 1,
     columns: [
-      { excelHeader: 'Columna Excel', field: 'campoSistema', type: 'string', required: true },
+      {
+        excelHeader: "Columna Excel",
+        field: "campoSistema",
+        type: "string",
+        required: true,
+      },
     ],
   };
   return JSON.stringify(example, null, 2);
@@ -71,27 +182,33 @@ export function useImportTemplates(tenantId: string) {
       );
       setTemplates(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar templates');
+      setError(e instanceof Error ? e.message : "Error al cargar templates");
     } finally {
       setLoading(false);
     }
   }, [tenantId, getToken]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  async function save(modulo: string, nombre: string, configJson: string): Promise<boolean> {
+  async function save(
+    modulo: string,
+    nombre: string,
+    configJson: string,
+  ): Promise<boolean> {
     setSaving(true);
     setError(null);
     try {
       const config = JSON.parse(configJson) as object;
-      await apiJson('/api/importaciones/templates', () => getToken(), {
-        method: 'POST',
+      await apiJson("/api/importaciones/templates", () => getToken(), {
+        method: "POST",
         body: JSON.stringify({ tenantId, modulo, nombre, config }),
       });
       await load();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al guardar template');
+      setError(e instanceof Error ? e.message : "Error al guardar template");
       return false;
     } finally {
       setSaving(false);
