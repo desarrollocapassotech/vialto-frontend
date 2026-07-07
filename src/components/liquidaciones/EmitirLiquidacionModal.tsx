@@ -156,7 +156,6 @@ export function EmitirLiquidacionModal({
                 <Fila label="Otras" value={fmtMoney(liq.gastosAdmin)} muted />
               )}
               {(() => {
-                // Base del IVA = bruto - comision (los gastos admin van al 0%)
                 const ivaBase = liq.bruto - liq.comision;
                 const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : 'IVA';
                 return (
