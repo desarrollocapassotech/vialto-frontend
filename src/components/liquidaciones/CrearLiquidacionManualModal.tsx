@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Liquidacion, Transportista, Viaje } from '@/types/api';
 
@@ -109,6 +110,12 @@ export function CrearLiquidacionManualModal({
       setError('Seleccioná al menos un viaje.');
       return;
     }
+    if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
+      setError(
+        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viajeInicial.numero}.`,
+      );
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -127,7 +134,7 @@ export function CrearLiquidacionManualModal({
       );
       onSuccess(liq);
     } catch (err) {
-      setError(friendlyError(err, 'arca'));
+      setError(friendlyError(err, 'liquidaciones'));
     } finally {
       setSubmitting(false);
     }
