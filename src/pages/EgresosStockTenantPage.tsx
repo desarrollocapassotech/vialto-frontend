@@ -17,7 +17,12 @@ import {
   validarStockDocumentoExterno,
   type StockDocumentoExternoModo,
 } from '@/lib/stockDocumentoExterno';
-import { loteEgresoSeleccionValida } from '@/lib/stockLote';
+import {
+  egresoOfreceFraccionar,
+  egresoPendienteFraccionar,
+  egresoSueltasAlcanzables,
+  loteEgresoSeleccionValida,
+} from '@/lib/stockLote';
 import type {
   Chofer,
   Cliente,
@@ -296,6 +301,21 @@ export function EgresosStockTenantPage({
     setStep(2);
   }
 
+  function unidadesPorBultoDeFila(row: EgresoRow): number {
+    const pps =
+      productosParaEgreso.find((p) => p.id === row.productoId)?.productoPresentaciones ?? [];
+    return pps.find((pp) => pp.id === row.presentacionId)?.unidadesPorBulto ?? 0;
+  }
+
+  function hayPendienteFraccionar(): boolean {
+    return rows.some((row) => {
+      const upb = unidadesPorBultoDeFila(row);
+      return row.loteLineas.some((linea) =>
+        egresoPendienteFraccionar(linea.loteStock, linea.sueltas, upb, linea.bultos),
+      );
+    });
+  }
+
   function validateProductRows(): Record<string, string> {
     const ferrs: Record<string, string> = {};
     rows.forEach((row, idx) => {
@@ -306,6 +326,7 @@ export function EgresosStockTenantPage({
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
 
+      const unidadesPorBulto = unidadesPorBultoDeFila(row);
       const lotesUsados = new Set<string>();
       row.loteLineas.forEach((linea, loteIdx) => {
         const loteKey = egresoFieldKey(idx, loteIdx, 'lote');
@@ -330,8 +351,24 @@ export function EgresosStockTenantPage({
               `Stock insuficiente. Disponible: ${linea.loteStock.bultos} bultos.`;
           }
           if (s > linea.loteStock.sueltas) {
-            ferrs[sueltasKey] =
-              `Stock insuficiente. Disponible: ${linea.loteStock.sueltas} sueltas.`;
+            if (
+              egresoOfreceFraccionar(
+                linea.loteStock,
+                linea.sueltas,
+                unidadesPorBulto,
+                linea.bultos,
+              )
+            ) {
+              // Cubrible desarmando bultos: el botón contextual guía al usuario.
+            } else {
+              const maxSueltas = egresoSueltasAlcanzables(
+                linea.loteStock,
+                unidadesPorBulto,
+                linea.bultos,
+              );
+              ferrs[sueltasKey] =
+                `Stock insuficiente. Disponible: ${maxSueltas} sueltas (incl. bultos).`;
+            }
           }
         }
       });
@@ -344,6 +381,13 @@ export function EgresosStockTenantPage({
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
       setFormError('Revisá los campos marcados en rojo.');
+      return;
+    }
+    if (hayPendienteFraccionar()) {
+      setFieldErrors({});
+      setFormError(
+        'Desarmá bultos con el botón junto al campo Sueltas antes de continuar.',
+      );
       return;
     }
     setFieldErrors({});

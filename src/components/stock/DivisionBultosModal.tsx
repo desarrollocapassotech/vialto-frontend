@@ -10,6 +10,7 @@ import { friendlyError } from '@/lib/friendlyError';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
 import {
   STOCK_SIN_LOTE_VALUE,
+  egresoBultosDisponiblesParaFraccionar,
   loteEgresoParaApi,
 } from '@/lib/stockLote';
 import type { LoteStockDisponible } from '@/components/stock/EgresoProductoLoteBloque';
@@ -30,6 +31,8 @@ export type DivisionBultosModalContext = {
   unidadesPorBulto: number;
   lote: string;
   loteStock: LoteStockDisponible;
+  /** Bultos ya reservados para extracción en la misma línea del egreso. */
+  bultosReservados?: string;
   labels?: { bultos: string; sueltas: string };
 };
 
@@ -47,7 +50,10 @@ export function DivisionBultosModal({
   const { getToken } = useAuth();
   useLockBodyScroll(true);
   const labels = ctx.labels ?? { bultos: 'bultos', sueltas: 'sueltas' };
-  const bultosDisponibles = ctx.loteStock.bultos;
+  const bultosDisponibles = egresoBultosDisponiblesParaFraccionar(
+    ctx.loteStock,
+    ctx.bultosReservados ?? '',
+  );
   const [bultos, setBultos] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

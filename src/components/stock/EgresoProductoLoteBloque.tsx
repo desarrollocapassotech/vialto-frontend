@@ -3,6 +3,7 @@ import { LoteSelect } from '@/components/stock/LoteSelect';
 import {
   STOCK_SIN_LOTE_VALUE,
   egresoOfreceFraccionar,
+  egresoSueltasAlcanzables,
   loteEgresoSeleccionValida,
 } from '@/lib/stockLote';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
@@ -93,9 +94,24 @@ export function EgresoProductoLoteBloque({
   const listoParaLote = Boolean(productoId && presentacionId && clienteId && depositoId);
   const loteElegido = loteEgresoSeleccionValida(lote);
   const cantidadesHabilitadas = listoParaLote && loteElegido;
-  const ofreceFraccionar =
-    onFraccionar &&
-    egresoOfreceFraccionar(loteStock, sueltas, unidadesPorBulto);
+  const puedeFraccionar = egresoOfreceFraccionar(
+    loteStock,
+    sueltas,
+    unidadesPorBulto,
+    bultos,
+  );
+  const ofreceFraccionar = puedeFraccionar && Boolean(onFraccionar);
+  const sueltasPedidas = parseFloat(sueltas) || 0;
+  const sueltasInsuficientes =
+    loteStock !== null && sueltasPedidas > loteStock.sueltas;
+  const maxSueltasAlcanzables =
+    loteStock && unidadesPorBulto > 0
+      ? egresoSueltasAlcanzables(loteStock, unidadesPorBulto, bultos)
+      : null;
+  const fraccionarLabel = sueltasInsuficientes
+    ? `Desarmar ${labels.bultos}`
+    : 'Fraccionar';
+  const sueltasFieldError = ofreceFraccionar ? undefined : fieldErrors.sueltas;
   const vencimientoLabel =
     lote === STOCK_SIN_LOTE_VALUE
       ? '—'
@@ -209,7 +225,7 @@ export function EgresoProductoLoteBloque({
               disabled={!cantidadesHabilitadas}
               onChange={(e) => onSueltasChange(e.target.value)}
               className={`${INPUT} flex-1 disabled:opacity-50 ${
-                fieldErrors.sueltas ? 'border-red-400' : ''
+                sueltasFieldError ? 'border-red-400' : ''
               }`}
               placeholder="0"
             />
@@ -220,17 +236,20 @@ export function EgresoProductoLoteBloque({
                 className="shrink-0 px-2.5 text-xs font-medium uppercase tracking-wider border border-vialto-fire text-vialto-fire rounded hover:bg-vialto-fire/5 whitespace-nowrap"
                 title={`Desarmar ${labels.bultos} para obtener ${labels.sueltas}`}
               >
-                Fraccionar
+                {fraccionarLabel}
               </button>
             )}
           </div>
           {ofreceFraccionar && (
             <p className="text-xs text-vialto-steel">
-              No hay {labels.sueltas} suficientes; podés desarmar {labels.bultos} del lote sin
-              salir del egreso.
+              {sueltasInsuficientes
+                ? maxSueltasAlcanzables !== null && sueltasPedidas > maxSueltasAlcanzables
+                  ? `Pediste ${sueltasPedidas} ${labels.sueltas}; como máximo hay ${maxSueltasAlcanzables} disponibles desarmando los ${labels.bultos} restantes.`
+                  : `Pediste ${sueltasPedidas} ${labels.sueltas} y hay ${loteStock!.sueltas} disponibles; desarmá ${labels.bultos} del lote sin salir del egreso.`
+                : `No hay ${labels.sueltas} sueltas; podés desarmar ${labels.bultos} del lote sin salir del egreso.`}
             </p>
           )}
-          <CrudFieldError message={fieldErrors.sueltas} />
+          <CrudFieldError message={sueltasFieldError} />
         </div>
       </div>
     </div>
