@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
 
 interface Props {
@@ -76,6 +77,12 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (viajeTieneLiquidacionTransportista(viaje)) {
+      setError(
+        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viaje.numero}.`,
+      );
+      return;
+    }
     setError(null);
     setBusyCrear(true);
     try {
@@ -100,7 +107,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
         setError(err.message);
       } else {
         setArcaConfigMissing(false);
-        setError(friendlyError(err, 'arca'));
+        setError(friendlyError(err, 'liquidaciones'));
       }
     } finally {
       setBusyCrear(false);
