@@ -9,18 +9,26 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ProductoModal } from "@/components/stock/ProductoModal";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import {
   SelectorOpcionesSheet,
   selectorTriggerClass,
   type SelectorOpcion,
 } from "@/components/ui/SelectorOpcionesSheet";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { paginatedItems as extractPaginatedItems } from "@/lib/paginatedItems";
 import { generarExcel, stockItemColumnas } from "@/lib/stockExcelExport";
 import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
-import type { Cliente, Deposito, PaginatedResponse, Producto, StockItem } from "@/types/api";
+import type {
+  Cliente,
+  Deposito,
+  PaginatedResponse,
+  Producto,
+  StockItem,
+} from "@/types/api";
 
 type ProductoModalState =
   | { mode: "closed" }
@@ -28,6 +36,7 @@ type ProductoModalState =
   | { mode: "edit"; producto: Producto };
 
 type ProductoFiltro = { id: string; nombre: string };
+
 import {
   listadoTablaBodyRowClass,
   listadoTablaHeadRowClass,
@@ -80,21 +89,43 @@ function cantidad2Cell(item: StockItem) {
   );
 }
 
-export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
+type StockPanelTenantPageProps = {
+  isPlatform?: boolean;
+  tenantId?: string;
+};
+
+export function StockPanelTenantPage({
+  isPlatform = false,
+  tenantId = "",
+}: StockPanelTenantPageProps) {
   const { getToken, orgRole } = useAuth();
   const { user } = useUser();
   const puedeGestionar = puedeGestionarComoAdminEmpresa(
     orgRole,
     user?.publicMetadata,
   );
-  const platform = Boolean(tenantId);
-  const disponibleUrl = platform
-    ? `/api/platform/stock/disponible${buildQs(tenantId)}`
+
+  // Hook que trae las empresas.
+  const allTenants = useTenantsList();
+
+  // Estado del Tenant Manager
+  const tenants = isPlatform ? allTenants : null;
+  const [activeTenantId, setActiveTenantId] = useState(tenantId);
+
+  // URLs dinámicas basadas en activeTenantId
+  const disponibleUrl = isPlatform
+    ? `/api/platform/stock/disponible${buildQs(activeTenantId)}`
     : "/api/stock/disponible";
-  const depositosUrl = platform
-    ? `/api/platform/stock/depositos${buildQs(tenantId)}${tenantId ? "&" : "?"}page=1&pageSize=500`
+
+  const depositosUrl = isPlatform
+    ? `/api/platform/stock/depositos${buildQs(activeTenantId)}${activeTenantId ? "&" : "?"}page=1&pageSize=500`
     : "/api/stock/depositos?page=1&pageSize=500";
 
+  const productosBase = isPlatform
+    ? "/api/platform/stock/productos"
+    : "/api/stock/productos";
+
+  // Estados de grilla y UI
   const [items, setItems] = useState<StockItem[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [productosDetalle, setProductosDetalle] = useState<Producto[]>([]);
@@ -115,13 +146,9 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
     mode: "closed",
   });
 
-  const productosBase = platform
-    ? "/api/platform/stock/productos"
-    : "/api/stock/productos";
-
   const abrirProducto = useCallback(
     async (productoId: string) => {
-      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+      const qs = buildQs(activeTenantId);
       try {
         const producto = await apiJson<Producto>(
           `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
@@ -132,10 +159,20 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         // sin feedback: el listado ya muestra el nombre del producto
       }
     },
-    [productosBase, tenantId, getToken],
+    [productosBase, activeTenantId, getToken],
   );
 
   const load = useCallback(async () => {
+    // Short-circuit: Si es admin y no eligió empresa, limpiamos la vista
+    if (isPlatform && !activeTenantId) {
+      setItems([]);
+      setDepositos([]);
+      setProductosDetalle([]);
+      setDepositoActivoId(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -143,7 +180,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         apiJson<StockItem[]>(disponibleUrl, () => getToken()),
         apiJson<PaginatedResponse<Deposito>>(depositosUrl, () => getToken()),
       ]);
-      const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+      const qs = buildQs(activeTenantId);
       const productoIds = [
         ...new Set(stockData.map((item) => item.productoId)),
       ];
@@ -157,13 +194,22 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       );
       setItems(stockData);
       setProductosDetalle(productos.filter((p): p is Producto => p !== null));
-      setDepositos(extractPaginatedItems(depositosData).filter((d) => d.activo));
+      setDepositos(
+        extractPaginatedItems(depositosData).filter((d) => d.activo),
+      );
     } catch (e) {
       setError(friendlyError(e, "stock"));
     } finally {
       setLoading(false);
     }
-  }, [disponibleUrl, depositosUrl, productosBase, tenantId, getToken]);
+  }, [
+    disponibleUrl,
+    depositosUrl,
+    productosBase,
+    activeTenantId,
+    isPlatform,
+    getToken,
+  ]);
 
   useEffect(() => {
     void load();
@@ -179,6 +225,14 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
       setPage(1);
     }
   }, [depositos, depositoActivoId]);
+
+  const handleTenantChange = (newTenantId: string) => {
+    setActiveTenantId(newTenantId);
+    setDepositoActivoId(null);
+    setFiltroClienteId("");
+    setFiltroProductoId("");
+    setPage(1);
+  };
 
   const handleCambiarTab = (id: string) => {
     setDepositoActivoId(id);
@@ -422,20 +476,33 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
 
   return (
     <div className="w-full space-y-6">
-      {!platform ? (
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-vialto-charcoal">
-              Inventario
-            </h1>
-            <p className="mt-1 text-sm text-vialto-steel">
-              Stock disponible en cada depósito, en tiempo real.
-            </p>
-          </div>
-          {exportExcelButton}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-vialto-charcoal">
+            Inventario
+          </h1>
+          <p className="mt-1 text-sm text-vialto-steel">
+            Stock disponible en cada depósito, en tiempo real.
+          </p>
         </div>
-      ) : (
-        <div className="flex justify-end">{exportExcelButton}</div>
+
+        {/* Solo mostramos el botón de Excel si no estamos en la pantalla inicial de plataforma */}
+        {(!isPlatform || activeTenantId) && (
+          <div className="flex w-full items-center justify-end gap-4 sm:w-auto">
+            {exportExcelButton}
+          </div>
+        )}
+      </div>
+
+      {/* Buscador debajo del título para Superadmins */}
+      {isPlatform && (
+        <div className="mt-6">
+          <EmpresaFilterBar
+            tenants={tenants}
+            value={activeTenantId}
+            onChange={handleTenantChange}
+          />
+        </div>
       )}
 
       {error && (
@@ -444,307 +511,331 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
         </div>
       )}
 
-      {loading && <p className="text-sm text-vialto-steel">Cargando…</p>}
-
-      {!loading && depositos.length === 0 && (
-        <p className="text-sm text-vialto-steel">
-          No hay depósitos activos configurados.
+      {/* Estado vacío minimalista igual al de facturación */}
+      {isPlatform && !activeTenantId && (
+        <p className="mt-10 text-sm text-vialto-steel">
+          Seleccioná una empresa para ver su inventario.
         </p>
       )}
 
-      {!loading && depositos.length > 0 && (
+      {/* Solo renderizamos el contenido si estamos en modo normal o si ya se seleccionó una empresa */}
+      {(!isPlatform || activeTenantId) && (
         <>
-          {/* Selector mobile / tabs desktop por depósito */}
-          <div className="border-b border-black/10">
-            <div className="pb-3 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setDepositoSheetOpen(true)}
-                aria-haspopup="dialog"
-                aria-expanded={depositoSheetOpen}
-                className={selectorTriggerClass}
-              >
-                <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
-                  Depósito
-                </span>
-                <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                  <Warehouse
-                    className="h-4 w-4 shrink-0 text-vialto-steel"
-                    strokeWidth={1.75}
-                    aria-hidden
-                  />
-                  <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
-                    {depositoActivo?.nombre ?? "Depósito"}
-                  </span>
-                  <span className="shrink-0 rounded-full bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
-                    {depositoActivoCount}
-                  </span>
-                  <ChevronDown
-                    className="h-4 w-4 shrink-0 text-vialto-steel"
-                    strokeWidth={2}
-                    aria-hidden
-                  />
-                </span>
-              </button>
-              <SelectorOpcionesSheet
-                open={depositoSheetOpen}
-                onClose={() => setDepositoSheetOpen(false)}
-                title="Elegir depósito"
-                options={depositoOptions}
-                activeId={depositoActivoId}
-                onSelect={handleCambiarTab}
-              />
-            </div>
+          {loading && <p className="text-sm text-vialto-steel">Cargando…</p>}
 
-            <nav
-              className="-mb-px hidden flex-wrap gap-0 lg:flex"
-              aria-label="Depósitos"
-            >
-              {depositos.map((dep) => {
-                const activo = depositoActivoId === dep.id;
-                const count = countByDeposito[dep.id] ?? 0;
-                return (
+          {!loading && depositos.length === 0 && (
+            <p className="text-sm text-vialto-steel">
+              No hay depósitos activos configurados.
+            </p>
+          )}
+
+          {!loading && depositos.length > 0 && (
+            <>
+              {/* Selector mobile / tabs desktop por depósito */}
+              <div className="border-b border-black/10">
+                <div className="pb-3 lg:hidden">
                   <button
-                    key={dep.id}
                     type="button"
-                    onClick={() => handleCambiarTab(dep.id)}
-                    className={[
-                      "flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
-                      activo
-                        ? "border-vialto-fire text-vialto-charcoal"
-                        : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:border-black/20",
-                    ].join(" ")}
+                    onClick={() => setDepositoSheetOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={depositoSheetOpen}
+                    className={selectorTriggerClass}
                   >
-                    <Warehouse
-                      className="h-3.5 w-3.5 shrink-0"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                    {dep.nombre}
-                    <span
-                      className={[
-                        "rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none",
-                        activo
-                          ? "bg-vialto-fire/15 text-vialto-fire"
-                          : "bg-black/8 text-vialto-steel",
-                      ].join(" ")}
-                    >
-                      {count}
+                    <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                      Depósito
+                    </span>
+                    <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                      <Warehouse
+                        className="h-4 w-4 shrink-0 text-vialto-steel"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                      <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+                        {depositoActivo?.nombre ?? "Depósito"}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-vialto-fire/15 px-1.5 py-0.5 text-xs font-semibold leading-none text-vialto-fire">
+                        {depositoActivoCount}
+                      </span>
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 text-vialto-steel"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
                     </span>
                   </button>
-                );
-              })}
-            </nav>
-          </div>
+                  <SelectorOpcionesSheet
+                    open={depositoSheetOpen}
+                    onClose={() => setDepositoSheetOpen(false)}
+                    title="Elegir depósito"
+                    options={depositoOptions}
+                    activeId={depositoActivoId}
+                    onSelect={handleCambiarTab}
+                  />
+                </div>
 
-          <ListadoDatos
-            columns={[]}
-            rows={paginatedItems}
-            rowKey={(item) => item.id}
-            emptyMessage={stockEmptyMessage}
-            tableColSpan={colSpan}
-            filters={filterToolbar}
-            activeFilterCount={activeFilterCount}
-            onClearFilters={limpiarFiltros}
-            tableHead={
-              <tr className={listadoTablaHeadRowClass}>
-                <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                  <ViajesListadoHeaderFiltro
-                    title="Cliente"
-                    filterActive={!!filtroClienteId.trim()}
-                    filterSignature={filtroClienteId}
-                  >
-                    <ClienteSearchSelect
-                      id="stock-panel-filtro-cliente"
-                      clientes={clientesEnDeposito}
-                      value={filtroClienteId}
-                      onChange={setFiltroClienteId}
-                      allowEmptyValue
-                      emptyListChoiceLabel="Todos"
-                      placeholderCerrado="Todos"
-                      placeholderBuscar="Buscar por nombre…"
-                      aria-label="Filtrar por cliente"
-                      inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        filtroClienteId.trim()
-                          ? "text-vialto-fire"
-                          : "text-vialto-charcoal"
-                      }`}
-                    />
-                  </ViajesListadoHeaderFiltro>
-                </th>
-                <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                  <ViajesListadoHeaderFiltro
-                    title="Producto"
-                    filterActive={!!filtroProductoId.trim()}
-                    filterSignature={filtroProductoId}
-                  >
-                    <SearchableEntitySelect<ProductoFiltro>
-                      items={productosEnDeposito}
-                      value={filtroProductoId}
-                      onChange={setFiltroProductoId}
-                      allowEmptyValue
-                      emptyListChoiceLabel="Todos"
-                      placeholderCerrado="Todos"
-                      placeholderBuscar="Buscar por nombre…"
-                      filterItems={(lista, q) => {
-                        const lq = q.toLowerCase();
-                        return lista.filter((p) =>
-                          p.nombre.toLowerCase().includes(lq),
-                        );
-                      }}
-                      getPrimaryLabel={(p) => p.nombre}
-                      searchAriaLabel="Filtrar productos"
-                      aria-label="Filtrar por producto"
-                      inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                        filtroProductoId.trim()
-                          ? "text-vialto-fire"
-                          : "text-vialto-charcoal"
-                      }`}
-                    />
-                  </ViajesListadoHeaderFiltro>
-                </th>
-                <th
-                  scope="col"
-                  className={`${listadoTablaThClass} text-right align-top`}
+                <nav
+                  className="-mb-px hidden flex-wrap gap-0 lg:flex"
+                  aria-label="Depósitos"
                 >
-                  <ViajesListadoHeaderFiltro
-                    title="Bultos"
-                    alignRight
-                    filterActive={soloConStockCant1}
-                    filterSignature={soloConStockCant1 ? "1" : ""}
-                  >
-                    <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
-                      <input
-                        type="checkbox"
-                        checked={soloConStockCant1}
-                        onChange={(e) => setSoloConStockCant1(e.target.checked)}
-                        className="h-4 w-4 accent-vialto-charcoal"
-                      />
-                      Solo con stock
-                    </label>
-                  </ViajesListadoHeaderFiltro>
-                </th>
-                {showUnidad2 && (
-                  <th
-                    scope="col"
-                    className={`${listadoTablaThClass} text-right align-top`}
-                  >
-                    <ViajesListadoHeaderFiltro
-                      title="Sueltas"
-                      alignRight
-                      filterActive={soloConStockCant2}
-                      filterSignature={soloConStockCant2 ? "1" : ""}
-                    >
-                      <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
-                        <input
-                          type="checkbox"
-                          checked={soloConStockCant2}
-                          onChange={(e) =>
-                            setSoloConStockCant2(e.target.checked)
-                          }
-                          className="h-4 w-4 accent-vialto-charcoal"
+                  {depositos.map((dep) => {
+                    const activo = depositoActivoId === dep.id;
+                    const count = countByDeposito[dep.id] ?? 0;
+                    return (
+                      <button
+                        key={dep.id}
+                        type="button"
+                        onClick={() => handleCambiarTab(dep.id)}
+                        className={[
+                          "flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
+                          activo
+                            ? "border-vialto-fire text-vialto-charcoal"
+                            : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:border-black/20",
+                        ].join(" ")}
+                      >
+                        <Warehouse
+                          className="h-3.5 w-3.5 shrink-0"
+                          strokeWidth={1.75}
+                          aria-hidden
                         />
-                        Solo con stock
-                      </label>
-                    </ViajesListadoHeaderFiltro>
-                  </th>
-                )}
-                <th scope="col" className={`${listadoTablaThClass} w-16`} />
-              </tr>
-            }
-            renderTableRow={(item) => {
-              const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
-              return (
-                <tr key={item.id} className={listadoTablaBodyRowClass}>
-                  <td className={listadoTablaTdClass}>
-                    <span className={sinStock ? "text-vialto-steel" : ""}>
-                      {item.cliente?.nombre ?? item.clienteId}
-                    </span>
-                  </td>
-                  <td className={listadoTablaTdClass}>
-                    <span className={sinStock ? "text-vialto-steel" : ""}>
-                      {item.producto?.nombre ?? item.productoId}
-                    </span>
-                  </td>
-                  <td
-                    className={`${listadoTablaTdClass} text-right tabular-nums`}
-                  >
-                    {cantidad1Cell(item)}
-                  </td>
-                  {showUnidad2 && (
-                    <td
-                      className={`${listadoTablaTdClass} text-right tabular-nums`}
-                    >
-                      {cantidad2Cell(item)}
-                    </td>
-                  )}
-                  <td className={`${listadoTablaTdClass} text-right`}>
-                    <button
-                      type="button"
-                      onClick={() => void abrirProducto(item.productoId)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
-                    >
-                      Ver
-                    </button>
-                  </td>
-                </tr>
-              );
-            }}
-            renderMobileCard={(item) => {
-              const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
-              const clienteNombre = item.cliente?.nombre ?? item.clienteId;
-              const productoNombre = item.producto?.nombre ?? item.productoId;
-              const fields = [
-                {
-                  label: "Producto",
-                  value: (
-                    <span className={sinStock ? "text-vialto-steel" : ""}>
-                      {productoNombre}
-                    </span>
-                  ),
-                },
-                {
-                  label: "Bultos",
-                  value: cantidad1Cell(item),
-                },
-              ];
-              if (showUnidad2) {
-                fields.push({ label: "Sueltas", value: cantidad2Cell(item) });
-              }
-              return (
-                <ListadoCard
-                  primary={
-                    <span className={sinStock ? "text-vialto-steel" : ""}>
-                      {clienteNombre}
-                    </span>
-                  }
-                  fields={fields}
-                  actions={
-                    <button
-                      type="button"
-                      onClick={() => void abrirProducto(item.productoId)}
-                      className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
-                    >
-                      Ver
-                    </button>
-                  }
-                />
-              );
-            }}
-          />
+                        {dep.nombre}
+                        <span
+                          className={[
+                            "rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none",
+                            activo
+                              ? "bg-vialto-fire/15 text-vialto-fire"
+                              : "bg-black/8 text-vialto-steel",
+                          ].join(" ")}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
 
-          {filteredItems.length > 0 && (
-            <div className="mt-4">
-              <ListadoPagination
-                meta={meta}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize);
-                  setPage(1);
+              <ListadoDatos
+                columns={[]}
+                rows={paginatedItems}
+                rowKey={(item) => item.id}
+                emptyMessage={stockEmptyMessage}
+                tableColSpan={colSpan}
+                filters={filterToolbar}
+                activeFilterCount={activeFilterCount}
+                onClearFilters={limpiarFiltros}
+                tableHead={
+                  <tr className={listadoTablaHeadRowClass}>
+                    <th
+                      scope="col"
+                      className={`${listadoTablaThClass} align-top`}
+                    >
+                      <ViajesListadoHeaderFiltro
+                        title="Cliente"
+                        filterActive={!!filtroClienteId.trim()}
+                        filterSignature={filtroClienteId}
+                      >
+                        <ClienteSearchSelect
+                          id="stock-panel-filtro-cliente"
+                          clientes={clientesEnDeposito}
+                          value={filtroClienteId}
+                          onChange={setFiltroClienteId}
+                          allowEmptyValue
+                          emptyListChoiceLabel="Todos"
+                          placeholderCerrado="Todos"
+                          placeholderBuscar="Buscar por nombre…"
+                          aria-label="Filtrar por cliente"
+                          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                            filtroClienteId.trim()
+                              ? "text-vialto-fire"
+                              : "text-vialto-charcoal"
+                          }`}
+                        />
+                      </ViajesListadoHeaderFiltro>
+                    </th>
+                    <th
+                      scope="col"
+                      className={`${listadoTablaThClass} align-top`}
+                    >
+                      <ViajesListadoHeaderFiltro
+                        title="Producto"
+                        filterActive={!!filtroProductoId.trim()}
+                        filterSignature={filtroProductoId}
+                      >
+                        <SearchableEntitySelect<ProductoFiltro>
+                          items={productosEnDeposito}
+                          value={filtroProductoId}
+                          onChange={setFiltroProductoId}
+                          allowEmptyValue
+                          emptyListChoiceLabel="Todos"
+                          placeholderCerrado="Todos"
+                          placeholderBuscar="Buscar por nombre…"
+                          filterItems={(lista, q) => {
+                            const lq = q.toLowerCase();
+                            return lista.filter((p) =>
+                              p.nombre.toLowerCase().includes(lq),
+                            );
+                          }}
+                          getPrimaryLabel={(p) => p.nombre}
+                          searchAriaLabel="Filtrar productos"
+                          aria-label="Filtrar por producto"
+                          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                            filtroProductoId.trim()
+                              ? "text-vialto-fire"
+                              : "text-vialto-charcoal"
+                          }`}
+                        />
+                      </ViajesListadoHeaderFiltro>
+                    </th>
+                    <th
+                      scope="col"
+                      className={`${listadoTablaThClass} text-right align-top`}
+                    >
+                      <ViajesListadoHeaderFiltro
+                        title="Bultos"
+                        alignRight
+                        filterActive={soloConStockCant1}
+                        filterSignature={soloConStockCant1 ? "1" : ""}
+                      >
+                        <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
+                          <input
+                            type="checkbox"
+                            checked={soloConStockCant1}
+                            onChange={(e) =>
+                              setSoloConStockCant1(e.target.checked)
+                            }
+                            className="h-4 w-4 accent-vialto-charcoal"
+                          />
+                          Solo con stock
+                        </label>
+                      </ViajesListadoHeaderFiltro>
+                    </th>
+                    {showUnidad2 && (
+                      <th
+                        scope="col"
+                        className={`${listadoTablaThClass} text-right align-top`}
+                      >
+                        <ViajesListadoHeaderFiltro
+                          title="Sueltas"
+                          alignRight
+                          filterActive={soloConStockCant2}
+                          filterSignature={soloConStockCant2 ? "1" : ""}
+                        >
+                          <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
+                            <input
+                              type="checkbox"
+                              checked={soloConStockCant2}
+                              onChange={(e) =>
+                                setSoloConStockCant2(e.target.checked)
+                              }
+                              className="h-4 w-4 accent-vialto-charcoal"
+                            />
+                            Solo con stock
+                          </label>
+                        </ViajesListadoHeaderFiltro>
+                      </th>
+                    )}
+                    <th scope="col" className={`${listadoTablaThClass} w-16`} />
+                  </tr>
+                }
+                renderTableRow={(item) => {
+                  const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
+                  return (
+                    <tr key={item.id} className={listadoTablaBodyRowClass}>
+                      <td className={listadoTablaTdClass}>
+                        <span className={sinStock ? "text-vialto-steel" : ""}>
+                          {item.cliente?.nombre ?? item.clienteId}
+                        </span>
+                      </td>
+                      <td className={listadoTablaTdClass}>
+                        <span className={sinStock ? "text-vialto-steel" : ""}>
+                          {item.producto?.nombre ?? item.productoId}
+                        </span>
+                      </td>
+                      <td
+                        className={`${listadoTablaTdClass} text-right tabular-nums`}
+                      >
+                        {cantidad1Cell(item)}
+                      </td>
+                      {showUnidad2 && (
+                        <td
+                          className={`${listadoTablaTdClass} text-right tabular-nums`}
+                        >
+                          {cantidad2Cell(item)}
+                        </td>
+                      )}
+                      <td className={`${listadoTablaTdClass} text-right`}>
+                        <button
+                          type="button"
+                          onClick={() => void abrirProducto(item.productoId)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                        >
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }}
+                renderMobileCard={(item) => {
+                  const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
+                  const clienteNombre = item.cliente?.nombre ?? item.clienteId;
+                  const productoNombre =
+                    item.producto?.nombre ?? item.productoId;
+                  const fields = [
+                    {
+                      label: "Producto",
+                      value: (
+                        <span className={sinStock ? "text-vialto-steel" : ""}>
+                          {productoNombre}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: "Bultos",
+                      value: cantidad1Cell(item),
+                    },
+                  ];
+                  if (showUnidad2) {
+                    fields.push({
+                      label: "Sueltas",
+                      value: cantidad2Cell(item),
+                    });
+                  }
+                  return (
+                    <ListadoCard
+                      primary={
+                        <span className={sinStock ? "text-vialto-steel" : ""}>
+                          {clienteNombre}
+                        </span>
+                      }
+                      fields={fields}
+                      actions={
+                        <button
+                          type="button"
+                          onClick={() => void abrirProducto(item.productoId)}
+                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                        >
+                          Ver
+                        </button>
+                      }
+                    />
+                  );
                 }}
               />
-            </div>
+
+              {filteredItems.length > 0 && (
+                <div className="mt-4">
+                  <ListadoPagination
+                    meta={meta}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    onPageSizeChange={(newSize) => {
+                      setPageSize(newSize);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -769,7 +860,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           productoInicial={productoModal.producto}
           getToken={getToken}
           baseUrl={productosBase}
-          tenantId={tenantId}
+          tenantId={activeTenantId}
           onClose={() => setProductoModal({ mode: "closed" })}
           onSaved={() => {}}
           onEdit={
@@ -790,7 +881,7 @@ export function StockPanelTenantPage({ tenantId }: { tenantId?: string }) {
           productoInicial={productoModal.producto}
           getToken={getToken}
           baseUrl={productosBase}
-          tenantId={tenantId}
+          tenantId={activeTenantId}
           onClose={() => setProductoModal({ mode: "closed" })}
           onSaved={async () => {
             setProductoModal({ mode: "closed" });

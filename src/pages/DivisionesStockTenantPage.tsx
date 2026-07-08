@@ -1,34 +1,45 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Minus, Plus } from 'lucide-react';
-import { useToast } from '@/lib/toast';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { Spinner } from '@/components/ui/Spinner';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { paginatedItems } from '@/lib/paginatedItems';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { LoteSelect } from '@/components/stock/LoteSelect';
-import type { LoteStockDisponible } from '@/components/stock/EgresoProductoLoteBloque';
-import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Deposito, PaginatedResponse, Producto, ProductoPresentacion, StockItem } from '@/types/api';
-import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import { useAuth } from "@clerk/clerk-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Minus, Plus } from "lucide-react";
+import { useToast } from "@/lib/toast";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { Spinner } from "@/components/ui/Spinner";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { paginatedItems } from "@/lib/paginatedItems";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { LoteSelect } from "@/components/stock/LoteSelect";
+import type { LoteStockDisponible } from "@/components/stock/EgresoProductoLoteBloque";
+import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
+import type {
+  Cliente,
+  Deposito,
+  PaginatedResponse,
+  Producto,
+  ProductoPresentacion,
+  StockItem,
+} from "@/types/api";
+import { fechaHoraToIso, isoToFechaHora } from "@/lib/viajeFechaHora";
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
+const INPUT = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
+const LABEL =
+  "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
 
-function buildQs(params: Record<string, string | number>, tenantId?: string): string {
+function buildQs(
+  params: Record<string, string | number>,
+  tenantId?: string,
+): string {
   const parts: string[] = [];
   if (tenantId) parts.push(`tenantId=${encodeURIComponent(tenantId)}`);
   for (const [k, v] of Object.entries(params))
     parts.push(`${k}=${encodeURIComponent(String(v))}`);
-  return parts.length ? `?${parts.join('&')}` : '';
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
 export function DivisionesStockTenantPage({
@@ -49,34 +60,43 @@ export function DivisionesStockTenantPage({
     () => clientesExternos ?? maestro.clientes,
     [clientesExternos, maestro.clientes],
   );
-  const clientesSelectLoading = platform ? Boolean(clientesExternosLoading) : maestro.loading;
+  const clientesSelectLoading = platform
+    ? Boolean(clientesExternosLoading)
+    : maestro.loading;
 
-  const productosBase = platform ? '/api/platform/stock/productos' : '/api/stock/productos';
+  const productosBase = platform
+    ? "/api/platform/stock/productos"
+    : "/api/stock/productos";
   const divisionesUrl = platform
     ? `/api/platform/stock/divisiones${buildQs({}, tenantId)}`
-    : '/api/stock/divisiones';
-  const disponibleBase = platform ? '/api/platform/stock/disponible' : '/api/stock/disponible';
-  const depositosBase = platform ? '/api/platform/stock/depositos' : '/api/stock/depositos';
-  const lotesBase = platform ? '/api/platform/stock/lotes' : '/api/stock/lotes';
+    : "/api/stock/divisiones";
+  const disponibleBase = platform
+    ? "/api/platform/stock/disponible"
+    : "/api/stock/disponible";
+  const depositosBase = platform
+    ? "/api/platform/stock/depositos"
+    : "/api/stock/depositos";
+  const lotesBase = platform ? "/api/platform/stock/lotes" : "/api/stock/lotes";
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [productosLoading, setProductosLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [clienteId, setClienteId] = useState('');
-  const [depositoId, setDepositoId] = useState('');
-  const [productoId, setProductoId] = useState('');
-  const [presentacionId, setPresentacionId] = useState('');
+  const [clienteId, setClienteId] = useState("");
+  const [depositoId, setDepositoId] = useState("");
+  const [productoId, setProductoId] = useState("");
+  const [presentacionId, setPresentacionId] = useState("");
   const [bultos, setBultos] = useState(1);
-  const [lote, setLote] = useState('');
-  const [loteDisponible, setLoteDisponible] = useState<LoteStockDisponible | null>(null);
+  const [lote, setLote] = useState("");
+  const [loteDisponible, setLoteDisponible] =
+    useState<LoteStockDisponible | null>(null);
 
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
-  const [observaciones, setObservaciones] = useState('');
+  const [observaciones, setObservaciones] = useState("");
   const [mostrarObs, setMostrarObs] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,7 +120,9 @@ export function DivisionesStockTenantPage({
   const presentacionSeleccionada: ProductoPresentacion | null = useMemo(() => {
     if (!productoSeleccionado || !presentacionId) return null;
     return (
-      productoSeleccionado.productoPresentaciones.find((pp) => pp.id === presentacionId) ?? null
+      productoSeleccionado.productoPresentaciones.find(
+        (pp) => pp.id === presentacionId,
+      ) ?? null
     );
   }, [productoSeleccionado, presentacionId]);
 
@@ -108,7 +130,8 @@ export function DivisionesStockTenantPage({
   const sueltasResultantes = bultos * unidadesPorBulto;
 
   const stockDisponible: StockItem | null = useMemo(() => {
-    if (!productoId || !clienteId || !depositoId || !presentacionId) return null;
+    if (!productoId || !clienteId || !depositoId || !presentacionId)
+      return null;
     return (
       stockItems.find(
         (s) =>
@@ -145,13 +168,13 @@ export function DivisionesStockTenantPage({
     setLoadError(null);
     try {
       const url = `${productosBase}/paginated${buildQs(
-        { page: 1, pageSize: 100, filtroActivo: 'activos' },
+        { page: 1, pageSize: 100, filtroActivo: "activos" },
         tenantId,
       )}`;
       const data = await apiJson<PaginatedProductos>(url, () => getToken());
       setProductos(data.items);
     } catch (e) {
-      setLoadError(friendlyError(e, 'stock'));
+      setLoadError(friendlyError(e, "stock"));
     } finally {
       setProductosLoading(false);
     }
@@ -162,7 +185,7 @@ export function DivisionesStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    const url = `${depositosBase}${buildQs({ activo: "1", page: 1, pageSize: 500 }, tenantId)}`;
     void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
       .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
@@ -171,7 +194,9 @@ export function DivisionesStockTenantPage({
   // Todo el stock del tenant (sin filtros) — para filtrar clientes y depósitos con bultos
   useEffect(() => {
     setAllStockLoading(true);
-    void apiJson<StockItem[]>(`${disponibleBase}${buildQs({}, tenantId)}`, () => getToken())
+    void apiJson<StockItem[]>(`${disponibleBase}${buildQs({}, tenantId)}`, () =>
+      getToken(),
+    )
       .then((items) => setAllStockItems(items.filter((s) => s.cantidad1 > 0)))
       .catch(() => setAllStockItems([]))
       .finally(() => setAllStockLoading(false));
@@ -185,7 +210,9 @@ export function DivisionesStockTenantPage({
     setStockLoading(true);
     const qs = buildQs({ productoId, clienteId }, tenantId);
     void apiJson<StockItem[]>(`${disponibleBase}${qs}`, () => getToken())
-      .then((items) => setStockItems(items.filter((s) => s.cantidad1 > 0 || s.cantidad2 > 0)))
+      .then((items) =>
+        setStockItems(items.filter((s) => s.cantidad1 > 0 || s.cantidad2 > 0)),
+      )
       .catch(() => setStockItems([]))
       .finally(() => setStockLoading(false));
   }, [productoId, clienteId, disponibleBase, tenantId, getToken]);
@@ -193,27 +220,27 @@ export function DivisionesStockTenantPage({
   // Auto-seleccionar si hay una sola presentación
   useEffect(() => {
     if (!productoSeleccionado) {
-      setPresentacionId('');
+      setPresentacionId("");
       return;
     }
     const pps = productoSeleccionado.productoPresentaciones;
-    setPresentacionId(pps.length === 1 ? pps[0].id : '');
+    setPresentacionId(pps.length === 1 ? pps[0].id : "");
     setBultos(1);
   }, [productoSeleccionado]);
 
   function resetForm() {
-    setClienteId('');
-    setDepositoId('');
-    setProductoId('');
-    setPresentacionId('');
+    setClienteId("");
+    setDepositoId("");
+    setProductoId("");
+    setPresentacionId("");
     setBultos(1);
     const p = isoToFechaHora(new Date().toISOString());
     setFechaMov(p.fecha);
     setHoraMov(p.hora);
     setFechaMovError(null);
-    setObservaciones('');
+    setObservaciones("");
     setMostrarObs(false);
-    setLote('');
+    setLote("");
     setLoteDisponible(null);
     setStockItems([]);
     setFormError(null);
@@ -225,34 +252,35 @@ export function DivisionesStockTenantPage({
     setFormError(null);
 
     const ferrs: Record<string, string> = {};
-    if (!clienteId) ferrs.clienteId = 'Seleccioná una empresa.';
-    if (!depositoId) ferrs.depositoId = 'Seleccioná un depósito.';
-    if (!productoId) ferrs.productoId = 'Seleccioná un producto.';
-    if (!presentacionId) ferrs.presentacionId = 'Seleccioná una presentación.';
+    if (!clienteId) ferrs.clienteId = "Seleccioná una empresa.";
+    if (!depositoId) ferrs.depositoId = "Seleccioná un depósito.";
+    if (!productoId) ferrs.productoId = "Seleccioná un producto.";
+    if (!presentacionId) ferrs.presentacionId = "Seleccioná una presentación.";
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
       return;
     }
     setFieldErrors({});
 
-    if (bultos < 1) return setFormError('La cantidad de bultos debe ser al menos 1.');
+    if (bultos < 1)
+      return setFormError("La cantidad de bultos debe ser al menos 1.");
     if (bultosDisponibles > 0 && bultos > bultosDisponibles) {
       return setFormError(
-        `Stock insuficiente. Tenés ${bultosDisponibles} bulto${bultosDisponibles !== 1 ? 's' : ''} disponible${bultosDisponibles !== 1 ? 's' : ''}.`,
+        `Stock insuficiente. Tenés ${bultosDisponibles} bulto${bultosDisponibles !== 1 ? "s" : ""} disponible${bultosDisponibles !== 1 ? "s" : ""}.`,
       );
     }
 
-    const fmError = !fechaMov.trim() ? 'Ingresá la fecha.' : null;
+    const fmError = !fechaMov.trim() ? "Ingresá la fecha." : null;
     setFechaMovError(fmError);
     if (fmError) return setFormError(fmError);
 
     const fechaIso = fechaHoraToIso(fechaMov, horaMov);
-    if (!fechaIso) return setFormError('Revisá la fecha y hora.');
+    if (!fechaIso) return setFormError("Revisá la fecha y hora.");
 
     setSaving(true);
     try {
       await apiJson(divisionesUrl, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({
           productoId,
           presentacionId,
@@ -261,13 +289,15 @@ export function DivisionesStockTenantPage({
           bultos,
           fecha: fechaIso,
           ...(lote.trim() ? { lote: lote.trim() } : {}),
-          ...(observaciones.trim() ? { observaciones: observaciones.trim() } : {}),
+          ...(observaciones.trim()
+            ? { observaciones: observaciones.trim() }
+            : {}),
         }),
       });
-      showToast('División registrada correctamente.');
+      showToast("División registrada correctamente.");
       resetForm();
     } catch (e) {
-      setFormError(friendlyError(e, 'stock'));
+      setFormError(friendlyError(e, "stock"));
     } finally {
       setSaving(false);
     }
@@ -275,10 +305,14 @@ export function DivisionesStockTenantPage({
 
   const historialHref = platform
     ? `/stock/divisiones/historial?tenantId=${encodeURIComponent(tenantId!)}`
-    : '/stock/divisiones/historial';
+    : "/stock/divisiones/historial";
 
   const readyToConvert = Boolean(
-    clienteId && depositoId && productoId && presentacionId && unidadesPorBulto > 0,
+    clienteId &&
+    depositoId &&
+    productoId &&
+    presentacionId &&
+    unidadesPorBulto > 0,
   );
 
   return (
@@ -286,16 +320,24 @@ export function DivisionesStockTenantPage({
       {!platform && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-vialto-charcoal">División de bultos</h1>
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">
+              División de bultos
+            </h1>
             <p className="mt-1 text-sm text-vialto-steel">
-              Convertí bultos en unidades sueltas. El stock se actualiza automáticamente.
+              Convertí bultos en unidades sueltas. El stock se actualiza
+              automáticamente.
             </p>
           </div>
           <Link
             to={historialHref}
             className="shrink-0 inline-flex items-center gap-2 rounded border border-black/15 bg-white px-3 py-1.5 text-sm font-medium text-vialto-charcoal hover:bg-vialto-mist/60 transition-colors"
           >
-            <img src="/icono-historial.png" alt="" className="h-5 w-5" aria-hidden />
+            <img
+              src="/icono-historial.png"
+              alt=""
+              className="h-5 w-5"
+              aria-hidden
+            />
             Historial
           </Link>
         </div>
@@ -322,12 +364,15 @@ export function DivisionesStockTenantPage({
                   setClienteId(id);
                   setStockItems([]);
                   const depositosParaCliente = new Set(
-                    allStockItems.filter((s) => s.clienteId === id).map((s) => s.depositoId),
+                    allStockItems
+                      .filter((s) => s.clienteId === id)
+                      .map((s) => s.depositoId),
                   );
-                  if (depositoId && !depositosParaCliente.has(depositoId)) setDepositoId('');
+                  if (depositoId && !depositosParaCliente.has(depositoId))
+                    setDepositoId("");
                 }}
                 loading={clientesSelectLoading || allStockLoading}
-                inputClassName={`${INPUT} ${fieldErrors.clienteId ? 'border-red-400' : ''}`}
+                inputClassName={`${INPUT} ${fieldErrors.clienteId ? "border-red-400" : ""}`}
               />
               <CrudFieldError message={fieldErrors.clienteId} />
             </div>
@@ -340,11 +385,13 @@ export function DivisionesStockTenantPage({
                 value={depositoId}
                 onChange={(e) => setDepositoId(e.target.value)}
                 className={`h-9 w-full border bg-white px-2 text-sm ${
-                  fieldErrors.depositoId ? 'border-red-400' : 'border-black/15'
+                  fieldErrors.depositoId ? "border-red-400" : "border-black/15"
                 }`}
               >
                 <option value="">
-                  {!clienteId ? 'Primero elegí una empresa…' : 'Elegí un depósito…'}
+                  {!clienteId
+                    ? "Primero elegí una empresa…"
+                    : "Elegí un depósito…"}
                 </option>
                 {depositosFiltrados.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -376,10 +423,12 @@ export function DivisionesStockTenantPage({
                       (p.codigo?.toLowerCase().includes(lq) ?? false),
                   );
                 }}
-                getPrimaryLabel={(p) => (p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre)}
+                getPrimaryLabel={(p) =>
+                  p.codigo ? `[${p.codigo}] ${p.nombre}` : p.nombre
+                }
                 placeholderCerrado="Elegí un producto…"
                 placeholderBuscar="Buscar por nombre o código…"
-                inputClassName={`${INPUT} ${fieldErrors.productoId ? 'border-red-400' : ''}`}
+                inputClassName={`${INPUT} ${fieldErrors.productoId ? "border-red-400" : ""}`}
               />
               <CrudFieldError message={fieldErrors.productoId} />
             </div>
@@ -396,18 +445,24 @@ export function DivisionesStockTenantPage({
                 }}
                 disabled={!productoId}
                 className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
-                  fieldErrors.presentacionId ? 'border-red-400' : 'border-black/15'
+                  fieldErrors.presentacionId
+                    ? "border-red-400"
+                    : "border-black/15"
                 }`}
               >
                 <option value="">
-                  {!productoId ? 'Primero elegí un producto' : 'Elegí una presentación…'}
+                  {!productoId
+                    ? "Primero elegí un producto"
+                    : "Elegí una presentación…"}
                 </option>
-                {(productoSeleccionado?.productoPresentaciones ?? []).map((pp) => (
-                  <option key={pp.id} value={pp.id}>
-                    {pp.presentacion?.nombre ?? pp.presentacionId} — {pp.unidadesPorBulto}{' '}
-                    uds/bulto
-                  </option>
-                ))}
+                {(productoSeleccionado?.productoPresentaciones ?? []).map(
+                  (pp) => (
+                    <option key={pp.id} value={pp.id}>
+                      {pp.presentacion?.nombre ?? pp.presentacionId} —{" "}
+                      {pp.unidadesPorBulto} uds/bulto
+                    </option>
+                  ),
+                )}
               </select>
               <CrudFieldError message={fieldErrors.presentacionId} />
             </div>
@@ -423,7 +478,9 @@ export function DivisionesStockTenantPage({
                 onLoteChange={(l, stock) => {
                   setLote(l);
                   setLoteDisponible(
-                    stock ? { bultos: stock.bultos, sueltas: stock.sueltas } : null,
+                    stock
+                      ? { bultos: stock.bultos, sueltas: stock.sueltas }
+                      : null,
                   );
                   setBultos(1);
                 }}
@@ -448,7 +505,7 @@ export function DivisionesStockTenantPage({
                 <span className="text-vialto-steel text-sm">Verificando…</span>
               ) : bultosDisponibles > 0 ? (
                 <span className="font-semibold text-vialto-charcoal">
-                  {bultosDisponibles} bulto{bultosDisponibles !== 1 ? 's' : ''}
+                  {bultosDisponibles} bulto{bultosDisponibles !== 1 ? "s" : ""}
                   {!lote && (stockDisponible?.cantidad2 ?? 0) > 0 && (
                     <span className="font-normal text-vialto-steel ml-2 text-xs">
                       + {stockDisponible!.cantidad2} sueltas
@@ -465,7 +522,9 @@ export function DivisionesStockTenantPage({
                 </span>
               ) : (
                 <span className="text-amber-600 text-sm">
-                  {lote ? `Sin stock en bultos para lote ${lote}` : 'Sin stock en bultos'}
+                  {lote
+                    ? `Sin stock en bultos para lote ${lote}`
+                    : "Sin stock en bultos"}
                 </span>
               )}
             </div>
@@ -501,7 +560,9 @@ export function DivisionesStockTenantPage({
                   <button
                     type="button"
                     onClick={() => setBultos((n) => n + 1)}
-                    disabled={bultosDisponibles > 0 && bultos >= bultosDisponibles}
+                    disabled={
+                      bultosDisponibles > 0 && bultos >= bultosDisponibles
+                    }
                     className="h-10 w-10 flex items-center justify-center rounded-full border border-black/20 bg-white hover:bg-vialto-mist/60 disabled:opacity-30 transition-colors"
                   >
                     <Plus className="h-4 w-4 text-vialto-charcoal" />
@@ -520,7 +581,7 @@ export function DivisionesStockTenantPage({
                   </p>
                   <p className="text-3xl font-bold text-red-600">−{bultos}</p>
                   <p className="text-sm text-red-500 mt-1">
-                    bulto{bultos !== 1 ? 's' : ''}
+                    bulto{bultos !== 1 ? "s" : ""}
                   </p>
                 </div>
 
@@ -532,7 +593,9 @@ export function DivisionesStockTenantPage({
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-2">
                     Entra
                   </p>
-                  <p className="text-3xl font-bold text-emerald-700">+{sueltasResultantes}</p>
+                  <p className="text-3xl font-bold text-emerald-700">
+                    +{sueltasResultantes}
+                  </p>
                   <p className="text-sm text-emerald-600 mt-1">sueltas</p>
                 </div>
               </div>
@@ -591,7 +654,7 @@ export function DivisionesStockTenantPage({
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-vialto-fire text-white text-sm font-semibold rounded hover:bg-vialto-fire/90 transition-colors disabled:opacity-50"
             >
               {saving && <Spinner />}
-              {saving ? 'Guardando…' : 'Registrar división'}
+              {saving ? "Guardando…" : "Registrar división"}
             </button>
           </div>
         </div>

@@ -1,48 +1,56 @@
-import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/clerk-react';
-import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AppShell } from '@/components/AppShell';
-import { MaestroDataProvider, useMaestroData } from '@/hooks/useMaestroData';
-import { isPlatformSuperadmin, isOrgMember, isStockViewer } from '@/lib/roleLabels';
-import { HomePage } from '@/pages/HomePage';
-import { ViajesPage } from '@/pages/ViajesPage';
-import { BaseDeDatosPage } from '@/pages/BaseDeDatosPage';
-import { SuperadminTenantCreatePage } from '@/pages/SuperadminTenantCreatePage';
-import { SuperadminTenantEditPage } from '@/pages/SuperadminTenantEditPage';
-import { ClienteCreatePage } from '@/pages/ClienteCreatePage';
-import { ClienteEditPage } from '@/pages/ClienteEditPage';
-import { TransportistaCreatePage } from '@/pages/TransportistaCreatePage';
-import { TransportistaEditPage } from '@/pages/TransportistaEditPage';
-import { ChoferCreatePage } from '@/pages/ChoferCreatePage';
-import { ChoferEditPage } from '@/pages/ChoferEditPage';
-import { DestinatarioCreatePage } from '@/pages/DestinatarioCreatePage';
-import { DestinatarioEditPage } from '@/pages/DestinatarioEditPage';
-import { VehiculoCreatePage } from '@/pages/VehiculoCreatePage';
-import { VehiculoEditPage } from '@/pages/VehiculoEditPage';
-import { DireccionEntregaCreatePage } from '@/pages/DireccionEntregaCreatePage';
-import { DireccionEntregaEditPage } from '@/pages/DireccionEntregaEditPage';
-import { ViajeCreatePage } from '@/pages/ViajeCreatePage';
-import { IngresosStockPage } from '@/pages/IngresosStockPage';
-import { IngresosStockHistorialPage } from '@/pages/IngresosStockHistorialPage';
-import { EgresosStockPage } from '@/pages/EgresosStockPage';
-import { EgresosStockHistorialPage } from '@/pages/EgresosStockHistorialPage';
-import { DivisionesStockPage } from '@/pages/DivisionesStockPage';
-import { DivisionesStockHistorialPage } from '@/pages/DivisionesStockHistorialPage';
-import { MovimientoStockDetallePage } from '@/pages/MovimientoStockDetallePage';
-import { StockMovimientosPage } from '@/pages/StockMovimientosPage';
-import { StockPanelPage } from '@/pages/StockPanelPage';
-import { FacturacionPage } from '@/pages/FacturacionPage';
-import { SuperadminEmpresasPage } from '@/pages/SuperadminEmpresasPage';
-import { SuperadminUsersPage } from '@/pages/SuperadminUsersPage';
-import { SuperadminUserCreatePage } from '@/pages/SuperadminUserCreatePage';
-import { SuperadminUserEditPage } from '@/pages/SuperadminUserEditPage';
-import { SuperadminArcaPage } from '@/pages/SuperadminArcaPage';
-import { LiquidacionesTenantPage } from '@/pages/LiquidacionesTenantPage';
-import { ArcaConfigTenantPage } from '@/pages/ArcaConfigTenantPage';
-import { CombustiblePage } from '@/pages/CombustiblePage';
-import { PasswordSignInPage } from '@/pages/PasswordSignInPage';
-import { PasswordSignUpPage } from '@/pages/PasswordSignUpPage';
-import { TaskSetupMFAPage } from '@/pages/TaskSetupMFAPage';
-import { TaskChooseOrganizationPage } from '@/pages/TaskChooseOrganizationPage';
+import {
+  AuthenticateWithRedirectCallback,
+  useAuth,
+  useUser,
+} from "@clerk/clerk-react";
+import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { AppShell } from "@/components/AppShell";
+import { MaestroDataProvider, useMaestroData } from "@/hooks/useMaestroData";
+import {
+  isPlatformSuperadmin,
+  isOrgMember,
+  isStockViewer,
+} from "@/lib/roleLabels";
+import { HomePage } from "@/pages/HomePage";
+import { ViajesPage } from "@/pages/ViajesPage";
+import { BaseDeDatosPage } from "@/pages/BaseDeDatosPage";
+import { SuperadminTenantCreatePage } from "@/pages/SuperadminTenantCreatePage";
+import { SuperadminTenantEditPage } from "@/pages/SuperadminTenantEditPage";
+import { ClienteCreatePage } from "@/pages/ClienteCreatePage";
+import { ClienteEditPage } from "@/pages/ClienteEditPage";
+import { TransportistaCreatePage } from "@/pages/TransportistaCreatePage";
+import { TransportistaEditPage } from "@/pages/TransportistaEditPage";
+import { ChoferCreatePage } from "@/pages/ChoferCreatePage";
+import { ChoferEditPage } from "@/pages/ChoferEditPage";
+import { DestinatarioCreatePage } from "@/pages/DestinatarioCreatePage";
+import { DestinatarioEditPage } from "@/pages/DestinatarioEditPage";
+import { VehiculoCreatePage } from "@/pages/VehiculoCreatePage";
+import { VehiculoEditPage } from "@/pages/VehiculoEditPage";
+import { DireccionEntregaCreatePage } from "@/pages/DireccionEntregaCreatePage";
+import { DireccionEntregaEditPage } from "@/pages/DireccionEntregaEditPage";
+import { ViajeCreatePage } from "@/pages/ViajeCreatePage";
+import { IngresosStockPage } from "@/pages/IngresosStockPage";
+import { IngresosStockHistorialPage } from "@/pages/IngresosStockHistorialPage";
+import { EgresosStockPage } from "@/pages/EgresosStockPage";
+import { EgresosStockHistorialPage } from "@/pages/EgresosStockHistorialPage";
+import { DivisionesStockPage } from "@/pages/DivisionesStockPage";
+import { DivisionesStockHistorialPage } from "@/pages/DivisionesStockHistorialPage";
+import { MovimientoStockDetallePage } from "@/pages/MovimientoStockDetallePage";
+import { StockMovimientosPage } from "@/pages/StockMovimientosPage";
+import { StockPanelPage } from "@/pages/StockPanelPage";
+import { FacturacionPage } from "@/pages/FacturacionPage";
+import { SuperadminEmpresasPage } from "@/pages/SuperadminEmpresasPage";
+import { SuperadminUsersPage } from "@/pages/SuperadminUsersPage";
+import { SuperadminUserCreatePage } from "@/pages/SuperadminUserCreatePage";
+import { SuperadminUserEditPage } from "@/pages/SuperadminUserEditPage";
+import { SuperadminArcaPage } from "@/pages/SuperadminArcaPage";
+import { LiquidacionesTenantPage } from "@/pages/LiquidacionesTenantPage";
+import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
+import { CombustiblePage } from "@/pages/CombustiblePage";
+import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
+import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
+import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
+import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -73,9 +81,14 @@ function RestrictedAccess({
 }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 text-center">
-      <p className="text-lg font-semibold text-vialto-charcoal">Acceso restringido</p>
+      <p className="text-lg font-semibold text-vialto-charcoal">
+        Acceso restringido
+      </p>
       <p className="text-sm text-vialto-steel max-w-xs">{message}</p>
-      <Link to={linkTo} className="text-sm text-vialto-fire underline underline-offset-2">
+      <Link
+        to={linkTo}
+        className="text-sm text-vialto-fire underline underline-offset-2"
+      >
         {linkLabel}
       </Link>
     </div>
@@ -196,11 +209,17 @@ function RequireModule({ module }: { module: string }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 text-center">
         <p className="text-3xl font-semibold text-vialto-charcoal">403</p>
-        <p className="text-lg font-semibold text-vialto-charcoal">Módulo no contratado</p>
-        <p className="text-sm text-vialto-steel max-w-xs">
-          Tu empresa no tiene acceso a esta sección. Contactá al administrador si necesitás habilitarla.
+        <p className="text-lg font-semibold text-vialto-charcoal">
+          Módulo no contratado
         </p>
-        <Link to="/" className="text-sm text-vialto-fire underline underline-offset-2">
+        <p className="text-sm text-vialto-steel max-w-xs">
+          Tu empresa no tiene acceso a esta sección. Contactá al administrador
+          si necesitás habilitarla.
+        </p>
+        <Link
+          to="/"
+          className="text-sm text-vialto-fire underline underline-offset-2"
+        >
           Volver al inicio
         </Link>
       </div>
@@ -213,10 +232,7 @@ function RequireModule({ module }: { module: string }) {
 export default function App() {
   return (
     <Routes>
-      <Route
-        path="/sign-in"
-        element={<PasswordSignInPage />}
-      />
+      <Route path="/sign-in" element={<PasswordSignInPage />} />
       <Route
         path="/sign-in/clerk/*"
         element={<Navigate to="/sign-in" replace />}
@@ -231,45 +247,110 @@ export default function App() {
       />
       <Route path="/sign-up/*" element={<PasswordSignUpPage />} />
       <Route path="/tasks/setup-mfa" element={<TaskSetupMFAPage />} />
-      <Route path="/tasks/choose-organization" element={<TaskChooseOrganizationPage />} />
+      <Route
+        path="/tasks/choose-organization"
+        element={<TaskChooseOrganizationPage />}
+      />
 
       <Route element={<RequireAuth />}>
-        <Route path="/" element={<MaestroDataProvider><AppShell /></MaestroDataProvider>}>
+        <Route
+          path="/"
+          element={
+            <MaestroDataProvider>
+              <AppShell />
+            </MaestroDataProvider>
+          }
+        >
           <Route element={<RequireNotStockViewer />}>
             <Route index element={<HomePage />} />
             <Route path="viajes" element={<ViajesPage />} />
             <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
-            <Route path="viajes/:id/editar" element={<Navigate to="/viajes" replace />} />
+            <Route
+              path="viajes/:id/editar"
+              element={<Navigate to="/viajes" replace />}
+            />
             <Route path="facturacion" element={<FacturacionPage />} />
             <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
           </Route>
           {/* rutas legacy → redirigen al tab correspondiente en /base-de-datos */}
-          <Route path="stock/productos" element={<Navigate to="/base-de-datos?tab=productos" replace />} />
-          <Route path="stock/depositos" element={<Navigate to="/base-de-datos?tab=depositos" replace />} />
-          <Route path="stock/panel" element={<Navigate to="/stock/inventario" replace />} />
-          <Route path="clientes" element={<Navigate to="/base-de-datos?tab=clientes" replace />} />
-          <Route path="transportistas" element={<Navigate to="/base-de-datos?tab=transportistas" replace />} />
-          <Route path="choferes" element={<Navigate to="/base-de-datos?tab=choferes" replace />} />
-          <Route path="destinatarios" element={<Navigate to="/base-de-datos?tab=destinatarios" replace />} />
-          <Route path="vehiculos" element={<Navigate to="/base-de-datos?tab=vehiculos" replace />} />
-          <Route path="direcciones-entrega" element={<Navigate to="/base-de-datos?tab=direcciones-entrega" replace />} />
+          <Route
+            path="stock/productos"
+            element={<Navigate to="/base-de-datos?tab=productos" replace />}
+          />
+          <Route
+            path="stock/depositos"
+            element={<Navigate to="/base-de-datos?tab=depositos" replace />}
+          />
+          <Route
+            path="stock/panel"
+            element={<Navigate to="/stock/inventario" replace />}
+          />
+          <Route
+            path="clientes"
+            element={<Navigate to="/base-de-datos?tab=clientes" replace />}
+          />
+          <Route
+            path="transportistas"
+            element={
+              <Navigate to="/base-de-datos?tab=transportistas" replace />
+            }
+          />
+          <Route
+            path="choferes"
+            element={<Navigate to="/base-de-datos?tab=choferes" replace />}
+          />
+          <Route
+            path="destinatarios"
+            element={<Navigate to="/base-de-datos?tab=destinatarios" replace />}
+          />
+          <Route
+            path="vehiculos"
+            element={<Navigate to="/base-de-datos?tab=vehiculos" replace />}
+          />
+          <Route
+            path="direcciones-entrega"
+            element={
+              <Navigate to="/base-de-datos?tab=direcciones-entrega" replace />
+            }
+          />
 
           {/* rutas accesibles solo para org:admin y superadmin */}
           <Route element={<RequireOrgAdmin />}>
-            <Route path="liquidaciones/configuracion" element={<ArcaConfigTenantPage />} />
+            <Route
+              path="liquidaciones/configuracion"
+              element={<ArcaConfigTenantPage />}
+            />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
             <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
-            <Route path="transportistas/nuevo" element={<TransportistaCreatePage />} />
-            <Route path="transportistas/:id/editar" element={<TransportistaEditPage />} />
+            <Route
+              path="transportistas/nuevo"
+              element={<TransportistaCreatePage />}
+            />
+            <Route
+              path="transportistas/:id/editar"
+              element={<TransportistaEditPage />}
+            />
             <Route path="choferes/nuevo" element={<ChoferCreatePage />} />
             <Route path="choferes/:id/editar" element={<ChoferEditPage />} />
-            <Route path="destinatarios/nuevo" element={<DestinatarioCreatePage />} />
-            <Route path="destinatarios/:id/editar" element={<DestinatarioEditPage />} />
+            <Route
+              path="destinatarios/nuevo"
+              element={<DestinatarioCreatePage />}
+            />
+            <Route
+              path="destinatarios/:id/editar"
+              element={<DestinatarioEditPage />}
+            />
             <Route path="vehiculos/nuevo" element={<VehiculoCreatePage />} />
             <Route path="vehiculos/:id/editar" element={<VehiculoEditPage />} />
-            <Route path="direcciones-entrega/nuevo" element={<DireccionEntregaCreatePage />} />
-            <Route path="direcciones-entrega/:id/editar" element={<DireccionEntregaEditPage />} />
+            <Route
+              path="direcciones-entrega/nuevo"
+              element={<DireccionEntregaCreatePage />}
+            />
+            <Route
+              path="direcciones-entrega/:id/editar"
+              element={<DireccionEntregaEditPage />}
+            />
           </Route>
 
           {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
@@ -283,28 +364,58 @@ export default function App() {
           <Route element={<RequireModule module="stock" />}>
             <Route element={<RequireStockReadAccess />}>
               <Route path="stock/inventario" element={<StockPanelPage />} />
-              <Route path="stock/movimientos" element={<StockMovimientosPage />} />
-              <Route path="stock/movimientos/:id" element={<MovimientoStockDetallePage />} />
+              <Route
+                path="stock/movimientos"
+                element={<StockMovimientosPage />}
+              />
+              <Route
+                path="stock/movimientos/:id"
+                element={<MovimientoStockDetallePage />}
+              />
             </Route>
 
             <Route element={<RequireOrgAdmin />}>
-              <Route path="stock/divisiones" element={<DivisionesStockPage />} />
-              <Route path="stock/divisiones/historial" element={<DivisionesStockHistorialPage />} />
+              <Route
+                path="stock/divisiones"
+                element={<DivisionesStockPage />}
+              />
+              <Route
+                path="stock/divisiones/historial"
+                element={<DivisionesStockHistorialPage />}
+              />
             </Route>
 
             <Route element={<RequireStockOperator />}>
               <Route path="stock/ingresos" element={<IngresosStockPage />} />
-              <Route path="stock/ingresos/historial" element={<IngresosStockHistorialPage />} />
+              <Route
+                path="stock/ingresos/historial"
+                element={<IngresosStockHistorialPage />}
+              />
               <Route path="stock/egresos" element={<EgresosStockPage />} />
-              <Route path="stock/egresos/historial" element={<EgresosStockHistorialPage />} />
+              <Route
+                path="stock/egresos/historial"
+                element={<EgresosStockHistorialPage />}
+              />
             </Route>
           </Route>
-          <Route path="superadmin/empresas" element={<SuperadminEmpresasPage />} />
+          <Route
+            path="superadmin/empresas"
+            element={<SuperadminEmpresasPage />}
+          />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
-          <Route path="superadmin/usuarios/nuevo" element={<SuperadminUserCreatePage />} />
-          <Route path="superadmin/usuarios/:userId/editar" element={<SuperadminUserEditPage />} />
-          <Route path="superadmin/empresas/nueva" element={<SuperadminTenantCreatePage />} />
+          <Route
+            path="superadmin/usuarios/nuevo"
+            element={<SuperadminUserCreatePage />}
+          />
+          <Route
+            path="superadmin/usuarios/:userId/editar"
+            element={<SuperadminUserEditPage />}
+          />
+          <Route
+            path="superadmin/empresas/nueva"
+            element={<SuperadminTenantCreatePage />}
+          />
           <Route
             path="superadmin/empresas/:orgId/editar"
             element={<SuperadminTenantEditPage />}
