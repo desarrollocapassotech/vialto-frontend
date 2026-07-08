@@ -1,9 +1,9 @@
-import { Link } from 'react-router-dom';
-import { TenantsPagination } from '@/components/superadmin/TenantsPagination';
-import { TenantsTable } from '@/components/superadmin/TenantsTable';
-import { TenantsToolbar } from '@/components/superadmin/TenantsToolbar';
-import { usePaginatedTenants } from '@/hooks/usePaginatedTenants';
-import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
+import { Link } from "react-router-dom";
+import { TenantsTable } from "@/components/superadmin/TenantsTable";
+import { TenantsToolbar } from "@/components/superadmin/TenantsToolbar";
+import { usePaginatedTenants } from "@/hooks/usePaginatedTenants";
+import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 
 export function SuperadminEmpresasPage() {
   const {
@@ -19,7 +19,6 @@ export function SuperadminEmpresasPage() {
     onChangePageSize,
     statusUpdatingByOrgId,
     toggleTenantEnabled,
-    prevPage,
     nextPage,
   } = usePaginatedTenants();
 
@@ -56,20 +55,24 @@ export function SuperadminEmpresasPage() {
           onSearch={applySearch}
           onClear={clearSearch}
         />
+
         <TenantsTable
           loading={loading}
           items={items}
           statusUpdatingByOrgId={statusUpdatingByOrgId}
           onToggleEnabled={toggleTenantEnabled}
         />
-        <TenantsPagination
-          meta={meta}
-          loading={loading}
-          pageSize={pageSize}
-          onPageSizeChange={onChangePageSize}
-          onPrev={prevPage}
-          onNext={nextPage}
-        />
+
+        {meta && (
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            loading={loading}
+            totalLabel="empresas"
+            onPageChange={nextPage}
+            onPageSizeChange={onChangePageSize}
+          />
+        )}
       </div>
     </SuperadminOnly>
   );

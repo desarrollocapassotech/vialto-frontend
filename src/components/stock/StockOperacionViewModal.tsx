@@ -1,7 +1,10 @@
 ﻿import { useState } from 'react';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { DivisionImpactoLinea } from '@/components/stock/DivisionImpactoLinea';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
+import { StockOperacionTipoCelda } from '@/components/stock/StockOperacionTipoCelda';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
+import { getDivisionImpacto } from '@/lib/stockDivision';
 import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion } from '@/types/api';
@@ -41,13 +44,17 @@ export function StockOperacionViewModal({
 }) {
   const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
   const fotosUrls = operacion.tipo === 'ingreso' ? (operacion.fotosUrls ?? []) : [];
+  const divisionImpacto =
+    operacion.tipo === 'division' ? getDivisionImpacto(operacion) : null;
 
   const titulo =
-    operacion.tipo === 'ingreso'
-      ? 'Ingreso al depósito'
-      : operacion.numeroRemito
-        ? `Egreso — Remito ${operacion.numeroRemito}`
-        : 'Egreso de stock';
+    operacion.tipo === 'division'
+      ? 'División de bultos'
+      : operacion.tipo === 'ingreso'
+        ? 'Ingreso al depósito'
+        : operacion.numeroRemito
+          ? `Egreso — Remito ${operacion.numeroRemito}`
+          : 'Egreso de stock';
 
   return (
     <ViewModalShell
@@ -83,6 +90,24 @@ export function StockOperacionViewModal({
         />
         <Campo label="Cliente" value={operacion.cliente?.nombre ?? operacion.clienteId} />
         <Campo label="Depósito" value={operacion.deposito?.nombre ?? operacion.depositoId} />
+
+        {operacion.tipo === 'division' && divisionImpacto && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+            <dt className={DT}>Transformación</dt>
+            <dd className="sm:col-span-2">
+              <DivisionImpactoLinea impacto={divisionImpacto} />
+            </dd>
+          </div>
+        )}
+
+        {operacion.tipo === 'division' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
+            <dt className={DT}>Tipo</dt>
+            <dd className="sm:col-span-2">
+              <StockOperacionTipoCelda tipo={operacion.tipo} />
+            </dd>
+          </div>
+        )}
 
         {operacion.tipo === 'egreso' && operacion.numeroRemito && (
           <Campo label="N° Remito" value={operacion.numeroRemito} mono />
@@ -160,38 +185,71 @@ export function StockOperacionViewModal({
 
       {/* â”€â”€ Líneas â”€â”€ */}
       <div className="px-4 pb-4 pt-2">
-        <p className={`${DT} mb-2`}>Productos ({operacion.movimientos.length})</p>
+        <p className={`${DT} mb-2`}>
+          {operacion.tipo === 'division' ? 'Producto' : `Productos (${operacion.movimientos.length})`}
+        </p>
         <div className="overflow-x-auto rounded border border-black/10">
           <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-vialto-mist/40">
               <tr>
                 <th className={TH}>Producto</th>
                 <th className={TH}>Presentación</th>
-                <th className={`${TH} text-right`}>Bultos</th>
-                <th className={`${TH} text-right`}>Sueltas</th>
+                {operacion.tipo === 'division' ? (
+                  <th className={TH}>Transformación</th>
+                ) : (
+                  <>
+                    <th className={`${TH} text-right`}>Bultos</th>
+                    <th className={`${TH} text-right`}>Sueltas</th>
+                  </>
+                )}
                 <th className={TH}>Lote</th>
                 {operacion.tipo === 'ingreso' && <th className={TH}>Vencimiento</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5">
-              {operacion.movimientos.map((mov) => (
-                <tr key={mov.id} className="hover:bg-vialto-mist/20">
-                  <td className={TD}>{mov.producto?.nombre ?? mov.productoId}</td>
+              {operacion.tipo === 'division' && divisionImpacto ? (
+                <tr className="hover:bg-vialto-mist/20">
                   <td className={TD}>
-                    {mov.presentacion?.presentacion?.nombre ?? mov.presentacionId ?? '—'}
+                    {divisionImpacto.productoNombre ??
+                      operacion.movimientos[0]?.producto?.nombre ??
+                      operacion.movimientos[0]?.productoId}
                   </td>
-                  <td className={`${TD} text-right tabular-nums`}>{mov.bultos}</td>
-                  <td className={`${TD} text-right tabular-nums`}>{mov.unidades}</td>
-                  <td className={TD}>{mov.lote ?? <span className="text-vialto-steel">Sin lote</span>}</td>
-                  {operacion.tipo === 'ingreso' && (
-                    <td className={TD}>
-                      {mov.fechaVencimiento
-                        ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
-                        : '—'}
-                    </td>
-                  )}
+                  <td className={TD}>
+                    {operacion.movimientos[0]?.presentacion?.presentacion?.nombre ??
+                      operacion.movimientos[0]?.presentacionId ??
+                      '—'}
+                  </td>
+                  <td className={TD}>
+                    <DivisionImpactoLinea impacto={divisionImpacto} />
+                  </td>
+                  <td className={TD}>
+                    {operacion.movimientos[0]?.lote ?? (
+                      <span className="text-vialto-steel">Sin lote</span>
+                    )}
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                operacion.movimientos.map((mov) => (
+                  <tr key={mov.id} className="hover:bg-vialto-mist/20">
+                    <td className={TD}>{mov.producto?.nombre ?? mov.productoId}</td>
+                    <td className={TD}>
+                      {mov.presentacion?.presentacion?.nombre ?? mov.presentacionId ?? '—'}
+                    </td>
+                    <td className={`${TD} text-right tabular-nums`}>{mov.bultos}</td>
+                    <td className={`${TD} text-right tabular-nums`}>{mov.unidades}</td>
+                    <td className={TD}>
+                      {mov.lote ?? <span className="text-vialto-steel">Sin lote</span>}
+                    </td>
+                    {operacion.tipo === 'ingreso' && (
+                      <td className={TD}>
+                        {mov.fechaVencimiento
+                          ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
+                          : '—'}
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

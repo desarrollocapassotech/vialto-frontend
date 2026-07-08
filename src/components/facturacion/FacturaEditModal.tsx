@@ -1,28 +1,39 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction, useCallback } from 'react';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { Spinner } from '@/components/ui/Spinner';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+} from "react";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { Spinner } from "@/components/ui/Spinner";
 import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
-} from '@/components/forms/MaestroSearchSelects';
-import { monedaUnicaDeViajes, textoImporteFacturaSeleccion, textoMontoFacturarListado } from '@/lib/viajesFlota';
-import type { Cliente, Factura, Transportista, Viaje } from '@/types/api';
+} from "@/components/forms/MaestroSearchSelects";
+import {
+  monedaUnicaDeViajes,
+  textoImporteFacturaSeleccion,
+  textoMontoFacturarListado,
+} from "@/lib/viajesFlota";
+import type { Cliente, Factura, Transportista, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'PENDIENTE',
-  cobrada: 'COBRADA',
-  vencida: 'VENCIDA',
+  pendiente: "PENDIENTE",
+  cobrada: "COBRADA",
+  vencida: "VENCIDA",
 };
 
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: 'bg-amber-100 text-amber-950 border-amber-300/90',
-  cobrada: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
-  vencida: 'bg-red-100 text-red-950 border-red-400/80',
+  pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
+  cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
+  vencida: "bg-red-100 text-red-950 border-red-400/80",
 };
 
 export type FacturaDraft = {
   numero: string;
-  tipo: 'cliente' | 'transportista_externo';
+  tipo: "cliente" | "transportista_externo";
   clienteId: string;
   transportistaId: string;
   viajeIds: string[];
@@ -36,20 +47,20 @@ function todayIso() {
 }
 
 function isoToDate(iso: string | null | undefined) {
-  if (!iso) return '';
+  if (!iso) return "";
   return iso.slice(0, 10);
 }
 
 export function emptyFacturaDraft(): FacturaDraft {
   return {
-    numero: '',
-    tipo: 'cliente',
-    clienteId: '',
-    transportistaId: '',
+    numero: "",
+    tipo: "cliente",
+    clienteId: "",
+    transportistaId: "",
     viajeIds: [],
     fechaEmision: todayIso(),
-    fechaVencimiento: '',
-    ivaPct: '21',
+    fechaVencimiento: "",
+    ivaPct: "21",
   };
 }
 
@@ -57,37 +68,37 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
   return {
     numero: f.numero,
     tipo: f.tipo,
-    clienteId: f.clienteId ?? '',
-    transportistaId: f.transportistaId ?? '',
+    clienteId: f.clienteId ?? "",
+    transportistaId: f.transportistaId ?? "",
     viajeIds: f.viajeIds,
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
-    ivaPct: f.ivaPct != null ? String(f.ivaPct) : '21',
+    ivaPct: f.ivaPct != null ? String(f.ivaPct) : "21",
   };
 }
 
 /** Al cambiar el tipo de factura, preserva el viaje actual y actualiza la contraparte según el tipo. Si no hay viaje previo, limpia todo. */
 export function patchFacturaTipo(
-  tipo: FacturaDraft['tipo'],
+  tipo: FacturaDraft["tipo"],
   viajeActual?: Viaje | null,
-): Pick<FacturaDraft, 'tipo' | 'clienteId' | 'transportistaId' | 'viajeIds'> {
-  if (tipo === 'transportista_externo' && viajeActual) {
+): Pick<FacturaDraft, "tipo" | "clienteId" | "transportistaId" | "viajeIds"> {
+  if (tipo === "transportista_externo" && viajeActual) {
     return {
       tipo,
-      clienteId: '',
-      transportistaId: viajeActual.transportistaId ?? '',
+      clienteId: "",
+      transportistaId: viajeActual.transportistaId ?? "",
       viajeIds: [viajeActual.id],
     };
   }
-  if (tipo === 'cliente' && viajeActual) {
+  if (tipo === "cliente" && viajeActual) {
     return {
       tipo,
-      clienteId: viajeActual.clienteId ?? '',
-      transportistaId: '',
+      clienteId: viajeActual.clienteId ?? "",
+      transportistaId: "",
       viajeIds: [viajeActual.id],
     };
   }
-  return { tipo, clienteId: '', transportistaId: '', viajeIds: [] };
+  return { tipo, clienteId: "", transportistaId: "", viajeIds: [] };
 }
 
 function FacturaContraparteField({
@@ -99,7 +110,7 @@ function FacturaContraparteField({
   onClienteChange,
   onTransportistaChange,
 }: {
-  tipo: FacturaDraft['tipo'];
+  tipo: FacturaDraft["tipo"];
   clienteId: string;
   transportistaId: string;
   clientes: Cliente[];
@@ -107,12 +118,12 @@ function FacturaContraparteField({
   onClienteChange: (id: string) => void;
   onTransportistaChange: (id: string) => void;
 }) {
-  const esTransportista = tipo === 'transportista_externo';
+  const esTransportista = tipo === "transportista_externo";
 
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-        {esTransportista ? 'Transportista' : 'Cliente'}
+        {esTransportista ? "Transportista" : "Cliente"}
       </label>
       {esTransportista ? (
         <TransportistaSearchSelect
@@ -140,14 +151,15 @@ function FacturaContraparteField({
   );
 }
 
-const clienteInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const clienteInputClass =
+  "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 
 export function ViajesCheckboxList({
   viajes,
   selected,
   onChange,
   loading,
-  maxHeightClass = 'max-h-40',
+  maxHeightClass = "max-h-40",
 }: {
   viajes: Viaje[];
   selected: string[];
@@ -157,7 +169,11 @@ export function ViajesCheckboxList({
   maxHeightClass?: string;
 }) {
   function toggle(id: string) {
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+    onChange(
+      selected.includes(id)
+        ? selected.filter((x) => x !== id)
+        : [...selected, id],
+    );
   }
 
   if (loading) {
@@ -165,7 +181,11 @@ export function ViajesCheckboxList({
   }
 
   if (viajes.length === 0) {
-    return <p className="text-sm text-vialto-steel py-1">No hay viajes disponibles.</p>;
+    return (
+      <p className="text-sm text-vialto-steel py-1">
+        No hay viajes disponibles.
+      </p>
+    );
   }
 
   return (
@@ -186,7 +206,7 @@ export function ViajesCheckboxList({
           <span className="font-medium">{v.numero}</span>
           {(v.origen || v.destino) && (
             <span className="text-xs text-vialto-steel">
-              {v.origen ?? '?'} → {v.destino ?? '?'}
+              {v.origen ?? "?"} → {v.destino ?? "?"}
             </span>
           )}
           {v.monto != null && (
@@ -217,7 +237,7 @@ export function ViajesVinculadosEditor({
   selected: string[];
   onChange: (ids: string[]) => void;
   loading?: boolean;
-  tipo: FacturaDraft['tipo'];
+  tipo: FacturaDraft["tipo"];
   clienteId: string;
   transportistaId: string;
 }) {
@@ -232,23 +252,27 @@ export function ViajesVinculadosEditor({
       }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPickerOpen(false);
+      if (e.key === "Escape") setPickerOpen(false);
     }
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
     };
   }, [pickerOpen]);
 
   const linkedViajes = selected
-    .map((id) => viajes.find((v) => v.id === id) ?? disponibles.find((v) => v.id === id))
+    .map(
+      (id) =>
+        viajes.find((v) => v.id === id) ?? disponibles.find((v) => v.id === id),
+    )
     .filter(Boolean) as Viaje[];
 
   const available = disponibles.filter((v) => !selected.includes(v.id));
-  const showClienteHint = tipo === 'cliente' && !clienteId.trim();
-  const showTransportistaHint = tipo === 'transportista_externo' && !transportistaId.trim();
+  const showClienteHint = tipo === "cliente" && !clienteId.trim();
+  const showTransportistaHint =
+    tipo === "transportista_externo" && !transportistaId.trim();
   const showContraparteHint = showClienteHint || showTransportistaHint;
 
   function remove(id: string) {
@@ -262,7 +286,9 @@ export function ViajesVinculadosEditor({
   return (
     <div className="flex flex-col gap-2">
       {linkedViajes.length === 0 ? (
-        <p className="py-1 text-sm text-vialto-steel">No hay viajes vinculados.</p>
+        <p className="py-1 text-sm text-vialto-steel">
+          No hay viajes vinculados.
+        </p>
       ) : (
         <div className="divide-y divide-black/5 rounded border border-black/15 bg-white">
           {linkedViajes.map((v) => (
@@ -270,7 +296,7 @@ export function ViajesVinculadosEditor({
               <span className="shrink-0 text-sm font-medium">{v.numero}</span>
               {(v.origen || v.destino) && (
                 <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">
-                  {v.origen ?? '?'} → {v.destino ?? '?'}
+                  {v.origen ?? "?"} → {v.destino ?? "?"}
                 </span>
               )}
               {v.monto != null && (
@@ -295,17 +321,17 @@ export function ViajesVinculadosEditor({
         {showContraparteHint ? (
           <p className="text-[11px] text-vialto-steel">
             {showTransportistaHint
-              ? 'Elegí un transportista para poder vincular viajes.'
-              : 'Elegí un cliente para poder vincular viajes.'}
+              ? "Elegí un transportista para poder vincular viajes."
+              : "Elegí un cliente para poder vincular viajes."}
           </p>
-        ) : (loading || available.length > 0) ? (
+        ) : loading || available.length > 0 ? (
           <button
             type="button"
             disabled={loading}
             onClick={() => setPickerOpen((o) => !o)}
             className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
           >
-            {loading ? 'Cargando…' : '+ Vincular viaje existente'}
+            {loading ? "Cargando…" : "+ Vincular viaje existente"}
           </button>
         ) : null}
 
@@ -313,25 +339,27 @@ export function ViajesVinculadosEditor({
           <div className="absolute left-0 top-full z-50 mt-1 min-w-[22rem] max-w-full border border-black/20 bg-white shadow-lg">
             <div className="max-h-52 overflow-y-auto divide-y divide-black/5">
               {available.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => add(v.id)}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-vialto-mist/60"
-                  >
-                    <span className="shrink-0 text-sm font-medium">{v.numero}</span>
-                    {(v.origen || v.destino) && (
-                      <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">
-                        {v.origen ?? '?'} → {v.destino ?? '?'}
-                      </span>
-                    )}
-                    {v.monto != null && (
-                      <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
-                        {textoMontoFacturarListado(v)}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => add(v.id)}
+                  className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-vialto-mist/60"
+                >
+                  <span className="shrink-0 text-sm font-medium">
+                    {v.numero}
+                  </span>
+                  {(v.origen || v.destino) && (
+                    <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">
+                      {v.origen ?? "?"} → {v.destino ?? "?"}
+                    </span>
+                  )}
+                  {v.monto != null && (
+                    <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
+                      {textoMontoFacturarListado(v)}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -345,7 +373,7 @@ export function ViajesVinculadosEditor({
 function useEscapeKey(active: boolean, disabled: boolean, onClose: () => void) {
   const handler = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !disabled) {
+      if (e.key === "Escape" && !disabled) {
         e.preventDefault();
         onClose();
       }
@@ -354,8 +382,8 @@ function useEscapeKey(active: boolean, disabled: boolean, onClose: () => void) {
   );
   useEffect(() => {
     if (!active) return;
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [active, handler]);
 }
 
@@ -408,7 +436,9 @@ export function FacturaCreateModal({
         className="absolute inset-0 bg-black/40"
         aria-label="Cerrar"
         disabled={saving}
-        onClick={() => { if (!saving) onClose(); }}
+        onClick={() => {
+          if (!saving) onClose();
+        }}
       />
       <div
         role="dialog"
@@ -462,7 +492,9 @@ export function FacturaCreateModal({
               clientes={clientes}
               transportistas={transportistas}
               onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
-              onTransportistaChange={(id) => patch({ transportistaId: id, viajeIds: [] })}
+              onTransportistaChange={(id) =>
+                patch({ transportistaId: id, viajeIds: [] })
+              }
             />
 
             <div className="flex flex-col gap-1">
@@ -508,11 +540,16 @@ export function FacturaCreateModal({
             <div className="col-span-full flex flex-col gap-1">
               <div className="flex items-baseline justify-between gap-2">
                 <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+                  Viajes vinculados{" "}
+                  {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
                 </label>
                 {draft.viajeIds.length > 0 && (
                   <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
+                    {textoImporteFacturaSeleccion(
+                      draft.viajeIds,
+                      viajes,
+                      draft.tipo,
+                    )}
                   </span>
                 )}
               </div>
@@ -530,29 +567,34 @@ export function FacturaCreateModal({
           </div>
 
           {(() => {
-            const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 0;
-            const importe = draft.viajeIds.length > 0
-              ? draft.viajeIds.reduce((sum, id) => {
-                  const v = viajes.find((x) => x.id === id);
-                  return sum + (v?.monto ?? 0);
-                }, 0)
-              : 0;
+            const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+            const importe =
+              draft.viajeIds.length > 0
+                ? draft.viajeIds.reduce((sum, id) => {
+                    const v = viajes.find((x) => x.id === id);
+                    return sum + (v?.monto ?? 0);
+                  }, 0)
+                : 0;
             if (ivaN <= 0 || importe === 0) return null;
             const total = importe * (1 + ivaN / 100);
             return (
               <p className="mt-3 text-xs text-vialto-steel text-right">
-                Total con IVA {ivaN}%: <span className="font-medium text-vialto-charcoal tabular-nums">
-                  ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                Total con IVA {ivaN}%:{" "}
+                <span className="font-medium text-vialto-charcoal tabular-nums">
+                  ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                 </span>
               </p>
             );
           })()}
 
-          {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
-            <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
-              Los viajes seleccionados tienen distintas monedas. Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.
-            </p>
-          )}
+          {draft.viajeIds.length > 0 &&
+            monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
+              <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
+                Los viajes seleccionados tienen distintas monedas. Una factura
+                no puede contener viajes en distintas monedas. Generá una
+                factura por moneda.
+              </p>
+            )}
 
           {error && (
             <div className="mt-4">
@@ -573,11 +615,15 @@ export function FacturaCreateModal({
           <button
             type="button"
             onClick={onSave}
-            disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
+            disabled={
+              saving ||
+              (draft.viajeIds.length > 0 &&
+                monedaUnicaDeViajes(draft.viajeIds, viajes) === null)
+            }
             className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
             {saving && <Spinner className="h-3.5 w-3.5" />}
-            {saving ? 'Guardando…' :'Guardar'}
+            {saving ? "Guardando…" : "Guardar"}
           </button>
         </footer>
       </div>
@@ -658,14 +704,15 @@ export function FacturaEditModal({
               Editar factura {draft.numero}
             </h2>
             <p className="mt-1 text-xs text-vialto-steel">
-              Estado de cobro según los viajes vinculados. Los demás datos se guardan al confirmar.
+              Estado de cobro según los viajes vinculados. Los demás datos se
+              guardan al confirmar.
             </p>
             <div className="mt-2">
               <span
                 className={[
-                  'inline-block rounded border px-2 py-0.5 text-xs font-medium',
-                  ESTADO_BADGE[snapshotFactura.estado] ?? '',
-                ].join(' ')}
+                  "inline-block rounded border px-2 py-0.5 text-xs font-medium",
+                  ESTADO_BADGE[snapshotFactura.estado] ?? "",
+                ].join(" ")}
               >
                 {ESTADO_LABEL[snapshotFactura.estado] ?? snapshotFactura.estado}
               </span>
@@ -704,7 +751,9 @@ export function FacturaEditModal({
               clientes={clientes}
               transportistas={transportistas}
               onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
-              onTransportistaChange={(id) => patch({ transportistaId: id, viajeIds: [] })}
+              onTransportistaChange={(id) =>
+                patch({ transportistaId: id, viajeIds: [] })
+              }
             />
 
             <div className="flex flex-col gap-1">
@@ -750,11 +799,16 @@ export function FacturaEditModal({
             <div className="col-span-full flex flex-col gap-1">
               <div className="flex items-baseline justify-between gap-2">
                 <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Viajes vinculados {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
+                  Viajes vinculados{" "}
+                  {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
                 </label>
                 {draft.viajeIds.length > 0 && (
                   <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
+                    {textoImporteFacturaSeleccion(
+                      draft.viajeIds,
+                      viajes,
+                      draft.tipo,
+                    )}
                   </span>
                 )}
               </div>
@@ -772,29 +826,34 @@ export function FacturaEditModal({
           </div>
 
           {(() => {
-            const ivaN = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 0;
-            const importe = draft.viajeIds.length > 0
-              ? draft.viajeIds.reduce((sum, id) => {
-                  const v = viajes.find((x) => x.id === id);
-                  return sum + (v?.monto ?? 0);
-                }, 0)
-              : 0;
+            const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+            const importe =
+              draft.viajeIds.length > 0
+                ? draft.viajeIds.reduce((sum, id) => {
+                    const v = viajes.find((x) => x.id === id);
+                    return sum + (v?.monto ?? 0);
+                  }, 0)
+                : 0;
             if (ivaN <= 0 || importe === 0) return null;
             const total = importe * (1 + ivaN / 100);
             return (
               <p className="mt-3 text-xs text-vialto-steel text-right">
-                Total con IVA {ivaN}%: <span className="font-medium text-vialto-charcoal tabular-nums">
-                  ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                Total con IVA {ivaN}%:{" "}
+                <span className="font-medium text-vialto-charcoal tabular-nums">
+                  ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                 </span>
               </p>
             );
           })()}
 
-          {draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
-            <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
-              Los viajes seleccionados tienen distintas monedas. Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.
-            </p>
-          )}
+          {draft.viajeIds.length > 0 &&
+            monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
+              <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
+                Los viajes seleccionados tienen distintas monedas. Una factura
+                no puede contener viajes en distintas monedas. Generá una
+                factura por moneda.
+              </p>
+            )}
 
           {error && (
             <div className="mt-4">
@@ -815,11 +874,15 @@ export function FacturaEditModal({
           <button
             type="button"
             onClick={onSave}
-            disabled={saving || (draft.viajeIds.length > 0 && monedaUnicaDeViajes(draft.viajeIds, viajes) === null)}
+            disabled={
+              saving ||
+              (draft.viajeIds.length > 0 &&
+                monedaUnicaDeViajes(draft.viajeIds, viajes) === null)
+            }
             className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
           >
             {saving && <Spinner className="h-3.5 w-3.5" />}
-            {saving ? 'Guardando…' :'Guardar cambios'}
+            {saving ? "Guardando…" : "Guardar cambios"}
           </button>
         </footer>
       </div>

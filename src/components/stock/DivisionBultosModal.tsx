@@ -19,6 +19,8 @@ const LABEL =
 
 export type DivisionBultosModalContext = {
   rowKey: string;
+  /** Clave de la línea de lote dentro del producto (multi-lote). */
+  loteKey: string;
   clienteId: string;
   depositoId: string;
   productoId: string;

@@ -45,6 +45,12 @@ type Props = {
   unidadesPorBulto?: number;
   loteRefreshKey?: number;
   onFraccionar?: () => void;
+  /** Lotes ya usados en otras líneas del mismo producto. */
+  excludedLotes?: string[];
+  /** Título del bloque (ej. «Lote 2»). */
+  title?: string;
+  /** Si hay más de una línea, permite quitar esta. */
+  onRemove?: () => void;
 };
 
 function etiquetaDisponibleLote(
@@ -80,6 +86,9 @@ export function EgresoProductoLoteBloque({
   unidadesPorBulto = 0,
   loteRefreshKey,
   onFraccionar,
+  excludedLotes = [],
+  title = 'Extracción por lote',
+  onRemove,
 }: Props) {
   const listoParaLote = Boolean(productoId && presentacionId && clienteId && depositoId);
   const loteElegido = loteEgresoSeleccionValida(lote);
@@ -98,9 +107,20 @@ export function EgresoProductoLoteBloque({
 
   return (
     <div className="space-y-3 rounded border border-black/10 bg-vialto-mist/20 p-3">
-      <p className="text-xs font-medium uppercase tracking-[0.08em] text-vialto-steel">
-        Extracción por lote
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-vialto-steel">
+          {title}
+        </p>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-600 hover:underline shrink-0"
+          >
+            Quitar lote
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -123,6 +143,7 @@ export function EgresoProductoLoteBloque({
             lotesBase={lotesBase}
             tenantId={tenantId}
             refreshKey={loteRefreshKey}
+            excludedLotes={excludedLotes}
             className={`${INPUT} ${fieldErrors.lote ? 'border-red-400' : ''}`}
             disabled={!listoParaLote}
             required

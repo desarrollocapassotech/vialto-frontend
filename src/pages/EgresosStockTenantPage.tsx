@@ -17,7 +17,7 @@ import {
   validarStockDocumentoExterno,
   type StockDocumentoExternoModo,
 } from '@/lib/stockDocumentoExterno';
-import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
+import { loteEgresoSeleccionValida } from '@/lib/stockLote';
 import type {
   Chofer,
   Cliente,
@@ -30,7 +30,7 @@ import type {
 } from '@/types/api';
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
-import { EgresoWizardStep3, emptyEgresoRow, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
+import { EgresoWizardStep3, emptyEgresoRow, egresoFieldKey, egresoRowsToApiLineas, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type EgresoResult = { id: string; numeroRemito: string | null; movimientosCount: number };
@@ -305,23 +305,36 @@ export function EgresosStockTenantPage({
       }
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
-      if (!loteEgresoSeleccionValida(row.lote)) {
-        ferrs[`row_${idx}_lote`] = 'Seleccioná un lote o Sin lote.';
-      }
-      const b = parseFloat(row.bultos) || 0;
-      const s = parseFloat(row.sueltas) || 0;
-      if (b <= 0 && s <= 0) {
-        ferrs[`row_${idx}_bultos`] = 'Ingresá bultos o sueltas mayor a 0.';
-      } else if (loteEgresoSeleccionValida(row.lote) && row.loteStock) {
-        if (b > row.loteStock.bultos) {
-          ferrs[`row_${idx}_bultos`] =
-            `Stock insuficiente. Disponible: ${row.loteStock.bultos} bultos.`;
+
+      const lotesUsados = new Set<string>();
+      row.loteLineas.forEach((linea, loteIdx) => {
+        const loteKey = egresoFieldKey(idx, loteIdx, 'lote');
+        const bultosKey = egresoFieldKey(idx, loteIdx, 'bultos');
+        const sueltasKey = egresoFieldKey(idx, loteIdx, 'sueltas');
+
+        if (!loteEgresoSeleccionValida(linea.lote)) {
+          ferrs[loteKey] = 'Seleccioná un lote o Sin lote.';
+        } else if (lotesUsados.has(linea.lote)) {
+          ferrs[loteKey] = 'Este lote ya fue seleccionado en otra línea del mismo producto.';
+        } else {
+          lotesUsados.add(linea.lote);
         }
-        if (s > row.loteStock.sueltas) {
-          ferrs[`row_${idx}_sueltas`] =
-            `Stock insuficiente. Disponible: ${row.loteStock.sueltas} sueltas.`;
+
+        const b = parseFloat(linea.bultos) || 0;
+        const s = parseFloat(linea.sueltas) || 0;
+        if (b <= 0 && s <= 0) {
+          ferrs[bultosKey] = 'Ingresá bultos o sueltas mayor a 0.';
+        } else if (loteEgresoSeleccionValida(linea.lote) && linea.loteStock) {
+          if (b > linea.loteStock.bultos) {
+            ferrs[bultosKey] =
+              `Stock insuficiente. Disponible: ${linea.loteStock.bultos} bultos.`;
+          }
+          if (s > linea.loteStock.sueltas) {
+            ferrs[sueltasKey] =
+              `Stock insuficiente. Disponible: ${linea.loteStock.sueltas} sueltas.`;
+          }
         }
-      }
+      });
     });
     return ferrs;
   }
@@ -401,19 +414,7 @@ export function EgresosStockTenantPage({
           destinoFinal: destinoFinal || undefined,
           numeroDocumentoExterno,
           observaciones: observaciones.trim() || undefined,
-          lineas: rows.map((row) => ({
-            productoId: row.productoId,
-            presentacionId: row.presentacionId,
-            bultos: parseFloat(row.bultos) || 0,
-            sueltas: parseFloat(row.sueltas) || 0,
-            lote: loteEgresoParaApi(row.lote),
-            ...(row.fechaVencimiento
-              ? {
-                  fechaVencimiento:
-                    fechaHoraToIso(row.fechaVencimiento, '00:00') ?? undefined,
-                }
-              : {}),
-          })),
+          lineas: egresoRowsToApiLineas(rows),
         }),
       });
       showToast(

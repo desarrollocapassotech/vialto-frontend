@@ -1,7 +1,13 @@
-import { useEffect, useId, type ComponentType, type ReactNode, type SVGProps } from 'react';
-import { createPortal } from 'react-dom';
-import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
-import { modalOverlayClass } from '@/lib/modalLayers';
+import {
+  useEffect,
+  useId,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
+import { createPortal } from "react-dom";
+import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
+import { modalOverlayClass } from "@/lib/modalLayers";
 
 export type AccionOpcion = {
   id: string;
@@ -25,7 +31,7 @@ type Props = {
 export function AccionesOpcionesSheet({
   open,
   onClose,
-  title = 'Acciones',
+  title = "Acciones",
   subtitle,
   options,
 }: Props) {
@@ -36,10 +42,10 @@ export function AccionesOpcionesSheet({
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -61,10 +67,10 @@ export function AccionesOpcionesSheet({
             >
               {title}
             </h2>
-            {subtitle != null && subtitle !== '' && (
+            {subtitle != null && subtitle !== "" && (
               <p
                 className="mt-0.5 truncate text-sm text-vialto-steel"
-                title={typeof subtitle === 'string' ? subtitle : undefined}
+                title={typeof subtitle === "string" ? subtitle : undefined}
               >
                 {subtitle}
               </p>
@@ -87,7 +93,9 @@ export function AccionesOpcionesSheet({
             const showSeparator = opt.separator || (opt.danger && !prevDanger);
             return (
               <div key={opt.id}>
-                {showSeparator && <div className="mx-3 my-1.5 border-t border-black/8" />}
+                {showSeparator && (
+                  <div className="mx-3 my-1.5 border-t border-black/8" />
+                )}
                 <button
                   type="button"
                   disabled={opt.disabled}
@@ -96,15 +104,17 @@ export function AccionesOpcionesSheet({
                     opt.onClick();
                   }}
                   className={[
-                    'flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
-                    'disabled:cursor-not-allowed disabled:opacity-40',
+                    "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
+                    "disabled:cursor-not-allowed disabled:opacity-40",
                     opt.danger
-                      ? 'text-red-700 hover:bg-red-50'
-                      : 'text-vialto-charcoal hover:bg-vialto-mist/70',
-                  ].join(' ')}
+                      ? "text-red-700 hover:bg-red-50"
+                      : "text-vialto-charcoal hover:bg-vialto-mist/70",
+                  ].join(" ")}
                 >
                   {Icon && (
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${opt.danger ? 'bg-red-50' : 'bg-vialto-mist'}`}>
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${opt.danger ? "bg-red-50" : "bg-vialto-mist"}`}
+                    >
                       <Icon className="h-4 w-4" strokeWidth={1.75} />
                     </span>
                   )}
