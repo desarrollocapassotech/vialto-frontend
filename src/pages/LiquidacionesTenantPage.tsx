@@ -8,6 +8,7 @@ import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquida
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
@@ -67,12 +68,13 @@ function caeCell(liq: LiquidacionConTransportista) {
     );
   }
   if (liq.arcaError) {
+    const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
     return (
       <p
         className="text-red-600 text-[11px] max-w-[180px] truncate"
-        title={liq.arcaError}
+        title={msg}
       >
-        {liq.arcaError}
+        {msg}
       </p>
     );
   }

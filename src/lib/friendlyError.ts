@@ -1,4 +1,5 @@
 import { ApiError } from "./api";
+import { sanitizeArcaApiError } from "./arcaFriendlyError";
 
 export type FriendlyErrorContext =
   | "tablero"
@@ -96,12 +97,14 @@ export function friendlyError(
       return "Algunos datos no son válidos. Revisá la información e intentá de nuevo.";
     }
     if (err.status === 422) {
-      // Errores de ARCA/AFIP SDK — el backend incluye el mensaje real
       if (
         err.message &&
         err.message !== "Unprocessable Entity" &&
         !err.message.match(/^HTTP \d+$/i)
       ) {
+        if (context === "arca") {
+          return sanitizeArcaApiError(err.message) ?? fallback.arca;
+        }
         return err.message;
       }
     }
