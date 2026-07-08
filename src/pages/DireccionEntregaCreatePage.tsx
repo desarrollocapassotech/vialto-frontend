@@ -1,56 +1,69 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import type { DireccionEntrega } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { ApiError, apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { useToast } from "@/lib/toast";
+import type { DireccionEntrega } from "@/types/api";
 
 export function DireccionEntregaCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
-  const [direccion, setDireccion] = useState('');
+  const { showToast } = useToast();
+  const [direccion, setDireccion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit() {
+    // 1. Validaciones locales
     const errs: Record<string, string> = {};
-    if (!direccion.trim()) errs.direccion = 'Ingresá la dirección o ruta de entrega.';
+    if (!direccion.trim())
+      errs.direccion = "Ingresá la dirección o ruta de entrega.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
     }
+
     setFieldErrors({});
     setLoading(true);
     setError(null);
+
     try {
       const path = tenantId
         ? `/api/platform/direcciones-entrega?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/direcciones-entrega';
+        : "/api/direcciones-entrega";
+
       await apiJson<DireccionEntrega>(path, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ direccion: direccion.trim() }),
       });
+
       if (!tenantId) await maestro.refreshDireccionesEntrega();
+
+      showToast("Dirección creada exitosamente", "success");
+
       navigate(
-        `/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`,
+        `/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe esa dirección o ruta de entrega.'
-          : friendlyError(e, 'direccionesEntrega'),
+          ? "Ya existe esa dirección o ruta de entrega."
+          : friendlyError(e, "direccionesEntrega"),
       );
+
+      showToast("No se pudo crear la dirección", "error");
     } finally {
       setLoading(false);
     }
@@ -59,7 +72,7 @@ export function DireccionEntregaCreatePage() {
   return (
     <CrudPageLayout
       title="Crear dirección / ruta"
-      backTo={`/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
+      backTo={`/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
       backLabel="← Volver a direcciones"
     >
       <form

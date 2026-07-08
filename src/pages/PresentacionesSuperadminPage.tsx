@@ -14,6 +14,7 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
@@ -27,6 +28,7 @@ export function PresentacionesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
+  const { showToast } = useToast();
   const [rows, setRows] = useState<Presentacion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -112,17 +114,20 @@ export function PresentacionesSuperadminPage() {
           () => getToken(),
           { method: "PATCH", body: JSON.stringify(payload) },
         );
+        showToast("Presentación actualizada exitosamente", "success");
       } else {
         await apiJson<Presentacion>(`${baseUrl}${qs}`, () => getToken(), {
           method: "POST",
           body: JSON.stringify(payload),
         });
+        showToast("Presentación creada exitosamente", "success");
       }
       await load();
       setIsFormOpen(false);
       setEditingId(null);
     } catch (e) {
       setError(friendlyError(e, "plataforma"));
+      showToast("No se pudo guardar la presentación", "error");
     } finally {
       setSaving(false);
     }
@@ -139,10 +144,12 @@ export function PresentacionesSuperadminPage() {
         () => getToken(),
         { method: "DELETE" },
       );
+      showToast("Presentación eliminada correctamente", "success");
       await load();
       setConfirmTarget(null);
     } catch (e) {
       setError(friendlyError(e, "plataforma"));
+      showToast("Ocurrió un error al intentar eliminar", "error");
       setConfirmTarget(null);
     } finally {
       setDeleting(false);
