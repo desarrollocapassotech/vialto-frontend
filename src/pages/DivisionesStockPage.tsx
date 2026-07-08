@@ -1,4 +1,4 @@
-import { DivisionesStockTenantPage } from './DivisionesStockTenantPage';
+import { DivisionesStockTenantPage } from "./DivisionesStockTenantPage";
 
 export function DivisionesStockPage() {
   return <DivisionesStockTenantPage />;
