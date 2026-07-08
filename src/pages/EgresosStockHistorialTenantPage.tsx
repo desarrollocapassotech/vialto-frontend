@@ -1,32 +1,43 @@
-﻿import { useAuth } from '@clerk/clerk-react';
-import { FileSpreadsheet } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ExcelExportModal } from '@/components/stock/ExcelExportModal';
-import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
-import { StockOperacionViewModal } from '@/components/stock/StockOperacionViewModal';
-import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { buildQs } from '@/lib/queryString';
-import { listadoTablaAccionClass, listadoTablaTdClass, listadoTablaThClass } from '@/lib/listadoTabla';
+﻿import { useAuth } from "@clerk/clerk-react";
+import { FileSpreadsheet } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
+import { StockOperacionViewModal } from "@/components/stock/StockOperacionViewModal";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { buildQs } from "@/lib/queryString";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+  listadoTablaThClass,
+} from "@/lib/listadoTabla";
 import {
   flattenStockOperaciones,
   stockOperacionColumnas,
-} from '@/lib/stockExcelExport';
-import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
-import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-import type { StockOperacion, Cliente, Deposito, Producto, PaginatedMeta } from '@/types/api';
-import { useHistorialStockFiltros } from '@/hooks/useHistorialStockFiltros';
+} from "@/lib/stockExcelExport";
+import { etiquetaStockDocumentoExterno } from "@/lib/stockDocumentoExterno";
+import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
+import type {
+  StockOperacion,
+  Cliente,
+  Deposito,
+  Producto,
+  PaginatedMeta,
+} from "@/types/api";
+import { useHistorialStockFiltros } from "@/hooks/useHistorialStockFiltros";
 
 type EgresosPaginatedResponse = {
   items: StockOperacion[];
   meta: PaginatedMeta;
 };
 
-const EXPORT_PAGE_SIZE = '500';
+const EXPORT_PAGE_SIZE = "500";
 
 export function EgresosStockHistorialTenantPage({
   tenantId,
@@ -40,8 +51,15 @@ export function EgresosStockHistorialTenantPage({
 
   const {
     setSearchParams,
-    clienteId, depositoId, productoId, fechaDesde, fechaHasta,
-    params, clientes, depositos, productos,
+    clienteId,
+    depositoId,
+    productoId,
+    fechaDesde,
+    fechaHasta,
+    params,
+    clientes,
+    depositos,
+    productos,
   } = useHistorialStockFiltros(platform, tenantId, getToken);
 
   const [page, setPage] = useState(1);
@@ -73,11 +91,13 @@ export function EgresosStockHistorialTenantPage({
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<EgresosPaginatedResponse>(egresosUrl, () => getToken());
+      const data = await apiJson<EgresosPaginatedResponse>(egresosUrl, () =>
+        getToken(),
+      );
       setItems(data.items);
       setMeta(data.meta);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     } finally {
       setLoading(false);
     }
@@ -93,15 +113,17 @@ export function EgresosStockHistorialTenantPage({
     try {
       const allUrl = platform
         ? `/api/platform/stock/egresos${buildQs(
-            { ...params, page: '1', pageSize: EXPORT_PAGE_SIZE },
+            { ...params, page: "1", pageSize: EXPORT_PAGE_SIZE },
             tenantId,
           )}`
-        : `/api/stock/egresos${buildQs({ ...params, page: '1', pageSize: EXPORT_PAGE_SIZE })}`;
-      const data = await apiJson<EgresosPaginatedResponse>(allUrl, () => getToken());
+        : `/api/stock/egresos${buildQs({ ...params, page: "1", pageSize: EXPORT_PAGE_SIZE })}`;
+      const data = await apiJson<EgresosPaginatedResponse>(allUrl, () =>
+        getToken(),
+      );
       setExportRows(data.items);
       setExportModalOpen(true);
     } catch (e) {
-      setError(friendlyError(e, 'stock'));
+      setError(friendlyError(e, "stock"));
     } finally {
       setExportLoading(false);
     }
@@ -109,9 +131,9 @@ export function EgresosStockHistorialTenantPage({
 
   const volverHref = platform
     ? `/stock/egresos?tenantId=${encodeURIComponent(tenantId!)}`
-    : '/stock/egresos';
+    : "/stock/egresos";
 
-  const excelCols = stockOperacionColumnas('egreso');
+  const excelCols = stockOperacionColumnas("egreso");
   const excelRows = flattenStockOperaciones(exportRows);
 
   const exportButton = (
@@ -122,7 +144,7 @@ export function EgresosStockHistorialTenantPage({
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
       <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-      {exportLoading ? 'Preparando…' : 'Descargar Excel'}
+      {exportLoading ? "Preparando…" : "Descargar Excel"}
     </button>
   );
 
@@ -130,10 +152,15 @@ export function EgresosStockHistorialTenantPage({
     <div className="w-full space-y-6">
       {!embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">Historial de egresos</h1>
+          <h1 className="text-2xl font-semibold text-vialto-charcoal">
+            Historial de egresos
+          </h1>
           <div className="flex items-center gap-4">
             {exportButton}
-            <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
+            <Link
+              to={volverHref}
+              className="text-sm font-medium text-vialto-fire hover:underline"
+            >
               ← Volver a egresos
             </Link>
           </div>
@@ -143,7 +170,10 @@ export function EgresosStockHistorialTenantPage({
       {embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-end gap-4">
           {exportButton}
-          <Link to={volverHref} className="text-sm font-medium text-vialto-fire hover:underline">
+          <Link
+            to={volverHref}
+            className="text-sm font-medium text-vialto-fire hover:underline"
+          >
             ← Volver a egresos
           </Link>
         </div>
@@ -156,10 +186,10 @@ export function EgresosStockHistorialTenantPage({
       )}
 
       <ListadoDatos
-        className={!embeddedInSuperadmin ? 'mt-4' : ''}
+        className={!embeddedInSuperadmin ? "mt-4" : ""}
         columns={[
           {
-            id: 'fecha',
+            id: "fecha",
             primary: true,
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
@@ -178,8 +208,8 @@ export function EgresosStockHistorialTenantPage({
                         const value = e.target.value;
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev);
-                          if (value) next.set('fechaDesde', value);
-                          else next.delete('fechaDesde');
+                          if (value) next.set("fechaDesde", value);
+                          else next.delete("fechaDesde");
                           return next;
                         });
                       }}
@@ -196,8 +226,8 @@ export function EgresosStockHistorialTenantPage({
                         const value = e.target.value;
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev);
-                          if (value) next.set('fechaHasta', value);
-                          else next.delete('fechaHasta');
+                          if (value) next.set("fechaHasta", value);
+                          else next.delete("fechaHasta");
                           return next;
                         });
                       }}
@@ -210,14 +240,14 @@ export function EgresosStockHistorialTenantPage({
             cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
           },
           {
-            id: 'remito',
+            id: "remito",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Remito',
-            cell: (op) => op.numeroRemito ?? '—',
+            header: "Remito",
+            cell: (op) => op.numeroRemito ?? "—",
             tdClassName: `${listadoTablaTdClass} font-mono`,
           },
           {
-            id: 'cliente',
+            id: "cliente",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -231,8 +261,8 @@ export function EgresosStockHistorialTenantPage({
                   onChange={(id) => {
                     setSearchParams((prev) => {
                       const next = new URLSearchParams(prev);
-                      if (id) next.set('clienteId', id);
-                      else next.delete('clienteId');
+                      if (id) next.set("clienteId", id);
+                      else next.delete("clienteId");
                       return next;
                     });
                   }}
@@ -242,7 +272,9 @@ export function EgresosStockHistorialTenantPage({
                   placeholderBuscar="Buscar por nombre…"
                   filterItems={(lista, q) => {
                     const lq = q.toLowerCase();
-                    return lista.filter((c) => c.nombre.toLowerCase().includes(lq));
+                    return lista.filter((c) =>
+                      c.nombre.toLowerCase().includes(lq),
+                    );
                   }}
                   getPrimaryLabel={(c) => c.nombre}
                   searchAriaLabel="Filtrar clientes"
@@ -254,7 +286,7 @@ export function EgresosStockHistorialTenantPage({
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'deposito',
+            id: "deposito",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -268,8 +300,8 @@ export function EgresosStockHistorialTenantPage({
                   onChange={(id) => {
                     setSearchParams((prev) => {
                       const next = new URLSearchParams(prev);
-                      if (id) next.set('depositoId', id);
-                      else next.delete('depositoId');
+                      if (id) next.set("depositoId", id);
+                      else next.delete("depositoId");
                       return next;
                     });
                   }}
@@ -279,7 +311,9 @@ export function EgresosStockHistorialTenantPage({
                   placeholderBuscar="Buscar por nombre…"
                   filterItems={(lista, q) => {
                     const lq = q.toLowerCase();
-                    return lista.filter((d) => d.nombre.toLowerCase().includes(lq));
+                    return lista.filter((d) =>
+                      d.nombre.toLowerCase().includes(lq),
+                    );
                   }}
                   getPrimaryLabel={(d) => d.nombre}
                   searchAriaLabel="Filtrar depósitos"
@@ -287,25 +321,26 @@ export function EgresosStockHistorialTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             ),
-            cell: (op) => op.deposito?.nombre ?? '—',
+            cell: (op) => op.deposito?.nombre ?? "—",
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'documentoExterno',
+            id: "documentoExterno",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Nº doc. externo',
-            cell: (op) => etiquetaStockDocumentoExterno(op.numeroDocumentoExterno),
+            header: "Nº doc. externo",
+            cell: (op) =>
+              etiquetaStockDocumentoExterno(op.numeroDocumentoExterno),
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'destinatario',
+            id: "destinatario",
             thClassName: `${listadoTablaThClass} align-top`,
-            header: 'Destinatario',
-            cell: (op) => op.destinatario ?? '—',
+            header: "Destinatario",
+            cell: (op) => op.destinatario ?? "—",
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'productos',
+            id: "productos",
             thClassName: `${listadoTablaThClass} align-top`,
             header: (
               <ViajesListadoHeaderFiltro
@@ -319,8 +354,8 @@ export function EgresosStockHistorialTenantPage({
                   onChange={(id) => {
                     setSearchParams((prev) => {
                       const next = new URLSearchParams(prev);
-                      if (id) next.set('productoId', id);
-                      else next.delete('productoId');
+                      if (id) next.set("productoId", id);
+                      else next.delete("productoId");
                       return next;
                     });
                   }}
@@ -330,7 +365,9 @@ export function EgresosStockHistorialTenantPage({
                   placeholderBuscar="Buscar por nombre…"
                   filterItems={(lista, q) => {
                     const lq = q.toLowerCase();
-                    return lista.filter((p) => p.nombre.toLowerCase().includes(lq));
+                    return lista.filter((p) =>
+                      p.nombre.toLowerCase().includes(lq),
+                    );
                   }}
                   getPrimaryLabel={(p) => p.nombre}
                   searchAriaLabel="Filtrar productos"
@@ -341,7 +378,7 @@ export function EgresosStockHistorialTenantPage({
             cell: (op) => {
               const count = op.movimientos.length;
               if (count === 1) {
-                return op.movimientos[0].producto?.nombre ?? '1 producto';
+                return op.movimientos[0].producto?.nombre ?? "1 producto";
               }
               return `${count} productos`;
             },
@@ -359,7 +396,9 @@ export function EgresosStockHistorialTenantPage({
               className={listadoTablaAccionClass}
               egresoId={op.id}
               tenantId={tenantId}
-              titulo={op.numeroRemito ? `Remito ${op.numeroRemito}` : 'Remito interno'}
+              titulo={
+                op.numeroRemito ? `Remito ${op.numeroRemito}` : "Remito interno"
+              }
             />
             <button
               type="button"
@@ -375,47 +414,17 @@ export function EgresosStockHistorialTenantPage({
       />
 
       {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                disabled={loading}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs disabled:opacity-50"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext || loading}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="registros"
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+        />
       )}
 
       {viendo && (
@@ -432,7 +441,7 @@ export function EgresosStockHistorialTenantPage({
           rowCount={excelRows.length}
           onExport={(selectedIds) => {
             const cols = excelCols.filter((c) => selectedIds.includes(c.id));
-            void generarExcel(cols, excelRows, 'historial-egresos');
+            void generarExcel(cols, excelRows, "historial-egresos");
           }}
           onClose={() => setExportModalOpen(false)}
         />
@@ -442,10 +451,10 @@ export function EgresosStockHistorialTenantPage({
 }
 
 async function generarExcel<T>(
-  cols: import('@/lib/stockExcelExport').ExcelColDef<T>[],
+  cols: import("@/lib/stockExcelExport").ExcelColDef<T>[],
   rows: T[],
   filename: string,
 ) {
-  const { generarExcel: gen } = await import('@/lib/stockExcelExport');
+  const { generarExcel: gen } = await import("@/lib/stockExcelExport");
   return gen(cols, rows, filename);
 }
