@@ -87,6 +87,7 @@ export interface Viaje {
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
   factura?: { id: string; numero: string } | null;
+  liquidacionesViaje?: { liquidacionId: string }[];
   createdAt: string;
   createdBy: string;
 }
@@ -120,6 +121,20 @@ export interface Chofer {
   transportistaId: string | null;
   /** true si el chofer tiene PIN configurado para la app vialto-combustible. El hash nunca se expone. */
   pinConfigured?: boolean;
+  createdAt: string;
+}
+
+export interface Destinatario {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  createdAt: string;
+}
+
+export interface DireccionEntrega {
+  id: string;
+  tenantId: string;
+  direccion: string;
   createdAt: string;
 }
 
@@ -193,9 +208,31 @@ export interface PaginatedMeta {
   hasNext: boolean;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginatedMeta;
+}
+
 export interface PaginatedTenantsResponse {
   items: Tenant[];
   meta: PaginatedMeta;
+}
+
+export interface CargaCombustible {
+  id: string;
+  tenantId: string;
+  vehiculoId: string | null;
+  vehiculo: { patente: string } | null;
+  choferId: string | null;
+  chofer: { nombre: string } | null;
+  estacion: string;
+  litros: number;
+  importe: number;
+  km: number;
+  formaPago: string | null;
+  fecha: string;
+  createdAt: string;
+  createdBy: string;
 }
 
 export interface Pago {
@@ -379,6 +416,7 @@ export interface MovimientoStock {
   cantidad2: number;
   numeroRemito?: string | null;
   lote?: string | null;
+  fechaVencimiento?: string | null;
   observaciones: string | null;
   /** PDF del remito interno (solo egresos). */
   remitoUrl: string | null;
@@ -391,6 +429,7 @@ export interface MovimientoStock {
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];
 }
@@ -504,9 +543,12 @@ export interface StockOperacion {
   /** PDF del remito interno generado al egresar. */
   remitoUrl?: string | null;
   numeroRemito?: string | null;
+  /** Número de remito del proveedor, informado manualmente al registrar un ingreso. */
+  numeroRemitoProveedor?: string | null; 
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;
+  numeroDocumentoExterno?: string | null;
   observaciones?: string | null;
   /** Fotos del producto (solo ingresos). */
   fotosUrls?: string[];

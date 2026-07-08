@@ -1,18 +1,20 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { uploadStockIngresoFoto } from '@/lib/stockRemitoUpload';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
-import type { Cliente, Deposito, Producto } from '@/types/api';
+import type { Cliente, Deposito, PaginatedResponse, Producto } from '@/types/api';
 import { IngresoWizardStep1 } from '@/components/stock/IngresoWizardStep1';
 import { IngresoWizardStep2 } from '@/components/stock/IngresoWizardStep2';
 import { IngresoWizardStep3, emptyRow, type IngresoRow } from '@/components/stock/IngresoWizardStep3';
+import { isOrgAdmin } from '@/lib/roleLabels';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type WizardStep = 1 | 2 | 3;
@@ -97,10 +99,12 @@ export function IngresosStockTenantPage({
   clientesExternosLoading?: boolean;
 }) {
   const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
-  const canCreateProducto = platform || orgRole === 'org:admin';
+  const canCreateProducto =
+    platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
@@ -135,6 +139,7 @@ export function IngresosStockTenantPage({
   const [horaMov, setHoraMov] = useState(partesInicial.hora);
   const [fechaMovError, setFechaMovError] = useState<string | null>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [numeroRemitoProveedor, setNumeroRemitoProveedor] = useState('');
   const [fotoFiles, setFotoFiles] = useState<File[]>([]);
   const [previewFoto, setPreviewFoto] = useState<File | null>(null);
 
@@ -169,9 +174,9 @@ export function IngresosStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
@@ -195,6 +200,7 @@ export function IngresosStockTenantPage({
     setHoraMov(p.hora);
     setFechaMovError(null);
     setObservaciones('');
+    setNumeroRemitoProveedor('');
     setFotoFiles([]);
     setRows([emptyRow()]);
     setFormError(null);
@@ -235,7 +241,7 @@ export function IngresosStockTenantPage({
       if (!row.productoId) ferrs[`row_${idx}_productoId`] = 'Seleccioná un producto.';
       if (!row.presentacionId)
         ferrs[`row_${idx}_presentacionId`] = 'Seleccioná una presentación.';
-      if (!row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Ingresá el lote.';
+      if (!row.sinLote && !row.lote.trim()) ferrs[`row_${idx}_lote`] = 'Ingresá el lote.';
       if (!row.fechaVencimiento)
         ferrs[`row_${idx}_fechaVencimiento`] = 'Ingresá la fecha de vencimiento.';
       const b = parseFloat(row.bultos) || 0;
@@ -268,12 +274,14 @@ export function IngresosStockTenantPage({
           fecha: fechaIso,
           fotosUrls,
           observaciones: observaciones.trim() || undefined,
+          numeroRemitoProveedor: numeroRemitoProveedor.trim() || undefined,
           lineas: rows.map((row) => ({
             productoId: row.productoId,
             presentacionId: row.presentacionId,
             bultos: parseFloat(row.bultos) || 0,
             sueltas: parseFloat(row.sueltas) || 0,
-            lote: row.lote.trim(),
+            sinLote: row.sinLote,
+            lote: row.sinLote ? undefined : row.lote.trim(),
             fechaVencimiento: row.fechaVencimiento,
           })),
         }),
@@ -352,6 +360,8 @@ export function IngresosStockTenantPage({
           }}
           observaciones={observaciones}
           onObservacionesChange={setObservaciones}
+          numeroRemitoProveedor={numeroRemitoProveedor}
+          onNumeroRemitoProveedorChange={setNumeroRemitoProveedor}
           fotoFiles={fotoFiles}
           onFotosChange={setFotoFiles}
           onFotoPreview={setPreviewFoto}

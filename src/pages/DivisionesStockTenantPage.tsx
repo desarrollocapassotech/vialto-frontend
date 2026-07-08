@@ -8,12 +8,14 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { paginatedItems } from '@/lib/paginatedItems';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { LoteSelect } from '@/components/stock/LoteSelect';
+import type { LoteStockDisponible } from '@/components/stock/EgresoProductoLoteBloque';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
-import type { Cliente, Deposito, Producto, ProductoPresentacion, StockItem } from '@/types/api';
+import type { Cliente, Deposito, PaginatedResponse, Producto, ProductoPresentacion, StockItem } from '@/types/api';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -68,7 +70,7 @@ export function DivisionesStockTenantPage({
   const [presentacionId, setPresentacionId] = useState('');
   const [bultos, setBultos] = useState(1);
   const [lote, setLote] = useState('');
-  const [loteDisponible, setLoteDisponible] = useState<number | null>(null);
+  const [loteDisponible, setLoteDisponible] = useState<LoteStockDisponible | null>(null);
 
   const partesInicial = isoToFechaHora(new Date().toISOString());
   const [fechaMov, setFechaMov] = useState(partesInicial.fecha);
@@ -120,7 +122,7 @@ export function DivisionesStockTenantPage({
 
   // Si hay lote seleccionado, usar su balance específico; si no, el total del StockItem
   const bultosDisponibles = lote
-    ? (loteDisponible ?? 0)
+    ? (loteDisponible?.bultos ?? 0)
     : (stockDisponible?.cantidad1 ?? 0);
 
   const clientesFiltrados = useMemo(() => {
@@ -160,9 +162,9 @@ export function DivisionesStockTenantPage({
   }, [loadProductos]);
 
   useEffect(() => {
-    const url = `${depositosBase}${buildQs({ activo: '1' }, tenantId)}`;
-    void apiJson<Deposito[]>(url, () => getToken())
-      .then(setDepositos)
+    const url = `${depositosBase}${buildQs({ activo: '1', page: 1, pageSize: 500 }, tenantId)}`;
+    void apiJson<PaginatedResponse<Deposito>>(url, () => getToken())
+      .then((data) => setDepositos(paginatedItems(data)))
       .catch(() => setDepositos([]));
   }, [depositosBase, tenantId, getToken]);
 
@@ -418,9 +420,11 @@ export function DivisionesStockTenantPage({
                 depositoId={depositoId}
                 presentacionId={presentacionId}
                 value={lote}
-                onLoteChange={(l, d) => {
+                onLoteChange={(l, stock) => {
                   setLote(l);
-                  setLoteDisponible(d);
+                  setLoteDisponible(
+                    stock ? { bultos: stock.bultos, sueltas: stock.sueltas } : null,
+                  );
                   setBultos(1);
                 }}
                 lotesBase={lotesBase}
@@ -453,6 +457,9 @@ export function DivisionesStockTenantPage({
                   {lote && (
                     <span className="font-normal text-vialto-steel ml-2 text-xs">
                       lote {lote}
+                      {(loteDisponible?.sueltas ?? 0) > 0 && (
+                        <> · {loteDisponible!.sueltas} sueltas</>
+                      )}
                     </span>
                   )}
                 </span>

@@ -2,16 +2,29 @@ import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoPagination } from '@/components/listado/ListadoPagination';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Deposito } from '@/types/api';
+import type { Deposito, PaginatedMeta } from '@/types/api';
 
 type DepositoFormState = {
   nombre: string;
   direccion: string;
   activo: boolean;
 };
+
+type DepositosPaginatedResponse = {
+  items: Deposito[];
+  meta: PaginatedMeta;
+};
+
+function buildQs(params: Record<string, string>): string {
+  const parts = Object.entries(params).map(
+    ([k, v]) => `${k}=${encodeURIComponent(v)}`,
+  );
+  return parts.length ? `?${parts.join('&')}` : '';
+}
 
 export function DepositosPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -27,6 +40,11 @@ export function DepositosPage() {
     activo: true,
   });
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const editarDeposito = useMemo(
     () => depositos?.find((d) => d.id === editingDepositoId) ?? null,
     [depositos, editingDepositoId],
@@ -37,24 +55,33 @@ export function DepositosPage() {
     let cancelled = false;
 
     (async () => {
+      setLoading(true);
       try {
-        const data = await apiJson<Deposito[]>('/api/stock/depositos', () => getToken());
+        const qs = buildQs({ page: String(page), pageSize: String(pageSize) });
+        const data = await apiJson<DepositosPaginatedResponse>(
+          `/api/stock/depositos${qs}`,
+          () => getToken(),
+        );
         if (!cancelled) {
-          setDepositos(data);
+          setDepositos(data.items);
+          setMeta(data.meta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setDepositos(null);
+          setMeta(null);
           setError(friendlyError(e, 'stock'));
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
 
   useEffect(() => {
     if (!isFormOpen) {
@@ -75,13 +102,22 @@ export function DepositosPage() {
   }, [editarDeposito, isFormOpen]);
 
   async function refresh() {
+    setLoading(true);
     try {
-      const data = await apiJson<Deposito[]>('/api/stock/depositos', () => getToken());
-      setDepositos(data);
+      const qs = buildQs({ page: String(page), pageSize: String(pageSize) });
+      const data = await apiJson<DepositosPaginatedResponse>(
+        `/api/stock/depositos${qs}`,
+        () => getToken(),
+      );
+      setDepositos(data.items);
+      setMeta(data.meta);
       setError(null);
     } catch (e) {
       setDepositos(null);
+      setMeta(null);
       setError(friendlyError(e, 'stock'));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -188,7 +224,7 @@ export function DepositosPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : depositos}
+        rows={loading ? null : error ? [] : depositos}
         rowKey={(deposito) => deposito.id}
         emptyMessage={
           error
@@ -206,6 +242,20 @@ export function DepositosPage() {
           </button>
         )}
       />
+
+      {meta && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="depósitos"
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+        />
+      )}
 
       {isFormOpen && (
         <div className="mt-8 rounded border border-black/5 bg-white p-6 shadow-sm">

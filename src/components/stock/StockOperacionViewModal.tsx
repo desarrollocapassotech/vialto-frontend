@@ -2,6 +2,7 @@
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { ImprimirRemitoButton } from '@/components/stock/ImprimirRemitoButton';
 import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShell';
+import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import type { StockOperacion } from '@/types/api';
 
@@ -87,8 +88,16 @@ export function StockOperacionViewModal({
           <Campo label="N° Remito" value={operacion.numeroRemito} mono />
         )}
 
+        {operacion.tipo === 'ingreso' && operacion.numeroRemitoProveedor && (
+          <Campo label="N° Remito Proveedor" value={operacion.numeroRemitoProveedor} mono />
+        )}
+
         {operacion.tipo === 'egreso' && (
           <>
+            <Campo
+              label="Nº documento externo"
+              value={etiquetaStockDocumentoExterno(operacion.numeroDocumentoExterno)}
+            />
             <Campo label="Conductor" value={operacion.entregadoPor ?? '—'} />
             <Campo label="Destinatario" value={operacion.destinatario ?? '—'} />
             <Campo label="Dirección / Ruta" value={operacion.destinoFinal ?? '—'} />
@@ -173,7 +182,7 @@ export function StockOperacionViewModal({
                   </td>
                   <td className={`${TD} text-right tabular-nums`}>{mov.bultos}</td>
                   <td className={`${TD} text-right tabular-nums`}>{mov.unidades}</td>
-                  <td className={TD}>{mov.lote ?? '—'}</td>
+                  <td className={TD}>{mov.lote ?? <span className="text-vialto-steel">Sin lote</span>}</td>
                   {operacion.tipo === 'ingreso' && (
                     <td className={TD}>
                       {mov.fechaVencimiento
