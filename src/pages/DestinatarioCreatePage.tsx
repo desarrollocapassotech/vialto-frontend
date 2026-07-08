@@ -1,56 +1,67 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { ApiError, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import type { Destinatario } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { ApiError, apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { useToast } from "@/lib/toast";
+import type { Destinatario } from "@/types/api";
 
 export function DestinatarioCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
-  const [nombre, setNombre] = useState('');
+  const { showToast } = useToast();
+  const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del destinatario.';
+    if (!nombre.trim()) errs.nombre = "Ingresá el nombre del destinatario.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
     }
+
     setFieldErrors({});
     setLoading(true);
     setError(null);
+
     try {
       const path = tenantId
         ? `/api/platform/destinatarios?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/destinatarios';
+        : "/api/destinatarios";
+
       await apiJson<Destinatario>(path, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ nombre: nombre.trim() }),
       });
+
       if (!tenantId) await maestro.refreshDestinatarios();
+
+      showToast("Destinatario creado exitosamente", "success");
+
       navigate(
-        `/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`,
+        `/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe un destinatario con ese nombre.'
-          : friendlyError(e, 'destinatarios'),
+          ? "Ya existe un destinatario con ese nombre."
+          : friendlyError(e, "destinatarios"),
       );
+
+      showToast("No se pudo crear el destinatario", "error");
     } finally {
       setLoading(false);
     }
@@ -59,7 +70,7 @@ export function DestinatarioCreatePage() {
   return (
     <CrudPageLayout
       title="Crear destinatario"
-      backTo={`/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
+      backTo={`/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
       backLabel="← Volver a destinatarios"
     >
       <form
@@ -80,6 +91,7 @@ export function DestinatarioCreatePage() {
           />
           <CrudFieldError message={fieldErrors.nombre} />
         </label>
+
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton loading={loading} label="Crear destinatario" />
       </form>

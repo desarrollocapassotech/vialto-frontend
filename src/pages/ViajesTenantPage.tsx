@@ -26,6 +26,7 @@ import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
 import { EmitirCvlpModal } from "@/components/viajes/EmitirCvlpModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { apiJson } from "@/lib/api";
+import { useToast } from "@/lib/toast"; // <-- IMPORTACIÓN DEL TOAST
 import {
   formatNumberForMoneda,
   normalizeViajeMoneda,
@@ -169,12 +170,16 @@ export function ViajesTenantPage({
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
 } = {}) {
+  // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
+  const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
+
+  // Variables de configuración de entorno (superadmin vs usuario normal)
   const platform = Boolean(tenantId?.trim());
   const hasLiquidacionesArca =
     !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
@@ -183,6 +188,8 @@ export function ViajesTenantPage({
     !hasLiquidacionesArca &&
     canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? "";
+
+  // Maestros de datos (dependiendo de si es vista superadmin o normal)
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
   const [transportistasP, setTransportistasP] = useState<Transportista[]>([]);
@@ -192,6 +199,7 @@ export function ViajesTenantPage({
   const transportistas = platform ? transportistasP : maestro.transportistas;
   const vehiculos = platform ? vehiculosP : maestro.vehiculos;
 
+  // ─── CONSTRUCCIÓN DE RUTAS DE API ────────────────────────────────────────
   function viajeApiUrl(id: string) {
     if (!platform) return `/api/viajes/${encodeURIComponent(id)}`;
     return `/api/platform/viajes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
@@ -211,6 +219,8 @@ export function ViajesTenantPage({
   }
 
   const facturacionNavExtras = () => (platform ? { tenantId: tid } : {});
+
+  // ─── ESTADOS GLOBALES DE LA VISTA ─────────────────────────────────────────
   const [rows, setRows] = useState<Viaje[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -225,6 +235,7 @@ export function ViajesTenantPage({
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(
     null,
   );
+
   /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
@@ -242,16 +253,19 @@ export function ViajesTenantPage({
   const [sortDir, setSortDir] = useState<ViajeSortDir>(
     VIAJE_SORT_DEFAULT.sortDir,
   );
+
   /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
   const ordenamientoAplicadoRef = useRef({
     sortBy: VIAJE_SORT_DEFAULT.sortBy,
     sortDir: VIAJE_SORT_DEFAULT.sortDir,
   });
+
   const initialEstadoFromUrl = searchParams.get("estado")?.trim() ?? "";
   const initialPagoTransportistaFromUrl = (() => {
     const p = searchParams.get(VIAJE_PAGO_TRANSPORTISTA_QUERY)?.trim() ?? "";
     return esFiltroPagoTransportistaValido(p) ? p : "";
   })();
+
   /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
   const filtrosAplicadosRef = useRef({
     clienteId: "",
@@ -267,6 +281,8 @@ export function ViajesTenantPage({
     ubicacion: "",
     periodo: "todos" as "todos" | "desde_hoy" | "anteriores",
   });
+
+  // ─── ESTADOS DE LOS FILTROS DE COLUMNAS ────────────────────────────────────
   /** Cliente seleccionado en filtro de columna (checks y facturación masiva). */
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
@@ -289,50 +305,55 @@ export function ViajesTenantPage({
     "todos" | "desde_hoy" | "anteriores"
   >("todos");
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
+
   /** Mientras se vuelve a pedir el listado (filtros, página, etc.). */
   const [listadoRefetching, setListadoRefetching] = useState(false);
+
   /** Selección para facturar varios viajes juntos (solo con filtro por cliente). */
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>(
     [],
   );
+
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+
   /** Modal de elección al facturar: nueva factura o agregar a una existente del cliente. */
   const [facturarOpcionState, setFacturarOpcionState] = useState<{
     viaje: Viaje;
     facturas: Factura[];
   } | null>(null);
   const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
-  /** Viaje sobre el que se está abriendo el modal de agregar gasto. */
+
+  // Modales de acciones secundarias
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(
     null,
   );
-  /** Viaje sobre el que se está abriendo el modal de registrar pago al transportista. */
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(
     null,
   );
-  /** Viaje para el que se quiere emitir un CVLP. */
   const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
-  /** Viaje para el selector manual factura/liquidación (tenants sin integracion-arca). */
   const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
-  /** Viaje para el modal de creación manual de liquidación. */
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
-  /** Conteos globales para los chips de acceso rápido. */
+
+  /** Conteos globales para los chips de acceso rápido en la UI. */
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
     sinCobrar: number;
     sinPagar: number;
     pagados: number;
   } | null>(null);
+
   /** IDs de viajes que ya tienen al menos una factura asociada (derivado de rows, sin request extra). */
   const viajesConFactura = useMemo(
     () => new Set((rows ?? []).filter((v) => v.facturaId).map((v) => v.id)),
     [rows],
   );
+
   /** Viaje abierto desde URL u otra pantalla: no tiene por qué estar en la página actual del listado. */
   const [viajeSnapshotRemoto, setViajeSnapshotRemoto] = useState<Viaje | null>(
     null,
   );
+
   const viajeEdicionSnapshot = useMemo(
     () =>
       editingId
@@ -341,13 +362,16 @@ export function ViajesTenantPage({
         : null,
     [editingId, rows, viajeSnapshotRemoto],
   );
+
   const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([]);
   const opcionesProductoModal = useMemo(
     () => mergeOpcionesProducto(productosCatalogo, viajeEdicionSnapshot),
     [productosCatalogo, viajeEdicionSnapshot],
   );
+
   /** Aviso al editar un viaje en flota propia si chofer/vehículo del maestro no era compatible. */
   const [viajeEditHint, setViajeEditHint] = useState<string | null>(null);
+
   /** Maestros fusionados (catálogo + sesión + relaciones del viaje) mientras el modal de edición está abierto. */
   const [edicionMaestro, setEdicionMaestro] =
     useState<MaestroListasViaje | null>(null);
@@ -379,6 +403,7 @@ export function ViajesTenantPage({
     });
   }, [location.pathname, location.search, location.state, navigate]);
 
+  // Derivaciones en vivo para determinar la flota propia a editar
   const choferesPropios = useMemo(
     () => choferesFlotaPropia(edicionMaestro?.choferes ?? choferes),
     [edicionMaestro?.choferes, choferes],
@@ -391,9 +416,12 @@ export function ViajesTenantPage({
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
+
+  // Variables booleanas para facilitar la legibilidad de la grilla
   const ordenResaltaFechaCarga = sortBy === "fecha_carga";
   const ordenResaltaFechaDescarga = sortBy === "fecha_descarga";
 
+  // Efecto que trae los datos de los maestros si operamos bajo modo superadmin
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
       setClientesP([]);
@@ -434,6 +462,7 @@ export function ViajesTenantPage({
     };
   }, [platform, tid, isLoaded, isSignedIn, getToken]);
 
+  // Carga inicial de productos activos en stock
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -453,6 +482,7 @@ export function ViajesTenantPage({
     };
   }, [getToken, isLoaded, isSignedIn, platform, tid]);
 
+  // Actualiza los badges contadores del inicio ("Sin facturar", "Sin cobrar", etc.)
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (platform && !tid) return;
@@ -496,6 +526,7 @@ export function ViajesTenantPage({
     };
   }, [getToken, isLoaded, isSignedIn, platform, tid]);
 
+  // Carga del listado principal y aplicación de los queries de búsqueda / filtrado / orden
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (platform && !tid) return;
@@ -515,6 +546,8 @@ export function ViajesTenantPage({
           ubicacion: ut,
           periodo: per,
         } = filtrosAplicadosRef.current;
+
+        // Asignación manual de parámetros para armar la URL del request
         if (cid) filtros.set("clienteId", cid);
         if (transpFiltro) filtros.set("transportistaId", transpFiltro);
         if (estF.trim()) filtros.set("estado", estF.trim());
@@ -558,6 +591,7 @@ export function ViajesTenantPage({
 
         const sortFetch = ordenamientoAplicadoRef.current;
 
+        // Existen diferentes estrategias de fetch según si ordenamos por pago, cliente o campos genéricos
         if (pagoFiltroActivo) {
           const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
             listBase,
@@ -626,6 +660,7 @@ export function ViajesTenantPage({
     tid,
   ]);
 
+  // ─── HANDLERS DE APLICACIÓN DE FILTROS ─────────────────────────────────────
   function aplicarOrdenamiento(
     nuevoSortBy: ViajeSortField,
     nuevoSortDir: ViajeSortDir,
@@ -818,7 +853,6 @@ export function ViajesTenantPage({
     }
   }
 
-  /** Solo se llama desde `CiudadCombobox` al elegir una ciudad de la lista (o vaciar). */
   function aplicarUbicacionCiudadSeleccion(val: string) {
     const s = val.trim().slice(0, 200);
     filtrosAplicadosRef.current = {
@@ -903,6 +937,7 @@ export function ViajesTenantPage({
     periodoFiltro,
   ]);
 
+  // Si cambia el cliente en el filtro, limpiamos la selección para facturar
   useEffect(() => {
     setIdsFacturarSeleccion([]);
   }, [clienteIdFiltroActivo]);
@@ -933,6 +968,7 @@ export function ViajesTenantPage({
     }
   }
 
+  // ─── RUTEO Y REDIRECCIÓN AL FACTURAR ───────────────────────────────────────
   function facturarSeleccionMultiple() {
     const ids = idsFacturarSeleccion;
     const cid = clienteIdFiltroActivo.trim();
@@ -948,6 +984,7 @@ export function ViajesTenantPage({
     });
   }
 
+  // Hook auxiliar para limpiar chofer cuando conmutamos a "Flota externa"
   useEffect(() => {
     if (!editingId || !draft || draft.operacionModo !== "propio") return;
     setDraft((p) => {
@@ -962,6 +999,7 @@ export function ViajesTenantPage({
     if (draft?.operacionModo === "externo") setViajeEditHint(null);
   }, [draft?.operacionModo]);
 
+  // Actualiza los estados de maestranza en caso de creación "inline" de entidades (clientes, choferes, etc)
   function upsertMaestroEdicion<K extends keyof MaestroListasViaje>(
     key: K,
     item: MaestroListasViaje[K][number],
@@ -1107,6 +1145,8 @@ export function ViajesTenantPage({
     setViajeEditHint(partes.length ? partes.join(" ") : null);
     const partesFc = isoToFechaHora(v.fechaCarga);
     const partesFd = isoToFechaHora(v.fechaDescarga);
+
+    // Inyectamos el draft actual al state para alimentar los forms de edición modal
     setDraft({
       numero: v.numero ?? "",
       estado: v.estado ?? "pendiente",
@@ -1196,12 +1236,17 @@ export function ViajesTenantPage({
     setViajeDeleteConfirm(v);
   }
 
+  // ─── ELIMINACIÓN DEFINITIVA ────────────────────────────────────────────────
   async function confirmDeleteViaje() {
     const v = viajeDeleteConfirm;
     if (!v || deletingViajeId) return;
     setDeletingViajeId(v.id);
     try {
       await apiJson(viajeApiUrl(v.id), () => getToken(), { method: "DELETE" });
+
+      // --> TOAST INYECTADO: ÉXITO AL ELIMINAR <--
+      showToast("Viaje eliminado correctamente", "success");
+
       setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
       setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
       setIdsFacturarSeleccion((ids) => ids.filter((id) => id !== v.id));
@@ -1215,6 +1260,9 @@ export function ViajesTenantPage({
       setViajeDeleteConfirm(null);
     } catch (e) {
       setError(friendlyError(e, platform ? "plataforma" : "viajes"));
+
+      // --> TOAST INYECTADO: ERROR AL ELIMINAR <--
+      showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
       setDeletingViajeId(null);
     }
@@ -1236,7 +1284,6 @@ export function ViajesTenantPage({
       },
       { replace: true },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
   /** Abrir editor desde enlace (p. ej. panel de alertas): `?viaje=id` */
@@ -1270,9 +1317,9 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- abrir una vez por valor de `viaje` en URL
   }, [searchParams, isLoaded, isSignedIn, rows, getToken, setSearchParams]);
 
+  // ─── CAMBIO RÁPIDO DE ESTADO (SELECT DESDE LA GRILLA) ─────────────────────
   async function patchEstadoDesdeListado(v: Viaje, nuevoEstado: string) {
     if (nuevoEstado === v.estado) {
       setEstadoQuickId(null);
@@ -1296,8 +1343,14 @@ export function ViajesTenantPage({
         prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev,
       );
       setEstadoQuickId(null);
+
+      // --> TOAST INYECTADO: ÉXITO AL ACTUALIZAR EL ESTADO <--
+      showToast("Estado actualizado correctamente", "success");
     } catch (e) {
       setError(friendlyError(e, "viajes"));
+
+      // --> TOAST INYECTADO: ERROR AL ACTUALIZAR EL ESTADO <--
+      showToast("No se pudo actualizar el estado", "error");
     } finally {
       setSavingEstadoId(null);
     }
@@ -1320,7 +1373,6 @@ export function ViajesTenantPage({
         facturasPorClienteUrl(v.clienteId ?? ""),
         () => getToken(),
       );
-      // Si el viaje ya está vinculado a una factura, ir directamente a ella
       const yaVinculada = facturasCliente.find((f) =>
         f.viajeIds.includes(v.id),
       );
@@ -1330,13 +1382,12 @@ export function ViajesTenantPage({
         });
         return;
       }
-      // Si el cliente tiene otras facturas, mostrar el modal de elección
       if (facturasCliente.length > 0) {
         setFacturarOpcionState({ viaje: v, facturas: facturasCliente });
         return;
       }
     } catch {
-      // si falla la consulta, igualmente navegamos para no bloquear al usuario
+      // si falla la consulta, igualmente navegamos
     }
     navigate("/facturacion", {
       state: {
@@ -1349,6 +1400,7 @@ export function ViajesTenantPage({
     });
   }
 
+  // ─── OPERACIÓN AL CONFIRMAR AÑADIR A FACTURA EXISTENTE O NUEVA ────────────
   async function handleFacturarOpcionConfirm(
     opcion: "nueva" | { facturaId: string },
   ) {
@@ -1367,7 +1419,8 @@ export function ViajesTenantPage({
       });
       return;
     }
-    // Agregar a factura existente
+
+    // Proceso de agregar a una factura preexistente
     const facturaTarget = facturas.find((f) => f.id === opcion.facturaId);
     if (!facturaTarget) return;
     setFacturarOpcionBusy(true);
@@ -1379,11 +1432,18 @@ export function ViajesTenantPage({
         }),
       });
       setFacturarOpcionState(null);
+
+      // --> TOAST INYECTADO: ÉXITO AL ASOCIAR A LA FACTURA <--
+      showToast("Viaje agregado a la factura exitosamente", "success");
+
       navigate("/facturacion", {
         state: { ...facturacionNavExtras(), expandFacturaId: opcion.facturaId },
       });
     } catch (e) {
       setError(friendlyError(e, "facturacion"));
+
+      // --> TOAST INYECTADO: ERROR AL ASOCIAR A LA FACTURA <--
+      showToast("No se pudo agregar el viaje a la factura", "error");
     } finally {
       setFacturarOpcionBusy(false);
     }
@@ -1414,6 +1474,7 @@ export function ViajesTenantPage({
     );
   }
 
+  // ─── GUARDADO DEL VIAJE DESDE EL MODAL DE EDICIÓN (INLINE) ─────────────────
   async function saveInline(viajeId: string) {
     if (!draft) return;
     if (!draft.numero.trim()) {
@@ -1580,6 +1641,7 @@ export function ViajesTenantPage({
           }),
         },
       );
+
       let viajeGuardado = viajeConDestinosEnRespuesta(
         updated,
         destinosVal.destinos,
@@ -1603,6 +1665,10 @@ export function ViajesTenantPage({
       setRows((prev) =>
         prev ? prev.map((r) => (r.id === viajeId ? viajeGuardado : r)) : prev,
       );
+
+      // --> TOAST INYECTADO: ÉXITO AL EDITAR <--
+      showToast("Viaje guardado exitosamente", "success");
+
       const stubs = entidadesMaestroStubsDesdeViaje(updated);
       setSessionMaestro((prev) => ({
         clientes: mergeMaestroPorId(prev.clientes, stubs.clientes),
@@ -1616,6 +1682,9 @@ export function ViajesTenantPage({
       cancelEdit();
     } catch (e) {
       setError(friendlyError(e, "viajes"));
+
+      // --> TOAST INYECTADO: ERROR AL EDITAR <--
+      showToast("No se pudo guardar el viaje", "error");
     } finally {
       setSavingId(null);
     }
@@ -1633,6 +1702,7 @@ export function ViajesTenantPage({
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
+  // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
       <ListadoFiltroCampo label="Período" active={periodoFiltro !== "todos"}>
@@ -1939,6 +2009,7 @@ export function ViajesTenantPage({
         </div>
       )}
 
+      {/* GRILLA DE VIAJES PRINCIPAL */}
       <ListadoDatos
         className="mt-8"
         columns={[]}
@@ -2567,6 +2638,7 @@ export function ViajesTenantPage({
         />
       )}
 
+      {/* Editor Modal Inferior para Editar Viajes en Listado */}
       {editingId && draft && viajeEdicionSnapshot && (
         <ViajeEditModal
           open
@@ -2634,6 +2706,7 @@ export function ViajesTenantPage({
         />
       )}
 
+      {/* Modal de selección "Crear nueva factura vs Agregar a la actual" */}
       <FacturarOpcionModal
         open={facturarOpcionState != null}
         facturas={facturarOpcionState?.facturas ?? []}
@@ -2708,7 +2781,6 @@ export function ViajesTenantPage({
           viaje={emitirCvlpViaje}
           onClose={() => setEmitirCvlpViaje(null)}
           onEmitido={(_liq: Liquidacion) => {
-            // La liquidación se creó; refrescar listado para reflejar el nuevo estado si corresponde
             setListadoQueryVersion((v) => v + 1);
           }}
           onFacturarManual={() => void navigateToFacturacion(emitirCvlpViaje)}
@@ -2752,7 +2824,7 @@ export function ViajesTenantPage({
         title="Eliminar viaje"
         message={
           viajeDeleteConfirm
-            ? `¿Eliminás el viaje ${viajeDeleteConfirm.numero}? Esta acción no se puede deshacer.`
+            ? `¿Seguro que querés eliminar el viaje ${viajeDeleteConfirm.numero}? Esta acción no se puede deshacer.`
             : ""
         }
         confirmLabel="Eliminar"

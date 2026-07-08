@@ -1,23 +1,23 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
-} from '@/components/ui/ViewModalShell';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { labelVehiculoTipo } from '@/lib/labels';
-import type { Vehiculo } from '@/types/api';
+} from "@/components/ui/ViewModalShell";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { labelVehiculoTipo } from "@/lib/labels";
+import type { Vehiculo } from "@/types/api";
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 }
 
@@ -48,10 +48,10 @@ export function VehiculoViewModal({
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     }
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
   useEffect(() => {
@@ -60,7 +60,10 @@ export function VehiculoViewModal({
     setError(null);
     (async () => {
       try {
-        const row = await apiJson<Vehiculo>(vehiculoDetailUrl(vehiculoId, tenantId), () => getToken());
+        const row = await apiJson<Vehiculo>(
+          vehiculoDetailUrl(vehiculoId, tenantId),
+          () => getToken(),
+        );
         if (!cancelled) {
           setVehiculo(row);
           setError(null);
@@ -68,7 +71,7 @@ export function VehiculoViewModal({
       } catch (e) {
         if (!cancelled) {
           setVehiculo(null);
-          setError(friendlyError(e, 'vehiculos'));
+          setError(friendlyError(e, "vehiculos"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -79,7 +82,7 @@ export function VehiculoViewModal({
     };
   }, [getToken, vehiculoId, tenantId]);
 
-  const titulo = vehiculo?.patente ?? patenteTitulo ?? 'Vehículo';
+  const titulo = vehiculo?.patente ?? patenteTitulo ?? "Vehículo";
   const anio = vehiculo ? (vehiculo.año ?? vehiculo.anio) : null;
 
   return (
@@ -108,30 +111,36 @@ export function VehiculoViewModal({
       {!loading && vehiculo && (
         <div className={viewModalGridClass}>
           {[
-            { label: 'Patente', value: vehiculo.patente },
-            { label: 'Tipo', value: labelVehiculoTipo(vehiculo.tipo) },
-            { label: 'Marca', value: vehiculo.marca },
-            { label: 'Modelo', value: vehiculo.modelo },
-            { label: 'Año', value: anio },
-            { label: 'KM actual', value: vehiculo.kmActual },
-            { label: 'N.° Chasis', value: vehiculo.nroChasis },
-            { label: 'Póliza', value: vehiculo.poliza },
+            { label: "Patente", value: vehiculo.patente },
+            { label: "Tipo", value: labelVehiculoTipo(vehiculo.tipo) },
+            { label: "Marca", value: vehiculo.marca },
+            { label: "Modelo", value: vehiculo.modelo },
+            { label: "Año", value: anio },
+            { label: "KM actual", value: vehiculo.kmActual },
+            { label: "N.° Chasis", value: vehiculo.nroChasis },
+            { label: "Póliza", value: vehiculo.poliza },
             {
-              label: 'Vto. Póliza',
-              value: vehiculo.vencimientoPoliza ? fmtDate(vehiculo.vencimientoPoliza) : null,
+              label: "Vto. Póliza",
+              value: vehiculo.vencimientoPoliza
+                ? fmtDate(vehiculo.vencimientoPoliza)
+                : null,
             },
-            { label: 'Tara (kg)', value: vehiculo.tara },
-            { label: 'Precinto', value: vehiculo.precinto },
+            { label: "Tara (kg)", value: vehiculo.tara },
+            { label: "Precinto", value: vehiculo.precinto },
             {
-              label: 'Pertenencia',
-              value: vehiculo.transportistaId?.trim() ? 'Transportista externo' : 'Sin asignar',
+              label: "Pertenencia",
+              value: vehiculo.transportistaId?.trim()
+                ? "Transportista externo"
+                : "Sin asignar",
             },
-            { label: 'Alta', value: fmtDate(vehiculo.createdAt) },
+            { label: "Alta", value: fmtDate(vehiculo.createdAt) },
           ]
-            .filter((c) => c.value != null && c.value !== '')
+            .filter((c) => c.value != null && c.value !== "")
             .map((c, i) => (
               <div key={i}>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  {c.label}
+                </p>
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}

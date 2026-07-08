@@ -1,18 +1,24 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { VehiculoViewModal } from '@/components/vehiculos/VehiculoViewModal';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { useTransportistasList } from '@/hooks/useTransportistasList';
-import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
-import { apiJson } from '@/lib/api';
-import { labelVehiculoTipo } from '@/lib/labels';
-import { labelAsignacionTransportista, mapTransportistaNombres } from '@/lib/transportistas';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { ConEmpresa, Vehiculo } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTransportistasList } from "@/hooks/useTransportistasList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { apiJson } from "@/lib/api";
+import { labelVehiculoTipo } from "@/lib/labels";
+import {
+  labelAsignacionTransportista,
+  mapTransportistaNombres,
+} from "@/lib/transportistas";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { ConEmpresa, Vehiculo } from "@/types/api";
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -27,8 +33,10 @@ export function VehiculosSuperadminPage() {
   );
   const [rows, setRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(null);
-  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState('');
+  const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(
+    null,
+  );
+  const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
   const tenants = useTenantsList();
 
   useEffect(() => {
@@ -53,7 +61,7 @@ export function VehiculosSuperadminPage() {
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'plataforma'));
+          setError(friendlyError(e, "plataforma"));
         }
       }
     })();
@@ -83,12 +91,12 @@ export function VehiculosSuperadminPage() {
           to={
             filtroEmpresa
               ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
-              : '#'
+              : "#"
           }
           className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
             filtroEmpresa
-              ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
-              : 'bg-vialto-charcoal/50 pointer-events-none'
+              ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+              : "bg-vialto-charcoal/50 pointer-events-none"
           }`}
           aria-disabled={!filtroEmpresa}
         >
@@ -105,27 +113,31 @@ export function VehiculosSuperadminPage() {
         className="mt-8"
         columns={[
           {
-            id: 'patente',
-            header: 'Patente',
+            id: "patente",
+            header: "Patente",
             primary: true,
             cell: (v) => v.patente,
             tdClassName: `${listadoTablaTdClass} font-[family-name:var(--font-ui)] tracking-wider font-semibold`,
           },
           {
-            id: 'tipoMarca',
-            header: 'Tipo y marca',
+            id: "tipoMarca",
+            header: "Tipo y marca",
             cell: (v) => (
               <>
                 {labelVehiculoTipo(v.tipo)}
-                {v.marca ? ` · ${v.marca}` : ''}
+                {v.marca ? ` · ${v.marca}` : ""}
               </>
             ),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'pertenencia',
-            header: 'Pertenencia',
-            cell: (v) => labelAsignacionTransportista(v.transportistaId, nombresTransportistas),
+            id: "pertenencia",
+            header: "Pertenencia",
+            cell: (v) =>
+              labelAsignacionTransportista(
+                v.transportistaId,
+                nombresTransportistas,
+              ),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
@@ -133,10 +145,10 @@ export function VehiculosSuperadminPage() {
         rowKey={(v) => v.id}
         emptyMessage={
           !filtroEmpresa
-            ? 'Seleccioná una empresa para ver los vehículos.'
+            ? "Seleccioná una empresa para ver los vehículos."
             : error
-              ? 'No se pudieron cargar los vehículos.'
-              : 'No hay vehículos cargados para esta empresa.'
+              ? "No se pudieron cargar los vehículos."
+              : "No hay vehículos cargados para esta empresa."
         }
         loadingMessage="Cargando…"
         renderActions={(v) => (
@@ -168,7 +180,7 @@ export function VehiculosSuperadminPage() {
           tenantId={filtroEmpresa}
           onClose={() => {
             setViewingVehiculoId(null);
-            setViewingVehiculoPatente('');
+            setViewingVehiculoPatente("");
           }}
           editTo={`/vehiculos/${encodeURIComponent(viewingVehiculoId)}/editar?tenantId=${encodeURIComponent(filtroEmpresa)}`}
         />
