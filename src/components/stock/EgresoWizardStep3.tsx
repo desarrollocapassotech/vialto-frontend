@@ -1,12 +1,19 @@
+import { useAuth } from '@clerk/clerk-react';
+import { useCallback, useState } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
+import {
+  DivisionBultosModal,
+  type DivisionBultosModalContext,
+} from '@/components/stock/DivisionBultosModal';
 import {
   EgresoProductoLoteBloque,
   type LoteStockDisponible,
 } from '@/components/stock/EgresoProductoLoteBloque';
+import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
 import { Spinner } from '@/components/ui/Spinner';
-import { loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
+import { fetchSaldoLote, loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
+import { useToast } from '@/lib/toast';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
 import type { Producto, ProductoPresentacion } from '@/types/api';
 
@@ -141,6 +148,11 @@ export function EgresoWizardStep3({
   onVolver: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
+  const { getToken } = useAuth();
+  const { showToast } = useToast();
+  const [divisionModal, setDivisionModal] = useState<DivisionBultosModalContext | null>(null);
+  const [loteRefreshKey, setLoteRefreshKey] = useState(0);
+
   function updateLoteLinea(
     rowKey: string,
     loteKey: string,
@@ -173,7 +185,47 @@ export function EgresoWizardStep3({
     });
   }
 
+  const refreshLoteLineaStock = useCallback(
+    async (rowKey: string, loteKey: string, row: EgresoRow) => {
+      const linea = row.loteLineas.find((ll) => ll._key === loteKey);
+      if (
+        !linea ||
+        !row.productoId ||
+        !row.presentacionId ||
+        !loteEgresoSeleccionValida(linea.lote)
+      ) {
+        return;
+      }
+      const saldo = await fetchSaldoLote(() => getToken(), lotesBase, {
+        productoId: row.productoId,
+        clienteId,
+        depositoId,
+        presentacionId: row.presentacionId,
+        lote: linea.lote,
+        tenantId,
+      });
+      if (saldo) {
+        onUpdateRow(rowKey, {
+          loteLineas: row.loteLineas.map((ll) =>
+            ll._key === loteKey
+              ? {
+                  ...ll,
+                  loteStock: { bultos: saldo.bultos, sueltas: saldo.sueltas },
+                  fechaVencimiento: saldo.fechaVencimiento
+                    ? isoToFechaHora(saldo.fechaVencimiento).fecha
+                    : ll.fechaVencimiento,
+                }
+              : ll,
+          ),
+        });
+      }
+      setLoteRefreshKey((k) => k + 1);
+    },
+    [clienteId, depositoId, getToken, lotesBase, onUpdateRow, tenantId],
+  );
+
   return (
+    <>
     <form onSubmit={onSubmit} className="space-y-6">
       <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
@@ -213,6 +265,15 @@ export function EgresoWizardStep3({
         {rows.map((row, idx) => {
           const pps = getPresentaciones(productos, row.productoId);
           const selectedPP = pps.find((pp) => pp.id === row.presentacionId);
+          const producto = productos.find((p) => p.id === row.productoId);
+          const productoLabel = producto
+            ? producto.codigo
+              ? `[${producto.codigo}] ${producto.nombre}`
+              : producto.nombre
+            : '—';
+          const presentacionLabel = selectedPP
+            ? `${selectedPP.presentacion?.nombre ?? selectedPP.presentacionId} — ${selectedPP.unidadesPorBulto} uds/bulto`
+            : '—';
           const lastLoteLinea = row.loteLineas[row.loteLineas.length - 1];
           const canAddLote =
             Boolean(row.productoId && row.presentacionId) &&
@@ -358,7 +419,9 @@ export function EgresoWizardStep3({
                       }}
                       lotesBase={lotesBase}
                       tenantId={tenantId}
+                      loteRefreshKey={loteRefreshKey}
                       excludedLotes={excludedLotes}
+                      unidadesPorBulto={selectedPP?.unidadesPorBulto ?? 0}
                       title={
                         row.loteLineas.length > 1
                           ? `Lote ${loteIdx + 1}`
@@ -367,6 +430,26 @@ export function EgresoWizardStep3({
                       onRemove={
                         row.loteLineas.length > 1
                           ? () => removeLoteLinea(row._key, linea._key)
+                          : undefined
+                      }
+                      onFraccionar={
+                        linea.loteStock && selectedPP
+                          ? () => {
+                              const stock = linea.loteStock!;
+                              setDivisionModal({
+                                rowKey: row._key,
+                                loteKey: linea._key,
+                                clienteId,
+                                depositoId,
+                                productoId: row.productoId,
+                                productoLabel,
+                                presentacionId: row.presentacionId,
+                                presentacionLabel,
+                                unidadesPorBulto: selectedPP.unidadesPorBulto,
+                                lote: linea.lote,
+                                loteStock: stock,
+                              });
+                            }
                           : undefined
                       }
                     />
@@ -452,5 +535,27 @@ export function EgresoWizardStep3({
         </button>
       </div>
     </form>
+
+    {divisionModal && (
+      <DivisionBultosModal
+        ctx={divisionModal}
+        tenantId={tenantId}
+        onClose={() => setDivisionModal(null)}
+        onSuccess={() => {
+          const row = rows.find((r) => r._key === divisionModal.rowKey);
+          if (row) {
+            void refreshLoteLineaStock(
+              divisionModal.rowKey,
+              divisionModal.loteKey,
+              row,
+            );
+          } else {
+            setLoteRefreshKey((k) => k + 1);
+          }
+          showToast('División registrada. Stock del lote actualizado.');
+        }}
+      />
+    )}
+    </>
   );
 }
