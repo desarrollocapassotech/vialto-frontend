@@ -44,6 +44,7 @@ export function LoteSelect({
   requiereLote,
   placeholder,
   error,
+  excludedLotes = [],
 }: {
   productoId: string;
   clienteId: string;
@@ -62,6 +63,8 @@ export function LoteSelect({
   requiereLote?: boolean;
   placeholder?: string;
   error?: boolean;
+  /** Lotes ya elegidos en otras líneas del mismo producto (no se listan salvo el valor actual). */
+  excludedLotes?: string[];
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<LotesDisponiblesResponse>({ lotes: [], sinLote: null });
@@ -110,6 +113,7 @@ export function LoteSelect({
     : 'Sin lote';
 
   const emptyLabel = placeholder ?? (isRequired ? 'Elegí un lote…' : '— Sin lote —');
+  const excluded = new Set(excludedLotes.filter((l) => l && l !== value));
 
   return (
     <select
@@ -121,15 +125,17 @@ export function LoteSelect({
       <option value="" disabled={isRequired}>
         {emptyLabel}
       </option>
-      {data.sinLote && !requiereLote && (
+      {data.sinLote && !requiereLote && !excluded.has(STOCK_SIN_LOTE_VALUE) && (
         <option value={STOCK_SIN_LOTE_VALUE}>{sinLoteLabel}</option>
       )}
-      {data.lotes.map((l) => (
-        <option key={l.lote} value={l.lote}>
-          {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
-          {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
-        </option>
-      ))}
+      {data.lotes
+        .filter((l) => !excluded.has(l.lote))
+        .map((l) => (
+          <option key={l.lote} value={l.lote}>
+            {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
+            {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
+          </option>
+        ))}
     </select>
   );
 }
