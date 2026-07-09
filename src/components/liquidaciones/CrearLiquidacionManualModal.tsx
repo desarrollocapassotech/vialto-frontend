@@ -151,9 +151,9 @@ export function CrearLiquidacionManualModal({
     : viajes.filter((v) => selectedViajeIds.has(v.id));
   const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
   const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
-  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : null;
-  const comisionMonto = comisionNum !== null && anyHasPrice ? (bruto * comisionNum) / 100 : null;
-  const netoGravado = comisionMonto !== null ? bruto - comisionMonto : null;
+  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : 0;
+  const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
+  const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== '' ? Number(ivaPct) : 21;
   const ivaMonto = netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar = netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
@@ -363,7 +363,7 @@ export function CrearLiquidacionManualModal({
                 <span className={labelClass}>Sub Total</span>
                 <span className="tabular-nums text-sm font-medium text-vialto-charcoal">{fmtMoney(bruto)}</span>
               </div>
-              {comisionMonto !== null && (
+              {anyHasPrice && comisionMonto > 0 && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
                   <span className="tabular-nums">− {fmtMoney(comisionMonto)}</span>
