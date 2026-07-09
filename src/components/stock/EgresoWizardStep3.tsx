@@ -433,9 +433,9 @@ export function EgresoWizardStep3({
                           : undefined
                       }
                       onFraccionar={
-                        linea.loteStock && selectedPP
+                        selectedPP && loteEgresoSeleccionValida(linea.lote)
                           ? () => {
-                              const stock = linea.loteStock!;
+                              if (!linea.loteStock) return;
                               setDivisionModal({
                                 rowKey: row._key,
                                 loteKey: linea._key,
@@ -447,7 +447,8 @@ export function EgresoWizardStep3({
                                 presentacionLabel,
                                 unidadesPorBulto: selectedPP.unidadesPorBulto,
                                 lote: linea.lote,
-                                loteStock: stock,
+                                loteStock: linea.loteStock,
+                                bultosReservados: linea.bultos,
                               });
                             }
                           : undefined

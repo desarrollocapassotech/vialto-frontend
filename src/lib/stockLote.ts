@@ -88,14 +88,62 @@ export async function fetchSaldoLote(
   };
 }
 
-/** Indica si conviene ofrecer desarmar bultos para obtener sueltas en el egreso. */
+/** Bultos del lote que aún se pueden desarmar (descontando los ya reservados en la línea). */
+export function egresoBultosDisponiblesParaFraccionar(
+  loteStock: { bultos: number; sueltas: number },
+  bultosReservados = '',
+): number {
+  return Math.max(0, loteStock.bultos - (parseFloat(bultosReservados) || 0));
+}
+
+/** Máximo de sueltas obtenibles desarmando todos los bultos del lote. */
+export function egresoSueltasAlcanzables(
+  loteStock: { bultos: number; sueltas: number },
+  unidadesPorBulto: number,
+  bultosReservados = '',
+): number {
+  const bultosLibres = egresoBultosDisponiblesParaFraccionar(loteStock, bultosReservados);
+  return loteStock.sueltas + bultosLibres * unidadesPorBulto;
+}
+
+/**
+ * Indica si conviene ofrecer desarmar bultos para obtener sueltas en el egreso.
+ * Se muestra cuando las sueltas pedidas superan las sueltas sueltas del lote y aún hay
+ * bultos remanentes (el usuario puede fraccionar de a uno hasta cubrir o agotar bultos).
+ */
 export function egresoOfreceFraccionar(
   loteStock: { bultos: number; sueltas: number } | null,
   sueltasIngresadas: string,
   unidadesPorBulto: number,
+  bultosReservados = '',
 ): boolean {
-  if (!loteStock || unidadesPorBulto <= 0 || loteStock.bultos <= 0) return false;
+  if (!loteStock || unidadesPorBulto <= 0) return false;
+  if (egresoBultosDisponiblesParaFraccionar(loteStock, bultosReservados) <= 0) {
+    return false;
+  }
   const pedidas = parseFloat(sueltasIngresadas) || 0;
-  if (pedidas > loteStock.sueltas) return true;
-  return loteStock.sueltas === 0;
+  if (pedidas <= 0) {
+    return loteStock.sueltas <= 0;
+  }
+  return pedidas > loteStock.sueltas;
+}
+
+/** Las sueltas pedidas superan el stock suelto pero aún se pueden desarmar bultos. */
+export function egresoPendienteFraccionar(
+  loteStock: { bultos: number; sueltas: number } | null,
+  sueltasIngresadas: string,
+  unidadesPorBulto: number,
+  bultosReservados = '',
+): boolean {
+  if (!loteStock) return false;
+  const pedidas = parseFloat(sueltasIngresadas) || 0;
+  return (
+    pedidas > loteStock.sueltas &&
+    egresoOfreceFraccionar(
+      loteStock,
+      sueltasIngresadas,
+      unidadesPorBulto,
+      bultosReservados,
+    )
+  );
 }
