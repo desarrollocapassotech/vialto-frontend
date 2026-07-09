@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
@@ -18,7 +19,8 @@ import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
 } from "@/lib/listadoTabla";
-import type { ConEmpresa, Vehiculo } from "@/types/api";
+import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import type { ConEmpresa, PaginatedMeta, Vehiculo } from "@/types/api";
 
 export function VehiculosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -31,44 +33,74 @@ export function VehiculosSuperadminPage() {
     () => mapTransportistaNombres(transportistas ?? []),
     [transportistas],
   );
-  const [rows, setRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(
+    LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
+  );
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingVehiculoId, setViewingVehiculoId] = useState<string | null>(
     null,
   );
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
   const tenants = useTenantsList();
+  const [allRows, setAllRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (!filtroEmpresa) {
-      setRows(null);
+      setAllRows(null);
       setError(null);
       return;
     }
     let cancelled = false;
-    setRows(null);
+    setAllRows(null);
+    setLoading(true);
     (async () => {
       try {
-        const data = await apiJson<ConEmpresa<Vehiculo>[]>(
+        const raw = await apiJson<unknown>(
           `/api/platform/vehiculos?tenantId=${encodeURIComponent(filtroEmpresa)}`,
           () => getToken(),
         );
+        const asObj = raw as { items?: ConEmpresa<Vehiculo>[] };
+        const items = Array.isArray(raw)
+          ? (raw as ConEmpresa<Vehiculo>[])
+          : (asObj.items ?? []);
         if (!cancelled) {
-          setRows(data);
+          setAllRows(items);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
-          setRows(null);
+          setAllRows(null);
           setError(friendlyError(e, "plataforma"));
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
+
+  const { rows, meta } = useMemo(() => {
+    if (allRows === null) return { rows: null, meta: null };
+    const total = allRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const pageSafe = Math.min(page, totalPages);
+    const start = (pageSafe - 1) * pageSize;
+    const slice = allRows.slice(start, start + pageSize);
+    const meta: PaginatedMeta = {
+      page: pageSafe,
+      pageSize,
+      total,
+      totalPages,
+      hasPrev: pageSafe > 1,
+      hasNext: pageSafe < totalPages,
+    };
+    return { rows: slice, meta };
+  }, [allRows, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -83,7 +115,10 @@ export function VehiculosSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={onChangeTenant}
+          onChange={(id) => {
+            setPage(1);
+            onChangeTenant(id);
+          }}
         />
       </div>
       <div className="mt-4 flex justify-end">
@@ -172,6 +207,20 @@ export function VehiculosSuperadminPage() {
           </div>
         )}
       />
+
+      {filtroEmpresa && !error && meta && meta.total > 0 && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="vehículos"
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
 
       {viewingVehiculoId && (
         <VehiculoViewModal
