@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import type { DivisionImpacto } from '@/lib/stockDivision';
 
-/** Impacto de división en una sola línea: −2 Pallets → +20 Unidades */
+/** Impacto de división en una sola línea: −2 Talones → +20 Sueltas */
 export function DivisionImpactoLinea({
   impacto,
   className = '',

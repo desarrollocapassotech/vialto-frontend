@@ -1,3 +1,4 @@
+import { presentacionNombreFromLike } from '@/lib/stockPresentacion';
 import type { StockOperacion } from '@/types/api';
 
 export type DivisionImpacto = {
@@ -23,11 +24,13 @@ export function getDivisionImpacto(op: StockOperacion): DivisionImpacto | null {
 
   const ref = op.movimientos.find((m) => m.bultos > 0) ?? op.movimientos[0];
 
+  const presentacionNombre = presentacionNombreFromLike(ref.presentacion);
+
   return {
     bultosRestados,
     unidadesGeneradas,
-    unidad1Nombre: ref.producto?.unidad1Nombre ?? 'Pallets',
-    unidad2Nombre: ref.producto?.unidad2Nombre ?? 'Unidades',
+    unidad1Nombre: presentacionNombre || 'Bultos',
+    unidad2Nombre: 'Sueltas',
     productoNombre: ref.producto?.nombre ?? null,
   };
 }
