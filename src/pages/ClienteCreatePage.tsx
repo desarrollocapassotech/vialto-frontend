@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useToast } from "@/lib/toast";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import {
   CrudFieldLabel,
@@ -27,6 +28,7 @@ export function ClienteCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const { showToast } = useToast();
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -84,12 +86,14 @@ export function ClienteCreatePage() {
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
+      showToast("Cliente creado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "clientes"));
+      showToast("No se pudo crear el cliente", "error");
     } finally {
       setLoading(false);
     }

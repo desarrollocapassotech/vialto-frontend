@@ -1,4 +1,5 @@
 import { ApiError } from "./api";
+import { sanitizeArcaApiError } from "./arcaFriendlyError";
 
 export type FriendlyErrorContext =
   | "tablero"
@@ -11,6 +12,7 @@ export type FriendlyErrorContext =
   | "vehiculos"
   | "direccionesEntrega"
   | "facturacion"
+  | "liquidaciones"
   | "stock"
   | "combustible"
   | "plataforma"
@@ -32,6 +34,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
   direccionesEntrega:
     "No pudimos cargar las direcciones de entrega. Probá de nuevo en un momento.",
   facturacion: "No pudimos cargar las facturas. Probá de nuevo en un momento.",
+  liquidaciones:
+    "No pudimos completar la liquidación. Revisá los datos e intentá de nuevo.",
   stock:
     "No pudimos cargar el catálogo de productos. Probá de nuevo en un momento.",
   combustible:
@@ -61,12 +65,19 @@ export function friendlyError(
       ) {
         return "Tu empresa todavía no tiene habilitada la gestión de viajes, o falta completar el registro. Consultá con quien administra la cuenta en tu organización.";
       }
-      if (context === "facturacion") {
+      if (context === "facturacion" || context === "liquidaciones") {
         return "Tu empresa no tiene habilitado el módulo de facturación. Consultá con el administrador de tu cuenta.";
       }
       return "No tenés permiso para ver esto. Si necesitás acceso, pedilo a un administrador.";
     }
     if (err.status === 404) {
+      if (
+        err.message &&
+        err.message !== "Not Found" &&
+        !err.message.match(/^HTTP \d+$/i)
+      ) {
+        return err.message;
+      }
       return "No encontramos lo que buscás.";
     }
     if (err.status === 409) {
@@ -86,12 +97,14 @@ export function friendlyError(
       return "Algunos datos no son válidos. Revisá la información e intentá de nuevo.";
     }
     if (err.status === 422) {
-      // Errores de ARCA/AFIP SDK — el backend incluye el mensaje real
       if (
         err.message &&
         err.message !== "Unprocessable Entity" &&
         !err.message.match(/^HTTP \d+$/i)
       ) {
+        if (context === "arca") {
+          return sanitizeArcaApiError(err.message) ?? fallback.arca;
+        }
         return err.message;
       }
     }
@@ -106,6 +119,13 @@ export function friendlyError(
     }
     if (err.status >= 500) {
       return "Tuvimos un problema del nuestro. Intentá de nuevo más tarde.";
+    }
+    if (
+      err.message &&
+      err.message !== "Conflict" &&
+      !err.message.match(/^HTTP \d+$/i)
+    ) {
+      return err.message;
     }
   }
   return fallback[context];

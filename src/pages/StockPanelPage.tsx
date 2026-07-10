@@ -1,5 +1,5 @@
-import { StockPanelTenantPage } from './StockPanelTenantPage';
+import { StockPanelTenantPage } from "./StockPanelTenantPage";
 
 export function StockPanelPage() {
-  return <StockPanelTenantPage />;
+  return <StockPanelTenantPage isPlatform={true} />;
 }

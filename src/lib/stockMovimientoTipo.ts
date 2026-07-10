@@ -4,6 +4,7 @@
 export const movimientoStockTipoBadgeColors: Record<string, string> = {
   ingreso: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
   egreso: 'bg-red-100 text-red-950 border-red-400/80',
+  division: 'bg-amber-50 text-amber-950 border-amber-400/80',
 };
 
 export const movimientoStockTipoBadgeDefault =
@@ -36,5 +37,6 @@ export function movimientoStockTipoLabel(tipo: string | undefined | null): strin
     .toLowerCase();
   if (k === 'ingreso') return 'Ingreso';
   if (k === 'egreso') return 'Egreso';
+  if (k === 'division') return 'División';
   return k ? k.charAt(0).toUpperCase() + k.slice(1) : '—';
 }

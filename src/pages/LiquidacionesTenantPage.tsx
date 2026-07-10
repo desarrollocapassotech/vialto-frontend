@@ -8,9 +8,11 @@ import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquida
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
@@ -67,12 +69,13 @@ function caeCell(liq: LiquidacionConTransportista) {
     );
   }
   if (liq.arcaError) {
+    const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
     return (
       <p
         className="text-red-600 text-[11px] max-w-[180px] truncate"
-        title={liq.arcaError}
+        title={msg}
       >
-        {liq.arcaError}
+        {msg}
       </p>
     );
   }
@@ -392,12 +395,14 @@ export function LiquidacionesTenantPage() {
             id: "viajes",
             header: "Viajes",
             cell: (liq) => liq.cantViajes,
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "bruto",
             header: "Bruto",
             cell: (liq) => fmtMoney(liq.bruto),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
@@ -409,12 +414,14 @@ export function LiquidacionesTenantPage() {
                 <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
               </>
             ),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
           },
           {
             id: "liquido",
             header: "Líquido",
             cell: (liq) => fmtMoney(liq.liquido),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
           },
           {

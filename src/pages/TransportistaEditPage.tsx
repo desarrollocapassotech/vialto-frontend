@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useToast } from "@/lib/toast";
 import { CrudDangerZone } from "@/components/crud/CrudDangerZone";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import {
@@ -35,6 +36,7 @@ export function TransportistaEditPage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const { showToast } = useToast();
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -158,12 +160,14 @@ export function TransportistaEditPage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
+      showToast("Transportista guardado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
+      showToast("No se pudo guardar el transportista", "error");
     } finally {
       setLoading(false);
     }
@@ -179,12 +183,14 @@ export function TransportistaEditPage() {
         : `/api/transportistas/${encodeURIComponent(id)}`;
       await apiJson(path, () => getToken(), { method: "DELETE" });
       if (!tenantId) void maestro.refreshTransportistas();
+      showToast("Transportista eliminado correctamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
+      showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
       setDeleting(false);
     }

@@ -6,6 +6,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import {
   listadoTablaAccionClass,
   listadoTablaHeadRowClass,
@@ -28,6 +29,7 @@ type ModalState =
 export function ProductosSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
+  const { showToast } = useToast();
 
   const [filtroEmpresa, setFiltroEmpresa] = useState("");
   const [rows, setRows] = useState<Producto[] | null>(null);
@@ -103,10 +105,11 @@ export function ProductosSuperadminPage() {
   }, [codigoFiltro, nombreFiltro, filtroActivo, filtroEmpresa]);
 
   async function toggleActivo(row: Producto) {
-    const mensaje = row.activo
-      ? `¿Desactivar "${row.nombre}"? Los movimientos históricos conservan el vínculo.`
-      : `¿Reactivar "${row.nombre}"?`;
-    if (!window.confirm(mensaje)) return;
+    const aviso = row.activo
+      ? `Desactivando "${row.nombre}". Los movimientos históricos conservan el vínculo.`
+      : `Reactivando "${row.nombre}".`;
+
+    showToast(aviso, "success");
     setError(null);
     try {
       await apiJson<Producto>(
@@ -117,6 +120,7 @@ export function ProductosSuperadminPage() {
       await load();
     } catch (e) {
       setError(friendlyError(e, "plataforma"));
+      showToast("No se pudo cambiar el estado del producto", "error");
     }
   }
 

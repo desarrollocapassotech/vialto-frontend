@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/lib/toast";
 import {
   emptyFacturaDraft,
   FacturaCreateModal,
@@ -75,8 +76,6 @@ function facturaPayloadFromDraft(draft: FacturaDraft) {
   };
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: "PENDIENTE",
   cobrada: "COBRADA",
@@ -110,20 +109,18 @@ type FacturaNuevaNavState = {
   viewFacturaId?: string;
 };
 
-// ─── componente principal ─────────────────────────────────────────────────────
-
 export function FacturacionTenantPage({
   tenantId,
   embeddedInSuperadmin,
 }: {
   tenantId?: string;
-  /** Cuando true, el padre (superadmin) ya muestra título y barra de empresa. */
   embeddedInSuperadmin?: boolean;
 } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
+  const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
   const hasArca =
     !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
@@ -166,25 +163,21 @@ export function FacturacionTenantPage({
   const [viajesLoading, setViajesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // crear
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<FacturaDraft>(emptyFacturaDraft());
   const [draftError, setDraftError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // edición inline
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<FacturaDraft | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // eliminar
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
 
-  // filtros de columna (client-side)
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("");
@@ -341,7 +334,6 @@ export function FacturacionTenantPage({
     return facturas;
   }, [platform, facturasFiltradas, facturas, page, pageSize]);
 
-  /** Si cambia cliente/tipo, sacar de la selección viajes que ya no aplican. */
   useEffect(() => {
     if (!creating || viajes.length === 0) return;
     const allowed = new Set(viajesNuevaFactura.map((v) => v.id));
@@ -386,8 +378,6 @@ export function FacturacionTenantPage({
     if (estadoFiltro) params.set("estado", estadoFiltro);
     return params.toString();
   }
-
-  // ── carga inicial ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -451,7 +441,6 @@ export function FacturacionTenantPage({
     estadoFiltro,
   ]);
 
-  /** Abrir factura desde enlace (p. ej. alertas): `?factura=id` */
   useEffect(() => {
     const id = searchParams.get("factura")?.trim();
     if (!id) return;
@@ -485,7 +474,6 @@ export function FacturacionTenantPage({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams]);
 
   async function ensureViajesLoaded() {
@@ -495,13 +483,10 @@ export function FacturacionTenantPage({
       const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
       setViajes(data);
     } catch {
-      /* silencioso — el form mostrará lista vacía */
     } finally {
       setViajesLoading(false);
     }
   }
-
-  // ── pre-fill desde navegación ──────────────────────────────────────────────
 
   useEffect(() => {
     const state = location.state as FacturaNuevaNavState | null;
@@ -517,7 +502,7 @@ export function FacturacionTenantPage({
     setCreating(true);
     void ensureViajesLoaded();
     window.history.replaceState({}, "");
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const expand = (
@@ -530,11 +515,8 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
         startEdit(f);
-      } catch {
-        /* silencioso */
-      }
+      } catch {}
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, getToken]);
 
   useEffect(() => {
@@ -548,13 +530,9 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
         setViewingFactura(f);
-      } catch {
-        /* silencioso */
-      }
+      } catch {}
     })();
   }, [location.state, getToken]);
-
-  // ── refetch ────────────────────────────────────────────────────────────────
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
@@ -576,12 +554,8 @@ export function FacturacionTenantPage({
         setFacturas(data.items);
         setMeta(data.meta);
       }
-    } catch {
-      /* silencioso */
-    }
+    } catch {}
   }
-
-  // ── crear ──────────────────────────────────────────────────────────────────
 
   async function handleCreate() {
     setDraftError(null);
@@ -605,6 +579,7 @@ export function FacturacionTenantPage({
         method: "POST",
         body: JSON.stringify(facturaPayloadFromDraft(draft)),
       });
+      showToast("Factura creada exitosamente", "success");
       setCreating(false);
       setDraft(emptyFacturaDraft());
       await refetchFacturas();
@@ -612,12 +587,11 @@ export function FacturacionTenantPage({
       setDraftError(
         e instanceof Error ? e.message : "No se pudo guardar la factura.",
       );
+      showToast("No se pudo crear la factura", "error");
     } finally {
       setSaving(false);
     }
   }
-
-  // ── edición inline ─────────────────────────────────────────────────────────
 
   function startEdit(f: Factura) {
     setEditError(null);
@@ -663,18 +637,18 @@ export function FacturacionTenantPage({
       setFacturas((prev) =>
         prev ? prev.map((r) => (r.id === editingId ? updated : r)) : prev,
       );
+      showToast("Factura actualizada exitosamente", "success");
       cancelEdit();
       if (!platform) void refetchFacturas();
     } catch (e) {
       setEditError(
         e instanceof Error ? e.message : "No se pudo guardar la factura.",
       );
+      showToast("No se pudo actualizar la factura", "error");
     } finally {
       setSavingEditId(null);
     }
   }
-
-  // ── eliminar ───────────────────────────────────────────────────────────────
 
   async function confirmDeleteFactura() {
     const f = facturaDeleteConfirm;
@@ -682,6 +656,7 @@ export function FacturacionTenantPage({
     setDeletingId(f.id);
     try {
       await apiJson(facturaUrl(f.id), () => getToken(), { method: "DELETE" });
+      showToast("Factura eliminada correctamente", "success");
       if (platform) {
         setFacturas((prev) => prev?.filter((r) => r.id !== f.id) ?? prev);
       } else if (meta && facturas?.length === 1 && meta.page > 1) {
@@ -692,13 +667,11 @@ export function FacturacionTenantPage({
       if (editingId === f.id) cancelEdit();
       setFacturaDeleteConfirm(null);
     } catch {
-      /* sin toaster */
+      showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
       setDeletingId(null);
     }
   }
-
-  // ── helpers ────────────────────────────────────────────────────────────────
 
   function nombreCliente(id: string | null | undefined) {
     if (!id) return "—";
@@ -746,8 +719,6 @@ export function FacturacionTenantPage({
     setNumFiltro(numFiltroInput);
     setPage(1);
   }
-
-  // ── render ─────────────────────────────────────────────────────────────────
 
   const facturasEmptyMessage =
     (metaListado?.total ?? 0) === 0 &&
@@ -797,6 +768,7 @@ export function FacturacionTenantPage({
         >
           <option value="">Todos</option>
           <option value="cliente">Cliente</option>
+          <option value="transportista_externo">Transportista externo</option>
         </select>
       </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltro}>
@@ -925,7 +897,6 @@ export function FacturacionTenantPage({
         </>
       )}
 
-      {/* acciones */}
       <div className="mt-4">
         {error && <CrudFormErrorAlert message={error} />}
         <div className="flex justify-end gap-2 mt-2">

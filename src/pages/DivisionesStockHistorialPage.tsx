@@ -1,5 +1,5 @@
-import { DivisionesStockHistorialTenantPage } from './DivisionesStockHistorialTenantPage';
+import { DivisionesStockHistorialTenantPage } from "./DivisionesStockHistorialTenantPage";
 
 export function DivisionesStockHistorialPage() {
-  return <DivisionesStockHistorialTenantPage />;
+  return <DivisionesStockHistorialTenantPage isPlatform={true} />;
 }
