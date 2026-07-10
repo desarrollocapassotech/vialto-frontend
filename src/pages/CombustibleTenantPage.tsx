@@ -363,10 +363,31 @@ export function CombustibleTenantPage() {
     </tr>
   );
 
+  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean).length;
+
   return (
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
+        <div className="hidden min-h-10 items-center lg:flex">
+          {hayFiltros && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              disabled={rows === null}
+              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
+            >
+              Limpiar filtros
+              <span
+                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                aria-hidden
+              >
+                {cantFiltros}
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
