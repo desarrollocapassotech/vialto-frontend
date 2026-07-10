@@ -273,7 +273,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="periodoDesde" className="block text-xs text-vialto-steel mb-1">
-                      Desde
+                      Desde <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="periodoDesde"
@@ -286,7 +286,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   </div>
                   <div>
                     <label htmlFor="periodoHasta" className="block text-xs text-vialto-steel mb-1">
-                      Hasta
+                      Hasta <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="periodoHasta"
@@ -379,7 +379,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                     type="button"
                     disabled={busyCrear || !periodoDesde || !periodoHasta}
                     onClick={() => void handleCrear()}
-                    className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
+                    className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {busyCrear ? 'Creando…' : 'Crear liquidación'}
                   </button>
