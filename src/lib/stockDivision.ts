@@ -54,9 +54,21 @@ export function stockOperacionProductoLabel(op: StockOperacion): string {
     if (impacto?.productoNombre) return impacto.productoNombre;
   }
 
-  const count = op.movimientos.length;
-  if (count === 1) {
-    return op.movimientos[0].producto?.nombre ?? '1 producto';
+  const productosUnicos = [
+    ...new Map(
+      op.movimientos
+        .filter((mov) => mov.producto)
+        .map((mov) => [mov.producto!.id, mov.producto!]),
+    ).values(),
+  ];
+
+  if (productosUnicos.length === 1) {
+    return productosUnicos[0].nombre ?? '1 producto';
   }
-  return `${count} productos`;
+
+  if (productosUnicos.length === 0) {
+    return op.movimientos[0]?.producto?.nombre ?? '—';
+  }
+
+  return `${productosUnicos.length} productos`;
 }
