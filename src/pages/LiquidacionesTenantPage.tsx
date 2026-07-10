@@ -12,6 +12,7 @@ import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
@@ -394,12 +395,14 @@ export function LiquidacionesTenantPage() {
             id: "viajes",
             header: "Viajes",
             cell: (liq) => liq.cantViajes,
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "bruto",
             header: "Bruto",
             cell: (liq) => fmtMoney(liq.bruto),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
@@ -411,12 +414,14 @@ export function LiquidacionesTenantPage() {
                 <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
               </>
             ),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
           },
           {
             id: "liquido",
             header: "Líquido",
             cell: (liq) => fmtMoney(liq.liquido),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
           },
           {
