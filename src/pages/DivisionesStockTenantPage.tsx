@@ -106,7 +106,7 @@ export function DivisionesStockTenantPage({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [, setStockItems] = useState<StockItem[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allStockLoading, setAllStockLoading] = useState(true);
