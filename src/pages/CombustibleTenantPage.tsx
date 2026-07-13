@@ -6,8 +6,9 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { pageTitleClass } from "@/lib/listadoTabla";
+import { pageTitleClass, listadoTablaAccionClass, listadoTablaTdClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -123,6 +124,7 @@ export function CombustibleTenantPage() {
   const [choferId, setChoferId] = useState("");
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
+  const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
   function resetPage() { setPage(1); }
 
@@ -370,6 +372,11 @@ export function CombustibleTenantPage() {
           </select>
         </ViajesListadoHeaderFiltro>
       </th>
+      <th className="px-4 py-3 text-left font-normal">
+        <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
+          Acciones
+        </span>
+      </th>
     </tr>
   );
 
@@ -417,6 +424,16 @@ export function CombustibleTenantPage() {
         clearFiltersDisabled={!hayFiltros}
         filtersTitle="Filtrar cargas"
         tableHead={tableHead}
+        actionsTdClassName={listadoTablaTdClass}
+        renderActions={(c) => (
+          <button
+            type="button"
+            onClick={() => setViewingCargaId(c.id)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
       />
 
       {rows !== null && total > 0 && (
@@ -430,6 +447,13 @@ export function CombustibleTenantPage() {
             setPageSize(s);
             setPage(1);
           }}
+        />
+      )}
+
+      {viewingCargaId && (
+        <CargaCombustibleViewModal
+          cargaId={viewingCargaId}
+          onClose={() => setViewingCargaId(null)}
         />
       )}
     </div>
