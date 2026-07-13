@@ -14,6 +14,10 @@ import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { LoteSelect } from "@/components/stock/LoteSelect";
 import type { LoteStockDisponible } from "@/components/stock/EgresoProductoLoteBloque";
+import {
+  loteEgresoParaApi,
+  loteEgresoSeleccionValida,
+} from "@/lib/stockLote";
 import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
 import type {
   Cliente,
@@ -129,24 +133,8 @@ export function DivisionesStockTenantPage({
   const unidadesPorBulto = presentacionSeleccionada?.unidadesPorBulto ?? 0;
   const sueltasResultantes = bultos * unidadesPorBulto;
 
-  const stockDisponible: StockItem | null = useMemo(() => {
-    if (!productoId || !clienteId || !depositoId || !presentacionId)
-      return null;
-    return (
-      stockItems.find(
-        (s) =>
-          s.productoId === productoId &&
-          s.clienteId === clienteId &&
-          s.depositoId === depositoId &&
-          s.presentacionId === presentacionId,
-      ) ?? null
-    );
-  }, [stockItems, productoId, clienteId, depositoId, presentacionId]);
-
-  // Si hay lote seleccionado, usar su balance específico; si no, el total del StockItem
-  const bultosDisponibles = lote
-    ? (loteDisponible?.bultos ?? 0)
-    : (stockDisponible?.cantidad1 ?? 0);
+  // Saldo del lote elegido (obligatorio para dividir con trazabilidad).
+  const bultosDisponibles = loteDisponible?.bultos ?? 0;
 
   const clientesFiltrados = useMemo(() => {
     if (allStockLoading) return [];
@@ -226,6 +214,8 @@ export function DivisionesStockTenantPage({
     const pps = productoSeleccionado.productoPresentaciones;
     setPresentacionId(pps.length === 1 ? pps[0].id : "");
     setBultos(1);
+    setLote("");
+    setLoteDisponible(null);
   }, [productoSeleccionado]);
 
   function resetForm() {
@@ -256,8 +246,12 @@ export function DivisionesStockTenantPage({
     if (!depositoId) ferrs.depositoId = "Seleccioná un depósito.";
     if (!productoId) ferrs.productoId = "Seleccioná un producto.";
     if (!presentacionId) ferrs.presentacionId = "Seleccioná una presentación.";
+    if (!loteEgresoSeleccionValida(lote)) {
+      ferrs.lote = "Seleccioná el lote de origen.";
+    }
     if (Object.keys(ferrs).length > 0) {
       setFieldErrors(ferrs);
+      setFormError("Revisá los campos marcados en rojo.");
       return;
     }
     setFieldErrors({});
@@ -288,7 +282,7 @@ export function DivisionesStockTenantPage({
           depositoId,
           bultos,
           fecha: fechaIso,
-          ...(lote.trim() ? { lote: lote.trim() } : {}),
+          lote: loteEgresoParaApi(lote) ?? undefined,
           ...(observaciones.trim()
             ? { observaciones: observaciones.trim() }
             : {}),
@@ -309,10 +303,11 @@ export function DivisionesStockTenantPage({
 
   const readyToConvert = Boolean(
     clienteId &&
-    depositoId &&
-    productoId &&
-    presentacionId &&
-    unidadesPorBulto > 0,
+      depositoId &&
+      productoId &&
+      presentacionId &&
+      unidadesPorBulto > 0 &&
+      loteEgresoSeleccionValida(lote),
   );
 
   return (
@@ -363,6 +358,8 @@ export function DivisionesStockTenantPage({
                 onChange={(id) => {
                   setClienteId(id);
                   setStockItems([]);
+                  setLote("");
+                  setLoteDisponible(null);
                   const depositosParaCliente = new Set(
                     allStockItems
                       .filter((s) => s.clienteId === id)
@@ -383,7 +380,11 @@ export function DivisionesStockTenantPage({
               </label>
               <select
                 value={depositoId}
-                onChange={(e) => setDepositoId(e.target.value)}
+                onChange={(e) => {
+                  setDepositoId(e.target.value);
+                  setLote("");
+                  setLoteDisponible(null);
+                }}
                 className={`h-9 w-full border bg-white px-2 text-sm ${
                   fieldErrors.depositoId ? "border-red-400" : "border-black/15"
                 }`}
@@ -413,6 +414,8 @@ export function DivisionesStockTenantPage({
                   setProductoId(id);
                   setBultos(1);
                   setStockItems([]);
+                  setLote("");
+                  setLoteDisponible(null);
                 }}
                 loading={productosLoading}
                 filterItems={(items, q) => {
@@ -442,6 +445,8 @@ export function DivisionesStockTenantPage({
                 onChange={(e) => {
                   setPresentacionId(e.target.value);
                   setBultos(1);
+                  setLote("");
+                  setLoteDisponible(null);
                 }}
                 disabled={!productoId}
                 className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
@@ -468,7 +473,9 @@ export function DivisionesStockTenantPage({
             </div>
 
             <div className="space-y-1">
-              <label className={LABEL}>Lote</label>
+              <label className={LABEL}>
+                Lote <span className="text-red-500">*</span>
+              </label>
               <LoteSelect
                 productoId={productoId}
                 clienteId={clienteId}
@@ -483,12 +490,30 @@ export function DivisionesStockTenantPage({
                       : null,
                   );
                   setBultos(1);
+                  if (fieldErrors.lote) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.lote;
+                      return next;
+                    });
+                  }
                 }}
                 lotesBase={lotesBase}
                 tenantId={tenantId}
-                className={`${INPUT} disabled:opacity-50`}
-                disabled={!productoId || !clienteId || !depositoId}
+                className={`${INPUT} disabled:opacity-50 ${
+                  fieldErrors.lote ? "border-red-400" : ""
+                }`}
+                disabled={!productoId || !clienteId || !depositoId || !presentacionId}
+                required
+                requiereLote
+                error={Boolean(fieldErrors.lote)}
+                placeholder={
+                  !presentacionId
+                    ? "Primero elegí una presentación…"
+                    : "Elegí un lote con stock…"
+                }
               />
+              <CrudFieldError message={fieldErrors.lote} />
             </div>
           </div>
         </div>
@@ -506,25 +531,16 @@ export function DivisionesStockTenantPage({
               ) : bultosDisponibles > 0 ? (
                 <span className="font-semibold text-vialto-charcoal">
                   {bultosDisponibles} bulto{bultosDisponibles !== 1 ? "s" : ""}
-                  {!lote && (stockDisponible?.cantidad2 ?? 0) > 0 && (
-                    <span className="font-normal text-vialto-steel ml-2 text-xs">
-                      + {stockDisponible!.cantidad2} sueltas
-                    </span>
-                  )}
-                  {lote && (
-                    <span className="font-normal text-vialto-steel ml-2 text-xs">
-                      lote {lote}
-                      {(loteDisponible?.sueltas ?? 0) > 0 && (
-                        <> · {loteDisponible!.sueltas} sueltas</>
-                      )}
-                    </span>
-                  )}
+                  <span className="font-normal text-vialto-steel ml-2 text-xs">
+                    lote {lote}
+                    {(loteDisponible?.sueltas ?? 0) > 0 && (
+                      <> · {loteDisponible!.sueltas} sueltas</>
+                    )}
+                  </span>
                 </span>
               ) : (
                 <span className="text-amber-600 text-sm">
-                  {lote
-                    ? `Sin stock en bultos para lote ${lote}`
-                    : "Sin stock en bultos"}
+                  Sin stock en bultos para lote {lote}
                 </span>
               )}
             </div>
