@@ -227,6 +227,7 @@ export interface CargaCombustible {
   chofer: { nombre: string } | null;
   estacion: string;
   litros: number;
+  precioPorLitro: number;
   importe: number;
   km: number;
   formaPago: string | null;

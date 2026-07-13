@@ -85,6 +85,11 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
     cell: (r) => `${fmtNum(r.litros)} L`,
   },
   {
+    id: "precioPorLitro",
+    header: "Precio/L",
+    cell: (r) => r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
+  },
+  {
     id: "importe",
     header: "Monto",
     cell: (r) => `$${fmtNum(r.importe)}`,
@@ -329,6 +334,11 @@ export function CombustibleTenantPage() {
       <th className="px-4 py-3 text-left font-normal">
         <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
           Litros
+        </span>
+      </th>
+      <th className="px-4 py-3 text-left font-normal">
+        <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
+          Precio/L
         </span>
       </th>
       <th className="px-4 py-3 text-left font-normal">
