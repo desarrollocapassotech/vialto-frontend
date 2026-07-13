@@ -338,13 +338,19 @@ export function IngresoWizardStep3({
                     </div>
 
                     {row.sinLote ? (
-                      <input
-                        type="text"
-                        value=""
-                        disabled
-                        placeholder="Escribí o seleccioná un lote…"
-                        className="h-9 w-full border border-black/15 bg-white px-2 text-sm disabled:opacity-50"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value=""
+                          disabled
+                          placeholder="Se asignará un lote interno al guardar"
+                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm disabled:opacity-50"
+                        />
+                        <p className="text-xs text-vialto-steel">
+                          Cada ingreso sin lote de fábrica recibe un ID único (ej. INT-A1B2C) para
+                          conservar su vencimiento y trazabilidad.
+                        </p>
+                      </>
                     ) : (
                       <>
                         <LoteDatalistInput
