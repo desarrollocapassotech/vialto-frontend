@@ -1,50 +1,98 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { DestinatarioViewModal } from '@/components/destinatarios/DestinatarioViewModal';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Destinatario, PaginatedMeta } from '@/types/api';
-
-type DestinatariosPaginatedResponse = {
-  items: Destinatario[];
-  meta: PaginatedMeta;
-};
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { Destinatario, PaginatedMeta } from "@/types/api";
 
 export function DestinatariosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+
   const [rows, setRows] = useState<Destinatario[] | null>(null);
-  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [viewingId, setViewingId] = useState<string | null>(null);
-  const [viewingNombre, setViewingNombre] = useState('');
+  const [viewingNombre, setViewingNombre] = useState("");
+
+  // --- ESTADOS DE PAGINACIÓN ---
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(
+    LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
+  );
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+
     let cancelled = false;
+    setLoading(true);
+
     (async () => {
       try {
-        const data = await apiJson<DestinatariosPaginatedResponse>(
+        const response = await apiJson<any>(
           `/api/destinatarios/paginated?page=${page}&pageSize=${pageSize}`,
           () => getToken(),
         );
+
         if (!cancelled) {
-          setRows(data.items);
-          setMeta(data.meta);
+          let fetchedRows: Destinatario[] = [];
+          let fetchedMeta: PaginatedMeta | null = null;
+
+          // Extracción segura y paginación en el frontend si es necesario
+          if (Array.isArray(response)) {
+            const totalItems = response.length;
+            const calculatedTotalPages = Math.ceil(totalItems / pageSize) || 1;
+
+            // Aseguramos no estar en una página fuera de rango
+            const safePage =
+              page > calculatedTotalPages ? calculatedTotalPages : page;
+
+            // Recortamos el array
+            const startIndex = (safePage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+
+            fetchedRows = response.slice(startIndex, endIndex);
+            fetchedMeta = {
+              page: safePage,
+              pageSize: pageSize,
+              totalPages: calculatedTotalPages,
+              total: totalItems,
+              hasNext: safePage < calculatedTotalPages,
+              hasPrev: safePage > 1,
+            };
+          } else if (response && response.data) {
+            fetchedRows = response.data;
+            fetchedMeta = response.meta || null;
+          } else if (response && response.items) {
+            fetchedRows = response.items;
+            fetchedMeta = response.meta || null;
+          }
+
+          setRows(fetchedRows);
+          setMeta(fetchedMeta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
           setMeta(null);
-          setError(friendlyError(e, 'destinatarios'));
+          setError(friendlyError(e, "destinatarios"));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -58,6 +106,7 @@ export function DestinatariosTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Empresas o personas que reciben mercadería en egresos de stock.
       </p>
+
       <div className="mt-4 flex justify-end">
         <Link
           to="/destinatarios/nuevo"
@@ -66,17 +115,19 @@ export function DestinatariosTenantPage() {
           Crear destinatario
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
+
       <ListadoDatos
-        className="mt-8"
+        className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (d) => d.nombre,
             tdClassName: `${listadoTablaTdClass} font-medium`,
@@ -86,8 +137,8 @@ export function DestinatariosTenantPage() {
         rowKey={(d) => d.id}
         emptyMessage={
           error
-            ? 'No se pudieron cargar los destinatarios.'
-            : 'Todavía no hay destinatarios cargados.'
+            ? "No se pudieron cargar los destinatarios."
+            : "Todavía no hay destinatarios cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(d) => (
@@ -104,47 +155,19 @@ export function DestinatariosTenantPage() {
         )}
       />
 
-      {meta && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-vialto-steel">
-              Página {meta.page} de {meta.totalPages} · {meta.total} registros
-            </p>
-            <label className="text-xs uppercase tracking-wider text-vialto-steel flex items-center gap-2">
-              Mostrar
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-8 border border-black/20 bg-white px-2 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </label>
-          </div>
-          <div className="inline-flex gap-2">
-            <button
-              type="button"
-              disabled={!meta.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={!meta.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-9 px-3 border border-black/20 text-xs uppercase tracking-wider disabled:opacity-40"
-            >
-              Siguiente
-            </button>
-          </div>
-        </div>
+      {/* COMPONENTE DE PAGINACIÓN */}
+      {meta && rows && rows.length > 0 && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="destinatarios"
+          onPageChange={(p) => setPage(p)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1); // Reiniciar a página 1 al cambiar la cantidad
+          }}
+        />
       )}
 
       {viewingId && (
@@ -153,7 +176,7 @@ export function DestinatariosTenantPage() {
           nombreTitulo={viewingNombre}
           onClose={() => {
             setViewingId(null);
-            setViewingNombre('');
+            setViewingNombre("");
           }}
           editTo={`/destinatarios/${viewingId}/editar`}
         />
