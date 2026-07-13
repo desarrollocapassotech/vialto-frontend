@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
+import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
   STOCK_SIN_LOTE_VALUE,
   type LotesDisponiblesResponse,
@@ -27,6 +28,23 @@ function buildLotesUrl(
   parts.push(`depositoId=${encodeURIComponent(depositoId)}`);
   if (presentacionId) parts.push(`presentacionId=${encodeURIComponent(presentacionId)}`);
   return `${base}?${parts.join('&')}`;
+}
+
+function etiquetaLoteOption(
+  lote: string,
+  cantidad1: number,
+  cantidad2: number,
+  fechaVencimiento: string | null,
+): string {
+  let label = `${lote} (${cantidad1} bulto${cantidad1 !== 1 ? 's' : ''}`;
+  if (cantidad2 > 0) {
+    label += `, ${cantidad2} suelta${cantidad2 !== 1 ? 's' : ''}`;
+  }
+  label += ')';
+  if (fechaVencimiento) {
+    label += ` · Vto ${formatMovimientoStockFechaFromIso(fechaVencimiento)}`;
+  }
+  return label;
 }
 
 export function LoteSelect({
@@ -145,8 +163,7 @@ export function LoteSelect({
         .filter((l) => !excluded.has(l.lote))
         .map((l) => (
           <option key={l.lote} value={l.lote}>
-            {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
-            {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
+            {etiquetaLoteOption(l.lote, l.cantidad1, l.cantidad2, l.fechaVencimiento)}
           </option>
         ))}
     </select>
