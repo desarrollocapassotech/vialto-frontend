@@ -203,7 +203,9 @@ export function StockOperacionViewModal({
                   </>
                 )}
                 <th className={TH}>Lote</th>
-                {operacion.tipo === 'ingreso' && <th className={TH}>Vencimiento</th>}
+                {(operacion.tipo === 'ingreso' || operacion.tipo === 'egreso') && (
+                  <th className={TH}>Vencimiento</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5">
@@ -240,7 +242,7 @@ export function StockOperacionViewModal({
                     <td className={TD}>
                       {mov.lote ?? <span className="text-vialto-steel">Sin lote</span>}
                     </td>
-                    {operacion.tipo === 'ingreso' && (
+                    {(operacion.tipo === 'ingreso' || operacion.tipo === 'egreso') && (
                       <td className={TD}>
                         {mov.fechaVencimiento
                           ? formatMovimientoStockFechaFromIso(mov.fechaVencimiento)
