@@ -1,14 +1,22 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
+import {
+  ListadoDatos,
+  type ListadoColumn,
+} from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { pageTitleClass, listadoTablaAccionClass, listadoTablaTdClass } from "@/lib/listadoTabla";
+import {
+  pageTitleClass,
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -32,7 +40,12 @@ const TIPO_VEHICULO_LABELS: Record<string, string> = {
   otro: "Otro",
 };
 
-function fmtVehiculoLabel(v: { patente: string; tipo: string; marca: string | null; modelo: string | null }): string {
+function fmtVehiculoLabel(v: {
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+}): string {
   const tipo = TIPO_VEHICULO_LABELS[v.tipo] ?? v.tipo;
   const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
   const detalle = [tipo, marcaModelo].filter(Boolean).join(" · ");
@@ -88,7 +101,8 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
     id: "precioPorLitro",
     header: "Precio/L",
-    cell: (r) => r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
+    cell: (r) =>
+      r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
   },
   {
     id: "importe",
@@ -118,6 +132,7 @@ export function CombustibleTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const [month, setMonth] = useState("");
   const [vehiculoId, setVehiculoId] = useState("");
@@ -126,7 +141,9 @@ export function CombustibleTenantPage() {
   const [formaPago, setFormaPago] = useState("");
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
-  function resetPage() { setPage(1); }
+  function resetPage() {
+    setPage(1);
+  }
 
   function handleClearFilters() {
     setMonth("");
@@ -137,7 +154,20 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
-  const hayFiltros = Boolean(month || vehiculoId || choferId || estacion || formaPago);
+  const hayFiltros = Boolean(
+    month || vehiculoId || choferId || estacion || formaPago,
+  );
+
+  // Parámetros de filtro compartidos entre el listado y la exportación.
+  function filtroParams(): URLSearchParams {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+    if (choferId) qs.set("choferId", choferId);
+    if (estacion) qs.set("estacion", estacion);
+    if (formaPago) qs.set("formaPago", formaPago);
+    return qs;
+  }
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -146,15 +176,9 @@ export function CombustibleTenantPage() {
 
     void (async () => {
       try {
-        const qs = new URLSearchParams({
-          page: String(page),
-          limit: String(pageSize),
-        });
-        if (month) qs.set("month", month);
-        if (vehiculoId) qs.set("vehiculoId", vehiculoId);
-        if (choferId) qs.set("choferId", choferId);
-        if (estacion) qs.set("estacion", estacion);
-        if (formaPago) qs.set("formaPago", formaPago);
+        const qs = filtroParams();
+        qs.set("page", String(page));
+        qs.set("limit", String(pageSize));
 
         const data = await apiJson<CombustibleListResponse>(
           `/api/combustible?${qs.toString()}`,
@@ -177,7 +201,43 @@ export function CombustibleTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, page, pageSize, month, vehiculoId, choferId, estacion, formaPago, getToken]);
+  }, [
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    month,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    getToken,
+  ]);
+
+  async function handleDownloadExcel() {
+    if (downloading || total === 0) return;
+    setDownloading(true);
+    try {
+      // Traemos todas las cargas del filtro actual (no solo la página visible).
+      const qs = filtroParams();
+      qs.set("page", "1");
+      qs.set("limit", String(total));
+
+      const data = await apiJson<CombustibleListResponse>(
+        `/api/combustible?${qs.toString()}`,
+        () => getToken(),
+      );
+
+      await exportarCargasCombustible(data.cargas, {
+        month: month || undefined,
+      });
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, "combustible"));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const meta: PaginatedMeta = {
@@ -199,7 +259,10 @@ export function CombustibleTenantPage() {
         <input
           type="month"
           value={month}
-          onChange={(e) => { setMonth(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${month ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por mes"
         />
@@ -208,13 +271,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Conductor" active={Boolean(choferId)}>
         <select
           value={choferId}
-          onChange={(e) => { setChoferId(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setChoferId(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${choferId ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por conductor"
         >
           <option value="">Todos</option>
           {maestro.choferes.map((ch) => (
-            <option key={ch.id} value={ch.id}>{ch.nombre}</option>
+            <option key={ch.id} value={ch.id}>
+              {ch.nombre}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -222,13 +290,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Vehículo" active={Boolean(vehiculoId)}>
         <select
           value={vehiculoId}
-          onChange={(e) => { setVehiculoId(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setVehiculoId(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${vehiculoId ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por vehículo"
         >
           <option value="">Todos</option>
           {maestro.vehiculos.map((v) => (
-            <option key={v.id} value={v.id}>{fmtVehiculoLabel(v)}</option>
+            <option key={v.id} value={v.id}>
+              {fmtVehiculoLabel(v)}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -237,7 +310,10 @@ export function CombustibleTenantPage() {
         <input
           type="text"
           value={estacion}
-          onChange={(e) => { setEstacion(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setEstacion(e.target.value);
+            resetPage();
+          }}
           placeholder="Buscar estación..."
           className={`${inputClass} ${estacion ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por estación"
@@ -247,13 +323,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Forma de pago" active={Boolean(formaPago)}>
         <select
           value={formaPago}
-          onChange={(e) => { setFormaPago(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setFormaPago(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${formaPago ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por forma de pago"
         >
           <option value="">Todas</option>
           {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+            <option key={k} value={k}>
+              {v}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -273,7 +354,10 @@ export function CombustibleTenantPage() {
           <input
             type="month"
             value={month}
-            onChange={(e) => { setMonth(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[150px]`}
             aria-label="Filtrar por mes"
           />
@@ -287,13 +371,18 @@ export function CombustibleTenantPage() {
         >
           <select
             value={choferId}
-            onChange={(e) => { setChoferId(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setChoferId(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[160px]`}
             aria-label="Filtrar por conductor"
           >
             <option value="">Todos</option>
             {maestro.choferes.map((ch) => (
-              <option key={ch.id} value={ch.id}>{ch.nombre}</option>
+              <option key={ch.id} value={ch.id}>
+                {ch.nombre}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
@@ -306,13 +395,18 @@ export function CombustibleTenantPage() {
         >
           <select
             value={vehiculoId}
-            onChange={(e) => { setVehiculoId(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setVehiculoId(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[140px]`}
             aria-label="Filtrar por vehículo"
           >
             <option value="">Todos</option>
             {maestro.vehiculos.map((v) => (
-              <option key={v.id} value={v.id}>{fmtVehiculoLabel(v)}</option>
+              <option key={v.id} value={v.id}>
+                {fmtVehiculoLabel(v)}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
@@ -326,7 +420,10 @@ export function CombustibleTenantPage() {
           <input
             type="text"
             value={estacion}
-            onChange={(e) => { setEstacion(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setEstacion(e.target.value);
+              resetPage();
+            }}
             placeholder="Buscar..."
             className={`${inputClass} min-w-[140px]`}
             aria-label="Filtrar por estación"
@@ -361,13 +458,18 @@ export function CombustibleTenantPage() {
         >
           <select
             value={formaPago}
-            onChange={(e) => { setFormaPago(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setFormaPago(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[150px]`}
             aria-label="Filtrar por forma de pago"
           >
             <option value="">Todas</option>
             {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+              <option key={k} value={k}>
+                {v}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
@@ -380,29 +482,59 @@ export function CombustibleTenantPage() {
     </tr>
   );
 
-  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean).length;
+  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(
+    Boolean,
+  ).length;
 
   return (
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
-        <div className="hidden min-h-10 items-center lg:flex">
-          {hayFiltros && (
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              disabled={rows === null}
-              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={rows === null || total === 0 || downloading}
+            className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            aria-label="Descargar Excel"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
             >
-              Limpiar filtros
-              <span
-                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-                aria-hidden
+              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M12 11v6" />
+              <path d="m9 14 3 3 3-3" />
+            </svg>
+            {downloading ? "Descargando…" : "Descargar Excel"}
+          </button>
+
+          {hayFiltros && (
+            <div className="hidden min-h-10 items-center lg:flex">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={rows === null}
+                className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
               >
-                {cantFiltros}
-              </span>
-            </button>
+                Limpiar filtros
+                <span
+                  className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                  aria-hidden
+                >
+                  {cantFiltros}
+                </span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -419,7 +551,10 @@ export function CombustibleTenantPage() {
         rowKey={(r) => r.id}
         emptyMessage="Sin cargas registradas"
         filters={mobileFilters}
-        activeFilterCount={[month, vehiculoId, choferId, estacion, formaPago].filter(Boolean).length}
+        activeFilterCount={
+          [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean)
+            .length
+        }
         onClearFilters={handleClearFilters}
         clearFiltersDisabled={!hayFiltros}
         filtersTitle="Filtrar cargas"
