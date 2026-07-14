@@ -1,13 +1,21 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
-import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ListadoDatos,
+  type ListadoColumn,
+} from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { pageTitleClass } from "@/lib/listadoTabla";
+import {
+  pageTitleClass,
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -31,7 +39,12 @@ const TIPO_VEHICULO_LABELS: Record<string, string> = {
   otro: "Otro",
 };
 
-function fmtVehiculoLabel(v: { patente: string; tipo: string; marca: string | null; modelo: string | null }): string {
+function fmtVehiculoLabel(v: {
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+}): string {
   const tipo = TIPO_VEHICULO_LABELS[v.tipo] ?? v.tipo;
   const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
   const detalle = [tipo, marcaModelo].filter(Boolean).join(" · ");
@@ -87,7 +100,8 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
     id: "precioPorLitro",
     header: "Precio/L",
-    cell: (r) => r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
+    cell: (r) =>
+      r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
   },
   {
     id: "importe",
@@ -123,8 +137,18 @@ export function CombustibleTenantPage() {
   const [choferId, setChoferId] = useState("");
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
+  const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
-  function resetPage() { setPage(1); }
+  // Eliminación con confirmación
+  const [deleteTarget, setDeleteTarget] = useState<CargaCombustible | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function resetPage() {
+    setPage(1);
+  }
 
   function handleClearFilters() {
     setMonth("");
@@ -135,7 +159,9 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
-  const hayFiltros = Boolean(month || vehiculoId || choferId || estacion || formaPago);
+  const hayFiltros = Boolean(
+    month || vehiculoId || choferId || estacion || formaPago,
+  );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -175,7 +201,56 @@ export function CombustibleTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, page, pageSize, month, vehiculoId, choferId, estacion, formaPago, getToken]);
+  }, [
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    month,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    getToken,
+  ]);
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await apiJson<{ deleted: string }>(
+        `/api/combustible/${deleteTarget.id}`,
+        () => getToken(),
+        { method: "DELETE" },
+      );
+      const deletedId = deleteTarget.id;
+      setRows((prev) => {
+        const next = prev ? prev.filter((r) => r.id !== deletedId) : prev;
+        // si borrás el último de la página, retrocedé para que se refetchee
+        if (next && next.length === 0 && page > 1) {
+          setPage((p) => p - 1);
+        }
+        return next;
+      });
+      setTotal((t) => Math.max(0, t - 1));
+      setDeleteTarget(null);
+    } catch (e) {
+      setDeleteError(friendlyError(e, "combustible"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // Cerrar el modal con Escape
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deleting) setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteTarget, deleting]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const meta: PaginatedMeta = {
@@ -190,6 +265,31 @@ export function CombustibleTenantPage() {
   const inputClass =
     "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none";
 
+  // Columnas: las de módulo + la de acciones
+  const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
+    () => [
+      ...COLUMNS,
+      {
+        id: "acciones",
+        header: "Acciones",
+        cell: (r) => (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteTarget(r);
+            }}
+            className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
+            aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
+          >
+            Eliminar
+          </button>
+        ),
+      },
+    ],
+    [],
+  );
+
   // Filtros para el drawer móvil
   const mobileFilters = (
     <>
@@ -197,7 +297,10 @@ export function CombustibleTenantPage() {
         <input
           type="month"
           value={month}
-          onChange={(e) => { setMonth(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${month ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por mes"
         />
@@ -206,13 +309,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Conductor" active={Boolean(choferId)}>
         <select
           value={choferId}
-          onChange={(e) => { setChoferId(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setChoferId(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${choferId ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por conductor"
         >
           <option value="">Todos</option>
           {maestro.choferes.map((ch) => (
-            <option key={ch.id} value={ch.id}>{ch.nombre}</option>
+            <option key={ch.id} value={ch.id}>
+              {ch.nombre}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -220,13 +328,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Vehículo" active={Boolean(vehiculoId)}>
         <select
           value={vehiculoId}
-          onChange={(e) => { setVehiculoId(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setVehiculoId(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${vehiculoId ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por vehículo"
         >
           <option value="">Todos</option>
           {maestro.vehiculos.map((v) => (
-            <option key={v.id} value={v.id}>{fmtVehiculoLabel(v)}</option>
+            <option key={v.id} value={v.id}>
+              {fmtVehiculoLabel(v)}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -235,7 +348,10 @@ export function CombustibleTenantPage() {
         <input
           type="text"
           value={estacion}
-          onChange={(e) => { setEstacion(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setEstacion(e.target.value);
+            resetPage();
+          }}
           placeholder="Buscar estación..."
           className={`${inputClass} ${estacion ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por estación"
@@ -245,13 +361,18 @@ export function CombustibleTenantPage() {
       <ListadoFiltroCampo label="Forma de pago" active={Boolean(formaPago)}>
         <select
           value={formaPago}
-          onChange={(e) => { setFormaPago(e.target.value); resetPage(); }}
+          onChange={(e) => {
+            setFormaPago(e.target.value);
+            resetPage();
+          }}
           className={`${inputClass} ${formaPago ? "text-vialto-fire" : ""}`}
           aria-label="Filtrar por forma de pago"
         >
           <option value="">Todas</option>
           {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+            <option key={k} value={k}>
+              {v}
+            </option>
           ))}
         </select>
       </ListadoFiltroCampo>
@@ -271,7 +392,10 @@ export function CombustibleTenantPage() {
           <input
             type="month"
             value={month}
-            onChange={(e) => { setMonth(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[150px]`}
             aria-label="Filtrar por mes"
           />
@@ -285,13 +409,18 @@ export function CombustibleTenantPage() {
         >
           <select
             value={choferId}
-            onChange={(e) => { setChoferId(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setChoferId(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[160px]`}
             aria-label="Filtrar por conductor"
           >
             <option value="">Todos</option>
             {maestro.choferes.map((ch) => (
-              <option key={ch.id} value={ch.id}>{ch.nombre}</option>
+              <option key={ch.id} value={ch.id}>
+                {ch.nombre}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
@@ -304,13 +433,18 @@ export function CombustibleTenantPage() {
         >
           <select
             value={vehiculoId}
-            onChange={(e) => { setVehiculoId(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setVehiculoId(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[140px]`}
             aria-label="Filtrar por vehículo"
           >
             <option value="">Todos</option>
             {maestro.vehiculos.map((v) => (
-              <option key={v.id} value={v.id}>{fmtVehiculoLabel(v)}</option>
+              <option key={v.id} value={v.id}>
+                {fmtVehiculoLabel(v)}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
@@ -324,7 +458,10 @@ export function CombustibleTenantPage() {
           <input
             type="text"
             value={estacion}
-            onChange={(e) => { setEstacion(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setEstacion(e.target.value);
+              resetPage();
+            }}
             placeholder="Buscar..."
             className={`${inputClass} min-w-[140px]`}
             aria-label="Filtrar por estación"
@@ -359,21 +496,33 @@ export function CombustibleTenantPage() {
         >
           <select
             value={formaPago}
-            onChange={(e) => { setFormaPago(e.target.value); resetPage(); }}
+            onChange={(e) => {
+              setFormaPago(e.target.value);
+              resetPage();
+            }}
             className={`${inputClass} min-w-[150px]`}
             aria-label="Filtrar por forma de pago"
           >
             <option value="">Todas</option>
             {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+              <option key={k} value={k}>
+                {v}
+              </option>
             ))}
           </select>
         </ViajesListadoHeaderFiltro>
       </th>
+      <th className="px-4 py-3 text-left font-normal">
+        <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
+          Acciones
+        </span>
+      </th>
     </tr>
   );
 
-  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean).length;
+  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(
+    Boolean,
+  ).length;
 
   return (
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
@@ -407,16 +556,29 @@ export function CombustibleTenantPage() {
       )}
 
       <ListadoDatos<CargaCombustible>
-        columns={COLUMNS}
+        columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
         emptyMessage="Sin cargas registradas"
         filters={mobileFilters}
-        activeFilterCount={[month, vehiculoId, choferId, estacion, formaPago].filter(Boolean).length}
+        activeFilterCount={
+          [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean)
+            .length
+        }
         onClearFilters={handleClearFilters}
         clearFiltersDisabled={!hayFiltros}
         filtersTitle="Filtrar cargas"
         tableHead={tableHead}
+        actionsTdClassName={listadoTablaTdClass}
+        renderActions={(c) => (
+          <button
+            type="button"
+            onClick={() => setViewingCargaId(c.id)}
+            className={listadoTablaAccionClass}
+          >
+            Ver
+          </button>
+        )}
       />
 
       {rows !== null && total > 0 && (
@@ -430,6 +592,78 @@ export function CombustibleTenantPage() {
             setPageSize(s);
             setPage(1);
           }}
+        />
+      )}
+
+      {/* MODAL DE ELIMINACIÓN */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirmar-eliminar-titulo"
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="confirmar-eliminar-titulo"
+              className="text-lg font-semibold text-vialto-charcoal"
+            >
+              Eliminar carga
+            </h2>
+            <p className="mt-2 text-sm text-vialto-steel">
+              ¿Seguro que querés eliminar la carga del{" "}
+              <span className="font-medium text-vialto-charcoal">
+                {fmtFecha(deleteTarget.fecha)}
+              </span>
+              {deleteTarget.vehiculo?.patente ? (
+                <>
+                  {" "}
+                  del vehículo{" "}
+                  <span className="font-medium text-vialto-charcoal">
+                    {deleteTarget.vehiculo.patente}
+                  </span>
+                </>
+              ) : null}
+              ? Esta acción no se puede deshacer.
+            </p>
+
+            {deleteError && (
+              <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="inline-flex h-10 items-center px-4 border border-red-600 bg-red-600 text-sm uppercase tracking-wider text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleting ? "Eliminando…" : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISTA DE DETALLE */}
+      {viewingCargaId && (
+        <CargaCombustibleViewModal
+          cargaId={viewingCargaId}
+          onClose={() => setViewingCargaId(null)}
         />
       )}
     </div>

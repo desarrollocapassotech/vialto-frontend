@@ -234,6 +234,8 @@ export interface CargaCombustible {
   fecha: string;
   createdAt: string;
   createdBy: string;
+  fotoTacometro?: string | null;
+  fotoTicket?: string | null;
 }
 
 export interface Pago {

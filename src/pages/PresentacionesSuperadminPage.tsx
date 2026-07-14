@@ -30,7 +30,8 @@ export function PresentacionesSuperadminPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { showToast } = useToast();
   const [rows, setRows] = useState<Presentacion[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,18 +61,18 @@ export function PresentacionesSuperadminPage() {
     if (!isLoaded || !isSignedIn) return;
     if (!filtroEmpresa) {
       setRows(null);
-      setError(null);
+      setLoadError(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
         await load();
-        if (!cancelled) setError(null);
+        if (!cancelled) setLoadError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, "plataforma"));
+          setLoadError(friendlyError(e, "plataforma"));
         }
       }
     })();
@@ -105,7 +106,7 @@ export function PresentacionesSuperadminPage() {
     }
     setFieldErrors({});
     setSaving(true);
-    setError(null);
+    setActionError(null);
     try {
       const payload = { nombre: form.nombre.trim(), activo: form.activo };
       if (editingId) {
@@ -126,8 +127,9 @@ export function PresentacionesSuperadminPage() {
       setIsFormOpen(false);
       setEditingId(null);
     } catch (e) {
-      setError(friendlyError(e, "plataforma"));
-      showToast("No se pudo guardar la presentación", "error");
+      const msg = friendlyError(e, "plataforma");
+      setActionError(msg);
+      showToast(msg, "error");
     } finally {
       setSaving(false);
     }
@@ -137,7 +139,7 @@ export function PresentacionesSuperadminPage() {
     if (!confirmTarget || !filtroEmpresa) return;
     const row = confirmTarget;
     setDeleting(true);
-    setError(null);
+    setActionError(null);
     try {
       await apiJson(
         `${baseUrl}/${encodeURIComponent(row.id)}${qs}`,
@@ -148,8 +150,9 @@ export function PresentacionesSuperadminPage() {
       await load();
       setConfirmTarget(null);
     } catch (e) {
-      setError(friendlyError(e, "plataforma"));
-      showToast("Ocurrió un error al intentar eliminar", "error");
+      const msg = friendlyError(e, "plataforma");
+      setActionError(msg);
+      showToast(msg, "error");
       setConfirmTarget(null);
     } finally {
       setDeleting(false);
@@ -207,9 +210,15 @@ export function PresentacionesSuperadminPage() {
         </button>
       </div>
 
-      {error && (
+      {actionError && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
+          {actionError}
+        </p>
+      )}
+
+      {loadError && (
+        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {loadError}
         </p>
       )}
 
@@ -238,10 +247,10 @@ export function PresentacionesSuperadminPage() {
                 tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
               },
             ]}
-            rows={error ? [] : paginatedRows}
+            rows={paginatedRows}
             rowKey={(row) => row.id}
             emptyMessage={
-              error
+              loadError
                 ? "No se pudieron cargar las presentaciones."
                 : "No hay presentaciones para esta empresa."
             }
