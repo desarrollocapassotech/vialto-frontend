@@ -30,21 +30,27 @@ function buildLotesUrl(
   return `${base}?${parts.join('&')}`;
 }
 
-function etiquetaLoteOption(
-  lote: string,
-  cantidad1: number,
-  cantidad2: number,
-  fechaVencimiento: string | null,
-): string {
-  let label = `${lote} (${cantidad1} bulto${cantidad1 !== 1 ? 's' : ''}`;
-  if (cantidad2 > 0) {
-    label += `, ${cantidad2} suelta${cantidad2 !== 1 ? 's' : ''}`;
+/** Formato FEFO: «LOTE-123 (Vto: 15/08/2026)». */
+function etiquetaLoteOption(lote: string, fechaVencimiento: string | null): string {
+  if (!fechaVencimiento) return lote;
+  const vto = formatMovimientoStockFechaFromIso(fechaVencimiento);
+  if (!vto || vto === '—') return lote;
+  return `${lote} (Vto: ${vto})`;
+}
+
+function compareLotesFefo(
+  a: { lote: string; fechaVencimiento: string | null },
+  b: { lote: string; fechaVencimiento: string | null },
+): number {
+  if (a.fechaVencimiento && b.fechaVencimiento) {
+    const byDate = a.fechaVencimiento.localeCompare(b.fechaVencimiento);
+    if (byDate !== 0) return byDate;
+  } else if (a.fechaVencimiento && !b.fechaVencimiento) {
+    return -1;
+  } else if (!a.fechaVencimiento && b.fechaVencimiento) {
+    return 1;
   }
-  label += ')';
-  if (fechaVencimiento) {
-    label += ` · Vto ${formatMovimientoStockFechaFromIso(fechaVencimiento)}`;
-  }
-  return label;
+  return a.lote.localeCompare(b.lote, 'es');
 }
 
 export function LoteSelect({
@@ -159,11 +165,12 @@ export function LoteSelect({
       {data.sinLote && !requiereLote && !excluded.has(STOCK_SIN_LOTE_VALUE) && (
         <option value={STOCK_SIN_LOTE_VALUE}>{sinLoteLabel}</option>
       )}
-      {data.lotes
+      {[...data.lotes]
         .filter((l) => !excluded.has(l.lote))
+        .sort(compareLotesFefo)
         .map((l) => (
           <option key={l.lote} value={l.lote}>
-            {etiquetaLoteOption(l.lote, l.cantidad1, l.cantidad2, l.fechaVencimiento)}
+            {etiquetaLoteOption(l.lote, l.fechaVencimiento)}
           </option>
         ))}
     </select>
