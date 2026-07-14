@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "./Logo";
+import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   canAccessFacturacion,
@@ -70,6 +71,7 @@ export function AppShell() {
   const { tenant, tenantLoading } = useMaestroData();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEnsureTenantOrganization();
 
   const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
 
