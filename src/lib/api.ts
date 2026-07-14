@@ -24,6 +24,25 @@ export class ApiError extends Error {
   }
 }
 
+/** Mensaje legible desde respuestas de error de Nest (string o string[]). */
+export function extractApiErrorMessage(
+  data: unknown,
+  statusText: string,
+): string {
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    const msg = (data as { message: unknown }).message;
+    if (typeof msg === 'string' && msg.trim()) return msg.trim();
+    if (Array.isArray(msg)) {
+      const joined = msg
+        .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+        .join(' ');
+      if (joined) return joined;
+    }
+  }
+  if (typeof data === 'string' && data.trim()) return data.trim();
+  return statusText.trim() || 'Respuesta no válida';
+}
+
 export async function apiFetch(
   path: string,
   getToken: () => Promise<string | null>,
@@ -58,10 +77,7 @@ export async function apiJson<T>(
     }
   }
   if (!res.ok) {
-    const msg =
-      typeof data === 'object' && data !== null && 'message' in data
-        ? String((data as { message: unknown }).message)
-        : res.statusText;
+    const msg = extractApiErrorMessage(data, res.statusText);
     throw new ApiError(msg || 'Respuesta no válida', res.status, data);
   }
   return data as T;

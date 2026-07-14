@@ -2,6 +2,8 @@ import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { LoteSelect } from '@/components/stock/LoteSelect';
 import {
   STOCK_SIN_LOTE_VALUE,
+  egresoOfreceFraccionar,
+  egresoSueltasAlcanzables,
   loteEgresoSeleccionValida,
 } from '@/lib/stockLote';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
@@ -41,6 +43,15 @@ type Props = {
   lotesBase: string;
   tenantId?: string;
   labels?: { bultos: string; sueltas: string };
+  unidadesPorBulto?: number;
+  loteRefreshKey?: number;
+  onFraccionar?: () => void;
+  /** Lotes ya usados en otras líneas del mismo producto. */
+  excludedLotes?: string[];
+  /** Título del bloque (ej. «Lote 2»). */
+  title?: string;
+  /** Si hay más de una línea, permite quitar esta. */
+  onRemove?: () => void;
 };
 
 function etiquetaDisponibleLote(
@@ -73,10 +84,34 @@ export function EgresoProductoLoteBloque({
   lotesBase,
   tenantId,
   labels = { bultos: 'bultos', sueltas: 'sueltas' },
+  unidadesPorBulto = 0,
+  loteRefreshKey,
+  onFraccionar,
+  excludedLotes = [],
+  title = 'Extracción por lote',
+  onRemove,
 }: Props) {
   const listoParaLote = Boolean(productoId && presentacionId && clienteId && depositoId);
   const loteElegido = loteEgresoSeleccionValida(lote);
   const cantidadesHabilitadas = listoParaLote && loteElegido;
+  const puedeFraccionar = egresoOfreceFraccionar(
+    loteStock,
+    sueltas,
+    unidadesPorBulto,
+    bultos,
+  );
+  const ofreceFraccionar = puedeFraccionar && Boolean(onFraccionar);
+  const sueltasPedidas = parseFloat(sueltas) || 0;
+  const sueltasInsuficientes =
+    loteStock !== null && sueltasPedidas > loteStock.sueltas;
+  const maxSueltasAlcanzables =
+    loteStock && unidadesPorBulto > 0
+      ? egresoSueltasAlcanzables(loteStock, unidadesPorBulto, bultos)
+      : null;
+  const fraccionarLabel = sueltasInsuficientes
+    ? `Desarmar ${labels.bultos}`
+    : 'Fraccionar';
+  const sueltasFieldError = ofreceFraccionar ? undefined : fieldErrors.sueltas;
   const vencimientoLabel =
     lote === STOCK_SIN_LOTE_VALUE
       ? '—'
@@ -88,9 +123,20 @@ export function EgresoProductoLoteBloque({
 
   return (
     <div className="space-y-3 rounded border border-black/10 bg-vialto-mist/20 p-3">
-      <p className="text-xs font-medium uppercase tracking-[0.08em] text-vialto-steel">
-        Extracción por lote
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-vialto-steel">
+          {title}
+        </p>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-600 hover:underline shrink-0"
+          >
+            Quitar lote
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -112,6 +158,8 @@ export function EgresoProductoLoteBloque({
             }
             lotesBase={lotesBase}
             tenantId={tenantId}
+            refreshKey={loteRefreshKey}
+            excludedLotes={excludedLotes}
             className={`${INPUT} ${fieldErrors.lote ? 'border-red-400' : ''}`}
             disabled={!listoParaLote}
             required
@@ -168,19 +216,40 @@ export function EgresoProductoLoteBloque({
 
         <div className="space-y-1">
           <label className={LABEL}>{labels.sueltas} a extraer</label>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            value={sueltas}
-            disabled={!cantidadesHabilitadas}
-            onChange={(e) => onSueltasChange(e.target.value)}
-            className={`${INPUT} disabled:opacity-50 ${
-              fieldErrors.sueltas ? 'border-red-400' : ''
-            }`}
-            placeholder="0"
-          />
-          <CrudFieldError message={fieldErrors.sueltas} />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={sueltas}
+              disabled={!cantidadesHabilitadas}
+              onChange={(e) => onSueltasChange(e.target.value)}
+              className={`${INPUT} flex-1 disabled:opacity-50 ${
+                sueltasFieldError ? 'border-red-400' : ''
+              }`}
+              placeholder="0"
+            />
+            {ofreceFraccionar && (
+              <button
+                type="button"
+                onClick={onFraccionar}
+                className="shrink-0 px-2.5 text-xs font-medium uppercase tracking-wider border border-vialto-fire text-vialto-fire rounded hover:bg-vialto-fire/5 whitespace-nowrap"
+                title={`Desarmar ${labels.bultos} para obtener ${labels.sueltas}`}
+              >
+                {fraccionarLabel}
+              </button>
+            )}
+          </div>
+          {ofreceFraccionar && (
+            <p className="text-xs text-vialto-steel">
+              {sueltasInsuficientes
+                ? maxSueltasAlcanzables !== null && sueltasPedidas > maxSueltasAlcanzables
+                  ? `Pediste ${sueltasPedidas} ${labels.sueltas}; como máximo hay ${maxSueltasAlcanzables} disponibles desarmando los ${labels.bultos} restantes.`
+                  : `Pediste ${sueltasPedidas} ${labels.sueltas} y hay ${loteStock!.sueltas} disponibles; desarmá ${labels.bultos} del lote sin salir del egreso.`
+                : `No hay ${labels.sueltas} sueltas; podés desarmar ${labels.bultos} del lote sin salir del egreso.`}
+            </p>
+          )}
+          <CrudFieldError message={sueltasFieldError} />
         </div>
       </div>
     </div>

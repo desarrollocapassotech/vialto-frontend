@@ -1,6 +1,5 @@
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { isPlatformSuperadmin, isStockViewer } from '@/lib/roleLabels';
-import { StockPanelSuperadminPage } from './StockPanelSuperadminPage';
 import { StockPanelTenantPage } from './StockPanelTenantPage';
 
 export function StockPanelPage() {
@@ -18,8 +17,9 @@ export function StockPanelPage() {
     return <StockPanelTenantPage />;
   }
 
+  // Superadmin: buscador de empresas (isPlatform) embebido en el panel.
   if (isPlatformSuperadmin(user?.publicMetadata)) {
-    return <StockPanelSuperadminPage />;
+    return <StockPanelTenantPage isPlatform />;
   }
 
   return <StockPanelTenantPage />;

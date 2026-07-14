@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
 
 interface Props {
@@ -64,11 +65,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   const transportistaNombre = viaje.transportista?.nombre ?? viaje.transportistaId ?? '—';
 
-  const gastosAdminArs = (Array.isArray(viaje.otrosGastos) ? viaje.otrosGastos : []).filter(
-    (g) => (g.moneda ?? 'ARS') === 'ARS',
-  );
-  const totalGastosAdminArs = gastosAdminArs.reduce((acc, g) => acc + (g.monto ?? 0), 0);
-
   function fmtMoney(n: number) {
     return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
   }
@@ -81,6 +77,12 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (viajeTieneLiquidacionTransportista(viaje)) {
+      setError(
+        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viaje.numero}.`,
+      );
+      return;
+    }
     setError(null);
     setBusyCrear(true);
     try {
@@ -105,7 +107,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
         setError(err.message);
       } else {
         setArcaConfigMissing(false);
-        setError(friendlyError(err, 'arca'));
+        setError(friendlyError(err, 'liquidaciones'));
       }
     } finally {
       setBusyCrear(false);
@@ -271,7 +273,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="periodoDesde" className="block text-xs text-vialto-steel mb-1">
-                      Desde
+                      Desde <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="periodoDesde"
@@ -284,7 +286,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   </div>
                   <div>
                     <label htmlFor="periodoHasta" className="block text-xs text-vialto-steel mb-1">
-                      Hasta
+                      Hasta <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="periodoHasta"
@@ -323,28 +325,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                     </p>
                   )}
                 </div>
-              </section>
-
-              <section className="space-y-2">
-                <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                  Gastos administrativos (ARS)
-                </p>
-                {gastosAdminArs.length === 0 ? (
-                  <p className="text-xs text-vialto-steel">Sin gastos registrados en este viaje.</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {gastosAdminArs.map((g, i) => (
-                      <li key={i} className="flex justify-between text-xs text-vialto-charcoal">
-                        <span>{g.descripcion}</span>
-                        <span className="tabular-nums">${(g.monto ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                      </li>
-                    ))}
-                    <li className="flex justify-between text-xs font-medium text-vialto-charcoal border-t border-black/10 pt-1 mt-1">
-                      <span>Total gastos</span>
-                      <span className="tabular-nums">${totalGastosAdminArs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                    </li>
-                  </ul>
-                )}
               </section>
 
               <section className="space-y-2">
@@ -399,7 +379,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                     type="button"
                     disabled={busyCrear || !periodoDesde || !periodoHasta}
                     onClick={() => void handleCrear()}
-                    className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
+                    className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {busyCrear ? 'Creando…' : 'Crear liquidación'}
                   </button>
@@ -426,8 +406,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
-                <Row label={`IVA gastos (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
+                {liquidacion.gastosAdmin > 0 && (
+                  <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
+                )}
+                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>
                   <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
@@ -482,8 +464,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
-                <Row label={`IVA gastos (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
+                {liquidacion.gastosAdmin > 0 && (
+                  <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
+                )}
+                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>
                   <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>

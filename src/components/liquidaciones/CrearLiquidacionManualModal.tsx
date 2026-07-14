@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Liquidacion, Transportista, Viaje } from '@/types/api';
 
-type ViajeItem = Pick<Viaje, 'id' | 'numero' | 'fechaCarga' | 'origen' | 'destino' | 'precioTransportistaExterno' | 'otrosGastos'>;
+type ViajeItem = Pick<Viaje, 'id' | 'numero' | 'fechaCarga' | 'origen' | 'destino' | 'precioTransportistaExterno'>;
 
 function fmtDate(iso: string | null) {
   if (!iso) return '—';
@@ -109,6 +110,12 @@ export function CrearLiquidacionManualModal({
       setError('Seleccioná al menos un viaje.');
       return;
     }
+    if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
+      setError(
+        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viajeInicial.numero}.`,
+      );
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -127,7 +134,7 @@ export function CrearLiquidacionManualModal({
       );
       onSuccess(liq);
     } catch (err) {
-      setError(friendlyError(err, 'arca'));
+      setError(friendlyError(err, 'liquidaciones'));
     } finally {
       setSubmitting(false);
     }
@@ -144,17 +151,9 @@ export function CrearLiquidacionManualModal({
     : viajes.filter((v) => selectedViajeIds.has(v.id));
   const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
   const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
-  const gastosAdmin = selectedViajes.reduce(
-    (sum, v) =>
-      sum +
-      (v.otrosGastos ?? [])
-        .filter((g) => (g.moneda ?? 'ARS') === 'ARS')
-        .reduce((a, g) => a + (g.monto ?? 0), 0),
-    0,
-  );
-  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : null;
-  const comisionMonto = comisionNum !== null && anyHasPrice ? (bruto * comisionNum) / 100 : null;
-  const netoGravado = comisionMonto !== null ? bruto - comisionMonto - gastosAdmin : null;
+  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : 0;
+  const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
+  const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== '' ? Number(ivaPct) : 21;
   const ivaMonto = netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar = netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
@@ -364,16 +363,12 @@ export function CrearLiquidacionManualModal({
                 <span className={labelClass}>Sub Total</span>
                 <span className="tabular-nums text-sm font-medium text-vialto-charcoal">{fmtMoney(bruto)}</span>
               </div>
-              {comisionMonto !== null && (
+              {anyHasPrice && comisionMonto > 0 && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
                   <span className="tabular-nums">− {fmtMoney(comisionMonto)}</span>
                 </div>
               )}
-              <div className="flex justify-between items-baseline text-xs text-vialto-steel">
-                <span>Otras</span>
-                <span className="tabular-nums">{gastosAdmin > 0 ? `− ${fmtMoney(gastosAdmin)}` : '—'}</span>
-              </div>
               {netoGravado !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
                   <span className={labelClass}>Neto gravado</span>

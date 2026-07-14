@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
+import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
   STOCK_SIN_LOTE_VALUE,
   type LotesDisponiblesResponse,
@@ -29,6 +30,29 @@ function buildLotesUrl(
   return `${base}?${parts.join('&')}`;
 }
 
+/** Formato FEFO: «LOTE-123 (Vto: 15/08/2026)». */
+function etiquetaLoteOption(lote: string, fechaVencimiento: string | null): string {
+  if (!fechaVencimiento) return lote;
+  const vto = formatMovimientoStockFechaFromIso(fechaVencimiento);
+  if (!vto || vto === '—') return lote;
+  return `${lote} (Vto: ${vto})`;
+}
+
+function compareLotesFefo(
+  a: { lote: string; fechaVencimiento: string | null },
+  b: { lote: string; fechaVencimiento: string | null },
+): number {
+  if (a.fechaVencimiento && b.fechaVencimiento) {
+    const byDate = a.fechaVencimiento.localeCompare(b.fechaVencimiento);
+    if (byDate !== 0) return byDate;
+  } else if (a.fechaVencimiento && !b.fechaVencimiento) {
+    return -1;
+  } else if (!a.fechaVencimiento && b.fechaVencimiento) {
+    return 1;
+  }
+  return a.lote.localeCompare(b.lote, 'es');
+}
+
 export function LoteSelect({
   productoId,
   clienteId,
@@ -44,6 +68,8 @@ export function LoteSelect({
   requiereLote,
   placeholder,
   error,
+  refreshKey,
+  excludedLotes = [],
 }: {
   productoId: string;
   clienteId: string;
@@ -62,6 +88,10 @@ export function LoteSelect({
   requiereLote?: boolean;
   placeholder?: string;
   error?: boolean;
+  /** Incrementar tras una división u otro movimiento que altere saldos por lote. */
+  refreshKey?: number;
+  /** Lotes ya elegidos en otras líneas del mismo producto (no se listan salvo el valor actual). */
+  excludedLotes?: string[];
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<LotesDisponiblesResponse>({ lotes: [], sinLote: null });
@@ -78,7 +108,17 @@ export function LoteSelect({
     void apiJson<LotesDisponiblesResponse>(url, () => getToken())
       .then(setData)
       .catch(() => setData({ lotes: [], sinLote: null }));
-  }, [productoId, clienteId, depositoId, presentacionId, lotesBase, tenantId, getToken, ready]);
+  }, [
+    productoId,
+    clienteId,
+    depositoId,
+    presentacionId,
+    lotesBase,
+    tenantId,
+    getToken,
+    ready,
+    refreshKey,
+  ]);
 
   function stockForValue(selected: string): LoteSelectStock | null {
     if (!selected) return null;
@@ -110,6 +150,7 @@ export function LoteSelect({
     : 'Sin lote';
 
   const emptyLabel = placeholder ?? (isRequired ? 'Elegí un lote…' : '— Sin lote —');
+  const excluded = new Set(excludedLotes.filter((l) => l && l !== value));
 
   return (
     <select
@@ -121,15 +162,17 @@ export function LoteSelect({
       <option value="" disabled={isRequired}>
         {emptyLabel}
       </option>
-      {data.sinLote && !requiereLote && (
+      {data.sinLote && !requiereLote && !excluded.has(STOCK_SIN_LOTE_VALUE) && (
         <option value={STOCK_SIN_LOTE_VALUE}>{sinLoteLabel}</option>
       )}
-      {data.lotes.map((l) => (
-        <option key={l.lote} value={l.lote}>
-          {l.lote} ({l.cantidad1} bulto{l.cantidad1 !== 1 ? 's' : ''}
-          {l.cantidad2 > 0 ? `, ${l.cantidad2} suelta${l.cantidad2 !== 1 ? 's' : ''}` : ''})
-        </option>
-      ))}
+      {[...data.lotes]
+        .filter((l) => !excluded.has(l.lote))
+        .sort(compareLotesFefo)
+        .map((l) => (
+          <option key={l.lote} value={l.lote}>
+            {etiquetaLoteOption(l.lote, l.fechaVencimiento)}
+          </option>
+        ))}
     </select>
   );
 }

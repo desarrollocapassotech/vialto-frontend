@@ -23,7 +23,8 @@ type FormState = { nombre: string; activo: boolean };
 export function PresentacionesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Presentacion[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,11 +53,11 @@ export function PresentacionesTenantPage() {
     void (async () => {
       try {
         await load();
-        if (!cancelled) setError(null);
+        if (!cancelled) setLoadError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, "stock"));
+          setLoadError(friendlyError(e, "stock"));
         }
       }
     })();
@@ -86,7 +87,7 @@ export function PresentacionesTenantPage() {
     }
     setFieldErrors({});
     setSaving(true);
-    setError(null);
+    setActionError(null);
     try {
       const payload = { nombre: form.nombre.trim(), activo: form.activo };
       if (editingId) {
@@ -109,7 +110,7 @@ export function PresentacionesTenantPage() {
       setIsFormOpen(false);
       setEditingId(null);
     } catch (e) {
-      setError(friendlyError(e, "stock"));
+      setActionError(friendlyError(e, "stock"));
     } finally {
       setSaving(false);
     }
@@ -119,7 +120,7 @@ export function PresentacionesTenantPage() {
   async function confirmarEliminar() {
     if (!confirmTarget) return;
     setDeleting(true);
-    setError(null);
+    setActionError(null);
     try {
       await apiJson(
         `/api/stock/presentaciones/${encodeURIComponent(confirmTarget.id)}`,
@@ -129,7 +130,7 @@ export function PresentacionesTenantPage() {
       await load();
       setConfirmTarget(null);
     } catch (e) {
-      setError(friendlyError(e, "stock"));
+      setActionError(friendlyError(e, "stock"));
       setConfirmTarget(null);
     } finally {
       setDeleting(false);
@@ -178,9 +179,15 @@ export function PresentacionesTenantPage() {
         </button>
       </div>
 
-      {error && (
+      {actionError && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
+          {actionError}
+        </p>
+      )}
+
+      {loadError && (
+        <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {loadError}
         </p>
       )}
 
@@ -211,10 +218,10 @@ export function PresentacionesTenantPage() {
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : paginatedRows}
+        rows={paginatedRows}
         rowKey={(row) => row.id}
         emptyMessage={
-          error
+          loadError
             ? "No se pudieron cargar las presentaciones."
             : "No hay presentaciones cargadas. Creá una para usarla en los productos."
         }

@@ -1,39 +1,57 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { vehiculoCreatePayloadFromForm, type VehiculoFormState } from '@/lib/vehiculoForm';
+import { useAuth } from "@clerk/clerk-react";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
+// ---> IMPORTAMOS EL HOOK (Ajustá la ruta según tu estructura)
+import { useToast } from "@/lib/toast";
 
-const LABEL = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudInput, CrudSelect } from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import {
+  vehiculoCreatePayloadFromForm,
+  type VehiculoFormState,
+} from "@/lib/vehiculoForm";
+
+const TIPOS = [
+  "tractor",
+  "semirremolque",
+  "camion",
+  "utilitario",
+  "otro",
+] as const;
+
+const LABEL =
+  "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
 
 const emptyForm = (): VehiculoFormState => ({
-  patente: '',
-  tipo: 'camion',
-  marca: '',
-  modelo: '',
-  anio: '',
-  nroChasis: '',
-  poliza: '',
-  vencimientoPoliza: '',
-  tara: '',
-  precinto: '',
+  patente: "",
+  tipo: "camion",
+  marca: "",
+  modelo: "",
+  anio: "",
+  nroChasis: "",
+  poliza: "",
+  vencimientoPoliza: "",
+  tara: "",
+  precinto: "",
 });
 
 export function VehiculoCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+
+  // ---> INICIALIZAMOS EL TOAST
+  const { showToast } = useToast();
+
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +63,9 @@ export function VehiculoCreatePage() {
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!form.patente.trim()) errs.patente = 'Ingresá la patente.';
-    if (form.tara.trim() && vehiculoCreatePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
+    if (!form.patente.trim()) errs.patente = "Ingresá la patente.";
+    if (form.tara.trim() && vehiculoCreatePayloadFromForm(form).tara == null)
+      errs.tara = "La tara debe ser un número válido.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -57,15 +76,25 @@ export function VehiculoCreatePage() {
     try {
       const path = tenantId
         ? `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/vehiculos';
+        : "/api/vehiculos";
       await apiJson(path, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(vehiculoCreatePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+
+      // ---> FEEDBACK DE ÉXITO
+      showToast("Vehículo creado exitosamente", "success");
+
+      navigate(
+        `/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
+        { replace: true },
+      );
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setError(friendlyError(e, "vehiculos"));
+
+      // ---> FEEDBACK DE ERROR
+      showToast("No se pudo crear el vehículo", "error");
     } finally {
       setLoading(false);
     }
@@ -74,7 +103,7 @@ export function VehiculoCreatePage() {
   return (
     <CrudPageLayout
       title="Crear vehículo"
-      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
+      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
       backLabel="← Volver a vehículos"
     >
       <form
@@ -85,7 +114,9 @@ export function VehiculoCreatePage() {
         }}
       >
         <label className="grid gap-1.5">
-          <span className={LABEL}>Patente <span className="text-red-500">*</span></span>
+          <span className={LABEL}>
+            Patente <span className="text-red-500">*</span>
+          </span>
           <CrudInput
             placeholder="Ej: AA123BB"
             value={form.patente}

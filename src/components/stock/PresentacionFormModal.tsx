@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { ApiError, apiJson } from '@/lib/api';
-import { Spinner } from '@/components/ui/Spinner';
-import { friendlyError } from '@/lib/friendlyError';
-import type { Presentacion } from '@/types/api';
+import { useState } from "react";
+import { ApiError, apiJson } from "@/lib/api";
+import { Spinner } from "@/components/ui/Spinner";
+import { friendlyError } from "@/lib/friendlyError";
+import type { Presentacion } from "@/types/api";
 
 export function PresentacionFormModal({
   modo,
@@ -10,10 +10,10 @@ export function PresentacionFormModal({
   getToken,
   onClose,
   onSaved,
-  baseUrl = '/api/stock/presentaciones',
+  baseUrl = "/api/stock/presentaciones",
   tenantId,
 }: {
-  modo: 'create' | 'edit';
+  modo: "create" | "edit";
   presentacionInicial?: Presentacion;
   getToken: () => Promise<string | null>;
   onClose: () => void;
@@ -21,38 +21,42 @@ export function PresentacionFormModal({
   baseUrl?: string;
   tenantId?: string;
 }) {
-  const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
-  const [nombre, setNombre] = useState(presentacionInicial?.nombre ?? '');
+  const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
+  const [nombre, setNombre] = useState(presentacionInicial?.nombre ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     if (!nombre.trim()) {
-      setError('El nombre es obligatorio.');
+      setError("El nombre es obligatorio.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
       let result: Presentacion;
-      if (modo === 'create') {
-        result = await apiJson<Presentacion>(`${baseUrl}${qs}`, () => getToken(), {
-          method: 'POST',
-          body: JSON.stringify({ nombre: nombre.trim() }),
-        });
+      if (modo === "create") {
+        result = await apiJson<Presentacion>(
+          `${baseUrl}${qs}`,
+          () => getToken(),
+          {
+            method: "POST",
+            body: JSON.stringify({ nombre: nombre.trim() }),
+          },
+        );
       } else {
         result = await apiJson<Presentacion>(
           `${baseUrl}/${encodeURIComponent(presentacionInicial!.id)}${qs}`,
           () => getToken(),
-          { method: 'PATCH', body: JSON.stringify({ nombre: nombre.trim() }) },
+          { method: "PATCH", body: JSON.stringify({ nombre: nombre.trim() }) },
         );
       }
       onSaved(result);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe una presentación con ese nombre (sin distinguir mayúsculas).'
-          : friendlyError(e, 'stock'),
+          ? "Ya existe una presentación con ese nombre (sin distinguir mayúsculas)."
+          : friendlyError(e, "stock"),
       );
     } finally {
       setSaving(false);
@@ -68,7 +72,7 @@ export function PresentacionFormModal({
       >
         <div className="flex items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-            {modo === 'create' ? 'Nueva presentación' : 'Editar presentación'}
+            {modo === "create" ? "Nueva presentación" : "Editar presentación"}
           </h2>
           <button
             type="button"
@@ -115,7 +119,7 @@ export function PresentacionFormModal({
             className="inline-flex items-center gap-2 h-9 px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
             {saving && <Spinner className="h-3.5 w-3.5" />}
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving ? "Guardando…" : "Guardar"}
           </button>
         </div>
       </div>

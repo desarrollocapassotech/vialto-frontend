@@ -1,26 +1,45 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ClienteViewModal } from '@/components/clientes/ClienteViewModal';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { ListadoToolbar } from '@/components/listado/ListadoToolbar';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
-import { useListadoFiltros } from '@/hooks/useListadoFiltros';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Cliente, ConEmpresa } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { ListadoToolbar } from "@/components/listado/ListadoToolbar";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { useListadoFiltros } from "@/hooks/useListadoFiltros";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
 
 export function ClientesSuperadminPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<ConEmpresa<Cliente>[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(
+    LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
+  );
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
-  const { busqueda, setBusqueda, filtroPais, setFiltroPais, paisesList, rowsFiltradas, onClear, activeFilterCount } = useListadoFiltros(rows, ['nombre', 'idFiscal']);
+  const {
+    busqueda,
+    setBusqueda,
+    filtroPais,
+    setFiltroPais,
+    paisesList,
+    rowsFiltradas,
+    onClear,
+    activeFilterCount,
+  } = useListadoFiltros(rows, ["nombre", "idFiscal"]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -31,21 +50,28 @@ export function ClientesSuperadminPage() {
     }
     let cancelled = false;
     setRows(null);
+    setLoading(true);
     (async () => {
       try {
-        const data = await apiJson<ConEmpresa<Cliente>[]>(
+        const raw = await apiJson<unknown>(
           `/api/platform/clientes?tenantId=${encodeURIComponent(filtroEmpresa)}`,
           () => getToken(),
         );
+        const asObj = raw as { items?: ConEmpresa<Cliente>[] };
+        const items = Array.isArray(raw)
+          ? (raw as ConEmpresa<Cliente>[])
+          : (asObj.items ?? []);
         if (!cancelled) {
-          setRows(data);
+          setRows(items);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'plataforma'));
+          setError(friendlyError(e, "plataforma"));
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -53,19 +79,43 @@ export function ClientesSuperadminPage() {
     };
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
+  const { rowsPagina, meta } = useMemo(() => {
+    if (rows === null || rowsFiltradas == null) {
+      return { rowsPagina: null, meta: null };
+    }
+    const total = rowsFiltradas.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const pageSafe = Math.min(page, totalPages);
+    const start = (pageSafe - 1) * pageSize;
+    const slice = rowsFiltradas.slice(start, start + pageSize);
+    const meta: PaginatedMeta = {
+      page: pageSafe,
+      pageSize,
+      total,
+      totalPages,
+      hasPrev: pageSafe > 1,
+      hasNext: pageSafe < totalPages,
+    };
+    return { rowsPagina: slice, meta };
+  }, [rows, rowsFiltradas, page, pageSize]);
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Clientes
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa para ver sus clientes. Los datos los filtra el servidor.
+        Elegí una empresa para ver sus clientes. Los datos los filtra el
+        servidor.
       </p>
       <div className="mt-6">
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={onChangeTenant}
+          onChange={(id) => {
+            setPage(1);
+            onChangeTenant(id);
+          }}
         />
       </div>
       <div className="mt-4 flex justify-end">
@@ -73,12 +123,12 @@ export function ClientesSuperadminPage() {
           to={
             filtroEmpresa
               ? `/clientes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
-              : '#'
+              : "#"
           }
           className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
             filtroEmpresa
-              ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
-              : 'bg-vialto-charcoal/50 pointer-events-none'
+              ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+              : "bg-vialto-charcoal/50 pointer-events-none"
           }`}
           aria-disabled={!filtroEmpresa}
         >
@@ -94,17 +144,26 @@ export function ClientesSuperadminPage() {
       {filtroEmpresa && !error && (
         <ListadoToolbar
           searchValue={busqueda}
-          onSearchChange={setBusqueda}
+          onSearchChange={(v) => {
+            setPage(1);
+            setBusqueda(v);
+          }}
           searchPlaceholder="Buscar por nombre o ID fiscal"
           filtros={[
             {
               value: filtroPais,
-              onChange: setFiltroPais,
-              placeholder: 'Todos los países',
+              onChange: (v) => {
+                setPage(1);
+                setFiltroPais(v);
+              },
+              placeholder: "Todos los países",
               opciones: paisesList.map((p) => ({ value: p, label: p })),
             },
           ]}
-          onClear={onClear}
+          onClear={() => {
+            setPage(1);
+            onClear();
+          }}
         />
       )}
 
@@ -112,47 +171,47 @@ export function ClientesSuperadminPage() {
         className="mt-8"
         columns={[
           {
-            id: 'nombre',
-            header: 'Nombre',
+            id: "nombre",
+            header: "Nombre",
             primary: true,
             cell: (c) => c.nombre,
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'idFiscal',
-            header: 'ID Fiscal',
-            cell: (c) => c.idFiscal ?? '—',
+            id: "idFiscal",
+            header: "ID Fiscal",
+            cell: (c) => c.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'pais',
-            header: 'País',
-            cell: (c) => c.pais ?? '—',
+            id: "pais",
+            header: "País",
+            cell: (c) => c.pais ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'direccion',
-            header: 'Dirección',
-            cell: (c) => c.direccion ?? '—',
+            id: "direccion",
+            header: "Dirección",
+            cell: (c) => c.direccion ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: 'contacto',
-            header: 'Contacto',
-            cell: (c) => c.email ?? c.telefono ?? '—',
+            id: "contacto",
+            header: "Contacto",
+            cell: (c) => c.email ?? c.telefono ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={!filtroEmpresa || error ? [] : rowsFiltradas}
+        rows={!filtroEmpresa || error ? [] : rowsPagina}
         rowKey={(c) => c.id}
         emptyMessage={
           !filtroEmpresa
-            ? 'Seleccioná una empresa para ver los clientes.'
+            ? "Seleccioná una empresa para ver los clientes."
             : error
-              ? 'No se pudieron cargar los clientes.'
+              ? "No se pudieron cargar los clientes."
               : activeFilterCount > 0
-                ? 'No hay clientes que coincidan con los filtros aplicados.'
-                : 'No hay clientes cargados para esta empresa.'
+                ? "No hay clientes que coincidan con los filtros aplicados."
+                : "No hay clientes cargados para esta empresa."
         }
         loadingMessage="Cargando…"
         renderActions={(c) => (
@@ -165,6 +224,20 @@ export function ClientesSuperadminPage() {
           </button>
         )}
       />
+
+      {filtroEmpresa && !error && meta && meta.total > 0 && (
+        <ListadoPagination
+          meta={meta}
+          pageSize={pageSize}
+          loading={loading}
+          totalLabel="clientes"
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
 
       {viewingCliente && (
         <ClienteViewModal

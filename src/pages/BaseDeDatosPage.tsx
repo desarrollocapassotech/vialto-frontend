@@ -230,7 +230,9 @@ export function BaseDeDatosPage() {
         {activeTab === "vehiculos" && <VehiculosPage />}
         {activeTab === "productos" && <ProductosPage />}
         {activeTab === "presentaciones" && <PresentacionesPage />}
-        {activeTab === "depositos" && <DepositosPage />}
+        {activeTab === "depositos" && (
+          <DepositosPage isPlatform={superadmin} />
+        )}
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
         {activeTab === "usuarios" &&
           (superadmin ? <SuperadminUsersPage /> : <UsuariosTenantPage />)}

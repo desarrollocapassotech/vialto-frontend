@@ -1,37 +1,42 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudFieldLabel, CrudInput } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { apiJson } from '@/lib/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useToast } from "@/lib/toast";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { apiJson } from "@/lib/api";
 import {
   choferWritePayloadFromForm,
   validarDniForm,
   validarPinForm,
   type ChoferFormState,
-} from '@/lib/choferForm';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
-import { canAccessCombustible } from '@/lib/tenantModules';
+} from "@/lib/choferForm";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
+import { canAccessCombustible } from "@/lib/tenantModules";
 
 const emptyForm = (): ChoferFormState => ({
-  nombre: '',
-  dni: '',
-  cuit: '',
-  telefono: '',
+  nombre: "",
+  dni: "",
+  cuit: "",
+  telefono: "",
 });
 
 export function ChoferCreatePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+
+  const { showToast } = useToast();
+
   // Superadmin (tenantId en URL) siempre puede configurar PIN; tenant solo si tiene módulo combustible.
-  const showPinField = !!tenantId || canAccessCombustible(maestro.tenant?.modules ?? []);
+  const showPinField =
+    !!tenantId || canAccessCombustible(maestro.tenant?.modules ?? []);
   const [form, setForm] = useState<ChoferFormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +48,7 @@ export function ChoferCreatePage() {
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
-    if (!form.nombre.trim()) errs.nombre = 'Ingresá el nombre del chofer.';
+    if (!form.nombre.trim()) errs.nombre = "Ingresá el nombre del chofer.";
     const dniError = validarDniForm(form.dni);
     if (dniError) errs.dni = dniError;
     const pinError = showPinField ? validarPinForm(form.pin) : null;
@@ -58,22 +63,34 @@ export function ChoferCreatePage() {
     try {
       const path = tenantId
         ? `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`
-        : '/api/choferes';
+        : "/api/choferes";
       await apiJson(path, () => getToken(), {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(choferWritePayloadFromForm(form)),
       });
       if (!tenantId) void maestro.refreshChoferes();
-      navigate(`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+
+      showToast("Chofer creado exitosamente", "success");
+
+      navigate(
+        `/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
+        { replace: true },
+      );
     } catch (e) {
-      setError(friendlyError(e, 'choferes'));
+      setError(friendlyError(e, "choferes"));
+
+      showToast("No se pudo crear el chofer", "error");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <CrudPageLayout title="Crear chofer" backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`} backLabel="← Volver a choferes">
+    <CrudPageLayout
+      title="Crear chofer"
+      backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
+      backLabel="← Volver a choferes"
+    >
       <form
         className="mt-6 grid gap-4"
         onSubmit={(e) => {
@@ -124,10 +141,12 @@ export function ChoferCreatePage() {
               type="text"
               inputMode="numeric"
               placeholder="4 dígitos (opcional)"
-              value={form.pin ?? ''}
+              value={form.pin ?? ""}
               error={fieldErrors.pin}
               maxLength={4}
-              onChange={(e) => patch({ pin: e.target.value.replace(/\D/g, '') })}
+              onChange={(e) =>
+                patch({ pin: e.target.value.replace(/\D/g, "") })
+              }
             />
             <CrudFieldError message={fieldErrors.pin} />
           </label>

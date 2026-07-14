@@ -317,21 +317,56 @@ export function IngresoWizardStep3({
                 {/* Lote y vencimiento */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className={LABEL}>
-                      Lote <span className="text-red-500">*</span>
-                    </label>
-                    <LoteDatalistInput
-                      productoId={row.productoId}
-                      clienteId={clienteId}
-                      depositoId={depositoId}
-                      lotesBase={lotesBase}
-                      tenantId={tenantId}
-                      value={row.lote}
-                      onChange={(v) => onUpdateRow(row._key, { lote: v })}
-                      className={INPUT}
-                      error={Boolean(fieldErrors[`row_${idx}_lote`])}
-                    />
-                    <CrudFieldError message={fieldErrors[`row_${idx}_lote`]} />
+                    <div className="flex items-center justify-between">
+                      <label className={LABEL}>
+                        Lote {!row.sinLote && <span className="text-red-500">*</span>}
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-vialto-steel cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={row.sinLote}
+                          onChange={(e) =>
+                            onUpdateRow(row._key, {
+                              sinLote: e.target.checked,
+                              lote: e.target.checked ? "" : row.lote,
+                            })
+                          }
+                          className="h-3.5 w-3.5"
+                        />
+                        Sin lote
+                      </label>
+                    </div>
+
+                    {row.sinLote ? (
+                      <>
+                        <input
+                          type="text"
+                          value=""
+                          disabled
+                          placeholder="Se asignará un lote interno al guardar"
+                          className="h-9 w-full border border-black/15 bg-white px-2 text-sm disabled:opacity-50"
+                        />
+                        <p className="text-xs text-vialto-steel">
+                          Cada ingreso sin lote de fábrica recibe un ID único (ej. INT-A1B2C) para
+                          conservar su vencimiento y trazabilidad.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <LoteDatalistInput
+                          productoId={row.productoId}
+                          clienteId={clienteId}
+                          depositoId={depositoId}
+                          lotesBase={lotesBase}
+                          tenantId={tenantId}
+                          value={row.lote}
+                          onChange={(v) => onUpdateRow(row._key, { lote: v })}
+                          className={INPUT}
+                          error={Boolean(fieldErrors[`row_${idx}_lote`])}
+                        />
+                        <CrudFieldError message={fieldErrors[`row_${idx}_lote`]} />
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-1">

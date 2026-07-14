@@ -6,11 +6,14 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
@@ -67,12 +70,13 @@ function caeCell(liq: LiquidacionConTransportista) {
     );
   }
   if (liq.arcaError) {
+    const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
     return (
       <p
         className="text-red-600 text-[11px] max-w-[180px] truncate"
-        title={liq.arcaError}
+        title={msg}
       >
-        {liq.arcaError}
+        {msg}
       </p>
     );
   }
@@ -187,6 +191,10 @@ export function LiquidacionesTenantPage() {
   const [pendingEmitir, setPendingEmitir] =
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
+  const [anularConfirm, setAnularConfirm] =
+    useState<LiquidacionConTransportista | null>(null);
+  const [eliminarConfirm, setEliminarConfirm] =
+    useState<LiquidacionConTransportista | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,13 +229,9 @@ export function LiquidacionesTenantPage() {
     setPendingEmitir(null);
   }
 
-  async function eliminar(liq: LiquidacionConTransportista) {
-    if (
-      !confirm(
-        `¿Eliminar la liquidación de ${transportistaNombre(liq)}? Esta acción no se puede deshacer.`,
-      )
-    )
-      return;
+  async function confirmEliminar() {
+    const liq = eliminarConfirm;
+    if (!liq || busyId) return;
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -237,6 +241,7 @@ export function LiquidacionesTenantPage() {
         { method: "DELETE" },
       );
       setRows((prev) => prev?.filter((r) => r.id !== liq.id) ?? prev);
+      setEliminarConfirm(null);
     } catch (err) {
       setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
     } finally {
@@ -244,13 +249,9 @@ export function LiquidacionesTenantPage() {
     }
   }
 
-  async function anular(liq: LiquidacionConTransportista) {
-    if (
-      !confirm(
-        `¿Anular la liquidación de ${transportistaNombre(liq)}? Esta acción emite un comprobante negativo en ARCA.`,
-      )
-    )
-      return;
+  async function confirmAnular() {
+    const liq = anularConfirm;
+    if (!liq || busyId) return;
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -259,14 +260,8 @@ export function LiquidacionesTenantPage() {
         () => getToken(),
         { method: "POST" },
       );
-      setRows(
-        (prev) =>
-          prev?.map((r) =>
-            r.id === updated.id
-              ? { ...updated, transportista: r.transportista }
-              : r,
-          ) ?? prev,
-      );
+      setRows((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+      setAnularConfirm(null);
     } catch (err) {
       setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
     } finally {
@@ -305,8 +300,8 @@ export function LiquidacionesTenantPage() {
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
-      onAnular: () => void anular(liq),
-      onEliminar: () => void eliminar(liq),
+      onAnular: () => setAnularConfirm(liq),
+      onEliminar: () => setEliminarConfirm(liq),
     };
   }
 
@@ -392,12 +387,14 @@ export function LiquidacionesTenantPage() {
             id: "viajes",
             header: "Viajes",
             cell: (liq) => liq.cantViajes,
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "bruto",
             header: "Bruto",
             cell: (liq) => fmtMoney(liq.bruto),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
@@ -409,12 +406,14 @@ export function LiquidacionesTenantPage() {
                 <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
               </>
             ),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
           },
           {
             id: "liquido",
             header: "Líquido",
             cell: (liq) => fmtMoney(liq.liquido),
+            thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
           },
           {
@@ -527,6 +526,40 @@ export function LiquidacionesTenantPage() {
           onClose={() => setShowCrear(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={anularConfirm != null}
+        title="Anular liquidación"
+        message={
+          anularConfirm
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante negativo en ARCA.`
+            : ""
+        }
+        confirmLabel="Anular"
+        tone="danger"
+        busy={busyId === anularConfirm?.id}
+        onCancel={() => {
+          if (!busyId) setAnularConfirm(null);
+        }}
+        onConfirm={() => void confirmAnular()}
+      />
+
+      <ConfirmDialog
+        open={eliminarConfirm != null}
+        title="Eliminar liquidación"
+        message={
+          eliminarConfirm
+            ? `¿Eliminás la liquidación de ${transportistaNombre(eliminarConfirm)}? Esta acción no se puede deshacer.`
+            : ""
+        }
+        confirmLabel="Eliminar"
+        tone="danger"
+        busy={busyId === eliminarConfirm?.id}
+        onCancel={() => {
+          if (!busyId) setEliminarConfirm(null);
+        }}
+        onConfirm={() => void confirmEliminar()}
+      />
     </div>
   );
 }

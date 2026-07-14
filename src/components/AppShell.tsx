@@ -14,6 +14,7 @@ import {
   Split,
   Calculator,
   Database,
+  Fuel,
   House,
   Landmark,
   Menu,
@@ -30,6 +31,7 @@ import { Logo } from "./Logo";
 import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
+  canAccessCombustible,
   canAccessFacturacion,
   canAccessIntegracionArca,
   canAccessStock,
@@ -207,6 +209,13 @@ export function AppShell() {
             end: true,
           },
         ],
+      });
+    }
+
+    if (superadmin || canAccessCombustible(tenant?.modules ?? [])) {
+      groups.push({
+        title: "Combustible",
+        items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
       });
     }
 

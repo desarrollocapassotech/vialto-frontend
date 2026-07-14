@@ -113,7 +113,11 @@ export function AdjuntoPreviewModal({
     };
   }, [file, url, getToken, movimientoId, tenantId]);
 
-  const tipo = objectUrl ? detectarTipoAdjuntoDesdeContentType(contentType) : 'pdf';
+  const tipo = objectUrl
+    ? detectarTipoAdjuntoDesdeContentType(contentType)
+    : (url && esUrlImagen(url)) || (file && esUrlImagen(file.name))
+      ? 'imagen'
+      : 'pdf';
   const previewSrc = objectUrl && tipo !== 'imagen' ? pdfEmbedSrc(objectUrl) : objectUrl;
   const isPdf = tipo !== 'imagen';
   const esPantallaCompleta =

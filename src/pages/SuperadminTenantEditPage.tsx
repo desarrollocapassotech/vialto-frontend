@@ -1,22 +1,26 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { TenantForm, type TenantFormValues } from '@/components/superadmin/TenantForm';
-import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import type { Tenant } from '@/types/api';
-
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  TenantForm,
+  type TenantFormValues,
+} from "@/components/superadmin/TenantForm";
+import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
+import type { Tenant } from "@/types/api";
 function mapTenantToForm(t: Tenant): TenantFormValues {
   return {
     name: t.name,
     clerkOrgId: t.clerkOrgId,
-    idFiscal: t.idFiscal ?? '',
+    idFiscal: t.idFiscal ?? "",
     modules: t.modules ?? [],
-    billingStatus: (t.billingStatus as TenantFormValues['billingStatus']) ?? 'trial',
+    billingStatus:
+      (t.billingStatus as TenantFormValues["billingStatus"]) ?? "trial",
     maxUsers: String(t.maxUsers),
-    billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? '',
-    whiteLabelDomain: t.whiteLabelDomain ?? '',
+    billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
+    whiteLabelDomain: t.whiteLabelDomain ?? "",
   };
 }
 
@@ -24,14 +28,15 @@ export function SuperadminTenantEditPage() {
   const { getToken } = useAuth();
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [values, setValues] = useState<TenantFormValues | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [deleteConfirm, setDeleteConfirm] = useState('');
-  const [tenantName, setTenantName] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [tenantName, setTenantName] = useState("");
 
   useEffect(() => {
     if (!orgId) return;
@@ -50,7 +55,7 @@ export function SuperadminTenantEditPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(friendlyError(e, 'plataforma'));
+          setError(friendlyError(e, "plataforma"));
         }
       } finally {
         if (!cancelled) setInitialLoading(false);
@@ -64,28 +69,37 @@ export function SuperadminTenantEditPage() {
   async function onSubmit() {
     if (!orgId || !values) return;
     if (!values.name.trim()) {
-      setFieldErrors({ name: 'Ingresá el nombre de la empresa.' });
+      setFieldErrors({ name: "Ingresá el nombre de la empresa." });
       return;
     }
     setFieldErrors({});
     setLoading(true);
     setError(null);
+
     try {
-      await apiJson(`/api/tenants/${encodeURIComponent(orgId)}`, () => getToken(), {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: values.name.trim() || undefined,
-          idFiscal: values.idFiscal.trim() || null,
-          modules: values.modules,
-          billingStatus: values.billingStatus,
-          maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
-          billingRenewsAt: values.billingRenewsAt || null,
-          whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
-        }),
-      });
-      navigate('/superadmin/empresas', { replace: true });
+      await apiJson(
+        `/api/tenants/${encodeURIComponent(orgId)}`,
+        () => getToken(),
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: values.name.trim() || undefined,
+            idFiscal: values.idFiscal.trim() || null,
+            modules: values.modules,
+            billingStatus: values.billingStatus,
+            maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
+            billingRenewsAt: values.billingRenewsAt || null,
+            whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
+          }),
+        },
+      );
+
+      showToast("Empresa actualizada exitosamente", "success");
+      navigate("/superadmin/empresas", { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
+
+      showToast("No se pudo actualizar la empresa", "error");
     } finally {
       setLoading(false);
     }
@@ -93,18 +107,24 @@ export function SuperadminTenantEditPage() {
 
   const canDelete =
     tenantName.trim().length > 0 && deleteConfirm.trim() === tenantName;
-
   async function onDelete() {
     if (!orgId || !canDelete) return;
     setDeleteLoading(true);
     setError(null);
+
     try {
-      await apiJson(`/api/tenants/${encodeURIComponent(orgId)}`, () => getToken(), {
-        method: 'DELETE',
-      });
-      navigate('/superadmin/empresas', { replace: true });
+      await apiJson(
+        `/api/tenants/${encodeURIComponent(orgId)}`,
+        () => getToken(),
+        {
+          method: "DELETE",
+        },
+      );
+      showToast("Empresa eliminada correctamente", "success");
+      navigate("/superadmin/empresas", { replace: true });
     } catch (e) {
-      setError(friendlyError(e, 'plataforma'));
+      setError(friendlyError(e, "plataforma"));
+      showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
       setDeleteLoading(false);
     }
@@ -121,7 +141,10 @@ export function SuperadminTenantEditPage() {
         </p>
 
         <div className="mt-4">
-          <Link className="text-sm text-vialto-fire hover:text-vialto-bright" to="/superadmin/empresas">
+          <Link
+            className="text-sm text-vialto-fire hover:text-vialto-bright"
+            to="/superadmin/empresas"
+          >
             ← Volver a empresas
           </Link>
         </div>
@@ -166,7 +189,7 @@ export function SuperadminTenantEditPage() {
                 onClick={onDelete}
                 className="mt-3 h-10 px-4 bg-red-700 text-white text-sm uppercase tracking-wider disabled:opacity-50"
               >
-                {deleteLoading ? 'Eliminando…' : 'Eliminar empresa'}
+                {deleteLoading ? "Eliminando…" : "Eliminar empresa"}
               </button>
             </section>
           </>

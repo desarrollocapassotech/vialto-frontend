@@ -12,6 +12,7 @@ import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
 import { useTenantsList } from '@/hooks/useTenantsList';
 import { apiJson, apiFetch } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { formatStoredArcaError } from '@/lib/arcaFriendlyError';
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
@@ -607,14 +608,17 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                 >
                   {ESTADO_LABEL[liq.estado] ?? liq.estado}
                 </span>
-                {liq.arcaError && (
+                {liq.arcaError && (() => {
+                  const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
+                  return (
                   <p
                     className="mt-0.5 max-w-[180px] truncate text-xs text-red-600"
-                    title={liq.arcaError}
+                    title={msg}
                   >
-                    {liq.arcaError}
+                    {msg}
                   </p>
-                )}
+                  );
+                })()}
               </>
             ),
             tdClassName: listadoTablaTdClass,
@@ -666,11 +670,14 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                     >
                       {ESTADO_LABEL[liq.estado] ?? liq.estado}
                     </span>
-                    {liq.arcaError && (
-                      <p className="mt-0.5 truncate text-xs text-red-600" title={liq.arcaError}>
-                        {liq.arcaError}
+                    {liq.arcaError && (() => {
+                      const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
+                      return (
+                      <p className="mt-0.5 truncate text-xs text-red-600" title={msg}>
+                        {msg}
                       </p>
-                    )}
+                      );
+                    })()}
                   </>
                 ),
               },

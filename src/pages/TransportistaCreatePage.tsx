@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useToast } from "@/lib/toast";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import {
   CrudFieldLabel,
@@ -31,6 +32,7 @@ export function TransportistaCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const { showToast } = useToast();
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -98,12 +100,14 @@ export function TransportistaCreatePage() {
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
+      showToast("Transportista creado exitosamente", "success");
       navigate(
         `/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         { replace: true },
       );
     } catch (e) {
       setError(friendlyError(e, "transportistas"));
+      showToast("No se pudo crear el transportista", "error");
     } finally {
       setLoading(false);
     }

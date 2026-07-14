@@ -1,79 +1,148 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
-import { UserViewModal } from '@/components/superadmin/UserViewModal';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { useTenantFiltroUrl } from '@/hooks/useTenantFiltroUrl';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { listadoTablaAccionClass, listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { PlatformUser } from '@/types/api';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
+import { UserViewModal } from "@/components/superadmin/UserViewModal";
+import { ListadoPagination } from "@/components/listado/ListadoPagination";
+import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import {
+  listadoTablaAccionClass,
+  listadoTablaTdClass,
+} from "@/lib/listadoTabla";
+import type { PlatformUser, PaginatedMeta } from "@/types/api";
 
 function formatRole(role: string, platformRole?: string | null) {
-  if (platformRole === 'superadmin') return 'Superadmin';
-  if (role === 'org:admin') return 'Admin';
-  if (role === 'org:member') return 'Miembro';
-  if (role === 'org:stock_viewer') return 'Consulta de stock';
+  if (platformRole === "superadmin") return "Superadmin";
+  if (role === "org:admin") return "Admin";
+  if (role === "org:member") return "Miembro";
+  if (role === "org:stock_viewer") return "Consulta de stock";
   return role;
 }
 
 function formatDate(value: number | string) {
   try {
     const parsed =
-      typeof value === 'number' ? new Date(value) : new Date(value);
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+      typeof value === "number" ? new Date(value) : new Date(value);
+    return new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     }).format(parsed);
   } catch {
-    return '—';
+    return "—";
   }
 }
 
 export function SuperadminUsersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
+
   const [rows, setRows] = useState<PlatformUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
-  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
+
+  // --- ESTADOS DE PAGINACIÓN ---
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(
+    LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
+  );
+  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Reiniciar a la página 1 cuando se cambia de empresa
+  useEffect(() => {
+    setPage(1);
+  }, [filtroEmpresa]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (!filtroEmpresa) {
       setRows(null);
+      setMeta(null);
       setError(null);
       return;
     }
+
     let cancelled = false;
-    setRows(null);
+    setLoading(true);
+
     (async () => {
       try {
-        const data = await apiJson<PlatformUser[]>(
-          `/api/platform/users?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+        const response = await apiJson<any>(
+          `/api/platform/users?tenantId=${encodeURIComponent(
+            filtroEmpresa,
+          )}&page=${page}&limit=${pageSize}`,
           () => getToken(),
         );
+
         if (!cancelled) {
-          setRows(data);
+          let fetchedRows: PlatformUser[] = [];
+          let fetchedMeta: PaginatedMeta | null = null;
+
+          // Extracción segura y paginación en el frontend si es necesario
+          if (Array.isArray(response)) {
+            const totalItems = response.length;
+            const calculatedTotalPages = Math.ceil(totalItems / pageSize) || 1;
+
+            // Aseguramos no estar en una página fuera de rango
+            const safePage =
+              page > calculatedTotalPages ? calculatedTotalPages : page;
+
+            // Recortamos el array
+            const startIndex = (safePage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+
+            fetchedRows = response.slice(startIndex, endIndex);
+            fetchedMeta = {
+              page: safePage,
+              pageSize: pageSize,
+              totalPages: calculatedTotalPages,
+              total: totalItems,
+              hasNext: safePage < calculatedTotalPages,
+              hasPrev: safePage > 1,
+            };
+          } else if (response && response.data) {
+            fetchedRows = response.data;
+            fetchedMeta = response.meta || null;
+          } else if (response && response.items) {
+            fetchedRows = response.items;
+            fetchedMeta = response.meta || null;
+          }
+
+          setRows(fetchedRows);
+          setMeta(fetchedMeta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setError(friendlyError(e, 'plataforma'));
+          setMeta(null);
+          setError(friendlyError(e, "plataforma"));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [filtroEmpresa, getToken, isLoaded, isSignedIn]);
+  }, [filtroEmpresa, getToken, isLoaded, isSignedIn, page, pageSize]);
 
-  const count = useMemo(() => rows?.length ?? 0, [rows]);
+  // Usamos meta.total para saber el conteo real de usuarios en el servidor
+  const count = useMemo(
+    () => meta?.total ?? (rows ? rows.length : 0),
+    [meta, rows],
+  );
 
   return (
     <SuperadminOnly>
@@ -96,12 +165,12 @@ export function SuperadminUsersPage() {
             to={
               filtroEmpresa
                 ? `/superadmin/usuarios/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
-                : '#'
+                : "#"
             }
             className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
               filtroEmpresa
-                ? 'bg-vialto-charcoal hover:bg-vialto-graphite'
-                : 'bg-vialto-charcoal/50 pointer-events-none'
+                ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+                : "bg-vialto-charcoal/50 pointer-events-none"
             }`}
             aria-disabled={!filtroEmpresa}
           >
@@ -111,7 +180,7 @@ export function SuperadminUsersPage() {
 
         {filtroEmpresa && (
           <p className="mt-4 text-sm text-vialto-steel">
-            Usuarios encontrados: {rows === null ? '—' : count}
+            Usuarios encontrados: {rows === null ? "—" : count}
           </p>
         )}
 
@@ -122,30 +191,31 @@ export function SuperadminUsersPage() {
         )}
 
         <ListadoDatos
-          className="mt-8"
+          className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
           columns={[
             {
-              id: 'nombre',
-              header: 'Nombre',
+              id: "nombre",
+              header: "Nombre",
               primary: true,
-              cell: (u) => [u.firstName, u.lastName].filter(Boolean).join(' ') || '—',
+              cell: (u) =>
+                [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
               tdClassName: listadoTablaTdClass,
             },
             {
-              id: 'email',
-              header: 'Email',
-              cell: (u) => u.email ?? '—',
+              id: "email",
+              header: "Email",
+              cell: (u) => u.email ?? "—",
               tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
             },
             {
-              id: 'rol',
-              header: 'Rol',
+              id: "rol",
+              header: "Rol",
               cell: (u) => formatRole(u.role, u.platformRole),
               tdClassName: listadoTablaTdClass,
             },
             {
-              id: 'alta',
-              header: 'Alta',
+              id: "alta",
+              header: "Alta",
               cell: (u) => formatDate(u.createdAt),
               tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
             },
@@ -154,10 +224,10 @@ export function SuperadminUsersPage() {
           rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
           emptyMessage={
             !filtroEmpresa
-              ? 'Seleccioná una empresa para ver sus usuarios.'
+              ? "Seleccioná una empresa para ver sus usuarios."
               : error
-                ? 'No se pudieron cargar los usuarios.'
-                : 'No hay usuarios en esta empresa.'
+                ? "No se pudieron cargar los usuarios."
+                : "No hay usuarios en esta empresa."
           }
           loadingMessage="Cargando…"
           renderActions={(u) =>
@@ -174,6 +244,21 @@ export function SuperadminUsersPage() {
             )
           }
         />
+
+        {/* COMPONENTE DE PAGINACIÓN */}
+        {meta && rows && rows.length > 0 && (
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            loading={loading}
+            totalLabel="usuarios"
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1); // Reiniciar a página 1 al cambiar tamaño
+            }}
+          />
+        )}
       </div>
       {viewingUser && (
         <UserViewModal

@@ -1,24 +1,32 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CrudDangerZone } from '@/components/crud/CrudDangerZone';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { CrudInput, CrudSelect } from '@/components/crud/CrudFields';
-import { CrudPageLayout } from '@/components/crud/CrudPageLayout';
-import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
-import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
-import { apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useMaestroData } from '@/hooks/useMaestroData';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useToast } from "@/lib/toast";
+import { CrudDangerZone } from "@/components/crud/CrudDangerZone";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { CrudInput, CrudSelect } from "@/components/crud/CrudFields";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
+import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
+import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import { apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   vehiculoFormStateFromApi,
   vehiculoWritePayloadFromForm,
   type VehiculoFormState,
-} from '@/lib/vehiculoForm';
-import type { Vehiculo } from '@/types/api';
+} from "@/lib/vehiculoForm";
+import type { Vehiculo } from "@/types/api";
 
-const TIPOS = ['tractor', 'semirremolque', 'camion', 'utilitario', 'otro'] as const;
-const LABEL = 'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel';
+const TIPOS = [
+  "tractor",
+  "semirremolque",
+  "camion",
+  "utilitario",
+  "otro",
+] as const;
+const LABEL =
+  "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
 
 function vehiculoDetailUrl(id: string, tenantId: string): string {
   if (tenantId) {
@@ -32,14 +40,18 @@ export function VehiculoEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tenantId = searchParams.get('tenantId')?.trim() ?? '';
+  const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+
+  const { showToast } = useToast();
+
   const [form, setForm] = useState<VehiculoFormState | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function patch(p: Partial<VehiculoFormState>) {
@@ -52,13 +64,16 @@ export function VehiculoEditPage() {
     setInitialLoading(true);
     (async () => {
       try {
-        const row = await apiJson<Vehiculo>(vehiculoDetailUrl(id, tenantId), () => getToken());
+        const row = await apiJson<Vehiculo>(
+          vehiculoDetailUrl(id, tenantId),
+          () => getToken(),
+        );
         if (!cancelled) {
           setForm(vehiculoFormStateFromApi(row));
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(friendlyError(e, 'vehiculos'));
+        if (!cancelled) setError(friendlyError(e, "vehiculos"));
       } finally {
         if (!cancelled) setInitialLoading(false);
       }
@@ -71,8 +86,9 @@ export function VehiculoEditPage() {
   async function onSave() {
     if (!id || !form) return;
     const errs: Record<string, string> = {};
-    if (!form.patente.trim()) errs.patente = 'Ingresá la patente.';
-    if (form.tara.trim() && vehiculoWritePayloadFromForm(form).tara == null) errs.tara = 'La tara debe ser un número válido.';
+    if (!form.patente.trim()) errs.patente = "Ingresá la patente.";
+    if (form.tara.trim() && vehiculoWritePayloadFromForm(form).tara == null)
+      errs.tara = "La tara debe ser un número válido.";
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -81,33 +97,57 @@ export function VehiculoEditPage() {
     setLoading(true);
     setError(null);
     try {
-      await apiJson<Vehiculo>(vehiculoDetailUrl(id, tenantId), () => getToken(), {
-        method: 'PATCH',
-        body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
-      });
+      await apiJson<Vehiculo>(
+        vehiculoDetailUrl(id, tenantId),
+        () => getToken(),
+        {
+          method: "PATCH",
+          body: JSON.stringify(vehiculoWritePayloadFromForm(form)),
+        },
+      );
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+
+      showToast("Vehículo guardado exitosamente", "success");
+
+      navigate(
+        `/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
+        { replace: true },
+      );
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setError(friendlyError(e, "vehiculos"));
+      showToast("No se pudo guardar el vehículo", "error");
     } finally {
       setLoading(false);
     }
   }
 
+  const deleteConfirmWord = form?.patente.trim() || "ELIMINAR";
+
   async function onDelete() {
-    if (!id || !form || confirmDelete.trim().toUpperCase() !== form.patente.trim().toUpperCase()) {
+    if (
+      !id ||
+      !form ||
+      confirmDelete.trim().toUpperCase() !== deleteConfirmWord.toUpperCase()
+    ) {
       return;
     }
     setDeleting(true);
-    setError(null);
+    setDeleteError(null);
     try {
       await apiJson(vehiculoDetailUrl(id, tenantId), () => getToken(), {
-        method: 'DELETE',
+        method: "DELETE",
       });
       if (!tenantId) void maestro.refreshVehiculos();
-      navigate(`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`, { replace: true });
+
+      showToast("Vehículo eliminado correctamente", "success");
+
+      navigate(
+        `/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`,
+        { replace: true },
+      );
     } catch (e) {
-      setError(friendlyError(e, 'vehiculos'));
+      setDeleteError(friendlyError(e, "vehiculos"));
+      showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
       setDeleting(false);
     }
@@ -116,7 +156,7 @@ export function VehiculoEditPage() {
   return (
     <CrudPageLayout
       title="Editar vehículo"
-      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ''}`}
+      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
       backLabel="← Volver a vehículos"
     >
       {initialLoading ? (
@@ -131,7 +171,9 @@ export function VehiculoEditPage() {
             }}
           >
             <label className="grid gap-1.5">
-              <span className={LABEL}>Patente <span className="text-red-500">*</span></span>
+              <span className={LABEL}>
+                Patente <span className="text-red-500">*</span>
+              </span>
               <CrudInput
                 value={form.patente}
                 placeholder="Ej: AA123BB"
@@ -229,19 +271,31 @@ export function VehiculoEditPage() {
             </div>
           </form>
           <CrudDangerZone
-            message="Escribí la patente para eliminar este vehículo."
+            message={
+              form.patente.trim()
+                ? "Escribí la patente para eliminar este vehículo."
+                : "Escribí ELIMINAR para confirmar."
+            }
             confirmValue={confirmDelete}
             onConfirmValueChange={setConfirmDelete}
             canDelete={
-              confirmDelete.trim().toUpperCase() === form.patente.trim().toUpperCase()
+              confirmDelete.trim().toUpperCase() ===
+              deleteConfirmWord.toUpperCase()
             }
             deleting={deleting}
             onDelete={onDelete}
             deleteLabel="Eliminar vehículo"
           />
+          {deleteError && (
+            <div className="mt-2">
+              <CrudFormErrorAlert message={deleteError} />
+            </div>
+          )}
         </>
       ) : (
-        <CrudFormErrorAlert message={error ?? 'No se pudo cargar el vehículo.'} />
+        <CrudFormErrorAlert
+          message={error ?? "No se pudo cargar el vehículo."}
+        />
       )}
     </CrudPageLayout>
   );

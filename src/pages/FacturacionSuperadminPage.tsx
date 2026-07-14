@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { FacturacionTenantPage } from '@/pages/FacturacionTenantPage';
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { FacturacionTenantPage } from "@/pages/FacturacionTenantPage";
 
 type FacturaNuevaNavState = {
   tenantId?: string;
@@ -13,7 +13,7 @@ type FacturaNuevaNavState = {
 export function FacturacionSuperadminPage() {
   const location = useLocation();
   const tenants = useTenantsList();
-  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const [filtroEmpresa, setFiltroEmpresa] = useState("");
 
   useEffect(() => {
     const state = location.state as FacturaNuevaNavState | null;
@@ -26,7 +26,8 @@ export function FacturacionSuperadminPage() {
         Facturación
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Vista de plataforma — seleccioná una empresa para ver y administrar sus facturas con las mismas herramientas que un admin de la empresa.
+        Vista de plataforma — seleccioná una empresa para ver y administrar sus
+        facturas con las mismas herramientas que un admin de la empresa.
       </p>
 
       <div className="mt-6">
@@ -45,7 +46,10 @@ export function FacturacionSuperadminPage() {
 
       {filtroEmpresa ? (
         <div className="mt-8">
-          <FacturacionTenantPage tenantId={filtroEmpresa} embeddedInSuperadmin />
+          <FacturacionTenantPage
+            tenantId={filtroEmpresa}
+            embeddedInSuperadmin
+          />
         </div>
       ) : null}
     </div>
