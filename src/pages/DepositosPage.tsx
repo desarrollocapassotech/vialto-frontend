@@ -43,7 +43,7 @@ export function DepositosPage({
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
   // Tenant Manager
-  const allTenants = useTenantsList();
+  const allTenants = useTenantsList({ enabled: isPlatform });
   const tenants = isPlatform ? allTenants : null;
   const [activeTenantId, setActiveTenantId] = useState(tenantId);
 
