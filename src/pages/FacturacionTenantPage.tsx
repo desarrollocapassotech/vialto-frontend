@@ -18,7 +18,9 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiJson } from "@/lib/api";
+import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
@@ -52,9 +54,12 @@ type FacturasPaginatedResponse = {
   meta: PaginatedMeta;
 };
 
-function facturaPayloadFromDraft(draft: FacturaDraft) {
+function facturaPayloadFromDraft(
+  draft: FacturaDraft,
+  comprobanteUrl?: string | null,
+) {
   const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
-  const base = {
+  const base: Record<string, unknown> = {
     numero: draft.numero.trim(),
     tipo: draft.tipo,
     viajeIds: draft.viajeIds,
@@ -62,6 +67,9 @@ function facturaPayloadFromDraft(draft: FacturaDraft) {
     fechaVencimiento: draft.fechaVencimiento || undefined,
     ivaPct: ivaN,
   };
+  if (comprobanteUrl !== undefined) {
+    base.comprobanteUrl = comprobanteUrl ?? "";
+  }
   if (draft.tipo === "transportista_externo") {
     return {
       ...base,
@@ -124,6 +132,8 @@ export function FacturacionTenantPage({
   const platform = Boolean(tenantId?.trim());
   const hasArca =
     !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
+  /** Adjunto manual solo para tenants sin integración ARCA. */
+  const showComprobanteAdjunto = !platform && !hasArca;
   const tid = tenantId?.trim() ?? "";
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const [transportistasPlatform, setTransportistasPlatform] = useState<
@@ -177,6 +187,9 @@ export function FacturacionTenantPage({
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
+    string | null
+  >(null);
 
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
@@ -557,6 +570,16 @@ export function FacturacionTenantPage({
     } catch {}
   }
 
+  async function resolveComprobanteUrl(
+    d: FacturaDraft,
+  ): Promise<string | null | undefined> {
+    if (!showComprobanteAdjunto) return undefined;
+    if (d.comprobanteFile) {
+      return uploadComprobante(() => getToken(), d.comprobanteFile, "facturacion");
+    }
+    return d.comprobanteUrl;
+  }
+
   async function handleCreate() {
     setDraftError(null);
     if (!draft.numero.trim()) {
@@ -575,9 +598,10 @@ export function FacturacionTenantPage({
     }
     setSaving(true);
     try {
+      const comprobanteUrl = await resolveComprobanteUrl(draft);
       await apiJson<Factura>(facturasCreateUrl(), () => getToken(), {
         method: "POST",
-        body: JSON.stringify(facturaPayloadFromDraft(draft)),
+        body: JSON.stringify(facturaPayloadFromDraft(draft, comprobanteUrl)),
       });
       showToast("Factura creada exitosamente", "success");
       setCreating(false);
@@ -626,12 +650,13 @@ export function FacturacionTenantPage({
     }
     setSavingEditId(editingId);
     try {
+      const comprobanteUrl = await resolveComprobanteUrl(editDraft);
       const updated = await apiJson<Factura>(
         facturaUrl(editingId),
         () => getToken(),
         {
           method: "PATCH",
-          body: JSON.stringify(facturaPayloadFromDraft(editDraft)),
+          body: JSON.stringify(facturaPayloadFromDraft(editDraft, comprobanteUrl)),
         },
       );
       setFacturas((prev) =>
@@ -1165,6 +1190,11 @@ export function FacturacionTenantPage({
                 deleting={deletingId === f.id}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onVerComprobante={
+                  showComprobanteAdjunto && f.comprobanteUrl
+                    ? () => setPreviewComprobanteUrl(f.comprobanteUrl)
+                    : undefined
+                }
               />
             </td>
           </tr>
@@ -1201,6 +1231,11 @@ export function FacturacionTenantPage({
                 deleting={deletingId === f.id}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onVerComprobante={
+                  showComprobanteAdjunto && f.comprobanteUrl
+                    ? () => setPreviewComprobanteUrl(f.comprobanteUrl)
+                    : undefined
+                }
               />
             }
           />
@@ -1234,6 +1269,7 @@ export function FacturacionTenantPage({
         onSave={() => void handleCreate()}
         saving={saving}
         error={draftError}
+        showComprobanteAdjunto={showComprobanteAdjunto}
       />
 
       {viewingFactura && (
@@ -1246,6 +1282,11 @@ export function FacturacionTenantPage({
             setViewingFactura(null);
             startEdit(f);
           }}
+          onVerComprobante={
+            showComprobanteAdjunto && viewingFactura.comprobanteUrl
+              ? () => setPreviewComprobanteUrl(viewingFactura.comprobanteUrl)
+              : undefined
+          }
         />
       )}
 
@@ -1264,6 +1305,7 @@ export function FacturacionTenantPage({
           onSave={() => void saveEdit()}
           saving={savingEditId === editingId}
           error={editError}
+          showComprobanteAdjunto={showComprobanteAdjunto}
         />
       )}
 
@@ -1287,6 +1329,14 @@ export function FacturacionTenantPage({
         }}
         onConfirm={() => void confirmDeleteFactura()}
       />
+
+      {previewComprobanteUrl && (
+        <AdjuntoPreviewModal
+          url={previewComprobanteUrl}
+          title="Comprobante"
+          onClose={() => setPreviewComprobanteUrl(null)}
+        />
+      )}
     </div>
   );
 }

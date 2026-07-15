@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
+import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
+import { uploadComprobante } from '@/lib/comprobanteUpload';
 import { friendlyError } from '@/lib/friendlyError';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
-import { Spinner } from '@/components/ui/Spinner';
 import type { Liquidacion, Transportista, Viaje } from '@/types/api';
 
 type ViajeItem = Pick<Viaje, 'id' | 'numero' | 'fechaCarga' | 'origen' | 'destino' | 'precioTransportistaExterno'>;
@@ -55,6 +57,9 @@ export function CrearLiquidacionManualModal({
   const [selectedViajeIds, setSelectedViajeIds] = useState<Set<string>>(
     viajeInicial ? new Set([viajeInicial.id]) : new Set(),
   );
+
+  // — Comprobante adjunto (tenants sin ARCA) —
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
 
   // — Estado del submit —
   const [submitting, setSubmitting] = useState(false);
@@ -119,6 +124,14 @@ export function CrearLiquidacionManualModal({
     setError(null);
     setSubmitting(true);
     try {
+      let comprobanteUrl: string | undefined;
+      if (comprobanteFile) {
+        comprobanteUrl = await uploadComprobante(
+          () => getToken(),
+          comprobanteFile,
+          'facturacion',
+        );
+      }
       const body: Record<string, unknown> = {
         transportistaId,
         periodoDesde,
@@ -127,6 +140,7 @@ export function CrearLiquidacionManualModal({
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
       if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
+      if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       const liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
         () => getToken(),
@@ -389,6 +403,12 @@ export function CrearLiquidacionManualModal({
               )}
             </div>
           )}
+
+          <ComprobanteAdjuntoField
+            file={comprobanteFile}
+            onFileChange={setComprobanteFile}
+            disabled={submitting}
+          />
 
           {error && (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
