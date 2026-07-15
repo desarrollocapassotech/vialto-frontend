@@ -9,6 +9,7 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import {
   pageTitleClass,
   listadoTablaAccionClass,
@@ -16,7 +17,9 @@ import {
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { FORMA_PAGO_LABELS, fmtFormaPago, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -26,6 +29,7 @@ type CombustibleListResponse = {
   limit: number;
 };
 
+// Formatea los atributos del vehículo para armar una etiqueta única y descriptiva
 function fmtVehiculoLabel(v: {
   patente: string;
   tipo: string;
@@ -38,6 +42,7 @@ function fmtVehiculoLabel(v: {
   return detalle ? `${v.patente} — ${detalle}` : v.patente;
 }
 
+// Convierte marcas de tiempo ISO a formato legible local de Argentina
 function fmtFecha(iso: string) {
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",
@@ -47,10 +52,12 @@ function fmtFecha(iso: string) {
   }).format(new Date(iso));
 }
 
+// Aplica formato de millares para números en pantalla
 function fmtNum(n: number) {
   return n.toLocaleString("es-AR");
 }
 
+// Configuración de columnas base para la renderización de la grilla de datos
 const COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
     id: "fecha",
@@ -105,23 +112,31 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
 ];
 
 export function CombustibleTenantPage() {
+  // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const maestro = useMaestroData();
+  const { showToast } = useToast(); // <-- Instancia del context de toasts
 
+  // ─── ESTADOS DE LA TABLA Y PAGINACIÓN ────────────────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
+  // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
   const [month, setMonth] = useState("");
   const [vehiculoId, setVehiculoId] = useState("");
   const [choferId, setChoferId] = useState("");
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
-  const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
-  // Eliminación con confirmación
+  // Control de apertura de modales de visualización y alta
+  const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // ─── ESTADOS PARA EL DIÁLOGO DE ELIMINACIÓN ──────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<CargaCombustible | null>(
     null,
   );
@@ -132,6 +147,7 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
+  // Restablece todos los criterios de filtrado aplicados a la vista
   function handleClearFilters() {
     setMonth("");
     setVehiculoId("");
@@ -145,6 +161,18 @@ export function CombustibleTenantPage() {
     month || vehiculoId || choferId || estacion || formaPago,
   );
 
+  // Parámetros de filtro compartidos entre el listado y la exportación.
+  function filtroParams(): URLSearchParams {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+    if (choferId) qs.set("choferId", choferId);
+    if (estacion) qs.set("estacion", estacion);
+    if (formaPago) qs.set("formaPago", formaPago);
+    return qs;
+  }
+
+  // ─── EFECTO SECUNDARIO: CARGA Y FILTRADO DE COMPROBANTES ────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -152,15 +180,9 @@ export function CombustibleTenantPage() {
 
     void (async () => {
       try {
-        const qs = new URLSearchParams({
-          page: String(page),
-          limit: String(pageSize),
-        });
-        if (month) qs.set("month", month);
-        if (vehiculoId) qs.set("vehiculoId", vehiculoId);
-        if (choferId) qs.set("choferId", choferId);
-        if (estacion) qs.set("estacion", estacion);
-        if (formaPago) qs.set("formaPago", formaPago);
+        const qs = filtroParams();
+        qs.set("page", String(page));
+        qs.set("limit", String(pageSize));
 
         const data = await apiJson<CombustibleListResponse>(
           `/api/combustible?${qs.toString()}`,
@@ -196,6 +218,32 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
+  async function handleDownloadExcel() {
+    if (downloading || total === 0) return;
+    setDownloading(true);
+    try {
+      // Traemos todas las cargas del filtro actual (no solo la página visible).
+      const qs = filtroParams();
+      qs.set("page", "1");
+      qs.set("limit", String(total));
+
+      const data = await apiJson<CombustibleListResponse>(
+        `/api/combustible?${qs.toString()}`,
+        () => getToken(),
+      );
+
+      await exportarCargasCombustible(data.cargas, {
+        month: month || undefined,
+      });
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, "combustible"));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  // ─── ACCIÓN CRÍTICA: CONFIRMAR Y ELIMINAR REGISTRO ────────────────────────
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -206,10 +254,13 @@ export function CombustibleTenantPage() {
         () => getToken(),
         { method: "DELETE" },
       );
+
+      // --> TOAST INYECTADO: FEEDBACK DE ÉXITO AL BORRAR <--
+      showToast("Carga de combustible eliminada correctamente", "success");
+
       const deletedId = deleteTarget.id;
       setRows((prev) => {
         const next = prev ? prev.filter((r) => r.id !== deletedId) : prev;
-        // si borrás el último de la página, retrocedé para que se refetchee
         if (next && next.length === 0 && page > 1) {
           setPage((p) => p - 1);
         }
@@ -219,12 +270,15 @@ export function CombustibleTenantPage() {
       setDeleteTarget(null);
     } catch (e) {
       setDeleteError(friendlyError(e, "combustible"));
+
+      // --> TOAST INYECTADO: FEEDBACK DE ERROR AL BORRAR <--
+      showToast("No se pudo eliminar la carga de combustible", "error");
     } finally {
       setDeleting(false);
     }
   }
 
-  // Cerrar el modal con Escape
+  // Permite cerrar el diálogo de borrado presionando la tecla Escape
   useEffect(() => {
     if (!deleteTarget) return;
     const onKey = (e: KeyboardEvent) => {
@@ -234,6 +288,7 @@ export function CombustibleTenantPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [deleteTarget, deleting]);
 
+  // Constantes calculadas para alimentar la barra de paginación
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const meta: PaginatedMeta = {
     page,
@@ -247,7 +302,7 @@ export function CombustibleTenantPage() {
   const inputClass =
     "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none";
 
-  // Columnas: las de módulo + la de acciones
+  // Agrega de forma dinámica la acción de borrado al arreglo de columnas de la grilla
   const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
     () => [
       ...COLUMNS,
@@ -272,7 +327,7 @@ export function CombustibleTenantPage() {
     [],
   );
 
-  // Filtros para el drawer móvil
+  // Filtros renderizados exclusivamente para resoluciones móviles
   const mobileFilters = (
     <>
       <ListadoFiltroCampo label="Mes" active={Boolean(month)}>
@@ -361,8 +416,7 @@ export function CombustibleTenantPage() {
     </>
   );
 
-  // Encabezado de tabla con filtros por columna (desktop)
-  // tableHead se renderiza dentro del <thead> que provee ListadoDatos — solo el <tr>
+  // Cabecera interactiva con selectores embebidos para resoluciones de escritorio
   const tableHead = (
     <tr className="border-b border-black/10">
       <th className="px-4 py-3 text-left font-normal">
@@ -506,28 +560,68 @@ export function CombustibleTenantPage() {
     Boolean,
   ).length;
 
+  // ─── RENDERIZADO GENERAL DE LA PÁGINA ─────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
-        <div className="hidden min-h-10 items-center lg:flex">
-          {hayFiltros && (
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              disabled={rows === null}
-              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
+        <div className="flex items-center gap-3">
+          {/* BOTÓN: Descargar Excel (Rama ExcelExport) */}
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={rows === null || total === 0 || downloading}
+            className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            aria-label="Descargar Excel"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
             >
-              Limpiar filtros
-              <span
-                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-                aria-hidden
+              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M12 11v6" />
+              <path d="m9 14 3 3 3-3" />
+            </svg>
+            {downloading ? "Descargando…" : "Descargar Excel"}
+          </button>
+
+          {/* BOTÓN: Limpiar filtros alineado con los otros botones de acción */}
+          {hayFiltros && (
+            <div className="hidden min-h-10 items-center lg:flex">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={rows === null}
+                className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
               >
-                {cantFiltros}
-              </span>
-            </button>
+                Limpiar filtros
+                <span
+                  className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                  aria-hidden
+                >
+                  {cantFiltros}
+                </span>
+              </button>
+            </div>
           )}
+
+          {/* BOTÓN: Nueva Carga (Rama HEAD) */}
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-xs font-semibold uppercase tracking-wider hover:bg-black transition-colors"
+          >
+            Nueva carga
+          </button>
         </div>
       </div>
 
@@ -577,7 +671,7 @@ export function CombustibleTenantPage() {
         />
       )}
 
-      {/* MODAL DE ELIMINACIÓN */}
+      {/* COMPONENTE INTERFAZ DE DIÁLOGO: CONFIRMAR ELIMINACIÓN */}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
@@ -641,7 +735,35 @@ export function CombustibleTenantPage() {
         </div>
       )}
 
-      {/* MODAL DE VISTA DE DETALLE */}
+      {/* MODAL PARA EL REGISTRO DE ALTAS */}
+      {isCreateModalOpen && (
+        <CargaCombustibleCreateModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={(nuevaCarga) => {
+            setIsCreateModalOpen(false);
+
+            const vehiculoCompleto = maestro.vehiculos.find(
+              (v) => v.id === nuevaCarga.vehiculoId,
+            );
+            const choferCompleto = maestro.choferes.find(
+              (c) => c.id === nuevaCarga.choferId,
+            );
+
+            const cargaPopulada: CargaCombustible = {
+              ...nuevaCarga,
+              vehiculo: vehiculoCompleto || null,
+              chofer: choferCompleto || null,
+            };
+
+            setRows((prev) =>
+              prev ? [cargaPopulada, ...prev] : [cargaPopulada],
+            );
+            setTotal((t) => t + 1);
+          }}
+        />
+      )}
+
+      {/* MODAL PARA LA VISTA DETALLADA DEL COMPROBANTE */}
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}

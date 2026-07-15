@@ -2,6 +2,7 @@ export const FORMA_PAGO_LABELS: Record<string, string> = {
   transferencia: "Transferencia",
   cheque: "Cheque",
   efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
 };
 
 export const TIPO_VEHICULO_LABELS: Record<string, string> = {
