@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
+  buildLotesUrl,
+  compareLotesFefo,
   STOCK_SIN_LOTE_VALUE,
   type LotesDisponiblesResponse,
 } from '@/lib/stockLote';
@@ -13,44 +15,12 @@ export type LoteSelectStock = {
   fechaVencimiento: string | null;
 };
 
-function buildLotesUrl(
-  base: string,
-  productoId: string,
-  clienteId: string,
-  depositoId: string,
-  presentacionId: string,
-  tenantId?: string,
-): string {
-  const parts: string[] = [];
-  if (tenantId) parts.push(`tenantId=${encodeURIComponent(tenantId)}`);
-  parts.push(`productoId=${encodeURIComponent(productoId)}`);
-  parts.push(`clienteId=${encodeURIComponent(clienteId)}`);
-  parts.push(`depositoId=${encodeURIComponent(depositoId)}`);
-  if (presentacionId) parts.push(`presentacionId=${encodeURIComponent(presentacionId)}`);
-  return `${base}?${parts.join('&')}`;
-}
-
 /** Formato FEFO: «LOTE-123 (Vto: 15/08/2026)». */
 function etiquetaLoteOption(lote: string, fechaVencimiento: string | null): string {
   if (!fechaVencimiento) return lote;
   const vto = formatMovimientoStockFechaFromIso(fechaVencimiento);
   if (!vto || vto === '—') return lote;
   return `${lote} (Vto: ${vto})`;
-}
-
-function compareLotesFefo(
-  a: { lote: string; fechaVencimiento: string | null },
-  b: { lote: string; fechaVencimiento: string | null },
-): number {
-  if (a.fechaVencimiento && b.fechaVencimiento) {
-    const byDate = a.fechaVencimiento.localeCompare(b.fechaVencimiento);
-    if (byDate !== 0) return byDate;
-  } else if (a.fechaVencimiento && !b.fechaVencimiento) {
-    return -1;
-  } else if (!a.fechaVencimiento && b.fechaVencimiento) {
-    return 1;
-  }
-  return a.lote.localeCompare(b.lote, 'es');
 }
 
 export function LoteSelect({

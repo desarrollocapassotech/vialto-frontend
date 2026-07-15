@@ -85,6 +85,7 @@ export function StockMovimientosTenantPage({
   const clienteId = searchParams.get("clienteId") ?? "";
   const createdBy = searchParams.get("createdBy") ?? "";
   const depositoId = searchParams.get("depositoId") ?? "";
+  const lote = searchParams.get("lote") ?? "";
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -106,6 +107,7 @@ export function StockMovimientosTenantPage({
     clienteId,
     createdBy,
     depositoId,
+    lote,
   ]);
 
   const params: Record<string, string> = {};
@@ -117,6 +119,7 @@ export function StockMovimientosTenantPage({
   if (clienteId) params.clienteId = clienteId;
   if (createdBy) params.createdBy = createdBy;
   if (depositoId) params.depositoId = depositoId;
+  if (lote) params.lote = lote;
 
   params.page = String(page);
   params.pageSize = String(pageSize);
@@ -282,6 +285,30 @@ export function StockMovimientosTenantPage({
       {error && (
         <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {lote && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-black/10 bg-vialto-mist/50 px-4 py-3 text-sm text-vialto-charcoal">
+          <p>
+            Filtrado por lote:{" "}
+            <span className="font-medium">
+              {lote === "__sin_lote__" ? "Sin lote" : lote}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("lote");
+                return next;
+              });
+            }}
+            className="text-xs uppercase tracking-wider text-vialto-fire hover:underline"
+          >
+            Quitar filtro
+          </button>
         </div>
       )}
 
