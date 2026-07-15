@@ -16,6 +16,7 @@ import {
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { FORMA_PAGO_LABELS, fmtFormaPago, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -25,27 +26,13 @@ type CombustibleListResponse = {
   limit: number;
 };
 
-const FORMA_PAGO_LABELS: Record<string, string> = {
-  transferencia: "Transferencia",
-  cheque: "Cheque",
-  efectivo: "Efectivo",
-};
-
-const TIPO_VEHICULO_LABELS: Record<string, string> = {
-  tractor: "Tractor",
-  semirremolque: "Semirremolque",
-  camion: "Camión",
-  utilitario: "Utilitario",
-  otro: "Otro",
-};
-
 function fmtVehiculoLabel(v: {
   patente: string;
   tipo: string;
   marca: string | null;
   modelo: string | null;
 }): string {
-  const tipo = TIPO_VEHICULO_LABELS[v.tipo] ?? v.tipo;
+  const tipo = fmtTipoVehiculo(v.tipo);
   const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
   const detalle = [tipo, marcaModelo].filter(Boolean).join(" · ");
   return detalle ? `${v.patente} — ${detalle}` : v.patente;
@@ -62,11 +49,6 @@ function fmtFecha(iso: string) {
 
 function fmtNum(n: number) {
   return n.toLocaleString("es-AR");
-}
-
-function fmtFormaPago(v: string | null) {
-  if (!v) return "—";
-  return FORMA_PAGO_LABELS[v] ?? v;
 }
 
 const COLUMNS: ListadoColumn<CargaCombustible>[] = [
