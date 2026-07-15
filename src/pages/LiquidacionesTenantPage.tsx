@@ -6,6 +6,7 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
+import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -93,6 +94,7 @@ function LiquidacionAcciones({
   onPdf,
   onAnular,
   onEliminar,
+  onVerComprobante,
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
@@ -103,6 +105,7 @@ function LiquidacionAcciones({
   onPdf: () => void;
   onAnular: () => void;
   onEliminar: () => void;
+  onVerComprobante: () => void;
 }) {
   const puedeEmitir =
     hasArca && (liq.estado === "borrador" || liq.estado === "error");
@@ -113,6 +116,7 @@ function LiquidacionAcciones({
   const puedeAnular = hasArca && liq.estado === "autorizado";
   const tienePdf =
     hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
+  const tieneComprobanteAdjunto = !hasArca && Boolean(liq.comprobanteUrl?.trim());
 
   return (
     <div>
@@ -140,6 +144,15 @@ function LiquidacionAcciones({
             className={`${listadoTablaAccionClass} h-7 px-3`}
           >
             {isDownloading ? "…" : "PDF"}
+          </button>
+        )}
+        {tieneComprobanteAdjunto && (
+          <button
+            type="button"
+            onClick={onVerComprobante}
+            className={`${listadoTablaAccionClass} h-7 px-3`}
+          >
+            Ver comprobante
           </button>
         )}
         {puedeAnular && (
@@ -195,6 +208,9 @@ export function LiquidacionesTenantPage() {
     useState<LiquidacionConTransportista | null>(null);
   const [eliminarConfirm, setEliminarConfirm] =
     useState<LiquidacionConTransportista | null>(null);
+  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +318,9 @@ export function LiquidacionesTenantPage() {
       onPdf: () => void descargarPdf(liq),
       onAnular: () => setAnularConfirm(liq),
       onEliminar: () => setEliminarConfirm(liq),
+      onVerComprobante: () => {
+        if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
+      },
     };
   }
 
@@ -560,6 +579,14 @@ export function LiquidacionesTenantPage() {
         }}
         onConfirm={() => void confirmEliminar()}
       />
+
+      {previewComprobanteUrl && (
+        <AdjuntoPreviewModal
+          url={previewComprobanteUrl}
+          title="Comprobante"
+          onClose={() => setPreviewComprobanteUrl(null)}
+        />
+      )}
     </div>
   );
 }
