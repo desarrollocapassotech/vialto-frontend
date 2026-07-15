@@ -1,6 +1,7 @@
 import {
   AuthenticateWithRedirectCallback,
   useAuth,
+  useOrganization,
   useUser,
 } from "@clerk/clerk-react";
 import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
@@ -190,9 +191,13 @@ function RequireNotStockViewer() {
  */
 function RequireModule({ module }: { module: string }) {
   const { user, isLoaded } = useUser();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
   const { tenant, tenantLoading } = useMaestroData();
 
-  if (!isLoaded || tenantLoading) {
+  const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
+
+  // Usuarios de tenant: esperar organización activa (se auto-selecciona al entrar).
+  if (!isLoaded || !orgLoaded || (!superadmin && !organization) || tenantLoading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center text-vialto-steel">
         Un momento…
@@ -200,7 +205,6 @@ function RequireModule({ module }: { module: string }) {
     );
   }
 
-  const superadmin = isPlatformSuperadmin(user?.publicMetadata);
   const moduleActivo = (tenant?.modules ?? []).some(
     (m) => m.toLowerCase() === module.toLowerCase(),
   );
