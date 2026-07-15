@@ -63,7 +63,7 @@ export function CamposEmpresaPage() {
           const primerModulo = Object.keys(data)[0] ?? null;
           setModulo(primerModulo);
           setFormulario(
-            primerModulo ? (Object.keys(data[primerModulo])[0] ?? null) : null,
+            primerModulo ? (Object.keys(data[primerModulo].formularios)[0] ?? null) : null,
           );
         }
       } catch (e) {
