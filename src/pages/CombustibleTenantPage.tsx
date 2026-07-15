@@ -9,7 +9,7 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { useToast } from "@/lib/toast"; // <-- Importación del sistema de alertas visuales
+import { useToast } from "@/lib/toast";
 import {
   pageTitleClass,
   listadoTablaAccionClass,
@@ -18,6 +18,7 @@ import {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
+import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -142,6 +143,7 @@ export function CombustibleTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
   const [month, setMonth] = useState("");
@@ -179,6 +181,17 @@ export function CombustibleTenantPage() {
     month || vehiculoId || choferId || estacion || formaPago,
   );
 
+  // Parámetros de filtro compartidos entre el listado y la exportación.
+  function filtroParams(): URLSearchParams {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+    if (choferId) qs.set("choferId", choferId);
+    if (estacion) qs.set("estacion", estacion);
+    if (formaPago) qs.set("formaPago", formaPago);
+    return qs;
+  }
+
   // ─── EFECTO SECUNDARIO: CARGA Y FILTRADO DE COMPROBANTES ────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -187,15 +200,9 @@ export function CombustibleTenantPage() {
 
     void (async () => {
       try {
-        const qs = new URLSearchParams({
-          page: String(page),
-          limit: String(pageSize),
-        });
-        if (month) qs.set("month", month);
-        if (vehiculoId) qs.set("vehiculoId", vehiculoId);
-        if (choferId) qs.set("choferId", choferId);
-        if (estacion) qs.set("estacion", estacion);
-        if (formaPago) qs.set("formaPago", formaPago);
+        const qs = filtroParams();
+        qs.set("page", String(page));
+        qs.set("limit", String(pageSize));
 
         const data = await apiJson<CombustibleListResponse>(
           `/api/combustible?${qs.toString()}`,
@@ -230,6 +237,31 @@ export function CombustibleTenantPage() {
     formaPago,
     getToken,
   ]);
+
+  async function handleDownloadExcel() {
+    if (downloading || total === 0) return;
+    setDownloading(true);
+    try {
+      // Traemos todas las cargas del filtro actual (no solo la página visible).
+      const qs = filtroParams();
+      qs.set("page", "1");
+      qs.set("limit", String(total));
+
+      const data = await apiJson<CombustibleListResponse>(
+        `/api/combustible?${qs.toString()}`,
+        () => getToken(),
+      );
+
+      await exportarCargasCombustible(data.cargas, {
+        month: month || undefined,
+      });
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, "combustible"));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   // ─── ACCIÓN CRÍTICA: CONFIRMAR Y ELIMINAR REGISTRO ────────────────────────
   async function handleConfirmDelete() {
@@ -553,26 +585,56 @@ export function CombustibleTenantPage() {
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
-
         <div className="flex items-center gap-3">
-          {hayFiltros && (
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              disabled={rows === null}
-              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
+          {/* BOTÓN: Descargar Excel (Rama ExcelExport) */}
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={rows === null || total === 0 || downloading}
+            className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            aria-label="Descargar Excel"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
             >
-              Limpiar filtros
-              <span
-                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-                aria-hidden
+              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M12 11v6" />
+              <path d="m9 14 3 3 3-3" />
+            </svg>
+            {downloading ? "Descargando…" : "Descargar Excel"}
+          </button>
+
+          {/* BOTÓN: Limpiar filtros alineado con los otros botones de acción */}
+          {hayFiltros && (
+            <div className="hidden min-h-10 items-center lg:flex">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={rows === null}
+                className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
               >
-                {cantFiltros}
-              </span>
-            </button>
+                Limpiar filtros
+                <span
+                  className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                  aria-hidden
+                >
+                  {cantFiltros}
+                </span>
+              </button>
+            </div>
           )}
 
+          {/* BOTÓN: Nueva Carga (Rama HEAD) */}
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
