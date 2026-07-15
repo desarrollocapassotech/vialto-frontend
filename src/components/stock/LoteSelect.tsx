@@ -15,12 +15,18 @@ export type LoteSelectStock = {
   fechaVencimiento: string | null;
 };
 
-/** Formato FEFO: «LOTE-123 (Vto: 15/08/2026)». */
-function etiquetaLoteOption(lote: string, fechaVencimiento: string | null): string {
-  if (!fechaVencimiento) return lote;
-  const vto = formatMovimientoStockFechaFromIso(fechaVencimiento);
-  if (!vto || vto === '—') return lote;
-  return `${lote} (Vto: ${vto})`;
+/** Formato: «LOTE-123 - Vto: 15/08/2026 - Stock: 4 Bultos | 12 Sueltos». */
+function etiquetaLoteOption(
+  lote: string,
+  fechaVencimiento: string | null,
+  cantidad1: number,
+  cantidad2: number,
+): string {
+  const vto = fechaVencimiento
+    ? formatMovimientoStockFechaFromIso(fechaVencimiento)
+    : null;
+  const vtoLabel = vto && vto !== '—' ? vto : '—';
+  return `${lote} - Vto: ${vtoLabel} - Stock: ${cantidad1} Bultos | ${cantidad2} Sueltos`;
 }
 
 export function LoteSelect({
@@ -140,7 +146,7 @@ export function LoteSelect({
         .sort(compareLotesFefo)
         .map((l) => (
           <option key={l.lote} value={l.lote}>
-            {etiquetaLoteOption(l.lote, l.fechaVencimiento)}
+            {etiquetaLoteOption(l.lote, l.fechaVencimiento, l.cantidad1, l.cantidad2)}
           </option>
         ))}
     </select>
