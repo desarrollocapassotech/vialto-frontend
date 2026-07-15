@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ListadoDatos,
   type ListadoColumn,
@@ -141,6 +141,13 @@ export function CombustibleTenantPage() {
   const [formaPago, setFormaPago] = useState("");
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
+  // Eliminación con confirmación
+  const [deleteTarget, setDeleteTarget] = useState<CargaCombustible | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   function resetPage() {
     setPage(1);
   }
@@ -239,6 +246,44 @@ export function CombustibleTenantPage() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await apiJson<{ deleted: string }>(
+        `/api/combustible/${deleteTarget.id}`,
+        () => getToken(),
+        { method: "DELETE" },
+      );
+      const deletedId = deleteTarget.id;
+      setRows((prev) => {
+        const next = prev ? prev.filter((r) => r.id !== deletedId) : prev;
+        // si borrás el último de la página, retrocedé para que se refetchee
+        if (next && next.length === 0 && page > 1) {
+          setPage((p) => p - 1);
+        }
+        return next;
+      });
+      setTotal((t) => Math.max(0, t - 1));
+      setDeleteTarget(null);
+    } catch (e) {
+      setDeleteError(friendlyError(e, "combustible"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // Cerrar el modal con Escape
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deleting) setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteTarget, deleting]);
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const meta: PaginatedMeta = {
     page,
@@ -251,6 +296,31 @@ export function CombustibleTenantPage() {
 
   const inputClass =
     "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none";
+
+  // Columnas: las de módulo + la de acciones
+  const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
+    () => [
+      ...COLUMNS,
+      {
+        id: "acciones",
+        header: "Acciones",
+        cell: (r) => (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteTarget(r);
+            }}
+            className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
+            aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
+          >
+            Eliminar
+          </button>
+        ),
+      },
+    ],
+    [],
+  );
 
   // Filtros para el drawer móvil
   const mobileFilters = (
@@ -546,7 +616,7 @@ export function CombustibleTenantPage() {
       )}
 
       <ListadoDatos<CargaCombustible>
-        columns={COLUMNS}
+        columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
         emptyMessage="Sin cargas registradas"
@@ -585,6 +655,71 @@ export function CombustibleTenantPage() {
         />
       )}
 
+      {/* MODAL DE ELIMINACIÓN */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirmar-eliminar-titulo"
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-md border border-black/15 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="confirmar-eliminar-titulo"
+              className="text-lg font-semibold text-vialto-charcoal"
+            >
+              Eliminar carga
+            </h2>
+            <p className="mt-2 text-sm text-vialto-steel">
+              ¿Seguro que querés eliminar la carga del{" "}
+              <span className="font-medium text-vialto-charcoal">
+                {fmtFecha(deleteTarget.fecha)}
+              </span>
+              {deleteTarget.vehiculo?.patente ? (
+                <>
+                  {" "}
+                  del vehículo{" "}
+                  <span className="font-medium text-vialto-charcoal">
+                    {deleteTarget.vehiculo.patente}
+                  </span>
+                </>
+              ) : null}
+              ? Esta acción no se puede deshacer.
+            </p>
+
+            {deleteError && (
+              <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="inline-flex h-10 items-center px-4 border border-red-600 bg-red-600 text-sm uppercase tracking-wider text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleting ? "Eliminando…" : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISTA DE DETALLE */}
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}

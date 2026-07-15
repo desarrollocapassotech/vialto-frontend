@@ -4,11 +4,16 @@ import { apiJson } from '@/lib/api';
 import type { Tenant } from '@/types/api';
 
 /** Lista de empresas para filtros superadmin (GET /api/tenants). */
-export function useTenantsList() {
+export function useTenantsList(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [tenants, setTenants] = useState<Tenant[] | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setTenants(null);
+      return;
+    }
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
@@ -22,7 +27,7 @@ export function useTenantsList() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [enabled, getToken, isLoaded, isSignedIn]);
 
   return tenants;
 }

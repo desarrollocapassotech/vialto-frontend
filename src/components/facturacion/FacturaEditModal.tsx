@@ -7,11 +7,12 @@ import {
   useCallback,
 } from "react";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
-import { Spinner } from "@/components/ui/Spinner";
 import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
 } from "@/components/forms/MaestroSearchSelects";
+import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { Spinner } from "@/components/ui/Spinner";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
@@ -40,6 +41,10 @@ export type FacturaDraft = {
   fechaEmision: string;
   fechaVencimiento: string;
   ivaPct: string;
+  /** URL ya guardada (edición) o vacía si se quitó. */
+  comprobanteUrl: string | null;
+  /** Archivo local pendiente de subir. */
+  comprobanteFile: File | null;
 };
 
 function todayIso() {
@@ -61,6 +66,8 @@ export function emptyFacturaDraft(): FacturaDraft {
     fechaEmision: todayIso(),
     fechaVencimiento: "",
     ivaPct: "21",
+    comprobanteUrl: null,
+    comprobanteFile: null,
   };
 }
 
@@ -74,6 +81,8 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
     ivaPct: f.ivaPct != null ? String(f.ivaPct) : "21",
+    comprobanteUrl: f.comprobanteUrl ?? null,
+    comprobanteFile: null,
   };
 }
 
@@ -402,6 +411,8 @@ export type FacturaCreateModalProps = {
   onSave: () => void;
   saving: boolean;
   error: string | null;
+  /** Tenants sin integración ARCA: adjunto de comprobante. */
+  showComprobanteAdjunto?: boolean;
 };
 
 export function FacturaCreateModal({
@@ -417,6 +428,7 @@ export function FacturaCreateModal({
   onSave,
   saving,
   error,
+  showComprobanteAdjunto = false,
 }: FacturaCreateModalProps) {
   useEscapeKey(open, saving, onClose);
 
@@ -596,6 +608,26 @@ export function FacturaCreateModal({
               </p>
             )}
 
+          {showComprobanteAdjunto && (
+            <div className="mt-4">
+              <ComprobanteAdjuntoField
+                file={draft.comprobanteFile}
+                existingUrl={draft.comprobanteUrl}
+                onFileChange={(file) =>
+                  patch(
+                    file
+                      ? { comprobanteFile: file, comprobanteUrl: null }
+                      : { comprobanteFile: null },
+                  )
+                }
+                onClearExisting={() =>
+                  patch({ comprobanteUrl: null, comprobanteFile: null })
+                }
+                disabled={saving}
+              />
+            </div>
+          )}
+
           {error && (
             <div className="mt-4">
               <CrudFormErrorAlert message={error} />
@@ -649,6 +681,7 @@ export type FacturaEditModalProps = {
   onSave: () => void;
   saving: boolean;
   error: string | null;
+  showComprobanteAdjunto?: boolean;
 };
 
 export function FacturaEditModal({
@@ -665,6 +698,7 @@ export function FacturaEditModal({
   onSave,
   saving,
   error,
+  showComprobanteAdjunto = false,
 }: FacturaEditModalProps) {
   useEscapeKey(open, saving, onClose);
 
@@ -854,6 +888,26 @@ export function FacturaEditModal({
                 factura por moneda.
               </p>
             )}
+
+          {showComprobanteAdjunto && (
+            <div className="mt-4">
+              <ComprobanteAdjuntoField
+                file={draft.comprobanteFile}
+                existingUrl={draft.comprobanteUrl}
+                onFileChange={(file) =>
+                  patch(
+                    file
+                      ? { comprobanteFile: file, comprobanteUrl: null }
+                      : { comprobanteFile: null },
+                  )
+                }
+                onClearExisting={() =>
+                  patch({ comprobanteUrl: null, comprobanteFile: null })
+                }
+                disabled={saving}
+              />
+            </div>
+          )}
 
           {error && (
             <div className="mt-4">
