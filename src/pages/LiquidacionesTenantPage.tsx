@@ -116,7 +116,8 @@ function LiquidacionAcciones({
   const puedeAnular = hasArca && liq.estado === "autorizado";
   const tienePdf =
     hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
-  const tieneComprobanteAdjunto = !hasArca && Boolean(liq.comprobanteUrl?.trim());
+  const tieneComprobanteAdjunto =
+    !hasArca && Boolean(liq.comprobanteUrl?.trim());
 
   return (
     <div>
@@ -192,6 +193,11 @@ export function LiquidacionesTenantPage() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Estado para el filtro
+  const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
+    "todos",
+  );
 
   const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -276,7 +282,9 @@ export function LiquidacionesTenantPage() {
         () => getToken(),
         { method: "POST" },
       );
-      setRows((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+      setRows(
+        (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+      );
       setAnularConfirm(null);
     } catch (err) {
       setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
@@ -324,7 +332,14 @@ export function LiquidacionesTenantPage() {
     };
   }
 
-  const totalItems = rows ? rows.length : 0;
+  // Filtramos primero la data según el select
+  const filteredRows = rows
+    ? estadoFilter === "todos"
+      ? rows
+      : rows.filter((r) => r.estado === estadoFilter)
+    : null;
+
+  const totalItems = filteredRows ? filteredRows.length : 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   // Meta que pasa al componente de paginación
@@ -337,9 +352,9 @@ export function LiquidacionesTenantPage() {
     hasNext: page < totalPages,
   };
 
-  // Reducimos los datos de la pagina actual para la tabla
-  const paginatedRows = rows
-    ? rows.slice((page - 1) * pageSize, page * pageSize)
+  // Reducimos los datos de la pagina actual para la tabla en base a los filtrados
+  const paginatedRows = filteredRows
+    ? filteredRows.slice((page - 1) * pageSize, page * pageSize)
     : null;
 
   return (
@@ -364,16 +379,44 @@ export function LiquidacionesTenantPage() {
             {error}
           </div>
         )}
-        <div className="flex justify-end gap-2 mt-2">
-          {!hasArca && (
-            <button
-              type="button"
-              onClick={() => setShowCrear(true)}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
+          {/* Select de filtro por estado */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="estadoFilter"
+              className="text-sm font-medium text-vialto-charcoal"
             >
-              Nueva liquidación
-            </button>
-          )}
+              Estado:
+            </label>
+            <select
+              id="estadoFilter"
+              value={estadoFilter}
+              onChange={(e) => {
+                setEstadoFilter(e.target.value as LiquidacionEstado | "todos");
+                setPage(1); // Reiniciamos la página a 1 cuando cambian el filtro
+              }}
+              className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-vialto-charcoal shadow-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+            >
+              <option value="todos">Todos los estados</option>
+              {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            {!hasArca && (
+              <button
+                type="button"
+                onClick={() => setShowCrear(true)}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+              >
+                Nueva liquidación
+              </button>
+            )}
+          </div>
         </div>
       </div>
       <ListadoDatos
@@ -459,7 +502,7 @@ export function LiquidacionesTenantPage() {
         emptyMessage={
           error
             ? "No se pudieron cargar las liquidaciones."
-            : "Todavía no hay liquidaciones. Creá una desde las acciones de un viaje."
+            : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
         renderActions={(liq) => <LiquidacionAcciones {...accionesProps(liq)} />}
@@ -501,7 +544,7 @@ export function LiquidacionesTenantPage() {
         )}
       />
       {/*Componente de paginación */}
-      {rows && rows.length > 0 && (
+      {filteredRows && filteredRows.length > 0 && (
         <ListadoPagination
           meta={meta}
           pageSize={pageSize}
