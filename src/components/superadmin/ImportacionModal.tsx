@@ -1,57 +1,85 @@
-import { useRef, useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { useToast } from '@/lib/toast';
-import { Spinner } from '@/components/ui/Spinner';
-import { ListadoCard } from '@/components/listado/ListadoCard';
-import { ListadoDatos, type ListadoColumn } from '@/components/listado/ListadoDatos';
-import { useImportacion } from '@/hooks/useImportacion';
-import { useImportTemplates, getTemplateExample } from '@/hooks/useImportTemplates';
-import { modalOverlayClass } from '@/lib/modalLayers';
-import { labelModulo } from '@/lib/platformLabels';
-import { listadoTablaTdClass } from '@/lib/listadoTabla';
-import type { Tenant, ImportPreviewViaje, ImportPreviewFactura, ImportPreviewEntidad } from '@/types/api';
+import { useRef, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { useToast } from "@/lib/toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { ListadoCard } from "@/components/listado/ListadoCard";
+import {
+  ListadoDatos,
+  type ListadoColumn,
+} from "@/components/listado/ListadoDatos";
+import { useImportacion } from "@/hooks/useImportacion";
+import {
+  useImportTemplates,
+  getTemplateExample,
+} from "@/hooks/useImportTemplates";
+import { modalOverlayClass } from "@/lib/modalLayers";
+import { labelModulo } from "@/lib/platformLabels";
+import { listadoTablaTdClass } from "@/lib/listadoTabla";
+import type {
+  Tenant,
+  ImportPreviewViaje,
+  ImportPreviewFactura,
+  ImportPreviewEntidad,
+} from "@/types/api";
 
 interface ImportacionModalProps {
   tenant: Tenant;
   onClose: () => void;
 }
 
-type MainTab = 'importar' | 'templates';
-type ImportStep = 'upload' | 'preview' | 'result';
+type MainTab = "importar" | "templates";
+type ImportStep = "upload" | "preview" | "result";
 
 export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
-  const [mainTab, setMainTab] = useState<MainTab>('importar');
+  const [mainTab, setMainTab] = useState<MainTab>("importar");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const importacion = useImportacion(tenant.clerkOrgId, () => getToken());
-  const { templates, loading: loadingTpls, saving, error: tplError, save: saveTemplate } = useImportTemplates(tenant.clerkOrgId);
+  const {
+    templates,
+    loading: loadingTpls,
+    saving,
+    error: tplError,
+    save: saveTemplate,
+  } = useImportTemplates(tenant.clerkOrgId);
 
   // Template form state
-  const [tplModulo, setTplModulo] = useState('');
-  const [tplNombre, setTplNombre] = useState('');
-  const [tplConfig, setTplConfig] = useState('');
+  const [tplModulo, setTplModulo] = useState("");
+  const [tplNombre, setTplNombre] = useState("");
+  const [tplConfig, setTplConfig] = useState("");
   const [tplJsonError, setTplJsonError] = useState<string | null>(null);
 
   function handleModuloChange(m: string) {
     setTplModulo(m);
-    setTplNombre(m ? `Template ${labelModulo(m)} — ${tenant.name}` : '');
-    setTplConfig(m ? getTemplateExample(m) : '');
+    setTplNombre(m ? `Template ${labelModulo(m)} — ${tenant.name}` : "");
+    setTplConfig(m ? getTemplateExample(m) : "");
     setTplJsonError(null);
   }
 
   function handleConfigChange(val: string) {
     setTplConfig(val);
     setTplJsonError(null);
-    try { JSON.parse(val); } catch { setTplJsonError('JSON inválido'); }
+    try {
+      JSON.parse(val);
+    } catch {
+      setTplJsonError("JSON inválido");
+    }
   }
 
   async function handleSaveTemplate() {
     if (!tplModulo || !tplNombre || !tplConfig) return;
-    try { JSON.parse(tplConfig); } catch { setTplJsonError('JSON inválido — corregilo antes de guardar'); return; }
+    try {
+      JSON.parse(tplConfig);
+    } catch {
+      setTplJsonError("JSON inválido — corregilo antes de guardar");
+      return;
+    }
     const ok = await saveTemplate(tplModulo, tplNombre, tplConfig);
-    if (ok) { showToast('Template guardado correctamente.'); }
+    if (ok) {
+      showToast("Template guardado correctamente.");
+    }
   }
 
   function handleClose() {
@@ -60,18 +88,33 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   }
 
   const modulosDisponibles = tenant.modules.filter((m) =>
-    ['viajes', 'clientes', 'choferes', 'vehiculos'].includes(m),
+    ["viajes", "clientes", "choferes", "vehiculos"].includes(m),
   );
 
-  const { step, modulo, setModulo, file, setFile, loading, validandoCiudades, error, preview, log, submitPreview, confirm, reset } = importacion;
+  const {
+    step,
+    modulo,
+    setModulo,
+    file,
+    setFile,
+    loading,
+    validandoCiudades,
+    error,
+    preview,
+    log,
+    submitPreview,
+    confirm,
+    reset,
+  } = importacion;
 
   return (
     <div
       className={modalOverlayClass}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
       <div className="relative w-full max-w-5xl bg-white shadow-xl flex flex-col max-h-[90vh]">
-
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
           <div>
@@ -80,24 +123,30 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
             </h2>
             <p className="mt-0.5 text-sm text-vialto-steel">{tenant.name}</p>
           </div>
-          <button type="button" onClick={handleClose} className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none px-2">✕</button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none px-2"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Main tabs */}
         <div className="flex border-b border-black/10">
-          {(['importar', 'templates'] as MainTab[]).map((t) => (
+          {(["importar", "templates"] as MainTab[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setMainTab(t)}
               className={[
-                'px-6 py-2.5 text-xs uppercase tracking-widest font-[family-name:var(--font-ui)] border-b-2 -mb-px transition-colors',
+                "px-6 py-2.5 text-xs uppercase tracking-widest font-[family-name:var(--font-ui)] border-b-2 -mb-px transition-colors",
                 mainTab === t
-                  ? 'border-vialto-fire text-vialto-fire'
-                  : 'border-transparent text-vialto-steel hover:text-vialto-charcoal',
-              ].join(' ')}
+                  ? "border-vialto-fire text-vialto-fire"
+                  : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
+              ].join(" ")}
             >
-              {t === 'importar' ? 'Importar' : 'Templates'}
+              {t === "importar" ? "Importar" : "Templates"}
             </button>
           ))}
         </div>
@@ -105,17 +154,32 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
         {/* ══════════════════════════════════════════════════════ */}
         {/* TAB: IMPORTAR                                         */}
         {/* ══════════════════════════════════════════════════════ */}
-        {mainTab === 'importar' && (
+        {mainTab === "importar" && (
           <>
             {/* Step indicator */}
             <div className="flex border-b border-black/10 bg-vialto-mist">
-              {(['upload', 'preview', 'result'] as ImportStep[]).map((s, i) => {
-                const labels = ['1. Archivo', '2. Previsualización', '3. Resultado'];
+              {(["upload", "preview", "result"] as ImportStep[]).map((s, i) => {
+                const labels = [
+                  "1. Archivo",
+                  "2. Previsualización",
+                  "3. Resultado",
+                ];
                 const isActive = step === s;
-                const isDone = (s === 'upload' && step !== 'upload') || (s === 'preview' && step === 'result');
+                const isDone =
+                  (s === "upload" && step !== "upload") ||
+                  (s === "preview" && step === "result");
                 return (
-                  <div key={s} className={['flex-1 py-2 text-center text-[11px] uppercase tracking-widest font-[family-name:var(--font-ui)]',
-                    isActive ? 'bg-vialto-charcoal text-white' : isDone ? 'text-vialto-fire' : 'text-vialto-steel'].join(' ')}>
+                  <div
+                    key={s}
+                    className={[
+                      "flex-1 py-2 text-center text-[11px] uppercase tracking-widest font-[family-name:var(--font-ui)]",
+                      isActive
+                        ? "bg-vialto-charcoal text-white"
+                        : isDone
+                          ? "text-vialto-fire"
+                          : "text-vialto-steel",
+                    ].join(" ")}
+                  >
                     {labels[i]}
                   </div>
                 );
@@ -123,97 +187,186 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              {error && <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+              {error && (
+                <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {error}
+                </div>
+              )}
 
               {/* Step 1 */}
-              {step === 'upload' && (
+              {step === "upload" && (
                 <div className="space-y-5">
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo <span className="text-red-500">*</span></label>
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                      Módulo <span className="text-red-500">*</span>
+                    </label>
                     {modulosDisponibles.length === 0 ? (
-                      <p className="text-sm text-vialto-steel">Esta empresa no tiene módulos con soporte de importación.</p>
+                      <p className="text-sm text-vialto-steel">
+                        Esta empresa no tiene módulos con soporte de
+                        importación.
+                      </p>
                     ) : (
-                      <select value={modulo} onChange={(e) => setModulo(e.target.value)}
-                        className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal">
+                      <select
+                        value={modulo}
+                        onChange={(e) => setModulo(e.target.value)}
+                        className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                      >
                         <option value="">Seleccioná un módulo…</option>
                         {modulosDisponibles.map((m) => (
-                          <option key={m} value={m}>{labelModulo(m)}</option>
+                          <option key={m} value={m}>
+                            {labelModulo(m)}
+                          </option>
                         ))}
                       </select>
                     )}
                   </div>
 
-                  {modulo === 'viajes' && (
+                  {modulo === "viajes" && (
                     <div className="space-y-2">
                       <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
-                        <span className="mt-0.5 shrink-0 text-base leading-none">💡</span>
+                        <span className="mt-0.5 shrink-0 text-base leading-none">
+                          💡
+                        </span>
                         <span>
-                          El módulo Viajes requiere las columnas <code className="font-mono bg-blue-100 px-0.5">MONEDA MONTO</code> y <code className="font-mono bg-blue-100 px-0.5">MONEDA FLETE</code> con valores <strong>ARS</strong> o <strong>USD</strong>. Si el campo está vacío o tiene un valor distinto, la fila será rechazada.
+                          El módulo Viajes requiere las columnas{" "}
+                          <code className="font-mono bg-blue-100 px-0.5">
+                            MONEDA MONTO
+                          </code>{" "}
+                          y{" "}
+                          <code className="font-mono bg-blue-100 px-0.5">
+                            MONEDA FLETE
+                          </code>{" "}
+                          con valores <strong>ARS</strong> o{" "}
+                          <strong>USD</strong>. Si el campo está vacío o tiene
+                          un valor distinto, la fila será rechazada.
                         </span>
                       </div>
                       <div className="flex items-start gap-2 rounded border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-900">
-                        <span className="mt-0.5 shrink-0 text-base leading-none">📍</span>
+                        <span className="mt-0.5 shrink-0 text-base leading-none">
+                          📍
+                        </span>
                         <span>
-                          Origen y destino se validan contra el catálogo de ciudades (mismo criterio que al crear un viaje manual). Las ciudades reconocidas se normalizan; las no reconocidas generan advertencia pero no bloquean la importación.
+                          Origen y destino se validan contra el catálogo de
+                          ciudades (mismo criterio que al crear un viaje
+                          manual). Las ciudades reconocidas se normalizan; las
+                          no reconocidas generan advertencia pero no bloquean la
+                          importación.
                         </span>
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Archivo Excel (.xlsx / .xls) <span className="text-red-500">*</span></label>
-                    <div onClick={() => fileInputRef.current?.click()}
-                      className="flex cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-black/20 py-8 text-sm text-vialto-steel hover:border-vialto-charcoal hover:text-vialto-charcoal transition-colors">
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                      Archivo Excel (.xlsx / .xls){" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-black/20 py-8 text-sm text-vialto-steel hover:border-vialto-charcoal hover:text-vialto-charcoal transition-colors"
+                    >
                       {file ? (
-                        <><span className="text-2xl">📄</span><span className="font-medium text-vialto-charcoal">{file.name}</span><span className="text-xs">{(file.size / 1024).toFixed(0)} KB — clic para cambiar</span></>
+                        <>
+                          <span className="text-2xl">📄</span>
+                          <span className="font-medium text-vialto-charcoal">
+                            {file.name}
+                          </span>
+                          <span className="text-xs">
+                            {(file.size / 1024).toFixed(0)} KB — clic para
+                            cambiar
+                          </span>
+                        </>
                       ) : (
-                        <><span className="text-2xl">📂</span><span>Clic para seleccionar archivo</span></>
+                        <>
+                          <span className="text-2xl">📂</span>
+                          <span>Clic para seleccionar archivo</span>
+                        </>
                       )}
                     </div>
-                    <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
                   </div>
 
-                  {modulo && templates.length > 0 && !templates.find((t) => t.modulo === modulo) && (
-                    <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      No hay template configurado para <strong>{labelModulo(modulo)}</strong>.{' '}
-                      <button type="button" onClick={() => setMainTab('templates')} className="underline">Creá uno en la pestaña Templates</button>.
-                    </div>
-                  )}
+                  {modulo &&
+                    templates.length > 0 &&
+                    !templates.find((t) => t.modulo === modulo) && (
+                      <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        No hay template configurado para{" "}
+                        <strong>{labelModulo(modulo)}</strong>.{" "}
+                        <button
+                          type="button"
+                          onClick={() => setMainTab("templates")}
+                          className="underline"
+                        >
+                          Creá uno en la pestaña Templates
+                        </button>
+                        .
+                      </div>
+                    )}
                 </div>
               )}
 
               {/* Step 2 */}
-              {step === 'preview' && preview && (
+              {step === "preview" && preview && (
                 <PreviewPanel preview={preview} />
               )}
 
               {/* Step 3 */}
-              {step === 'result' && log && (
+              {step === "result" && log && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-3 gap-3">
                     <StatBox label="Total de filas" value={log.totalFilas} />
-                    <StatBox label="Importadas" value={log.exitosas} highlight="ok" />
-                    <StatBox label="Con errores" value={log.errores} highlight={log.errores > 0 ? 'error' : undefined} />
+                    <StatBox
+                      label="Importadas"
+                      value={log.exitosas}
+                      highlight="ok"
+                    />
+                    <StatBox
+                      label="Con errores"
+                      value={log.errores}
+                      highlight={log.errores > 0 ? "error" : undefined}
+                    />
                   </div>
-                  <div className={['rounded px-4 py-3 text-sm',
-                    log.estado === 'completado' ? 'bg-green-50 border border-green-200 text-green-800' : '',
-                    log.estado === 'con_errores' ? 'bg-amber-50 border border-amber-200 text-amber-800' : '',
-                    log.estado === 'fallido' ? 'bg-red-50 border border-red-200 text-red-800' : '',
-                  ].join(' ')}>
-                    {log.estado === 'completado' && `✓ Importación completada — ${log.exitosas} registros creados.`}
-                    {log.estado === 'con_errores' && `⚠ Importación parcial — ${log.exitosas} creados, ${log.errores} con error.`}
-                    {log.estado === 'fallido' && '✕ La importación falló. No se creó ningún registro.'}
+                  <div
+                    className={[
+                      "rounded px-4 py-3 text-sm",
+                      log.estado === "completado"
+                        ? "bg-green-50 border border-green-200 text-green-800"
+                        : "",
+                      log.estado === "con_errores"
+                        ? "bg-amber-50 border border-amber-200 text-amber-800"
+                        : "",
+                      log.estado === "fallido"
+                        ? "bg-red-50 border border-red-200 text-red-800"
+                        : "",
+                    ].join(" ")}
+                  >
+                    {log.estado === "completado" &&
+                      `✓ Importación completada — ${log.exitosas} registros creados.`}
+                    {log.estado === "con_errores" &&
+                      `⚠ Importación parcial — ${log.exitosas} creados, ${log.errores} con error.`}
+                    {log.estado === "fallido" &&
+                      "✕ La importación falló. No se creó ningún registro."}
                   </div>
-                  {log.detalles.some((d) => d.estado === 'error') && (
+                  {log.detalles.some((d) => d.estado === "error") && (
                     <div>
-                      <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">Filas con error</p>
+                      <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
+                        Filas con error
+                      </p>
                       <div className="max-h-48 overflow-y-auto rounded border border-red-200 bg-red-50 text-xs divide-y divide-red-100">
-                        {log.detalles.filter((d) => d.estado === 'error').map((d, i) => (
-                          <div key={i} className="px-3 py-1.5 text-red-800">
-                            <span className="font-medium">Fila {d.fila}</span> — {d.mensaje}
-                          </div>
-                        ))}
+                        {log.detalles
+                          .filter((d) => d.estado === "error")
+                          .map((d, i) => (
+                            <div key={i} className="px-3 py-1.5 text-red-800">
+                              <span className="font-medium">Fila {d.fila}</span>{" "}
+                              — {d.mensaje}
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}
@@ -223,22 +376,29 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
             {/* Footer import */}
             <div className="flex items-center justify-between border-t border-black/10 px-6 py-4 bg-vialto-mist/40">
-              <button type="button" onClick={step === 'preview' ? reset : handleClose}
-                className="text-sm uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal px-3 py-1.5">
-                {step === 'preview' ? 'Volver' : 'Cerrar'}
+              <button
+                type="button"
+                onClick={step === "preview" ? reset : handleClose}
+                className="text-sm uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal px-3 py-1.5"
+              >
+                {step === "preview" ? "Volver" : "Cerrar"}
               </button>
-              {step === 'upload' && (
-                <button type="button" disabled={!modulo || !file || loading} onClick={submitPreview}
-                  className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+              {step === "upload" && (
+                <button
+                  type="button"
+                  disabled={!modulo || !file || loading}
+                  onClick={submitPreview}
+                  className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                   {loading && <Spinner className="h-3.5 w-3.5" />}
                   {loading
                     ? validandoCiudades
-                      ? 'Validando ciudades…'
-                      : 'Procesando…'
-                    : 'Ver previsualización'}
+                      ? "Validando ciudades…"
+                      : "Procesando…"
+                    : "Ver previsualización"}
                 </button>
               )}
-              {step === 'preview' && preview && (
+              {step === "preview" && preview && (
                 <button
                   type="button"
                   disabled={loading || preview.exitosas === 0}
@@ -246,12 +406,17 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                   className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-fire text-white text-sm uppercase tracking-wider hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {loading && <Spinner className="h-3.5 w-3.5" />}
-                  {loading ? 'Importando…' : `Confirmar importación (${preview.exitosas} filas)`}
+                  {loading
+                    ? "Importando…"
+                    : `Confirmar importación (${preview.exitosas} filas)`}
                 </button>
               )}
-              {step === 'result' && (
-                <button type="button" onClick={handleClose}
-                  className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite">
+              {step === "result" && (
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+                >
                   Listo
                 </button>
               )}
@@ -262,7 +427,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
         {/* ══════════════════════════════════════════════════════ */}
         {/* TAB: TEMPLATES                                        */}
         {/* ══════════════════════════════════════════════════════ */}
-        {mainTab === 'templates' && (
+        {mainTab === "templates" && (
           <>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
               {/* Templates existentes */}
@@ -270,67 +435,123 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
                 <p className="text-sm text-vialto-steel">Cargando templates…</p>
               ) : templates.length > 0 ? (
                 <div>
-                  <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">Templates configurados</p>
+                  <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
+                    Templates configurados
+                  </p>
                   <div className="rounded border border-black/10 divide-y divide-black/5">
                     {templates.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between px-4 py-3 text-sm"
+                      >
                         <div>
-                          <span className="font-medium text-vialto-charcoal">{t.nombre}</span>
-                          <span className="ml-2 text-xs text-vialto-steel">({labelModulo(t.modulo)})</span>
+                          <span className="font-medium text-vialto-charcoal">
+                            {t.nombre}
+                          </span>
+                          <span className="ml-2 text-xs text-vialto-steel">
+                            ({labelModulo(t.modulo)})
+                          </span>
                         </div>
-                        <span className={['text-[11px] px-2 py-0.5 uppercase tracking-wider', t.activo ? 'bg-green-100 text-green-700' : 'bg-vialto-mist text-vialto-steel'].join(' ')}>
-                          {t.activo ? 'Activo' : 'Inactivo'}
+                        <span
+                          className={[
+                            "text-[11px] px-2 py-0.5 uppercase tracking-wider",
+                            t.activo
+                              ? "bg-green-100 text-green-700"
+                              : "bg-vialto-mist text-vialto-steel",
+                          ].join(" ")}
+                        >
+                          {t.activo ? "Activo" : "Inactivo"}
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-vialto-steel">No hay templates configurados para esta empresa.</p>
+                <p className="text-sm text-vialto-steel">
+                  No hay templates configurados para esta empresa.
+                </p>
               )}
 
               {/* Formulario crear/actualizar template */}
               <div>
-                <p className="mb-3 text-xs uppercase tracking-wider text-vialto-steel">Crear / actualizar template</p>
-                {tplError && <div className="mb-3 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{tplError}</div>}
+                <p className="mb-3 text-xs uppercase tracking-wider text-vialto-steel">
+                  Crear / actualizar template
+                </p>
+                {tplError && (
+                  <div className="mb-3 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {tplError}
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Módulo <span className="text-red-500">*</span></label>
-                    <select value={tplModulo} onChange={(e) => handleModuloChange(e.target.value)}
-                      className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal">
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                      Módulo <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={tplModulo}
+                      onChange={(e) => handleModuloChange(e.target.value)}
+                      className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                    >
                       <option value="">Seleccioná un módulo…</option>
-                      {modulosDisponibles.map((m) => <option key={m} value={m}>{labelModulo(m)}</option>)}
+                      {modulosDisponibles.map((m) => (
+                        <option key={m} value={m}>
+                          {labelModulo(m)}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">Nombre del template <span className="text-red-500">*</span></label>
-                    <input value={tplNombre} onChange={(e) => setTplNombre(e.target.value)}
+                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                      Nombre del template{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      value={tplNombre}
+                      onChange={(e) => setTplNombre(e.target.value)}
                       placeholder="ej. Template viajes Fernández v1"
-                      className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal" />
+                      className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                    />
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="block text-xs uppercase tracking-wider text-vialto-steel">Configuración (JSON) <span className="text-red-500">*</span></label>
-                      {tplJsonError && <span className="text-xs text-red-600">{tplJsonError}</span>}
+                      <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                        Configuración (JSON){" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      {tplJsonError && (
+                        <span className="text-xs text-red-600">
+                          {tplJsonError}
+                        </span>
+                      )}
                     </div>
                     <textarea
                       value={tplConfig}
                       onChange={(e) => handleConfigChange(e.target.value)}
                       rows={12}
                       spellCheck={false}
-                      className={['w-full border px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-vialto-charcoal resize-none',
-                        tplJsonError ? 'border-red-400' : 'border-black/20'].join(' ')}
+                      className={[
+                        "w-full border px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-vialto-charcoal resize-none",
+                        tplJsonError ? "border-red-400" : "border-black/20",
+                      ].join(" ")}
                       placeholder='{"sheet": 0, "headerRow": 1, "columns": [...]}'
                     />
                     <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
-                      <span className="mt-0.5 shrink-0 text-base leading-none">💡</span>
+                      <span className="mt-0.5 shrink-0 text-base leading-none">
+                        💡
+                      </span>
                       <span>
-                        El JSON viene precargado con los campos correctos para el módulo seleccionado.
-                        Solo tenés que cambiar cada <code className="font-mono bg-blue-100 px-0.5">excelHeader</code> para que coincida exactamente con el nombre de columna que usa el cliente en su Excel.
-                        El resto de la configuración (campos del sistema, tipos, lookups) no necesita modificarse.
+                        El JSON viene precargado con los campos correctos para
+                        el módulo seleccionado. Solo tenés que cambiar cada{" "}
+                        <code className="font-mono bg-blue-100 px-0.5">
+                          excelHeader
+                        </code>{" "}
+                        para que coincida exactamente con el nombre de columna
+                        que usa el cliente en su Excel. El resto de la
+                        configuración (campos del sistema, tipos, lookups) no
+                        necesita modificarse.
                       </span>
                     </div>
                   </div>
@@ -340,16 +561,27 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
             {/* Footer templates */}
             <div className="flex items-center justify-between border-t border-black/10 px-6 py-4 bg-vialto-mist/40">
-              <button type="button" onClick={handleClose}
-                className="text-sm uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal px-3 py-1.5">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="text-sm uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal px-3 py-1.5"
+              >
                 Cerrar
               </button>
-              <button type="button"
-                disabled={!tplModulo || !tplNombre || !tplConfig || !!tplJsonError || saving}
+              <button
+                type="button"
+                disabled={
+                  !tplModulo ||
+                  !tplNombre ||
+                  !tplConfig ||
+                  !!tplJsonError ||
+                  saving
+                }
                 onClick={handleSaveTemplate}
-                className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed">
+                className="inline-flex h-10 items-center gap-2 px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 {saving && <Spinner className="h-3.5 w-3.5" />}
-                {saving ? 'Guardando…' : 'Guardar template'}
+                {saving ? "Guardando…" : "Guardar template"}
               </button>
             </div>
           </>
@@ -359,53 +591,93 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
   );
 }
 
-function StatBox({ label, value, highlight }: { label: string; value: number; highlight?: 'ok' | 'error' | 'warn' }) {
+function StatBox({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: "ok" | "error" | "warn";
+}) {
   return (
-    <div className={['rounded border px-4 py-3 text-center',
-      highlight === 'ok' ? 'border-green-200 bg-green-50' : '',
-      highlight === 'error' && value > 0 ? 'border-red-200 bg-red-50' : '',
-      highlight === 'warn' && value > 0 ? 'border-amber-200 bg-amber-50' : '',
-      !highlight || ((highlight === 'error' || highlight === 'warn') && value === 0) ? 'border-black/10 bg-vialto-mist' : '',
-    ].join(' ')}>
-      <p className={['text-2xl font-bold',
-        highlight === 'ok' ? 'text-green-700' : '',
-        highlight === 'error' && value > 0 ? 'text-red-700' : '',
-        highlight === 'warn' && value > 0 ? 'text-amber-700' : '',
-        !highlight || ((highlight === 'error' || highlight === 'warn') && value === 0) ? 'text-vialto-charcoal' : '',
-      ].join(' ')}>{value}</p>
-      <p className="mt-0.5 text-[11px] uppercase tracking-wider text-vialto-steel">{label}</p>
+    <div
+      className={[
+        "rounded border px-4 py-3 text-center",
+        highlight === "ok" ? "border-green-200 bg-green-50" : "",
+        highlight === "error" && value > 0 ? "border-red-200 bg-red-50" : "",
+        highlight === "warn" && value > 0 ? "border-amber-200 bg-amber-50" : "",
+        !highlight ||
+        ((highlight === "error" || highlight === "warn") && value === 0)
+          ? "border-black/10 bg-vialto-mist"
+          : "",
+      ].join(" ")}
+    >
+      <p
+        className={[
+          "text-2xl font-bold",
+          highlight === "ok" ? "text-green-700" : "",
+          highlight === "error" && value > 0 ? "text-red-700" : "",
+          highlight === "warn" && value > 0 ? "text-amber-700" : "",
+          !highlight ||
+          ((highlight === "error" || highlight === "warn") && value === 0)
+            ? "text-vialto-charcoal"
+            : "",
+        ].join(" ")}
+      >
+        {value}
+      </p>
+      <p className="mt-0.5 text-[11px] uppercase tracking-wider text-vialto-steel">
+        {label}
+      </p>
     </div>
   );
 }
 
-type PreviewTab = 'viajes' | 'facturas' | 'clientes' | 'transportistas';
+type PreviewTab = "viajes" | "facturas" | "clientes" | "transportistas";
 
-function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPreviewResult }) {
-  const [tab, setTab] = useState<PreviewTab>('viajes');
+function PreviewPanel({
+  preview,
+}: {
+  preview: import("@/types/api").ImportPreviewResult;
+}) {
+  const [tab, setTab] = useState<PreviewTab>("viajes");
 
   const hasViajes = (preview.viajes?.length ?? 0) > 0;
   const hasFacturas = (preview.facturas?.length ?? 0) > 0;
   const hasClientes = (preview.clientes?.length ?? 0) > 0;
   const hasTransportistas = (preview.transportistas?.length ?? 0) > 0;
   const advertenciasCiudad = preview.advertenciasCiudad ?? [];
-  const totalAdvertenciasCiudad = preview.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
+  const totalAdvertenciasCiudad =
+    preview.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
 
   const nuevosClientes = preview.clientes?.filter((c) => c.esNuevo).length ?? 0;
-  const nuevosTransp = preview.transportistas?.filter((t) => t.esNuevo).length ?? 0;
+  const nuevosTransp =
+    preview.transportistas?.filter((t) => t.esNuevo).length ?? 0;
 
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className={`grid gap-2 ${hasViajes ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-4'}`}>
+      <div
+        className={`grid gap-2 ${hasViajes ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-4"}`}
+      >
         <StatBox label="Filas totales" value={preview.totalFilas} />
-        <StatBox label="Viajes a crear" value={preview.exitosas} highlight="ok" />
+        <StatBox
+          label="Viajes a crear"
+          value={preview.exitosas}
+          highlight="ok"
+        />
         <StatBox label="Facturas" value={preview.facturas?.length ?? 0} />
-        <StatBox label="Errores" value={preview.errores} highlight={preview.errores > 0 ? 'error' : undefined} />
+        <StatBox
+          label="Errores"
+          value={preview.errores}
+          highlight={preview.errores > 0 ? "error" : undefined}
+        />
         {hasViajes && (
           <StatBox
             label="Adv. ciudades"
             value={totalAdvertenciasCiudad}
-            highlight={totalAdvertenciasCiudad > 0 ? 'warn' : undefined}
+            highlight={totalAdvertenciasCiudad > 0 ? "warn" : undefined}
           />
         )}
       </div>
@@ -413,11 +685,14 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
       {/* Errores */}
       {preview.detalleErrores.length > 0 && (
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">Errores detectados</p>
+          <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
+            Errores detectados
+          </p>
           <div className="max-h-28 overflow-y-auto rounded border border-red-200 bg-red-50 text-xs divide-y divide-red-100">
             {preview.detalleErrores.map((e, i) => (
               <div key={i} className="px-3 py-1.5 text-red-800">
-                <span className="font-medium">Fila {e.fila}</span>{e.campo && <span> · {e.campo}</span>} — {e.error}
+                <span className="font-medium">Fila {e.fila}</span>
+                {e.campo && <span> · {e.campo}</span>} — {e.error}
               </div>
             ))}
           </div>
@@ -434,8 +709,8 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
             {advertenciasCiudad.map((a, i) => (
               <div key={i} className="px-3 py-1.5 text-amber-900">
                 <span className="font-medium">Fila {a.fila}</span>
-                <span> · {a.campo === 'origen' ? 'Origen' : 'Destino'}</span>
-                {' — '}
+                <span> · {a.campo === "origen" ? "Origen" : "Destino"}</span>
+                {" — "}
                 {a.mensaje}
               </div>
             ))}
@@ -444,32 +719,69 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
       )}
 
       {preview.exitosas === 0 && (
-        <p className="text-sm text-vialto-steel">No hay filas válidas. Revisá los errores y corregí el archivo.</p>
+        <p className="text-sm text-vialto-steel">
+          No hay filas válidas. Revisá los errores y corregí el archivo.
+        </p>
       )}
 
       {preview.exitosas > 0 && (
         <>
           {/* Tabs */}
           <div className="flex border-b border-black/10">
-            {([
-              { key: 'viajes', label: `Viajes (${preview.viajes?.length ?? 0})`, show: hasViajes },
-              { key: 'facturas', label: `Facturas (${preview.facturas?.length ?? 0})`, show: hasFacturas },
-              { key: 'clientes', label: `Clientes (${preview.clientes?.length ?? 0})${nuevosClientes > 0 ? ` · ${nuevosClientes} nuevos` : ''}`, show: hasClientes },
-              { key: 'transportistas', label: `Transportistas (${preview.transportistas?.length ?? 0})${nuevosTransp > 0 ? ` · ${nuevosTransp} nuevos` : ''}`, show: hasTransportistas },
-            ] as { key: PreviewTab; label: string; show: boolean }[]).filter((t) => t.show).map(({ key, label }) => (
-              <button key={key} type="button" onClick={() => setTab(key)}
-                className={['px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors',
-                  tab === key ? 'border-vialto-fire text-vialto-fire' : 'border-transparent text-vialto-steel hover:text-vialto-charcoal',
-                ].join(' ')}>
-                {label}
-              </button>
-            ))}
+            {(
+              [
+                {
+                  key: "viajes",
+                  label: `Viajes (${preview.viajes?.length ?? 0})`,
+                  show: hasViajes,
+                },
+                {
+                  key: "facturas",
+                  label: `Facturas (${preview.facturas?.length ?? 0})`,
+                  show: hasFacturas,
+                },
+                {
+                  key: "clientes",
+                  label: `Clientes (${preview.clientes?.length ?? 0})${nuevosClientes > 0 ? ` · ${nuevosClientes} nuevos` : ""}`,
+                  show: hasClientes,
+                },
+                {
+                  key: "transportistas",
+                  label: `Transportistas (${preview.transportistas?.length ?? 0})${nuevosTransp > 0 ? ` · ${nuevosTransp} nuevos` : ""}`,
+                  show: hasTransportistas,
+                },
+              ] as { key: PreviewTab; label: string; show: boolean }[]
+            )
+              .filter((t) => t.show)
+              .map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTab(key)}
+                  className={[
+                    "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
+                    tab === key
+                      ? "border-vialto-fire text-vialto-fire"
+                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
+                  ].join(" ")}
+                >
+                  {label}
+                </button>
+              ))}
           </div>
 
-          {tab === 'viajes' && hasViajes && <ViajesTable viajes={preview.viajes!} />}
-          {tab === 'facturas' && hasFacturas && <FacturasTable facturas={preview.facturas!} />}
-          {tab === 'clientes' && hasClientes && <EntidadTable entidades={preview.clientes!} />}
-          {tab === 'transportistas' && hasTransportistas && <EntidadTable entidades={preview.transportistas!} />}
+          {tab === "viajes" && hasViajes && (
+            <ViajesTable viajes={preview.viajes!} />
+          )}
+          {tab === "facturas" && hasFacturas && (
+            <FacturasTable facturas={preview.facturas!} />
+          )}
+          {tab === "clientes" && hasClientes && (
+            <EntidadTable entidades={preview.clientes!} />
+          )}
+          {tab === "transportistas" && hasTransportistas && (
+            <EntidadTable entidades={preview.transportistas!} />
+          )}
         </>
       )}
     </div>
@@ -477,23 +789,30 @@ function PreviewPanel({ preview }: { preview: import('@/types/api').ImportPrevie
 }
 
 function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
-  const fmt = (v: unknown) => (v != null ? String(v) : '—');
-  const money = (v: number | null) => (v != null ? `$${v.toLocaleString('es-AR')}` : '—');
+  const fmt = (v: unknown) => (v != null ? String(v) : "—");
+  const money = (v: number | null) =>
+    v != null ? `$${v.toLocaleString("es-AR")}` : "—";
   const hasChofer = viajes.some((v) => v.chofer);
   const hasVehiculo = viajes.some((v) => v.vehiculo);
 
-  function advertenciaCampo(v: ImportPreviewViaje, campo: 'origen' | 'destino') {
+  function advertenciaCampo(
+    v: ImportPreviewViaje,
+    campo: "origen" | "destino",
+  ) {
     return v.advertenciasCiudad?.find((a) => a.campo === campo);
   }
 
-  function celdaUbicacion(v: ImportPreviewViaje, campo: 'origen' | 'destino') {
+  function celdaUbicacion(v: ImportPreviewViaje, campo: "origen" | "destino") {
     const valor = fmt(v[campo]);
     const adv = advertenciaCampo(v, campo);
     if (!adv) return valor;
     return (
       <span className="inline-flex flex-col gap-0.5">
         <span>{valor}</span>
-        <span className="text-[10px] font-medium text-amber-700" title={adv.mensaje}>
+        <span
+          className="text-[10px] font-medium text-amber-700"
+          title={adv.mensaje}
+        >
           ⚠ {adv.mensaje}
         </span>
       </span>
@@ -502,31 +821,67 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
 
   const columns: ListadoColumn<ImportPreviewViaje>[] = [
     {
-      id: 'fila',
-      header: 'Fila',
+      id: "fila",
+      header: "Fila",
       primary: true,
       cell: (v) => v.fila,
       tdClassName: `${listadoTablaTdClass} text-vialto-steel text-xs`,
     },
-    { id: 'cliente', header: 'Cliente', cell: (v) => fmt(v.cliente) },
-    { id: 'transporte', header: 'Transporte', cell: (v) => fmt(v.transporte) },
-    { id: 'origen', header: 'Origen', cell: (v) => celdaUbicacion(v, 'origen') },
-    { id: 'destino', header: 'Destino', cell: (v) => celdaUbicacion(v, 'destino') },
+    { id: "cliente", header: "Cliente", cell: (v) => fmt(v.cliente) },
+    { id: "transporte", header: "Transporte", cell: (v) => fmt(v.transporte) },
+    {
+      id: "origen",
+      header: "Origen",
+      cell: (v) => celdaUbicacion(v, "origen"),
+    },
+    {
+      id: "destino",
+      header: "Destino",
+      cell: (v) => celdaUbicacion(v, "destino"),
+    },
     ...(hasChofer
-      ? [{ id: 'chofer', header: 'Chofer', cell: (v: ImportPreviewViaje) => fmt(v.chofer) }]
+      ? [
+          {
+            id: "chofer",
+            header: "Chofer",
+            cell: (v: ImportPreviewViaje) => fmt(v.chofer),
+          },
+        ]
       : []),
     ...(hasVehiculo
-      ? [{ id: 'vehiculo', header: 'Vehículo', cell: (v: ImportPreviewViaje) => fmt(v.vehiculo) }]
+      ? [
+          {
+            id: "vehiculo",
+            header: "Vehículo",
+            cell: (v: ImportPreviewViaje) => fmt(v.vehiculo),
+          },
+        ]
       : []),
-    { id: 'fechaCarga', header: 'F. Carga', cell: (v) => fmt(v.fechaCarga) },
-    { id: 'fechaDescarga', header: 'F. Descarga', cell: (v) => fmt(v.fechaDescarga) },
-    { id: 'carga', header: 'Carga', cell: (v) => fmt(v.detalleCarga) },
-    { id: 'monto', header: 'Monto', cell: (v) => money(v.monto) },
-    { id: 'moneda', header: 'Moneda', cell: (v) => fmt(v.monedaMonto) },
-    { id: 'nroFc', header: 'Nro FC', cell: (v) => fmt(v.nroFactura) },
-    { id: 'flete', header: 'Flete', cell: (v) => money(v.precioTransportistaExterno) },
-    { id: 'monedaFlete', header: 'Moneda Flete', cell: (v) => fmt(v.monedaPrecioTransportistaExterno) },
-    { id: 'fcFlete', header: 'FC Flete', cell: (v) => fmt(v.nroFacturaTransporte) },
+    { id: "fechaCarga", header: "F. Carga", cell: (v) => fmt(v.fechaCarga) },
+    {
+      id: "fechaDescarga",
+      header: "F. Descarga",
+      cell: (v) => fmt(v.fechaDescarga),
+    },
+    { id: "carga", header: "Carga", cell: (v) => fmt(v.detalleCarga) },
+    { id: "monto", header: "Monto", cell: (v) => money(v.monto) },
+    { id: "moneda", header: "Moneda", cell: (v) => fmt(v.monedaMonto) },
+    { id: "nroFc", header: "Nro FC", cell: (v) => fmt(v.nroFactura) },
+    {
+      id: "flete",
+      header: "Flete",
+      cell: (v) => money(v.precioTransportistaExterno),
+    },
+    {
+      id: "monedaFlete",
+      header: "Moneda Flete",
+      cell: (v) => fmt(v.monedaPrecioTransportistaExterno),
+    },
+    {
+      id: "fcFlete",
+      header: "FC Flete",
+      cell: (v) => fmt(v.nroFacturaTransporte),
+    },
   ];
 
   return (
@@ -536,42 +891,51 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
       rowKey={(v) => String(v.fila)}
       emptyMessage="No hay viajes en la vista previa."
       renderMobileCard={(v) => {
-        const advOrigen = advertenciaCampo(v, 'origen');
-        const advDestino = advertenciaCampo(v, 'destino');
+        const advOrigen = advertenciaCampo(v, "origen");
+        const advDestino = advertenciaCampo(v, "destino");
         return (
-        <ListadoCard
-          primary={`Fila ${v.fila} · ${fmt(v.cliente)}`}
-          fields={[
-            { label: 'Transporte', value: fmt(v.transporte) },
-            {
-              label: 'Origen',
-              value: advOrigen ? (
-                <span className="text-amber-700">{fmt(v.origen)} — {advOrigen.mensaje}</span>
-              ) : (
-                fmt(v.origen)
-              ),
-            },
-            {
-              label: 'Destino',
-              value: advDestino ? (
-                <span className="text-amber-700">{fmt(v.destino)} — {advDestino.mensaje}</span>
-              ) : (
-                fmt(v.destino)
-              ),
-            },
-            ...(hasChofer ? [{ label: 'Chofer', value: fmt(v.chofer) }] : []),
-            ...(hasVehiculo ? [{ label: 'Vehículo', value: fmt(v.vehiculo) }] : []),
-            { label: 'F. Carga', value: fmt(v.fechaCarga) },
-            { label: 'F. Descarga', value: fmt(v.fechaDescarga) },
-            { label: 'Carga', value: fmt(v.detalleCarga) },
-            { label: 'Monto', value: money(v.monto) },
-            { label: 'Moneda', value: fmt(v.monedaMonto) },
-            { label: 'Nro FC', value: fmt(v.nroFactura) },
-            { label: 'Flete', value: money(v.precioTransportistaExterno) },
-            { label: 'Moneda Flete', value: fmt(v.monedaPrecioTransportistaExterno) },
-            { label: 'FC Flete', value: fmt(v.nroFacturaTransporte) },
-          ]}
-        />
+          <ListadoCard
+            primary={`Fila ${v.fila} · ${fmt(v.cliente)}`}
+            fields={[
+              { label: "Transporte", value: fmt(v.transporte) },
+              {
+                label: "Origen",
+                value: advOrigen ? (
+                  <span className="text-amber-700">
+                    {fmt(v.origen)} — {advOrigen.mensaje}
+                  </span>
+                ) : (
+                  fmt(v.origen)
+                ),
+              },
+              {
+                label: "Destino",
+                value: advDestino ? (
+                  <span className="text-amber-700">
+                    {fmt(v.destino)} — {advDestino.mensaje}
+                  </span>
+                ) : (
+                  fmt(v.destino)
+                ),
+              },
+              ...(hasChofer ? [{ label: "Chofer", value: fmt(v.chofer) }] : []),
+              ...(hasVehiculo
+                ? [{ label: "Vehículo", value: fmt(v.vehiculo) }]
+                : []),
+              { label: "F. Carga", value: fmt(v.fechaCarga) },
+              { label: "F. Descarga", value: fmt(v.fechaDescarga) },
+              { label: "Carga", value: fmt(v.detalleCarga) },
+              { label: "Monto", value: money(v.monto) },
+              { label: "Moneda", value: fmt(v.monedaMonto) },
+              { label: "Nro FC", value: fmt(v.nroFactura) },
+              { label: "Flete", value: money(v.precioTransportistaExterno) },
+              {
+                label: "Moneda Flete",
+                value: fmt(v.monedaPrecioTransportistaExterno),
+              },
+              { label: "FC Flete", value: fmt(v.nroFacturaTransporte) },
+            ]}
+          />
         );
       }}
     />
@@ -579,14 +943,16 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
 }
 
 function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
-  const tipoBadge = (tipo: ImportPreviewFactura['tipo']) => (
+  const tipoBadge = (tipo: ImportPreviewFactura["tipo"]) => (
     <span
       className={[
-        'text-[10px] px-1.5 py-0.5 uppercase tracking-wider rounded',
-        tipo === 'cliente' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
-      ].join(' ')}
+        "text-[10px] px-1.5 py-0.5 uppercase tracking-wider rounded",
+        tipo === "cliente"
+          ? "bg-blue-100 text-blue-700"
+          : "bg-amber-100 text-amber-700",
+      ].join(" ")}
     >
-      {tipo === 'cliente' ? 'Cliente' : 'Flete'}
+      {tipo === "cliente" ? "Cliente" : "Flete"}
     </span>
   );
 
@@ -594,26 +960,30 @@ function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
     <ListadoDatos
       columns={[
         {
-          id: 'tipo',
-          header: 'Tipo',
+          id: "tipo",
+          header: "Tipo",
           cell: (f) => tipoBadge(f.tipo),
           tdClassName: listadoTablaTdClass,
         },
         {
-          id: 'numero',
-          header: 'Número',
+          id: "numero",
+          header: "Número",
           primary: true,
           cell: (f) => f.numero,
         },
-        { id: 'nombre', header: 'Nombre', cell: (f) => f.nombre },
+        { id: "nombre", header: "Nombre", cell: (f) => f.nombre },
         {
-          id: 'importe',
-          header: 'Importe',
-          cell: (f) => `$${f.importe.toLocaleString('es-AR')}`,
+          id: "importe",
+          header: "Importe",
+          cell: (f) => `$${f.importe.toLocaleString("es-AR")}`,
           tdClassName: `${listadoTablaTdClass} font-medium`,
         },
-        { id: 'emision', header: 'Emisión', cell: (f) => f.fechaEmision },
-        { id: 'vencimiento', header: 'Vencimiento', cell: (f) => f.fechaVencimiento },
+        { id: "emision", header: "Emisión", cell: (f) => f.fechaEmision },
+        {
+          id: "vencimiento",
+          header: "Vencimiento",
+          cell: (f) => f.fechaVencimiento,
+        },
       ]}
       rows={facturas}
       rowKey={(f) => `${f.tipo}-${f.numero}`}
@@ -622,11 +992,14 @@ function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
         <ListadoCard
           primary={f.numero}
           fields={[
-            { label: 'Tipo', value: tipoBadge(f.tipo) },
-            { label: 'Nombre', value: f.nombre },
-            { label: 'Importe', value: `$${f.importe.toLocaleString('es-AR')}` },
-            { label: 'Emisión', value: f.fechaEmision },
-            { label: 'Vencimiento', value: f.fechaVencimiento },
+            { label: "Tipo", value: tipoBadge(f.tipo) },
+            { label: "Nombre", value: f.nombre },
+            {
+              label: "Importe",
+              value: `$${f.importe.toLocaleString("es-AR")}`,
+            },
+            { label: "Emisión", value: f.fechaEmision },
+            { label: "Vencimiento", value: f.fechaVencimiento },
           ]}
         />
       )}
@@ -638,12 +1011,20 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
   return (
     <div className="rounded border border-black/10 divide-y divide-black/5 max-h-80 overflow-y-auto">
       {entidades.map((e, i) => (
-        <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+        <div
+          key={i}
+          className="flex items-center justify-between px-4 py-2.5 text-sm"
+        >
           <span className="text-vialto-charcoal">{e.nombre}</span>
-          {e.esNuevo
-            ? <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">Nuevo</span>
-            : <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">Existente</span>
-          }
+          {e.esNuevo ? (
+            <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+              Nuevo
+            </span>
+          ) : (
+            <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+              Existente
+            </span>
+          )}
         </div>
       ))}
     </div>

@@ -272,6 +272,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   }
                   onClick={() => {
                     if (tipo !== 'cvlp') {
+                      // Factura A/B: cierra el flujo CVLP y deriva a facturación manual.
                       onFacturarManual?.();
                       return;
                     }

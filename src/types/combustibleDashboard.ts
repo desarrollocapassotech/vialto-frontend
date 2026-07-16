@@ -12,13 +12,6 @@ export type CombustibleDistribucionItem = {
   precioPromedio: number;
 };
 
-export type CombustibleProyeccionMesActual = {
-  gastoAcumulado: number;
-  diasTranscurridos: number;
-  diasEnMes: number;
-  proyeccionTotal: number;
-};
-
 export type CombustiblePorVehiculoItem = {
   vehiculoId: string;
   patente: string;
@@ -64,12 +57,6 @@ export type CombustibleEvolucionCostoPorKmPunto = {
   costoPorKm: number;
 };
 
-export type CombustibleSemaforoResumen = {
-  verde: number;
-  amarillo: number;
-  rojo: number;
-};
-
 export type CombustibleViajesCruceItem = {
   vehiculoId: string;
   patente: string;
@@ -97,7 +84,6 @@ export type CombustibleDashboardResponse = {
   precioPorLitro: number;
   litrosPorCarga: number;
   costoTotalPeriodo: CombustibleMetricSimple | null;
-  proyeccionMesActual: CombustibleProyeccionMesActual;
   distribucionEstaciones: CombustibleDistribucionItem[];
   distribucionFormaPago: CombustibleDistribucionItem[];
   porVehiculo: CombustiblePorVehiculoItem[];
@@ -105,7 +91,6 @@ export type CombustibleDashboardResponse = {
   alertas: CombustibleAlerta[];
   evolucionPrecio: CombustibleEvolucionPrecioPunto[];
   evolucionCostoPorKm: CombustibleEvolucionCostoPorKmPunto[];
-  semaforoResumen: CombustibleSemaforoResumen;
   viajesCruce: CombustibleViajesCruceItem[] | null;
   ultimasCargas: CombustibleUltimaCarga[];
 };
