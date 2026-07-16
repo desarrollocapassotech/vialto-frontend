@@ -1357,12 +1357,17 @@ export function ViajesTenantPage({
   }
 
   function openFacturarFlow(v: Viaje) {
-    if (
-      viajeRequiereComprobanteDual(v) &&
-      (hasFacturacionSinArca || hasLiquidacionesArca)
-    ) {
-      setSelectorViaje(v);
-      return;
+    if (viajeRequiereComprobanteDual(v)) {
+      // Con ARCA: elegir CVLP | Factura A | Factura B desde el viaje.
+      if (hasLiquidacionesArca) {
+        setEmitirCvlpViaje(v);
+        return;
+      }
+      // Sin ARCA: factura a cliente vs liquidación manual al transportista.
+      if (hasFacturacionSinArca) {
+        setSelectorViaje(v);
+        return;
+      }
     }
     void navigateToFacturacion(v);
   }
@@ -2783,7 +2788,11 @@ export function ViajesTenantPage({
           onEmitido={(_liq: Liquidacion) => {
             setListadoQueryVersion((v) => v + 1);
           }}
-          onFacturarManual={() => void navigateToFacturacion(emitirCvlpViaje)}
+          onFacturarManual={() => {
+            const v = emitirCvlpViaje;
+            setEmitirCvlpViaje(null);
+            if (v) void navigateToFacturacion(v);
+          }}
         />
       )}
 
@@ -2796,11 +2805,7 @@ export function ViajesTenantPage({
           }
           onFacturarCliente={() => void navigateToFacturacion(selectorViaje)}
           onLiquidacion={() => {
-            if (hasLiquidacionesArca) {
-              setEmitirCvlpViaje(selectorViaje);
-            } else {
-              setCrearLiqViaje(selectorViaje);
-            }
+            setCrearLiqViaje(selectorViaje);
             setSelectorViaje(null);
           }}
         />
