@@ -4,14 +4,17 @@ import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
-import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
+import {
+  viajePendienteComprobanteCliente,
+  viajeTieneLiquidacionTransportista,
+} from '@/lib/viajesComprobantes';
 import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
 
 interface Props {
   viaje: Viaje;
   onClose: () => void;
   onEmitido: (liq: Liquidacion) => void;
-  /** Cuando el usuario elige Factura A o B (registro manual) en lugar de CVLP. */
+  /** Cuando el usuario elige Factura A o B: cierra CVLP y deriva a facturación manual del cliente. */
   onFacturarManual?: () => void;
 }
 
@@ -36,8 +39,16 @@ function Row({ label, value }: { label: string; value: string }) {
 export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const cvlpDisponible = !viajeTieneLiquidacionTransportista(viaje);
+  const facturaManualDisponible = viajePendienteComprobanteCliente(viaje);
   const [step, setStep] = useState<Step>('tipo');
-  const [tipo, setTipo] = useState<TipoComprobante>('cvlp');
+  const [tipo, setTipo] = useState<TipoComprobante>(() =>
+    !viajeTieneLiquidacionTransportista(viaje)
+      ? 'cvlp'
+      : viajePendienteComprobanteCliente(viaje)
+        ? 'a'
+        : 'cvlp',
+  );
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
@@ -200,24 +211,32 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
               <div className="grid grid-cols-3 gap-3">
                 {(['cvlp', 'a', 'b'] as TipoComprobante[]).map((t) => {
                   const isManual = t !== 'cvlp';
+                  const disabled = isManual ? !facturaManualDisponible : !cvlpDisponible;
                   return (
                     <button
                       key={t}
                       type="button"
-                      onClick={() => setTipo(t)}
+                      disabled={disabled}
+                      onClick={() => {
+                        if (!disabled) setTipo(t);
+                      }}
                       className={[
                         'flex flex-col items-center justify-center border py-4 px-2 text-xs uppercase tracking-wider transition-colors',
-                        tipo === t
-                          ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
-                          : 'border-black/20 text-vialto-charcoal hover:bg-vialto-mist',
+                        disabled
+                          ? 'border-black/10 bg-vialto-mist/40 text-vialto-steel cursor-not-allowed opacity-60'
+                          : tipo === t
+                            ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
+                            : 'border-black/20 text-vialto-charcoal hover:bg-vialto-mist',
                       ].join(' ')}
                     >
                       {TIPO_LABEL[t]}
-                      {isManual && (
-                        <span className="mt-1 text-[10px] normal-case tracking-normal opacity-60">
-                          registro manual
-                        </span>
-                      )}
+                      <span className="mt-1 text-[10px] normal-case tracking-normal opacity-60">
+                        {disabled
+                          ? 'Ya registrado'
+                          : isManual
+                            ? 'Facturación cliente'
+                            : 'Liquidación ARCA'}
+                      </span>
                     </button>
                   );
                 })}
@@ -232,15 +251,19 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 </button>
                 <button
                   type="button"
+                  disabled={
+                    (tipo === 'cvlp' && !cvlpDisponible) ||
+                    (tipo !== 'cvlp' && !facturaManualDisponible)
+                  }
                   onClick={() => {
                     if (tipo !== 'cvlp') {
-                      onClose();
+                      // Factura A/B: cierra el flujo CVLP y deriva a facturación manual.
                       onFacturarManual?.();
-                    } else {
-                      setStep('revision');
+                      return;
                     }
+                    setStep('revision');
                   }}
-                  className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90"
+                  className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   Siguiente
                 </button>
