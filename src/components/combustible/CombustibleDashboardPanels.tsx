@@ -4,6 +4,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { Link } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
 import type {
@@ -65,13 +66,15 @@ function StatTile({
   label,
   value,
   trend,
+  linkTo,
 }: {
   label: string;
   value: string;
   trend?: number | null;
+  linkTo?: string;
 }) {
-  return (
-    <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">
+  const inner = (
+    <>
       <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
         {label}
       </span>
@@ -84,8 +87,28 @@ function StatTile({
             <TrendBadge changePct={trend} />
           </div>
         )}
+        {linkTo && (
+          <span className="mt-1 flex justify-end font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-white/40 transition-colors group-hover:text-white/80">
+            Ver →
+          </span>
+        )}
       </div>
-    </div>
+    </>
+  );
+
+  if (linkTo) {
+    return (
+      <Link
+        to={linkTo}
+        className="group flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5 transition-colors hover:bg-vialto-charcoal"
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">{inner}</div>
   );
 }
 
@@ -101,19 +124,33 @@ export function ResumenPanel({
   const listo = !loading && data !== null;
   const [metricaChart, setMetricaChart] = useState<"km" | "litro">("km");
 
+  const vehiculosConKm = (data?.porVehiculo ?? []).filter(
+    (v) => v.kmRecorridos != null && v.kmRecorridos > 0,
+  );
+  const totalKmFlota = vehiculosConKm.reduce((s, v) => s + (v.kmRecorridos ?? 0), 0);
+  const totalMontoConKm = vehiculosConKm.reduce((s, v) => s + v.monto, 0);
+  const precioPromedioPorKm = totalKmFlota > 0 ? totalMontoConKm / totalKmFlota : 0;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <StatTile label="Cargas" value={listo ? String(data.totalCargas) : "—"} />
-        <StatTile label="Total litros" value={listo ? fmtLitros(data.totalLitros) : "—"} />
         <StatTile
-          label="Gasto total"
-          value={listo ? fmtMoney(data.totalImporte) : "—"}
-          trend={data?.costoTotalPeriodo?.changePct ?? null}
+          label="Cargas"
+          value={listo ? String(data.totalCargas) : "—"}
+          linkTo={listo ? "/combustible" : undefined}
+        />
+        <StatTile
+          label="Precio prom. / km"
+          value={listo && totalKmFlota > 0 ? fmtMoney(precioPromedioPorKm) : "—"}
         />
         <StatTile
           label="Precio prom. / litro"
           value={listo ? fmtMoney(data.precioPorLitro) : "—"}
+        />
+        <StatTile
+          label="Gasto total"
+          value={listo ? fmtMoney(data.totalImporte) : "—"}
+          trend={data?.costoTotalPeriodo?.changePct ?? null}
         />
       </div>
 
@@ -516,19 +553,6 @@ function EvolucionChartBase({
         {titulo}
       </p>
       <p className="mt-1 text-xs text-vialto-steel">{descripcion}</p>
-
-      {changePct !== null && puntos.length > 1 && (
-        <p
-          className={`mt-2 inline-flex items-center gap-1.5 text-sm font-medium ${
-            subio ? "text-rose-600" : bajo ? "text-emerald-600" : "text-vialto-steel"
-          }`}
-        >
-          {changePct !== 0 && <TrendIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden />}
-          {changePct === 0
-            ? `Sin variación: se mantuvo en ${fmtValor(ultimo)}`
-            : `${subio ? "Subió" : "Bajó"} de ${fmtValor(primero)} a ${fmtValor(ultimo)} (${subio ? "+" : ""}${changePct}%) entre el inicio y el fin del período.`}
-        </p>
-      )}
 
       <div ref={containerRef} className="relative mt-4">
         <svg
