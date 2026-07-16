@@ -1,4 +1,9 @@
-import { useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
 import type {
@@ -113,43 +118,9 @@ export function ResumenPanel({
       </div>
 
       {listo && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="bg-white border border-black/10 p-4">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-              Proyección del mes actual
-            </p>
-            <p className="mt-2 font-[family-name:var(--font-display)] text-2xl text-vialto-charcoal">
-              {fmtMoney(data.proyeccionMesActual.proyeccionTotal)}
-            </p>
-            <p className="mt-1 text-xs text-vialto-steel">
-              Acumulado {fmtMoney(data.proyeccionMesActual.gastoAcumulado)} en{" "}
-              {data.proyeccionMesActual.diasTranscurridos} de {data.proyeccionMesActual.diasEnMes}{" "}
-              días del mes
-            </p>
-          </div>
-          <div className="bg-white border border-black/10 p-4">
-            <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-              Semáforo de la flota
-            </p>
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="inline-flex items-center gap-1.5 text-sm text-vialto-charcoal">
-                <SemaforoDot color="verde" /> {data.semaforoResumen.verde} normal
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-sm text-vialto-charcoal">
-                <SemaforoDot color="amarillo" /> {data.semaforoResumen.amarillo} atención
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-sm text-vialto-charcoal">
-                <SemaforoDot color="rojo" /> {data.semaforoResumen.rojo} revisar
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {listo && (
         <div className="flex flex-col gap-3">
           <div
-            className="flex w-fit gap-1 rounded border border-black/10 bg-white p-1"
+            className="flex w-fit gap-1 rounded border border-black/10 bg-white p-1.5"
             role="tablist"
             aria-label="Métrica del gráfico de evolución"
           >
@@ -158,7 +129,7 @@ export function ResumenPanel({
               role="tab"
               aria-selected={metricaChart === "km"}
               onClick={() => setMetricaChart("km")}
-              className={`rounded px-3 py-1 text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
+              className={`rounded px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
                 metricaChart === "km"
                   ? "bg-vialto-charcoal text-vialto-fire"
                   : "text-vialto-steel hover:text-vialto-charcoal"
@@ -171,7 +142,7 @@ export function ResumenPanel({
               role="tab"
               aria-selected={metricaChart === "litro"}
               onClick={() => setMetricaChart("litro")}
-              className={`rounded px-3 py-1 text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
+              className={`rounded px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
                 metricaChart === "litro"
                   ? "bg-vialto-charcoal text-vialto-fire"
                   : "text-vialto-steel hover:text-vialto-charcoal"
@@ -409,11 +380,32 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
 
 // ── Evolución (precio por litro / costo por km) ─────────────────────────
 
-const CHART_W = 640;
-const CHART_H = 240;
+// Alto fijo del gráfico, independiente del ancho — el ancho se mide del contenedor
+// real (ver useChartWidth) y se usa 1:1 como viewBox, así el trazo, los puntos y el
+// texto de los ejes quedan en tamaño físico fijo sin importar cuán ancho sea el dashboard.
+const CHART_H = 220;
 const CHART_PAD = { top: 16, right: 16, bottom: 28, left: 56 };
-const PLOT_W = CHART_W - CHART_PAD.left - CHART_PAD.right;
 const PLOT_H = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
+
+/** Mide en px el ancho real del elemento referenciado y lo mantiene actualizado ante resize. */
+function useChartWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+  const ref = useRef<T | null>(null);
+  const [width, setWidth] = useState(960);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return [ref, width];
+}
 
 function niceStep(rawStep: number): number {
   if (rawStep <= 0) return 1;
@@ -439,6 +431,8 @@ function EvolucionChartBase({
   mensajeVacio: string;
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [containerRef, chartW] = useChartWidth<HTMLDivElement>();
+  const plotW = Math.max(0, chartW - CHART_PAD.left - CHART_PAD.right);
   const fmtValor = (n: number) => `${fmtMoney(n)}${unidadSufijo}`;
 
   if (puntos.length === 0) {
@@ -474,7 +468,7 @@ function EvolucionChartBase({
   const yRange = yMax - yMin || 1;
   const yToPx = (v: number) => CHART_PAD.top + PLOT_H - ((v - yMin) / yRange) * PLOT_H;
 
-  const stepX = puntos.length > 1 ? PLOT_W / (puntos.length - 1) : 0;
+  const stepX = puntos.length > 1 ? plotW / (puntos.length - 1) : 0;
   const coords = puntos.map((p, i) => ({
     x: CHART_PAD.left + i * stepX,
     y: yToPx(p.valor),
@@ -497,7 +491,8 @@ function EvolucionChartBase({
 
   function handlePointerMove(e: ReactPointerEvent<SVGRectElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const localX = ((e.clientX - rect.left) / rect.width) * CHART_W;
+    const fraction = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0;
+    const localX = CHART_PAD.left + fraction * plotW;
     let nearest = 0;
     let nearestDist = Infinity;
     coords.forEach((c, i) => {
@@ -535,10 +530,11 @@ function EvolucionChartBase({
         </p>
       )}
 
-      <div className="relative mt-4">
+      <div ref={containerRef} className="relative mt-4">
         <svg
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          viewBox={`0 0 ${chartW} ${CHART_H}`}
           className="w-full"
+          style={{ height: CHART_H }}
           role="img"
           aria-label={`${titulo}: de ${fmtValor(primero)} a ${fmtValor(ultimo)} entre ${puntos[0].etiqueta} y ${puntos[puntos.length - 1].etiqueta}. Mínimo ${fmtValor(minVal)}, máximo ${fmtValor(maxVal)}.`}
         >
@@ -548,7 +544,7 @@ function EvolucionChartBase({
               <g key={i}>
                 <line
                   x1={CHART_PAD.left}
-                  x2={CHART_W - CHART_PAD.right}
+                  x2={chartW - CHART_PAD.right}
                   y1={y}
                   y2={y}
                   className="stroke-black/10"
@@ -624,7 +620,7 @@ function EvolucionChartBase({
           <rect
             x={CHART_PAD.left}
             y={CHART_PAD.top}
-            width={PLOT_W}
+            width={plotW}
             height={PLOT_H}
             fill="transparent"
             onPointerMove={handlePointerMove}
@@ -636,7 +632,7 @@ function EvolucionChartBase({
           <div
             className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+8px)] whitespace-nowrap rounded border border-black/10 bg-white px-2.5 py-1.5 text-xs shadow-md"
             style={{
-              left: `${(hovered.x / CHART_W) * 100}%`,
+              left: `${(hovered.x / chartW) * 100}%`,
               top: `${(hovered.y / CHART_H) * 100}%`,
             }}
           >
