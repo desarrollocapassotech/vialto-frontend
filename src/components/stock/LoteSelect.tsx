@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import {
@@ -15,7 +15,7 @@ export type LoteSelectStock = {
   fechaVencimiento: string | null;
 };
 
-/** Formato: «LOTE-123 - Vto: 15/08/2026 - Stock: 4 Bultos | 12 Sueltos». */
+/** Formato: «LOTE-123 - 15/08/2026 - 4 Bultos | 12 Sueltos». */
 function etiquetaLoteOption(
   lote: string,
   fechaVencimiento: string | null,
@@ -26,7 +26,7 @@ function etiquetaLoteOption(
     ? formatMovimientoStockFechaFromIso(fechaVencimiento)
     : null;
   const vtoLabel = vto && vto !== '—' ? vto : '—';
-  return `${lote} - Vto: ${vtoLabel} - Stock: ${cantidad1} Bultos | ${cantidad2} Sueltos`;
+  return `${lote} - ${vtoLabel} - ${cantidad1} Bultos | ${cantidad2} Sueltos`;
 }
 
 export function LoteSelect({
@@ -71,6 +71,8 @@ export function LoteSelect({
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<LotesDisponiblesResponse>({ lotes: [], sinLote: null });
+  const [isLoading, setIsLoading] = useState(false);
+  const requestIdRef = useRef(0);
 
   const ready = Boolean(productoId && clienteId && depositoId && presentacionId);
   const isRequired = required || requiereLote;
@@ -78,12 +80,26 @@ export function LoteSelect({
   useEffect(() => {
     if (!ready) {
       setData({ lotes: [], sinLote: null });
+      setIsLoading(false);
       return;
     }
+    const currentRequestId = ++requestIdRef.current;
+    setIsLoading(true);
     const url = buildLotesUrl(lotesBase, productoId, clienteId, depositoId, presentacionId, tenantId);
     void apiJson<LotesDisponiblesResponse>(url, () => getToken())
-      .then(setData)
-      .catch(() => setData({ lotes: [], sinLote: null }));
+      .then((response) => {
+        // Descarta la respuesta si ya se disparó una petición más nueva.
+        if (currentRequestId !== requestIdRef.current) return;
+        setData(response);
+      })
+      .catch(() => {
+        if (currentRequestId !== requestIdRef.current) return;
+        setData({ lotes: [], sinLote: null });
+      })
+      .finally(() => {
+        if (currentRequestId !== requestIdRef.current) return;
+        setIsLoading(false);
+      });
   }, [
     productoId,
     clienteId,
@@ -125,30 +141,33 @@ export function LoteSelect({
       })`
     : 'Sin lote';
 
-  const emptyLabel = placeholder ?? (isRequired ? 'Elegí un lote…' : '— Sin lote —');
+  const emptyLabel = isLoading
+    ? 'Cargando lotes…'
+    : (placeholder ?? (isRequired ? 'Elegí un lote…' : '— Sin lote —'));
   const excluded = new Set(excludedLotes.filter((l) => l && l !== value));
 
   return (
     <select
       value={value}
       onChange={(e) => handleChange(e.target.value)}
-      disabled={disabled || !ready}
+      disabled={disabled || !ready || isLoading}
       className={`${className ?? ''} ${error ? 'border-red-400' : ''}`}
     >
       <option value="" disabled={isRequired}>
         {emptyLabel}
       </option>
-      {data.sinLote && !requiereLote && !excluded.has(STOCK_SIN_LOTE_VALUE) && (
+      {!isLoading && data.sinLote && !requiereLote && !excluded.has(STOCK_SIN_LOTE_VALUE) && (
         <option value={STOCK_SIN_LOTE_VALUE}>{sinLoteLabel}</option>
       )}
-      {[...data.lotes]
-        .filter((l) => !excluded.has(l.lote))
-        .sort(compareLotesFefo)
-        .map((l) => (
-          <option key={l.lote} value={l.lote}>
-            {etiquetaLoteOption(l.lote, l.fechaVencimiento, l.cantidad1, l.cantidad2)}
-          </option>
-        ))}
+      {!isLoading &&
+        [...data.lotes]
+          .filter((l) => !excluded.has(l.lote))
+          .sort(compareLotesFefo)
+          .map((l) => (
+            <option key={l.lote} value={l.lote}>
+              {etiquetaLoteOption(l.lote, l.fechaVencimiento, l.cantidad1, l.cantidad2)}
+            </option>
+          ))}
     </select>
   );
 }
