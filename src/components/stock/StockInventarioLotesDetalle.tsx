@@ -194,7 +194,7 @@ export function StockInventarioLotesDetalle({
                       <th className={`${TH} text-right`}>{unidad1Nombre}</th>
                       {showUnidad2 && (
                         <th className={`${TH} text-right`}>
-                          {unidad2Nombre ?? 'Sueltas'}
+                          {unidad2Nombre ?? 'Sueltos'}
                         </th>
                       )}
                       <th className={`${TH} text-right`}>Acciones</th>
