@@ -133,19 +133,23 @@ export function ResumenPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
         <StatTile
           label="Cargas"
           value={listo ? String(data.totalCargas) : "—"}
           linkTo={listo ? "/combustible" : undefined}
         />
         <StatTile
-          label="Precio prom. / km"
+          label="Costo prom. / km"
           value={listo && totalKmFlota > 0 ? fmtMoney(precioPromedioPorKm) : "—"}
         />
         <StatTile
-          label="Precio prom. / litro"
+          label="Costo prom. / litro"
           value={listo ? fmtMoney(data.precioPorLitro) : "—"}
+        />
+        <StatTile
+          label="Km recorridos"
+          value={listo && totalKmFlota > 0 ? `${fmtNum(totalKmFlota)} km` : "—"}
         />
         <StatTile
           label="Gasto total"
@@ -490,7 +494,6 @@ function EvolucionChartBase({
   const minIdx = valores.indexOf(minVal);
   const primero = puntos[0].valor;
   const ultimo = puntos[puntos.length - 1].valor;
-  const changePct = primero > 0 ? Math.round(((ultimo - primero) / primero) * 1000) / 10 : null;
 
   // Escala Y con "aire" arriba/abajo y ticks en números redondos.
   const rango = maxVal - minVal;
@@ -543,9 +546,6 @@ function EvolucionChartBase({
   }
 
   const hovered = hoverIndex !== null ? coords[hoverIndex] : null;
-  const subio = changePct !== null && changePct > 0;
-  const bajo = changePct !== null && changePct < 0;
-  const TrendIcon = subio ? TrendingUp : TrendingDown;
 
   return (
     <div className="bg-white border border-black/10 p-4">
