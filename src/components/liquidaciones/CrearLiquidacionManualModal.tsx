@@ -7,7 +7,16 @@ import { friendlyError } from '@/lib/friendlyError';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { Liquidacion, Transportista, Viaje } from '@/types/api';
 
-type ViajeItem = Pick<Viaje, 'id' | 'numero' | 'fechaCarga' | 'origen' | 'destino' | 'precioTransportistaExterno'>;
+type ViajeItem = Pick<
+  Viaje,
+  | 'id'
+  | 'numero'
+  | 'fechaCarga'
+  | 'origen'
+  | 'destino'
+  | 'precioTransportistaExterno'
+  | 'liquidacionesViaje'
+>;
 
 function fmtDate(iso: string | null) {
   if (!iso) return '—';
@@ -77,10 +86,18 @@ export function CrearLiquidacionManualModal({
     void (async () => {
       try {
         const res = await apiJson<{ items: ViajeItem[] }>(
-          `/api/viajes/paginated?transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1`,
+          `/api/viajes/paginated?transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1&sinLiquidacionActiva=1`,
           () => getToken(),
         );
-        if (!cancelled) setViajes(res.items ?? []);
+        // Defensa en cliente: oculta viajes que aún traigan liquidación activa
+        // (p. ej. backend sin el filtro o include sin estado).
+        if (!cancelled) {
+          setViajes(
+            (res.items ?? []).filter(
+              (v) => !viajeTieneLiquidacionTransportista(v),
+            ),
+          );
+        }
       } catch {
         if (!cancelled) setViajes([]);
       } finally {
