@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
@@ -36,6 +36,12 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+function sumGastosAdminArs(viaje: Viaje): number {
+  return (viaje.otrosGastos ?? [])
+    .filter((g) => (g.moneda ?? 'ARS') === 'ARS')
+    .reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
+}
+
 export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -43,11 +49,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
   const facturaManualDisponible = viajePendienteComprobanteCliente(viaje);
   const [step, setStep] = useState<Step>('tipo');
   const [tipo, setTipo] = useState<TipoComprobante>(() =>
-    !viajeTieneLiquidacionTransportista(viaje)
-      ? 'cvlp'
-      : viajePendienteComprobanteCliente(viaje)
-        ? 'a'
-        : 'cvlp',
+    cvlpDisponible ? 'cvlp' : facturaManualDisponible ? 'a' : 'cvlp',
   );
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
@@ -75,6 +77,11 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
   }, [getToken]);
 
   const transportistaNombre = viaje.transportista?.nombre ?? viaje.transportistaId ?? '—';
+  const gastosAdminArs = useMemo(() => sumGastosAdminArs(viaje), [viaje]);
+  const periodoInvalido =
+    Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
+  const periodoCompleto =
+    Boolean(periodoDesde && periodoHasta) && !periodoInvalido;
 
   function fmtMoney(n: number) {
     return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
@@ -88,6 +95,14 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (!periodoCompleto) {
+      setError(
+        periodoInvalido
+          ? 'La fecha Hasta no puede ser anterior a Desde.'
+          : 'Completá el período Desde y Hasta.',
+      );
+      return;
+    }
     if (viajeTieneLiquidacionTransportista(viaje)) {
       setError(
         `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viaje.numero}.`,
@@ -284,7 +299,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
               <section className="space-y-1">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                  Beneficiario
+                  Transportista
                 </p>
                 <p className="text-sm text-vialto-charcoal font-medium">{transportistaNombre}</p>
               </section>
@@ -303,7 +318,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                       type="date"
                       required
                       value={periodoDesde}
-                      onChange={(e) => setPeriodoDesde(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setPeriodoDesde(next);
+                        if (periodoHasta && next && periodoHasta < next) {
+                          setPeriodoHasta('');
+                        }
+                      }}
                       className="w-full h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
                     />
                   </div>
@@ -316,55 +337,89 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                       type="date"
                       required
                       value={periodoHasta}
-                      min={periodoDesde}
+                      min={periodoDesde || undefined}
                       onChange={(e) => setPeriodoHasta(e.target.value)}
-                      className="w-full h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
+                      className={`w-full h-9 border px-3 text-sm focus:outline-none focus:border-vialto-charcoal ${
+                        periodoInvalido ? 'border-red-400' : 'border-black/20'
+                      }`}
                     />
+                    {periodoInvalido && (
+                      <p className="mt-1 text-xs font-medium text-red-600">
+                        Hasta no puede ser anterior a Desde.
+                      </p>
+                    )}
                   </div>
                 </div>
               </section>
 
               <section className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                  Viaje incluido
+                  Detalle del viaje
                 </p>
-                <div className="bg-vialto-mist/50 px-3 py-2 space-y-0.5">
-                  <p className="text-xs font-medium text-vialto-charcoal">
-                    Viaje #{viaje.numero}
-                    {viaje.fechaCarga && (
-                      <span className="font-normal text-vialto-steel ml-2">
-                        — {fmtDate(viaje.fechaCarga.slice(0, 10))}
-                      </span>
-                    )}
-                  </p>
-                  {(viaje.origen || viaje.destino) && (
-                    <p className="text-xs text-vialto-steel">
-                      {viaje.origen ?? '—'} → {viaje.destino ?? '—'}
-                    </p>
-                  )}
-                  {viaje.precioTransportistaExterno != null && (
-                    <p className="text-xs text-vialto-charcoal tabular-nums">
-                      Bruto: {fmtMoney(viaje.precioTransportistaExterno)}
-                    </p>
-                  )}
+                <div className="bg-vialto-mist/50 px-3 py-2 space-y-1.5">
+                  <Row label="Número" value={`#${viaje.numero}`} />
+                  <Row
+                    label="Fecha de carga"
+                    value={
+                      viaje.fechaCarga
+                        ? fmtDate(viaje.fechaCarga.slice(0, 10))
+                        : '—'
+                    }
+                  />
+                  <Row label="Origen" value={viaje.origen ?? '—'} />
+                  <Row label="Destino" value={viaje.destino ?? '—'} />
+                  <Row
+                    label="Bruto"
+                    value={
+                      viaje.precioTransportistaExterno != null
+                        ? fmtMoney(viaje.precioTransportistaExterno)
+                        : '—'
+                    }
+                  />
                 </div>
               </section>
 
               <section className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                  Comisión
+                  Gastos administrativos
                 </p>
-                <input
-                  id="comisionPct"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={comisionPct}
-                  onChange={(e) => setComisionPct(e.target.value)}
-                  placeholder={arcaConfig != null ? String(arcaConfig.comisionPctDefault) : ''}
-                  className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
-                />
+                {gastosAdminArs > 0 ? (
+                  <p className="text-sm tabular-nums text-vialto-charcoal">
+                    {fmtMoney(gastosAdminArs)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-vialto-steel">
+                    No hay gastos administrativos.
+                  </p>
+                )}
+              </section>
+
+              <section className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                  Comisión por flete
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="comisionPct"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={comisionPct}
+                    onChange={(e) => setComisionPct(e.target.value)}
+                    placeholder={
+                      arcaConfig != null ? String(arcaConfig.comisionPctDefault) : ''
+                    }
+                    className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
+                  />
+                  <span className="text-xs text-vialto-steel">%</span>
+                </div>
+                <p className="text-xs text-vialto-steel">
+                  Vacío usa el default del tenant
+                  {arcaConfig != null
+                    ? ` (${arcaConfig.comisionPctDefault}%).`
+                    : '.'}
+                </p>
               </section>
 
               {error && (
@@ -400,7 +455,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   </button>
                   <button
                     type="button"
-                    disabled={busyCrear || !periodoDesde || !periodoHasta}
+                    disabled={busyCrear || !periodoCompleto}
                     onClick={() => void handleCrear()}
                     className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >
