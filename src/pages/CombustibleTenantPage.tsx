@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ListadoDatos,
   type ListadoColumn,
@@ -18,8 +18,13 @@ import {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
-import { FORMA_PAGO_LABELS, fmtFormaPago, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import {
+  FORMA_PAGO_LABELS,
+  fmtFormaPago,
+  fmtTipoVehiculo,
+} from "@/lib/combustibleLabels";
 import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
+import { exportarCargasCombustibleCsv } from "@/lib/combustibleCsvExport";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
 
 type CombustibleListResponse = {
@@ -28,6 +33,8 @@ type CombustibleListResponse = {
   page: number;
   limit: number;
 };
+
+type FormatoExport = "xlsx" | "csv";
 
 // Formatea los atributos del vehículo para armar una etiqueta única y descriptiva
 function fmtVehiculoLabel(v: {
@@ -124,6 +131,8 @@ export function CombustibleTenantPage() {
   const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
   const [month, setMonth] = useState("");
@@ -218,23 +227,51 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
-  async function handleDownloadExcel() {
+  // Cerrar el menú de exportación al hacer click afuera o presionar Escape.
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(e.target as Node)
+      ) {
+        setExportMenuOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setExportMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [exportMenuOpen]);
+
+  // Trae todas las cargas del filtro actual (sin límite de página).
+  async function fetchTodasLasCargas(): Promise<CargaCombustible[]> {
+    const qs = filtroParams();
+    qs.set("page", "1");
+    qs.set("limit", String(total));
+    const data = await apiJson<CombustibleListResponse>(
+      `/api/combustible?${qs.toString()}`,
+      () => getToken(),
+    );
+    return data.cargas;
+  }
+
+  async function handleExport(formato: FormatoExport) {
     if (downloading || total === 0) return;
+    setExportMenuOpen(false);
     setDownloading(true);
     try {
-      // Traemos todas las cargas del filtro actual (no solo la página visible).
-      const qs = filtroParams();
-      qs.set("page", "1");
-      qs.set("limit", String(total));
-
-      const data = await apiJson<CombustibleListResponse>(
-        `/api/combustible?${qs.toString()}`,
-        () => getToken(),
-      );
-
-      await exportarCargasCombustible(data.cargas, {
-        month: month || undefined,
-      });
+      const cargas = await fetchTodasLasCargas();
+      if (formato === "xlsx") {
+        await exportarCargasCombustible(cargas, { month: month || undefined });
+      } else {
+        exportarCargasCombustibleCsv(cargas, { month: month || undefined });
+      }
       setError(null);
     } catch (e) {
       setError(friendlyError(e, "combustible"));
@@ -301,6 +338,8 @@ export function CombustibleTenantPage() {
 
   const inputClass =
     "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none";
+
+  const exportDisabled = rows === null || total === 0 || downloading;
 
   // Agrega de forma dinámica la acción de borrado al arreglo de columnas de la grilla
   const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
@@ -566,32 +605,73 @@ export function CombustibleTenantPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
         <div className="flex items-center gap-3">
-          {/* BOTÓN: Descargar Excel (Rama ExcelExport) */}
-          <button
-            type="button"
-            onClick={handleDownloadExcel}
-            disabled={rows === null || total === 0 || downloading}
-            className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-            aria-label="Descargar Excel"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-              aria-hidden
+          {/* Exportar: el admin elige entre Excel (.xlsx) o CSV (.csv) */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              type="button"
+              onClick={() => setExportMenuOpen((o) => !o)}
+              disabled={exportDisabled}
+              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              aria-label="Exportar listado"
             >
-              <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
-              <path d="M12 11v6" />
-              <path d="m9 14 3 3 3-3" />
-            </svg>
-            {downloading ? "Descargando…" : "Descargar Excel"}
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden
+              >
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                <path d="M12 11v6" />
+                <path d="m9 14 3 3 3-3" />
+              </svg>
+              {downloading ? "Exportando…" : "Exportar"}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-4 w-4 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {exportMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-1 min-w-[190px] border border-black/15 bg-white shadow-lg"
+              >
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => handleExport("xlsx")}
+                  className="flex w-full items-center px-4 py-2.5 text-left text-sm text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors"
+                >
+                  Excel (.xlsx)
+                </button>
+                <button
+                  role="menuitem"
+                  type="button"
+                  onClick={() => handleExport("csv")}
+                  className="flex w-full items-center px-4 py-2.5 text-left text-sm text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors border-t border-black/10"
+                >
+                  CSV (.csv)
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* BOTÓN: Limpiar filtros alineado con los otros botones de acción */}
           {hayFiltros && (

@@ -16,8 +16,9 @@ function upper(v: string | null | undefined): string {
 }
 
 /**
- * Columnas del Excel de cargas de combustible.
- * Replica exactamente el formato del archivo de ejemplo:
+ * Columnas de la exportación de cargas de combustible.
+ * Fuente única compartida por Excel y CSV, para que el contenido sea idéntico.
+ * Replica el formato del archivo de ejemplo:
  * DOMINIO | FECHA | LITROS | MONTO | KILOMETROS | LUGAR (NOMBRE) | CHOFER | PAGO
  */
 export function cargaCombustibleColumnas(): ExcelColDef<CargaCombustible>[] {
@@ -74,8 +75,12 @@ function isoDate(iso: string): string {
  * Período para el nombre del archivo. Si se pasa un mes (YYYY-MM) del filtro,
  * se usa tal cual (ej. `2026-06`). Si no, se deriva el rango de fechas de las
  * cargas exportadas (ej. `2026-05-06-2026-07-31`).
+ * Compartido por Excel y CSV para que ambos usen el mismo nombre de período.
  */
-function periodoArchivo(cargas: CargaCombustible[], month?: string): string {
+export function periodoArchivoCargas(
+  cargas: CargaCombustible[],
+  month?: string,
+): string {
   if (month) return month;
   if (cargas.length === 0) return "sin-datos";
   const fechas = cargas.map((c) => isoDate(c.fecha)).sort();
@@ -92,7 +97,7 @@ export async function exportarCargasCombustible(
   cargas: CargaCombustible[],
   opts?: { month?: string },
 ): Promise<void> {
-  const periodo = periodoArchivo(cargas, opts?.month);
+  const periodo = periodoArchivoCargas(cargas, opts?.month);
   await generarExcel(
     cargaCombustibleColumnas(),
     cargas,
