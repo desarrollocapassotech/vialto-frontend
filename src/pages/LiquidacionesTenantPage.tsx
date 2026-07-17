@@ -6,6 +6,11 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
+import {
+  LiquidacionViewModal,
+  type LiquidacionConTransportista,
+} from "@/components/liquidaciones/LiquidacionViewModal";
+import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiFetch, apiJson } from "@/lib/api";
@@ -18,15 +23,7 @@ import {
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
-import type { ArcaConfig, Liquidacion, LiquidacionEstado } from "@/types/api";
-
-type LiquidacionConTransportista = Liquidacion & {
-  transportista?: {
-    id: string;
-    nombre: string;
-    idFiscal: string | null;
-  } | null;
-};
+import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "Borrador",
@@ -90,6 +87,7 @@ function LiquidacionAcciones({
   isBusy,
   isDownloading,
   actionErrorMsg,
+  onVer,
   onEmitir,
   onPdf,
   onAnular,
@@ -101,6 +99,7 @@ function LiquidacionAcciones({
   isBusy: boolean;
   isDownloading: boolean;
   actionErrorMsg?: string;
+  onVer: () => void;
   onEmitir: () => void;
   onPdf: () => void;
   onAnular: () => void;
@@ -122,6 +121,13 @@ function LiquidacionAcciones({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onVer}
+          className={`${listadoTablaAccionClass} h-7 px-3`}
+        >
+          Ver
+        </button>
         {puedeEmitir && (
           <button
             type="button"
@@ -217,6 +223,20 @@ export function LiquidacionesTenantPage() {
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
+  const [detail, setDetail] = useState<
+    | { mode: "view"; liq: LiquidacionConTransportista }
+    | { mode: "edit"; liq: LiquidacionConTransportista }
+    | null
+  >(null);
+
+  function canEditLiquidacion(liq: LiquidacionConTransportista) {
+    if (!hasArca) return true;
+    return (
+      liq.estado === "borrador" ||
+      liq.estado === "error" ||
+      liq.estado === "pendiente_cae"
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -322,6 +342,7 @@ export function LiquidacionesTenantPage() {
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
+      onVer: () => setDetail({ mode: "view", liq }),
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
       onAnular: () => setAnularConfirm(liq),
@@ -628,6 +649,37 @@ export function LiquidacionesTenantPage() {
           url={previewComprobanteUrl}
           title="Comprobante"
           onClose={() => setPreviewComprobanteUrl(null)}
+        />
+      )}
+
+      {detail?.mode === "view" && (
+        <LiquidacionViewModal
+          liq={detail.liq}
+          ivaPct={config?.ivaGastosAdmin}
+          canEdit={canEditLiquidacion(detail.liq)}
+          onClose={() => setDetail(null)}
+          onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
+          onVerComprobante={
+            !hasArca && detail.liq.comprobanteUrl?.trim()
+              ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)
+              : undefined
+          }
+        />
+      )}
+
+      {detail?.mode === "edit" && (
+        <LiquidacionEditModal
+          liq={detail.liq}
+          hasArca={hasArca}
+          getToken={getToken}
+          onClose={() => setDetail({ mode: "view", liq: detail.liq })}
+          onSaved={(updated) => {
+            setRows(
+              (prev) =>
+                prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+            );
+            setDetail({ mode: "view", liq: updated });
+          }}
         />
       )}
     </div>
