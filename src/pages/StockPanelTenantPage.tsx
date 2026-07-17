@@ -68,7 +68,9 @@ function buildQs(tenantId?: string) {
   return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
 }
 
-function cantidad1Cell(item: StockItem) {
+const LABEL_SUELTOS = "Sueltos";
+
+function cantidad1Cell(item: StockItem, unidad1Nombre: string) {
   return (
     <>
       <span
@@ -80,17 +82,18 @@ function cantidad1Cell(item: StockItem) {
       >
         {item.cantidad1}
       </span>{" "}
-      <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad1Nombre ?? "Pallets"}
-      </span>
+      <span className="text-xs text-vialto-steel">{unidad1Nombre}</span>
     </>
   );
 }
 
-function stockTotalCell(item: StockItem, showUnidad2: boolean) {
+function stockTotalCell(
+  item: StockItem,
+  unidad1Nombre: string,
+  showUnidad2: boolean,
+  unidad2Nombre: string | null,
+) {
   const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
-  const u1 = item.producto?.unidad1Nombre ?? "Pallets";
-  const u2 = item.producto?.unidad2Nombre;
   return (
     <span
       className={`inline-flex items-center justify-end gap-2 ${
@@ -104,14 +107,18 @@ function stockTotalCell(item: StockItem, showUnidad2: boolean) {
       />
       <span className="tabular-nums">
         <span className={sinStock ? "" : "font-semibold"}>{item.cantidad1}</span>
-        <span className="text-xs text-vialto-steel"> {u1}</span>
-        {showUnidad2 && u2 !== null && (
+        <span className="text-xs text-vialto-steel"> {unidad1Nombre}</span>
+        {showUnidad2 && unidad2Nombre != null && (
           <>
             <span className="text-vialto-steel"> · </span>
-            <span className={item.cantidad2 === 0 || sinStock ? "" : "font-semibold"}>
+            <span
+              className={
+                item.cantidad2 === 0 || sinStock ? "" : "font-semibold"
+              }
+            >
               {item.cantidad2}
             </span>
-            <span className="text-xs text-vialto-steel"> {u2 ?? "Unidad"}</span>
+            <span className="text-xs text-vialto-steel"> {unidad2Nombre}</span>
           </>
         )}
       </span>
@@ -119,8 +126,8 @@ function stockTotalCell(item: StockItem, showUnidad2: boolean) {
   );
 }
 
-function cantidad2Cell(item: StockItem) {
-  if (item.producto?.unidad2Nombre === null) {
+function cantidad2Cell(item: StockItem, unidad2Nombre: string | null) {
+  if (unidad2Nombre === null) {
     return <span className="text-vialto-steel">—</span>;
   }
   return (
@@ -134,9 +141,7 @@ function cantidad2Cell(item: StockItem) {
       >
         {item.cantidad2}
       </span>{" "}
-      <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad2Nombre ?? "Unidad"}
-      </span>
+      <span className="text-xs text-vialto-steel">{unidad2Nombre}</span>
     </>
   );
 }
@@ -386,7 +391,6 @@ export function StockPanelTenantPage({
     );
     return (
       item.presentacion?.presentacion?.nombre ??
-      item.producto?.unidad1Nombre ??
       pres?.presentacion?.nombre ??
       null
     );
@@ -399,14 +403,12 @@ export function StockPanelTenantPage({
     );
     const nombrePres =
       item.presentacion?.presentacion?.nombre ??
-      item.producto?.unidad1Nombre ??
-      pres?.presentacion?.nombre;
+      pres?.presentacion?.nombre ??
+      null;
+    const sinUnidad2 = item.producto?.unidad2Nombre === null;
     return {
       unidad1: nombrePres || "Bultos",
-      unidad2:
-        item.producto?.unidad2Nombre !== undefined
-          ? item.producto.unidad2Nombre
-          : "Sueltas",
+      unidad2: sinUnidad2 ? null : LABEL_SUELTOS,
     };
   }
 
@@ -614,7 +616,7 @@ export function StockPanelTenantPage({
         </label>
       </ListadoFiltroCampo>
       {showUnidad2 && (
-        <ListadoFiltroCampo label="Sueltas" active={soloConStockCant2}>
+        <ListadoFiltroCampo label={LABEL_SUELTOS} active={soloConStockCant2}>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
             <input
               type="checkbox"
@@ -888,7 +890,7 @@ export function StockPanelTenantPage({
                         className={`${listadoTablaThClass} text-right align-top`}
                       >
                         <ViajesListadoHeaderFiltro
-                          title="Sueltas"
+                          title={LABEL_SUELTOS}
                           alignRight
                           filterActive={soloConStockCant2}
                           filterSignature={soloConStockCant2 ? "1" : ""}
@@ -976,13 +978,13 @@ export function StockPanelTenantPage({
                         <td
                           className={`${listadoTablaTdClass} text-right tabular-nums`}
                         >
-                          {stockTotalCell(item, false)}
+                          {stockTotalCell(item, units.unidad1, false, units.unidad2)}
                         </td>
                         {showUnidad2 && (
                           <td
                             className={`${listadoTablaTdClass} text-right tabular-nums`}
                           >
-                            {cantidad2Cell(item)}
+                            {cantidad2Cell(item, units.unidad2)}
                           </td>
                         )}
                         <td className={`${listadoTablaTdClass} text-right`}>
@@ -1040,13 +1042,13 @@ export function StockPanelTenantPage({
                     },
                     {
                       label: "Stock total",
-                      value: cantidad1Cell(item),
+                      value: cantidad1Cell(item, units.unidad1),
                     },
                   ];
                   if (showUnidad2) {
                     fields.push({
-                      label: "Sueltas",
-                      value: cantidad2Cell(item),
+                      label: LABEL_SUELTOS,
+                      value: cantidad2Cell(item, units.unidad2),
                     });
                   }
                   if (expanded) {
