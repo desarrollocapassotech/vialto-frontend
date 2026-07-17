@@ -155,7 +155,6 @@ export function IngresosStockHistorialTenantPage({
             Historial de ingresos
           </h1>
           <div className="flex items-center gap-4">
-            {exportButton}
             <Link
               to={volverHref}
               className="text-sm font-medium text-vialto-fire hover:underline"

@@ -1,6 +1,13 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { ChevronDown, FileSpreadsheet, Warehouse } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileSpreadsheet,
+  Package,
+  Warehouse,
+} from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -9,6 +16,12 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ProductoModal } from "@/components/stock/ProductoModal";
+import {
+  FechaVencimientoLote,
+  filasDesdeLotesResponse,
+  StockInventarioLotesDetalle,
+  type StockInventarioLoteFila,
+} from "@/components/stock/StockInventarioLotesDetalle";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import {
   SelectorOpcionesSheet,
@@ -22,6 +35,14 @@ import { friendlyError } from "@/lib/friendlyError";
 import { paginatedItems as extractPaginatedItems } from "@/lib/paginatedItems";
 import { generarExcel, stockItemColumnas } from "@/lib/stockExcelExport";
 import { puedeGestionarComoAdminEmpresa } from "@/lib/roleLabels";
+import { fetchLotesDisponibles } from "@/lib/stockLote";
+import {
+  listadoTablaAccionClass,
+  listadoTablaBodyRowClass,
+  listadoTablaHeadRowClass,
+  listadoTablaTdClass,
+  listadoTablaThClass,
+} from "@/lib/listadoTabla";
 import type {
   Cliente,
   Deposito,
@@ -37,18 +58,19 @@ type ProductoModalState =
 
 type ProductoFiltro = { id: string; nombre: string };
 
-import {
-  listadoTablaBodyRowClass,
-  listadoTablaHeadRowClass,
-  listadoTablaTdClass,
-  listadoTablaThClass,
-} from "@/lib/listadoTabla";
+type LotesCacheEntry = {
+  loading: boolean;
+  error: string | null;
+  filas: StockInventarioLoteFila[] | null;
+};
 
 function buildQs(tenantId?: string) {
   return tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
 }
 
-function cantidad1Cell(item: StockItem) {
+const LABEL_SUELTOS = "Sueltos";
+
+function cantidad1Cell(item: StockItem, unidad1Nombre: string) {
   return (
     <>
       <span
@@ -60,15 +82,52 @@ function cantidad1Cell(item: StockItem) {
       >
         {item.cantidad1}
       </span>{" "}
-      <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad1Nombre ?? "Pallets"}
-      </span>
+      <span className="text-xs text-vialto-steel">{unidad1Nombre}</span>
     </>
   );
 }
 
-function cantidad2Cell(item: StockItem) {
-  if (item.producto?.unidad2Nombre === null) {
+function stockTotalCell(
+  item: StockItem,
+  unidad1Nombre: string,
+  showUnidad2: boolean,
+  unidad2Nombre: string | null,
+) {
+  const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
+  return (
+    <span
+      className={`inline-flex items-center justify-end gap-2 ${
+        sinStock ? "text-vialto-steel" : "text-vialto-charcoal"
+      }`}
+    >
+      <Package
+        className="h-3.5 w-3.5 shrink-0 text-vialto-steel"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <span className="tabular-nums">
+        <span className={sinStock ? "" : "font-semibold"}>{item.cantidad1}</span>
+        <span className="text-xs text-vialto-steel"> {unidad1Nombre}</span>
+        {showUnidad2 && unidad2Nombre != null && (
+          <>
+            <span className="text-vialto-steel"> · </span>
+            <span
+              className={
+                item.cantidad2 === 0 || sinStock ? "" : "font-semibold"
+              }
+            >
+              {item.cantidad2}
+            </span>
+            <span className="text-xs text-vialto-steel"> {unidad2Nombre}</span>
+          </>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function cantidad2Cell(item: StockItem, unidad2Nombre: string | null) {
+  if (unidad2Nombre === null) {
     return <span className="text-vialto-steel">—</span>;
   }
   return (
@@ -82,9 +141,7 @@ function cantidad2Cell(item: StockItem) {
       >
         {item.cantidad2}
       </span>{" "}
-      <span className="text-xs text-vialto-steel">
-        {item.producto?.unidad2Nombre ?? "Unidad"}
-      </span>
+      <span className="text-xs text-vialto-steel">{unidad2Nombre}</span>
     </>
   );
 }
@@ -105,8 +162,8 @@ export function StockPanelTenantPage({
     user?.publicMetadata,
   );
 
-  // Hook que trae las empresas.
-  const allTenants = useTenantsList();
+  // Hook que trae las empresas (solo plataforma; /api/tenants es superadmin).
+  const allTenants = useTenantsList({ enabled: isPlatform });
 
   // Estado del Tenant Manager
   const tenants = isPlatform ? allTenants : null;
@@ -124,6 +181,10 @@ export function StockPanelTenantPage({
   const productosBase = isPlatform
     ? "/api/platform/stock/productos"
     : "/api/stock/productos";
+
+  const lotesBase = isPlatform
+    ? "/api/platform/stock/lotes"
+    : "/api/stock/lotes";
 
   // Estados de grilla y UI
   const [items, setItems] = useState<StockItem[]>([]);
@@ -145,6 +206,10 @@ export function StockPanelTenantPage({
   const [productoModal, setProductoModal] = useState<ProductoModalState>({
     mode: "closed",
   });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [lotesCache, setLotesCache] = useState<Record<string, LotesCacheEntry>>(
+    {},
+  );
 
   const abrirProducto = useCallback(
     async (productoId: string) => {
@@ -231,6 +296,8 @@ export function StockPanelTenantPage({
     setDepositoActivoId(null);
     setFiltroClienteId("");
     setFiltroProductoId("");
+    setExpandedIds(new Set());
+    setLotesCache({});
     setPage(1);
   };
 
@@ -241,8 +308,109 @@ export function StockPanelTenantPage({
     setSoloConStockCant1(false);
     setSoloConStockCant2(false);
     setDepositoSheetOpen(false);
+    setExpandedIds(new Set());
     setPage(1);
   };
+
+  const cargarLotesItem = useCallback(
+    async (item: StockItem) => {
+      setLotesCache((prev) => {
+        if (prev[item.id]?.loading) return prev;
+        return {
+          ...prev,
+          [item.id]: {
+            loading: true,
+            error: null,
+            filas: prev[item.id]?.filas ?? null,
+          },
+        };
+      });
+      try {
+        const data = await fetchLotesDisponibles(() => getToken(), lotesBase, {
+          productoId: item.productoId,
+          clienteId: item.clienteId,
+          depositoId: item.depositoId,
+          presentacionId: item.presentacionId ?? "",
+          tenantId: isPlatform ? activeTenantId : undefined,
+        });
+        setLotesCache((prev) => ({
+          ...prev,
+          [item.id]: {
+            loading: false,
+            error: null,
+            filas: filasDesdeLotesResponse(data),
+          },
+        }));
+      } catch (e) {
+        setLotesCache((prev) => ({
+          ...prev,
+          [item.id]: {
+            loading: false,
+            error: friendlyError(e, "stock"),
+            filas: null,
+          },
+        }));
+      }
+    },
+    [getToken, lotesBase, isPlatform, activeTenantId],
+  );
+
+  const toggleExpand = useCallback((item: StockItem) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) {
+        next.delete(item.id);
+        return next;
+      }
+      next.add(item.id);
+      return next;
+    });
+    // Si había error previo, limpiar para reintentar al reabrir.
+    setLotesCache((prev) => {
+      if (!prev[item.id]?.error) return prev;
+      const { [item.id]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
+  // Al expandir una fila, cargar lotes si aún no están en caché.
+  useEffect(() => {
+    for (const id of expandedIds) {
+      const item = items.find((i) => i.id === id);
+      if (!item) continue;
+      const cache = lotesCache[id];
+      if (cache?.loading || cache?.filas || cache?.error) continue;
+      void cargarLotesItem(item);
+    }
+  }, [expandedIds, items, lotesCache, cargarLotesItem]);
+
+  function presentacionNombre(item: StockItem): string | null {
+    const producto = productosDetalle.find((p) => p.id === item.productoId);
+    const pres = producto?.productoPresentaciones?.find(
+      (p) => p.id === item.presentacionId,
+    );
+    return (
+      item.presentacion?.presentacion?.nombre ??
+      pres?.presentacion?.nombre ??
+      null
+    );
+  }
+
+  function unidadNombres(item: StockItem) {
+    const producto = productosDetalle.find((p) => p.id === item.productoId);
+    const pres = producto?.productoPresentaciones?.find(
+      (p) => p.id === item.presentacionId,
+    );
+    const nombrePres =
+      item.presentacion?.presentacion?.nombre ??
+      pres?.presentacion?.nombre ??
+      null;
+    const sinUnidad2 = item.producto?.unidad2Nombre === null;
+    return {
+      unidad1: nombrePres || "Bultos",
+      unidad2: sinUnidad2 ? null : LABEL_SUELTOS,
+    };
+  }
 
   const clientesEnDeposito = useMemo(() => {
     if (!depositoActivoId) return [];
@@ -363,7 +531,8 @@ export function StockPanelTenantPage({
     [items, depositoActivoId],
   );
 
-  const colSpan = 2 + 1 + (showUnidad2 ? 1 : 0);
+  // expand + cliente + producto + stock total (+ sueltas) + acciones
+  const colSpan = 5 + (showUnidad2 ? 1 : 0);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -447,7 +616,7 @@ export function StockPanelTenantPage({
         </label>
       </ListadoFiltroCampo>
       {showUnidad2 && (
-        <ListadoFiltroCampo label="Sueltas" active={soloConStockCant2}>
+        <ListadoFiltroCampo label={LABEL_SUELTOS} active={soloConStockCant2}>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-vialto-charcoal">
             <input
               type="checkbox"
@@ -627,6 +796,12 @@ export function StockPanelTenantPage({
                   <tr className={listadoTablaHeadRowClass}>
                     <th
                       scope="col"
+                      className={`${listadoTablaThClass} w-10 align-middle`}
+                    >
+                      <span className="sr-only">Desglose por lote</span>
+                    </th>
+                    <th
+                      scope="col"
                       className={`${listadoTablaThClass} align-top`}
                     >
                       <ViajesListadoHeaderFiltro
@@ -691,7 +866,7 @@ export function StockPanelTenantPage({
                       className={`${listadoTablaThClass} text-right align-top`}
                     >
                       <ViajesListadoHeaderFiltro
-                        title="Bultos"
+                        title="Stock total"
                         alignRight
                         filterActive={soloConStockCant1}
                         filterSignature={soloConStockCant1 ? "1" : ""}
@@ -715,7 +890,7 @@ export function StockPanelTenantPage({
                         className={`${listadoTablaThClass} text-right align-top`}
                       >
                         <ViajesListadoHeaderFiltro
-                          title="Sueltas"
+                          title={LABEL_SUELTOS}
                           alignRight
                           filterActive={soloConStockCant2}
                           filterSignature={soloConStockCant2 ? "1" : ""}
@@ -739,40 +914,107 @@ export function StockPanelTenantPage({
                 }
                 renderTableRow={(item) => {
                   const sinStock = item.cantidad1 === 0 && item.cantidad2 === 0;
+                  const expanded = expandedIds.has(item.id);
+                  const cache = lotesCache[item.id];
+                  const units = unidadNombres(item);
+                  const presentacion = presentacionNombre(item);
                   return (
-                    <tr key={item.id} className={listadoTablaBodyRowClass}>
-                      <td className={listadoTablaTdClass}>
-                        <span className={sinStock ? "text-vialto-steel" : ""}>
-                          {item.cliente?.nombre ?? item.clienteId}
-                        </span>
-                      </td>
-                      <td className={listadoTablaTdClass}>
-                        <span className={sinStock ? "text-vialto-steel" : ""}>
-                          {item.producto?.nombre ?? item.productoId}
-                        </span>
-                      </td>
-                      <td
-                        className={`${listadoTablaTdClass} text-right tabular-nums`}
+                    <Fragment key={item.id}>
+                      <tr
+                        className={`${listadoTablaBodyRowClass} ${
+                          expanded
+                            ? "bg-vialto-mist/40 border-l-2 border-l-vialto-charcoal/25"
+                            : ""
+                        }`}
                       >
-                        {cantidad1Cell(item)}
-                      </td>
-                      {showUnidad2 && (
+                        <td className={`${listadoTablaTdClass} w-10 pr-1`}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(item)}
+                            aria-expanded={expanded}
+                            aria-label={
+                              expanded
+                                ? "Ocultar desglose por lote"
+                                : "Ver desglose por lote"
+                            }
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+                              expanded
+                                ? "border-vialto-charcoal/25 bg-vialto-mist text-vialto-charcoal"
+                                : "border-black/15 bg-white text-vialto-charcoal hover:bg-vialto-mist"
+                            }`}
+                          >
+                            <ChevronRight
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                expanded ? "rotate-90" : ""
+                              }`}
+                              strokeWidth={1.75}
+                              aria-hidden
+                            />
+                          </button>
+                        </td>
+                        <td className={listadoTablaTdClass}>
+                          <span
+                            className={
+                              sinStock
+                                ? "text-vialto-steel"
+                                : "font-medium text-vialto-charcoal"
+                            }
+                          >
+                            {item.cliente?.nombre ?? item.clienteId}
+                          </span>
+                        </td>
+                        <td className={listadoTablaTdClass}>
+                          <div className={sinStock ? "text-vialto-steel" : ""}>
+                            <p className="font-medium text-vialto-charcoal">
+                              {item.producto?.nombre ?? item.productoId}
+                            </p>
+                            {presentacion && (
+                              <p className="mt-0.5 text-xs text-vialto-steel">
+                                {presentacion}
+                              </p>
+                            )}
+                          </div>
+                        </td>
                         <td
                           className={`${listadoTablaTdClass} text-right tabular-nums`}
                         >
-                          {cantidad2Cell(item)}
+                          {stockTotalCell(item, units.unidad1, false, units.unidad2)}
                         </td>
+                        {showUnidad2 && (
+                          <td
+                            className={`${listadoTablaTdClass} text-right tabular-nums`}
+                          >
+                            {cantidad2Cell(item, units.unidad2)}
+                          </td>
+                        )}
+                        <td className={`${listadoTablaTdClass} text-right`}>
+                          <button
+                            type="button"
+                            onClick={() => void abrirProducto(item.productoId)}
+                            className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+                          >
+                            Ver
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <StockInventarioLotesDetalle
+                          colSpan={colSpan}
+                          showUnidad2={showUnidad2}
+                          unidad1Nombre={units.unidad1}
+                          unidad2Nombre={units.unidad2}
+                          loading={!cache || Boolean(cache.loading)}
+                          error={cache?.error ?? null}
+                          filas={cache?.filas ?? null}
+                          productoId={item.productoId}
+                          clienteId={item.clienteId}
+                          depositoId={item.depositoId}
+                          tenantId={
+                            isPlatform ? activeTenantId || undefined : undefined
+                          }
+                        />
                       )}
-                      <td className={`${listadoTablaTdClass} text-right`}>
-                        <button
-                          type="button"
-                          onClick={() => void abrirProducto(item.productoId)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
-                        >
-                          Ver
-                        </button>
-                      </td>
-                    </tr>
+                    </Fragment>
                   );
                 }}
                 renderMobileCard={(item) => {
@@ -780,25 +1022,79 @@ export function StockPanelTenantPage({
                   const clienteNombre = item.cliente?.nombre ?? item.clienteId;
                   const productoNombre =
                     item.producto?.nombre ?? item.productoId;
+                  const expanded = expandedIds.has(item.id);
+                  const cache = lotesCache[item.id];
+                  const units = unidadNombres(item);
+                  const presentacion = presentacionNombre(item);
                   const fields = [
                     {
                       label: "Producto",
                       value: (
                         <span className={sinStock ? "text-vialto-steel" : ""}>
                           {productoNombre}
+                          {presentacion ? (
+                            <span className="mt-0.5 block text-xs text-vialto-steel">
+                              {presentacion}
+                            </span>
+                          ) : null}
                         </span>
                       ),
                     },
                     {
-                      label: "Bultos",
-                      value: cantidad1Cell(item),
+                      label: "Stock total",
+                      value: cantidad1Cell(item, units.unidad1),
                     },
                   ];
                   if (showUnidad2) {
                     fields.push({
-                      label: "Sueltas",
-                      value: cantidad2Cell(item),
+                      label: LABEL_SUELTOS,
+                      value: cantidad2Cell(item, units.unidad2),
                     });
+                  }
+                  if (expanded) {
+                    if (!cache || cache.loading) {
+                      fields.push({
+                        label: "Lotes",
+                        value: (
+                          <span className="text-vialto-steel">Cargando…</span>
+                        ),
+                      });
+                    } else if (cache?.error) {
+                      fields.push({
+                        label: "Lotes",
+                        value: (
+                          <span className="text-red-700">{cache.error}</span>
+                        ),
+                      });
+                    } else if (cache?.filas) {
+                      for (const fila of cache.filas) {
+                        fields.push({
+                          label: fila.loteLabel,
+                          value: (
+                            <div className="space-y-1">
+                              <p className="tabular-nums text-vialto-charcoal">
+                                {fila.cantidad1} {units.unidad1}
+                                {showUnidad2 && units.unidad2 != null
+                                  ? ` · ${fila.cantidad2} ${units.unidad2}`
+                                  : ""}
+                              </p>
+                              <div className="text-xs">
+                                <span className="text-vialto-steel">Vto. </span>
+                                <FechaVencimientoLote
+                                  fechaVencimiento={fila.fechaVencimiento}
+                                />
+                              </div>
+                              <Link
+                                to={`/stock/movimientos?productoId=${encodeURIComponent(item.productoId)}&clienteId=${encodeURIComponent(item.clienteId)}&depositoId=${encodeURIComponent(item.depositoId)}&lote=${encodeURIComponent(fila.loteParam)}${isPlatform && activeTenantId ? `&tenantId=${encodeURIComponent(activeTenantId)}` : ""}`}
+                                className={`${listadoTablaAccionClass} inline-flex`}
+                              >
+                                Ver movimiento
+                              </Link>
+                            </div>
+                          ),
+                        });
+                      }
+                    }
                   }
                   return (
                     <ListadoCard
@@ -809,13 +1105,23 @@ export function StockPanelTenantPage({
                       }
                       fields={fields}
                       actions={
-                        <button
-                          type="button"
-                          onClick={() => void abrirProducto(item.productoId)}
-                          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
-                        >
-                          Ver
-                        </button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(item)}
+                            aria-expanded={expanded}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                          >
+                            {expanded ? "Ocultar lotes" : "Ver lotes"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void abrirProducto(item.productoId)}
+                            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
+                          >
+                            Ver
+                          </button>
+                        </div>
                       }
                     />
                   );

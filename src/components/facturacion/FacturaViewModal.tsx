@@ -40,11 +40,13 @@ export function FacturaViewModal({
   clienteNombre,
   onClose,
   onEditar,
+  onVerComprobante,
 }: {
   factura: Factura;
   clienteNombre?: string;
   onClose: () => void;
   onEditar: () => void;
+  onVerComprobante?: () => void;
 }) {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -113,6 +115,19 @@ export function FacturaViewModal({
           </div>
         ))}
       </div>
+
+      {onVerComprobante && factura.comprobanteUrl?.trim() && (
+        <div className="mt-6 border-t border-black/10 pt-4">
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Comprobante</p>
+          <button
+            type="button"
+            onClick={onVerComprobante}
+            className="mt-2 text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist"
+          >
+            Ver comprobante
+          </button>
+        </div>
+      )}
     </ViewModalShell>
   );
 }

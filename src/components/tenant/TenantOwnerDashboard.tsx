@@ -6,13 +6,12 @@ import {
   canAccessStock,
   canAccessCombustible,
 } from '@/lib/tenantModules';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
-import { apiJson } from '@/lib/api';
 import { ChevronDown } from 'lucide-react';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { modalOverlayClass } from '@/lib/modalLayers';
+import { CombustibleDashboardSection } from '@/components/combustible/CombustibleDashboardSection';
 
 function formatMoney(n: number) {
   return `$ ${n.toLocaleString('es-AR', {
@@ -558,56 +557,6 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
   );
 }
 
-type CombustibleDashData = {
-  totalCargas: number;
-  totalLitros: number;
-  totalImporte: number;
-  precioPorLitro: number;
-  topEstaciones: Array<{ nombre: string; litros: number }>;
-  topVehiculos: Array<{ patente: string; litros: number }>;
-  ultimasCargas: Array<{
-    id: string;
-    fecha: string;
-    litros: number;
-    importe: number;
-    vehiculo: { patente: string } | null;
-    chofer: { nombre: string } | null;
-  }>;
-};
-
-function periodToDates(
-  period: string,
-  customFrom: string,
-  customTo: string,
-): { from: string; to: string } | null {
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  if (period === 'week') {
-    const d = new Date(today);
-    d.setDate(d.getDate() - 6);
-    return { from: d.toISOString().slice(0, 10), to: todayStr };
-  }
-  if (period === 'month') {
-    return {
-      from: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10),
-      to: todayStr,
-    };
-  }
-  if (period === '3months') {
-    const d = new Date(today);
-    d.setMonth(d.getMonth() - 3);
-    return { from: d.toISOString().slice(0, 10), to: todayStr };
-  }
-  if (period === 'custom' && customFrom && customTo) {
-    return { from: customFrom, to: customTo };
-  }
-  return null;
-}
-
-function toMetric(n: number): MetricCompare {
-  return { current: n, previous: 0, changePct: null, sentiment: 'neutral' };
-}
-
 interface TenantOwnerDashboardProps {
   modules: string[];
   dash: ReturnType<typeof useTenantOwnerDashboard>;
@@ -619,33 +568,6 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
-
-  const { getToken } = useAuth();
-  const getTokenRef = useRef(getToken);
-  useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
-  const [combustData, setCombustData] = useState<CombustibleDashData | null>(null);
-  const [combustLoading, setCombustLoading] = useState(false);
-
-  useEffect(() => {
-    if (!showCombustible) return;
-    const dates = periodToDates(dash.period, dash.customFrom, dash.customTo);
-    if (!dates) return;
-    let cancelled = false;
-    setCombustLoading(true);
-    void (async () => {
-      try {
-        const qs = new URLSearchParams({ from: dates.from, to: dates.to });
-        const data = await apiJson<CombustibleDashData>(
-          `/api/combustible/dashboard?${qs.toString()}`,
-          () => getTokenRef.current(),
-        );
-        if (!cancelled) { setCombustData(data); setCombustLoading(false); }
-      } catch {
-        if (!cancelled) setCombustLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [showCombustible, dash.period, dash.customFrom, dash.customTo]);
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -994,93 +916,7 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         </section>
       )}
 
-      {showCombustible && (
-        <section aria-labelledby="combustible-heading">
-          <h2
-            id="combustible-heading"
-            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-          >
-            Combustible
-          </h2>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <MetricCard
-              title="Cargas"
-              tooltip="Cantidad de cargas registradas en el período"
-              simpleCount={combustData?.totalCargas ?? 0}
-              loading={combustLoading}
-              linkTo="/combustible"
-              alwaysLink
-            />
-            <MetricCard
-              title="Total litros"
-              tooltip="Litros cargados en el período"
-              metric={toMetric(combustData?.totalLitros ?? 0)}
-              loading={combustLoading}
-              formatValue={(n) => `${Math.round(n).toLocaleString('es-AR')} L`}
-            />
-            <MetricCard
-              title="Gasto total"
-              tooltip="Importe total de cargas en el período"
-              metric={toMetric(combustData?.totalImporte ?? 0)}
-              loading={combustLoading}
-              formatValue={(n) => `$ ${Math.round(n).toLocaleString('es-AR')}`}
-            />
-            <MetricCard
-              title="Precio prom. / litro"
-              tooltip="Costo promedio por litro en el período"
-              metric={toMetric(combustData?.precioPorLitro ?? 0)}
-              loading={combustLoading}
-              formatValue={(n) => `$ ${Math.round(n).toLocaleString('es-AR')}`}
-            />
-          </div>
-
-          {!combustLoading && combustData && combustData.ultimasCargas.length > 0 && (
-            <div className="mt-3 bg-white border border-black/10 p-4">
-              <p className="mb-3 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-                Últimas cargas
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-black/10">
-                      <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">Fecha</th>
-                      <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">Conductor</th>
-                      <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">Vehículo</th>
-                      <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">Litros</th>
-                      <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {combustData.ultimasCargas.map((c) => (
-                      <tr key={c.id} className="border-b border-black/5 last:border-0">
-                        <td className="py-2 text-vialto-charcoal">
-                          {new Intl.DateTimeFormat('es-AR', {
-                            day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
-                          }).format(new Date(c.fecha))}
-                        </td>
-                        <td className="py-2 text-vialto-charcoal">{c.chofer?.nombre ?? '—'}</td>
-                        <td className="py-2 text-vialto-charcoal">{c.vehiculo?.patente ?? '—'}</td>
-                        <td className="py-2 text-right text-vialto-charcoal">{c.litros.toLocaleString('es-AR')} L</td>
-                        <td className="py-2 text-right text-vialto-charcoal">$ {c.importe.toLocaleString('es-AR')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Link
-                to="/combustible"
-                className="mt-3 inline-flex font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-vialto-fire hover:text-vialto-charcoal"
-              >
-                Ver todas las cargas →
-              </Link>
-            </div>
-          )}
-
-          {!combustLoading && combustData && combustData.totalCargas === 0 && (
-            <p className="mt-3 text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>
-          )}
-        </section>
-      )}
+      {showCombustible && <CombustibleDashboardSection dash={dash} showViajes={showViajes} />}
     </div>
   );
 }

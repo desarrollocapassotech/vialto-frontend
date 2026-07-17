@@ -75,6 +75,36 @@ function arcaDateToIso(arca: string): string {
   return `${y}-${m}-${d}`;
 }
 
+function validateConfigForm(values: ConfigFormValues): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (!values.cuitEmisor.trim()) {
+    errors.cuitEmisor = 'El CUIT emisor es obligatorio.';
+  }
+
+  const enteroPositivoFields: (keyof ConfigFormValues)[] = ['ptoVentaCvlp', 'ptoVentaFactura'];
+  for (const field of enteroPositivoFields) {
+    const n = Number(values[field]);
+    if (!Number.isInteger(n) || n < 1) {
+      errors[field] = 'Debe ser un número entero mayor o igual a 1.';
+    }
+  }
+
+  const porcentajeFields: (keyof ConfigFormValues)[] = [
+    'comisionPctDefault',
+    'comisionPctAlt',
+    'ivaGastosAdmin',
+  ];
+  for (const field of porcentajeFields) {
+    const n = Number(values[field]);
+    if (Number.isNaN(n) || n < 0 || n > 100) {
+      errors[field] = 'Debe ser un valor entre 0 y 100.';
+    }
+  }
+
+  return errors;
+}
+
 // ── ConfigTab ────────────────────────────────────────────────────────────────
 
 type ConfigFormValues = {
@@ -147,22 +177,27 @@ function TextInput({
   value,
   onChange,
   placeholder,
+  error,
 }: {
   id?: string;
   type?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  error?: string;
 }) {
   return (
-    <input
-      id={id}
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
-    />
+    <>
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${error ? 'border-red-400' : 'border-black/10'}`}
+      />
+      <CrudFieldError message={error} />
+    </>
   );
 }
 
@@ -216,8 +251,9 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!values.cuitEmisor.trim()) {
-      setFieldErrors({ cuitEmisor: 'El CUIT emisor es obligatorio.' });
+    const errors = validateConfigForm(values);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
     setFieldErrors({});
@@ -369,6 +405,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             type="number"
             value={values.ptoVentaCvlp}
             onChange={(v) => set('ptoVentaCvlp', v)}
+            error={fieldErrors.ptoVentaCvlp}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -378,6 +415,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             type="number"
             value={values.ptoVentaFactura}
             onChange={(v) => set('ptoVentaFactura', v)}
+            error={fieldErrors.ptoVentaFactura}
           />
         </div>
       </div>
@@ -409,6 +447,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             type="number"
             value={values.comisionPctDefault}
             onChange={(v) => set('comisionPctDefault', v)}
+            error={fieldErrors.comisionPctDefault}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -418,6 +457,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             type="number"
             value={values.comisionPctAlt}
             onChange={(v) => set('comisionPctAlt', v)}
+            error={fieldErrors.comisionPctAlt}
           />
         </div>
       </div>
@@ -430,6 +470,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           type="number"
           value={values.ivaGastosAdmin}
           onChange={(v) => set('ivaGastosAdmin', v)}
+          error={fieldErrors.ivaGastosAdmin}
         />
       </div>
 

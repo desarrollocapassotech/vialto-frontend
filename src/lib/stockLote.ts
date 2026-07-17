@@ -31,7 +31,7 @@ export type SaldoLote = {
   fechaVencimiento: string | null;
 };
 
-function buildLotesUrl(
+export function buildLotesUrl(
   base: string,
   productoId: string,
   clienteId: string,
@@ -46,6 +46,74 @@ function buildLotesUrl(
   parts.push(`depositoId=${encodeURIComponent(depositoId)}`);
   if (presentacionId) parts.push(`presentacionId=${encodeURIComponent(presentacionId)}`);
   return `${base}?${parts.join('&')}`;
+}
+
+/** Orden FEFO: vencimiento más próximo primero; sin vto al final. */
+export function compareLotesFefo(
+  a: { lote: string; fechaVencimiento: string | null },
+  b: { lote: string; fechaVencimiento: string | null },
+): number {
+  if (a.fechaVencimiento && b.fechaVencimiento) {
+    const byDate = a.fechaVencimiento.localeCompare(b.fechaVencimiento);
+    if (byDate !== 0) return byDate;
+  } else if (a.fechaVencimiento && !b.fechaVencimiento) {
+    return -1;
+  } else if (!a.fechaVencimiento && b.fechaVencimiento) {
+    return 1;
+  }
+  return a.lote.localeCompare(b.lote, 'es');
+}
+
+export type LoteVencimientoNivel = 'vencido' | 'proximo' | 'ok' | null;
+
+/** Umbral de aviso: 30 días antes del vencimiento. */
+export const LOTE_VTO_PROXIMO_DIAS = 30;
+
+/**
+ * Clasifica la urgencia de un vencimiento respecto a hoy (inicio del día local).
+ * `null` si no hay fecha.
+ */
+export function nivelVencimientoLote(
+  fechaVencimiento: string | null | undefined,
+  hoy = new Date(),
+): LoteVencimientoNivel {
+  if (!fechaVencimiento) return null;
+  const raw = fechaVencimiento.trim();
+  if (!raw) return null;
+  const vto = new Date(raw.includes('T') ? raw : `${raw}T12:00:00`);
+  if (Number.isNaN(vto.getTime())) return null;
+
+  const startHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const startVto = new Date(vto.getFullYear(), vto.getMonth(), vto.getDate());
+  const diffDias = Math.round(
+    (startVto.getTime() - startHoy.getTime()) / (24 * 60 * 60 * 1000),
+  );
+
+  if (diffDias < 0) return 'vencido';
+  if (diffDias <= LOTE_VTO_PROXIMO_DIAS) return 'proximo';
+  return 'ok';
+}
+
+export async function fetchLotesDisponibles(
+  getToken: () => Promise<string | null>,
+  lotesBase: string,
+  ctx: {
+    productoId: string;
+    clienteId: string;
+    depositoId: string;
+    presentacionId: string;
+    tenantId?: string;
+  },
+): Promise<LotesDisponiblesResponse> {
+  const url = buildLotesUrl(
+    lotesBase,
+    ctx.productoId,
+    ctx.clienteId,
+    ctx.depositoId,
+    ctx.presentacionId,
+    ctx.tenantId,
+  );
+  return apiJson<LotesDisponiblesResponse>(url, getToken);
 }
 
 /** Saldo disponible de un lote (o sin lote) para refrescar el egreso tras una división. */

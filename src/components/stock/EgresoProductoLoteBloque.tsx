@@ -196,9 +196,7 @@ export function EgresoProductoLoteBloque({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className={LABEL}>
-            {labels.bultos} a extraer <span className="text-red-500">*</span>
-          </label>
+          <label className={LABEL}>{labels.bultos} a extraer</label>
           <input
             type="number"
             min="0"

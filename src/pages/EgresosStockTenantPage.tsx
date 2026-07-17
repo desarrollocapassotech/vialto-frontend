@@ -344,7 +344,10 @@ export function EgresosStockTenantPage({
         const b = parseFloat(linea.bultos) || 0;
         const s = parseFloat(linea.sueltas) || 0;
         if (b <= 0 && s <= 0) {
-          ferrs[bultosKey] = 'Ingresá bultos o sueltas mayor a 0.';
+          // Regla OR: al menos uno de los dos; el mensaje se muestra en ambos campos.
+          const msg = 'Ingresá bultos o sueltas (al menos uno mayor a 0).';
+          ferrs[bultosKey] = msg;
+          ferrs[sueltasKey] = msg;
         } else if (loteEgresoSeleccionValida(linea.lote) && linea.loteStock) {
           if (b > linea.loteStock.bultos) {
             ferrs[bultosKey] =
