@@ -63,31 +63,42 @@ El tenant se define por la organización activa de Clerk.
 
 ## Estructura actual del frontend
 
+> Este bloque muestra la forma de las carpetas, no un listado exhaustivo de archivos — cada módulo del backend (viajes, stock, combustible, facturación, integración ARCA/liquidaciones, destinatarios, direcciones de entrega, transportistas, importaciones, etc.) tiene hoy su propia carpeta en `components/` y su propio grupo de páginas en `pages/`, siguiendo la convención `XPage` / `XSuperadminPage` / `XTenantPage` descripta abajo. Antes de asumir que un archivo puntual no existe, buscarlo — esta lista no se mantiene campo a campo.
+
 ```txt
 src/
   components/
-    ui/
+    ui/                      # componentes shadcn/base
     superadmin/
+    tenant/                  # TenantOwnerDashboard.tsx — dashboard real del tenant, montado en TenantHomePage
+    combustible/             # CombustibleDashboardSection.tsx, CombustibleDashboardPanels.tsx
+    stock/, viajes/, facturacion/, liquidaciones/, choferes/, clientes/,
+    transportistas/, vehiculos/, destinatarios/, direcciones-entrega/
+    crud/                    # CrudFieldLabel, CrudInput, CrudSelect, CrudFieldError, CrudFormErrorAlert
+    forms/, listado/, shared/
     AppShell.tsx
     MissingClerkConfig.tsx
-  hooks/
-    useTenantsList.ts
+    Logo.tsx
+  hooks/                     # useTenantsList.ts, useCurrentTenant.ts, useEntityList.ts,
+                             # useTenantOwnerDashboard.ts, useImportacion.ts, y uno por listado/módulo paginado
   lib/
-    api.ts
-    friendlyError.ts
-    roleLabels.ts
-    sentry.ts
+    api.ts, friendlyError.ts, roleLabels.ts, sentry.ts, tenantModules.ts
+    # + utilidades específicas por módulo (stock*, viajes*, combustible*, micCrt*, arca*, etc.)
   pages/
-    HomePage.tsx
-    DashboardPage.tsx
-    ViajesPage.tsx
-    ClientesPage.tsx
-    ChoferesPage.tsx
-    VehiculosPage.tsx
-    *SuperadminPage.tsx
-    *TenantPage.tsx
+    HomePage.tsx             # decide SuperadminHomePage o TenantHomePage
+    TenantHomePage.tsx       # monta TenantOwnerDashboard — este es el dashboard real
+    SuperadminHomePage.tsx
+    DashboardPage.tsx        # ⚠️ código huérfano, sin ruta en App.tsx — no es el dashboard activo, no editar pensando que sí
+    ViajesPage.tsx / ViajeCreatePage.tsx / *SuperadminPage.tsx / *TenantPage.tsx
+    ClientesPage.tsx, ChoferesPage.tsx, VehiculosPage.tsx, TransportistasPage.tsx,
+    DestinatariosPage.tsx, DireccionesEntregaPage.tsx  # + Create/Edit por entidad
+    Stock*Page.tsx           # panel, movimientos, ingresos, egresos, divisiones, productos, presentaciones, depósitos
+    CombustiblePage.tsx / CombustibleTenantPage.tsx
+    LiquidacionesTenantPage.tsx, ArcaConfigTenantPage.tsx, SuperadminArcaPage.tsx
+    FacturacionPage.tsx / *SuperadminPage.tsx / *TenantPage.tsx
+    SuperadminEmpresasPage.tsx, SuperadminUsersPage.tsx, UsuariosTenantPage.tsx, BaseDeDatosPage.tsx
   types/
-    api.ts
+    api.ts, ownerDashboard.ts, combustibleDashboard.ts, micCrtDocumento.ts
   App.tsx
   main.tsx
 ```
@@ -345,4 +356,4 @@ Aplicar la clase `border-red-400` de forma condicional:
 
 ---
 
-Última actualización: junio 2026
+Última actualización: julio 2026 (resync de la estructura de carpetas contra el código real)
