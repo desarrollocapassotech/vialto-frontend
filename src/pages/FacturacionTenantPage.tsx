@@ -61,7 +61,7 @@ function facturaPayloadFromDraft(
   const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
   const base: Record<string, unknown> = {
     numero: draft.numero.trim(),
-    tipo: draft.tipo,
+    tipo: "cliente",
     viajeIds: draft.viajeIds,
     fechaEmision: draft.fechaEmision,
     fechaVencimiento: draft.fechaVencimiento || undefined,
@@ -69,13 +69,6 @@ function facturaPayloadFromDraft(
   };
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
-  }
-  if (draft.tipo === "transportista_externo") {
-    return {
-      ...base,
-      transportistaId: draft.transportistaId || undefined,
-      clienteId: undefined,
-    };
   }
   return {
     ...base,
@@ -94,11 +87,6 @@ const ESTADO_BADGE: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
   cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
   vencida: "bg-red-100 text-red-950 border-red-400/80",
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  cliente: "Cliente",
-  transportista_externo: "Transportista externo",
 };
 
 function fmtFecha(iso: string | null) {
@@ -193,7 +181,6 @@ export function FacturacionTenantPage({
 
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
-  const [tipoFiltro, setTipoFiltro] = useState("");
   const [clienteIdFiltro, setClienteIdFiltro] = useState("");
   const [emisionDesdeFiltro, setEmisionDesdeFiltro] = useState("");
   const [emisionHastaFiltro, setEmisionHastaFiltro] = useState("");
@@ -276,7 +263,6 @@ export function FacturacionTenantPage({
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (numFiltro.trim()) n += 1;
-    if (tipoFiltro) n += 1;
     if (clienteIdFiltro) n += 1;
     if (emisionDesdeFiltro || emisionHastaFiltro) n += 1;
     if (vencimientoDesdeFiltro || vencimientoHastaFiltro) n += 1;
@@ -284,7 +270,6 @@ export function FacturacionTenantPage({
     return n;
   }, [
     numFiltro,
-    tipoFiltro,
     clienteIdFiltro,
     emisionDesdeFiltro,
     emisionHastaFiltro,
@@ -303,7 +288,6 @@ export function FacturacionTenantPage({
         !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())
       )
         return false;
-      if (tipoFiltro && f.tipo !== tipoFiltro) return false;
       if (clienteIdFiltro && f.clienteId !== clienteIdFiltro) return false;
       const emision = f.fechaEmision ? f.fechaEmision.substring(0, 10) : "";
       if (emisionDesdeFiltro && emision < emisionDesdeFiltro) return false;
@@ -322,7 +306,6 @@ export function FacturacionTenantPage({
     platform,
     facturas,
     numFiltro,
-    tipoFiltro,
     clienteIdFiltro,
     emisionDesdeFiltro,
     emisionHastaFiltro,
@@ -380,7 +363,6 @@ export function FacturacionTenantPage({
     params.set("page", String(pageApi));
     params.set("pageSize", String(pageSizeApi));
     if (numFiltro.trim()) params.set("numero", numFiltro.trim());
-    if (tipoFiltro) params.set("tipo", tipoFiltro);
     if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
     if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
     if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
@@ -445,7 +427,6 @@ export function FacturacionTenantPage({
     page,
     pageSize,
     numFiltro,
-    tipoFiltro,
     clienteIdFiltro,
     emisionDesdeFiltro,
     emisionHastaFiltro,
@@ -575,7 +556,11 @@ export function FacturacionTenantPage({
   ): Promise<string | null | undefined> {
     if (!showComprobanteAdjunto) return undefined;
     if (d.comprobanteFile) {
-      return uploadComprobante(() => getToken(), d.comprobanteFile, "facturacion");
+      return uploadComprobante(
+        () => getToken(),
+        d.comprobanteFile,
+        "facturacion",
+      );
     }
     return d.comprobanteUrl;
   }
@@ -656,7 +641,9 @@ export function FacturacionTenantPage({
         () => getToken(),
         {
           method: "PATCH",
-          body: JSON.stringify(facturaPayloadFromDraft(editDraft, comprobanteUrl)),
+          body: JSON.stringify(
+            facturaPayloadFromDraft(editDraft, comprobanteUrl),
+          ),
         },
       );
       setFacturas((prev) =>
@@ -704,20 +691,12 @@ export function FacturacionTenantPage({
   }
 
   function nombreContraparte(f: Factura) {
-    if (f.tipo === "transportista_externo") {
-      const id = f.transportistaId;
-      if (!id) return "—";
-      return transportistas.find((t) => t.id === id)?.nombre ?? id;
-    }
-    const id = f.clienteId;
-    if (!id) return "—";
-    return clientes.find((c) => c.id === id)?.nombre ?? id;
+    return nombreCliente(f.clienteId);
   }
 
   function limpiarFiltros() {
     setNumFiltro("");
     setNumFiltroInput("");
-    setTipoFiltro("");
     setClienteIdFiltro("");
     setEmisionDesdeFiltro("");
     setEmisionHastaFiltro("");
@@ -777,24 +756,6 @@ export function FacturacionTenantPage({
             OK
           </button>
         </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro}>
-        <select
-          value={tipoFiltro}
-          onChange={(e) => {
-            setListadoRefetching(true);
-            setPage(1);
-            setTipoFiltro(e.target.value);
-          }}
-          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            tipoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
-          }`}
-          aria-label="Filtrar por tipo de factura"
-        >
-          <option value="">Todos</option>
-          <option value="cliente">Cliente</option>
-          <option value="transportista_externo">Transportista externo</option>
-        </select>
       </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Cliente" active={!!clienteIdFiltro}>
         <ClienteSearchSelect
@@ -958,7 +919,7 @@ export function FacturacionTenantPage({
           error ? "No se pudieron cargar las facturas." : facturasEmptyMessage
         }
         loadingMessage="Cargando…"
-        tableColSpan={8}
+        tableColSpan={7}
         filters={facturasListadoFiltros}
         activeFilterCount={activeFilterCount}
         onClearFilters={limpiarFiltros}
@@ -994,32 +955,6 @@ export function FacturacionTenantPage({
                     OK
                   </button>
                 </div>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Tipo"
-                filterActive={!!tipoFiltro}
-                filterSignature={tipoFiltro}
-              >
-                <select
-                  value={tipoFiltro}
-                  onChange={(e) => {
-                    setListadoRefetching(true);
-                    setPage(1);
-                    setTipoFiltro(e.target.value);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    tipoFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por tipo de factura"
-                >
-                  <option value="">Todos</option>
-                  <option value="cliente">Cliente</option>
-                  <option value="transportista_externo">
-                    Transportista externo
-                  </option>
-                </select>
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1159,9 +1094,6 @@ export function FacturacionTenantPage({
         renderTableRow={(f) => (
           <tr key={f.id} className={listadoTablaBodyRowClass}>
             <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
-            <td className="px-4 py-3 leading-snug">
-              {TIPO_LABEL[f.tipo] ?? f.tipo}
-            </td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
               {nombreContraparte(f)}
             </td>
@@ -1203,7 +1135,6 @@ export function FacturacionTenantPage({
           <ListadoCard
             primary={f.numero}
             fields={[
-              { label: "Tipo", value: TIPO_LABEL[f.tipo] ?? f.tipo },
               { label: "Cliente", value: nombreContraparte(f) },
               { label: "Emisión", value: fmtFecha(f.fechaEmision) },
               { label: "Vencimiento", value: fmtFecha(f.fechaVencimiento) },
