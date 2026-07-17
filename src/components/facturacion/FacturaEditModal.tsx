@@ -41,6 +41,8 @@ export type FacturaDraft = {
   fechaEmision: string;
   fechaVencimiento: string;
   ivaPct: string;
+  /** Letra AFIP elegida al facturar desde un viaje (A o B). */
+  letraComprobante?: "a" | "b" | null;
   /** URL ya guardada (edición) o vacía si se quitó. */
   comprobanteUrl: string | null;
   /** Archivo local pendiente de subir. */
@@ -66,6 +68,7 @@ export function emptyFacturaDraft(): FacturaDraft {
     fechaEmision: todayIso(),
     fechaVencimiento: "",
     ivaPct: "21",
+    letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
   };
@@ -466,9 +469,17 @@ export function FacturaCreateModal({
               className="text-base font-semibold text-vialto-charcoal"
             >
               Nueva factura
+              {draft.letraComprobante === "a"
+                ? " A"
+                : draft.letraComprobante === "b"
+                  ? " B"
+                  : ""}
             </h2>
             <p className="mt-1 text-xs text-vialto-steel">
               Completá los datos y opcionalmente vinculá viajes a esta factura.
+              {draft.letraComprobante
+                ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
+                : ""}
             </p>
           </div>
           <button

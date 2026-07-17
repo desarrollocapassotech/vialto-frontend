@@ -7,6 +7,10 @@ interface Props {
   onClose: () => void;
   clienteCompletado?: boolean;
   transportistaCompletado?: boolean;
+  /** Subtítulo bajo «Factura a cliente» (default: Registro manual). */
+  subtituloCliente?: string;
+  /** Subtítulo bajo «Liquidación a transportista». */
+  subtituloTransportista?: string;
 }
 
 function OpcionComprobante({
@@ -68,6 +72,8 @@ export function FacturarSelectorModal({
   onClose,
   clienteCompletado = false,
   transportistaCompletado = false,
+  subtituloCliente = "Registro manual",
+  subtituloTransportista = "Registro manual",
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +112,7 @@ export function FacturarSelectorModal({
         <div className="px-6 py-5 space-y-3">
           <OpcionComprobante
             titulo="Factura a cliente"
-            subtitulo="Registro manual"
+            subtitulo={subtituloCliente}
             completado={clienteCompletado}
             icon={Receipt}
             onClick={() => {
@@ -117,7 +123,7 @@ export function FacturarSelectorModal({
 
           <OpcionComprobante
             titulo="Liquidación a transportista"
-            subtitulo="Registro manual"
+            subtitulo={subtituloTransportista}
             completado={transportistaCompletado}
             icon={Users}
             onClick={() => {

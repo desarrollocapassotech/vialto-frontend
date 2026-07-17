@@ -27,9 +27,13 @@ export interface Viaje {
   estado: string;
   clienteId: string;
   /** Presente en listados/detalle cuando el backend incluye la relación. */
-  cliente?: { id: string; nombre: string };
+  cliente?: { id: string; nombre: string; condicionIva?: number | null };
   transportistaId: string | null;
-  transportista?: { id: string; nombre: string } | null;
+  transportista?: {
+    id: string;
+    nombre: string;
+    condicionIva?: number | null;
+  } | null;
   transportistaEfectivoId?: string | null;
   transportistaEfectivo?: { id: string; nombre: string } | null;
   choferId: string | null;

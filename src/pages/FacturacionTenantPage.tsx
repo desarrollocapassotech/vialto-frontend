@@ -100,7 +100,11 @@ function fmtFecha(iso: string | null) {
 
 type FacturaNuevaNavState = {
   tenantId?: string;
-  newFacturaDraft?: { clienteId: string; viajeIds: string[] };
+  newFacturaDraft?: {
+    clienteId: string;
+    viajeIds: string[];
+    letraComprobante?: "a" | "b";
+  };
   expandFacturaId?: string;
   viewFacturaId?: string;
 };
@@ -487,11 +491,12 @@ export function FacturacionTenantPage({
     if (!state) return;
     if (state.expandFacturaId?.trim()) return;
     if (!state.newFacturaDraft) return;
-    const { clienteId, viajeIds } = state.newFacturaDraft;
+    const { clienteId, viajeIds, letraComprobante } = state.newFacturaDraft;
     setDraft({
       ...emptyFacturaDraft(),
       clienteId: clienteId ?? "",
       viajeIds: viajeIds ?? [],
+      letraComprobante: letraComprobante ?? null,
     });
     setCreating(true);
     void ensureViajesLoaded();
