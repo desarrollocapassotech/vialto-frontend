@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ListadoDatos,
   type ListadoColumn,
@@ -16,13 +17,11 @@ import {
   listadoTablaTdClass,
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
-import {
-  FORMA_PAGO_LABELS,
-  fmtFormaPago,
-  fmtTipoVehiculo,
-} from "@/lib/combustibleLabels";
+import { SospechaBadge } from "@/components/combustible/SospechaBadge";
+import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import { exportarCargasCombustibleCsv } from "@/lib/combustibleCsvExport";
 import type { CargaCombustible, PaginatedMeta } from "@/types/api";
@@ -64,6 +63,23 @@ function fmtNum(n: number) {
   return n.toLocaleString("es-AR");
 }
 
+// yyyy-mm-dd en huso horario local (no UTC, para que coincida con lo que el usuario ve/elige).
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function primerDiaMesActual(): string {
+  const now = new Date();
+  return toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function hoyIso(): string {
+  return toIsoDate(new Date());
+}
+
 // Configuración de columnas base para la renderización de la grilla de datos
 const COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
@@ -86,7 +102,6 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
     id: "estacion",
     header: "Estación",
     cell: (r) => r.estacion,
-    showInCard: false,
   },
   {
     id: "litros",
@@ -94,27 +109,9 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
     cell: (r) => `${fmtNum(r.litros)} L`,
   },
   {
-    id: "precioPorLitro",
-    header: "Precio/L",
-    cell: (r) =>
-      r.precioPorLitro != null ? `$${fmtNum(r.precioPorLitro)}` : "—",
-  },
-  {
     id: "importe",
     header: "Monto",
     cell: (r) => `$${fmtNum(r.importe)}`,
-  },
-  {
-    id: "km",
-    header: "Km",
-    cell: (r) => fmtNum(r.km),
-    showInCard: false,
-  },
-  {
-    id: "formaPago",
-    header: "Forma de pago",
-    cell: (r) => fmtFormaPago(r.formaPago),
-    showInCard: false,
   },
 ];
 
@@ -134,12 +131,29 @@ export function CombustibleTenantPage() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
+  // Filtros iniciales que puede traer el link "Ver cargas" del dashboard
+  // (por vehículo o por chofer + período). Solo se leen una vez, al montar.
+  const [searchParams] = useSearchParams();
+  const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
+  const initialChoferId = searchParams.get("choferId") ?? "";
+  const initialFrom = searchParams.get("from");
+  const initialTo = searchParams.get("to");
+
   // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
-  const [month, setMonth] = useState("");
-  const [vehiculoId, setVehiculoId] = useState("");
-  const [choferId, setChoferId] = useState("");
+  // Rango de fechas aplicado (dispara el fetch) vs. borrador en los inputs
+  // (solo se aplica al hacer clic en "Filtrar"). Por defecto: mes actual a hoy,
+  // salvo que venga un rango explícito por query param.
+  const [desde, setDesde] = useState<string>(
+    () => initialFrom || primerDiaMesActual(),
+  );
+  const [hasta, setHasta] = useState<string>(() => initialTo || hoyIso());
+  const [desdeInput, setDesdeInput] = useState<string>(desde);
+  const [hastaInput, setHastaInput] = useState<string>(hasta);
+  const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
+  const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
+  const [estaciones, setEstaciones] = useState<string[]>([]);
 
   // Control de apertura de modales de visualización y alta
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
@@ -156,9 +170,21 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
+  // Aplica el rango de fechas ingresado en los inputs (botón "Filtrar").
+  function aplicarFiltroFecha() {
+    setDesde(desdeInput);
+    setHasta(hastaInput);
+    resetPage();
+  }
+
   // Restablece todos los criterios de filtrado aplicados a la vista
   function handleClearFilters() {
-    setMonth("");
+    const d = primerDiaMesActual();
+    const h = hoyIso();
+    setDesde(d);
+    setHasta(h);
+    setDesdeInput(d);
+    setHastaInput(h);
     setVehiculoId("");
     setChoferId("");
     setEstacion("");
@@ -166,14 +192,20 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
+  // El rango de fechas siempre tiene un valor (por defecto mes actual → hoy),
+  // así que solo cuenta como "filtro activo" cuando el usuario lo cambió.
+  const rangoFechaPorDefecto =
+    desde === primerDiaMesActual() && hasta === hoyIso();
+
   const hayFiltros = Boolean(
-    month || vehiculoId || choferId || estacion || formaPago,
+    !rangoFechaPorDefecto || vehiculoId || choferId || estacion || formaPago,
   );
 
   // Parámetros de filtro compartidos entre el listado y la exportación.
   function filtroParams(): URLSearchParams {
     const qs = new URLSearchParams();
-    if (month) qs.set("month", month);
+    if (desde) qs.set("from", desde);
+    if (hasta) qs.set("to", hasta);
     if (vehiculoId) qs.set("vehiculoId", vehiculoId);
     if (choferId) qs.set("choferId", choferId);
     if (estacion) qs.set("estacion", estacion);
@@ -219,13 +251,34 @@ export function CombustibleTenantPage() {
     isSignedIn,
     page,
     pageSize,
-    month,
+    desde,
+    hasta,
     vehiculoId,
     choferId,
     estacion,
     formaPago,
     getToken,
   ]);
+
+  // Estaciones distintas entre las cargas existentes, para el filtro (independiente de la página/filtros actuales).
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await apiJson<string[]>(
+          "/api/combustible/estaciones",
+          () => getToken(),
+        );
+        if (!cancelled) setEstaciones(data);
+      } catch {
+        // silencioso — el filtro queda con solo la opción "Todas"
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, getToken]);
 
   // Cerrar el menú de exportación al hacer click afuera o presionar Escape.
   useEffect(() => {
@@ -268,9 +321,9 @@ export function CombustibleTenantPage() {
     try {
       const cargas = await fetchTodasLasCargas();
       if (formato === "xlsx") {
-        await exportarCargasCombustible(cargas, { month: month || undefined });
+        await exportarCargasCombustible(cargas, { from: desde, to: hasta });
       } else {
-        exportarCargasCombustibleCsv(cargas, { month: month || undefined });
+        exportarCargasCombustibleCsv(cargas, { from: desde, to: hasta });
       }
       setError(null);
     } catch (e) {
@@ -341,9 +394,44 @@ export function CombustibleTenantPage() {
 
   const exportDisabled = rows === null || total === 0 || downloading;
 
+  // Opciones para los filtros con buscador (conductor, vehículo, estación)
+  const choferOptions = useMemo(
+    () => maestro.choferes.map((ch) => ({ value: ch.id, label: ch.nombre })),
+    [maestro.choferes],
+  );
+  const vehiculoOptions = useMemo(
+    () =>
+      maestro.vehiculos.map((v) => ({
+        value: v.id,
+        label: fmtVehiculoLabel(v),
+      })),
+    [maestro.vehiculos],
+  );
+  const estacionOptions = useMemo(
+    () => estaciones.map((e) => ({ value: e, label: e })),
+    [estaciones],
+  );
+
   // Agrega de forma dinámica la acción de borrado al arreglo de columnas de la grilla
   const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
     () => [
+      {
+        id: "sospecha",
+        header: "",
+        // Indicador único por fila, fuera de cualquier columna de datos (litros/monto
+        // ya no llevan el suyo propio). Clickeable: abre el detalle de la carga.
+        // Solo desktop: en mobile el título (Fecha) ya identifica la fila.
+        cell: (r) =>
+          r.sospechoso ? (
+            <SospechaBadge
+              motivo={r.motivoSospecha}
+              onClick={() => setViewingCargaId(r.id)}
+            />
+          ) : null,
+        showInCard: false,
+        thClassName: "w-8 px-2 py-3",
+        tdClassName: "w-8 px-2 py-3",
+      },
       ...COLUMNS,
       {
         id: "acciones",
@@ -369,68 +457,82 @@ export function CombustibleTenantPage() {
   // Filtros renderizados exclusivamente para resoluciones móviles
   const mobileFilters = (
     <>
-      <ListadoFiltroCampo label="Mes" active={Boolean(month)}>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => {
-            setMonth(e.target.value);
-            resetPage();
-          }}
-          className={`${inputClass} ${month ? "text-vialto-fire" : ""}`}
-          aria-label="Filtrar por mes"
-        />
+      <ListadoFiltroCampo label="Fecha" active={!rangoFechaPorDefecto}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+              Desde
+              <input
+                type="date"
+                value={desdeInput}
+                onChange={(e) => setDesdeInput(e.target.value)}
+                className={inputClass}
+                aria-label="Filtrar desde fecha"
+              />
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+              Hasta
+              <input
+                type="date"
+                value={hastaInput}
+                onChange={(e) => setHastaInput(e.target.value)}
+                className={inputClass}
+                aria-label="Filtrar hasta fecha"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={aplicarFiltroFecha}
+            className="h-9 w-full border border-black/15 bg-vialto-charcoal text-xs uppercase tracking-wider text-white hover:bg-black transition-colors"
+          >
+            Filtrar
+          </button>
+        </div>
       </ListadoFiltroCampo>
 
       <ListadoFiltroCampo label="Conductor" active={Boolean(choferId)}>
-        <select
+        <SearchableSelect
           value={choferId}
-          onChange={(e) => {
-            setChoferId(e.target.value);
+          onChange={(v) => {
+            setChoferId(v);
             resetPage();
           }}
-          className={`${inputClass} ${choferId ? "text-vialto-fire" : ""}`}
-          aria-label="Filtrar por conductor"
-        >
-          <option value="">Todos</option>
-          {maestro.choferes.map((ch) => (
-            <option key={ch.id} value={ch.id}>
-              {ch.nombre}
-            </option>
-          ))}
-        </select>
+          options={choferOptions}
+          placeholder="Todos"
+          searchPlaceholder="Buscar conductor…"
+          triggerClassName={choferId ? "text-vialto-fire" : ""}
+          ariaLabel="Filtrar por conductor"
+        />
       </ListadoFiltroCampo>
 
       <ListadoFiltroCampo label="Vehículo" active={Boolean(vehiculoId)}>
-        <select
+        <SearchableSelect
           value={vehiculoId}
-          onChange={(e) => {
-            setVehiculoId(e.target.value);
+          onChange={(v) => {
+            setVehiculoId(v);
             resetPage();
           }}
-          className={`${inputClass} ${vehiculoId ? "text-vialto-fire" : ""}`}
-          aria-label="Filtrar por vehículo"
-        >
-          <option value="">Todos</option>
-          {maestro.vehiculos.map((v) => (
-            <option key={v.id} value={v.id}>
-              {fmtVehiculoLabel(v)}
-            </option>
-          ))}
-        </select>
+          options={vehiculoOptions}
+          placeholder="Todos"
+          searchPlaceholder="Buscar vehículo…"
+          triggerClassName={vehiculoId ? "text-vialto-fire" : ""}
+          ariaLabel="Filtrar por vehículo"
+        />
       </ListadoFiltroCampo>
 
       <ListadoFiltroCampo label="Estación" active={Boolean(estacion)}>
-        <input
-          type="text"
+        <SearchableSelect
           value={estacion}
-          onChange={(e) => {
-            setEstacion(e.target.value);
+          onChange={(v) => {
+            setEstacion(v);
             resetPage();
           }}
-          placeholder="Buscar estación..."
-          className={`${inputClass} ${estacion ? "text-vialto-fire" : ""}`}
-          aria-label="Filtrar por estación"
+          options={estacionOptions}
+          placeholder="Todas"
+          searchPlaceholder="Buscar estación…"
+          triggerClassName={estacion ? "text-vialto-fire" : ""}
+          ariaLabel="Filtrar por estación"
         />
       </ListadoFiltroCampo>
 
@@ -458,22 +560,43 @@ export function CombustibleTenantPage() {
   // Cabecera interactiva con selectores embebidos para resoluciones de escritorio
   const tableHead = (
     <tr className="border-b border-black/10">
+      {/* Gutter del indicador de sospecha: sin encabezado, fuera de las columnas de datos. */}
+      <th className="w-8 px-2 py-3" aria-hidden />
       <th className="px-4 py-3 text-left font-normal">
         <ViajesListadoHeaderFiltro
           title="Fecha"
-          filterActive={Boolean(month)}
-          filterSignature={month}
+          filterActive={!rangoFechaPorDefecto}
+          filterSignature={`${desde}|${hasta}`}
         >
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              resetPage();
-            }}
-            className={`${inputClass} min-w-[150px]`}
-            aria-label="Filtrar por mes"
-          />
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+              Desde
+              <input
+                type="date"
+                value={desdeInput}
+                onChange={(e) => setDesdeInput(e.target.value)}
+                className={`${inputClass} min-w-[150px]`}
+                aria-label="Filtrar desde fecha"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+              Hasta
+              <input
+                type="date"
+                value={hastaInput}
+                onChange={(e) => setHastaInput(e.target.value)}
+                className={`${inputClass} min-w-[150px]`}
+                aria-label="Filtrar hasta fecha"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={aplicarFiltroFecha}
+              className="h-8 w-full border border-black/15 bg-vialto-charcoal text-xs uppercase tracking-wider text-white hover:bg-black transition-colors"
+            >
+              Filtrar
+            </button>
+          </div>
         </ViajesListadoHeaderFiltro>
       </th>
       <th className="px-4 py-3 text-left font-normal">
@@ -482,22 +605,18 @@ export function CombustibleTenantPage() {
           filterActive={Boolean(choferId)}
           filterSignature={choferId}
         >
-          <select
+          <SearchableSelect
             value={choferId}
-            onChange={(e) => {
-              setChoferId(e.target.value);
+            onChange={(v) => {
+              setChoferId(v);
               resetPage();
             }}
-            className={`${inputClass} min-w-[160px]`}
-            aria-label="Filtrar por conductor"
-          >
-            <option value="">Todos</option>
-            {maestro.choferes.map((ch) => (
-              <option key={ch.id} value={ch.id}>
-                {ch.nombre}
-              </option>
-            ))}
-          </select>
+            options={choferOptions}
+            placeholder="Todos"
+            searchPlaceholder="Buscar conductor…"
+            triggerClassName="min-w-[160px]"
+            ariaLabel="Filtrar por conductor"
+          />
         </ViajesListadoHeaderFiltro>
       </th>
       <th className="px-4 py-3 text-left font-normal">
@@ -506,22 +625,18 @@ export function CombustibleTenantPage() {
           filterActive={Boolean(vehiculoId)}
           filterSignature={vehiculoId}
         >
-          <select
+          <SearchableSelect
             value={vehiculoId}
-            onChange={(e) => {
-              setVehiculoId(e.target.value);
+            onChange={(v) => {
+              setVehiculoId(v);
               resetPage();
             }}
-            className={`${inputClass} min-w-[140px]`}
-            aria-label="Filtrar por vehículo"
-          >
-            <option value="">Todos</option>
-            {maestro.vehiculos.map((v) => (
-              <option key={v.id} value={v.id}>
-                {fmtVehiculoLabel(v)}
-              </option>
-            ))}
-          </select>
+            options={vehiculoOptions}
+            placeholder="Todos"
+            searchPlaceholder="Buscar vehículo…"
+            triggerClassName="min-w-[140px]"
+            ariaLabel="Filtrar por vehículo"
+          />
         </ViajesListadoHeaderFiltro>
       </th>
       <th className="px-4 py-3 text-left font-normal">
@@ -530,16 +645,17 @@ export function CombustibleTenantPage() {
           filterActive={Boolean(estacion)}
           filterSignature={estacion}
         >
-          <input
-            type="text"
+          <SearchableSelect
             value={estacion}
-            onChange={(e) => {
-              setEstacion(e.target.value);
+            onChange={(v) => {
+              setEstacion(v);
               resetPage();
             }}
-            placeholder="Buscar..."
-            className={`${inputClass} min-w-[140px]`}
-            aria-label="Filtrar por estación"
+            options={estacionOptions}
+            placeholder="Todas"
+            searchPlaceholder="Buscar estación…"
+            triggerClassName="min-w-[140px]"
+            ariaLabel="Filtrar por estación"
           />
         </ViajesListadoHeaderFiltro>
       </th>
@@ -550,42 +666,8 @@ export function CombustibleTenantPage() {
       </th>
       <th className="px-4 py-3 text-left font-normal">
         <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
-          Precio/L
-        </span>
-      </th>
-      <th className="px-4 py-3 text-left font-normal">
-        <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
           Monto
         </span>
-      </th>
-      <th className="px-4 py-3 text-left font-normal">
-        <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
-          Km
-        </span>
-      </th>
-      <th className="px-4 py-3 text-left font-normal">
-        <ViajesListadoHeaderFiltro
-          title="Forma de pago"
-          filterActive={Boolean(formaPago)}
-          filterSignature={formaPago}
-        >
-          <select
-            value={formaPago}
-            onChange={(e) => {
-              setFormaPago(e.target.value);
-              resetPage();
-            }}
-            className={`${inputClass} min-w-[150px]`}
-            aria-label="Filtrar por forma de pago"
-          >
-            <option value="">Todas</option>
-            {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </ViajesListadoHeaderFiltro>
       </th>
       <th className="px-4 py-3 text-left font-normal">
         <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
@@ -595,9 +677,13 @@ export function CombustibleTenantPage() {
     </tr>
   );
 
-  const cantFiltros = [month, vehiculoId, choferId, estacion, formaPago].filter(
-    Boolean,
-  ).length;
+  const cantFiltros = [
+    !rangoFechaPorDefecto,
+    Boolean(vehiculoId),
+    Boolean(choferId),
+    Boolean(estacion),
+    Boolean(formaPago),
+  ].filter(Boolean).length;
 
   // ─── RENDERIZADO GENERAL DE LA PÁGINA ─────────────────────────────────────
   return (
@@ -705,6 +791,10 @@ export function CombustibleTenantPage() {
         </div>
       </div>
 
+      <p className="text-xs text-vialto-steel">
+        Mostrando cargas del {fmtFecha(desde)} al {fmtFecha(hasta)}
+      </p>
+
       {error && (
         <p className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -717,10 +807,7 @@ export function CombustibleTenantPage() {
         rowKey={(r) => r.id}
         emptyMessage="Sin cargas registradas"
         filters={mobileFilters}
-        activeFilterCount={
-          [month, vehiculoId, choferId, estacion, formaPago].filter(Boolean)
-            .length
-        }
+        activeFilterCount={cantFiltros}
         onClearFilters={handleClearFilters}
         clearFiltersDisabled={!hayFiltros}
         filtersTitle="Filtrar cargas"

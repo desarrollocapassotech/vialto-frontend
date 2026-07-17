@@ -236,6 +236,8 @@ export interface CargaCombustible {
   createdBy: string;
   fotoTacometro?: string | null;
   fotoTicket?: string | null;
+  sospechoso: boolean;
+  motivoSospecha: string | null;
 }
 
 export interface Pago {

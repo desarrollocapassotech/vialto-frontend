@@ -42,7 +42,7 @@ function descargarArchivo(contenido: BlobPart, filename: string, mime: string): 
  */
 export function exportarCargasCombustibleCsv(
   cargas: CargaCombustible[],
-  opts?: { month?: string },
+  opts?: { from?: string; to?: string },
 ): void {
   const cols = cargaCombustibleColumnas();
 
@@ -54,6 +54,6 @@ export function exportarCargasCombustibleCsv(
   ];
 
   const contenido = '\uFEFF' + filas.join('\r\n');
-  const periodo = periodoArchivoCargas(cargas, opts?.month);
+  const periodo = periodoArchivoCargas(cargas, opts);
   descargarArchivo(contenido, `cargas-combustible-${periodo}.csv`, 'text/csv;charset=utf-8;');
 }

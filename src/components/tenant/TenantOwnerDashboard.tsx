@@ -244,9 +244,11 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
   const sinFacturaMon = montosPorMonedaCompat(alertas.viajesSinFactura);
   const itemsFacturasVencidas = alertas.facturasVencidas.items ?? [];
   const itemsViajesSinFactura = alertas.viajesSinFactura.items ?? [];
+  const cargasSospechosas = alertas.cargasSospechosas ?? { cantidad: 0, montoTotal: 0 };
   const totalAlertasBadge =
     (alertas.facturasVencidas.cantidad > 0 ? alertas.facturasVencidas.cantidad : 0) +
-    (alertas.viajesSinFactura.cantidad > 0 ? alertas.viajesSinFactura.cantidad : 0);
+    (alertas.viajesSinFactura.cantidad > 0 ? alertas.viajesSinFactura.cantidad : 0) +
+    (cargasSospechosas.cantidad > 0 ? cargasSospechosas.cantidad : 0);
   const badgeText = totalAlertasBadge > 99 ? '99+' : String(totalAlertasBadge);
   const resumenMobile =
     totalAlertasBadge === 1
@@ -391,6 +393,37 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
                 onViewViaje,
                 loadingViajeId,
               )}
+            </div>
+          </div>
+        )}
+
+        {cargasSospechosas.cantidad > 0 && (
+          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
+            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
+                {cargasSospechosas.cantidad === 1
+                  ? 'Carga de combustible sospechosa en el período'
+                  : 'Cargas de combustible sospechosas en el período'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {cargasSospechosas.cantidad}{' '}
+                <span className="font-body text-base text-white/70">
+                  {cargasSospechosas.cantidad === 1 ? 'carga' : 'cargas'}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-amber-100/90">
+                {cargasSospechosas.montoTotal === 0 ? '—' : formatMoney(cargasSospechosas.montoTotal)}
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  to="/?combustibleTab=alertas"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
+                  onClick={closePanel}
+                >
+                  Ir a alertas de combustible →
+                </Link>
+              </div>
             </div>
           </div>
         )}

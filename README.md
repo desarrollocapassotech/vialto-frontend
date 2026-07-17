@@ -70,7 +70,7 @@ src/
 - Mantener tipado explícito en `src/types`.
 - Mantener mensajes de error amigables para usuario final.
 
-Para lineamientos completos consultar `ARCHITECTURE.md`.
+Para lineamientos completos consultar `CLAUDE.md`.
 
 ## Flujo recomendado para nuevas funcionalidades
 
@@ -95,6 +95,12 @@ npm run lint
 npm run build
 ```
 
+## Proyectos relacionados
+
+- `vialto-backend` — API NestJS consumida por este frontend.
+- `vialto-combustible` — app mobile-first para choferes (cliente Bressan). Hoy corre sobre Firebase/Firestore, pero está en camino de migrar a este mismo stack (consumiendo `vialto-backend` vía `chofer-auth`, no Clerk) — ver `CLAUDE.md` de ese repo.
+- `vialto-logistica-webpage` — landing comercial pública, independiente de esta SPA.
+
 ---
 
-Documentación técnica extendida: `ARCHITECTURE.md`.
+Documentación técnica extendida: `CLAUDE.md`.

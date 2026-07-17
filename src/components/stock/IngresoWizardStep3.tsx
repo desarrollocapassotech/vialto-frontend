@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { AsignarPresentacionProductoModal } from "@/components/stock/AsignarPresentacionProductoModal";
 import { LoteDatalistInput } from "@/components/stock/LoteDatalistInput";
 import { ProductoModal } from "@/components/stock/ProductoModal";
 import { Spinner } from "@/components/ui/Spinner";
@@ -78,6 +79,7 @@ export function IngresoWizardStep3({
   productosBase,
   canCreateProducto,
   onProductoCreado,
+  onProductoActualizado,
   onVolver,
   onSubmit,
 }: {
@@ -101,12 +103,25 @@ export function IngresoWizardStep3({
   productosBase: string;
   canCreateProducto?: boolean;
   onProductoCreado: (p: Producto) => void;
+  onProductoActualizado: (p: Producto) => void;
   onVolver: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
   const [nuevoProductoRowKey, setNuevoProductoRowKey] = useState<string | null>(
     null,
   );
+  const [asignarPresentacionRowKey, setAsignarPresentacionRowKey] = useState<
+    string | null
+  >(null);
+
+  const productoParaAsignar =
+    asignarPresentacionRowKey == null
+      ? null
+      : (productos.find(
+          (p) =>
+            p.id ===
+            rows.find((r) => r._key === asignarPresentacionRowKey)?.productoId,
+        ) ?? null);
 
   return (
     <>
@@ -237,32 +252,53 @@ export function IngresoWizardStep3({
                     <label className={LABEL}>
                       Presentación <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <SearchableEntitySelect<ProductoPresentacion>
+                      items={pps}
                       value={row.presentacionId}
-                      onChange={(e) =>
-                        onUpdateRow(row._key, {
-                          presentacionId: e.target.value,
-                        })
+                      onChange={(id) =>
+                        onUpdateRow(row._key, { presentacionId: id })
                       }
-                      disabled={!row.productoId || pps.length === 0}
-                      className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
+                      disabled={!row.productoId}
+                      filterItems={(items, q) => {
+                        const lq = q.toLowerCase();
+                        return items.filter((pp) => {
+                          const nombre =
+                            pp.presentacion?.nombre ?? pp.presentacionId;
+                          return nombre.toLowerCase().includes(lq);
+                        });
+                      }}
+                      getPrimaryLabel={(pp) =>
+                        `${pp.presentacion?.nombre ?? pp.presentacionId} — ${pp.unidadesPorBulto} uds/bulto`
+                      }
+                      placeholderCerrado={
+                        !row.productoId
+                          ? "Primero elegí un producto"
+                          : "Elegí una presentación…"
+                      }
+                      placeholderBuscar="Buscar presentación…"
+                      inputClassName={`${INPUT} ${
                         fieldErrors[`row_${idx}_presentacionId`]
                           ? "border-red-400"
-                          : "border-black/15"
+                          : ""
                       }`}
-                    >
-                      <option value="">
-                        {!row.productoId
-                          ? "Primero elegí un producto"
-                          : "Elegí una presentación…"}
-                      </option>
-                      {pps.map((pp) => (
-                        <option key={pp.id} value={pp.id}>
-                          {pp.presentacion?.nombre ?? pp.presentacionId} —{" "}
-                          {pp.unidadesPorBulto} uds/bulto
-                        </option>
-                      ))}
-                    </select>
+                      onNuevo={
+                        canCreateProducto && row.productoId
+                          ? () => setAsignarPresentacionRowKey(row._key)
+                          : undefined
+                      }
+                      onNuevoLabel="+ Nueva presentación"
+                      noItemsSlot={
+                        <div
+                          className={`${INPUT} flex items-center text-vialto-steel ${
+                            !row.productoId ? "opacity-50" : ""
+                          }`}
+                        >
+                          {!row.productoId
+                            ? "Primero elegí un producto"
+                            : "Sin presentaciones asignadas"}
+                        </div>
+                      }
+                    />
                     {selectedPP && (
                       <p className="text-xs text-vialto-steel">
                         {selectedPP.unidadesPorBulto} unidades por bulto
@@ -457,6 +493,23 @@ export function IngresoWizardStep3({
               presentacionId: "",
             });
             setNuevoProductoRowKey(null);
+          }}
+        />
+      )}
+
+      {productoParaAsignar && asignarPresentacionRowKey !== null && (
+        <AsignarPresentacionProductoModal
+          producto={productoParaAsignar}
+          getToken={getToken}
+          productosBase={productosBase}
+          tenantId={tenantId}
+          onClose={() => setAsignarPresentacionRowKey(null)}
+          onSaved={(productoActualizado, nuevaPp) => {
+            onProductoActualizado(productoActualizado);
+            onUpdateRow(asignarPresentacionRowKey, {
+              presentacionId: nuevaPp.id,
+            });
+            setAsignarPresentacionRowKey(null);
           }}
         />
       )}

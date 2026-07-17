@@ -400,6 +400,9 @@ export function IngresosStockTenantPage({
           productosBase={productosBase}
           canCreateProducto={canCreateProducto}
           onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
+          onProductoActualizado={(p) =>
+            setProductos((prev) => prev.map((x) => (x.id === p.id ? p : x)))
+          }
           onVolver={() => {
             setStep(2);
             setFieldErrors({});

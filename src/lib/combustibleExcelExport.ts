@@ -72,16 +72,20 @@ function isoDate(iso: string): string {
 }
 
 /**
- * Período para el nombre del archivo. Si se pasa un mes (YYYY-MM) del filtro,
- * se usa tal cual (ej. `2026-06`). Si no, se deriva el rango de fechas de las
- * cargas exportadas (ej. `2026-05-06-2026-07-31`).
+ * Período para el nombre del archivo. Si se pasa el rango de fechas (desde/hasta)
+ * del filtro, se usa tal cual (ej. `2026-07-01-2026-07-17`). Si no, se deriva el
+ * rango de fechas de las cargas exportadas.
  * Compartido por Excel y CSV para que ambos usen el mismo nombre de período.
  */
 export function periodoArchivoCargas(
   cargas: CargaCombustible[],
-  month?: string,
+  rango?: { from?: string; to?: string },
 ): string {
-  if (month) return month;
+  if (rango?.from && rango?.to) {
+    return rango.from === rango.to ? rango.from : `${rango.from}-${rango.to}`;
+  }
+  if (rango?.from) return `desde-${rango.from}`;
+  if (rango?.to) return `hasta-${rango.to}`;
   if (cargas.length === 0) return "sin-datos";
   const fechas = cargas.map((c) => isoDate(c.fecha)).sort();
   const min = fechas[0];
@@ -95,9 +99,9 @@ export function periodoArchivoCargas(
  */
 export async function exportarCargasCombustible(
   cargas: CargaCombustible[],
-  opts?: { month?: string },
+  opts?: { from?: string; to?: string },
 ): Promise<void> {
-  const periodo = periodoArchivoCargas(cargas, opts?.month);
+  const periodo = periodoArchivoCargas(cargas, opts);
   await generarExcel(
     cargaCombustibleColumnas(),
     cargas,

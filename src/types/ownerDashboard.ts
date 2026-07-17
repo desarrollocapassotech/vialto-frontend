@@ -41,6 +41,11 @@ export type OwnerDashboardResponse = {
       montosPorMoneda?: { ARS: number; USD: number };
       items?: Array<{ id: string; numero: string }>;
     };
+    /** Cargas de combustible marcadas `sospechoso` (snapshot actual, no filtrado por período). */
+    cargasSospechosas?: {
+      cantidad: number;
+      montoTotal: number;
+    };
   } | null;
   viajes?: {
     enCurso: MetricCompare;

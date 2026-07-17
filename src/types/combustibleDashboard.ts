@@ -36,11 +36,14 @@ export type CombustiblePorChoferItem = {
 
 export type CombustibleAlerta = {
   cargaId: string;
-  vehiculoId: string;
+  vehiculoId: string | null;
   patente: string;
+  choferNombre: string | null;
   fecha: string;
-  tipo: "consumo_alto" | "recarga_rapida";
-  detalle: string;
+  motivoSospecha: string;
+  litros: number;
+  importe: number;
+  precioPorLitro: number;
 };
 
 export type CombustibleEvolucionPrecioPunto = {
