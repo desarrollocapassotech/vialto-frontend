@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { ArcaCertificadoModal } from '@/components/liquidaciones/ArcaCertificadoModal';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -67,6 +68,36 @@ const EMPTY: FormValues = {
   keyPem: '',
 };
 
+const EMISOR_FIELDS = [
+  'cuitEmisor',
+  'razonSocial',
+  'domicilioEmisor',
+  'condicionIvaEmisor',
+  'ingBrutos',
+  'inicActEmisor',
+] as const satisfies readonly (keyof FormValues)[];
+
+const VENTA_FIELDS = [
+  'ptoVentaCvlp',
+  'ptoVentaFactura',
+  'ambiente',
+] as const satisfies readonly (keyof FormValues)[];
+
+const COMISION_FIELDS = [
+  'comisionPctDefault',
+  'comisionPctAlt',
+  'ivaGastosAdmin',
+] as const satisfies readonly (keyof FormValues)[];
+
+const CERT_FIELDS = ['certPem', 'keyPem'] as const satisfies readonly (keyof FormValues)[];
+
+const ALL_FIELDS = [
+  ...EMISOR_FIELDS,
+  ...VENTA_FIELDS,
+  ...COMISION_FIELDS,
+  ...CERT_FIELDS,
+] as const satisfies readonly (keyof FormValues)[];
+
 function configToForm(c: ArcaConfig): FormValues {
   return {
     cuitEmisor: c.cuitEmisor,
@@ -92,15 +123,58 @@ const inputClass =
 const labelClass =
   'font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel';
 
+const sectionTitleClass =
+  'font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-vialto-charcoal';
+
+function SectionCard({
+  title,
+  description,
+  onSave,
+  saving,
+  dirty,
+  children,
+}: {
+  title: string;
+  description?: string;
+  onSave?: () => void;
+  saving?: boolean;
+  dirty?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded border border-black/10 bg-white p-5 sm:p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className={sectionTitleClass}>{title}</h2>
+          {description && <p className="mt-1 text-xs text-vialto-steel">{description}</p>}
+        </div>
+        {onSave && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || !dirty}
+            className="shrink-0 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel hover:text-vialto-fire disabled:opacity-50 disabled:hover:text-vialto-steel"
+          >
+            {saving ? 'Aplicando…' : dirty ? 'Aplicar cambios' : 'Sin cambios'}
+          </button>
+        )}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
 export function ArcaConfigTenantPage() {
   const { getToken } = useAuth();
   const { showToast } = useToast();
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<FormValues>(EMPTY);
+  const [savedValues, setSavedValues] = useState<FormValues>(EMPTY);
   const [initialLoading, setInitialLoading] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [certModalOpen, setCertModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +189,7 @@ export function ArcaConfigTenantPage() {
           if (config) {
             setExisting(config);
             setValues(configToForm(config));
+            setSavedValues(configToForm(config));
           }
         }
       } catch {
@@ -130,31 +205,58 @@ export function ArcaConfigTenantPage() {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!values.cuitEmisor.trim()) {
+  function sectionDirty(keys: readonly (keyof FormValues)[]) {
+    return !existing || keys.some((k) => values[k] !== savedValues[k]);
+  }
+
+  /**
+   * Guarda solo los campos de `keys` (más los de `overrides`, si difieren de `keys`).
+   * El resto del payload usa el último valor persistido (`savedValues`), nunca ediciones
+   * sin aplicar de otras tarjetas — así "Aplicar cambios" de una tarjeta no arrastra
+   * cambios pendientes de las demás. El backend igual requiere el objeto completo (upsert).
+   */
+  async function saveSection(
+    keys: readonly (keyof FormValues)[],
+    overrides?: Partial<FormValues>,
+  ) {
+    const v: FormValues = { ...savedValues };
+    for (const k of keys) (v as Record<string, string>)[k] = values[k];
+    Object.assign(v, overrides ?? {});
+    const touched = new Set<keyof FormValues>([...keys, ...(Object.keys(overrides ?? {}) as (keyof FormValues)[])]);
+
+    // Todavía no hay config guardada: no existe un "cuitEmisor" persistido que reusar, así
+    // que la primera vez usamos el valor actual del campo aunque la tarjeta que se está
+    // aplicando no sea "Datos del emisor" — sin esto, ninguna tarjeta podría guardar nunca.
+    if (!existing) {
+      v.cuitEmisor = values.cuitEmisor;
+      touched.add('cuitEmisor');
+    }
+
+    if (!v.cuitEmisor.trim()) {
       setFieldErrors({ cuitEmisor: 'El CUIT emisor es obligatorio.' });
-      return;
+      const msg = 'Ingresá el CUIT emisor en "Datos del emisor" antes de guardar.';
+      setError(msg);
+      throw new Error(msg);
     }
     setFieldErrors({});
     setLoading(true);
     setError(null);
     try {
       const body = {
-        cuitEmisor: values.cuitEmisor.trim(),
-        razonSocial: values.razonSocial.trim() || undefined,
-        domicilioEmisor: values.domicilioEmisor.trim() || undefined,
-        condicionIvaEmisor: values.condicionIvaEmisor.trim() || undefined,
-        ingBrutos: values.ingBrutos.trim() || undefined,
-        inicActEmisor: values.inicActEmisor ? isoToArcaDate(values.inicActEmisor) : undefined,
-        ptoVentaCvlp: Number(values.ptoVentaCvlp),
-        ptoVentaFactura: Number(values.ptoVentaFactura),
-        ambiente: values.ambiente,
-        comisionPctDefault: Number(values.comisionPctDefault),
-        comisionPctAlt: Number(values.comisionPctAlt),
-        ivaGastosAdmin: Number(values.ivaGastosAdmin),
-        certPem: values.certPem.trim() || undefined,
-        keyPem: values.keyPem.trim() || undefined,
+        cuitEmisor: v.cuitEmisor.trim(),
+        razonSocial: v.razonSocial.trim() || undefined,
+        domicilioEmisor: v.domicilioEmisor.trim() || undefined,
+        condicionIvaEmisor: v.condicionIvaEmisor.trim() || undefined,
+        ingBrutos: v.ingBrutos.trim() || undefined,
+        inicActEmisor: v.inicActEmisor ? isoToArcaDate(v.inicActEmisor) : undefined,
+        ptoVentaCvlp: Number(v.ptoVentaCvlp),
+        ptoVentaFactura: Number(v.ptoVentaFactura),
+        ambiente: v.ambiente,
+        comisionPctDefault: Number(v.comisionPctDefault),
+        comisionPctAlt: Number(v.comisionPctAlt),
+        ivaGastosAdmin: Number(v.ivaGastosAdmin),
+        certPem: v.certPem.trim() || undefined,
+        keyPem: v.keyPem.trim() || undefined,
       };
       const config = await apiJson<ArcaConfig>(
         '/api/integracion-arca/config',
@@ -162,13 +264,30 @@ export function ArcaConfigTenantPage() {
         { method: 'POST', body: JSON.stringify(body) },
       );
       setExisting(config);
-      setValues(configToForm(config));
+      const merged = configToForm(config);
+      setSavedValues(merged);
+      // Solo sincronizamos los campos que efectivamente guardamos; el resto de los
+      // inputs conserva lo que el usuario esté editando en otras tarjetas todavía sin aplicar.
+      setValues((prev) => {
+        const next = { ...prev };
+        for (const k of touched) (next as Record<string, string>)[k] = merged[k];
+        return next;
+      });
       showToast('Configuración guardada correctamente.');
     } catch (e) {
-      setError(friendlyError(e, 'arca'));
+      const msg = friendlyError(e, 'arca');
+      setError(msg);
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
+  }
+
+  const dirty = !existing || JSON.stringify(values) !== JSON.stringify(savedValues);
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void saveSection(ALL_FIELDS).catch(() => {});
   }
 
   return (
@@ -177,231 +296,255 @@ export function ArcaConfigTenantPage() {
         Configuración ARCA / AFIP
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Datos de emisión electrónica para comprobantes CVLP y facturas A/B.
+        Datos para la emisión de comprobantes electrónicos.
       </p>
+      {existing && (
+        <p className="mt-1 text-xs text-vialto-steel/70">
+          Última actualización: {fmtDate(existing.updatedAt)}
+        </p>
+      )}
 
       {initialLoading ? (
         <p className="mt-8 text-sm text-vialto-steel">Cargando configuración…</p>
       ) : (
-        <form onSubmit={onSubmit} className="mt-8 max-w-xl space-y-5">
-          {existing && (
-            <div className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-charcoal">
-              <span className="font-medium">Configurado</span> — última actualización:{' '}
-              {fmtDate(existing.updatedAt)} · ambiente:{' '}
-              <span
-                className={`font-medium ${existing.ambiente === 'produccion' ? 'text-red-700' : 'text-amber-700'}`}
-              >
-                {existing.ambiente === 'produccion' ? 'Producción' : 'Homologación (testing)'}
-              </span>
-            </div>
-          )}
-
+        <form onSubmit={onSubmit} className="mt-8 space-y-6">
           {error && (
             <div className="rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
               {error}
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="razonSocial" className={labelClass}>Razón Social</label>
-            <input
-              id="razonSocial"
-              type="text"
-              value={values.razonSocial}
-              onChange={(e) => set('razonSocial', e.target.value)}
-              placeholder="Ej: Transportes Del Sur S.R.L."
-              className={inputClass}
-            />
-          </div>
+          <SectionCard
+            title="Datos del emisor"
+            onSave={() => void saveSection(EMISOR_FIELDS).catch(() => {})}
+            saving={loading}
+            dirty={sectionDirty(EMISOR_FIELDS)}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cuitEmisor" className={labelClass}>
+                  CUIT Emisor <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="cuitEmisor"
+                  type="text"
+                  value={values.cuitEmisor}
+                  onChange={(e) => set('cuitEmisor', e.target.value)}
+                  placeholder="Ej: 30-71234567-8"
+                  className={`${inputClass} ${fieldErrors.cuitEmisor ? 'border-red-400' : ''}`}
+                />
+                <CrudFieldError message={fieldErrors.cuitEmisor} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="razonSocial" className={labelClass}>Razón Social</label>
+                <input
+                  id="razonSocial"
+                  type="text"
+                  value={values.razonSocial}
+                  onChange={(e) => set('razonSocial', e.target.value)}
+                  placeholder="Ej: Transportes Del Sur S.R.L."
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="condicionIva" className={labelClass}>Condición frente al IVA</label>
+                <select
+                  id="condicionIva"
+                  value={values.condicionIvaEmisor}
+                  onChange={(e) => set('condicionIvaEmisor', e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— Sin especificar —</option>
+                  {CONDICION_IVA.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="domicilioEmisor" className={labelClass}>Domicilio del Emisor</label>
+                <input
+                  id="domicilioEmisor"
+                  type="text"
+                  value={values.domicilioEmisor}
+                  onChange={(e) => set('domicilioEmisor', e.target.value)}
+                  placeholder="Ej: San Martín 1234, Paraná, Entre Ríos"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ingBrutos" className={labelClass}>Ing. Brutos</label>
+                <input
+                  id="ingBrutos"
+                  type="text"
+                  value={values.ingBrutos}
+                  onChange={(e) => set('ingBrutos', e.target.value)}
+                  placeholder="Ej: CM-30712345678"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="inicActEmisor" className={labelClass}>Inicio de Actividades</label>
+                <input
+                  id="inicActEmisor"
+                  type="date"
+                  value={values.inicActEmisor}
+                  onChange={(e) => set('inicActEmisor', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </SectionCard>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="domicilioEmisor" className={labelClass}>Domicilio del Emisor</label>
-            <input
-              id="domicilioEmisor"
-              type="text"
-              value={values.domicilioEmisor}
-              onChange={(e) => set('domicilioEmisor', e.target.value)}
-              placeholder="Ej: San Martín 1234, Paraná, Entre Ríos"
-              className={inputClass}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="cuitEmisor" className={labelClass}>
-                CUIT Emisor <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="cuitEmisor"
-                type="text"
-                value={values.cuitEmisor}
-                onChange={(e) => set('cuitEmisor', e.target.value)}
-                placeholder="Ej: 30-71234567-8"
-                className={`${inputClass} ${fieldErrors.cuitEmisor ? 'border-red-400' : ''}`}
-              />
-              <CrudFieldError message={fieldErrors.cuitEmisor} />
+          <SectionCard
+            title="Puntos de venta y ambiente"
+            onSave={() => void saveSection(VENTA_FIELDS).catch(() => {})}
+            saving={loading}
+            dirty={sectionDirty(VENTA_FIELDS)}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ptoVentaCvlp" className={labelClass}>Pto. Venta CVLP</label>
+                <input
+                  id="ptoVentaCvlp"
+                  type="number"
+                  value={values.ptoVentaCvlp}
+                  onChange={(e) => set('ptoVentaCvlp', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ptoVentaFactura" className={labelClass}>Pto. Venta Factura A/B</label>
+                <input
+                  id="ptoVentaFactura"
+                  type="number"
+                  value={values.ptoVentaFactura}
+                  onChange={(e) => set('ptoVentaFactura', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ambiente" className={labelClass}>Ambiente</label>
+                <select
+                  id="ambiente"
+                  value={values.ambiente}
+                  onChange={(e) => set('ambiente', e.target.value as FormValues['ambiente'])}
+                  className={inputClass}
+                >
+                  <option value="homologacion">Homologación (testing)</option>
+                  <option value="produccion">Producción</option>
+                </select>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="condicionIva" className={labelClass}>Condición frente al IVA</label>
-              <select
-                id="condicionIva"
-                value={values.condicionIvaEmisor}
-                onChange={(e) => set('condicionIvaEmisor', e.target.value)}
-                className={inputClass}
-              >
-                <option value="">— Sin especificar —</option>
-                {CONDICION_IVA.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="ingBrutos" className={labelClass}>Ing. Brutos</label>
-              <input
-                id="ingBrutos"
-                type="text"
-                value={values.ingBrutos}
-                onChange={(e) => set('ingBrutos', e.target.value)}
-                placeholder="Ej: CM-30712345678"
-                className={inputClass}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="inicActEmisor" className={labelClass}>Inicio de Actividades</label>
-              <input
-                id="inicActEmisor"
-                type="date"
-                value={values.inicActEmisor}
-                onChange={(e) => set('inicActEmisor', e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="ptoVentaCvlp" className={labelClass}>Pto. Venta CVLP</label>
-              <input
-                id="ptoVentaCvlp"
-                type="number"
-                value={values.ptoVentaCvlp}
-                onChange={(e) => set('ptoVentaCvlp', e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="ptoVentaFactura" className={labelClass}>Pto. Venta Factura A/B</label>
-              <input
-                id="ptoVentaFactura"
-                type="number"
-                value={values.ptoVentaFactura}
-                onChange={(e) => set('ptoVentaFactura', e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="ambiente" className={labelClass}>Ambiente</label>
-            <select
-              id="ambiente"
-              value={values.ambiente}
-              onChange={(e) => set('ambiente', e.target.value as FormValues['ambiente'])}
-              className={inputClass}
-            >
-              <option value="homologacion">Homologación (testing)</option>
-              <option value="produccion">Producción</option>
-            </select>
             {values.ambiente === 'produccion' && (
               <p className="text-xs text-red-700">
                 Los comprobantes emitidos en producción son reales y tienen validez fiscal ante AFIP.
               </p>
             )}
-          </div>
+          </SectionCard>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="comisionPctDefault" className={labelClass}>Comisión default (%)</label>
-              <input
-                id="comisionPctDefault"
-                type="number"
-                value={values.comisionPctDefault}
-                onChange={(e) => set('comisionPctDefault', e.target.value)}
-                className={inputClass}
-              />
+          <SectionCard
+            title="Comisiones e IVA"
+            description="Porcentajes aplicados por defecto al liquidar viajes."
+            onSave={() => void saveSection(COMISION_FIELDS).catch(() => {})}
+            saving={loading}
+            dirty={sectionDirty(COMISION_FIELDS)}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="comisionPctDefault" className={labelClass}>Comisión default (%)</label>
+                <input
+                  id="comisionPctDefault"
+                  type="number"
+                  value={values.comisionPctDefault}
+                  onChange={(e) => set('comisionPctDefault', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="comisionPctAlt" className={labelClass}>Comisión alternativa (%)</label>
+                <input
+                  id="comisionPctAlt"
+                  type="number"
+                  value={values.comisionPctAlt}
+                  onChange={(e) => set('comisionPctAlt', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ivaGastosAdmin" className={labelClass}>IVA sobre neto (%)</label>
+                <input
+                  id="ivaGastosAdmin"
+                  type="number"
+                  value={values.ivaGastosAdmin}
+                  onChange={(e) => set('ivaGastosAdmin', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="comisionPctAlt" className={labelClass}>Comisión alternativa (%)</label>
-              <input
-                id="comisionPctAlt"
-                type="number"
-                value={values.comisionPctAlt}
-                onChange={(e) => set('comisionPctAlt', e.target.value)}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          </SectionCard>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="ivaGastosAdmin" className={labelClass}>IVA sobre neto (%)</label>
-            <input
-              id="ivaGastosAdmin"
-              type="number"
-              value={values.ivaGastosAdmin}
-              onChange={(e) => set('ivaGastosAdmin', e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="border-t border-black/10 pt-5 space-y-4">
-            <div>
-              <p className={labelClass}>Certificado y clave privada</p>
-              <p className="text-xs text-vialto-steel mt-1">
-                Archivos PEM generados en AFIP y vinculados al servicio WSFE. Dejá vacío para conservar el valor actual.
-              </p>
+          <SectionCard
+            title="Certificado y clave privada"
+            description="Archivos PEM generados en AFIP y vinculados al servicio WSFE."
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setCertModalOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded border border-black/20 bg-white px-4 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                {existing?.certConfigurado || existing?.keyConfigurado
+                  ? 'Editar certificado y clave'
+                  : 'Cargar certificado y clave'}
+              </button>
+              <div className="flex flex-col gap-1 text-xs text-vialto-steel">
+                <span>
+                  Certificado:{' '}
+                  {values.certPem ? (
+                    <span className="text-amber-700">● pendiente de guardar</span>
+                  ) : existing?.certConfigurado ? (
+                    <span className="text-green-700">● configurado</span>
+                  ) : (
+                    <span>○ sin configurar</span>
+                  )}
+                </span>
+                <span>
+                  Clave privada:{' '}
+                  {values.keyPem ? (
+                    <span className="text-amber-700">● pendiente de guardar</span>
+                  ) : existing?.keyConfigurado ? (
+                    <span className="text-green-700">● configurada</span>
+                  ) : (
+                    <span>○ sin configurar</span>
+                  )}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="certPem" className={labelClass}>
-                Certificado digital (.crt / .pem)
-                {existing?.certConfigurado && <span className="ml-2 normal-case text-green-700">● configurado</span>}
-              </label>
-              <textarea
-                id="certPem"
-                rows={5}
-                value={values.certPem}
-                onChange={(e) => set('certPem', e.target.value)}
-                placeholder={existing?.certConfigurado ? 'Pegá aquí para reemplazar el certificado actual.' : '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'}
-                className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="keyPem" className={labelClass}>
-                Clave privada (.key / .pem)
-                {existing?.keyConfigurado && <span className="ml-2 normal-case text-green-700">● configurada</span>}
-              </label>
-              <textarea
-                id="keyPem"
-                rows={5}
-                value={values.keyPem}
-                onChange={(e) => set('keyPem', e.target.value)}
-                placeholder={existing?.keyConfigurado ? 'Pegá aquí para reemplazar la clave actual.' : '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'}
-                className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
-              />
-            </div>
-          </div>
+          </SectionCard>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !dirty}
             className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
           >
             {loading && <Spinner />}
-            {loading ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar configuración'}
+            {loading ? 'Aplicando…' : dirty ? 'Aplicar cambios' : 'Sin cambios para aplicar'}
           </button>
         </form>
+      )}
+
+      {certModalOpen && (
+        <ArcaCertificadoModal
+          certPem={values.certPem}
+          keyPem={values.keyPem}
+          certConfigurado={existing?.certConfigurado}
+          keyConfigurado={existing?.keyConfigurado}
+          onClose={() => setCertModalOpen(false)}
+          onSave={async ({ certPem, keyPem }) => {
+            await saveSection(CERT_FIELDS, { certPem, keyPem });
+            setCertModalOpen(false);
+          }}
+        />
       )}
     </div>
   );
