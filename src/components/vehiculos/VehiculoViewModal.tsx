@@ -21,6 +21,10 @@ function fmtDate(iso: string | null | undefined) {
   });
 }
 
+function fmtNum(n: number) {
+  return n.toLocaleString("es-AR");
+}
+
 function vehiculoDetailUrl(id: string, tenantId?: string): string {
   if (tenantId?.trim()) {
     return `/api/platform/vehiculos/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tenantId.trim())}`;
@@ -45,6 +49,9 @@ export function VehiculoViewModal({
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ultimoKmCombustible, setUltimoKmCombustible] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -82,8 +89,38 @@ export function VehiculoViewModal({
     };
   }, [getToken, vehiculoId, tenantId]);
 
+  // Si el vehículo nunca tuvo kmActual seteado (0), mostramos el km de su
+  // última carga de combustible como referencia. Solo en contexto tenant —
+  // no hay endpoint de plataforma para combustible cross-tenant — y sin
+  // romper la vista si ese tenant no tiene el módulo habilitado.
+  useEffect(() => {
+    setUltimoKmCombustible(null);
+    if (!vehiculo || vehiculo.kmActual !== 0 || tenantId?.trim()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiJson<{ cargas: { km: number }[] }>(
+          `/api/combustible?vehiculoId=${encodeURIComponent(vehiculoId)}&limit=1`,
+          () => getToken(),
+        );
+        if (!cancelled && data.cargas.length > 0) {
+          setUltimoKmCombustible(data.cargas[0].km);
+        }
+      } catch {
+        // silencioso: módulo combustible deshabilitado u otro error — se mantiene el 0
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vehiculo, vehiculoId, tenantId, getToken]);
+
   const titulo = vehiculo?.patente ?? patenteTitulo ?? "Vehículo";
   const anio = vehiculo ? (vehiculo.año ?? vehiculo.anio) : null;
+  const kmActualEsFallback = vehiculo?.kmActual === 0 && ultimoKmCombustible != null;
+  const kmActualMostrado = kmActualEsFallback
+    ? ultimoKmCombustible
+    : vehiculo?.kmActual;
 
   return (
     <ViewModalShell
@@ -116,7 +153,30 @@ export function VehiculoViewModal({
             { label: "Marca", value: vehiculo.marca },
             { label: "Modelo", value: vehiculo.modelo },
             { label: "Año", value: anio },
-            { label: "KM actual", value: vehiculo.kmActual },
+          ]
+            .filter((c) => c.value != null && c.value !== "")
+            .map((c) => (
+              <div key={c.label}>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  {c.label}
+                </p>
+                <p className="mt-1 text-sm">{c.value}</p>
+              </div>
+            ))}
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Kilometraje actual
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-sm">
+              {kmActualMostrado != null ? fmtNum(kmActualMostrado) : "—"}
+              {kmActualEsFallback && (
+                <span className="text-[11px] font-normal italic text-vialto-steel">
+                  (según última carga de combustible)
+                </span>
+              )}
+            </p>
+          </div>
+          {[
             { label: "N.° Chasis", value: vehiculo.nroChasis },
             { label: "Póliza", value: vehiculo.poliza },
             {
@@ -125,19 +185,16 @@ export function VehiculoViewModal({
                 ? fmtDate(vehiculo.vencimientoPoliza)
                 : null,
             },
-            { label: "Tara (kg)", value: vehiculo.tara },
-            { label: "Precinto", value: vehiculo.precinto },
             {
-              label: "Pertenencia",
-              value: vehiculo.transportistaId?.trim()
-                ? "Transportista externo"
-                : "Sin asignar",
+              label: "Tara (kg)",
+              value: vehiculo.tara != null ? fmtNum(vehiculo.tara) : null,
             },
+            { label: "Precinto", value: vehiculo.precinto },
             { label: "Alta", value: fmtDate(vehiculo.createdAt) },
           ]
             .filter((c) => c.value != null && c.value !== "")
-            .map((c, i) => (
-              <div key={i}>
+            .map((c) => (
+              <div key={c.label}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                   {c.label}
                 </p>

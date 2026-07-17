@@ -11,6 +11,8 @@ import { friendlyError } from "@/lib/friendlyError";
 import type { CargaCombustible } from "@/types/api";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { CargaCombustibleEditModal } from "./CargaCombustibleEditModal";
+import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
+import { SospechaBadge, motivoAfectaCampo } from "./SospechaBadge";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -49,6 +51,8 @@ export function CargaCombustibleViewModal({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [viewingVehiculo, setViewingVehiculo] = useState(false);
+  const [showFechaRegistro, setShowFechaRegistro] = useState(false);
 
   // Estados para cruzar los datos si el backend no los trae poblados
   const [choferes, setChoferes] = useState<{ id: string; nombre: string }[]>(
@@ -135,6 +139,20 @@ export function CargaCombustibleViewModal({
     vehiculos.find((v) => v.id === carga?.vehiculoId)?.patente ??
     "—";
 
+  const resolvedVehiculoId = carga?.vehiculoId ?? carga?.vehiculo?.id ?? null;
+
+  // La fecha de registro solo interesa cuando difiere de la fecha real de la carga
+  // (carga tardía). Si coinciden, no aporta nada mostrarla.
+  const fechaRegistroDistinta =
+    !!carga && fmtDate(carga.fecha) !== fmtDate(carga.createdAt);
+
+  // Si no se cargó precio por litro (0 histórico), lo derivamos de importe/litros.
+  const precioPorLitroCalculado =
+    !!carga && carga.precioPorLitro === 0 && carga.litros > 0;
+  const precioPorLitroMostrado = precioPorLitroCalculado
+    ? carga!.importe / carga!.litros
+    : carga?.precioPorLitro;
+
   return (
     <ViewModalShell
       title="Detalle de Carga de Combustible"
@@ -166,23 +184,145 @@ export function CargaCombustibleViewModal({
       {!loading && carga && (
         <div className="space-y-6">
           <div className={viewModalGridClass}>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Fecha
+              </p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-vialto-charcoal">
+                {fmtDate(carga.fecha)}
+                {fechaRegistroDistinta && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFechaRegistro((v) => !v)}
+                    className="text-[11px] font-normal normal-case tracking-normal text-vialto-steel underline decoration-dotted underline-offset-2 hover:text-vialto-fire"
+                  >
+                    {showFechaRegistro ? "Ocultar" : "Ver fecha de registro"}
+                  </button>
+                )}
+              </p>
+              {fechaRegistroDistinta && showFechaRegistro && (
+                <p className="mt-1 text-xs text-vialto-steel">
+                  Registrado el {fmtDate(carga.createdAt)}
+                </p>
+              )}
+            </div>
+            {[{ label: "Conductor", value: choferNombre }].map((c, i) => (
+              <div key={i}>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  {c.label}
+                </p>
+                <p className="mt-1 text-sm font-medium text-vialto-charcoal">
+                  {c.value}
+                </p>
+              </div>
+            ))}
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Vehículo
+              </p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-vialto-charcoal">
+                {vehiculoPatente}
+                {resolvedVehiculoId && (
+                  <button
+                    type="button"
+                    onClick={() => setViewingVehiculo(true)}
+                    className="text-[11px] font-normal normal-case tracking-normal text-vialto-steel underline decoration-dotted underline-offset-2 hover:text-vialto-fire"
+                  >
+                    Ver info completa
+                  </button>
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Estación de servicio
+              </p>
+              <p className="mt-1 text-sm font-medium text-vialto-charcoal">
+                {carga.estacion}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Litros
+              </p>
+              <p
+                className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
+                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "litros")
+                    ? "text-amber-700"
+                    : "text-vialto-charcoal"
+                }`}
+              >
+                {`${fmtNum(carga.litros)} L`}
+                {carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "litros") && (
+                    <SospechaBadge motivo={carga.motivoSospecha} />
+                  )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Precio/L
+              </p>
+              <p
+                className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
+                  carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "precioPorLitro")
+                    ? "text-amber-700"
+                    : "text-vialto-charcoal"
+                }`}
+              >
+                {precioPorLitroMostrado != null
+                  ? `$${fmtNum(precioPorLitroMostrado)}`
+                  : "—"}
+                {precioPorLitroCalculado && (
+                  <span className="text-[11px] font-normal italic text-vialto-steel">
+                    (calculado)
+                  </span>
+                )}
+                {carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "precioPorLitro") && (
+                    <SospechaBadge motivo={carga.motivoSospecha} />
+                  )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Monto Total
+              </p>
+              <p
+                className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
+                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "importe")
+                    ? "text-amber-700"
+                    : "text-vialto-charcoal"
+                }`}
+              >
+                {`$${fmtNum(carga.importe)}`}
+                {carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "importe") && (
+                    <SospechaBadge motivo={carga.motivoSospecha} />
+                  )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Kilometraje
+              </p>
+              <p
+                className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
+                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "km")
+                    ? "text-amber-700"
+                    : "text-vialto-charcoal"
+                }`}
+              >
+                {`${fmtNum(carga.km)} km`}
+                {carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "km") && (
+                    <SospechaBadge motivo={carga.motivoSospecha} />
+                  )}
+              </p>
+            </div>
             {[
-              { label: "Fecha", value: fmtDate(carga.fecha) },
-              { label: "Conductor", value: choferNombre }, // Usamos la variable resuelta
-              { label: "Vehículo", value: vehiculoPatente }, // Usamos la variable resuelta
-              { label: "Estación de servicio", value: carga.estacion },
-              { label: "Litros", value: `${fmtNum(carga.litros)} L` },
-              {
-                label: "Precio/L",
-                value:
-                  carga.precioPorLitro != null
-                    ? `$${fmtNum(carga.precioPorLitro)}`
-                    : "—",
-              },
-              { label: "Monto Total", value: `$${fmtNum(carga.importe)}` },
-              { label: "Kilometraje", value: `${fmtNum(carga.km)} km` },
               { label: "Forma de pago", value: carga.formaPago ?? "—" },
-              { label: "Registrado el", value: fmtDate(carga.createdAt) },
             ].map((c, i) => (
               <div key={i}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
@@ -197,7 +337,7 @@ export function CargaCombustibleViewModal({
 
           <div className="border-t border-black/10 pt-6">
             <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-vialto-charcoal">
-              Documentación respaldatoria (Fotos)
+              Documentación respaldatoria
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Fotos del Tacómetro */}
@@ -271,6 +411,15 @@ export function CargaCombustibleViewModal({
               : "Foto del Ticket"
           }
           onClose={() => setPreviewUrl(null)}
+        />
+      )}
+
+      {viewingVehiculo && resolvedVehiculoId && (
+        <VehiculoViewModal
+          vehiculoId={resolvedVehiculoId}
+          patenteTitulo={vehiculoPatente}
+          onClose={() => setViewingVehiculo(false)}
+          editTo={`/vehiculos/${encodeURIComponent(resolvedVehiculoId)}/editar`}
         />
       )}
     </ViewModalShell>

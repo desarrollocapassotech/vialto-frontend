@@ -7,7 +7,7 @@ import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import { apiJson } from '@/lib/api';
-import { canAccessFacturacion } from '@/lib/tenantModules';
+import { canAccessCombustible, canAccessFacturacion } from '@/lib/tenantModules';
 import type { Factura, Viaje } from '@/types/api';
 
 export function TenantHomePage() {
@@ -50,9 +50,11 @@ export function TenantHomePage() {
   const alertas = dash.data?.alertas;
   const showAlertsBlock =
     tenant != null &&
-    canAccessFacturacion(tenant.modules) &&
+    (canAccessFacturacion(tenant.modules) || canAccessCombustible(tenant.modules)) &&
     alertas != null &&
-    (alertas.facturasVencidas.cantidad > 0 || alertas.viajesSinFactura.cantidad > 0);
+    (alertas.facturasVencidas.cantidad > 0 ||
+      alertas.viajesSinFactura.cantidad > 0 ||
+      (alertas.cargasSospechosas?.cantidad ?? 0) > 0);
 
   return (
     <div className="w-full">

@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiJson } from "@/lib/api";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import type { CombustibleDashboardResponse } from "@/types/combustibleDashboard";
@@ -60,6 +61,25 @@ export function CombustibleDashboardSection({
   const [data, setData] = useState<CombustibleDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<CombustibleTab>("resumen");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep link desde el panel de Alertas (ej. "Ir a alertas de combustible →"):
+  // `/?combustibleTab=alertas` salta directo a esta pestaña y hace scroll a la sección.
+  useEffect(() => {
+    if (searchParams.get("combustibleTab") !== "alertas") return;
+    setTab("alertas");
+    document
+      .getElementById("combustible-heading")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("combustibleTab");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const dates = periodToDates(dash.period, dash.customFrom, dash.customTo);
@@ -87,6 +107,7 @@ export function CombustibleDashboardSection({
   }, [dash.period, dash.customFrom, dash.customTo]);
 
   const cantAlertas = data?.alertas.length ?? 0;
+  const periodo = periodToDates(dash.period, dash.customFrom, dash.customTo);
 
   const tabs: { id: CombustibleTab; label: string; badge?: number }[] = [
     { id: "resumen", label: "Resumen" },
@@ -135,8 +156,12 @@ export function CombustibleDashboardSection({
 
       <div className="mt-3">
         {tab === "resumen" && <ResumenPanel data={data} loading={loading} />}
-        {tab === "vehiculo" && <VehiculoRankingTable items={data?.porVehiculo ?? []} />}
-        {tab === "chofer" && <ChoferRankingTable items={data?.porChofer ?? []} />}
+        {tab === "vehiculo" && (
+          <VehiculoRankingTable items={data?.porVehiculo ?? []} periodo={periodo} />
+        )}
+        {tab === "chofer" && (
+          <ChoferRankingTable items={data?.porChofer ?? []} periodo={periodo} />
+        )}
         {tab === "distribucion" && (
           <div className="grid gap-4 lg:grid-cols-2">
             <DistribucionPanel

@@ -7,6 +7,8 @@ import {
 import { Link } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
+import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
+import { motivoShortLabel } from "./SospechaBadge";
 import type {
   CombustibleAlerta,
   CombustibleDashboardResponse,
@@ -210,7 +212,14 @@ export function ResumenPanel({
 
 // ── Por vehículo ─────────────────────────────────────────────────────────
 
-export function VehiculoRankingTable({ items }: { items: CombustiblePorVehiculoItem[] }) {
+export function VehiculoRankingTable({
+  items,
+  periodo,
+}: {
+  items: CombustiblePorVehiculoItem[];
+  /** Rango del dashboard actual, para armar el link "Ver cargas" filtrado. */
+  periodo?: { from: string; to: string } | null;
+}) {
   if (items.length === 0) {
     return <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>;
   }
@@ -226,45 +235,61 @@ export function VehiculoRankingTable({ items }: { items: CombustiblePorVehiculoI
               Litros
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Costo/km
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              L/100km
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Monto
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Cargas
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Costo/km
-            </th>
-            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              L/100km
+              <span className="sr-only">Acciones</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((v) => (
-            <tr key={v.vehiculoId} className="border-b border-black/5 last:border-0">
-              <td className="py-2">
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  <SemaforoDot color={v.semaforo} />
-                  <span className="font-medium text-vialto-charcoal">{v.patente}</span>
-                  <span className="text-xs text-vialto-steel">{fmtTipoVehiculo(v.tipo)}</span>
-                  {v.esOutlier && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
-                      Consume más que su categoría
-                    </span>
-                  )}
-                </span>
-              </td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(v.litros)}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(v.monto)}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{v.cantidad}</td>
-              <td className="py-2 text-right text-vialto-charcoal">
-                {v.costoPorKm != null ? fmtMoney(v.costoPorKm) : "—"}
-              </td>
-              <td className="py-2 text-right text-vialto-charcoal">
-                {v.litrosPor100Km != null ? `${v.litrosPor100Km.toFixed(1)} L` : "—"}
-              </td>
-            </tr>
-          ))}
+          {items.map((v) => {
+            const qs = new URLSearchParams({ vehiculoId: v.vehiculoId });
+            if (periodo?.from) qs.set("from", periodo.from);
+            if (periodo?.to) qs.set("to", periodo.to);
+            return (
+              <tr key={v.vehiculoId} className="border-b border-black/5 last:border-0">
+                <td className="py-2">
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <SemaforoDot color={v.semaforo} />
+                    <span className="font-medium text-vialto-charcoal">{v.patente}</span>
+                    <span className="text-xs text-vialto-steel">{fmtTipoVehiculo(v.tipo)}</span>
+                    {v.esOutlier && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
+                        Consume más que su categoría
+                      </span>
+                    )}
+                  </span>
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(v.litros)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {v.costoPorKm != null ? fmtMoney(v.costoPorKm) : "—"}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {v.litrosPor100Km != null ? `${v.litrosPor100Km.toFixed(1)} L` : "—"}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(v.monto)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{v.cantidad}</td>
+                <td className="py-2 text-right">
+                  <Link
+                    to={`/combustible?${qs.toString()}`}
+                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+                  >
+                    Ver cargas →
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -273,7 +298,14 @@ export function VehiculoRankingTable({ items }: { items: CombustiblePorVehiculoI
 
 // ── Por chofer ───────────────────────────────────────────────────────────
 
-export function ChoferRankingTable({ items }: { items: CombustiblePorChoferItem[] }) {
+export function ChoferRankingTable({
+  items,
+  periodo,
+}: {
+  items: CombustiblePorChoferItem[];
+  /** Rango del dashboard actual, para armar el link "Ver cargas" filtrado. */
+  periodo?: { from: string; to: string } | null;
+}) {
   if (items.length === 0) {
     return <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>;
   }
@@ -294,52 +326,202 @@ export function ChoferRankingTable({ items }: { items: CombustiblePorChoferItem[
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Cargas
             </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              <span className="sr-only">Acciones</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((c) => (
-            <tr key={c.choferId ?? "sin-chofer"} className="border-b border-black/5 last:border-0">
-              <td className="py-2 text-vialto-charcoal">{c.nombre}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(c.litros)}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(c.monto)}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{c.cantidad}</td>
-            </tr>
-          ))}
+          {items.map((c) => {
+            const qs = c.choferId
+              ? new URLSearchParams({ choferId: c.choferId })
+              : null;
+            if (qs) {
+              if (periodo?.from) qs.set("from", periodo.from);
+              if (periodo?.to) qs.set("to", periodo.to);
+            }
+            return (
+              <tr key={c.choferId ?? "sin-chofer"} className="border-b border-black/5 last:border-0">
+                <td className="py-2 text-vialto-charcoal">{c.nombre}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(c.litros)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(c.monto)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{c.cantidad}</td>
+                <td className="py-2 text-right">
+                  {qs && (
+                    <Link
+                      to={`/combustible?${qs.toString()}`}
+                      className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+                    >
+                      Ver cargas →
+                    </Link>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-// ── Distribución (estación / forma de pago) ─────────────────────────────
+// ── Distribución (estación / forma de pago) — gráfico de torta ──────────
 
-function DistribucionBarraFila({
-  label,
-  item,
-  maxMonto,
-}: {
+// Paleta categórica fija — primeros 4 slots del orden validado (únicos 4 que
+// pasan CVD "all-pairs", necesario acá porque en una torta cualquier par de
+// porciones puede terminar siendo vecino, a diferencia de una barra apilada).
+const DONUT_HUES = [
+  "#2a78d6", // blue
+  "#008300", // green
+  "#e87ba4", // magenta
+  "#eda100", // yellow
+];
+const DONUT_OTRAS_HUE = "#c3c2b7"; // gris — no es identidad de serie, es "el resto"
+const DONUT_MAX_SLICES = 4; // + 1 balde "Otras" si sobran más
+const DONUT_GAP_PCT = 0.6; // separador entre porciones, en % de circunferencia
+const DONUT_R = 15.9155; // truco clásico: 2πr ≈ 100, así el % mapea directo al dasharray
+
+type DonutSlice = {
+  clave: string;
   label: string;
-  item: CombustibleDistribucionItem;
-  maxMonto: number;
-}) {
-  const pct = maxMonto > 0 ? Math.max(2, Math.round((item.monto / maxMonto) * 100)) : 0;
+  monto: number;
+  litros: number;
+  cantidad: number;
+  precioPromedio: number;
+  color: string;
+};
+
+function buildDonutSlices(
+  items: CombustibleDistribucionItem[],
+  labelFor: (clave: string) => string,
+): DonutSlice[] {
+  const ordenado = [...items].sort((a, b) => b.monto - a.monto);
+  const top = ordenado.slice(0, DONUT_MAX_SLICES);
+  const resto = ordenado.slice(DONUT_MAX_SLICES);
+
+  const slices: DonutSlice[] = top.map((it, i) => ({
+    clave: it.clave,
+    label: labelFor(it.clave),
+    monto: it.monto,
+    litros: it.litros,
+    cantidad: it.cantidad,
+    precioPromedio: it.precioPromedio,
+    color: DONUT_HUES[i % DONUT_HUES.length],
+  }));
+
+  if (resto.length > 0) {
+    const montoResto = resto.reduce((s, it) => s + it.monto, 0);
+    const litrosResto = resto.reduce((s, it) => s + it.litros, 0);
+    const cantidadResto = resto.reduce((s, it) => s + it.cantidad, 0);
+    slices.push({
+      clave: "__otras__",
+      label: `Otras (${resto.length})`,
+      monto: montoResto,
+      litros: litrosResto,
+      cantidad: cantidadResto,
+      precioPromedio: litrosResto > 0 ? montoResto / litrosResto : 0,
+      color: DONUT_OTRAS_HUE,
+    });
+  }
+
+  return slices;
+}
+
+function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) {
+  const [hoverClave, setHoverClave] = useState<string | null>(null);
+
+  let acumulado = 0;
+  const arcos = slices.map((s) => {
+    const pct = total > 0 ? (s.monto / total) * 100 : 0;
+    const visible = Math.max(0, pct - DONUT_GAP_PCT);
+    const offset = -acumulado;
+    acumulado += pct;
+    return { slice: s, pct, visible, offset };
+  });
+
   return (
-    <li className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <span className="min-w-0 truncate text-sm font-medium text-vialto-charcoal">{label}</span>
-        <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
-          {fmtMoney(item.monto)} · {fmtLitros(item.litros)} · {item.cantidad}{" "}
-          {item.cantidad === 1 ? "carga" : "cargas"} · {fmtMoney(item.precioPromedio)}/L prom.
-        </span>
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+      <div className="relative h-40 w-40 shrink-0">
+        <svg viewBox="0 0 42 42" className="h-full w-full -rotate-90">
+          <circle
+            cx="21"
+            cy="21"
+            r={DONUT_R}
+            fill="transparent"
+            stroke="#e1e0d9"
+            strokeWidth="6"
+          />
+          {arcos.map(({ slice, visible, offset, pct }) => {
+            const esHover = hoverClave === slice.clave;
+            const atenuado = hoverClave !== null && !esHover;
+            return (
+              <circle
+                key={slice.clave}
+                cx="21"
+                cy="21"
+                r={DONUT_R}
+                fill="transparent"
+                stroke={slice.color}
+                strokeWidth={esHover ? 7.5 : 6}
+                strokeDasharray={`${visible} ${100 - visible}`}
+                strokeDashoffset={offset}
+                opacity={atenuado ? 0.35 : 1}
+                className="cursor-pointer transition-[opacity,stroke-width]"
+                tabIndex={0}
+                role="img"
+                aria-label={`${slice.label}: ${pct.toFixed(1)}%, ${fmtMoney(slice.monto)}, ${fmtLitros(slice.litros)}, ${slice.cantidad} ${slice.cantidad === 1 ? "carga" : "cargas"}`}
+                onPointerEnter={() => setHoverClave(slice.clave)}
+                onPointerLeave={() => setHoverClave(null)}
+                onFocus={() => setHoverClave(slice.clave)}
+                onBlur={() => setHoverClave(null)}
+              />
+            );
+          })}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center overflow-hidden">
+          <span className="max-w-[76px] truncate font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.1em] text-vialto-steel">
+            {hoverClave
+              ? (slices.find((s) => s.clave === hoverClave)?.label ?? "Total")
+              : "Total"}
+          </span>
+          <span className="max-w-[76px] text-center text-[13px] font-semibold leading-tight break-words text-vialto-charcoal">
+            {fmtMoney(
+              hoverClave
+                ? (slices.find((s) => s.clave === hoverClave)?.monto ?? total)
+                : total,
+            )}
+          </span>
+        </div>
       </div>
-      <div
-        className="h-2.5 w-full bg-black/5"
-        role="img"
-        aria-label={`${label}: ${fmtMoney(item.monto)}, ${fmtLitros(item.litros)}, ${item.cantidad} ${item.cantidad === 1 ? "carga" : "cargas"}`}
-      >
-        <div className="h-2.5 rounded-r bg-vialto-fire" style={{ width: `${pct}%` }} />
-      </div>
-    </li>
+
+      <ul className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
+        {arcos.map(({ slice, pct }) => (
+          <li
+            key={slice.clave}
+            className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded px-1.5 py-1 transition-colors ${
+              hoverClave === slice.clave ? "bg-vialto-mist/60" : ""
+            }`}
+            onPointerEnter={() => setHoverClave(slice.clave)}
+            onPointerLeave={() => setHoverClave(null)}
+          >
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: slice.color }}
+                aria-hidden
+              />
+              <span className="min-w-0 truncate text-sm font-medium text-vialto-charcoal">
+                {slice.label}
+              </span>
+            </span>
+            <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
+              {pct.toFixed(1)}% · {fmtMoney(slice.monto)} · {fmtLitros(slice.litros)} ·{" "}
+              {slice.cantidad} {slice.cantidad === 1 ? "carga" : "cargas"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -352,7 +534,8 @@ export function DistribucionPanel({
   items: CombustibleDistribucionItem[];
   labelFor: (clave: string) => string;
 }) {
-  const maxMonto = items.reduce((m, it) => Math.max(m, it.monto), 0);
+  const total = items.reduce((s, it) => s + it.monto, 0);
+  const slices = buildDonutSlices(items, labelFor);
   return (
     <div className="bg-white border border-black/10 p-4">
       <p className="mb-3 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
@@ -361,16 +544,7 @@ export function DistribucionPanel({
       {items.length === 0 ? (
         <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {items.map((it) => (
-            <DistribucionBarraFila
-              key={it.clave}
-              label={labelFor(it.clave)}
-              item={it}
-              maxMonto={maxMonto}
-            />
-          ))}
-        </ul>
+        <DonutChart slices={slices} total={total} />
       )}
     </div>
   );
@@ -384,38 +558,84 @@ export function fmtFormaPagoClave(clave: string): string {
 // ── Alertas ──────────────────────────────────────────────────────────────
 
 export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
+  const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
+
   if (alertas.length === 0) {
     return (
       <div className="bg-white border border-black/10 p-4">
-        <p className="text-sm text-vialto-steel">Sin alertas de consumo anómalo en el período.</p>
+        <p className="text-sm text-vialto-steel">Sin cargas marcadas como sospechosas en el período.</p>
       </div>
     );
   }
   return (
-    <ul className="flex flex-col gap-2">
-      {alertas.map((a) => {
-        const esConsumoAlto = a.tipo === "consumo_alto";
-        return (
-          <li
-            key={a.cargaId + a.tipo}
-            className={`rounded border px-4 py-3 text-sm ${
-              esConsumoAlto
-                ? "border-red-200 bg-red-50 text-red-800"
-                : "border-amber-600/30 bg-amber-50 text-amber-900"
-            }`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium">{a.patente}</span>
-              <span className="text-xs opacity-80">{fmtFecha(a.fecha)}</span>
-            </div>
-            <p className="mt-1 text-xs uppercase tracking-wide opacity-70">
-              {esConsumoAlto ? "Consumo alto" : "Recarga sospechosa"}
-            </p>
-            <p className="mt-1">{a.detalle}</p>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="overflow-x-auto bg-white border border-black/10 p-4">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-black/10">
+            <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Tipo
+            </th>
+            <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Fecha
+            </th>
+            <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Vehículo
+            </th>
+            <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Conductor
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Litros
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Costo/L
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              Monto
+            </th>
+            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+              <span className="sr-only">Acciones</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {alertas.map((a) => {
+            return (
+              <tr key={a.cargaId} className="border-b border-black/5 last:border-0">
+                <td className="py-2">
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <SemaforoDot color="rojo" />
+                    {motivoShortLabel(a.motivoSospecha)}
+                  </span>
+                </td>
+                <td className="py-2 whitespace-nowrap text-vialto-charcoal">{fmtFecha(a.fecha)}</td>
+                <td className="py-2 font-medium text-vialto-charcoal">{a.patente}</td>
+                <td className="py-2 text-vialto-charcoal">{a.choferNombre ?? "—"}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(a.litros)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(a.precioPorLitro)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(a.importe)}</td>
+                <td className="py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setViewingCargaId(a.cargaId)}
+                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+                  >
+                    Ver carga →
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {viewingCargaId && (
+        <CargaCombustibleViewModal
+          cargaId={viewingCargaId}
+          onClose={() => setViewingCargaId(null)}
+        />
+      )}
+    </div>
   );
 }
 
