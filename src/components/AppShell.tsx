@@ -185,7 +185,7 @@ export function AppShell() {
         });
         if (!superadmin && hasArca) {
           facturacionItems.push({
-            to: "/liquidaciones/configuracion",
+            to: "/configuracion/arca",
             label: "Configuración ARCA",
             icon: Landmark,
           });

@@ -457,6 +457,7 @@ export interface ArcaConfig {
   condicionIvaEmisor: string | null;
   ingBrutos: string | null;
   inicActEmisor: string | null;
+  logoUrl: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: 'homologacion' | 'produccion';

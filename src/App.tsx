@@ -321,7 +321,7 @@ export default function App() {
           {/* rutas accesibles solo para org:admin y superadmin */}
           <Route element={<RequireOrgAdmin />}>
             <Route
-              path="liquidaciones/configuracion"
+              path="configuracion/arca"
               element={<ArcaConfigTenantPage />}
             />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />

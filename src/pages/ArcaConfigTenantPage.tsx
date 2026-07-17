@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArcaCertificadoModal } from '@/components/liquidaciones/ArcaCertificadoModal';
+import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -175,6 +176,10 @@ export function ArcaConfigTenantPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [certModalOpen, setCertModalOpen] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,6 +285,54 @@ export function ArcaConfigTenantPage() {
       throw new Error(msg);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLogoSelect(file: File) {
+    setLogoError(null);
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (!isImage) {
+      setLogoError('El logo debe ser una imagen JPG, PNG o WEBP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError('El logo no puede superar 5 MB.');
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const config = await apiJson<ArcaConfig>(
+        '/api/integracion-arca/config/logo',
+        () => getToken(),
+        { method: 'POST', body: form },
+      );
+      setExisting(config);
+      showToast('Logo actualizado correctamente.');
+    } catch (e) {
+      setLogoError(friendlyError(e, 'arca'));
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  }
+
+  async function handleLogoRemove() {
+    setLogoError(null);
+    setLogoUploading(true);
+    try {
+      const config = await apiJson<ArcaConfig>(
+        '/api/integracion-arca/config/logo',
+        () => getToken(),
+        { method: 'DELETE' },
+      );
+      setExisting(config);
+      showToast('Logo eliminado.');
+    } catch (e) {
+      setLogoError(friendlyError(e, 'arca'));
+    } finally {
+      setLogoUploading(false);
     }
   }
 
@@ -393,6 +446,84 @@ export function ArcaConfigTenantPage() {
                 />
               </div>
             </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Logo de la empresa"
+            description="Se muestra en los comprobantes emitidos por ARCA."
+          >
+            {!existing ? (
+              <p className="text-xs text-vialto-steel">
+                Guardá el CUIT del emisor en "Datos del emisor" antes de subir el logo.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-4">
+                {existing.logoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setLogoPreviewOpen(true)}
+                    title="Ver logo en tamaño completo"
+                    className="h-16 w-16 shrink-0 rounded border border-black/10 bg-white p-1 hover:ring-2 hover:ring-vialto-fire/35"
+                  >
+                    <img
+                      src={existing.logoUrl}
+                      alt="Logo de la empresa"
+                      className="h-full w-full object-contain"
+                    />
+                  </button>
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded border border-dashed border-black/20 text-center text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Sin logo
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={logoUploading}
+                      onClick={() => logoInputRef.current?.click()}
+                      className="inline-flex h-10 items-center gap-2 rounded border border-black/20 bg-white px-4 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
+                    >
+                      {logoUploading && <Spinner className="h-3.5 w-3.5" />}
+                      {logoUploading ? 'Subiendo…' : existing.logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                    </button>
+                    {existing.logoUrl && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={logoUploading}
+                          onClick={() => setLogoPreviewOpen(true)}
+                          className="text-xs uppercase tracking-wider text-vialto-steel hover:underline disabled:opacity-50"
+                        >
+                          Ver
+                        </button>
+                        <button
+                          type="button"
+                          disabled={logoUploading}
+                          onClick={() => void handleLogoRemove()}
+                          className="text-xs uppercase tracking-wider text-vialto-fire hover:underline disabled:opacity-50"
+                        >
+                          Quitar
+                        </button>
+                      </>
+                    )}
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      disabled={logoUploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void handleLogoSelect(f);
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-vialto-steel">JPG, PNG o WEBP, máximo 5 MB.</p>
+                </div>
+              </div>
+            )}
+            {logoError && <p className="text-xs font-medium text-red-600">{logoError}</p>}
           </SectionCard>
 
           <SectionCard
@@ -544,6 +675,14 @@ export function ArcaConfigTenantPage() {
             await saveSection(CERT_FIELDS, { certPem, keyPem });
             setCertModalOpen(false);
           }}
+        />
+      )}
+
+      {logoPreviewOpen && existing?.logoUrl && (
+        <AdjuntoPreviewModal
+          url={existing.logoUrl}
+          title="Logo de la empresa"
+          onClose={() => setLogoPreviewOpen(false)}
         />
       )}
     </div>

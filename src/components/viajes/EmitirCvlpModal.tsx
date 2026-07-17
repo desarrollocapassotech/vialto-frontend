@@ -438,7 +438,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               {arcaConfigMissing && (
                 <button
                   type="button"
-                  onClick={() => { onClose(); navigate('/liquidaciones/configuracion'); }}
+                  onClick={() => { onClose(); navigate('/configuracion/arca'); }}
                   className="w-full h-9 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
                 >
                   Ir a configuración de ARCA
