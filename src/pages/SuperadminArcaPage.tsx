@@ -1,77 +1,81 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
-import { Receipt } from 'lucide-react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { useToast } from '@/lib/toast';
-import { Spinner } from '@/components/ui/Spinner';
-import { ListadoCard } from '@/components/listado/ListadoCard';
-import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import { EmitirLiquidacionModal } from '@/components/liquidaciones/EmitirLiquidacionModal';
-import { SuperadminOnly } from '@/components/superadmin/SuperadminOnly';
-import { EmpresaFilterBar } from '@/components/superadmin/EmpresaFilterBar';
-import { useTenantsList } from '@/hooks/useTenantsList';
-import { apiJson, apiFetch } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { formatStoredArcaError } from '@/lib/arcaFriendlyError';
+import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { Receipt } from "lucide-react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { useToast } from "@/lib/toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { ListadoCard } from "@/components/listado/ListadoCard";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { apiJson, apiFetch } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
   listadoTablaThClass,
-} from '@/lib/listadoTabla';
-import type { ArcaConfig, ArcaLog, Liquidacion } from '@/types/api';
+} from "@/lib/listadoTabla";
+import type { ArcaConfig, ArcaLog, Liquidacion } from "@/types/api";
 
 // ── Helpers visuales ──────────────────────────────────────────────────────────
 
 const ESTADO_LABEL: Record<string, string> = {
-  borrador: 'Borrador',
-  pendiente_cae: 'Pendiente CAE',
-  autorizado: 'Autorizado',
-  error: 'Error',
-  anulado: 'Anulado',
+  borrador: "Borrador",
+  pendiente_cae: "Pendiente CAE",
+  autorizado: "Autorizado",
+  error: "Error",
+  anulado: "Anulado",
 };
 
 const ESTADO_CLASS: Record<string, string> = {
-  borrador: 'bg-vialto-steel/15 text-vialto-steel',
-  pendiente_cae: 'bg-amber-100 text-amber-800',
-  autorizado: 'bg-green-100 text-green-800',
-  error: 'bg-red-100 text-red-800',
-  anulado: 'bg-slate-100 text-slate-600',
+  borrador: "bg-vialto-steel/15 text-vialto-steel",
+  pendiente_cae: "bg-amber-100 text-amber-800",
+  autorizado: "bg-green-100 text-green-800",
+  error: "bg-red-100 text-red-800",
+  anulado: "bg-slate-100 text-slate-600",
 };
 
-const ars = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
+const ars = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
   maximumFractionDigits: 2,
 });
 const fmt = (n: number) => ars.format(n);
-const fmtDate = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+const fmtDate = (iso: string) =>
+  iso.slice(0, 10).split("-").reverse().join("/");
 const fmtTs = (iso: string) =>
-  new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(iso).toLocaleString("es-AR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 
 // ── Condición IVA emisor (AFIP standard codes) ───────────────────────────────
 
 const CONDICION_IVA_EMISOR = [
-  { value: '1', label: 'IVA Responsable Inscripto' },
-  { value: '6', label: 'Responsable Monotributo' },
-  { value: '4', label: 'IVA Sujeto Exento' },
-  { value: '5', label: 'Consumidor Final' },
-  { value: '3', label: 'IVA no Responsable' },
-  { value: '7', label: 'Sujeto no Categorizado' },
+  { value: "1", label: "IVA Responsable Inscripto" },
+  { value: "6", label: "Responsable Monotributo" },
+  { value: "4", label: "IVA Sujeto Exento" },
+  { value: "5", label: "Consumidor Final" },
+  { value: "3", label: "IVA no Responsable" },
+  { value: "7", label: "Sujeto no Categorizado" },
 ];
 
 // Helpers para la fecha (UI ↔ ARCA format)
 function isoToArcaDate(iso: string): string {
   // "YYYY-MM-DD" → "DD/MM/YYYY"
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
 
 function arcaDateToIso(arca: string): string {
   // "DD/MM/YYYY" → "YYYY-MM-DD"
-  if (!arca) return '';
-  const [d, m, y] = arca.split('/');
-  if (!y) return '';
+  if (!arca) return "";
+  const [d, m, y] = arca.split("/");
+  if (!y) return "";
   return `${y}-${m}-${d}`;
 }
 
@@ -79,30 +83,80 @@ function validateConfigForm(values: ConfigFormValues): Record<string, string> {
   const errors: Record<string, string> = {};
 
   if (!values.cuitEmisor.trim()) {
-    errors.cuitEmisor = 'El CUIT emisor es obligatorio.';
+    errors.cuitEmisor = "El CUIT emisor es obligatorio.";
   }
 
-  const enteroPositivoFields: (keyof ConfigFormValues)[] = ['ptoVentaCvlp', 'ptoVentaFactura'];
+  const enteroPositivoFields: (keyof ConfigFormValues)[] = [
+    "ptoVentaCvlp",
+    "ptoVentaFactura",
+  ];
   for (const field of enteroPositivoFields) {
     const n = Number(values[field]);
     if (!Number.isInteger(n) || n < 1) {
-      errors[field] = 'Debe ser un número entero mayor o igual a 1.';
+      errors[field] = "Debe ser un número entero mayor o igual a 1.";
     }
   }
 
   const porcentajeFields: (keyof ConfigFormValues)[] = [
-    'comisionPctDefault',
-    'comisionPctAlt',
-    'ivaGastosAdmin',
+    "comisionPctDefault",
+    "comisionPctAlt",
+    "ivaGastosAdmin",
   ];
   for (const field of porcentajeFields) {
     const n = Number(values[field]);
     if (Number.isNaN(n) || n < 0 || n > 100) {
-      errors[field] = 'Debe ser un valor entre 0 y 100.';
+      errors[field] = "Debe ser un valor entre 0 y 100.";
     }
   }
 
   return errors;
+}
+
+// ── Modales genéricos ─────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText: string;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded bg-white p-6 shadow-xl">
+        <h3 className="font-[family-name:var(--font-display)] text-lg font-medium text-vialto-charcoal">
+          {title}
+        </h3>
+        <p className="mt-3 text-sm text-vialto-steel">{message}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-vialto-steel hover:bg-slate-100 hover:text-vialto-charcoal transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded bg-red-600 px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-medium text-white hover:bg-red-700 transition-colors"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── ConfigTab ────────────────────────────────────────────────────────────────
@@ -116,7 +170,7 @@ type ConfigFormValues = {
   inicActEmisor: string;
   ptoVentaCvlp: string;
   ptoVentaFactura: string;
-  ambiente: 'homologacion' | 'produccion';
+  ambiente: "homologacion" | "produccion";
   comisionPctDefault: string;
   comisionPctAlt: string;
   ivaGastosAdmin: string;
@@ -125,42 +179,48 @@ type ConfigFormValues = {
 };
 
 const EMPTY_FORM: ConfigFormValues = {
-  cuitEmisor: '',
-  razonSocial: '',
-  domicilioEmisor: '',
-  condicionIvaEmisor: '',
-  ingBrutos: '',
-  inicActEmisor: '',
-  ptoVentaCvlp: '1',
-  ptoVentaFactura: '1',
-  ambiente: 'homologacion',
-  comisionPctDefault: '8',
-  comisionPctAlt: '7',
-  ivaGastosAdmin: '21',
-  certPem: '',
-  keyPem: '',
+  cuitEmisor: "",
+  razonSocial: "",
+  domicilioEmisor: "",
+  condicionIvaEmisor: "",
+  ingBrutos: "",
+  inicActEmisor: "",
+  ptoVentaCvlp: "1",
+  ptoVentaFactura: "1",
+  ambiente: "homologacion",
+  comisionPctDefault: "8",
+  comisionPctAlt: "7",
+  ivaGastosAdmin: "21",
+  certPem: "",
+  keyPem: "",
 };
 
 function configToForm(c: ArcaConfig): ConfigFormValues {
   return {
     cuitEmisor: c.cuitEmisor,
-    razonSocial: c.razonSocial ?? '',
-    domicilioEmisor: c.domicilioEmisor ?? '',
-    condicionIvaEmisor: c.condicionIvaEmisor ?? '',
-    ingBrutos: c.ingBrutos ?? '',
-    inicActEmisor: arcaDateToIso(c.inicActEmisor ?? ''),
+    razonSocial: c.razonSocial ?? "",
+    domicilioEmisor: c.domicilioEmisor ?? "",
+    condicionIvaEmisor: c.condicionIvaEmisor ?? "",
+    ingBrutos: c.ingBrutos ?? "",
+    inicActEmisor: arcaDateToIso(c.inicActEmisor ?? ""),
     ptoVentaCvlp: String(c.ptoVentaCvlp),
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
     comisionPctAlt: String(c.comisionPctAlt),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
-    certPem: '',
-    keyPem: '',
+    certPem: "",
+    keyPem: "",
   };
 }
 
-function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
+function FieldLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label
       htmlFor={htmlFor}
@@ -173,7 +233,7 @@ function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.R
 
 function TextInput({
   id,
-  type = 'text',
+  type = "text",
   value,
   onChange,
   placeholder,
@@ -194,7 +254,7 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${error ? 'border-red-400' : 'border-black/10'}`}
+        className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${error ? "border-red-400" : "border-black/10"}`}
       />
       <CrudFieldError message={error} />
     </>
@@ -245,7 +305,10 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
     };
   }, [getToken, tenantId]);
 
-  function set<K extends keyof ConfigFormValues>(key: K, value: ConfigFormValues[K]) {
+  function set<K extends keyof ConfigFormValues>(
+    key: K,
+    value: ConfigFormValues[K],
+  ) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -266,7 +329,9 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         domicilioEmisor: values.domicilioEmisor.trim() || undefined,
         condicionIvaEmisor: values.condicionIvaEmisor.trim() || undefined,
         ingBrutos: values.ingBrutos.trim() || undefined,
-        inicActEmisor: values.inicActEmisor ? isoToArcaDate(values.inicActEmisor) : undefined,
+        inicActEmisor: values.inicActEmisor
+          ? isoToArcaDate(values.inicActEmisor)
+          : undefined,
         ptoVentaCvlp: Number(values.ptoVentaCvlp),
         ptoVentaFactura: Number(values.ptoVentaFactura),
         ambiente: values.ambiente,
@@ -280,34 +345,40 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       const config = await apiJson<ArcaConfig>(
         `/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
-        { method: 'POST', body: JSON.stringify(body) },
+        { method: "POST", body: JSON.stringify(body) },
       );
       setExisting(config);
       setValues(configToForm(config));
-      showToast('Configuración guardada correctamente.');
+      showToast("Configuración guardada correctamente.");
     } catch (e) {
-      setError(friendlyError(e, 'arca'));
+      setError(friendlyError(e, "arca"));
     } finally {
       setLoading(false);
     }
   }
 
   if (initialLoading) {
-    return <p className="mt-4 text-sm text-vialto-steel">Cargando configuración…</p>;
+    return (
+      <p className="mt-4 text-sm text-vialto-steel">Cargando configuración…</p>
+    );
   }
 
   return (
     <form onSubmit={onSubmit} className="mt-6 max-w-xl space-y-5">
       {existing && (
         <div className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-charcoal">
-          <span className="font-medium">Configurado</span> — última actualización:{' '}
-          {fmtDate(existing.updatedAt)} · ambiente:{' '}
+          <span className="font-medium">Configurado</span> — última
+          actualización: {fmtDate(existing.updatedAt)} · ambiente:{" "}
           <span
             className={`font-medium ${
-              existing.ambiente === 'produccion' ? 'text-red-700' : 'text-amber-700'
+              existing.ambiente === "produccion"
+                ? "text-red-700"
+                : "text-amber-700"
             }`}
           >
-            {existing.ambiente === 'produccion' ? 'Producción' : 'Homologación (testing)'}
+            {existing.ambiente === "produccion"
+              ? "Producción"
+              : "Homologación (testing)"}
           </span>
         </div>
       )}
@@ -321,14 +392,13 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
-
       {/* Datos del emisor */}
       <div className="flex flex-col gap-1.5">
         <FieldLabel htmlFor="razonSocial">Razón Social</FieldLabel>
         <TextInput
           id="razonSocial"
           value={values.razonSocial}
-          onChange={(v) => set('razonSocial', v)}
+          onChange={(v) => set("razonSocial", v)}
           placeholder="Ej: NyM Logística S.R.L."
         />
       </div>
@@ -338,30 +408,34 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         <TextInput
           id="domicilioEmisor"
           value={values.domicilioEmisor}
-          onChange={(v) => set('domicilioEmisor', v)}
+          onChange={(v) => set("domicilioEmisor", v)}
           placeholder="Ej: Av. Siempreviva 742, CABA"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="cuitEmisor">CUIT Emisor <span className="text-red-500">*</span></FieldLabel>
+          <FieldLabel htmlFor="cuitEmisor">
+            CUIT Emisor <span className="text-red-500">*</span>
+          </FieldLabel>
           <input
             id="cuitEmisor"
             type="text"
             value={values.cuitEmisor}
-            onChange={(e) => set('cuitEmisor', e.target.value)}
+            onChange={(e) => set("cuitEmisor", e.target.value)}
             placeholder="20XXXXXXXXXXX"
-            className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${fieldErrors.cuitEmisor ? 'border-red-400' : 'border-black/10'}`}
+            className={`h-10 rounded border bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 ${fieldErrors.cuitEmisor ? "border-red-400" : "border-black/10"}`}
           />
           <CrudFieldError message={fieldErrors.cuitEmisor} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="condicionIvaEmisor">Condición frente al IVA</FieldLabel>
+          <FieldLabel htmlFor="condicionIvaEmisor">
+            Condición frente al IVA
+          </FieldLabel>
           <select
             id="condicionIvaEmisor"
             value={values.condicionIvaEmisor}
-            onChange={(e) => set('condicionIvaEmisor', e.target.value)}
+            onChange={(e) => set("condicionIvaEmisor", e.target.value)}
             className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
           >
             <option value="">— Sin especificar —</option>
@@ -380,7 +454,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           <TextInput
             id="ingBrutos"
             value={values.ingBrutos}
-            onChange={(v) => set('ingBrutos', v)}
+            onChange={(v) => set("ingBrutos", v)}
             placeholder="Ej: CM 20XXXXXXXXX3"
           />
         </div>
@@ -390,7 +464,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             id="inicActEmisor"
             type="date"
             value={values.inicActEmisor}
-            onChange={(e) => set('inicActEmisor', e.target.value)}
+            onChange={(e) => set("inicActEmisor", e.target.value)}
             className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
           />
         </div>
@@ -404,17 +478,19 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
             id="ptoVentaCvlp"
             type="number"
             value={values.ptoVentaCvlp}
-            onChange={(v) => set('ptoVentaCvlp', v)}
+            onChange={(v) => set("ptoVentaCvlp", v)}
             error={fieldErrors.ptoVentaCvlp}
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="ptoVentaFactura">Pto. Venta Factura A/B</FieldLabel>
+          <FieldLabel htmlFor="ptoVentaFactura">
+            Pto. Venta Factura A/B
+          </FieldLabel>
           <TextInput
             id="ptoVentaFactura"
             type="number"
             value={values.ptoVentaFactura}
-            onChange={(v) => set('ptoVentaFactura', v)}
+            onChange={(v) => set("ptoVentaFactura", v)}
             error={fieldErrors.ptoVentaFactura}
           />
         </div>
@@ -425,15 +501,18 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         <FieldLabel>Ambiente</FieldLabel>
         <select
           value={values.ambiente}
-          onChange={(e) => set('ambiente', e.target.value as ConfigFormValues['ambiente'])}
+          onChange={(e) =>
+            set("ambiente", e.target.value as ConfigFormValues["ambiente"])
+          }
           className="h-10 rounded border border-black/10 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
         >
           <option value="homologacion">Homologación (testing)</option>
           <option value="produccion">Producción</option>
         </select>
-        {values.ambiente === 'produccion' && (
+        {values.ambiente === "produccion" && (
           <p className="text-xs text-red-700">
-            Los comprobantes emitidos en producción son reales y tienen validez fiscal ante AFIP.
+            Los comprobantes emitidos en producción son reales y tienen validez
+            fiscal ante AFIP.
           </p>
         )}
       </div>
@@ -441,22 +520,26 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
       {/* Comisiones */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="comisionPctDefault">Comisión default (%)</FieldLabel>
+          <FieldLabel htmlFor="comisionPctDefault">
+            Comisión default (%)
+          </FieldLabel>
           <TextInput
             id="comisionPctDefault"
             type="number"
             value={values.comisionPctDefault}
-            onChange={(v) => set('comisionPctDefault', v)}
+            onChange={(v) => set("comisionPctDefault", v)}
             error={fieldErrors.comisionPctDefault}
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="comisionPctAlt">Comisión alternativa (%)</FieldLabel>
+          <FieldLabel htmlFor="comisionPctAlt">
+            Comisión alternativa (%)
+          </FieldLabel>
           <TextInput
             id="comisionPctAlt"
             type="number"
             value={values.comisionPctAlt}
-            onChange={(v) => set('comisionPctAlt', v)}
+            onChange={(v) => set("comisionPctAlt", v)}
             error={fieldErrors.comisionPctAlt}
           />
         </div>
@@ -469,7 +552,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           id="ivaGastosAdmin"
           type="number"
           value={values.ivaGastosAdmin}
-          onChange={(v) => set('ivaGastosAdmin', v)}
+          onChange={(v) => set("ivaGastosAdmin", v)}
           error={fieldErrors.ivaGastosAdmin}
         />
       </div>
@@ -479,34 +562,51 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         <div>
           <FieldLabel>Certificado y clave privada</FieldLabel>
           <p className="text-xs text-vialto-steel mt-1">
-            Archivos PEM generados en AFIP y vinculados al servicio WSFE. Dejá vacío para conservar el valor actual.
+            Archivos PEM generados en AFIP y vinculados al servicio WSFE. Dejá
+            vacío para conservar el valor actual.
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="certPem">
             Certificado digital (.crt / .pem)
-            {existing?.certConfigurado && <span className="ml-2 normal-case text-green-700">● configurado</span>}
+            {existing?.certConfigurado && (
+              <span className="ml-2 normal-case text-green-700">
+                ● configurado
+              </span>
+            )}
           </FieldLabel>
           <textarea
             id="certPem"
             rows={5}
             value={values.certPem}
-            onChange={(e) => set('certPem', e.target.value)}
-            placeholder={existing?.certConfigurado ? 'Pegá aquí para reemplazar el certificado actual.' : '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'}
+            onChange={(e) => set("certPem", e.target.value)}
+            placeholder={
+              existing?.certConfigurado
+                ? "Pegá aquí para reemplazar el certificado actual."
+                : "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+            }
             className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="keyPem">
             Clave privada (.key / .pem)
-            {existing?.keyConfigurado && <span className="ml-2 normal-case text-green-700">● configurada</span>}
+            {existing?.keyConfigurado && (
+              <span className="ml-2 normal-case text-green-700">
+                ● configurada
+              </span>
+            )}
           </FieldLabel>
           <textarea
             id="keyPem"
             rows={5}
             value={values.keyPem}
-            onChange={(e) => set('keyPem', e.target.value)}
-            placeholder={existing?.keyConfigurado ? 'Pegá aquí para reemplazar la clave actual.' : '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'}
+            onChange={(e) => set("keyPem", e.target.value)}
+            placeholder={
+              existing?.keyConfigurado
+                ? "Pegá aquí para reemplazar la clave actual."
+                : "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+            }
             className="rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y"
           />
         </div>
@@ -518,7 +618,11 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
       >
         {loading && <Spinner />}
-        {loading ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar configuración'}
+        {loading
+          ? "Guardando…"
+          : existing
+            ? "Guardar cambios"
+            : "Guardar configuración"}
       </button>
     </form>
   );
@@ -532,9 +636,17 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [rowProcessing, setRowProcessing] = useState<Record<string, string>>(
+    {},
+  );
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [pendingEmitir, setPendingEmitir] = useState<Liquidacion | null>(null);
+
+  // Estado para la ventana de confirmación
+  const [confirmModal, setConfirmModal] = useState<{
+    id: string;
+    type: "anular" | "eliminar";
+  } | null>(null);
 
   function load() {
     setLoading(true);
@@ -549,8 +661,11 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         () => getToken(),
       ).catch(() => null),
     ])
-      .then(([liq, cfg]) => { setItems(liq); setArcaConfig(cfg); })
-      .catch((e) => setError(friendlyError(e, 'arca')))
+      .then(([liq, cfg]) => {
+        setItems(liq);
+        setArcaConfig(cfg);
+      })
+      .catch((e) => setError(friendlyError(e, "arca")))
       .finally(() => setLoading(false));
   }
 
@@ -559,107 +674,172 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   }, [tenantId]);
 
   function onEmitirSuccess(updated: Liquidacion) {
-    setItems((prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev);
+    setItems(
+      (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+    );
     setPendingEmitir(null);
   }
 
   async function descargarPdf(id: string) {
-    setDownloading(id);
-    setActionError(null);
+    setRowProcessing((prev) => ({ ...prev, [id]: "pdf" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
     try {
       const res = await apiFetch(
         `/api/platform/arca/liquidaciones/${id}/pdf?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
       );
-      if (!res.ok) throw new Error('Error al descargar el PDF');
+      if (!res.ok) throw new Error("Error al descargar el PDF");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `liquidacion-${id}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setActionError(friendlyError(e, 'arca'));
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
     } finally {
-      setDownloading(null);
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
     }
   }
 
-  if (loading) return <p className="mt-6 text-sm text-vialto-steel">Cargando liquidaciones…</p>;
+  async function anular(id: string) {
+    setRowProcessing((prev) => ({ ...prev, [id]: "anular" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    try {
+      await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}/anular?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+        { method: "POST" },
+      );
+      load(); // Refrescamos todo para tener el estado actualizado desde el backend
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
+    } finally {
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+    }
+  }
+
+  async function eliminar(id: string) {
+    setRowProcessing((prev) => ({ ...prev, [id]: "eliminar" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    try {
+      await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+        { method: "DELETE" },
+      );
+      setItems((prev) => prev?.filter((r) => r.id !== id) ?? prev);
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
+    } finally {
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+    }
+  }
+
+  if (loading)
+    return (
+      <p className="mt-6 text-sm text-vialto-steel">Cargando liquidaciones…</p>
+    );
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
 
   return (
     <div className="mt-6 space-y-3">
-      {actionError && (
-        <div
-          className="rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="alert"
-        >
-          {actionError}
-        </div>
-      )}
-
       <ListadoDatos
         columns={[
           {
-            id: 'periodo',
-            header: 'Período',
+            id: "periodo",
+            header: "Período",
             primary: true,
-            cell: (liq) => `${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`,
+            cell: (liq) =>
+              `${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`,
             tdClassName: listadoTablaTdClass,
           },
           {
-            id: 'viajes',
-            header: 'Vj.',
+            id: "viajes",
+            header: "Vj.",
             cell: (liq) => liq.cantViajes,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
-            id: 'bruto',
-            header: 'Bruto',
+            id: "bruto",
+            header: "Bruto",
             cell: (liq) => fmt(liq.bruto),
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
-            id: 'comision',
-            header: 'Comisión',
+            id: "comision",
+            header: "Comisión",
             cell: (liq) => fmt(liq.comision),
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
           },
           {
-            id: 'liquido',
-            header: 'Líquido',
+            id: "liquido",
+            header: "Líquido",
             cell: (liq) => fmt(liq.liquido),
             tdClassName: `${listadoTablaTdClass} text-right font-medium tabular-nums`,
           },
           {
-            id: 'cae',
-            header: 'CAE',
-            cell: (liq) => liq.cae ?? '—',
+            id: "cae",
+            header: "CAE",
+            cell: (liq) => liq.cae ?? "—",
             tdClassName: `${listadoTablaTdClass} font-mono text-xs text-vialto-steel`,
           },
           {
-            id: 'estado',
-            header: 'Estado',
+            id: "estado",
+            header: "Estado",
             cell: (liq) => (
               <>
                 <span
-                  className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ''}`}
+                  className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ""}`}
                 >
                   {ESTADO_LABEL[liq.estado] ?? liq.estado}
                 </span>
-                {liq.arcaError && (() => {
-                  const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
-                  return (
+                {liq.arcaError &&
+                  (() => {
+                    const msg =
+                      formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
+                    return (
+                      <p
+                        className="mt-0.5 max-w-[180px] truncate text-xs text-red-600"
+                        title={msg}
+                      >
+                        {msg}
+                      </p>
+                    );
+                  })()}
+                {rowErrors[liq.id] && (
                   <p
-                    className="mt-0.5 max-w-[180px] truncate text-xs text-red-600"
-                    title={msg}
+                    className="mt-1 max-w-[180px] rounded bg-red-50 p-1 text-xs font-medium text-red-700"
+                    title={rowErrors[liq.id]}
                   >
-                    {msg}
+                    Error: {rowErrors[liq.id]}
                   </p>
-                  );
-                })()}
+                )}
               </>
             ),
             tdClassName: listadoTablaTdClass,
@@ -668,87 +848,166 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         rows={items ?? []}
         rowKey={(liq) => liq.id}
         emptyMessage="No hay liquidaciones para esta empresa."
-        renderActions={(liq) => (
-          <>
-            {(liq.estado === 'borrador' ||
-              liq.estado === 'pendiente_cae' ||
-              liq.estado === 'error') && (
-              <button
-                type="button"
-                onClick={() => setPendingEmitir(liq)}
-                className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
-              >
-                Emitir
-              </button>
-            )}
-            <button
-              type="button"
-              disabled={downloading === liq.id}
-              onClick={() => descargarPdf(liq.id)}
-              className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
-            >
-              {downloading === liq.id ? '…' : 'PDF'}
-            </button>
-          </>
-        )}
-        actionsHeader="Acciones"
-        actionsTdClassName={`${listadoTablaTdClass} text-right`}
-        renderMobileCard={(liq) => (
-          <ListadoCard
-            primary={`${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`}
-            fields={[
-              { label: 'Viajes', value: liq.cantViajes },
-              { label: 'Bruto', value: fmt(liq.bruto) },
-              { label: 'Comisión', value: fmt(liq.comision) },
-              { label: 'Líquido', value: fmt(liq.liquido) },
-              { label: 'CAE', value: liq.cae ?? '—' },
-              {
-                label: 'Estado',
-                value: (
-                  <>
-                    <span
-                      className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ''}`}
-                    >
-                      {ESTADO_LABEL[liq.estado] ?? liq.estado}
-                    </span>
-                    {liq.arcaError && (() => {
-                      const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
-                      return (
-                      <p className="mt-0.5 truncate text-xs text-red-600" title={msg}>
-                        {msg}
-                      </p>
-                      );
-                    })()}
-                  </>
-                ),
-              },
-            ]}
-            actions={
-              <>
-                {(liq.estado === 'borrador' ||
-                  liq.estado === 'pendiente_cae' ||
-                  liq.estado === 'error') && (
-                  <button
-                    type="button"
-                    onClick={() => setPendingEmitir(liq)}
-                    className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright`}
-                  >
-                    <Receipt className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-                    Emitir
-                  </button>
-                )}
+        renderActions={(liq) => {
+          const isProc = rowProcessing[liq.id];
+          return (
+            <>
+              {(liq.estado === "borrador" || liq.estado === "error") && (
                 <button
                   type="button"
-                  disabled={downloading === liq.id}
-                  onClick={() => descargarPdf(liq.id)}
-                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                  disabled={!!isProc}
+                  onClick={() => setPendingEmitir(liq)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright disabled:opacity-50`}
                 >
-                  {downloading === liq.id ? '…' : 'PDF'}
+                  Emitir
                 </button>
-              </>
-            }
-          />
-        )}
+              )}
+              {(liq.estado === "autorizado" || liq.estado === "anulado") && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() => descargarPdf(liq.id)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
+                >
+                  {isProc === "pdf" ? "…" : "PDF"}
+                </button>
+              )}
+              {liq.estado === "autorizado" && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() =>
+                    setConfirmModal({ id: liq.id, type: "anular" })
+                  }
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                >
+                  {isProc === "anular" ? "…" : "Anular"}
+                </button>
+              )}
+              {(liq.estado === "borrador" ||
+                liq.estado === "error" ||
+                liq.estado === "pendiente_cae") && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() =>
+                    setConfirmModal({ id: liq.id, type: "eliminar" })
+                  }
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
+                >
+                  {isProc === "eliminar" ? "…" : "Eliminar"}
+                </button>
+              )}
+            </>
+          );
+        }}
+        actionsHeader="Acciones"
+        actionsTdClassName={`${listadoTablaTdClass} text-right`}
+        renderMobileCard={(liq) => {
+          const isProc = rowProcessing[liq.id];
+          return (
+            <ListadoCard
+              primary={`${fmtDate(liq.periodoDesde)} – ${fmtDate(liq.periodoHasta)}`}
+              fields={[
+                { label: "Viajes", value: liq.cantViajes },
+                { label: "Bruto", value: fmt(liq.bruto) },
+                { label: "Comisión", value: fmt(liq.comision) },
+                { label: "Líquido", value: fmt(liq.liquido) },
+                { label: "CAE", value: liq.cae ?? "—" },
+                {
+                  label: "Estado",
+                  value: (
+                    <>
+                      <span
+                        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_CLASS[liq.estado] ?? ""}`}
+                      >
+                        {ESTADO_LABEL[liq.estado] ?? liq.estado}
+                      </span>
+                      {liq.arcaError &&
+                        (() => {
+                          const msg =
+                            formatStoredArcaError(liq.arcaError) ??
+                            liq.arcaError;
+                          return (
+                            <p
+                              className="mt-0.5 truncate text-xs text-red-600"
+                              title={msg}
+                            >
+                              {msg}
+                            </p>
+                          );
+                        })()}
+                      {rowErrors[liq.id] && (
+                        <p
+                          className="mt-1 rounded bg-red-50 p-1 text-xs font-medium text-red-700"
+                          title={rowErrors[liq.id]}
+                        >
+                          Error: {rowErrors[liq.id]}
+                        </p>
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+              actions={
+                <>
+                  {(liq.estado === "borrador" || liq.estado === "error") && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() => setPendingEmitir(liq)}
+                      className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-vialto-fire hover:text-vialto-bright disabled:opacity-50`}
+                    >
+                      <Receipt
+                        className="h-3.5 w-3.5 shrink-0"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                      Emitir
+                    </button>
+                  )}
+                  {(liq.estado === "autorizado" ||
+                    liq.estado === "anulado") && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() => descargarPdf(liq.id)}
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
+                    >
+                      {isProc === "pdf" ? "…" : "PDF"}
+                    </button>
+                  )}
+                  {liq.estado === "autorizado" && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() =>
+                        setConfirmModal({ id: liq.id, type: "anular" })
+                      }
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                    >
+                      {isProc === "anular" ? "…" : "Anular"}
+                    </button>
+                  )}
+                  {(liq.estado === "borrador" ||
+                    liq.estado === "error" ||
+                    liq.estado === "pendiente_cae") && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() =>
+                        setConfirmModal({ id: liq.id, type: "eliminar" })
+                      }
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
+                    >
+                      {isProc === "eliminar" ? "…" : "Eliminar"}
+                    </button>
+                  )}
+                </>
+              }
+            />
+          );
+        }}
       />
 
       {pendingEmitir && (
@@ -761,6 +1020,29 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
           ivaPct={arcaConfig?.ivaGastosAdmin}
         />
       )}
+
+      {/* Modal de confirmación para Anular / Eliminar */}
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        onConfirm={() => {
+          if (!confirmModal) return;
+          if (confirmModal.type === "anular") anular(confirmModal.id);
+          if (confirmModal.type === "eliminar") eliminar(confirmModal.id);
+          setConfirmModal(null);
+        }}
+        title={
+          confirmModal?.type === "anular"
+            ? "Anular liquidación"
+            : "Eliminar liquidación"
+        }
+        message={
+          confirmModal?.type === "anular"
+            ? "¿Deseas anular esta liquidación? Esta acción no se puede deshacer."
+            : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
+        }
+        confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}
+      />
     </div>
   );
 }
@@ -781,11 +1063,12 @@ function LogsTab({ tenantId }: { tenantId: string }) {
       () => getToken(),
     )
       .then(setLogs)
-      .catch((e) => setError(friendlyError(e, 'arca')))
+      .catch((e) => setError(friendlyError(e, "arca")))
       .finally(() => setLoading(false));
   }, [tenantId]);
 
-  if (loading) return <p className="mt-6 text-sm text-vialto-steel">Cargando logs…</p>;
+  if (loading)
+    return <p className="mt-6 text-sm text-vialto-steel">Cargando logs…</p>;
   if (error) return <p className="mt-6 text-sm text-amber-700">{error}</p>;
 
   return (
@@ -793,49 +1076,51 @@ function LogsTab({ tenantId }: { tenantId: string }) {
       className="mt-6"
       columns={[
         {
-          id: 'fecha',
-          header: 'Fecha',
+          id: "fecha",
+          header: "Fecha",
           primary: true,
           cell: (log) => fmtTs(log.createdAt),
           tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
         },
         {
-          id: 'method',
-          header: 'Método',
+          id: "method",
+          header: "Método",
           cell: (log) => (
-            <span className="font-mono text-xs text-vialto-charcoal">{log.method}</span>
+            <span className="font-mono text-xs text-vialto-charcoal">
+              {log.method}
+            </span>
           ),
           tdClassName: listadoTablaTdClass,
         },
         {
-          id: 'ambiente',
-          header: 'Ambiente',
+          id: "ambiente",
+          header: "Ambiente",
           cell: (log) => log.ambiente,
           tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
         },
         {
-          id: 'http',
-          header: 'HTTP',
-          cell: (log) => log.httpStatus ?? '—',
+          id: "http",
+          header: "HTTP",
+          cell: (log) => log.httpStatus ?? "—",
           thClassName: `${listadoTablaThClass} text-right`,
           tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-xs text-vialto-steel`,
         },
         {
-          id: 'ms',
-          header: 'ms',
+          id: "ms",
+          header: "ms",
           cell: (log) => log.durationMs,
           thClassName: `${listadoTablaThClass} text-right`,
           tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-xs text-vialto-steel`,
         },
         {
-          id: 'resultado',
-          header: 'Resultado',
+          id: "resultado",
+          header: "Resultado",
           cell: (log) =>
             log.exitoso ? (
               <span className="font-medium text-green-700">OK</span>
             ) : (
-              <span className="text-red-600" title={log.error ?? ''}>
-                {log.error ? 'Error' : 'Fallido'}
+              <span className="text-red-600" title={log.error ?? ""}>
+                {log.error ? "Error" : "Fallido"}
               </span>
             ),
           tdClassName: listadoTablaTdClass,
@@ -848,16 +1133,19 @@ function LogsTab({ tenantId }: { tenantId: string }) {
         <ListadoCard
           primary={fmtTs(log.createdAt)}
           fields={[
-            { label: 'Método', value: <span className="font-mono">{log.method}</span> },
-            { label: 'Ambiente', value: log.ambiente },
-            { label: 'HTTP', value: log.httpStatus ?? '—' },
-            { label: 'ms', value: log.durationMs },
             {
-              label: 'Resultado',
+              label: "Método",
+              value: <span className="font-mono">{log.method}</span>,
+            },
+            { label: "Ambiente", value: log.ambiente },
+            { label: "HTTP", value: log.httpStatus ?? "—" },
+            { label: "ms", value: log.durationMs },
+            {
+              label: "Resultado",
               value: log.exitoso ? (
                 <span className="font-medium text-green-700">OK</span>
               ) : (
-                <span className="text-red-600">{log.error ?? 'Fallido'}</span>
+                <span className="text-red-600">{log.error ?? "Fallido"}</span>
               ),
             },
           ]}
@@ -869,22 +1157,22 @@ function LogsTab({ tenantId }: { tenantId: string }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'config' | 'liquidaciones' | 'logs';
+type Tab = "config" | "liquidaciones" | "logs";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'config', label: 'Configuración' },
-  { id: 'liquidaciones', label: 'Liquidaciones' },
-  { id: 'logs', label: 'Logs de auditoría' },
+  { id: "config", label: "Configuración" },
+  { id: "liquidaciones", label: "Liquidaciones" },
+  { id: "logs", label: "Logs de auditoría" },
 ];
 
 export function SuperadminArcaPage() {
   const tenants = useTenantsList();
-  const [tenantId, setTenantId] = useState('');
-  const [tab, setTab] = useState<Tab>('config');
+  const [tenantId, setTenantId] = useState("");
+  const [tab, setTab] = useState<Tab>("config");
 
   function handleTenantChange(next: string) {
     setTenantId(next);
-    setTab('config');
+    setTab("config");
   }
 
   return (
@@ -898,7 +1186,11 @@ export function SuperadminArcaPage() {
         </p>
 
         <div className="mt-6">
-          <EmpresaFilterBar tenants={tenants} value={tenantId} onChange={handleTenantChange} />
+          <EmpresaFilterBar
+            tenants={tenants}
+            value={tenantId}
+            onChange={handleTenantChange}
+          />
         </div>
 
         {!tenantId && (
@@ -916,22 +1208,26 @@ export function SuperadminArcaPage() {
                   type="button"
                   onClick={() => setTab(t.id)}
                   className={[
-                    'px-4 py-2.5 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider border-b-2 -mb-px transition-colors',
+                    "px-4 py-2.5 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider border-b-2 -mb-px transition-colors",
                     tab === t.id
-                      ? 'border-vialto-fire font-semibold text-vialto-charcoal'
-                      : 'border-transparent text-vialto-steel hover:text-vialto-charcoal',
-                  ].join(' ')}
+                      ? "border-vialto-fire font-semibold text-vialto-charcoal"
+                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
+                  ].join(" ")}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
 
-            {tab === 'config' && <ConfigTab key={`cfg-${tenantId}`} tenantId={tenantId} />}
-            {tab === 'liquidaciones' && (
+            {tab === "config" && (
+              <ConfigTab key={`cfg-${tenantId}`} tenantId={tenantId} />
+            )}
+            {tab === "liquidaciones" && (
               <LiquidacionesTab key={`liq-${tenantId}`} tenantId={tenantId} />
             )}
-            {tab === 'logs' && <LogsTab key={`log-${tenantId}`} tenantId={tenantId} />}
+            {tab === "logs" && (
+              <LogsTab key={`log-${tenantId}`} tenantId={tenantId} />
+            )}
           </>
         )}
       </div>
