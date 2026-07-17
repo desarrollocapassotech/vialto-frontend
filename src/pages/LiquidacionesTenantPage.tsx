@@ -14,6 +14,7 @@ import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEdit
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiFetch, apiJson } from "@/lib/api";
+import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
@@ -321,11 +322,15 @@ export function LiquidacionesTenantPage() {
         () => getToken(),
       );
       if (!res.ok) throw new Error("Error al generar el PDF");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `liquidacion-${liq.id}.pdf`,
+      );
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `liquidacion-${liq.id}.pdf`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

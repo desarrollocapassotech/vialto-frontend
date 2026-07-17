@@ -11,6 +11,7 @@ import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson, apiFetch } from "@/lib/api";
+import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
@@ -693,11 +694,15 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         () => getToken(),
       );
       if (!res.ok) throw new Error("Error al descargar el PDF");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `liquidacion-${id}.pdf`,
+      );
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `liquidacion-${id}.pdf`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
