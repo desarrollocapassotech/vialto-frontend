@@ -9,6 +9,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import { FORMA_PAGO_LABELS } from "@/lib/combustibleLabels";
+import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
 function toLocalDateString(isoDate: string | null | undefined) {
@@ -60,6 +61,24 @@ export function CargaCombustibleEditModal({
   const [vehiculoSeleccionado, setVehiculoSeleccionado] =
     useState(initialVehiculoId);
 
+  const defaultDate = toLocalDateString(carga.fecha);
+  const [fecha, setFecha] = useState(defaultDate);
+  const [litros, setLitros] = useState(String(carga.litros));
+  const [precioPorLitro, setPrecioPorLitro] = useState(String(carga.precioPorLitro ?? ""));
+  const [importe, setImporte] = useState(String(carga.importe));
+  const [km, setKm] = useState(String(carga.km));
+
+  const { formErrors } = useCombustibleValidation(
+    getToken,
+    vehiculoSeleccionado,
+    fecha,
+    litros,
+    precioPorLitro,
+    importe,
+    km,
+    carga.id
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -91,10 +110,10 @@ export function CargaCombustibleEditModal({
     };
   }, [getToken, carga, initialChoferId, initialVehiculoId]);
 
-  const defaultDate = toLocalDateString(carga.fecha);
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (Object.keys(formErrors).length > 0) return;
+
     setSaving(true);
     setError(null);
 
@@ -154,7 +173,7 @@ export function CargaCombustibleEditModal({
           <button
             type="submit"
             form="edit-carga-form"
-            disabled={saving}
+            disabled={saving || Object.keys(formErrors).length > 0}
             className={viewModalBtnPrimary}
           >
             {saving ? "Guardando..." : "Guardar Cambios"}
@@ -181,7 +200,8 @@ export function CargaCombustibleEditModal({
               type="date"
               id="fecha"
               name="fecha"
-              defaultValue={defaultDate}
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
               required
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
@@ -274,7 +294,8 @@ export function CargaCombustibleEditModal({
               step="0.01"
               id="litros"
               name="litros"
-              defaultValue={carga.litros}
+              value={litros}
+              onChange={(e) => setLitros(e.target.value)}
               required
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
@@ -292,7 +313,8 @@ export function CargaCombustibleEditModal({
               step="0.01"
               id="precioPorLitro"
               name="precioPorLitro"
-              defaultValue={carga.precioPorLitro ?? ""}
+              value={precioPorLitro}
+              onChange={(e) => setPrecioPorLitro(e.target.value)}
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
           </div>
@@ -309,10 +331,16 @@ export function CargaCombustibleEditModal({
               step="0.01"
               id="importe"
               name="importe"
-              defaultValue={carga.importe}
+              value={importe}
+              onChange={(e) => setImporte(e.target.value)}
               required
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
+            {formErrors.importe && (
+              <p className="mt-1 text-xs font-semibold text-red-600">
+                ⚠️ {formErrors.importe}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col">
@@ -326,10 +354,16 @@ export function CargaCombustibleEditModal({
               type="number"
               id="km"
               name="km"
-              defaultValue={carga.km}
+              value={km}
+              onChange={(e) => setKm(e.target.value)}
               required
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
+            {formErrors.km && (
+              <p className="mt-1 text-xs font-semibold text-red-600">
+                ⚠️ {formErrors.km}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col">
