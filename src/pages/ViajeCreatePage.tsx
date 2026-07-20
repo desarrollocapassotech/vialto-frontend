@@ -93,6 +93,7 @@ import type {
   Vehiculo,
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   type OpcionProducto,
   type ViajeProductoItem,
@@ -116,6 +117,7 @@ export function ViajeCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const { isVisible } = useFieldConfig("viajes");
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
@@ -1060,27 +1062,29 @@ export function ViajeCreatePage() {
               }
             />
 
-            <ViajeGananciaBrutaManualFieldset
-              draft={{
-                operacionModo: modoOperacion,
-                monto,
-                monedaMonto,
-                precioTransportistaExterno,
-                monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-                gananciaBrutaManual,
-                monedaGananciaBrutaManual,
-                otrosGastos,
-              }}
-              onPatch={(p) => {
-                if (p.gananciaBrutaManual !== undefined)
-                  setGananciaBrutaManual(p.gananciaBrutaManual);
-                if (p.monedaGananciaBrutaManual !== undefined) {
-                  setMonedaGananciaBrutaManual(p.monedaGananciaBrutaManual);
-                }
-              }}
-              labelClassName={fieldLabelClass}
-              inputClassName={inputClass}
-            />
+            {isVisible("alta_viaje", "gananciaBrutaManual") && (
+              <ViajeGananciaBrutaManualFieldset
+                draft={{
+                  operacionModo: modoOperacion,
+                  monto,
+                  monedaMonto,
+                  precioTransportistaExterno,
+                  monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+                  gananciaBrutaManual,
+                  monedaGananciaBrutaManual,
+                  otrosGastos,
+                }}
+                onPatch={(p) => {
+                  if (p.gananciaBrutaManual !== undefined)
+                    setGananciaBrutaManual(p.gananciaBrutaManual);
+                  if (p.monedaGananciaBrutaManual !== undefined) {
+                    setMonedaGananciaBrutaManual(p.monedaGananciaBrutaManual);
+                  }
+                }}
+                labelClassName={fieldLabelClass}
+                inputClassName={inputClass}
+              />
+            )}
             <ViajeFechaHoraFields
               fechaCarga={fechaCarga}
               horaCarga={horaCarga}
@@ -1105,7 +1109,8 @@ export function ViajeCreatePage() {
               errorFechaDescarga={fechaDescargaError}
             />
             {estadoMuestraKmLitros(estado) && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+              {isVisible("alta_viaje", "kmRecorridos") && (
                 <div className="flex flex-col gap-1">
                   <span className={fieldLabelClass}>Km recorridos</span>
                   <input
@@ -1116,6 +1121,8 @@ export function ViajeCreatePage() {
                     className={inputClass}
                   />
                 </div>
+              )}
+              {isVisible("alta_viaje", "litrosConsumidos") && (
                 <div className="flex flex-col gap-1">
                   <span className={fieldLabelClass}>Litros consumidos</span>
                   <input
@@ -1126,8 +1133,10 @@ export function ViajeCreatePage() {
                     className={inputClass}
                   />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
+            {isVisible("alta_viaje", "productoItems") && (
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Productos</span>
               <ViajeProductosLista
@@ -1148,6 +1157,8 @@ export function ViajeCreatePage() {
                 }
               />
             </div>
+          )}
+          {isVisible("alta_viaje", "detalleCarga") && (
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Detalle adicional</span>
               <textarea
@@ -1157,6 +1168,8 @@ export function ViajeCreatePage() {
                 className={textareaLongClass}
               />
             </div>
+          )}
+          {isVisible("alta_viaje", "observaciones") && (
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Observaciones</span>
               <textarea
@@ -1166,6 +1179,8 @@ export function ViajeCreatePage() {
                 className={textareaLongClass}
               />
             </div>
+          )}
+          {isVisible("alta_viaje", "otrosGastos") && (
             <div className="md:col-span-2 lg:col-span-3">
               <OtrosGastosFieldset
                 rows={otrosGastos}
@@ -1175,41 +1190,39 @@ export function ViajeCreatePage() {
               <button
                 type="button"
                 onClick={() =>
-                  setOtrosGastos((prev) => [
-                    ...prev,
-                    emptyOtroGasto(gastoAutor),
-                  ])
+                  setOtrosGastos((prev) => [...prev, emptyOtroGasto(gastoAutor)])
                 }
                 className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
               >
                 + Agregar gasto
               </button>
             </div>
-            {modoOperacion === "externo" && (
-              <div className="md:col-span-2 lg:col-span-3">
-                <PagosTransportistaFieldset
-                  rows={pagosTransportista}
-                  onChange={setPagosTransportista}
-                  saldoContext={{
-                    transportistaId,
-                    precioTransportistaExterno,
-                    monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPagosTransportista((prev) => [
-                      ...prev,
-                      emptyPagoTransportista(monedaPrecioTransportista),
-                    ])
-                  }
-                  className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
-                >
-                  + Agregar pago al transportista
-                </button>
-              </div>
-            )}
+          )}
+          {modoOperacion === "externo" && isVisible("alta_viaje", "pagosTransportista") && (
+            <div className="md:col-span-2 lg:col-span-3">
+              <PagosTransportistaFieldset
+                rows={pagosTransportista}
+                onChange={setPagosTransportista}
+                saldoContext={{
+                  transportistaId,
+                  precioTransportistaExterno,
+                  monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setPagosTransportista((prev) => [
+                    ...prev,
+                    emptyPagoTransportista(monedaPrecioTransportista),
+                  ])
+                }
+                className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+              >
+                + Agregar pago al transportista
+              </button>
+            </div>
+          )}
             <div className="md:col-span-2 lg:col-span-3">
               <ViajeExportacionLeyenda />
             </div>
