@@ -5,6 +5,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useToast } from "@/lib/toast";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -44,6 +45,16 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
     formaPago: "",
   });
 
+  const { formErrors } = useCombustibleValidation(
+    getToken,
+    formData.vehiculoId,
+    formData.fecha,
+    formData.litros,
+    formData.precioPorLitro,
+    formData.importe,
+    formData.km
+  );
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -53,6 +64,8 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (Object.keys(formErrors).length > 0) return;
+
     setLoading(true);
     setError(null);
 
@@ -224,6 +237,11 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
                 placeholder="0.00"
               />
+              {formErrors.importe && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  ⚠️ {formErrors.importe}
+                </p>
+              )}
             </div>
 
             <div>
@@ -238,6 +256,11 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
                 placeholder="Ej: 450.000"
               />
+              {formErrors.km && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  ⚠️ {formErrors.km}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -269,8 +292,8 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+              disabled={loading || Object.keys(formErrors).length > 0}
+              className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
             >
               {loading ? "Guardando..." : "Guardar Carga"}
             </button>
