@@ -90,7 +90,7 @@ export function LiquidacionViewModal({
 
   const transportistaNombre =
     liq.transportista?.nombre ?? liq.transportistaId;
-  const ivaBase = liq.bruto - liq.comision;
+  const ivaBase = liq.bruto - liq.comision - liq.gastosAdmin;
   const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
 
   return (
