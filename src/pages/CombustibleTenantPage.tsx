@@ -119,7 +119,7 @@ export function CombustibleTenantPage() {
   // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const maestro = useMaestroData();
-  const { showToast } = useToast(); // <-- Instancia del context de toasts
+  const { showToast } = useToast();
 
   // ─── ESTADOS DE LA TABLA Y PAGINACIÓN ────────────────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
@@ -132,7 +132,6 @@ export function CombustibleTenantPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Filtros iniciales que puede traer el link "Ver cargas" del dashboard
-  // (por vehículo o por chofer + período). Solo se leen una vez, al montar.
   const [searchParams] = useSearchParams();
   const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
   const initialChoferId = searchParams.get("choferId") ?? "";
@@ -140,9 +139,6 @@ export function CombustibleTenantPage() {
   const initialTo = searchParams.get("to");
 
   // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
-  // Rango de fechas aplicado (dispara el fetch) vs. borrador en los inputs
-  // (solo se aplica al hacer clic en "Filtrar"). Por defecto: mes actual a hoy,
-  // salvo que venga un rango explícito por query param.
   const [desde, setDesde] = useState<string>(
     () => initialFrom || primerDiaMesActual(),
   );
@@ -154,6 +150,14 @@ export function CombustibleTenantPage() {
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
   const [estaciones, setEstaciones] = useState<string[]>([]);
+
+  // ─── ESTADOS PARA OPCIONES DINÁMICAS (FILTROS EN CASCADA) ──────────────
+  const [opcionesValidas, setOpcionesValidas] = useState<{
+    choferIds: Set<string>;
+    vehiculoIds: Set<string>;
+    estaciones: Set<string>;
+    formasPago: Set<string>;
+  } | null>(null);
 
   // Control de apertura de modales de visualización y alta
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
@@ -192,8 +196,6 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
-  // El rango de fechas siempre tiene un valor (por defecto mes actual → hoy),
-  // así que solo cuenta como "filtro activo" cuando el usuario lo cambió.
   const rangoFechaPorDefecto =
     desde === primerDiaMesActual() && hasta === hoyIso();
 
@@ -201,7 +203,6 @@ export function CombustibleTenantPage() {
     !rangoFechaPorDefecto || vehiculoId || choferId || estacion || formaPago,
   );
 
-  // Parámetros de filtro compartidos entre el listado y la exportación.
   function filtroParams(): URLSearchParams {
     const qs = new URLSearchParams();
     if (desde) qs.set("from", desde);
@@ -260,7 +261,60 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
-  // Estaciones distintas entre las cargas existentes, para el filtro (independiente de la página/filtros actuales).
+  // ─── EFECTO: CALCULAR OPCIONES DE FILTROS DINÁMICOS ──────────────────────
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const qs = filtroParams();
+        qs.set("page", "1");
+        qs.set("limit", "10000"); // Límite alto para mapear las combinaciones de la consulta actual
+
+        const data = await apiJson<CombustibleListResponse>(
+          `/api/combustible?${qs.toString()}`,
+          () => getToken(),
+        );
+
+        if (!cancelled) {
+          setOpcionesValidas({
+            choferIds: new Set(
+              data.cargas.map((c) => c.choferId).filter(Boolean) as string[],
+            ),
+            vehiculoIds: new Set(
+              data.cargas.map((c) => c.vehiculoId).filter(Boolean) as string[],
+            ),
+            estaciones: new Set(
+              data.cargas.map((c) => c.estacion).filter(Boolean) as string[],
+            ),
+            formasPago: new Set(
+              data.cargas.map((c) => c.formaPago).filter(Boolean) as string[],
+            ),
+          });
+        }
+      } catch (e) {
+        if (!cancelled)
+          console.warn("No se pudieron cargar los filtros dinámicos", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLoaded,
+    isSignedIn,
+    desde,
+    hasta,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    getToken,
+  ]);
+
+  // Estaciones distintas entre las cargas existentes, para el filtro
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -272,7 +326,7 @@ export function CombustibleTenantPage() {
         );
         if (!cancelled) setEstaciones(data);
       } catch {
-        // silencioso — el filtro queda con solo la opción "Todas"
+        // silencioso
       }
     })();
     return () => {
@@ -280,7 +334,7 @@ export function CombustibleTenantPage() {
     };
   }, [isLoaded, isSignedIn, getToken]);
 
-  // Cerrar el menú de exportación al hacer click afuera o presionar Escape.
+  // Cerrar el menú de exportación
   useEffect(() => {
     if (!exportMenuOpen) return;
     function onDocClick(e: MouseEvent) {
@@ -302,7 +356,6 @@ export function CombustibleTenantPage() {
     };
   }, [exportMenuOpen]);
 
-  // Trae todas las cargas del filtro actual (sin límite de página).
   async function fetchTodasLasCargas(): Promise<CargaCombustible[]> {
     const qs = filtroParams();
     qs.set("page", "1");
@@ -345,7 +398,6 @@ export function CombustibleTenantPage() {
         { method: "DELETE" },
       );
 
-      // --> TOAST INYECTADO: FEEDBACK DE ÉXITO AL BORRAR <--
       showToast("Carga de combustible eliminada correctamente", "success");
 
       const deletedId = deleteTarget.id;
@@ -360,15 +412,12 @@ export function CombustibleTenantPage() {
       setDeleteTarget(null);
     } catch (e) {
       setDeleteError(friendlyError(e, "combustible"));
-
-      // --> TOAST INYECTADO: FEEDBACK DE ERROR AL BORRAR <--
       showToast("No se pudo eliminar la carga de combustible", "error");
     } finally {
       setDeleting(false);
     }
   }
 
-  // Permite cerrar el diálogo de borrado presionando la tecla Escape
   useEffect(() => {
     if (!deleteTarget) return;
     const onKey = (e: KeyboardEvent) => {
@@ -378,7 +427,6 @@ export function CombustibleTenantPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [deleteTarget, deleting]);
 
-  // Constantes calculadas para alimentar la barra de paginación
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const meta: PaginatedMeta = {
     page,
@@ -394,23 +442,39 @@ export function CombustibleTenantPage() {
 
   const exportDisabled = rows === null || total === 0 || downloading;
 
-  // Opciones para los filtros con buscador (conductor, vehículo, estación)
-  const choferOptions = useMemo(
-    () => maestro.choferes.map((ch) => ({ value: ch.id, label: ch.nombre })),
-    [maestro.choferes],
-  );
-  const vehiculoOptions = useMemo(
-    () =>
-      maestro.vehiculos.map((v) => ({
-        value: v.id,
-        label: fmtVehiculoLabel(v),
-      })),
-    [maestro.vehiculos],
-  );
-  const estacionOptions = useMemo(
-    () => estaciones.map((e) => ({ value: e, label: e })),
-    [estaciones],
-  );
+  // ─── OPCIONES DINÁMICAS PARA FILTROS ──────────────────────────────────────
+  const choferOptions = useMemo(() => {
+    let base = maestro.choferes;
+    if (opcionesValidas) {
+      base = base.filter(
+        (ch) => opcionesValidas.choferIds.has(ch.id) || ch.id === choferId,
+      );
+    }
+    return base.map((ch) => ({ value: ch.id, label: ch.nombre }));
+  }, [maestro.choferes, opcionesValidas, choferId]);
+
+  const vehiculoOptions = useMemo(() => {
+    let base = maestro.vehiculos;
+    if (opcionesValidas) {
+      base = base.filter(
+        (v) => opcionesValidas.vehiculoIds.has(v.id) || v.id === vehiculoId,
+      );
+    }
+    return base.map((v) => ({
+      value: v.id,
+      label: fmtVehiculoLabel(v),
+    }));
+  }, [maestro.vehiculos, opcionesValidas, vehiculoId]);
+
+  const estacionOptions = useMemo(() => {
+    let base = estaciones;
+    if (opcionesValidas) {
+      base = base.filter(
+        (e) => opcionesValidas.estaciones.has(e) || e === estacion,
+      );
+    }
+    return base.map((e) => ({ value: e, label: e }));
+  }, [estaciones, opcionesValidas, estacion]);
 
   // Agrega de forma dinámica la acción de borrado al arreglo de columnas de la grilla
   const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
@@ -418,9 +482,6 @@ export function CombustibleTenantPage() {
       {
         id: "sospecha",
         header: "",
-        // Indicador único por fila, fuera de cualquier columna de datos (litros/monto
-        // ya no llevan el suyo propio). Clickeable: abre el detalle de la carga.
-        // Solo desktop: en mobile el título (Fecha) ya identifica la fila.
         cell: (r) =>
           r.sospechoso ? (
             <SospechaBadge
@@ -454,7 +515,6 @@ export function CombustibleTenantPage() {
     [],
   );
 
-  // Filtros renderizados exclusivamente para resoluciones móviles
   const mobileFilters = (
     <>
       <ListadoFiltroCampo label="Fecha" active={!rangoFechaPorDefecto}>
@@ -547,20 +607,25 @@ export function CombustibleTenantPage() {
           aria-label="Filtrar por forma de pago"
         >
           <option value="">Todas</option>
-          {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
+          {Object.entries(FORMA_PAGO_LABELS)
+            .filter(
+              ([k]) =>
+                !opcionesValidas ||
+                opcionesValidas.formasPago.has(k) ||
+                k === formaPago,
+            )
+            .map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
         </select>
       </ListadoFiltroCampo>
     </>
   );
 
-  // Cabecera interactiva con selectores embebidos para resoluciones de escritorio
   const tableHead = (
     <tr className="border-b border-black/10">
-      {/* Gutter del indicador de sospecha: sin encabezado, fuera de las columnas de datos. */}
       <th className="w-8 px-2 py-3" aria-hidden />
       <th className="px-4 py-3 text-left font-normal">
         <ViajesListadoHeaderFiltro
@@ -685,13 +750,11 @@ export function CombustibleTenantPage() {
     Boolean(formaPago),
   ].filter(Boolean).length;
 
-  // ─── RENDERIZADO GENERAL DE LA PÁGINA ─────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 py-6 px-4 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className={pageTitleClass}>Combustible</h1>
         <div className="flex items-center gap-3">
-          {/* Exportar: el admin elige entre Excel (.xlsx) o CSV (.csv) */}
           <div className="relative" ref={exportMenuRef}>
             <button
               type="button"
@@ -759,7 +822,6 @@ export function CombustibleTenantPage() {
             )}
           </div>
 
-          {/* BOTÓN: Limpiar filtros alineado con los otros botones de acción */}
           {hayFiltros && (
             <div className="hidden min-h-10 items-center lg:flex">
               <button
@@ -780,7 +842,6 @@ export function CombustibleTenantPage() {
             </div>
           )}
 
-          {/* BOTÓN: Nueva Carga (Rama HEAD) */}
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
@@ -838,7 +899,6 @@ export function CombustibleTenantPage() {
         />
       )}
 
-      {/* COMPONENTE INTERFAZ DE DIÁLOGO: CONFIRMAR ELIMINACIÓN */}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
@@ -902,7 +962,6 @@ export function CombustibleTenantPage() {
         </div>
       )}
 
-      {/* MODAL PARA EL REGISTRO DE ALTAS */}
       {isCreateModalOpen && (
         <CargaCombustibleCreateModal
           onClose={() => setIsCreateModalOpen(false)}
@@ -930,7 +989,6 @@ export function CombustibleTenantPage() {
         />
       )}
 
-      {/* MODAL PARA LA VISTA DETALLADA DEL COMPROBANTE */}
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
