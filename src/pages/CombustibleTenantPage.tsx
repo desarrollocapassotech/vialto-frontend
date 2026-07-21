@@ -119,7 +119,7 @@ export function CombustibleTenantPage() {
   // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const maestro = useMaestroData();
-  const { showToast } = useToast(); // <-- Instancia del context de toasts
+  const { showToast } = useToast();
 
   // ─── ESTADOS DE LA TABLA Y PAGINACIÓN ────────────────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
@@ -132,17 +132,16 @@ export function CombustibleTenantPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Filtros iniciales que puede traer el link "Ver cargas" del dashboard
-  // (por vehículo o por chofer + período). Solo se leen una vez, al montar.
-  const [searchParams] = useSearchParams();
+  // (por vehículo, chofer + período, o recarga manual). Solo se leen una vez, al montar.
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
   const initialChoferId = searchParams.get("choferId") ?? "";
   const initialFrom = searchParams.get("from");
   const initialTo = searchParams.get("to");
+  const initialEstacion = searchParams.get("estacion") ?? "";
+  const initialFormaPago = searchParams.get("formaPago") ?? "";
 
   // ─── ESTADOS PARA LOS FILTROS DE LA GRILLA ───────────────────────────────
-  // Rango de fechas aplicado (dispara el fetch) vs. borrador en los inputs
-  // (solo se aplica al hacer clic en "Filtrar"). Por defecto: mes actual a hoy,
-  // salvo que venga un rango explícito por query param.
   const [desde, setDesde] = useState<string>(
     () => initialFrom || primerDiaMesActual(),
   );
@@ -151,8 +150,8 @@ export function CombustibleTenantPage() {
   const [hastaInput, setHastaInput] = useState<string>(hasta);
   const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
   const [choferId, setChoferId] = useState(initialChoferId);
-  const [estacion, setEstacion] = useState("");
-  const [formaPago, setFormaPago] = useState("");
+  const [estacion, setEstacion] = useState(initialEstacion);
+  const [formaPago, setFormaPago] = useState(initialFormaPago);
   const [estaciones, setEstaciones] = useState<string[]>([]);
 
   // Control de apertura de modales de visualización y alta
@@ -165,6 +164,35 @@ export function CombustibleTenantPage() {
   );
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ─── EFECTO SECUNDARIO: SINCRONIZAR FILTROS CON LA URL ───────────────────
+  useEffect(() => {
+    const qs = new URLSearchParams();
+
+    // Solo ensuciamos la URL con las fechas si el usuario sale del rango por defecto
+    const esRangoPorDefecto =
+      desde === primerDiaMesActual() && hasta === hoyIso();
+    if (!esRangoPorDefecto) {
+      if (desde) qs.set("from", desde);
+      if (hasta) qs.set("to", hasta);
+    }
+
+    if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+    if (choferId) qs.set("choferId", choferId);
+    if (estacion) qs.set("estacion", estacion);
+    if (formaPago) qs.set("formaPago", formaPago);
+
+    // Usamos replace: true para no crear un historial de navegación infinito
+    setSearchParams(qs, { replace: true });
+  }, [
+    desde,
+    hasta,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    setSearchParams,
+  ]);
 
   function resetPage() {
     setPage(1);
@@ -260,7 +288,7 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
-  // Estaciones distintas entre las cargas existentes, para el filtro (independiente de la página/filtros actuales).
+  // Estaciones distintas entre las cargas existentes, para el filtro
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -345,7 +373,6 @@ export function CombustibleTenantPage() {
         { method: "DELETE" },
       );
 
-      // --> TOAST INYECTADO: FEEDBACK DE ÉXITO AL BORRAR <--
       showToast("Carga de combustible eliminada correctamente", "success");
 
       const deletedId = deleteTarget.id;
@@ -360,8 +387,6 @@ export function CombustibleTenantPage() {
       setDeleteTarget(null);
     } catch (e) {
       setDeleteError(friendlyError(e, "combustible"));
-
-      // --> TOAST INYECTADO: FEEDBACK DE ERROR AL BORRAR <--
       showToast("No se pudo eliminar la carga de combustible", "error");
     } finally {
       setDeleting(false);
@@ -418,9 +443,6 @@ export function CombustibleTenantPage() {
       {
         id: "sospecha",
         header: "",
-        // Indicador único por fila, fuera de cualquier columna de datos (litros/monto
-        // ya no llevan el suyo propio). Clickeable: abre el detalle de la carga.
-        // Solo desktop: en mobile el título (Fecha) ya identifica la fila.
         cell: (r) =>
           r.sospechoso ? (
             <SospechaBadge
@@ -560,7 +582,6 @@ export function CombustibleTenantPage() {
   // Cabecera interactiva con selectores embebidos para resoluciones de escritorio
   const tableHead = (
     <tr className="border-b border-black/10">
-      {/* Gutter del indicador de sospecha: sin encabezado, fuera de las columnas de datos. */}
       <th className="w-8 px-2 py-3" aria-hidden />
       <th className="px-4 py-3 text-left font-normal">
         <ViajesListadoHeaderFiltro
@@ -780,7 +801,7 @@ export function CombustibleTenantPage() {
             </div>
           )}
 
-          {/* BOTÓN: Nueva Carga (Rama HEAD) */}
+          {/* BOTÓN: Nueva Carga */}
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
