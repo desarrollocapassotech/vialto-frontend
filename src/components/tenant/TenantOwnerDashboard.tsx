@@ -5,6 +5,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessCombustible,
+  canAccessIntegracionArca,
 } from '@/lib/tenantModules';
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { ChevronDown } from 'lucide-react';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { modalOverlayClass } from '@/lib/modalLayers';
 import { CombustibleDashboardSection } from '@/components/combustible/CombustibleDashboardSection';
+import { FinancieroDashboardSection } from '@/components/financiero/FinancieroDashboardSection';
 
 function formatMoney(n: number) {
   return `$ ${n.toLocaleString('es-AR', {
@@ -597,9 +599,11 @@ interface TenantOwnerDashboardProps {
 
 export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProps) {
   const showViajes = canAccessViajes(modules);
-  const showFin = canAccessFacturacion(modules) || showViajes;
+  const showFacturacionModulo = canAccessFacturacion(modules);
+  const showFin = showFacturacionModulo || showViajes;
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
+  const showIntegracionArca = canAccessIntegracionArca(modules);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
@@ -903,6 +907,13 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
           </div>
         </section>
       )}
+
+      <FinancieroDashboardSection
+        dash={dash}
+        showViajes={showViajes}
+        showFacturacion={showFacturacionModulo}
+        showIntegracionArca={showIntegracionArca}
+      />
 
       {showStock && (
         <section aria-labelledby="stock-heading">
