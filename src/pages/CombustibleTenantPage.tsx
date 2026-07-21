@@ -104,6 +104,15 @@ const COLUMNS: ListadoColumn<CargaCombustible>[] = [
     cell: (r) => r.estacion,
   },
   {
+    id: "formaPago",
+    header: "Pago",
+    cell: (r) =>
+      r.formaPago
+        ? FORMA_PAGO_LABELS[r.formaPago as keyof typeof FORMA_PAGO_LABELS] ||
+          r.formaPago
+        : "—",
+  },
+  {
     id: "litros",
     header: "Litros",
     cell: (r) => `${fmtNum(r.litros)} L`,
@@ -660,6 +669,30 @@ export function CombustibleTenantPage() {
         </ViajesListadoHeaderFiltro>
       </th>
       <th className="px-4 py-3 text-left font-normal">
+        <ViajesListadoHeaderFiltro
+          title="Pago"
+          filterActive={Boolean(formaPago)}
+          filterSignature={formaPago}
+        >
+          <select
+            value={formaPago}
+            onChange={(e) => {
+              setFormaPago(e.target.value);
+              resetPage(); // Vuelve a la página 1 y dispara el useEffect
+            }}
+            className={`${inputClass} min-w-[120px] ${formaPago ? "text-vialto-fire" : ""}`}
+            aria-label="Filtrar por forma de pago"
+          >
+            <option value="">Todas</option>
+            {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </ViajesListadoHeaderFiltro>
+      </th>
+      <th className="px-4 py-3 text-left font-normal">
         <span className="text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase">
           Litros
         </span>
@@ -935,6 +968,18 @@ export function CombustibleTenantPage() {
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
           onClose={() => setViewingCargaId(null)}
+          // Capturamos el cambio y mutamos solo la fila afectada
+          onUpdate={(cargaActualizada: CargaCombustible) => {
+            setRows((prev) =>
+              prev
+                ? prev.map((r) =>
+                    r.id === cargaActualizada.id
+                      ? { ...r, ...cargaActualizada }
+                      : r,
+                  )
+                : prev,
+            );
+          }}
         />
       )}
     </div>
