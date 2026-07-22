@@ -146,28 +146,13 @@ type VehiculoOpt = {
 type ChoferOpt = { id: string; nombre: string };
 
 interface Props {
-  /** clerkOrgId del tenant sobre el que se registra la carga. */
-  tenantId: string;
-  /** Flota del tenant elegido (viene del endpoint /platform/vehiculos). */
   vehiculos: VehiculoOpt[];
-  /** Conductores del tenant elegido (viene del endpoint /platform/choferes). */
   choferes: ChoferOpt[];
+  tenantId?: string;
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
 
-/**
- * Variante del alta de cargas para el panel de superadmin.
- *
- * A diferencia de CargaCombustibleCreateModal (tenant), NO usa useMaestroData
- * (que está scopeado a la organización propia) ni el hook de validación en vivo
- * de km — recibe la flota/conductores del tenant elegido por props y postea a
- * /api/platform/combustible?tenantId=…
- *
- * La validación fuerte (km sin retroceso + coherencia importe) la garantiza el
- * backend en `create`; acá replicamos solo el chequeo de coherencia de importe
- * (litros × precio ≈ importe) para dar feedback inmediato.
- */
 export function CargaCombustibleCreateModal({
   tenantId,
   vehiculos,
@@ -217,26 +202,18 @@ export function CargaCombustibleCreateModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handler especial para el custom select
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validación manual para los custom selects requeridos (vehículo)
-    if (!formData.vehiculoId) {
-      setError("Debes seleccionar un vehículo.");
-      return;
-    }
-    if (importeError) return;
-
     setLoading(true);
     setError(null);
 
     try {
       const kmSanitizado = parseInt(formData.km.replace(/\./g, ""), 10);
+
       if (isNaN(kmSanitizado)) {
         throw new Error("El kilometraje ingresado no es válido.");
       }
@@ -250,8 +227,15 @@ export function CargaCombustibleCreateModal({
         km: kmSanitizado,
       };
 
+      const apiBase = tenantId ? "/api/platform" : "/api";
+      let endpoint = `${apiBase}/combustible`;
+
+      if (tenantId) {
+        endpoint += `?tenantId=${encodeURIComponent(tenantId || "")}`;
+      }
+
       const nuevaCarga = await apiJson<CargaCombustible>(
-        `/api/platform/combustible?tenantId=${encodeURIComponent(tenantId)}`,
+        endpoint,
         () => getToken(),
         {
           method: "POST",
