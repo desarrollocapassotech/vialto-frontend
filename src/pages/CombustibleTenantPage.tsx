@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -121,10 +121,24 @@ const BASE_COLUMNS: ListadoColumn<CargaCombustible>[] = [
 ];
 
 export function CombustibleTenantPage() {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
+  const { user } = useUser(); // <-- Hook extraído para obtener la info real del usuario
+
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { showToast } = useToast();
+
+  // ─── VALIDACIÓN DE ROL INFALIBLE ──────────────────────────────────────────
+  // Buscamos el rol directamente en el User de Clerk, y usamos el token como plan B
+  const isSuperAdmin = Boolean(
+    user?.publicMetadata?.role === "superadmin" ||
+    user?.unsafeMetadata?.role === "superadmin" ||
+    JSON.stringify(sessionClaims || {})
+      .toLowerCase()
+      .includes("superadmin"),
+  );
+
+  const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
 
   // ─── Estado de la grilla (paginación server-side) ─────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
@@ -182,7 +196,6 @@ export function CombustibleTenantPage() {
     setPage(1);
   }
 
-  // Al cambiar de empresa: limpiar filtros y volver a la primera página.
   function handleChangeEmpresa(id: string) {
     setPage(1);
     const d = primerDiaMesActual();
@@ -206,7 +219,6 @@ export function CombustibleTenantPage() {
     resetPage();
   }
 
-  // Restablece todos los criterios de filtrado aplicados a la vista
   function handleClearFilters() {
     const d = primerDiaMesActual();
     const h = hoyIso();
@@ -238,7 +250,8 @@ export function CombustibleTenantPage() {
 
   function filtroParams(): URLSearchParams {
     const qs = new URLSearchParams();
-    qs.set("tenantId", filtroEmpresa);
+    if (activeTenantId) qs.set("tenantId", activeTenantId);
+
     if (desde) qs.set("from", desde);
     if (hasta) qs.set("to", hasta);
     if (vehiculoId) qs.set("vehiculoId", vehiculoId);
@@ -250,27 +263,28 @@ export function CombustibleTenantPage() {
 
   // ─── Maestros del tenant (vehículos, conductores, estaciones) ─────────────
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !filtroEmpresa) {
+    if (!isLoaded || !isSignedIn || !activeTenantId) {
       setVehiculos([]);
       setChoferes([]);
       setEstaciones([]);
       return;
     }
     let cancelled = false;
-    const enc = encodeURIComponent(filtroEmpresa);
+    const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+
     void (async () => {
       try {
         const [v, ch, est] = await Promise.all([
           apiJson<ConEmpresa<Vehiculo>[]>(
-            `/api/platform/vehiculos?tenantId=${enc}`,
+            `/api/platform/vehiculos${qsTenant}`,
             () => getToken(),
           ),
           apiJson<ConEmpresa<Chofer>[]>(
-            `/api/platform/choferes?tenantId=${enc}`,
+            `/api/platform/choferes${qsTenant}`,
             () => getToken(),
           ),
           apiJson<string[]>(
-            `/api/platform/combustible/estaciones?tenantId=${enc}`,
+            `/api/platform/combustible/estaciones${qsTenant}`,
             () => getToken(),
           ),
         ]);
@@ -280,18 +294,18 @@ export function CombustibleTenantPage() {
           setEstaciones(Array.isArray(est) ? est : []);
         }
       } catch {
-        // silencioso — los filtros quedan con solo la opción "Todas/Todos"
+        // silencioso
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, filtroEmpresa, getToken]);
+  }, [isLoaded, isSignedIn, activeTenantId, getToken]);
 
   // ─── Listado de cargas ────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    if (!filtroEmpresa) {
+    if (!activeTenantId) {
       setRows(null);
       setError(null);
       return;
@@ -330,7 +344,7 @@ export function CombustibleTenantPage() {
   }, [
     isLoaded,
     isSignedIn,
-    filtroEmpresa,
+    activeTenantId,
     page,
     pageSize,
     desde,
@@ -345,14 +359,14 @@ export function CombustibleTenantPage() {
 
   // ─── EFECTO: CALCULAR OPCIONES DE FILTROS DINÁMICOS ──────────────────────
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
+    if (!isLoaded || !isSignedIn || !activeTenantId) return;
     let cancelled = false;
 
     void (async () => {
       try {
         const qs = filtroParams();
         qs.set("page", "1");
-        qs.set("limit", "10000"); // Límite alto para mapear combinaciones
+        qs.set("limit", "10000");
 
         const data = await apiJson<CombustibleListResponse>(
           `/api/platform/combustible?${qs.toString()}`,
@@ -384,10 +398,11 @@ export function CombustibleTenantPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isLoaded,
     isSignedIn,
-    filtroEmpresa,
+    activeTenantId,
     desde,
     hasta,
     vehiculoId,
@@ -465,15 +480,16 @@ export function CombustibleTenantPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+
       await apiJson<{ deleted: string }>(
-        `/api/platform/combustible/${deleteTarget.id}?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+        `/api/platform/combustible/${deleteTarget.id}${qsTenant}`,
         () => getToken(),
         { method: "DELETE" },
       );
 
       showToast("Carga de combustible eliminada correctamente", "success");
 
-      // Si borramos la última fila de una página > 1, retrocedemos una página.
       if (rows && rows.length === 1 && page > 1) {
         setPage((p) => p - 1);
       } else {
@@ -542,8 +558,6 @@ export function CombustibleTenantPage() {
       {
         id: "sospecha",
         header: "",
-        // Indicador (no interactivo). El detalle de la carga se puede sumar
-        // cuando adaptemos CargaCombustibleViewModal para aceptar tenantId.
         cell: (r) =>
           r.sospechoso ? (
             <span
@@ -586,22 +600,26 @@ export function CombustibleTenantPage() {
         Combustible
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa para ver y gestionar sus cargas de combustible. El
-        listado lo filtra el servidor.
+        {isSuperAdmin
+          ? "Elegí una empresa para ver y gestionar sus cargas de combustible. El listado lo filtra el servidor."
+          : "Visualizá y gestioná las cargas de combustible de tu empresa. El listado lo filtra el servidor."}
       </p>
 
-      <div className="mt-6">
-        <EmpresaFilterBar
-          tenants={tenants}
-          value={filtroEmpresa}
-          onChange={handleChangeEmpresa}
-        />
-      </div>
+      {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
+      {isSuperAdmin && (
+        <div className="mt-6">
+          <EmpresaFilterBar
+            tenants={tenants}
+            value={filtroEmpresa}
+            onChange={handleChangeEmpresa}
+          />
+        </div>
+      )}
 
       <div className="mt-4 flex justify-between items-center flex-wrap gap-4">
         <div className="flex items-center gap-3">
           {/* Exportar */}
-          {filtroEmpresa && (
+          {activeTenantId && (
             <div className="relative" ref={exportMenuRef}>
               <button
                 type="button"
@@ -671,7 +689,7 @@ export function CombustibleTenantPage() {
           )}
 
           {/* Limpiar Filtros */}
-          {filtroEmpresa && hayFiltros && (
+          {activeTenantId && hayFiltros && (
             <div className="hidden min-h-10 items-center lg:flex">
               <button
                 type="button"
@@ -695,26 +713,27 @@ export function CombustibleTenantPage() {
         <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
-          disabled={!filtroEmpresa}
+          disabled={!activeTenantId}
           className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
-            filtroEmpresa
+            activeTenantId
               ? "bg-vialto-charcoal hover:bg-vialto-graphite"
               : "bg-vialto-charcoal/50 pointer-events-none"
           }`}
-          aria-disabled={!filtroEmpresa}
+          aria-disabled={!activeTenantId}
         >
           Nueva carga
         </button>
       </div>
 
-      {error && (
+      {/* RENDERIZADO DEL CARTEL DE ERROR (SOLO SI ES SUPERADMIN Y HAY ERROR) */}
+      {isSuperAdmin && error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
 
       {/* ─── Barra de filtros (solo con empresa elegida) ─────────────────── */}
-      {filtroEmpresa && !error && (
+      {activeTenantId && (!error || !isSuperAdmin) && (
         <div className="mt-6 flex flex-wrap items-end gap-3">
           <div className="flex items-end gap-2">
             <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -831,7 +850,7 @@ export function CombustibleTenantPage() {
         </div>
       )}
 
-      {filtroEmpresa && !error && (
+      {activeTenantId && (!error || !isSuperAdmin) && (
         <p className="mt-4 text-xs text-vialto-steel">
           Mostrando cargas del {fmtFecha(desde)} al {fmtFecha(hasta)}
         </p>
@@ -840,11 +859,13 @@ export function CombustibleTenantPage() {
       <ListadoDatos<CargaCombustible>
         className="mt-6"
         columns={columns}
-        rows={!filtroEmpresa || error ? [] : rows}
+        rows={!activeTenantId || error ? [] : rows}
         rowKey={(r) => r.id}
         emptyMessage={
-          !filtroEmpresa
-            ? "Seleccioná una empresa para ver las cargas."
+          !activeTenantId
+            ? isSuperAdmin
+              ? "Seleccioná una empresa para ver las cargas."
+              : "Cargando datos de empresa..."
             : error
               ? "No se pudieron cargar las cargas."
               : "Sin cargas registradas para esta empresa."
@@ -853,7 +874,7 @@ export function CombustibleTenantPage() {
         actionsTdClassName={listadoTablaTdClass}
       />
 
-      {filtroEmpresa && !error && total > 0 && (
+      {activeTenantId && (!error || !isSuperAdmin) && total > 0 && (
         <ListadoPagination
           meta={meta}
           pageSize={pageSize}
@@ -932,9 +953,9 @@ export function CombustibleTenantPage() {
       )}
 
       {/* ─── Modal de alta (scopeado al tenant elegido) ──────────────────── */}
-      {isCreateOpen && filtroEmpresa && (
+      {isCreateOpen && activeTenantId && (
         <CargaCombustibleCreateModal
-          tenantId={filtroEmpresa}
+          tenantId={activeTenantId}
           vehiculos={vehiculos}
           choferes={choferes}
           onClose={() => setIsCreateOpen(false)}
