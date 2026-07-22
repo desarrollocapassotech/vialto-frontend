@@ -100,6 +100,7 @@ export function AccionesOpcionesSheet({
                   type="button"
                   disabled={opt.disabled}
                   onClick={() => {
+                    if (opt.disabled) return;
                     onClose();
                     opt.onClick();
                   }}

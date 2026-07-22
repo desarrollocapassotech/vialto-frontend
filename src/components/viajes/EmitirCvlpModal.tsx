@@ -15,6 +15,7 @@ import {
   formatCvlpEmitMissingMessage,
 } from '@/lib/cvlpEmitValidation';
 import { friendlyError } from '@/lib/friendlyError';
+import { MSG_ARCA_NO_LIQUIDA_USD, arcaBloqueaLiquidarUsd } from '@/lib/arcaUsdRestriction';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { ArcaConfig, Cliente, Liquidacion, Transportista, Viaje } from '@/types/api';
 
@@ -45,6 +46,11 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const cvlpDisponible = !viajeTieneLiquidacionTransportista(viaje);
+  const bloqueadoUsd = arcaBloqueaLiquidarUsd(
+    true,
+    viaje.monedaPrecioTransportistaExterno,
+  );
+  const puedeAvanzar = cvlpDisponible && !bloqueadoUsd;
   const condicionIva = viaje.transportista?.condicionIva ?? null;
   const sugerido = cvlpCbteTipoFromCondicionIva(condicionIva);
 
@@ -142,6 +148,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (bloqueadoUsd) {
+      setError(MSG_ARCA_NO_LIQUIDA_USD);
+      return;
+    }
     if (datosEmitIncompletos) {
       setError(missingEmitMessage);
       return;
@@ -285,13 +295,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                     <button
                       key={t}
                       type="button"
-                      disabled={!cvlpDisponible}
+                      disabled={!puedeAvanzar}
                       onClick={() => {
-                        if (cvlpDisponible) setCbteTipo(t);
+                        if (puedeAvanzar) setCbteTipo(t);
                       }}
                       className={[
                         'flex flex-col items-center justify-center border py-4 px-2 text-xs uppercase tracking-wider transition-colors',
-                        !cvlpDisponible
+                        !puedeAvanzar
                           ? 'border-black/10 bg-vialto-mist/40 text-vialto-steel cursor-not-allowed opacity-60'
                           : selected
                             ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
@@ -327,6 +337,15 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 )}
               </div>
 
+              {bloqueadoUsd && (
+                <p
+                  className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+                  role="alert"
+                >
+                  {MSG_ARCA_NO_LIQUIDA_USD}
+                </p>
+              )}
+
               {!cvlpDisponible && (
                 <p className="text-xs text-vialto-steel border border-black/10 bg-vialto-mist/40 px-3 py-2">
                   Este viaje ya tiene una liquidación activa para el transportista.
@@ -343,7 +362,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={!cvlpDisponible}
+                  disabled={!puedeAvanzar}
                   onClick={() => setStep('revision')}
                   className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                 >
@@ -370,6 +389,15 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <p className="text-sm text-vialto-charcoal font-medium">{transportistaNombre}</p>
                 <p className="text-xs text-vialto-steel">{condicionIvaLabel(condicionIva)}</p>
               </section>
+
+              {bloqueadoUsd && (
+                <p
+                  className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+                  role="alert"
+                >
+                  {MSG_ARCA_NO_LIQUIDA_USD}
+                </p>
+              )}
 
               <section className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
@@ -533,7 +561,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                   </button>
                   <button
                     type="button"
-                    disabled={busyCrear || !periodoCompleto || !datosReady || datosEmitIncompletos}
+                    disabled={
+                      busyCrear ||
+                      !periodoCompleto ||
+                      !datosReady ||
+                      datosEmitIncompletos ||
+                      bloqueadoUsd
+                    }
                     onClick={() => void handleCrear()}
                     className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >

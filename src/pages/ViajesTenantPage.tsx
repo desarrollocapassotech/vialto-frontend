@@ -127,6 +127,13 @@ import {
   canAccessFacturacion,
   canAccessIntegracionArca,
 } from "@/lib/tenantModules";
+import {
+  MSG_ARCA_NO_FACTURA_USD,
+  MSG_ARCA_NO_LIQUIDA_USD,
+  arcaBloqueaFacturarUsd,
+  arcaBloqueaLiquidarUsd,
+  motivoBloqueoAccionFacturarArcaUsd,
+} from "@/lib/arcaUsdRestriction";
 import { FacturarSelectorModal } from "@/components/viajes/FacturarSelectorModal";
 import type {
   Chofer,
@@ -947,7 +954,9 @@ export function ViajesTenantPage({
   }, [clienteIdFiltroActivo]);
 
   function esElegibleFacturarLote(v: Viaje): boolean {
-    return viajePermiteBotonFacturar(v) && !viajesConFactura.has(v.id);
+    if (!viajePermiteBotonFacturar(v) || viajesConFactura.has(v.id)) return false;
+    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto)) return false;
+    return true;
   }
 
   function toggleFacturarLote(id: string) {
@@ -977,6 +986,16 @@ export function ViajesTenantPage({
     const ids = idsFacturarSeleccion;
     const cid = clienteIdFiltroActivo.trim();
     if (ids.length === 0 || !cid) return;
+    if (hasLiquidacionesArca) {
+      const seleccion = (rows ?? []).filter((v) => ids.includes(v.id));
+      const conUsd = seleccion.some((v) =>
+        arcaBloqueaFacturarUsd(true, v.monedaMonto),
+      );
+      if (conUsd) {
+        showToast(MSG_ARCA_NO_FACTURA_USD, "error");
+        return;
+      }
+    }
     navigate("/facturacion", {
       state: {
         ...facturacionNavExtras(),
@@ -1369,6 +1388,10 @@ export function ViajesTenantPage({
         setSelectorViaje(v);
         return;
       }
+    }
+    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto)) {
+      showToast(MSG_ARCA_NO_FACTURA_USD, "error");
+      return;
     }
     setTipoFacturaViaje(v);
   }
@@ -2394,6 +2417,7 @@ export function ViajesTenantPage({
               <td className="px-4 py-3 text-right">
                 <ViajeAccionesMenu
                   viaje={v}
+                  hasArca={hasLiquidacionesArca}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -2584,6 +2608,7 @@ export function ViajesTenantPage({
               actions={
                 <ViajeAccionesMenu
                   viaje={v}
+                  hasArca={hasLiquidacionesArca}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -2691,9 +2716,32 @@ export function ViajesTenantPage({
               ...viajeEdicionSnapshot,
               clienteId:
                 draft.clienteId.trim() || viajeEdicionSnapshot.clienteId,
+              monedaMonto: draft.monedaMonto,
+              monedaPrecioTransportistaExterno:
+                draft.monedaPrecioTransportistaExterno,
+              transportistaId:
+                draft.operacionModo === "externo"
+                  ? draft.transportistaId
+                  : viajeEdicionSnapshot.transportistaId,
             };
             openFacturarFlow(v);
           }}
+          facturarBloqueoMotivo={motivoBloqueoAccionFacturarArcaUsd(
+            hasLiquidacionesArca,
+            {
+              ...viajeEdicionSnapshot,
+              estado: draft.estado,
+              clienteId:
+                draft.clienteId.trim() || viajeEdicionSnapshot.clienteId,
+              monedaMonto: draft.monedaMonto,
+              monedaPrecioTransportistaExterno:
+                draft.monedaPrecioTransportistaExterno,
+              transportistaId:
+                draft.operacionModo === "externo"
+                  ? draft.transportistaId
+                  : viajeEdicionSnapshot.transportistaId,
+            },
+          )}
           onEliminar={() => requestDeleteViaje(viajeEdicionSnapshot)}
           saving={savingId === editingId}
           error={error}
@@ -2801,6 +2849,22 @@ export function ViajesTenantPage({
           transportistaCompletado={
             !viajePendienteComprobanteTransportista(selectorViaje)
           }
+          clienteBloqueadoMotivo={
+            arcaBloqueaFacturarUsd(
+              hasLiquidacionesArca,
+              selectorViaje.monedaMonto,
+            )
+              ? MSG_ARCA_NO_FACTURA_USD
+              : null
+          }
+          transportistaBloqueadoMotivo={
+            arcaBloqueaLiquidarUsd(
+              hasLiquidacionesArca,
+              selectorViaje.monedaPrecioTransportistaExterno,
+            )
+              ? MSG_ARCA_NO_LIQUIDA_USD
+              : null
+          }
           subtituloCliente={
             hasLiquidacionesArca
               ? "Elegí Factura A o B según IVA del cliente"
@@ -2812,10 +2876,28 @@ export function ViajesTenantPage({
               : "Registro manual"
           }
           onFacturarCliente={() => {
+            if (
+              arcaBloqueaFacturarUsd(
+                hasLiquidacionesArca,
+                selectorViaje.monedaMonto,
+              )
+            ) {
+              showToast(MSG_ARCA_NO_FACTURA_USD, "error");
+              return;
+            }
             setTipoFacturaViaje(selectorViaje);
             setSelectorViaje(null);
           }}
           onLiquidacion={() => {
+            if (
+              arcaBloqueaLiquidarUsd(
+                hasLiquidacionesArca,
+                selectorViaje.monedaPrecioTransportistaExterno,
+              )
+            ) {
+              showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
+              return;
+            }
             if (hasLiquidacionesArca) {
               setEmitirCvlpViaje(selectorViaje);
             } else {
