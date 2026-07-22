@@ -593,6 +593,7 @@ export function LiquidacionesTenantPage() {
       {showCrear && (
         <CrearLiquidacionManualModal
           transportistas={transportistas}
+          config={config}
           getToken={getToken}
           onSuccess={(liq) => {
             setRows((prev) =>
