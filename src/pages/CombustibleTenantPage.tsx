@@ -36,6 +36,16 @@ type CombustibleListResponse = {
 type FormatoExport = "xlsx" | "csv";
 
 // ─── Helpers de formato ────────────────────────────────────────────────────
+
+// Helper para normalizar textos: quita espacios, pasa a minúsculas y elimina tildes
+function normalizeString(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function fmtVehiculoLabel(v: {
   patente: string;
   tipo: string;
@@ -102,11 +112,14 @@ const BASE_COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
     id: "formaPago",
     header: "Pago",
-    cell: (r) =>
-      r.formaPago
-        ? FORMA_PAGO_LABELS[r.formaPago as keyof typeof FORMA_PAGO_LABELS] ||
-          r.formaPago
-        : "—",
+    cell: (r) => {
+      if (!r.formaPago) return "—";
+      const normal = normalizeString(r.formaPago);
+      return (
+        FORMA_PAGO_LABELS[normal as keyof typeof FORMA_PAGO_LABELS] ||
+        r.formaPago
+      );
+    },
   },
   {
     id: "litros",
@@ -122,14 +135,12 @@ const BASE_COLUMNS: ListadoColumn<CargaCombustible>[] = [
 
 export function CombustibleTenantPage() {
   const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
-  const { user } = useUser(); // <-- Hook extraído para obtener la info real del usuario
+  const { user } = useUser();
 
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { showToast } = useToast();
 
-  // ─── VALIDACIÓN DE ROL INFALIBLE ──────────────────────────────────────────
-  // Buscamos el rol directamente en el User de Clerk, y usamos el token como plan B
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
     user?.unsafeMetadata?.role === "superadmin" ||
@@ -140,7 +151,6 @@ export function CombustibleTenantPage() {
 
   const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
 
-  // ─── Estado de la grilla (paginación server-side) ─────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -148,7 +158,6 @@ export function CombustibleTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Filtros iniciales que puede traer el link de dashboard o URL compartida
   const [searchParams, setSearchParams] = useSearchParams();
   const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
   const initialChoferId = searchParams.get("choferId") ?? "";
@@ -157,12 +166,10 @@ export function CombustibleTenantPage() {
   const initialEstacion = searchParams.get("estacion") ?? "";
   const initialFormaPago = searchParams.get("formaPago") ?? "";
 
-  // ─── Datos maestros del tenant elegido (para filtros y alta) ──────────────
   const [vehiculos, setVehiculos] = useState<ConEmpresa<Vehiculo>[]>([]);
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
   const [estaciones, setEstaciones] = useState<string[]>([]);
 
-  // ─── Filtros aplicados vs. borrador de fechas ─────────────────────────────
   const [desde, setDesde] = useState<string>(
     () => initialFrom || primerDiaMesActual(),
   );
@@ -174,7 +181,6 @@ export function CombustibleTenantPage() {
   const [estacion, setEstacion] = useState(initialEstacion);
   const [formaPago, setFormaPago] = useState(initialFormaPago);
 
-  // ─── ESTADOS PARA OPCIONES DINÁMICAS (FILTROS EN CASCADA) ──────────────
   const [opcionesValidas, setOpcionesValidas] = useState<{
     choferIds: Set<string>;
     vehiculoIds: Set<string>;
@@ -189,19 +195,14 @@ export function CombustibleTenantPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Exportación
   const [downloading, setDownloading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
-  // ─── EFECTO SECUNDARIO: SINCRONIZAR FILTROS CON LA URL ───────────────────
   useEffect(() => {
     setSearchParams(
       (prevParams) => {
-        // Mantenemos los parámetros actuales de la URL (incluido el tenantId)
         const qs = new URLSearchParams(prevParams);
-
-        // Solo ensuciamos la URL con las fechas si el usuario sale del rango por defecto
         const esRangoPorDefecto =
           desde === primerDiaMesActual() && hasta === hoyIso();
 
@@ -209,12 +210,10 @@ export function CombustibleTenantPage() {
           if (desde) qs.set("from", desde);
           if (hasta) qs.set("to", hasta);
         } else {
-          // Si vuelve al rango por defecto, quitamos los parámetros
           qs.delete("from");
           qs.delete("to");
         }
 
-        // Seteamos o eliminamos explícitamente los demás filtros
         if (vehiculoId) qs.set("vehiculoId", vehiculoId);
         else qs.delete("vehiculoId");
 
@@ -310,7 +309,6 @@ export function CombustibleTenantPage() {
     return qs;
   }
 
-  // ─── Maestros del tenant (vehículos, conductores, estaciones) ─────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !activeTenantId) {
       setVehiculos([]);
@@ -351,7 +349,6 @@ export function CombustibleTenantPage() {
     };
   }, [isLoaded, isSignedIn, activeTenantId, getToken]);
 
-  // ─── Listado de cargas ────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (!activeTenantId) {
@@ -389,7 +386,6 @@ export function CombustibleTenantPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isLoaded,
     isSignedIn,
@@ -406,7 +402,6 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
-  // ─── EFECTO: CALCULAR OPCIONES DE FILTROS DINÁMICOS ──────────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !activeTenantId) return;
     let cancelled = false;
@@ -434,7 +429,9 @@ export function CombustibleTenantPage() {
               data.cargas.map((c) => c.estacion).filter(Boolean) as string[],
             ),
             formasPago: new Set(
-              data.cargas.map((c) => c.formaPago).filter(Boolean) as string[],
+              data.cargas
+                .map((c) => (c.formaPago ? normalizeString(c.formaPago) : ""))
+                .filter(Boolean) as string[],
             ),
           });
         }
@@ -447,7 +444,6 @@ export function CombustibleTenantPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isLoaded,
     isSignedIn,
@@ -461,7 +457,6 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
-  // Cerrar el menú de exportación
   useEffect(() => {
     if (!exportMenuOpen) return;
     function onDocClick(e: MouseEvent) {
@@ -513,7 +508,6 @@ export function CombustibleTenantPage() {
     }
   }
 
-  // Cerrar el diálogo de borrado con Escape.
   useEffect(() => {
     if (!deleteTarget) return;
     const onKey = (e: KeyboardEvent) => {
@@ -523,7 +517,6 @@ export function CombustibleTenantPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [deleteTarget, deleting]);
 
-  // ─── ACCIÓN CRÍTICA: CONFIRMAR Y ELIMINAR REGISTRO ────────────────────────
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -568,7 +561,6 @@ export function CombustibleTenantPage() {
 
   const exportDisabled = rows === null || total === 0 || downloading;
 
-  // ─── OPCIONES DINÁMICAS PARA FILTROS ──────────────────────────────────────
   const choferOptions = useMemo(() => {
     let base = choferes;
     if (opcionesValidas) {
@@ -654,7 +646,6 @@ export function CombustibleTenantPage() {
           : "Visualizá y gestioná las cargas de combustible de tu empresa. El listado lo filtra el servidor."}
       </p>
 
-      {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
       {isSuperAdmin && (
         <div className="mt-6">
           <EmpresaFilterBar
@@ -667,7 +658,6 @@ export function CombustibleTenantPage() {
 
       <div className="mt-4 flex justify-between items-center flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          {/* Exportar */}
           {activeTenantId && (
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -737,7 +727,6 @@ export function CombustibleTenantPage() {
             </div>
           )}
 
-          {/* Limpiar Filtros */}
           {activeTenantId && hayFiltros && (
             <div className="hidden min-h-10 items-center lg:flex">
               <button
@@ -774,14 +763,12 @@ export function CombustibleTenantPage() {
         </button>
       </div>
 
-      {/* RENDERIZADO DEL CARTEL DE ERROR (SOLO SI ES SUPERADMIN Y HAY ERROR) */}
       {isSuperAdmin && error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
 
-      {/* ─── Barra de filtros (solo con empresa elegida) ─────────────────── */}
       {activeTenantId && (!error || !isSuperAdmin) && (
         <div className="mt-6 flex flex-wrap items-end gap-3">
           <div className="flex items-end gap-2">
@@ -882,18 +869,8 @@ export function CombustibleTenantPage() {
               aria-label="Filtrar por forma de pago"
             >
               <option value="">Todas</option>
-              {Object.entries(FORMA_PAGO_LABELS)
-                .filter(
-                  ([k]) =>
-                    !opcionesValidas ||
-                    opcionesValidas.formasPago.has(k) ||
-                    k === formaPago,
-                )
-                .map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
+              <option value="tarjeta">Tarjeta</option>
+              <option value="efectivo">Efectivo</option>
             </select>
           </div>
         </div>
@@ -937,7 +914,6 @@ export function CombustibleTenantPage() {
         />
       )}
 
-      {/* ─── Diálogo de confirmación de borrado ──────────────────────────── */}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
@@ -1001,7 +977,6 @@ export function CombustibleTenantPage() {
         </div>
       )}
 
-      {/* ─── Modal de alta (scopeado al tenant elegido) ──────────────────── */}
       {isCreateOpen && activeTenantId && (
         <CargaCombustibleCreateModal
           tenantId={activeTenantId}
