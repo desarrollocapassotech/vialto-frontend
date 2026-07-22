@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ListadoDatos,
   type ListadoColumn,
@@ -12,8 +13,11 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
+import { exportarCargasCombustibleCsv } from "@/lib/combustibleCsvExport";
 import type {
   CargaCombustible,
   Chofer,
@@ -29,7 +33,9 @@ type CombustibleListResponse = {
   limit: number;
 };
 
-// ─── Helpers de formato (idénticos a la página por tenant) ──────────────────
+type FormatoExport = "xlsx" | "csv";
+
+// ─── Helpers de formato ────────────────────────────────────────────────────
 function fmtVehiculoLabel(v: {
   patente: string;
   tipo: string;
@@ -118,8 +124,9 @@ export function CombustibleTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
+  const { showToast } = useToast();
 
-  // ─── Estado de la grilla (paginación server-side, igual que el endpoint) ──
+  // ─── Estado de la grilla (paginación server-side) ─────────────────────────
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -127,20 +134,37 @@ export function CombustibleTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // ─── Datos maestros del tenant elegido (para filtros y alta) ──────────────
+  // Filtros iniciales que puede traer la URL
+  const [searchParams] = useSearchParams();
+  const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
+  const initialChoferId = searchParams.get("choferId") ?? "";
+  const initialFrom = searchParams.get("from");
+  const initialTo = searchParams.get("to");
+
+  // ─── Datos maestros del tenant elegido ────────────────────────────────────
   const [vehiculos, setVehiculos] = useState<ConEmpresa<Vehiculo>[]>([]);
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
   const [estaciones, setEstaciones] = useState<string[]>([]);
 
   // ─── Filtros aplicados vs. borrador de fechas ─────────────────────────────
-  const [desde, setDesde] = useState<string>(primerDiaMesActual());
-  const [hasta, setHasta] = useState<string>(hoyIso());
+  const [desde, setDesde] = useState<string>(
+    () => initialFrom || primerDiaMesActual(),
+  );
+  const [hasta, setHasta] = useState<string>(() => initialTo || hoyIso());
   const [desdeInput, setDesdeInput] = useState<string>(desde);
   const [hastaInput, setHastaInput] = useState<string>(hasta);
-  const [vehiculoId, setVehiculoId] = useState("");
-  const [choferId, setChoferId] = useState("");
+  const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
+  const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState("");
   const [formaPago, setFormaPago] = useState("");
+
+  // ─── ESTADOS PARA OPCIONES DINÁMICAS (FILTROS EN CASCADA) ──────────────
+  const [opcionesValidas, setOpcionesValidas] = useState<{
+    choferIds: Set<string>;
+    vehiculoIds: Set<string>;
+    estaciones: Set<string>;
+    formasPago: Set<string>;
+  } | null>(null);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CargaCombustible | null>(
@@ -149,6 +173,11 @@ export function CombustibleTenantPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Exportación
+  const [downloading, setDownloading] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
   function resetPage() {
     setPage(1);
   }
@@ -156,10 +185,12 @@ export function CombustibleTenantPage() {
   // Al cambiar de empresa: limpiar filtros y volver a la primera página.
   function handleChangeEmpresa(id: string) {
     setPage(1);
-    setDesde(primerDiaMesActual());
-    setHasta(hoyIso());
-    setDesdeInput(primerDiaMesActual());
-    setHastaInput(hoyIso());
+    const d = primerDiaMesActual();
+    const h = hoyIso();
+    setDesde(d);
+    setHasta(h);
+    setDesdeInput(d);
+    setHastaInput(h);
     setVehiculoId("");
     setChoferId("");
     setEstacion("");
@@ -174,6 +205,36 @@ export function CombustibleTenantPage() {
     setHasta(hastaInput);
     resetPage();
   }
+
+  // Restablece todos los criterios de filtrado aplicados a la vista
+  function handleClearFilters() {
+    const d = primerDiaMesActual();
+    const h = hoyIso();
+    setDesde(d);
+    setHasta(h);
+    setDesdeInput(d);
+    setHastaInput(h);
+    setVehiculoId("");
+    setChoferId("");
+    setEstacion("");
+    setFormaPago("");
+    setPage(1);
+  }
+
+  const rangoFechaPorDefecto =
+    desde === primerDiaMesActual() && hasta === hoyIso();
+
+  const hayFiltros = Boolean(
+    !rangoFechaPorDefecto || vehiculoId || choferId || estacion || formaPago,
+  );
+
+  const cantFiltros = [
+    !rangoFechaPorDefecto,
+    Boolean(vehiculoId),
+    Boolean(choferId),
+    Boolean(estacion),
+    Boolean(formaPago),
+  ].filter(Boolean).length;
 
   function filtroParams(): URLSearchParams {
     const qs = new URLSearchParams();
@@ -282,6 +343,112 @@ export function CombustibleTenantPage() {
     getToken,
   ]);
 
+  // ─── EFECTO: CALCULAR OPCIONES DE FILTROS DINÁMICOS ──────────────────────
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const qs = filtroParams();
+        qs.set("page", "1");
+        qs.set("limit", "10000"); // Límite alto para mapear combinaciones
+
+        const data = await apiJson<CombustibleListResponse>(
+          `/api/platform/combustible?${qs.toString()}`,
+          () => getToken(),
+        );
+
+        if (!cancelled) {
+          setOpcionesValidas({
+            choferIds: new Set(
+              data.cargas.map((c) => c.choferId).filter(Boolean) as string[],
+            ),
+            vehiculoIds: new Set(
+              data.cargas.map((c) => c.vehiculoId).filter(Boolean) as string[],
+            ),
+            estaciones: new Set(
+              data.cargas.map((c) => c.estacion).filter(Boolean) as string[],
+            ),
+            formasPago: new Set(
+              data.cargas.map((c) => c.formaPago).filter(Boolean) as string[],
+            ),
+          });
+        }
+      } catch (e) {
+        if (!cancelled)
+          console.warn("No se pudieron cargar los filtros dinámicos", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLoaded,
+    isSignedIn,
+    filtroEmpresa,
+    desde,
+    hasta,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    getToken,
+  ]);
+
+  // Cerrar el menú de exportación
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(e.target as Node)
+      ) {
+        setExportMenuOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setExportMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [exportMenuOpen]);
+
+  async function fetchTodasLasCargas(): Promise<CargaCombustible[]> {
+    const qs = filtroParams();
+    qs.set("page", "1");
+    qs.set("limit", String(total));
+    const data = await apiJson<CombustibleListResponse>(
+      `/api/platform/combustible?${qs.toString()}`,
+      () => getToken(),
+    );
+    return data.cargas;
+  }
+
+  async function handleExport(formato: FormatoExport) {
+    if (downloading || total === 0) return;
+    setExportMenuOpen(false);
+    setDownloading(true);
+    try {
+      const cargas = await fetchTodasLasCargas();
+      if (formato === "xlsx") {
+        await exportarCargasCombustible(cargas, { from: desde, to: hasta });
+      } else {
+        exportarCargasCombustibleCsv(cargas, { from: desde, to: hasta });
+      }
+      setError(null);
+    } catch (e) {
+      setError(friendlyError(e, "plataforma"));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   // Cerrar el diálogo de borrado con Escape.
   useEffect(() => {
     if (!deleteTarget) return;
@@ -292,6 +459,7 @@ export function CombustibleTenantPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [deleteTarget, deleting]);
 
+  // ─── ACCIÓN CRÍTICA: CONFIRMAR Y ELIMINAR REGISTRO ────────────────────────
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -302,6 +470,9 @@ export function CombustibleTenantPage() {
         () => getToken(),
         { method: "DELETE" },
       );
+
+      showToast("Carga de combustible eliminada correctamente", "success");
+
       // Si borramos la última fila de una página > 1, retrocedemos una página.
       if (rows && rows.length === 1 && page > 1) {
         setPage((p) => p - 1);
@@ -311,6 +482,7 @@ export function CombustibleTenantPage() {
       setDeleteTarget(null);
     } catch (e) {
       setDeleteError(friendlyError(e, "plataforma"));
+      showToast("No se pudo eliminar la carga de combustible", "error");
     } finally {
       setDeleting(false);
     }
@@ -329,18 +501,41 @@ export function CombustibleTenantPage() {
   const inputClass =
     "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none focus:border-vialto-fire";
 
-  const vehiculoOptions = useMemo(
-    () => vehiculos.map((v) => ({ value: v.id, label: fmtVehiculoLabel(v) })),
-    [vehiculos],
-  );
-  const choferOptions = useMemo(
-    () => choferes.map((ch) => ({ value: ch.id, label: ch.nombre })),
-    [choferes],
-  );
-  const estacionOptions = useMemo(
-    () => estaciones.map((e) => ({ value: e, label: e })),
-    [estaciones],
-  );
+  const exportDisabled = rows === null || total === 0 || downloading;
+
+  // ─── OPCIONES DINÁMICAS PARA FILTROS ──────────────────────────────────────
+  const choferOptions = useMemo(() => {
+    let base = choferes;
+    if (opcionesValidas) {
+      base = base.filter(
+        (ch) => opcionesValidas.choferIds.has(ch.id) || ch.id === choferId,
+      );
+    }
+    return base.map((ch) => ({ value: ch.id, label: ch.nombre }));
+  }, [choferes, opcionesValidas, choferId]);
+
+  const vehiculoOptions = useMemo(() => {
+    let base = vehiculos;
+    if (opcionesValidas) {
+      base = base.filter(
+        (v) => opcionesValidas.vehiculoIds.has(v.id) || v.id === vehiculoId,
+      );
+    }
+    return base.map((v) => ({
+      value: v.id,
+      label: fmtVehiculoLabel(v),
+    }));
+  }, [vehiculos, opcionesValidas, vehiculoId]);
+
+  const estacionOptions = useMemo(() => {
+    let base = estaciones;
+    if (opcionesValidas) {
+      base = base.filter(
+        (e) => opcionesValidas.estaciones.has(e) || e === estacion,
+      );
+    }
+    return base.map((e) => ({ value: e, label: e }));
+  }, [estaciones, opcionesValidas, estacion]);
 
   const columns = useMemo<ListadoColumn<CargaCombustible>[]>(
     () => [
@@ -353,7 +548,7 @@ export function CombustibleTenantPage() {
           r.sospechoso ? (
             <span
               title={r.motivoSospecha ?? "Carga marcada como sospechosa"}
-              className="text-vialto-fire"
+              className="text-vialto-fire cursor-help"
               aria-label="Carga sospechosa"
             >
               ⚠
@@ -403,7 +598,100 @@ export function CombustibleTenantPage() {
         />
       </div>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-between items-center flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          {/* Exportar */}
+          {filtroEmpresa && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen((o) => !o)}
+                disabled={exportDisabled}
+                className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-haspopup="menu"
+                aria-expanded={exportMenuOpen}
+                aria-label="Exportar listado"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  aria-hidden
+                >
+                  <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                  <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M12 11v6" />
+                  <path d="m9 14 3 3 3-3" />
+                </svg>
+                {downloading ? "Exportando…" : "Exportar"}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-4 w-4 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {exportMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute left-0 z-20 mt-1 min-w-[190px] border border-black/15 bg-white shadow-lg"
+                >
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => handleExport("xlsx")}
+                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors"
+                  >
+                    Excel (.xlsx)
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => handleExport("csv")}
+                    className="flex w-full items-center px-4 py-2.5 text-left text-sm text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors border-t border-black/10"
+                  >
+                    CSV (.csv)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Limpiar Filtros */}
+          {filtroEmpresa && hayFiltros && (
+            <div className="hidden min-h-10 items-center lg:flex">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={rows === null}
+                className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-label={`Limpiar filtros (${cantFiltros} activo${cantFiltros !== 1 ? "s" : ""})`}
+              >
+                Limpiar filtros
+                <span
+                  className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+                  aria-hidden
+                >
+                  {cantFiltros}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
@@ -526,11 +814,18 @@ export function CombustibleTenantPage() {
               aria-label="Filtrar por forma de pago"
             >
               <option value="">Todas</option>
-              {Object.entries(FORMA_PAGO_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
+              {Object.entries(FORMA_PAGO_LABELS)
+                .filter(
+                  ([k]) =>
+                    !opcionesValidas ||
+                    opcionesValidas.formasPago.has(k) ||
+                    k === formaPago,
+                )
+                .map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
