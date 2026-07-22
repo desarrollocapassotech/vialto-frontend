@@ -588,6 +588,7 @@ export function LiquidacionesTenantPage() {
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
           ivaPct={config?.ivaGastosAdmin}
+          arcaConfig={config}
         />
       )}
       {showCrear && (
