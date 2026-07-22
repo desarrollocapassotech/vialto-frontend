@@ -12,10 +12,7 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import {
-  listadoTablaAccionClass,
-  listadoTablaTdClass,
-} from "@/lib/listadoTabla";
+import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import type {
   CargaCombustible,
