@@ -14,6 +14,7 @@ import {
 import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -50,6 +51,7 @@ export function ViajeViewModal({
   tenantId?: string;
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
+  const { isVisible } = useFieldConfig("viajes");
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -72,31 +74,37 @@ export function ViajeViewModal({
       .join(", ") ?? null;
 
   const campos = [
-    { label: "Cliente", value: clienteNombre },
+    { key: "clienteId", label: "Cliente", value: clienteNombre },
     {
+      key: "transportistaId",
       label: "Transportista",
       value: viaje.transportistaId ? transportistaNombre : "Flota propia",
     },
     {
+      key: "origen",
       label: "Ruta",
       value: textoRutaViaje(viaje.origen, etiquetasDestinosDesdeViaje(viaje)),
     },
     {
+      key: "fechaCarga",
       label: "Fecha de carga",
       value: viaje.fechaCarga ? fmtDate(viaje.fechaCarga) : null,
     },
     {
+      key: "fechaDescarga",
       label: "Fecha de descarga",
       value: viaje.fechaDescarga ? fmtDate(viaje.fechaDescarga) : null,
     },
-    { label: "Vehículos", value: vehiculoPatentes },
-    { label: "Productos", value: productosDesc },
+    { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
+    { key: "productoItems", label: "Productos", value: productosDesc },
     {
+      key: "monto",
       label: "Monto cliente",
       value:
         viaje.monto != null ? fmtMonto(viaje.monto, viaje.monedaMonto) : null,
     },
     {
+      key: "precioTransportistaExterno",
       label: "Precio transportista",
       value:
         viaje.precioTransportistaExterno != null
@@ -106,13 +114,23 @@ export function ViajeViewModal({
             )
           : null,
     },
-    { label: "KM recorridos", value: viaje.kmRecorridos },
-    { label: "Litros consumidos", value: viaje.litrosConsumidos },
+    { key: "kmRecorridos", label: "KM recorridos", value: viaje.kmRecorridos },
     {
+      key: "litrosConsumidos",
+      label: "Litros consumidos",
+      value: viaje.litrosConsumidos,
+    },
+    {
+      key: "fechaFinalizado",
       label: "Fecha finalizado",
       value: viaje.fechaFinalizado ? fmtDate(viaje.fechaFinalizado) : null,
     },
-  ].filter((c) => c.value != null && c.value !== "");
+  ].filter(
+    (c) =>
+      c.value != null &&
+      c.value !== "" &&
+      isVisible("detalle_viaje", c.key),
+  );
 
   return (
     <ViewModalShell
@@ -154,7 +172,7 @@ export function ViajeViewModal({
               </div>
             ))}
           </div>
-          {viaje.detalleCarga && (
+          {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                 Detalle de carga
@@ -162,7 +180,7 @@ export function ViajeViewModal({
               <p className="mt-1 text-sm">{viaje.detalleCarga}</p>
             </div>
           )}
-          {viaje.observaciones && (
+          {isVisible("detalle_viaje", "observaciones") && viaje.observaciones && (
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                 Observaciones
@@ -172,117 +190,111 @@ export function ViajeViewModal({
           )}
         </div>
 
-        <div className="py-5">
-          <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
-            Gastos adicionales
-            {viaje.otrosGastos && viaje.otrosGastos.length > 0 && (
-              <span className="ml-2 font-normal normal-case tracking-normal">
-                ({viaje.otrosGastos.length})
-              </span>
-            )}
-          </p>
-          {!viaje.otrosGastos || viaje.otrosGastos.length === 0 ? (
-            <p className="text-sm text-vialto-steel/70">
-              Sin gastos registrados.
+        {isVisible("detalle_viaje", "otrosGastos") && (
+          <div className="py-5">
+            <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
+              Gastos adicionales
+              {viaje.otrosGastos && viaje.otrosGastos.length > 0 && (
+                <span className="ml-2 font-normal normal-case tracking-normal">
+                  ({viaje.otrosGastos.length})
+                </span>
+              )}
             </p>
-          ) : (
-            <ListadoDatos
-              columns={[
-                {
-                  id: "descripcion",
-                  header: "Descripción",
-                  primary: true,
-                  cell: (g) => g.descripcion || "—",
-                  tdClassName: listadoTablaTdClass,
-                },
-                {
-                  id: "fecha",
-                  header: "Fecha",
-                  cell: (g) => fmtDate(g.fecha),
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-                },
-                {
-                  id: "cargadoPor",
-                  header: "Cargado por",
-                  cell: (g) => (
-                    <OtroGastoAutorDisplay
-                      row={g}
-                      labelMap={userLabelMap}
-                      className="max-w-[11rem]"
-                    />
-                  ),
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-                },
-                {
-                  id: "monto",
-                  header: "Monto",
-                  cell: (g) => fmtMonto(g.monto, g.moneda),
-                  thClassName: `${listadoTablaThClass} text-right`,
-                  tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
-                },
-              ]}
-              rows={viaje.otrosGastos}
-              rowKey={(g) =>
-                `${g.descripcion ?? ""}-${g.fecha ?? ""}-${g.monto ?? ""}`
-              }
-              emptyMessage="Sin gastos registrados."
-            />
-          )}
-        </div>
+            {!viaje.otrosGastos || viaje.otrosGastos.length === 0 ? (
+              <p className="text-sm text-vialto-steel/70">Sin gastos registrados.</p>
+            ) : (
+              <ListadoDatos
+                columns={[
+                  {
+                    id: "descripcion",
+                    header: "Descripción",
+                    primary: true,
+                    cell: (g) => g.descripcion || "—",
+                    tdClassName: listadoTablaTdClass,
+                  },
+                  {
+                    id: "fecha",
+                    header: "Fecha",
+                    cell: (g) => fmtDate(g.fecha),
+                    tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                  },
+                  {
+                    id: "cargadoPor",
+                    header: "Cargado por",
+                    cell: (g) => (
+                      <OtroGastoAutorDisplay
+                        row={g}
+                        labelMap={userLabelMap}
+                        className="max-w-[11rem]"
+                      />
+                    ),
+                    tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                  },
+                  {
+                    id: "monto",
+                    header: "Monto",
+                    cell: (g) => fmtMonto(g.monto, g.moneda),
+                    thClassName: `${listadoTablaThClass} text-right`,
+                    tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
+                  },
+                ]}
+                rows={viaje.otrosGastos}
+                rowKey={(g) => `${g.descripcion ?? ""}-${g.fecha ?? ""}-${g.monto ?? ""}`}
+                emptyMessage="Sin gastos registrados."
+              />
+            )}
+          </div>
+        )}
 
-        <div className="pt-5">
-          <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
-            Pagos al transportista
-            {viaje.pagosTransportista &&
-              viaje.pagosTransportista.length > 0 && (
+        {isVisible("detalle_viaje", "pagosTransportista") && (
+          <div className="pt-5">
+            <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
+              Pagos al transportista
+              {viaje.pagosTransportista && viaje.pagosTransportista.length > 0 && (
                 <span className="ml-2 font-normal normal-case tracking-normal">
                   ({viaje.pagosTransportista.length})
                 </span>
               )}
-          </p>
-          {!viaje.pagosTransportista ||
-          viaje.pagosTransportista.length === 0 ? (
-            <p className="text-sm text-vialto-steel/70">
-              Sin pagos registrados.
             </p>
-          ) : (
-            <ListadoDatos
-              columns={[
-                {
-                  id: "fecha",
-                  header: "Fecha",
-                  primary: true,
-                  cell: (p) => fmtDate(p.fecha),
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-                },
-                {
-                  id: "metodo",
-                  header: "Método",
-                  cell: (p) => p.metodo || "—",
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-                },
-                {
-                  id: "observaciones",
-                  header: "Observaciones",
-                  cell: (p) => p.observaciones || "—",
-                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-                },
-                {
-                  id: "monto",
-                  header: "Monto",
-                  cell: (p) => fmtMonto(p.monto, p.moneda),
-                  thClassName: `${listadoTablaThClass} text-right`,
-                  tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
-                },
-              ]}
-              rows={viaje.pagosTransportista}
-              rowKey={(p) =>
-                `${p.fecha ?? ""}-${p.metodo ?? ""}-${p.monto ?? ""}`
-              }
-              emptyMessage="Sin pagos registrados."
-            />
-          )}
-        </div>
+            {!viaje.pagosTransportista || viaje.pagosTransportista.length === 0 ? (
+              <p className="text-sm text-vialto-steel/70">Sin pagos registrados.</p>
+            ) : (
+              <ListadoDatos
+                columns={[
+                  {
+                    id: "fecha",
+                    header: "Fecha",
+                    primary: true,
+                    cell: (p) => fmtDate(p.fecha),
+                    tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                  },
+                  {
+                    id: "metodo",
+                    header: "Método",
+                    cell: (p) => p.metodo || "—",
+                    tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                  },
+                  {
+                    id: "observaciones",
+                    header: "Observaciones",
+                    cell: (p) => p.observaciones || "—",
+                    tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                  },
+                  {
+                    id: "monto",
+                    header: "Monto",
+                    cell: (p) => fmtMonto(p.monto, p.moneda),
+                    thClassName: `${listadoTablaThClass} text-right`,
+                    tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
+                  },
+                ]}
+                rows={viaje.pagosTransportista}
+                rowKey={(p) => `${p.fecha ?? ""}-${p.metodo ?? ""}-${p.monto ?? ""}`}
+                emptyMessage="Sin pagos registrados."
+              />
+            )}
+          </div>
+        )}
       </div>
     </ViewModalShell>
   );
