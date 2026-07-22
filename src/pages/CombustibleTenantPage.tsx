@@ -134,14 +134,16 @@ export function CombustibleTenantPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Filtros iniciales que puede traer la URL
-  const [searchParams] = useSearchParams();
+  // Filtros iniciales que puede traer el link de dashboard o URL compartida
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialVehiculoId = searchParams.get("vehiculoId") ?? "";
   const initialChoferId = searchParams.get("choferId") ?? "";
   const initialFrom = searchParams.get("from");
   const initialTo = searchParams.get("to");
+  const initialEstacion = searchParams.get("estacion") ?? "";
+  const initialFormaPago = searchParams.get("formaPago") ?? "";
 
-  // ─── Datos maestros del tenant elegido ────────────────────────────────────
+  // ─── Datos maestros del tenant elegido (para filtros y alta) ──────────────
   const [vehiculos, setVehiculos] = useState<ConEmpresa<Vehiculo>[]>([]);
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
   const [estaciones, setEstaciones] = useState<string[]>([]);
@@ -155,8 +157,8 @@ export function CombustibleTenantPage() {
   const [hastaInput, setHastaInput] = useState<string>(hasta);
   const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
   const [choferId, setChoferId] = useState(initialChoferId);
-  const [estacion, setEstacion] = useState("");
-  const [formaPago, setFormaPago] = useState("");
+  const [estacion, setEstacion] = useState(initialEstacion);
+  const [formaPago, setFormaPago] = useState(initialFormaPago);
 
   // ─── ESTADOS PARA OPCIONES DINÁMICAS (FILTROS EN CASCADA) ──────────────
   const [opcionesValidas, setOpcionesValidas] = useState<{
@@ -177,6 +179,53 @@ export function CombustibleTenantPage() {
   const [downloading, setDownloading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // ─── EFECTO SECUNDARIO: SINCRONIZAR FILTROS CON LA URL ───────────────────
+  useEffect(() => {
+    setSearchParams(
+      (prevParams) => {
+        // Mantenemos los parámetros actuales de la URL (incluido el tenantId)
+        const qs = new URLSearchParams(prevParams);
+
+        // Solo ensuciamos la URL con las fechas si el usuario sale del rango por defecto
+        const esRangoPorDefecto =
+          desde === primerDiaMesActual() && hasta === hoyIso();
+
+        if (!esRangoPorDefecto) {
+          if (desde) qs.set("from", desde);
+          if (hasta) qs.set("to", hasta);
+        } else {
+          // Si vuelve al rango por defecto, quitamos los parámetros
+          qs.delete("from");
+          qs.delete("to");
+        }
+
+        // Seteamos o eliminamos explícitamente los demás filtros
+        if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+        else qs.delete("vehiculoId");
+
+        if (choferId) qs.set("choferId", choferId);
+        else qs.delete("choferId");
+
+        if (estacion) qs.set("estacion", estacion);
+        else qs.delete("estacion");
+
+        if (formaPago) qs.set("formaPago", formaPago);
+        else qs.delete("formaPago");
+
+        return qs;
+      },
+      { replace: true },
+    );
+  }, [
+    desde,
+    hasta,
+    vehiculoId,
+    choferId,
+    estacion,
+    formaPago,
+    setSearchParams,
+  ]);
 
   function resetPage() {
     setPage(1);
