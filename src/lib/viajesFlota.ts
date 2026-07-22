@@ -119,6 +119,7 @@ function stubTransportista(
     paut: null,
     permisoInternacional: null,
     fechaVencimientoPermiso: null,
+    comisionPct: null,
     createdAt: "",
   };
 }
