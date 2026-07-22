@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { useSearchParams } from "react-router-dom";
 import { apiJson } from "@/lib/api";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import type { FinancieroDashboardResponse } from "@/types/financieroDashboard";
@@ -15,7 +16,7 @@ import {
   CashflowPanel,
 } from "./FinancieroDashboardPanels";
 
-type FinancieroTab = "margen" | "viajes" | "liquidaciones" | "facturacion" | "cashflow";
+type FinancieroTab = "margen" | "alertas" | "viajes" | "liquidaciones" | "facturacion" | "cashflow";
 
 function periodToDates(
   period: string,
@@ -51,11 +52,15 @@ export function FinancieroDashboardSection({
   showViajes,
   showFacturacion,
   showIntegracionArca,
+  onViewViaje,
+  loadingViajeId,
 }: {
   dash: ReturnType<typeof useTenantOwnerDashboard>;
   showViajes: boolean;
   showFacturacion: boolean;
   showIntegracionArca: boolean;
+  onViewViaje?: (id: string) => void;
+  loadingViajeId?: string | null;
 }) {
   const { getToken } = useAuth();
   const getTokenRef = useRef(getToken);
@@ -65,6 +70,9 @@ export function FinancieroDashboardSection({
 
   const [data, setData] = useState<FinancieroDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const cantAlertas = data?.margen?.alertas.length ?? 0;
 
   const tabs: { id: FinancieroTab; label: string; badge?: number }[] = [
     ...(showViajes ? [{ id: "margen" as const, label: "Margen" }] : []),
@@ -74,9 +82,30 @@ export function FinancieroDashboardSection({
       : []),
     ...(showFacturacion ? [{ id: "facturacion" as const, label: "Facturación" }] : []),
     ...(showViajes && showFacturacion ? [{ id: "cashflow" as const, label: "Cashflow" }] : []),
+    ...(showViajes
+      ? [{ id: "alertas" as const, label: "Alertas", badge: cantAlertas > 0 ? cantAlertas : undefined }]
+      : []),
   ];
   const [tab, setTab] = useState<FinancieroTab | null>(null);
   const tabActivo = tab ?? tabs[0]?.id ?? "margen";
+
+  // Deep link desde la campanita de alertas del dashboard: `/?financieroTab=alertas`
+  // salta directo a esta pestaña y hace scroll a la sección.
+  useEffect(() => {
+    if (searchParams.get("financieroTab") !== "alertas") return;
+    setTab("alertas");
+    document
+      .getElementById("financiero-heading")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("financieroTab");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const dates = periodToDates(dash.period, dash.customFrom, dash.customTo);
@@ -106,14 +135,7 @@ export function FinancieroDashboardSection({
   if (tabs.length === 0) return null;
 
   return (
-    <section aria-labelledby="financiero-heading">
-      <h2
-        id="financiero-heading"
-        className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-      >
-        Financiero
-      </h2>
-
+    <section id="financiero-heading" aria-label="Financiero">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista financiera">
         {tabs.map((t) => (
           <button
@@ -129,6 +151,14 @@ export function FinancieroDashboardSection({
             }`}
           >
             {t.label}
+            {t.badge !== undefined && (
+              <span
+                className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-vialto-fire px-1 text-[10px] font-semibold leading-none text-white"
+                aria-hidden
+              >
+                {t.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -137,12 +167,6 @@ export function FinancieroDashboardSection({
         {tabActivo === "margen" && (
           <div className="flex flex-col gap-4">
             <MargenResumenPanel data={data} loading={loading} />
-            <div>
-              <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-                Alertas de margen bajo o negativo
-              </p>
-              <MargenAlertasList alertas={data?.margen?.alertas ?? []} />
-            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
@@ -177,6 +201,13 @@ export function FinancieroDashboardSection({
         {tabActivo === "liquidaciones" && <LiquidacionesPanel data={data} loading={loading} />}
         {tabActivo === "facturacion" && <FacturacionPanel data={data} loading={loading} />}
         {tabActivo === "cashflow" && <CashflowPanel data={data} loading={loading} />}
+        {tabActivo === "alertas" && (
+          <MargenAlertasList
+            alertas={data?.margen?.alertas ?? []}
+            onViewViaje={onViewViaje}
+            loadingViajeId={loadingViajeId}
+          />
+        )}
       </div>
     </section>
   );

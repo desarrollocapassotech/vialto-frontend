@@ -119,14 +119,7 @@ export function CombustibleDashboardSection({
   ];
 
   return (
-    <section aria-labelledby="combustible-heading">
-      <h2
-        id="combustible-heading"
-        className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-      >
-        Combustible
-      </h2>
-
+    <section id="combustible-heading" aria-label="Combustible">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista de combustible">
         {tabs.map((t) => (
           <button

@@ -44,6 +44,10 @@ export type FinancieroDashboardResponse = {
   };
   viajesFunnel?: {
     porEstado: Array<{ estado: string; cantidad: number }>;
+    liquidados: {
+      cantidad: number;
+      montoTotal: FinancieroMoney;
+    };
     sinLiquidar: {
       cantidad: number;
       montoPendiente: FinancieroMoney;

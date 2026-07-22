@@ -21,6 +21,13 @@ function fmtPct(n: number | null): string {
   return `${n.toFixed(1)}%`;
 }
 
+function fmtMoneyDualCompact(money: FinancieroMoney): string {
+  const parts: string[] = [];
+  if (money.ARS !== 0) parts.push(fmtMoney(money.ARS));
+  if (money.USD !== 0) parts.push(fmtMoneyUSD(money.USD));
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
 function MoneyDual({ money }: { money: FinancieroMoney }) {
   if (money.ARS === 0 && money.USD === 0) return <span>—</span>;
   return (
@@ -44,7 +51,7 @@ function StatTile({
 }) {
   const inner = (
     <>
-      <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+      <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
         {label}
       </span>
       <div>
@@ -91,13 +98,13 @@ export function MargenResumenPanel({
   return (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">
-        <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+        <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
           Facturado
         </span>
         <div className="text-right text-white">{listo && r ? <MoneyDual money={r.facturado} /> : "—"}</div>
       </div>
       <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">
-        <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+        <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
           Margen
         </span>
         <div className="text-right text-emerald-400">{listo && r ? <MoneyDual money={r.margen} /> : "—"}</div>
@@ -212,7 +219,15 @@ export function MargenPorRutaTable({
   );
 }
 
-export function MargenAlertasList({ alertas }: { alertas: FinancieroMargenAlerta[] }) {
+export function MargenAlertasList({
+  alertas,
+  onViewViaje,
+  loadingViajeId,
+}: {
+  alertas: FinancieroMargenAlerta[];
+  onViewViaje?: (id: string) => void;
+  loadingViajeId?: string | null;
+}) {
   if (alertas.length === 0) {
     return <EmptyState text="Sin viajes con margen bajo o negativo en el período." />;
   }
@@ -258,12 +273,23 @@ export function MargenAlertasList({ alertas }: { alertas: FinancieroMargenAlerta
               </td>
               <td className="py-2 text-right text-vialto-charcoal">{fmtPct(a.margenPct)}</td>
               <td className="py-2 text-right">
-                <Link
-                  to={`/viajes?viaje=${encodeURIComponent(a.viajeId)}`}
-                  className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                >
-                  Ver viaje →
-                </Link>
+                {onViewViaje ? (
+                  <button
+                    type="button"
+                    disabled={loadingViajeId === a.viajeId}
+                    onClick={() => onViewViaje(a.viajeId)}
+                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {loadingViajeId === a.viajeId ? "Cargando…" : "Ver viaje →"}
+                  </button>
+                ) : (
+                  <Link
+                    to={`/viajes?viaje=${encodeURIComponent(a.viajeId)}`}
+                    className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+                  >
+                    Ver viaje →
+                  </Link>
+                )}
               </td>
             </tr>
           ))}
@@ -296,6 +322,12 @@ export function ViajesFunnelPanel({
             linkTo={`/viajes?estado=${encodeURIComponent(e.estado)}`}
           />
         ))}
+        <StatTile
+          label="Liquidados"
+          value={String(funnel.liquidados.cantidad)}
+          sub={fmtMoneyDualCompact(funnel.liquidados.montoTotal)}
+          linkTo="/viajes?pagoTransportista=pagado"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -537,7 +569,7 @@ export function FacturacionPanel({
 
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
         <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
-          <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
             Facturado
           </span>
           <div className="text-right text-white">
@@ -545,7 +577,7 @@ export function FacturacionPanel({
           </div>
         </div>
         <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
-          <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
             Cobrado
           </span>
           <div className="text-right text-emerald-400">
@@ -553,7 +585,7 @@ export function FacturacionPanel({
           </div>
         </div>
         <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
-          <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
             Pendiente de cobro (total)
           </span>
           <div className="text-right text-amber-400">
@@ -657,7 +689,7 @@ export function CashflowPanel({
       </div>
 
       <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
-        <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-white/35">
+        <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
           A pagar a transportistas (pendiente total)
         </span>
         <div className="text-right text-rose-400">

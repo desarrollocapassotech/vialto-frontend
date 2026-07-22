@@ -46,6 +46,11 @@ export type OwnerDashboardResponse = {
       cantidad: number;
       montoTotal: number;
     };
+    /** Viajes del período con margen bajo o negativo. `montoTotal` solo suma el margen negativo en ARS. */
+    margenBajo?: {
+      cantidad: number;
+      montoTotal: number;
+    };
   } | null;
   viajes?: {
     enCurso: MetricCompare;
