@@ -1022,6 +1022,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
           emitirUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}/emitir?tenantId=${encodeURIComponent(tenantId)}`}
+          detalleUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}?tenantId=${encodeURIComponent(tenantId)}`}
+          configUrl={`/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`}
+          arcaConfig={arcaConfig}
           ivaPct={arcaConfig?.ivaGastosAdmin}
         />
       )}

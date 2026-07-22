@@ -15,9 +15,13 @@ import {
   cvlpCbteTipoFromCondicionIva,
   type CvlpCbteTipo,
 } from '@/lib/arcaCbteTipo';
+import {
+  collectCvlpEmitMissingFields,
+  formatCvlpEmitMissingMessage,
+} from '@/lib/cvlpEmitValidation';
 import { friendlyError } from '@/lib/friendlyError';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
-import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
+import type { ArcaConfig, Cliente, Liquidacion, Transportista, Viaje } from '@/types/api';
 
 interface Props {
   viaje: Viaje;
@@ -62,20 +66,47 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [liquidacion, setLiquidacion] = useState<Liquidacion | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
+  const [transportistaDetalle, setTransportistaDetalle] = useState<Transportista | null>(null);
+  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+  const [datosReady, setDatosReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDatosReady(false);
     void (async () => {
       try {
         const cfg = await apiJson<ArcaConfig>('/api/integracion-arca/config', () => getToken());
         if (!cancelled) setArcaConfig(cfg);
       } catch {
-        // config no disponible — se omite el placeholder
+        // config no disponible — la validación de emisión lo reporta
       }
+      if (viaje.transportistaId) {
+        try {
+          const t = await apiJson<Transportista>(
+            `/api/transportistas/${encodeURIComponent(viaje.transportistaId)}`,
+            () => getToken(),
+          );
+          if (!cancelled) setTransportistaDetalle(t);
+        } catch {
+          // se valida con lo disponible en el viaje
+        }
+      }
+      if (viaje.clienteId) {
+        try {
+          const c = await apiJson<Cliente>(
+            `/api/clientes/${encodeURIComponent(viaje.clienteId)}`,
+            () => getToken(),
+          );
+          if (!cancelled) setClienteDetalle(c);
+        } catch {
+          // se valida con lo disponible en el viaje
+        }
+      }
+      if (!cancelled) setDatosReady(true);
     })();
     return () => { cancelled = true; };
-  }, [getToken]);
+  }, [getToken, viaje.transportistaId, viaje.clienteId]);
 
   const transportistaNombre = viaje.transportista?.nombre ?? viaje.transportistaId ?? '—';
   const gastosAdminArs = useMemo(() => sumGastosAdminArs(viaje), [viaje]);
@@ -84,6 +115,26 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const periodoCompleto =
     Boolean(periodoDesde && periodoHasta) && !periodoInvalido;
   const overrideManual = cbteTipo !== sugerido;
+
+  const missingEmitFields = useMemo(
+    () =>
+      collectCvlpEmitMissingFields({
+        emisor: arcaConfig,
+        transportista: transportistaDetalle ?? {
+          condicionIva: viaje.transportista?.condicionIva ?? null,
+          idFiscal: null,
+          domicilio: null,
+        },
+        cliente: clienteDetalle ?? {
+          nombre: viaje.cliente?.nombre ?? null,
+          direccion: null,
+          idFiscal: null,
+        },
+      }),
+    [arcaConfig, transportistaDetalle, clienteDetalle, viaje.transportista?.condicionIva, viaje.cliente?.nombre],
+  );
+  const missingEmitMessage = formatCvlpEmitMissingMessage(missingEmitFields);
+  const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
 
   function fmtMoney(n: number) {
     return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
@@ -97,6 +148,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (datosEmitIncompletos) {
+      setError(missingEmitMessage);
+      return;
+    }
     if (!periodoCompleto) {
       setError(
         periodoInvalido
@@ -147,6 +202,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
 
   async function handleEmitirArca() {
     if (!liquidacion) return;
+    if (datosEmitIncompletos) {
+      setError(missingEmitMessage);
+      return;
+    }
     setError(null);
     setBusyArca(true);
     try {
@@ -447,6 +506,17 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 />
               </section>
 
+              {datosEmitIncompletos && (
+                <div className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">Completá estos datos antes de emitir</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                    {missingEmitFields.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {error && (
                 <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
                   {error}
@@ -480,7 +550,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                   </button>
                   <button
                     type="button"
-                    disabled={busyCrear || !periodoCompleto}
+                    disabled={busyCrear || !periodoCompleto || !datosReady || datosEmitIncompletos}
                     onClick={() => void handleCrear()}
                     className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >
@@ -519,6 +589,17 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 </div>
               </section>
 
+              {datosEmitIncompletos && (
+                <div className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">Completá estos datos antes de emitir</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                    {missingEmitFields.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {error && (
                 <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
                   {error}
@@ -535,7 +616,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={busyArca}
+                  disabled={busyArca || !datosReady || datosEmitIncompletos}
                   onClick={() => void handleEmitirArca()}
                   className="inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
                 >

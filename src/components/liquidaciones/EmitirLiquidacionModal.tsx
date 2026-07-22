@@ -1,12 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Receipt } from 'lucide-react';
 import { apiJson } from '@/lib/api';
+import {
+  collectCvlpEmitMissingFields,
+  formatCvlpEmitMissingMessage,
+} from '@/lib/cvlpEmitValidation';
 import { friendlyError } from '@/lib/friendlyError';
 import { Spinner } from '@/components/ui/Spinner';
-import type { Liquidacion } from '@/types/api';
+import type { ArcaConfig, Liquidacion } from '@/types/api';
 
-type LiquidacionConTransportista = Liquidacion & {
-  transportista?: { id: string; nombre: string; idFiscal: string | null } | null;
+type LiquidacionEmitDetail = Liquidacion & {
+  transportista?: {
+    id: string;
+    nombre: string;
+    idFiscal: string | null;
+    domicilio?: string | null;
+    condicionIva?: number | null;
+  } | null;
+  viajes?: Array<{
+    viaje?: {
+      cliente?: {
+        nombre?: string | null;
+        idFiscal?: string | null;
+        direccion?: string | null;
+      } | null;
+    } | null;
+  }>;
 };
 
 const CBTE_TIPO: Record<number, string> = {
@@ -55,19 +74,31 @@ export function EmitirLiquidacionModal({
   onSuccess,
   onClose,
   emitirUrl,
+  detalleUrl,
+  configUrl,
+  arcaConfig: arcaConfigProp,
   ivaPct,
 }: {
-  liq: LiquidacionConTransportista;
+  liq: LiquidacionEmitDetail;
   getToken: () => Promise<string | null>;
-  onSuccess: (updated: LiquidacionConTransportista) => void;
+  onSuccess: (updated: LiquidacionEmitDetail) => void;
   onClose: () => void;
   /** URL del endpoint de emisión. Por defecto usa el endpoint de tenant. */
   emitirUrl?: string;
+  /** GET detalle de liquidación (con cliente del viaje). Por defecto tenant. */
+  detalleUrl?: string;
+  /** GET config ARCA. Por defecto tenant. */
+  configUrl?: string;
+  /** Si ya está cargada en la página, evita un fetch extra. */
+  arcaConfig?: ArcaConfig | null;
   /** Porcentaje de IVA configurado (ej: 21). Si no se pasa, se deduce de los valores guardados. */
   ivaPct?: number;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<LiquidacionEmitDetail | null>(null);
+  const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(arcaConfigProp ?? null);
+  const [datosReady, setDatosReady] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -77,17 +108,72 @@ export function EmitirLiquidacionModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [submitting, onClose]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setDatosReady(false);
+    void (async () => {
+      try {
+        const det = await apiJson<LiquidacionEmitDetail>(
+          detalleUrl ?? `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+          () => getToken(),
+        );
+        if (!cancelled) setDetail(det);
+      } catch {
+        if (!cancelled) setDetail(liq);
+      }
+      if (arcaConfigProp) {
+        if (!cancelled) {
+          setArcaConfig(arcaConfigProp);
+          setDatosReady(true);
+        }
+        return;
+      }
+      try {
+        const cfg = await apiJson<ArcaConfig>(
+          configUrl ?? '/api/integracion-arca/config',
+          () => getToken(),
+        );
+        if (!cancelled) setArcaConfig(cfg);
+      } catch {
+        // la validación reporta emisor incompleto
+      }
+      if (!cancelled) setDatosReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [liq.id, getToken, detalleUrl, configUrl, arcaConfigProp, liq]);
+
+  const source = detail ?? liq;
+  const missingEmitFields = useMemo(
+    () =>
+      collectCvlpEmitMissingFields({
+        emisor: arcaConfig,
+        transportista: source.transportista ?? {
+          idFiscal: null,
+          domicilio: null,
+          condicionIva: null,
+        },
+        cliente: source.viajes?.[0]?.viaje?.cliente ?? null,
+      }),
+    [arcaConfig, detail, liq],
+  );
+  const missingEmitMessage = formatCvlpEmitMissingMessage(missingEmitFields);
+  const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
+
   async function confirmar() {
+    if (datosEmitIncompletos) {
+      setError(missingEmitMessage);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const url = emitirUrl ?? `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`;
-      const updated = await apiJson<LiquidacionConTransportista>(
+      const updated = await apiJson<LiquidacionEmitDetail>(
         url,
         () => getToken(),
         { method: 'POST' },
       );
-      onSuccess({ ...updated, transportista: liq.transportista });
+      onSuccess({ ...updated, transportista: source.transportista ?? liq.transportista });
     } catch (e) {
       setError(friendlyError(e, 'arca'));
     } finally {
@@ -107,7 +193,6 @@ export function EmitirLiquidacionModal({
         aria-modal="true"
         className="w-full max-w-md rounded border border-black/10 bg-white shadow-xl"
       >
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
             Emitir comprobante
@@ -124,26 +209,23 @@ export function EmitirLiquidacionModal({
           )}
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          {/* Datos del emisor */}
           <div>
             <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel mb-2">
               Destinatario
             </p>
             <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
               <p className="font-medium text-vialto-charcoal">
-                {liq.transportista?.nombre ?? liq.transportistaId}
+                {source.transportista?.nombre ?? liq.transportista?.nombre ?? liq.transportistaId}
               </p>
-              {liq.transportista?.idFiscal && (
+              {(source.transportista?.idFiscal ?? liq.transportista?.idFiscal) && (
                 <p className="text-xs text-vialto-steel mt-0.5">
-                  CUIT {liq.transportista.idFiscal}
+                  CUIT {source.transportista?.idFiscal ?? liq.transportista?.idFiscal}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Detalle financiero */}
           <div>
             <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel mb-2">
               Detalle del comprobante
@@ -170,7 +252,6 @@ export function EmitirLiquidacionModal({
             </div>
           </div>
 
-          {/* Tipo comprobante */}
           <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
             <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel">
               Comprobante
@@ -178,12 +259,23 @@ export function EmitirLiquidacionModal({
             <span className="text-sm text-vialto-charcoal">{cbteTipoLabel}</span>
           </div>
 
-          {/* Advertencia */}
-          <div className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-            Al confirmar se enviará el comprobante a ARCA para su autorización. Una vez emitido no puede modificarse.
-          </div>
+          {datosEmitIncompletos && (
+            <div className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900" role="alert">
+              <p className="font-medium">Completá estos datos antes de emitir</p>
+              <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                {missingEmitFields.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-          {/* Error */}
+          {!datosEmitIncompletos && (
+            <div className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+              Al confirmar se enviará el comprobante a ARCA para su autorización. Una vez emitido no puede modificarse.
+            </div>
+          )}
+
           {error && (
             <div className="rounded border border-red-300/50 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
               {error}
@@ -191,7 +283,6 @@ export function EmitirLiquidacionModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end gap-3 border-t border-black/10 px-6 py-4">
           <button
             type="button"
@@ -203,8 +294,8 @@ export function EmitirLiquidacionModal({
           </button>
           <button
             type="button"
-            disabled={submitting}
-            onClick={confirmar}
+            disabled={submitting || !datosReady || datosEmitIncompletos}
+            onClick={() => void confirmar()}
             className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-fire font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-bright disabled:opacity-50"
           >
             {submitting ? <Spinner /> : <Receipt className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />}
