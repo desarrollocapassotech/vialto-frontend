@@ -94,6 +94,15 @@ const BASE_COLUMNS: ListadoColumn<CargaCombustible>[] = [
     cell: (r) => r.estacion,
   },
   {
+    id: "formaPago",
+    header: "Pago",
+    cell: (r) =>
+      r.formaPago
+        ? FORMA_PAGO_LABELS[r.formaPago as keyof typeof FORMA_PAGO_LABELS] ||
+          r.formaPago
+        : "—",
+  },
+  {
     id: "litros",
     header: "Litros",
     cell: (r) => `${fmtNum(r.litros)} L`,
