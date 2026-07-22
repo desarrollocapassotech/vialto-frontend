@@ -177,6 +177,7 @@ export interface Transportista {
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;
+  comisionPct: number | null;
   createdAt: string;
 }
 
