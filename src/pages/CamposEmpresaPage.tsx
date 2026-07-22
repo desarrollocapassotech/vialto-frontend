@@ -152,8 +152,7 @@ export function CamposEmpresaPage() {
         Configuración por empresa
       </h1>
       <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa y un formulario para configurar qué campos ve. Los
-        campos ocultos no se muestran en alta, edición ni detalle.
+        Elegí una empresa y un formulario para configurar qué campos se visualizan.
       </p>
 
       {catalogoError && (
