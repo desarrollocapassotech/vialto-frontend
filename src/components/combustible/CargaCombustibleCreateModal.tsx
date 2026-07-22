@@ -1,11 +1,9 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { useMaestroData } from "@/hooks/useMaestroData";
 import { useToast } from "@/lib/toast";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
-import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -20,14 +18,46 @@ function fmtVehiculoLabel(v: {
   return detalle ? `${v.patente} — ${detalle}` : v.patente;
 }
 
+type VehiculoOpt = {
+  id: string;
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+};
+type ChoferOpt = { id: string; nombre: string };
+
 interface Props {
+  /** clerkOrgId del tenant sobre el que se registra la carga. */
+  tenantId: string;
+  /** Flota del tenant elegido (viene del endpoint /platform/vehiculos). */
+  vehiculos: VehiculoOpt[];
+  /** Conductores del tenant elegido (viene del endpoint /platform/choferes). */
+  choferes: ChoferOpt[];
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
 
-export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
+/**
+ * Variante del alta de cargas para el panel de superadmin.
+ *
+ * A diferencia de CargaCombustibleCreateModal (tenant), NO usa useMaestroData
+ * (que está scopeado a la organización propia) ni el hook de validación en vivo
+ * de km — recibe la flota/conductores del tenant elegido por props y postea a
+ * /api/platform/combustible?tenantId=…
+ *
+ * La validación fuerte (km sin retroceso + coherencia importe) la garantiza el
+ * backend en `create`; acá replicamos solo el chequeo de coherencia de importe
+ * (litros × precio ≈ importe) para dar feedback inmediato.
+ */
+export function CargaCombustibleCreateModal({
+  tenantId,
+  vehiculos,
+  choferes,
+  onClose,
+  onSuccess,
+}: Props) {
   const { getToken } = useAuth();
-  const maestro = useMaestroData();
   const { showToast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -45,15 +75,22 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
     formaPago: "",
   });
 
-  const { formErrors } = useCombustibleValidation(
-    getToken,
-    formData.vehiculoId,
-    formData.fecha,
-    formData.litros,
-    formData.precioPorLitro,
-    formData.importe,
-    formData.km
-  );
+  // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
+  const importeError = useMemo(() => {
+    const litros = Number(formData.litros);
+    const precio = Number(formData.precioPorLitro);
+    const importe = Number(formData.importe);
+    if (!litros || !precio || !importe) return null;
+    const esperado = litros * precio;
+    const diff = Math.abs(importe - esperado);
+    if (diff > esperado * 0.01) {
+      return `El monto no coincide con litros × precio (esperado ≈ $${esperado.toLocaleString(
+        "es-AR",
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+      )}).`;
+    }
+    return null;
+  }, [formData.litros, formData.precioPorLitro, formData.importe]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -64,14 +101,13 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(formErrors).length > 0) return;
+    if (importeError) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const kmSanitizado = parseInt(formData.km.replace(/\./g, ""), 10);
-
       if (isNaN(kmSanitizado)) {
         throw new Error("El kilometraje ingresado no es válido.");
       }
@@ -86,7 +122,7 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
       };
 
       const nuevaCarga = await apiJson<CargaCombustible>(
-        `/api/combustible`,
+        `/api/platform/combustible?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
         {
           method: "POST",
@@ -114,11 +150,11 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="nueva-carga-titulo"
+      aria-labelledby="nueva-carga-sa-titulo"
     >
       <div className="relative w-full max-w-2xl border border-black/15 bg-white p-6 shadow-xl my-auto">
         <h2
-          id="nueva-carga-titulo"
+          id="nueva-carga-sa-titulo"
           className="text-xl font-semibold text-vialto-charcoal mb-6 border-b border-black/10 pb-3"
         >
           Registrar nueva carga
@@ -169,7 +205,7 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 <option value="" disabled>
                   Seleccione un vehículo...
                 </option>
-                {maestro.vehiculos.map((v) => (
+                {vehiculos.map((v) => (
                   <option key={v.id} value={v.id}>
                     {fmtVehiculoLabel(v)}
                   </option>
@@ -186,7 +222,7 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
               >
                 <option value="">Sin conductor asignado</option>
-                {maestro.choferes.map((ch) => (
+                {choferes.map((ch) => (
                   <option key={ch.id} value={ch.id}>
                     {ch.nombre}
                   </option>
@@ -237,9 +273,9 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
                 placeholder="0.00"
               />
-              {formErrors.importe && (
+              {importeError && (
                 <p className="mt-1 text-xs font-semibold text-red-600">
-                  ⚠️ {formErrors.importe}
+                  ⚠️ {importeError}
                 </p>
               )}
             </div>
@@ -256,11 +292,6 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
                 placeholder="Ej: 450.000"
               />
-              {formErrors.km && (
-                <p className="mt-1 text-xs font-semibold text-red-600">
-                  ⚠️ {formErrors.km}
-                </p>
-              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -292,7 +323,7 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
             </button>
             <button
               type="submit"
-              disabled={loading || Object.keys(formErrors).length > 0}
+              disabled={loading || Boolean(importeError)}
               className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
             >
               {loading ? "Guardando..." : "Guardar Carga"}
