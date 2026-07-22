@@ -182,23 +182,41 @@ export function CombustibleTenantPage() {
 
   // ─── EFECTO SECUNDARIO: SINCRONIZAR FILTROS CON LA URL ───────────────────
   useEffect(() => {
-    const qs = new URLSearchParams();
+    setSearchParams(
+      (prevParams) => {
+        // Mantenemos los parámetros actuales de la URL (incluido el tenantId)
+        const qs = new URLSearchParams(prevParams);
 
-    // Solo ensuciamos la URL con las fechas si el usuario sale del rango por defecto
-    const esRangoPorDefecto =
-      desde === primerDiaMesActual() && hasta === hoyIso();
-    if (!esRangoPorDefecto) {
-      if (desde) qs.set("from", desde);
-      if (hasta) qs.set("to", hasta);
-    }
+        // Solo ensuciamos la URL con las fechas si el usuario sale del rango por defecto
+        const esRangoPorDefecto =
+          desde === primerDiaMesActual() && hasta === hoyIso();
 
-    if (vehiculoId) qs.set("vehiculoId", vehiculoId);
-    if (choferId) qs.set("choferId", choferId);
-    if (estacion) qs.set("estacion", estacion);
-    if (formaPago) qs.set("formaPago", formaPago);
+        if (!esRangoPorDefecto) {
+          if (desde) qs.set("from", desde);
+          if (hasta) qs.set("to", hasta);
+        } else {
+          // Si vuelve al rango por defecto, quitamos los parámetros
+          qs.delete("from");
+          qs.delete("to");
+        }
 
-    // Usamos replace: true para no crear un historial de navegación infinito
-    setSearchParams(qs, { replace: true });
+        // Seteamos o eliminamos explícitamente los demás filtros
+        if (vehiculoId) qs.set("vehiculoId", vehiculoId);
+        else qs.delete("vehiculoId");
+
+        if (choferId) qs.set("choferId", choferId);
+        else qs.delete("choferId");
+
+        if (estacion) qs.set("estacion", estacion);
+        else qs.delete("estacion");
+
+        if (formaPago) qs.set("formaPago", formaPago);
+        else qs.delete("formaPago");
+
+        return qs;
+      },
+      { replace: true },
+    );
   }, [
     desde,
     hasta,
