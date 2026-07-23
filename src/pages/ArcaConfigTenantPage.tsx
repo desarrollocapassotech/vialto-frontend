@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useRef, useState } from 'react';
 import { ArcaCertificadoModal } from '@/components/liquidaciones/ArcaCertificadoModal';
+import { ConceptosLiquidacionConfigSection } from '@/components/liquidaciones/ConceptosLiquidacionConfigSection';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { useToast } from '@/lib/toast';
@@ -180,6 +181,7 @@ export function ArcaConfigTenantPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
+  const [tab, setTab] = useState<'config' | 'conceptos'>('config');
 
   useEffect(() => {
     let cancelled = false;
@@ -343,6 +345,11 @@ export function ArcaConfigTenantPage() {
     void saveSection(ALL_FIELDS).catch(() => {});
   }
 
+  const TABS: { id: 'config' | 'conceptos'; label: string }[] = [
+    { id: 'config', label: 'Configuración' },
+    { id: 'conceptos', label: 'Conceptos de liquidación' },
+  ];
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
@@ -357,10 +364,39 @@ export function ArcaConfigTenantPage() {
         </p>
       )}
 
-      {initialLoading ? (
+      <div className="mt-8 flex gap-0.5 border-b border-black/10">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={[
+              'px-4 py-2.5 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider border-b-2 -mb-px transition-colors',
+              tab === t.id
+                ? 'border-vialto-fire font-semibold text-vialto-charcoal'
+                : 'border-transparent text-vialto-steel hover:text-vialto-charcoal',
+            ].join(' ')}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'conceptos' && (
+        <div className="mt-6">
+          <SectionCard
+            title="Conceptos de liquidación"
+            description="Catálogo de conceptos adicionales que se pueden sumar o restar al liquidar."
+          >
+            <ConceptosLiquidacionConfigSection getToken={() => getToken()} />
+          </SectionCard>
+        </div>
+      )}
+
+      {tab === 'config' && initialLoading ? (
         <p className="mt-8 text-sm text-vialto-steel">Cargando configuración…</p>
-      ) : (
-        <form onSubmit={onSubmit} className="mt-8 space-y-6">
+      ) : tab === 'config' ? (
+        <form onSubmit={onSubmit} className="mt-6 space-y-6">
           {error && (
             <div className="rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
               {error}
@@ -662,7 +698,7 @@ export function ArcaConfigTenantPage() {
             {loading ? 'Aplicando…' : dirty ? 'Aplicar cambios' : 'Sin cambios para aplicar'}
           </button>
         </form>
-      )}
+      ) : null}
 
       {certModalOpen && (
         <ArcaCertificadoModal

@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  ConceptosLiquidacionLineasEditor,
+  toConceptosLineasPayload,
+  type ConceptoLineaDraft,
+} from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
@@ -62,6 +67,7 @@ export function CrearLiquidacionManualModal({
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
   const [ivaPct, setIvaPct] = useState('21');
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
 
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
@@ -160,6 +166,8 @@ export function CrearLiquidacionManualModal({
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
       if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
+      const lineasPayload = toConceptosLineasPayload(conceptosLineas);
+      if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       const liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
@@ -310,6 +318,13 @@ export function CrearLiquidacionManualModal({
               />
             </div>
           </div>
+
+          <ConceptosLiquidacionLineasEditor
+            getToken={getToken}
+            lineas={conceptosLineas}
+            onChange={setConceptosLineas}
+            disabled={submitting}
+          />
 
           {/* Viaje pre-fijado */}
           {viajeInicial && (

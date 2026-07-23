@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
+import {
+  ConceptosLiquidacionLineasEditor,
+  toConceptosLineasPayload,
+  type ConceptoLineaDraft,
+} from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import {
   ARCA_CBTE_OVERRIDE_WARNING,
@@ -53,6 +58,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +177,8 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
         cbteTipo,
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
+      const lineasPayload = toConceptosLineasPayload(conceptosLineas);
+      if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       const liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
         () => getToken(),
@@ -252,8 +260,8 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       onClick={handleOverlayClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
-      <div className="w-full max-w-lg bg-white shadow-xl border border-black/20">
-        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
+      <div className="w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh]">
+        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
           <div>
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
               Liquidación a transportista
@@ -271,7 +279,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
           </button>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto flex-1">
           {step === 'tipo' && (
             <div className="space-y-5">
               <p className="text-xs uppercase tracking-wider text-vialto-steel">
@@ -487,6 +495,15 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                     ? ` (${arcaConfig.comisionPctDefault}%).`
                     : '.'}
                 </p>
+              </section>
+
+              <section className="space-y-2">
+                <ConceptosLiquidacionLineasEditor
+                  getToken={getToken}
+                  lineas={conceptosLineas}
+                  onChange={setConceptosLineas}
+                  disabled={busyCrear}
+                />
               </section>
 
               {datosEmitIncompletos && (
