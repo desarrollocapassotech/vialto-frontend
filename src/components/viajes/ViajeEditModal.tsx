@@ -142,6 +142,8 @@ export type ViajeEditModalProps = {
   onSave: () => void;
   /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
   onFacturar?: () => void;
+  /** Motivo para deshabilitar Facturar (ej. ARCA + USD). */
+  facturarBloqueoMotivo?: string | null;
   onEliminar?: () => void;
   saving: boolean;
   error: string | null;
@@ -186,6 +188,7 @@ export function ViajeEditModal({
   onClose,
   onSave,
   onFacturar,
+  facturarBloqueoMotivo = null,
   onEliminar,
   saving,
   error,
@@ -267,7 +270,8 @@ export function ViajeEditModal({
           ? draft.transportistaId
           : snapshotViaje.transportistaId,
     });
-  const facturarDeshabilitado = saving || !draft.clienteId.trim();
+  const facturarDeshabilitado =
+    saving || !draft.clienteId.trim() || Boolean(facturarBloqueoMotivo);
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId:
@@ -924,9 +928,11 @@ export function ViajeEditModal({
                   onClick={onFacturar}
                   disabled={facturarDeshabilitado}
                   title={
-                    !draft.clienteId.trim()
-                      ? "Elegí un cliente para poder facturar este viaje"
-                      : undefined
+                    facturarBloqueoMotivo
+                      ? facturarBloqueoMotivo
+                      : !draft.clienteId.trim()
+                        ? "Elegí un cliente para poder facturar este viaje"
+                        : undefined
                   }
                   className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
                 >

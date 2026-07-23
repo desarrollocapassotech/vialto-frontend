@@ -472,6 +472,29 @@ export interface ArcaConfig {
 
 export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
 
+export type ConceptoLiquidacionSigno = 'favor' | 'contra';
+
+export interface ConceptoLiquidacion {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  signo: ConceptoLiquidacionSigno;
+  ivaPct: number;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LiquidacionConceptoLinea {
+  id: string;
+  conceptoLiquidacionId: string | null;
+  nombreSnapshot: string;
+  signo: ConceptoLiquidacionSigno;
+  ivaPct: number;
+  monto: number;
+  orden: number;
+}
+
 export interface Liquidacion {
   id: string;
   tenantId: string;
@@ -496,6 +519,7 @@ export interface Liquidacion {
   comprobanteUrl: string | null;
   createdAt: string;
   createdBy: string;
+  conceptosLineas?: LiquidacionConceptoLinea[];
 }
 
 export interface ArcaLog {

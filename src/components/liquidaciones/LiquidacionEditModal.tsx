@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import {
+  ConceptosLiquidacionLineasEditor,
+  toConceptosLineasPayload,
+  type ConceptoLineaDraft,
+} from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import {
   ViewModalShell,
@@ -49,6 +54,18 @@ export function LiquidacionEditModal({
   const [periodoDesde, setPeriodoDesde] = useState(toDateInput(liq.periodoDesde));
   const [periodoHasta, setPeriodoHasta] = useState(toDateInput(liq.periodoHasta));
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(() =>
+    (liq.conceptosLineas ?? [])
+      .filter((l) => l.conceptoLiquidacionId)
+      .map((l) => ({
+        conceptoLiquidacionId: l.conceptoLiquidacionId as string,
+        monto: l.monto,
+        nombre: l.nombreSnapshot,
+        signo: l.signo,
+        ivaPct: l.ivaPct,
+      })),
+  );
+  const [lineasLoading, setLineasLoading] = useState(canEditDatos);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(
     liq.comprobanteUrl ?? null,
@@ -56,6 +73,42 @@ export function LiquidacionEditModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!canEditDatos) {
+      setLineasLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLineasLoading(true);
+    void (async () => {
+      try {
+        const full = await apiJson<LiquidacionConTransportista>(
+          `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+          () => getToken(),
+        );
+        if (cancelled) return;
+        setConceptosLineas(
+          (full.conceptosLineas ?? [])
+            .filter((l) => l.conceptoLiquidacionId)
+            .map((l) => ({
+              conceptoLiquidacionId: l.conceptoLiquidacionId as string,
+              monto: l.monto,
+              nombre: l.nombreSnapshot,
+              signo: l.signo,
+              ivaPct: l.ivaPct,
+            })),
+        );
+      } catch {
+        // se edita con lo que haya en el listado si falla la carga
+      } finally {
+        if (!cancelled) setLineasLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEditDatos, getToken, liq.id]);
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -106,6 +159,7 @@ export function LiquidacionEditModal({
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
         }
+        body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
       if (showComprobante) {
         body.comprobanteUrl = nextComprobanteUrl ?? null;
@@ -248,6 +302,13 @@ export function LiquidacionEditModal({
                 </p>
               )}
             </div>
+
+            <ConceptosLiquidacionLineasEditor
+              getToken={getToken}
+              lineas={conceptosLineas}
+              onChange={setConceptosLineas}
+              disabled={saving || lineasLoading}
+            />
           </>
         ) : (
           <p className="text-sm text-vialto-steel">
