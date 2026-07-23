@@ -512,9 +512,6 @@ export function LiquidacionesPanel({
                     Comisión
                   </th>
                   <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Gastos admin.
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
                     Líquido
                   </th>
                 </tr>
@@ -525,7 +522,6 @@ export function LiquidacionesPanel({
                     <td className="py-2 text-vialto-charcoal">{p.periodo}</td>
                     <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.bruto)}</td>
                     <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.comision)}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.gastosAdmin)}</td>
                     <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.liquido)}</td>
                   </tr>
                 ))}

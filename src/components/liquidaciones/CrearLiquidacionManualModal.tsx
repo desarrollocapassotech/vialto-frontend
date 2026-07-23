@@ -193,16 +193,10 @@ export function CrearLiquidacionManualModal({
     : viajes.filter((v) => selectedViajeIds.has(v.id));
   const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
   const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
-  const gastosAdmin = selectedViajes.reduce((total, v) => {
-    const gastos = v.otrosGastos ?? [];
-    const gastosARS = gastos
-      .filter((g) => g.moneda === 'ARS')
-      .reduce((sum, g) => sum + g.monto, 0);
-    return total + gastosARS;
-  }, 0);
   const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ?? config?.comisionPctDefault ?? 0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
-  const netoGravado = anyHasPrice ? bruto - comisionMonto - gastosAdmin : null;
+  // Neto = bruto − comisión. Los gastos del viaje van en `otrosGastos`, no en la liquidación.
+  const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== '' ? Number(ivaPct) : 21;
   const ivaMonto = netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar = netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
@@ -423,12 +417,6 @@ export function CrearLiquidacionManualModal({
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
                   <span className="tabular-nums">− {fmtMoney(comisionMonto)}</span>
-                </div>
-              )}
-              {gastosAdmin > 0 && (
-                <div className="flex justify-between items-baseline text-xs text-vialto-steel">
-                  <span>Gastos administrativos</span>
-                  <span className="tabular-nums">− {fmtMoney(gastosAdmin)}</span>
                 </div>
               )}
               {netoGravado !== null && (

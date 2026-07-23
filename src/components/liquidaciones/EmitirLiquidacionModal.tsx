@@ -235,9 +235,6 @@ export function EmitirLiquidacionModal({
               <Fila label="Viajes" value={liq.cantViajes} muted />
               <Fila label="Sub total" value={fmtMoney(liq.bruto)} />
               <Fila label={`Comisión según convenio ${liq.comisionPct}%`} value={fmtMoney(liq.comision)} muted />
-              {liq.gastosAdmin > 0 && (
-                <Fila label="Otras" value={fmtMoney(liq.gastosAdmin)} muted />
-              )}
               {(() => {
                 const ivaBase = liq.bruto - liq.comision;
                 const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : 'IVA';
