@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { uploadComprobante } from '@/lib/comprobanteUpload';
+import {
+  normalizeViajeMoneda,
+  type ViajeMonedaCodigo,
+} from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
+import { formatViajeImporteForListado } from '@/lib/viajesFlota';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { Liquidacion, Transportista, Viaje, ArcaConfig } from '@/types/api';
 
@@ -15,6 +20,7 @@ type ViajeItem = Pick<
   | 'origen'
   | 'destino'
   | 'precioTransportistaExterno'
+  | 'monedaPrecioTransportistaExterno'
   | 'liquidacionesViaje'
   | 'otrosGastos'
 >;
@@ -25,9 +31,13 @@ function fmtDate(iso: string | null) {
   return `${d}/${m}/${y}`;
 }
 
-function fmtMoney(n: number | null) {
+function fmtMoney(n: number | null, moneda?: string | null) {
   if (n == null) return '—';
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  return formatViajeImporteForListado(n, moneda);
+}
+
+function monedaViaje(v: Pick<ViajeItem, 'monedaPrecioTransportistaExterno'>): ViajeMonedaCodigo {
+  return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
 }
 
 const inputClass =
@@ -118,11 +128,33 @@ export function CrearLiquidacionManualModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [submitting, onClose]);
 
+  const selectedViajes = useMemo(() => {
+    if (viajeInicial) return [viajeInicial as ViajeItem];
+    return viajes.filter((v) => selectedViajeIds.has(v.id));
+  }, [viajeInicial, viajes, selectedViajeIds]);
+
+  /** Moneda ya fijada por la selección actual (null si no hay selección). */
+  const monedaSeleccionada = useMemo<ViajeMonedaCodigo | null>(() => {
+    if (selectedViajes.length === 0) return null;
+    return monedaViaje(selectedViajes[0]);
+  }, [selectedViajes]);
+
   function toggleViaje(id: string) {
     setSelectedViajeIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      const candidato = viajes.find((v) => v.id === id);
+      if (!candidato) return prev;
+      if (prev.size > 0) {
+        const monedaFija = monedaViaje(
+          viajes.find((v) => prev.has(v.id)) ?? candidato,
+        );
+        if (monedaViaje(candidato) !== monedaFija) return prev;
+      }
+      next.add(id);
       return next;
     });
   }
@@ -140,6 +172,13 @@ export function CrearLiquidacionManualModal({
         `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viajeInicial.numero}.`,
       );
       return;
+    }
+    if (!viajeInicial && selectedViajes.length > 0) {
+      const monedas = new Set(selectedViajes.map((v) => monedaViaje(v)));
+      if (monedas.size > 1) {
+        setError('Una liquidación no puede mezclar viajes en distintas monedas.');
+        return;
+      }
     }
     setError(null);
     setSubmitting(true);
@@ -180,9 +219,9 @@ export function CrearLiquidacionManualModal({
     transportistaId;
 
   // — Resumen de montos —
-  const selectedViajes = viajeInicial
-    ? [viajeInicial as ViajeItem]
-    : viajes.filter((v) => selectedViajeIds.has(v.id));
+  const monedaResumen =
+    monedaSeleccionada ??
+    (viajeInicial ? monedaViaje(viajeInicial) : 'ARS');
   const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
   const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
   const gastosAdmin = selectedViajes.reduce((total, v) => {
@@ -329,9 +368,16 @@ export function CrearLiquidacionManualModal({
                     {viajeInicial.origen ?? '—'} → {viajeInicial.destino ?? '—'}
                   </p>
                 )}
+                <p className="text-xs text-vialto-charcoal">
+                  Moneda: <span className="font-medium">{monedaViaje(viajeInicial)}</span>
+                </p>
                 {viajeInicial.precioTransportistaExterno != null && (
                   <p className="text-xs text-vialto-charcoal tabular-nums">
-                    Bruto: {fmtMoney(viajeInicial.precioTransportistaExterno)}
+                    Bruto:{' '}
+                    {fmtMoney(
+                      viajeInicial.precioTransportistaExterno,
+                      viajeInicial.monedaPrecioTransportistaExterno,
+                    )}
                   </p>
                 )}
               </div>
@@ -345,7 +391,8 @@ export function CrearLiquidacionManualModal({
                 Viajes a incluir <span className="text-red-500">*</span>
                 {selectedViajeIds.size > 0 && (
                   <span className="ml-1 normal-case text-vialto-charcoal">
-                    ({selectedViajeIds.size} seleccionado{selectedViajeIds.size !== 1 ? 's' : ''})
+                    ({selectedViajeIds.size} seleccionado{selectedViajeIds.size !== 1 ? 's' : ''}
+                    {monedaSeleccionada ? ` · ${monedaSeleccionada}` : ''})
                   </span>
                 )}
               </p>
@@ -358,41 +405,72 @@ export function CrearLiquidacionManualModal({
                   No hay viajes registrados para este transportista.
                 </p>
               ) : (
-                <div className="max-h-44 overflow-y-auto rounded border border-black/10 divide-y divide-black/5">
-                  {viajes.map((v) => (
-                    <label
-                      key={v.id}
-                      className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-vialto-mist/60"
-                    >
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 shrink-0"
-                        checked={selectedViajeIds.has(v.id)}
-                        onChange={() => toggleViaje(v.id)}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-vialto-charcoal">
-                          Viaje #{v.numero}
-                          {v.fechaCarga && (
-                            <span className="font-normal text-vialto-steel ml-1.5">
-                              {fmtDate(v.fechaCarga)}
-                            </span>
-                          )}
-                        </p>
-                        {(v.origen || v.destino) && (
-                          <p className="text-[11px] text-vialto-steel truncate">
-                            {v.origen ?? '—'} → {v.destino ?? '—'}
-                          </p>
-                        )}
-                        {v.precioTransportistaExterno != null && (
-                          <p className="text-[11px] text-vialto-charcoal tabular-nums">
-                            {fmtMoney(v.precioTransportistaExterno)}
-                          </p>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                <>
+                  {monedaSeleccionada && (
+                    <p className="mb-1.5 text-[11px] text-vialto-steel">
+                      Solo podés incluir viajes en {monedaSeleccionada}. Los de otra moneda quedan deshabilitados.
+                    </p>
+                  )}
+                  <div className="max-h-44 overflow-y-auto rounded border border-black/10 divide-y divide-black/5">
+                    {viajes.map((v) => {
+                      const moneda = monedaViaje(v);
+                      const selected = selectedViajeIds.has(v.id);
+                      const disabledByMoneda =
+                        !selected &&
+                        monedaSeleccionada != null &&
+                        moneda !== monedaSeleccionada;
+                      return (
+                        <label
+                          key={v.id}
+                          title={
+                            disabledByMoneda
+                              ? `Este viaje está en ${moneda}. La liquidación ya tiene viajes en ${monedaSeleccionada}.`
+                              : undefined
+                          }
+                          className={`flex items-start gap-3 px-3 py-2.5 ${
+                            disabledByMoneda
+                              ? 'cursor-not-allowed opacity-50 bg-vialto-mist/30'
+                              : 'cursor-pointer hover:bg-vialto-mist/60'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 shrink-0"
+                            checked={selected}
+                            disabled={disabledByMoneda}
+                            onChange={() => toggleViaje(v.id)}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-vialto-charcoal">
+                              Viaje #{v.numero}
+                              <span className="ml-1.5 font-normal text-vialto-steel">
+                                {moneda}
+                              </span>
+                              {v.fechaCarga && (
+                                <span className="font-normal text-vialto-steel ml-1.5">
+                                  {fmtDate(v.fechaCarga)}
+                                </span>
+                              )}
+                            </p>
+                            {(v.origen || v.destino) && (
+                              <p className="text-[11px] text-vialto-steel truncate">
+                                {v.origen ?? '—'} → {v.destino ?? '—'}
+                              </p>
+                            )}
+                            {v.precioTransportistaExterno != null && (
+                              <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                                {fmtMoney(
+                                  v.precioTransportistaExterno,
+                                  v.monedaPrecioTransportistaExterno,
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -401,37 +479,47 @@ export function CrearLiquidacionManualModal({
           {showSummary && (
             <div className="rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 space-y-1.5">
               <div className="flex justify-between items-baseline">
+                <span className={labelClass}>Moneda</span>
+                <span className="text-sm font-medium text-vialto-charcoal">{monedaResumen}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
                 <span className={labelClass}>Sub Total</span>
-                <span className="tabular-nums text-sm font-medium text-vialto-charcoal">{fmtMoney(bruto)}</span>
+                <span className="tabular-nums text-sm font-medium text-vialto-charcoal">
+                  {fmtMoney(bruto, monedaResumen)}
+                </span>
               </div>
               {anyHasPrice && comisionMonto > 0 && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
-                  <span className="tabular-nums">− {fmtMoney(comisionMonto)}</span>
+                  <span className="tabular-nums">− {fmtMoney(comisionMonto, monedaResumen)}</span>
                 </div>
               )}
               {gastosAdmin > 0 && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Gastos administrativos</span>
-                  <span className="tabular-nums">− {fmtMoney(gastosAdmin)}</span>
+                  <span className="tabular-nums">− {fmtMoney(gastosAdmin, 'ARS')}</span>
                 </div>
               )}
               {netoGravado !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
                   <span className={labelClass}>Neto gravado</span>
-                  <span className="tabular-nums text-sm font-medium text-vialto-charcoal">{fmtMoney(netoGravado)}</span>
+                  <span className="tabular-nums text-sm font-medium text-vialto-charcoal">
+                    {fmtMoney(netoGravado, monedaResumen)}
+                  </span>
                 </div>
               )}
               {ivaMonto !== null && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>IVA {ivaPctNum}%</span>
-                  <span className="tabular-nums">+ {fmtMoney(ivaMonto)}</span>
+                  <span className="tabular-nums">+ {fmtMoney(ivaMonto, monedaResumen)}</span>
                 </div>
               )}
               {totalALiquidar !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
                   <span className={labelClass}>Total neto a liquidar</span>
-                  <span className="tabular-nums text-base font-semibold text-vialto-charcoal">{fmtMoney(totalALiquidar)}</span>
+                  <span className="tabular-nums text-base font-semibold text-vialto-charcoal">
+                    {fmtMoney(totalALiquidar, monedaResumen)}
+                  </span>
                 </div>
               )}
             </div>
