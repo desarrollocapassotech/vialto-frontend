@@ -93,14 +93,11 @@ export interface Viaje {
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
-  factura?: { id: string; numero: string } | null;
+  factura?: { id: string; numero: string; estado: string } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
     monto?: number;
-    liquidacion?: {
-      liquido: number;
-      estado: string;
-    };
+    liquidacion: { id: string; estado: string; liquido: number };
   }[];
   createdAt: string;
   createdBy: string;
