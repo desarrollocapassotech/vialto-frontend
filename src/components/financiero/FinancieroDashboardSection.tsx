@@ -13,10 +13,9 @@ import {
   ViajesFunnelPanel,
   LiquidacionesPanel,
   FacturacionPanel,
-  CashflowPanel,
 } from "./FinancieroDashboardPanels";
 
-type FinancieroTab = "margen" | "alertas" | "viajes" | "liquidaciones" | "facturacion" | "cashflow";
+type FinancieroTab = "margen" | "alertas" | "viajes" | "liquidaciones" | "facturacion";
 
 function periodToDates(
   period: string,
@@ -75,13 +74,12 @@ export function FinancieroDashboardSection({
   const cantAlertas = data?.margen?.alertas.length ?? 0;
 
   const tabs: { id: FinancieroTab; label: string; badge?: number }[] = [
-    ...(showViajes ? [{ id: "margen" as const, label: "Margen" }] : []),
+    ...(showViajes ? [{ id: "margen" as const, label: "Resumen" }] : []),
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
     ...(showViajes && showIntegracionArca
       ? [{ id: "liquidaciones" as const, label: "Liquidaciones" }]
       : []),
     ...(showFacturacion ? [{ id: "facturacion" as const, label: "Facturación" }] : []),
-    ...(showViajes && showFacturacion ? [{ id: "cashflow" as const, label: "Cashflow" }] : []),
     ...(showViajes
       ? [{ id: "alertas" as const, label: "Alertas", badge: cantAlertas > 0 ? cantAlertas : undefined }]
       : []),
@@ -204,10 +202,16 @@ export function FinancieroDashboardSection({
             </div>
           </div>
         )}
-        {tabActivo === "viajes" && <ViajesFunnelPanel data={data} loading={loading} />}
+        {tabActivo === "viajes" && (
+          <ViajesFunnelPanel
+            data={data}
+            loading={loading}
+            onViewViaje={onViewViaje}
+            loadingViajeId={loadingViajeId}
+          />
+        )}
         {tabActivo === "liquidaciones" && <LiquidacionesPanel data={data} loading={loading} />}
         {tabActivo === "facturacion" && <FacturacionPanel data={data} loading={loading} />}
-        {tabActivo === "cashflow" && <CashflowPanel data={data} loading={loading} />}
         {tabActivo === "alertas" && (
           <MargenAlertasList
             alertas={data?.margen?.alertas ?? []}

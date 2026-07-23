@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Banknote, Receipt } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -46,6 +47,8 @@ export function ViajeViewModal({
   editando = false,
   onFacturar,
   facturando = false,
+  onLiquidar,
+  liquidando = false,
 }: {
   viaje: Viaje;
   onClose: () => void;
@@ -58,10 +61,14 @@ export function ViajeViewModal({
   onFacturar?: () => void;
   /** El creador de factura se está preparando: bloquea el modal hasta que esté listo. */
   facturando?: boolean;
+  /** Si se pasa, muestra un botón "Liquidar" (registrar pago al transportista, hoy solo desde el dashboard). */
+  onLiquidar?: () => void;
+  /** El registro de pago se está preparando: bloquea el modal hasta que esté listo. */
+  liquidando?: boolean;
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
-  const bloqueado = editando || facturando;
+  const bloqueado = editando || facturando || liquidando;
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === "Escape" && !bloqueado) onClose();
@@ -178,7 +185,30 @@ export function ViajeViewModal({
                   Abriendo…
                 </span>
               ) : (
-                "Facturar"
+                <span className="inline-flex items-center gap-1.5">
+                  <Receipt className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  Facturar
+                </span>
+              )}
+            </button>
+          )}
+          {onLiquidar && (
+            <button
+              type="button"
+              onClick={onLiquidar}
+              disabled={bloqueado}
+              className={`${viewModalBtnGhost} disabled:cursor-wait disabled:opacity-50`}
+            >
+              {liquidando ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Abriendo…
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Banknote className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  Liquidar
+                </span>
               )}
             </button>
           )}

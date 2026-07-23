@@ -56,12 +56,13 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
   }
 
   /** Precarga el draft para un viaje puntual, sin abrir el modal todavía. */
-  function prepararDraftParaViaje(v: Viaje) {
+  function prepararDraftParaViaje(v: Viaje, letraComprobante?: "a" | "b") {
     setError(null);
     setDraft({
       ...emptyFacturaDraft(),
       clienteId: v.clienteId ?? "",
       viajeIds: [v.id],
+      letraComprobante: letraComprobante ?? null,
     });
   }
 

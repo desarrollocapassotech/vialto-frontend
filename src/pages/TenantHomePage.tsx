@@ -5,12 +5,16 @@ import { TenantOwnerDashboard, AlertsPanel } from '@/components/tenant/TenantOwn
 import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { ViajeEditModal } from '@/components/viajes/ViajeEditModal';
+import { TipoFacturaClienteModal } from '@/components/viajes/TipoFacturaClienteModal';
+import { EmitirCvlpModal } from '@/components/viajes/EmitirCvlpModal';
+import { CrearLiquidacionManualModal } from '@/components/liquidaciones/CrearLiquidacionManualModal';
 import { FacturaCreateModal } from '@/components/facturacion/FacturaEditModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { useViajeEditor } from '@/hooks/useViajeEditor';
 import { useFacturaCreator } from '@/hooks/useFacturaCreator';
+import { useToast } from '@/lib/toast';
 import { apiJson } from '@/lib/api';
 import {
   canAccessCombustible,
@@ -18,6 +22,13 @@ import {
   canAccessIntegracionArca,
   canAccessViajes,
 } from '@/lib/tenantModules';
+import {
+  MSG_ARCA_NO_FACTURA_USD,
+  MSG_ARCA_NO_LIQUIDA_USD,
+  arcaBloqueaFacturarUsd,
+  arcaBloqueaLiquidarUsd,
+} from '@/lib/arcaUsdRestriction';
+import { viajePermiteBotonFacturar, viajePendienteComprobanteTransportista } from '@/lib/viajesComprobantes';
 import type { Factura, Producto, Viaje } from '@/types/api';
 
 export function TenantHomePage() {
@@ -27,12 +38,16 @@ export function TenantHomePage() {
   const { tenant, loading, error } = useCurrentTenant();
   const dash = useTenantOwnerDashboard();
   const maestro = useMaestroData();
+  const { showToast } = useToast();
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [loadingFacturaId, setLoadingFacturaId] = useState<string | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
   const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
+  const [facturaLetraViaje, setFacturaLetraViaje] = useState<Viaje | null>(null);
   const [abriendoFacturar, setAbriendoFacturar] = useState(false);
+  const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
+  const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
 
   const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
   const facturaCreator = useFacturaCreator({
@@ -126,7 +141,10 @@ export function TenantHomePage() {
               viewingFactura !== null ||
               viewingViaje !== null ||
               viajeEditor.editingId !== null ||
-              facturaCreator.creating
+              facturaLetraViaje !== null ||
+              facturaCreator.creating ||
+              emitirCvlpViaje !== null ||
+              crearLiqViaje !== null
             }
           />
         )}
@@ -194,23 +212,79 @@ export function TenantHomePage() {
             })();
           }}
           onFacturar={
-            tenant && canAccessFacturacion(tenant.modules)
+            tenant &&
+            canAccessFacturacion(tenant.modules) &&
+            viajePermiteBotonFacturar(viewingViaje)
               ? () => {
                   const v = viewingViaje;
-                  void (async () => {
-                    setAbriendoFacturar(true);
-                    try {
-                      facturaCreator.prepararDraftParaViaje(v);
-                      await facturaCreator.ensureViajesLoaded();
-                      facturaCreator.abrir();
-                      setViewingViaje(null);
-                    } finally {
-                      setAbriendoFacturar(false);
-                    }
-                  })();
+                  if (arcaBloqueaFacturarUsd(hasArca, v.monedaMonto)) {
+                    showToast(MSG_ARCA_NO_FACTURA_USD, 'error');
+                    return;
+                  }
+                  setFacturaLetraViaje(v);
+                  setViewingViaje(null);
                 }
               : undefined
           }
+          onLiquidar={
+            tenant &&
+            canAccessViajes(tenant.modules) &&
+            viajePendienteComprobanteTransportista(viewingViaje)
+              ? () => {
+                  const v = viewingViaje;
+                  if (arcaBloqueaLiquidarUsd(hasArca, v.monedaPrecioTransportistaExterno)) {
+                    showToast(MSG_ARCA_NO_LIQUIDA_USD, 'error');
+                    return;
+                  }
+                  if (hasArca) {
+                    setEmitirCvlpViaje(v);
+                  } else {
+                    setCrearLiqViaje(v);
+                  }
+                  setViewingViaje(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {emitirCvlpViaje && (
+        <EmitirCvlpModal
+          viaje={emitirCvlpViaje}
+          onClose={() => setEmitirCvlpViaje(null)}
+          onEmitido={() => setEmitirCvlpViaje(null)}
+        />
+      )}
+
+      {crearLiqViaje && (
+        <CrearLiquidacionManualModal
+          viajeInicial={crearLiqViaje}
+          transportistas={maestro.transportistas}
+          getToken={getToken}
+          onSuccess={() => setCrearLiqViaje(null)}
+          onClose={() => setCrearLiqViaje(null)}
+        />
+      )}
+
+      {facturaLetraViaje && (
+        <TipoFacturaClienteModal
+          viaje={facturaLetraViaje}
+          busy={abriendoFacturar}
+          onClose={() => setFacturaLetraViaje(null)}
+          onConfirm={(letra) => {
+            const v = facturaLetraViaje;
+            void (async () => {
+              setAbriendoFacturar(true);
+              try {
+                facturaCreator.prepararDraftParaViaje(v, letra);
+                await facturaCreator.ensureViajesLoaded();
+                facturaCreator.abrir();
+                setFacturaLetraViaje(null);
+              } finally {
+                setAbriendoFacturar(false);
+              }
+            })();
+          }}
         />
       )}
 
