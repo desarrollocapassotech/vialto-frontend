@@ -85,4 +85,4 @@ export const viewModalBtnGhost =
   'inline-flex min-h-11 items-center justify-center px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist';
 
 export const viewModalBtnPrimary =
-  'inline-flex min-h-11 items-center justify-center px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite';
+  'inline-flex min-h-11 items-center justify-center px-3 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:bg-gray-300 disabled:text-gray-500';

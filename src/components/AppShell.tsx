@@ -21,6 +21,7 @@ import {
   PackageMinus,
   PackagePlus,
   Receipt,
+  SlidersHorizontal,
   Truck,
   Warehouse,
   LogOut,
@@ -151,6 +152,11 @@ export function AppShell() {
         items: [
           { to: "/superadmin/empresas", label: "Empresas", icon: Building2 },
           { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
+          {
+            to: "/superadmin/campos-empresa",
+            label: "Configuración por empresa",
+            icon: SlidersHorizontal,
+          },
         ],
       });
     }
@@ -185,7 +191,7 @@ export function AppShell() {
         });
         if (!superadmin && hasArca) {
           facturacionItems.push({
-            to: "/liquidaciones/configuracion",
+            to: "/configuracion/arca",
             label: "Configuración ARCA",
             icon: Landmark,
           });

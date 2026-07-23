@@ -32,7 +32,8 @@ const ESTADO_BADGE: Record<LiquidacionEstado, string> = {
 };
 
 const CBTE_TIPO: Record<number, string> = {
-  60: "Tipo 60 — Liquidación CVLP",
+  60: "CVLP Tipo 60 (clase A)",
+  61: "CVLP Tipo 61 (clase B)",
   1: "Factura A",
   6: "Factura B",
 };
@@ -89,7 +90,7 @@ export function LiquidacionViewModal({
 
   const transportistaNombre =
     liq.transportista?.nombre ?? liq.transportistaId;
-  const ivaBase = liq.bruto - liq.comision;
+  const ivaBase = liq.bruto - liq.comision - liq.gastosAdmin;
   const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
 
   return (

@@ -27,9 +27,13 @@ export interface Viaje {
   estado: string;
   clienteId: string;
   /** Presente en listados/detalle cuando el backend incluye la relación. */
-  cliente?: { id: string; nombre: string };
+  cliente?: { id: string; nombre: string; condicionIva?: number | null };
   transportistaId: string | null;
-  transportista?: { id: string; nombre: string } | null;
+  transportista?: {
+    id: string;
+    nombre: string;
+    condicionIva?: number | null;
+  } | null;
   transportistaEfectivoId?: string | null;
   transportistaEfectivo?: { id: string; nombre: string } | null;
   choferId: string | null;
@@ -173,6 +177,7 @@ export interface Transportista {
   paut: string | null;
   permisoInternacional: string | null;
   fechaVencimientoPermiso: string | null;
+  comisionPct: number | null;
   createdAt: string;
 }
 
@@ -453,6 +458,7 @@ export interface ArcaConfig {
   condicionIvaEmisor: string | null;
   ingBrutos: string | null;
   inicActEmisor: string | null;
+  logoUrl: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
   ambiente: 'homologacion' | 'produccion';
@@ -465,6 +471,29 @@ export interface ArcaConfig {
 }
 
 export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
+
+export type ConceptoLiquidacionSigno = 'favor' | 'contra';
+
+export interface ConceptoLiquidacion {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  signo: ConceptoLiquidacionSigno;
+  ivaPct: number;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LiquidacionConceptoLinea {
+  id: string;
+  conceptoLiquidacionId: string | null;
+  nombreSnapshot: string;
+  signo: ConceptoLiquidacionSigno;
+  ivaPct: number;
+  monto: number;
+  orden: number;
+}
 
 export interface Liquidacion {
   id: string;
@@ -490,6 +519,7 @@ export interface Liquidacion {
   comprobanteUrl: string | null;
   createdAt: string;
   createdBy: string;
+  conceptosLineas?: LiquidacionConceptoLinea[];
 }
 
 export interface ArcaLog {

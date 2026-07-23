@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  ConceptosLiquidacionLineasEditor,
+  toConceptosLineasPayload,
+  type ConceptoLineaDraft,
+} from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
 import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { uploadComprobante } from '@/lib/comprobanteUpload';
 import { friendlyError } from '@/lib/friendlyError';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
-import type { Liquidacion, Transportista, Viaje } from '@/types/api';
+import type { Liquidacion, Transportista, Viaje, ArcaConfig } from '@/types/api';
 
 type ViajeItem = Pick<
   Viaje,
@@ -16,6 +21,7 @@ type ViajeItem = Pick<
   | 'destino'
   | 'precioTransportistaExterno'
   | 'liquidacionesViaje'
+  | 'otrosGastos'
 >;
 
 function fmtDate(iso: string | null) {
@@ -39,6 +45,7 @@ interface Props {
   /** Si se provee, la liquidación es para este viaje específico (transportista y viaje bloqueados). */
   viajeInicial?: Viaje;
   transportistas: Transportista[];
+  config?: ArcaConfig | null;
   getToken: () => Promise<string | null>;
   onSuccess: (liq: Liquidacion) => void;
   onClose: () => void;
@@ -47,6 +54,7 @@ interface Props {
 export function CrearLiquidacionManualModal({
   viajeInicial,
   transportistas,
+  config,
   getToken,
   onSuccess,
   onClose,
@@ -59,6 +67,7 @@ export function CrearLiquidacionManualModal({
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
   const [ivaPct, setIvaPct] = useState('21');
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
 
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
@@ -157,6 +166,8 @@ export function CrearLiquidacionManualModal({
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
       if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
+      const lineasPayload = toConceptosLineasPayload(conceptosLineas);
+      if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       const liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
@@ -182,9 +193,16 @@ export function CrearLiquidacionManualModal({
     : viajes.filter((v) => selectedViajeIds.has(v.id));
   const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
   const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
-  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : 0;
+  const gastosAdmin = selectedViajes.reduce((total, v) => {
+    const gastos = v.otrosGastos ?? [];
+    const gastosARS = gastos
+      .filter((g) => g.moneda === 'ARS')
+      .reduce((sum, g) => sum + g.monto, 0);
+    return total + gastosARS;
+  }, 0);
+  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ?? config?.comisionPctDefault ?? 0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
-  const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
+  const netoGravado = anyHasPrice ? bruto - comisionMonto - gastosAdmin : null;
   const ivaPctNum = ivaPct.trim() !== '' ? Number(ivaPct) : 21;
   const ivaMonto = netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar = netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
@@ -301,6 +319,13 @@ export function CrearLiquidacionManualModal({
             </div>
           </div>
 
+          <ConceptosLiquidacionLineasEditor
+            getToken={getToken}
+            lineas={conceptosLineas}
+            onChange={setConceptosLineas}
+            disabled={submitting}
+          />
+
           {/* Viaje pre-fijado */}
           {viajeInicial && (
             <div>
@@ -398,6 +423,12 @@ export function CrearLiquidacionManualModal({
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
                   <span className="tabular-nums">− {fmtMoney(comisionMonto)}</span>
+                </div>
+              )}
+              {gastosAdmin > 0 && (
+                <div className="flex justify-between items-baseline text-xs text-vialto-steel">
+                  <span>Gastos administrativos</span>
+                  <span className="tabular-nums">− {fmtMoney(gastosAdmin)}</span>
                 </div>
               )}
               {netoGravado !== null && (

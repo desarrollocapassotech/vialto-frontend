@@ -7,37 +7,56 @@ interface Props {
   onClose: () => void;
   clienteCompletado?: boolean;
   transportistaCompletado?: boolean;
+  /** Motivo para deshabilitar «Factura a cliente» (ej. ARCA + USD). */
+  clienteBloqueadoMotivo?: string | null;
+  /** Motivo para deshabilitar «Liquidación a transportista» (ej. ARCA + USD). */
+  transportistaBloqueadoMotivo?: string | null;
+  /** Subtítulo bajo «Factura a cliente» (default: Registro manual). */
+  subtituloCliente?: string;
+  /** Subtítulo bajo «Liquidación a transportista». */
+  subtituloTransportista?: string;
 }
 
 function OpcionComprobante({
   titulo,
   subtitulo,
   completado,
+  bloqueadoMotivo,
   icon: Icon,
   onClick,
 }: {
   titulo: string;
   subtitulo: string;
   completado: boolean;
+  bloqueadoMotivo?: string | null;
   icon: typeof Receipt;
   onClick: () => void;
 }) {
+  const bloqueado = Boolean(bloqueadoMotivo);
+  const disabled = completado || bloqueado;
+  const textoSecundario = completado
+    ? 'Ya registrado'
+    : bloqueado
+      ? bloqueadoMotivo!
+      : subtitulo;
+
   return (
     <button
       type="button"
-      disabled={completado}
+      disabled={disabled}
+      title={bloqueado ? bloqueadoMotivo ?? undefined : undefined}
       onClick={() => {
-        if (!completado) onClick();
+        if (!disabled) onClick();
       }}
       className={`w-full flex items-center gap-4 border px-4 py-4 text-left transition-colors ${
-        completado
+        disabled
           ? 'border-black/10 bg-vialto-mist/40 cursor-not-allowed opacity-60'
           : 'border-black/15 hover:bg-vialto-mist group'
       }`}
     >
       <div
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${
-          completado ? 'bg-white/80' : 'bg-vialto-mist group-hover:bg-white'
+          disabled ? 'bg-white/80' : 'bg-vialto-mist group-hover:bg-white'
         }`}
       >
         {completado ? (
@@ -54,8 +73,12 @@ function OpcionComprobante({
         >
           {titulo}
         </p>
-        <p className="text-xs text-vialto-steel mt-0.5">
-          {completado ? 'Ya registrado' : subtitulo}
+        <p
+          className={`text-xs mt-0.5 ${
+            bloqueado && !completado ? 'text-amber-800' : 'text-vialto-steel'
+          }`}
+        >
+          {textoSecundario}
         </p>
       </div>
     </button>
@@ -68,6 +91,10 @@ export function FacturarSelectorModal({
   onClose,
   clienteCompletado = false,
   transportistaCompletado = false,
+  clienteBloqueadoMotivo = null,
+  transportistaBloqueadoMotivo = null,
+  subtituloCliente = "Registro manual",
+  subtituloTransportista = "Registro manual",
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -106,8 +133,9 @@ export function FacturarSelectorModal({
         <div className="px-6 py-5 space-y-3">
           <OpcionComprobante
             titulo="Factura a cliente"
-            subtitulo="Registro manual"
+            subtitulo={subtituloCliente}
             completado={clienteCompletado}
+            bloqueadoMotivo={clienteCompletado ? null : clienteBloqueadoMotivo}
             icon={Receipt}
             onClick={() => {
               onFacturarCliente();
@@ -117,8 +145,11 @@ export function FacturarSelectorModal({
 
           <OpcionComprobante
             titulo="Liquidación a transportista"
-            subtitulo="Registro manual"
+            subtitulo={subtituloTransportista}
             completado={transportistaCompletado}
+            bloqueadoMotivo={
+              transportistaCompletado ? null : transportistaBloqueadoMotivo
+            }
             icon={Users}
             onClick={() => {
               onLiquidacion();

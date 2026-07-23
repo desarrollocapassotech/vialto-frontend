@@ -343,6 +343,27 @@ Aplicar la clase `border-red-400` de forma condicional:
 
 ---
 
+## Panel del tenant: pestañas por módulo en el dashboard
+
+**Regla global para toda sección nueva del dashboard de tenant (`src/components/tenant/TenantOwnerDashboard.tsx`).**
+
+Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
+
+- Si el tenant solo tiene **un** módulo con sección de dashboard, no se muestra la barra de pestañas: esa sección se renderiza directo (sin tab nav de por medio).
+- Si tiene **más de uno**, se arma `moduloTabs: { id, label, icon }[]` agregando una entrada por módulo, condicionada por su respectivo `canAccessX(modules)` de `lib/tenantModules.ts`.
+- Desktop: `<nav>` con botones `border-t-2 border-t-vialto-fire bg-vialto-mist text-vialto-charcoal` para el activo, `border-transparent text-vialto-steel` para el resto (icono `lucide-react` + label, mismas clases que `BaseDeDatosPage.tsx`).
+- Mobile: botón `selectorTriggerClass` + `<SelectorOpcionesSheet>` (ambos de `@/components/ui/SelectorOpcionesSheet`), igual que en Base de Datos.
+- El contenido de cada módulo se gatea con `moduloActivo === 'x' && showX` (nunca solo `moduloActivo === 'x'`, para no romper el caso de un solo tab donde `moduloActivo` cae por default en el primero de la lista).
+
+### Al agregar el dashboard de un módulo nuevo
+
+1. Crear su sección propia en `src/components/<modulo>/<Modulo>DashboardSection.tsx` (fetch propio a su endpoint, pestañas internas si corresponde — ver Combustible/Financiero como referencia).
+2. En `TenantOwnerDashboard.tsx`: agregar un ítem a `moduloTabs` (id, label, ícono de `lucide-react`) condicionado por su `canAccessX(modules)`.
+3. Agregar el bloque `{moduloActivo === '<id>' && showX && <ModuloDashboardSection ... />}` al final del render, respetando el orden de `moduloTabs`.
+4. No agregar heading `<h2>` propio de nivel superior para el módulo — el label ya vive en la pestaña; el `<h2>` interno de la sección (si lo tiene) queda para sus propias sub-pestañas.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -353,7 +374,8 @@ Aplicar la clase `border-red-400` de forma condicional:
 - Mantener textos y UX consistentes con el resto del producto.
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
+- **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 
 ---
 
-Última actualización: julio 2026 (resync de la estructura de carpetas contra el código real)
+Última actualización: julio 2026 (resync de la estructura de carpetas contra el código real; agregado el patrón de pestañas por módulo del dashboard de tenant)

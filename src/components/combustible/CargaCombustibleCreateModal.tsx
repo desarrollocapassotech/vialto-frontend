@@ -1,8 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
-import { useMaestroData } from "@/hooks/useMaestroData";
 import { useToast } from "@/lib/toast";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
@@ -19,14 +18,149 @@ function fmtVehiculoLabel(v: {
   return detalle ? `${v.patente} — ${detalle}` : v.patente;
 }
 
+// Utilidad para normalizar texto (quita tildes y pasa a minúsculas)
+const normalizeText = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface SearchableSelectProps {
+  options: Option[];
+  value: string;
+  onChange: (name: string, value: string) => void;
+  name: string;
+  placeholder: string;
+}
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  name,
+  placeholder,
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  // Cerrar al hacer click afuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+        setSearchTerm(""); // Reseteamos la búsqueda al cerrar
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filtrado reactivo de opciones
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options;
+    const normalizedSearch = normalizeText(searchTerm);
+    return options.filter((opt) =>
+      normalizeText(opt.label).includes(normalizedSearch),
+    );
+  }, [options, searchTerm]);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <div
+        className="h-9 w-full border border-black/15 bg-white px-2 flex items-center justify-between cursor-pointer text-sm focus-within:border-vialto-fire"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span
+          className={
+            selectedOption && selectedOption.value !== ""
+              ? "text-vialto-charcoal"
+              : "text-gray-500"
+          }
+        >
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <span className="text-gray-400 text-xs">▼</span>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-10 mt-1 w-full border border-black/15 bg-white shadow-xl">
+          <div className="p-1 border-b border-black/10">
+            <input
+              type="text"
+              className="w-full bg-gray-50 border border-black/10 px-2 py-1.5 text-sm focus:outline-none focus:border-vialto-fire focus:bg-white"
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <ul className="max-h-48 overflow-y-auto py-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <li
+                  key={opt.value}
+                  className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-vialto-fire hover:text-white ${
+                    value === opt.value
+                      ? "bg-vialto-mist text-vialto-charcoal font-medium"
+                      : "text-vialto-charcoal"
+                  }`}
+                  onClick={() => {
+                    onChange(name, opt.value);
+                    setIsOpen(false);
+                    setSearchTerm("");
+                  }}
+                >
+                  {opt.label}
+                </li>
+              ))
+            ) : (
+              <li className="px-3 py-2 text-sm text-gray-500 italic">
+                No se encontraron resultados
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type VehiculoOpt = {
+  id: string;
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+};
+type ChoferOpt = { id: string; nombre: string };
+
 interface Props {
+  vehiculos: VehiculoOpt[];
+  choferes: ChoferOpt[];
+  tenantId?: string;
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
 
-export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
+export function CargaCombustibleCreateModal({
+  tenantId,
+  vehiculos,
+  choferes,
+  onClose,
+  onSuccess,
+}: Props) {
   const { getToken } = useAuth();
-  const maestro = useMaestroData();
   const { showToast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -44,10 +178,31 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
     formaPago: "",
   });
 
+  // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
+  const importeError = useMemo(() => {
+    const litros = Number(formData.litros);
+    const precio = Number(formData.precioPorLitro);
+    const importe = Number(formData.importe);
+    if (!litros || !precio || !importe) return null;
+    const esperado = litros * precio;
+    const diff = Math.abs(importe - esperado);
+    if (diff > esperado * 0.01) {
+      return `El monto no coincide con litros × precio (esperado ≈ $${esperado.toLocaleString(
+        "es-AR",
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+      )}).`;
+    }
+    return null;
+  }, [formData.litros, formData.precioPorLitro, formData.importe]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -72,8 +227,15 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
         km: kmSanitizado,
       };
 
+      const apiBase = tenantId ? "/api/platform" : "/api";
+      let endpoint = `${apiBase}/combustible`;
+
+      if (tenantId) {
+        endpoint += `?tenantId=${encodeURIComponent(tenantId || "")}`;
+      }
+
       const nuevaCarga = await apiJson<CargaCombustible>(
-        `/api/combustible`,
+        endpoint,
         () => getToken(),
         {
           method: "POST",
@@ -96,16 +258,34 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
   const labelClass =
     "block text-xs font-semibold uppercase tracking-wider text-vialto-steel mb-1";
 
+  // Preparamos las opciones para los SearchableSelects basados en los props
+  const vehiculosOptions = useMemo(() => {
+    return vehiculos.map((v) => ({
+      value: v.id,
+      label: fmtVehiculoLabel(v),
+    }));
+  }, [vehiculos]);
+
+  const choferesOptions = useMemo(() => {
+    return [
+      { value: "", label: "Sin conductor asignado" },
+      ...choferes.map((ch) => ({
+        value: ch.id,
+        label: ch.nombre,
+      })),
+    ];
+  }, [choferes]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="nueva-carga-titulo"
+      aria-labelledby="nueva-carga-sa-titulo"
     >
       <div className="relative w-full max-w-2xl border border-black/15 bg-white p-6 shadow-xl my-auto">
         <h2
-          id="nueva-carga-titulo"
+          id="nueva-carga-sa-titulo"
           className="text-xl font-semibold text-vialto-charcoal mb-6 border-b border-black/10 pb-3"
         >
           Registrar nueva carga
@@ -146,39 +326,24 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
 
             <div>
               <label className={labelClass}>Vehículo *</label>
-              <select
+              <SearchableSelect
                 name="vehiculoId"
-                required
+                options={vehiculosOptions}
                 value={formData.vehiculoId}
-                onChange={handleChange}
-                className={inputClass}
-              >
-                <option value="" disabled>
-                  Seleccione un vehículo...
-                </option>
-                {maestro.vehiculos.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {fmtVehiculoLabel(v)}
-                  </option>
-                ))}
-              </select>
+                onChange={handleSelectChange}
+                placeholder="Seleccione un vehículo..."
+              />
             </div>
 
             <div>
               <label className={labelClass}>Conductor (Opcional)</label>
-              <select
+              <SearchableSelect
                 name="choferId"
+                options={choferesOptions}
                 value={formData.choferId}
-                onChange={handleChange}
-                className={inputClass}
-              >
-                <option value="">Sin conductor asignado</option>
-                {maestro.choferes.map((ch) => (
-                  <option key={ch.id} value={ch.id}>
-                    {ch.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={handleSelectChange}
+                placeholder="Sin conductor asignado"
+              />
             </div>
 
             <div>
@@ -224,6 +389,11 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
                 className={inputClass}
                 placeholder="0.00"
               />
+              {importeError && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  ⚠️ {importeError}
+                </p>
+              )}
             </div>
 
             <div>
@@ -269,8 +439,8 @@ export function CargaCombustibleCreateModal({ onClose, onSuccess }: Props) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+              disabled={loading || Boolean(importeError)}
+              className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
             >
               {loading ? "Guardando..." : "Guardar Carga"}
             </button>

@@ -2,30 +2,35 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
-import { ApiError, apiFetch, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
 import {
-  viajePendienteComprobanteCliente,
-  viajeTieneLiquidacionTransportista,
-} from '@/lib/viajesComprobantes';
-import type { ArcaConfig, Liquidacion, Viaje } from '@/types/api';
+  ConceptosLiquidacionLineasEditor,
+  toConceptosLineasPayload,
+  type ConceptoLineaDraft,
+} from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
+import { ApiError, apiFetch, apiJson } from '@/lib/api';
+import {
+  ARCA_CBTE_OVERRIDE_WARNING,
+  condicionIvaLabel,
+  cvlpCbteLabel,
+  cvlpCbteTipoFromCondicionIva,
+  type CvlpCbteTipo,
+} from '@/lib/arcaCbteTipo';
+import {
+  collectCvlpEmitMissingFields,
+  formatCvlpEmitMissingMessage,
+} from '@/lib/cvlpEmitValidation';
+import { friendlyError } from '@/lib/friendlyError';
+import { MSG_ARCA_NO_LIQUIDA_USD, arcaBloqueaLiquidarUsd } from '@/lib/arcaUsdRestriction';
+import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
+import type { ArcaConfig, Cliente, Liquidacion, Transportista, Viaje } from '@/types/api';
 
 interface Props {
   viaje: Viaje;
   onClose: () => void;
   onEmitido: (liq: Liquidacion) => void;
-  /** Cuando el usuario elige Factura A o B: cierra CVLP y deriva a facturación manual del cliente. */
-  onFacturarManual?: () => void;
 }
 
-type TipoComprobante = 'cvlp' | 'a' | 'b';
 type Step = 'tipo' | 'revision' | 'creada' | 'autorizada';
-
-const TIPO_LABEL: Record<TipoComprobante, string> = {
-  cvlp: 'CVLP',
-  a: 'Factura A',
-  b: 'Factura B',
-};
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -42,18 +47,24 @@ function sumGastosAdminArs(viaje: Viaje): number {
     .reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
 }
 
-export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }: Props) {
+export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const cvlpDisponible = !viajeTieneLiquidacionTransportista(viaje);
-  const facturaManualDisponible = viajePendienteComprobanteCliente(viaje);
-  const [step, setStep] = useState<Step>('tipo');
-  const [tipo, setTipo] = useState<TipoComprobante>(() =>
-    cvlpDisponible ? 'cvlp' : facturaManualDisponible ? 'a' : 'cvlp',
+  const bloqueadoUsd = arcaBloqueaLiquidarUsd(
+    true,
+    viaje.monedaPrecioTransportistaExterno,
   );
+  const puedeAvanzar = cvlpDisponible && !bloqueadoUsd;
+  const condicionIva = viaje.transportista?.condicionIva ?? null;
+  const sugerido = cvlpCbteTipoFromCondicionIva(condicionIva);
+
+  const [step, setStep] = useState<Step>('tipo');
+  const [cbteTipo, setCbteTipo] = useState<CvlpCbteTipo>(sugerido);
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,20 +72,47 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
   const [liquidacion, setLiquidacion] = useState<Liquidacion | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
+  const [transportistaDetalle, setTransportistaDetalle] = useState<Transportista | null>(null);
+  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+  const [datosReady, setDatosReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDatosReady(false);
     void (async () => {
       try {
         const cfg = await apiJson<ArcaConfig>('/api/integracion-arca/config', () => getToken());
         if (!cancelled) setArcaConfig(cfg);
       } catch {
-        // config no disponible — se omite el placeholder
+        // config no disponible — la validación de emisión lo reporta
       }
+      if (viaje.transportistaId) {
+        try {
+          const t = await apiJson<Transportista>(
+            `/api/transportistas/${encodeURIComponent(viaje.transportistaId)}`,
+            () => getToken(),
+          );
+          if (!cancelled) setTransportistaDetalle(t);
+        } catch {
+          // se valida con lo disponible en el viaje
+        }
+      }
+      if (viaje.clienteId) {
+        try {
+          const c = await apiJson<Cliente>(
+            `/api/clientes/${encodeURIComponent(viaje.clienteId)}`,
+            () => getToken(),
+          );
+          if (!cancelled) setClienteDetalle(c);
+        } catch {
+          // se valida con lo disponible en el viaje
+        }
+      }
+      if (!cancelled) setDatosReady(true);
     })();
     return () => { cancelled = true; };
-  }, [getToken]);
+  }, [getToken, viaje.transportistaId, viaje.clienteId]);
 
   const transportistaNombre = viaje.transportista?.nombre ?? viaje.transportistaId ?? '—';
   const gastosAdminArs = useMemo(() => sumGastosAdminArs(viaje), [viaje]);
@@ -82,6 +120,27 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
     Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
   const periodoCompleto =
     Boolean(periodoDesde && periodoHasta) && !periodoInvalido;
+  const overrideManual = cbteTipo !== sugerido;
+
+  const missingEmitFields = useMemo(
+    () =>
+      collectCvlpEmitMissingFields({
+        emisor: arcaConfig,
+        transportista: transportistaDetalle ?? {
+          condicionIva: viaje.transportista?.condicionIva ?? null,
+          idFiscal: null,
+          domicilio: null,
+        },
+        cliente: clienteDetalle ?? {
+          nombre: viaje.cliente?.nombre ?? null,
+          direccion: null,
+          idFiscal: null,
+        },
+      }),
+    [arcaConfig, transportistaDetalle, clienteDetalle, viaje.transportista?.condicionIva, viaje.cliente?.nombre],
+  );
+  const missingEmitMessage = formatCvlpEmitMissingMessage(missingEmitFields);
+  const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
 
   function fmtMoney(n: number) {
     return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
@@ -95,6 +154,14 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   async function handleCrear() {
     if (!viaje.transportistaId) return;
+    if (bloqueadoUsd) {
+      setError(MSG_ARCA_NO_LIQUIDA_USD);
+      return;
+    }
+    if (datosEmitIncompletos) {
+      setError(missingEmitMessage);
+      return;
+    }
     if (!periodoCompleto) {
       setError(
         periodoInvalido
@@ -117,8 +184,11 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
         periodoDesde,
         periodoHasta,
         viajeIds: [viaje.id],
+        cbteTipo,
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
+      const lineasPayload = toConceptosLineasPayload(conceptosLineas);
+      if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       const liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
         () => getToken(),
@@ -142,6 +212,10 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
 
   async function handleEmitirArca() {
     if (!liquidacion) return;
+    if (datosEmitIncompletos) {
+      setError(missingEmitMessage);
+      return;
+    }
     setError(null);
     setBusyArca(true);
     try {
@@ -196,12 +270,11 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
       onClick={handleOverlayClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
-      <div className="w-full max-w-lg bg-white shadow-xl border border-black/20">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
+      <div className="w-full max-w-lg bg-white shadow-xl border border-black/20 flex flex-col max-h-[90dvh]">
+        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
           <div>
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-              Emitir comprobante
+              Liquidación a transportista
             </h2>
             {stepLabel && (
               <p className="text-xs text-vialto-steel mt-0.5">Paso {stepLabel}</p>
@@ -216,46 +289,77 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
           </button>
         </div>
 
-        <div className="px-6 py-5">
-          {/* ── Paso 1: tipo ── */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">
           {step === 'tipo' && (
             <div className="space-y-5">
               <p className="text-xs uppercase tracking-wider text-vialto-steel">
                 Tipo de comprobante
               </p>
-              <div className="grid grid-cols-3 gap-3">
-                {(['cvlp', 'a', 'b'] as TipoComprobante[]).map((t) => {
-                  const isManual = t !== 'cvlp';
-                  const disabled = isManual ? !facturaManualDisponible : !cvlpDisponible;
+
+              <div className="grid grid-cols-2 gap-3">
+                {([60, 61] as CvlpCbteTipo[]).map((t) => {
+                  const selected = cbteTipo === t;
                   return (
                     <button
                       key={t}
                       type="button"
-                      disabled={disabled}
+                      disabled={!puedeAvanzar}
                       onClick={() => {
-                        if (!disabled) setTipo(t);
+                        if (puedeAvanzar) setCbteTipo(t);
                       }}
                       className={[
                         'flex flex-col items-center justify-center border py-4 px-2 text-xs uppercase tracking-wider transition-colors',
-                        disabled
+                        !puedeAvanzar
                           ? 'border-black/10 bg-vialto-mist/40 text-vialto-steel cursor-not-allowed opacity-60'
-                          : tipo === t
+                          : selected
                             ? 'border-vialto-charcoal bg-vialto-charcoal text-white'
                             : 'border-black/20 text-vialto-charcoal hover:bg-vialto-mist',
                       ].join(' ')}
                     >
-                      {TIPO_LABEL[t]}
-                      <span className="mt-1 text-[10px] normal-case tracking-normal opacity-60">
-                        {disabled
-                          ? 'Ya registrado'
-                          : isManual
-                            ? 'Facturación cliente'
-                            : 'Liquidación ARCA'}
+                      CVLP
+                      <span className="mt-1 text-[10px] normal-case tracking-normal opacity-80">
+                        {cvlpCbteLabel(t)}
                       </span>
+                      {t === sugerido && (
+                        <span className="mt-1 text-[10px] normal-case tracking-normal opacity-70">
+                          Sugerido
+                        </span>
+                      )}
                     </button>
                   );
                 })}
               </div>
+
+              <div className="rounded border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-950 space-y-1">
+                <p>
+                  Corresponde a la condición frente al IVA del transportista:{' '}
+                  <span className="font-medium">{condicionIvaLabel(condicionIva)}</span>
+                  {' → '}
+                  <span className="font-medium">{cvlpCbteLabel(sugerido)}</span>.
+                </p>
+                <p>{ARCA_CBTE_OVERRIDE_WARNING}</p>
+                {overrideManual && (
+                  <p className="font-medium text-amber-900">
+                    Estás usando un tipo distinto al sugerido ({cvlpCbteLabel(cbteTipo)}).
+                  </p>
+                )}
+              </div>
+
+              {bloqueadoUsd && (
+                <p
+                  className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+                  role="alert"
+                >
+                  {MSG_ARCA_NO_LIQUIDA_USD}
+                </p>
+              )}
+
+              {!cvlpDisponible && (
+                <p className="text-xs text-vialto-steel border border-black/10 bg-vialto-mist/40 px-3 py-2">
+                  Este viaje ya tiene una liquidación activa para el transportista.
+                </p>
+              )}
+
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   type="button"
@@ -266,18 +370,8 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 </button>
                 <button
                   type="button"
-                  disabled={
-                    (tipo === 'cvlp' && !cvlpDisponible) ||
-                    (tipo !== 'cvlp' && !facturaManualDisponible)
-                  }
-                  onClick={() => {
-                    if (tipo !== 'cvlp') {
-                      // Factura A/B: cierra el flujo CVLP y deriva a facturación manual.
-                      onFacturarManual?.();
-                      return;
-                    }
-                    setStep('revision');
-                  }}
+                  disabled={!puedeAvanzar}
+                  onClick={() => setStep('revision')}
                   className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   Siguiente
@@ -286,15 +380,14 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
             </div>
           )}
 
-          {/* ── Paso 2: revisión ── */}
           {step === 'revision' && (
             <div className="space-y-5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs uppercase tracking-wider text-vialto-steel">Tipo:</span>
                 <span className="text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-                  {TIPO_LABEL[tipo]}
+                  CVLP
                 </span>
-                <span className="text-xs text-vialto-steel">(Comprobante Tipo 60)</span>
+                <span className="text-xs text-vialto-steel">({cvlpCbteLabel(cbteTipo)})</span>
               </div>
 
               <section className="space-y-1">
@@ -302,7 +395,17 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   Transportista
                 </p>
                 <p className="text-sm text-vialto-charcoal font-medium">{transportistaNombre}</p>
+                <p className="text-xs text-vialto-steel">{condicionIvaLabel(condicionIva)}</p>
               </section>
+
+              {bloqueadoUsd && (
+                <p
+                  className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+                  role="alert"
+                >
+                  {MSG_ARCA_NO_LIQUIDA_USD}
+                </p>
+              )}
 
               <section className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
@@ -422,6 +525,26 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 </p>
               </section>
 
+              <section className="space-y-2">
+                <ConceptosLiquidacionLineasEditor
+                  getToken={getToken}
+                  lineas={conceptosLineas}
+                  onChange={setConceptosLineas}
+                  disabled={busyCrear}
+                />
+              </section>
+
+              {datosEmitIncompletos && (
+                <div className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">Completá estos datos antes de emitir</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                    {missingEmitFields.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {error && (
                 <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
                   {error}
@@ -430,7 +553,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
               {arcaConfigMissing && (
                 <button
                   type="button"
-                  onClick={() => { onClose(); navigate('/liquidaciones/configuracion'); }}
+                  onClick={() => { onClose(); navigate('/configuracion/arca'); }}
                   className="w-full h-9 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
                 >
                   Ir a configuración de ARCA
@@ -455,7 +578,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   </button>
                   <button
                     type="button"
-                    disabled={busyCrear || !periodoCompleto}
+                    disabled={
+                      busyCrear ||
+                      !periodoCompleto ||
+                      !datosReady ||
+                      datosEmitIncompletos ||
+                      bloqueadoUsd
+                    }
                     onClick={() => void handleCrear()}
                     className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50 disabled:pointer-events-none"
                   >
@@ -466,7 +595,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
             </div>
           )}
 
-          {/* ── Liquidación creada (borrador) — pendiente de envío a ARCA ── */}
           {step === 'creada' && liquidacion && (
             <div className="space-y-5">
               <div className="border border-amber-200 bg-amber-50 px-4 py-3">
@@ -480,6 +608,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                   Detalle del comprobante
                 </p>
+                <Row label="Tipo" value={cvlpCbteLabel((liquidacion.cbteTipo === 61 ? 61 : 60) as CvlpCbteTipo)} />
                 <Row label="Transportista" value={transportistaNombre} />
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
@@ -493,6 +622,17 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                   <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
                 </div>
               </section>
+
+              {datosEmitIncompletos && (
+                <div className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">Completá estos datos antes de emitir</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                    {missingEmitFields.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {error && (
                 <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
@@ -510,7 +650,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 </button>
                 <button
                   type="button"
-                  disabled={busyArca}
+                  disabled={busyArca || !datosReady || datosEmitIncompletos}
                   onClick={() => void handleEmitirArca()}
                   className="inline-flex items-center gap-2 h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
                 >
@@ -521,7 +661,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
             </div>
           )}
 
-          {/* ── Autorizado por ARCA ── */}
           {step === 'autorizada' && liquidacion && (
             <div className="space-y-5">
               <div className="border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -538,6 +677,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido, onFacturarManual }:
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                   Resumen
                 </p>
+                <Row label="Tipo" value={cvlpCbteLabel((liquidacion.cbteTipo === 61 ? 61 : 60) as CvlpCbteTipo)} />
                 <Row label="Transportista" value={transportistaNombre} />
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />

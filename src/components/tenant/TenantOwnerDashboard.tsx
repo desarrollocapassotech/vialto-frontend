@@ -5,13 +5,16 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessCombustible,
+  canAccessIntegracionArca,
 } from '@/lib/tenantModules';
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Wallet, Warehouse, Fuel, type LucideIcon } from 'lucide-react';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import { modalOverlayClass } from '@/lib/modalLayers';
+import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { CombustibleDashboardSection } from '@/components/combustible/CombustibleDashboardSection';
+import { FinancieroDashboardSection } from '@/components/financiero/FinancieroDashboardSection';
 
 function formatMoney(n: number) {
   return `$ ${n.toLocaleString('es-AR', {
@@ -245,10 +248,12 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
   const itemsFacturasVencidas = alertas.facturasVencidas.items ?? [];
   const itemsViajesSinFactura = alertas.viajesSinFactura.items ?? [];
   const cargasSospechosas = alertas.cargasSospechosas ?? { cantidad: 0, montoTotal: 0 };
+  const margenBajo = alertas.margenBajo ?? { cantidad: 0, montoTotal: 0 };
   const totalAlertasBadge =
     (alertas.facturasVencidas.cantidad > 0 ? alertas.facturasVencidas.cantidad : 0) +
     (alertas.viajesSinFactura.cantidad > 0 ? alertas.viajesSinFactura.cantidad : 0) +
-    (cargasSospechosas.cantidad > 0 ? cargasSospechosas.cantidad : 0);
+    (cargasSospechosas.cantidad > 0 ? cargasSospechosas.cantidad : 0) +
+    (margenBajo.cantidad > 0 ? margenBajo.cantidad : 0);
   const badgeText = totalAlertasBadge > 99 ? '99+' : String(totalAlertasBadge);
   const resumenMobile =
     totalAlertasBadge === 1
@@ -427,6 +432,37 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
             </div>
           </div>
         )}
+
+        {margenBajo.cantidad > 0 && (
+          <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
+            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
+                {margenBajo.cantidad === 1
+                  ? 'Viaje con margen bajo o negativo en el período'
+                  : 'Viajes con margen bajo o negativo en el período'}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {margenBajo.cantidad}{' '}
+                <span className="font-body text-base text-white/70">
+                  {margenBajo.cantidad === 1 ? 'viaje' : 'viajes'}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-amber-100/90">
+                {margenBajo.montoTotal === 0 ? '—' : formatMoney(margenBajo.montoTotal)}
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  to="/?financieroTab=alertas"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
+                  onClick={closePanel}
+                >
+                  Ir a alertas de margen →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -550,7 +586,7 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
             id={panelId}
             role="region"
             aria-labelledby={headingId}
-            className="w-80 shrink-0 rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-lg ring-1 ring-vialto-fire/20"
+            className="fixed right-6 top-6 z-40 max-h-[calc(100dvh-3rem)] w-80 overflow-y-auto rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-2xl ring-1 ring-vialto-fire/20"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -593,14 +629,31 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
 interface TenantOwnerDashboardProps {
   modules: string[];
   dash: ReturnType<typeof useTenantOwnerDashboard>;
+  onViewViaje?: (id: string) => void;
+  loadingViajeId?: string | null;
 }
 
-export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProps) {
+type ModuloDashboardTab = 'financiero' | 'stock' | 'combustible';
+
+export function TenantOwnerDashboard({ modules, dash, onViewViaje, loadingViajeId }: TenantOwnerDashboardProps) {
   const showViajes = canAccessViajes(modules);
-  const showFin = canAccessFacturacion(modules) || showViajes;
+  const showFacturacionModulo = canAccessFacturacion(modules);
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
+  const showIntegracionArca = canAccessIntegracionArca(modules);
+  const showFinanciero = showViajes || showFacturacionModulo;
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
+  const [moduloSheetOpen, setModuloSheetOpen] = useState(false);
+
+  const moduloTabs: { id: ModuloDashboardTab; label: string; icon: LucideIcon }[] = [
+    ...(showFinanciero ? [{ id: 'financiero' as const, label: 'Financiero', icon: Wallet }] : []),
+    ...(showStock ? [{ id: 'stock' as const, label: 'Stock', icon: Warehouse }] : []),
+    ...(showCombustible ? [{ id: 'combustible' as const, label: 'Combustible', icon: Fuel }] : []),
+  ];
+  const [moduloTab, setModuloTab] = useState<ModuloDashboardTab | null>(null);
+  const moduloActivo = moduloTab ?? moduloTabs[0]?.id ?? 'financiero';
+  const moduloActivoDef = moduloTabs.find((t) => t.id === moduloActivo);
+  const ModuloActivoIcon = moduloActivoDef?.icon;
 
   const periodTabs: { id: typeof dash.period; label: string }[] = [
     { id: 'week', label: 'Esta semana' },
@@ -627,9 +680,6 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
     dash.setPeriod(id);
     if (id !== 'custom') setPeriodModalOpen(false);
   }
-
-  const fin = dash.data?.financiero;
-  const viajes = dash.data?.viajes;
 
   return (
     <div className="mt-6 space-y-6 lg:mt-8 lg:space-y-10">
@@ -819,92 +869,79 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         </div>
       )}
 
-      {showFin && (
-        <section aria-labelledby="fin-heading">
-          <h2
-            id="fin-heading"
-            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-          >
-            Resumen financiero
-          </h2>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <MetricCard
-              title="A pagar (transportistas externos)"
-              tooltip="Suma del precio acordado con transportistas externos en viajes del período"
-              metric={fin?.aPagarTransportistas}
-              loading={dash.loading}
-              valueTone="payable"
-              className="col-span-2 lg:col-span-1"
-            />
-            <MetricCard
-              title="Sin facturar"
-              tooltip="Monto de viajes finalizados o en curso sin factura emitida, atribuidos al período por fecha de carga"
-              metric={fin?.sinFacturarPeriodo}
-              loading={dash.loading}
-            />
-            <MetricCard
-              title="Facturado"
-              tooltip="Suma de montos de viajes facturados sin cobrar del período (ARS y USD por separado)"
-              metric={fin?.facturado}
-              loading={dash.loading}
-            />
-            <MetricCard
-              title="Cobrado"
-              tooltip="Pagos recibidos de clientes en el período, más viajes cobrados sin pago explícito registrado"
-              metric={fin?.cobrado}
-              loading={dash.loading}
-              valueTone="positiveCash"
-            />
-          </div>
-        </section>
-      )}
-
-      {showViajes && (
-        <section aria-labelledby="viajes-heading">
-          <h2
-            id="viajes-heading"
-            className="mb-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.2em] text-vialto-steel lg:mb-3"
-          >
-            Actividad operativa
-          </h2>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <MetricCard
-              title="En curso"
-              tooltip="Viajes del período actualmente en curso"
-              metric={viajes?.enCurso}
-              loading={dash.loading}
-              formatValue={(n) => String(Math.round(n))}
-              linkTo="/viajes?estado=en_curso"
-            />
-            <MetricCard
-              title="Sin facturar"
-              tooltip="Viajes del período finalizados sin factura emitida"
-              simpleCount={viajes?.sinFacturar}
-              loading={dash.loading}
-              valueTone="warn"
-              linkTo="/viajes?estado=finalizado_sin_facturar"
-            />
-            <MetricCard
-              title="Sin cobrar"
-              tooltip="Viajes del período con factura emitida aún no cobrada"
-              simpleCount={viajes?.sinCobrar}
-              loading={dash.loading}
-              valueTone="payable"
-              linkTo="/viajes?estado=facturado_sin_cobrar"
-            />
-            <MetricCard
-              title="Cobrados"
-              tooltip="Viajes del período ya cobrados"
-              simpleCount={viajes?.cobrados}
-              loading={dash.loading}
-              valueTone="positiveCash"
-              linkTo="/viajes?estado=cobrado"
+      {moduloTabs.length > 1 && (
+        <div className="border-b border-black/15">
+          <div className="pb-3 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setModuloSheetOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={moduloSheetOpen}
+              className={selectorTriggerClass}
+            >
+              <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
+                Módulo
+              </span>
+              <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                {ModuloActivoIcon && (
+                  <ModuloActivoIcon
+                    className="h-4 w-4 shrink-0 text-vialto-steel"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                )}
+                <span className="truncate font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+                  {moduloActivoDef?.label ?? ''}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={2} aria-hidden />
+              </span>
+            </button>
+            <SelectorOpcionesSheet
+              open={moduloSheetOpen}
+              onClose={() => setModuloSheetOpen(false)}
+              title="Elegir módulo"
+              options={moduloTabs.map((t) => ({ id: t.id, label: t.label }))}
+              activeId={moduloActivo}
+              onSelect={(id) => {
+                setModuloTab(id as ModuloDashboardTab);
+                setModuloSheetOpen(false);
+              }}
             />
           </div>
-        </section>
+
+          <nav className="-mb-px hidden gap-1 overflow-x-auto lg:flex" aria-label="Módulos del dashboard">
+            {moduloTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setModuloTab(tab.id)}
+                className={[
+                  'flex shrink-0 whitespace-nowrap items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border',
+                  moduloActivo === tab.id
+                    ? 'border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal'
+                    : 'border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]',
+                ].join(' ')}
+              >
+                <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
       )}
 
-      {showStock && (
+      {moduloActivo === 'financiero' && (
+        <FinancieroDashboardSection
+          dash={dash}
+          showViajes={showViajes}
+          showFacturacion={showFacturacionModulo}
+          showIntegracionArca={showIntegracionArca}
+          onViewViaje={onViewViaje}
+          loadingViajeId={loadingViajeId}
+        />
+      )}
+
+      {moduloActivo === 'stock' && showStock && (
         <section aria-labelledby="stock-heading">
           <h2
             id="stock-heading"
@@ -949,7 +986,9 @@ export function TenantOwnerDashboard({ modules, dash }: TenantOwnerDashboardProp
         </section>
       )}
 
-      {showCombustible && <CombustibleDashboardSection dash={dash} showViajes={showViajes} />}
+      {moduloActivo === 'combustible' && showCombustible && (
+        <CombustibleDashboardSection dash={dash} showViajes={showViajes} />
+      )}
     </div>
   );
 }

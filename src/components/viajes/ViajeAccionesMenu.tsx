@@ -3,6 +3,7 @@ import { Banknote, Download, Eye, FileText, PlusCircle, Receipt, Trash2 } from '
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
+import { motivoBloqueoAccionFacturarArcaUsd } from '@/lib/arcaUsdRestriction';
 import {
   viajePermiteAgregarGasto,
 } from '@/lib/viajesEstados';
@@ -16,6 +17,8 @@ function fmtDate(iso: string) {
 
 interface Props {
   viaje: Viaje;
+  /** Tenant con módulo integracion-arca activo. */
+  hasArca?: boolean;
   onVer: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
@@ -27,6 +30,7 @@ interface Props {
 
 export function ViajeAccionesMenu({
   viaje,
+  hasArca = false,
   onVer,
   onAgregarGasto,
   onRegistrarPago,
@@ -40,6 +44,7 @@ export function ViajeAccionesMenu({
   const permitePago = viajeRequierePagosTransportista(viaje) && viaje.estado !== 'cancelado';
   const permiteGasto = viajePermiteAgregarGasto(viaje.estado);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
+  const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasArca, viaje);
   const permiteExportar = viaje.estado !== 'cancelado';
 
   const options = useMemo(() => {
@@ -54,6 +59,8 @@ export function ViajeAccionesMenu({
         label: 'Facturar',
         icon: Receipt,
         onClick: onFacturar,
+        disabled: Boolean(facturarBloqueoArcaUsd),
+        description: facturarBloqueoArcaUsd ?? undefined,
       });
     }
     if (permiteGasto) {
@@ -80,6 +87,7 @@ export function ViajeAccionesMenu({
     onVer,
     onVerFactura,
     permiteFacturar,
+    facturarBloqueoArcaUsd,
     onFacturar,
     permiteGasto,
     onAgregarGasto,

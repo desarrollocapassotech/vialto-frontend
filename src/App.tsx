@@ -52,6 +52,7 @@ import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
 import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
+import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -321,7 +322,7 @@ export default function App() {
           {/* rutas accesibles solo para org:admin y superadmin */}
           <Route element={<RequireOrgAdmin />}>
             <Route
-              path="liquidaciones/configuracion"
+              path="configuracion/arca"
               element={<ArcaConfigTenantPage />}
             />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
@@ -408,6 +409,7 @@ export default function App() {
           />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
+          <Route path="superadmin/campos-empresa" element={<CamposEmpresaPage />} />
           <Route
             path="superadmin/usuarios/nuevo"
             element={<SuperadminUserCreatePage />}

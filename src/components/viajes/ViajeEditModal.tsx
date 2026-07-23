@@ -72,6 +72,7 @@ import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
 import type { ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
 import { ViajeExportacionLeyenda } from "@/components/viajes/ViajeExportacionLeyenda";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -141,6 +142,8 @@ export type ViajeEditModalProps = {
   onSave: () => void;
   /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
   onFacturar?: () => void;
+  /** Motivo para deshabilitar Facturar (ej. ARCA + USD). */
+  facturarBloqueoMotivo?: string | null;
   onEliminar?: () => void;
   saving: boolean;
   error: string | null;
@@ -185,6 +188,7 @@ export function ViajeEditModal({
   onClose,
   onSave,
   onFacturar,
+  facturarBloqueoMotivo = null,
   onEliminar,
   saving,
   error,
@@ -199,6 +203,7 @@ export function ViajeEditModal({
 }: ViajeEditModalProps) {
   type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop";
   const { user } = useUser();
+  const { isVisible } = useFieldConfig("viajes");
   const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
@@ -265,7 +270,8 @@ export function ViajeEditModal({
           ? draft.transportistaId
           : snapshotViaje.transportistaId,
     });
-  const facturarDeshabilitado = saving || !draft.clienteId.trim();
+  const facturarDeshabilitado =
+    saving || !draft.clienteId.trim() || Boolean(facturarBloqueoMotivo);
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId:
@@ -731,14 +737,16 @@ export function ViajeEditModal({
                 }
               />
 
-              <ViajeGananciaBrutaManualFieldset
-                draft={draft}
-                onPatch={(p) =>
-                  setDraft((prev) => (prev ? { ...prev, ...p } : prev))
-                }
-                labelClassName={labelClass}
-                inputClassName={inputClass}
-              />
+              {isVisible("edicion_viaje", "gananciaBrutaManual") && (
+                <ViajeGananciaBrutaManualFieldset
+                  draft={draft}
+                  onPatch={(p) =>
+                    setDraft((prev) => (prev ? { ...prev, ...p } : prev))
+                  }
+                  labelClassName={labelClass}
+                  inputClassName={inputClass}
+                />
+              )}
 
               <ViajeFechaHoraFields
                 fechaCarga={draft.fechaCarga}
@@ -754,119 +762,126 @@ export function ViajeEditModal({
 
               {estadoMuestraKmLitros(draft.estado) && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Km recorridos</span>
-                    <input
-                      type="number"
-                      value={draft.kmRecorridos}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p ? { ...p, kmRecorridos: e.target.value } : p,
-                        )
-                      }
-                      placeholder="0"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Litros consumidos</span>
-                    <input
-                      type="number"
-                      value={draft.litrosConsumidos}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p ? { ...p, litrosConsumidos: e.target.value } : p,
-                        )
-                      }
-                      placeholder="0"
-                      className={inputClass}
-                    />
-                  </div>
+                  {isVisible("edicion_viaje", "kmRecorridos") && (
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Km recorridos</span>
+                      <input
+                        type="number"
+                        value={draft.kmRecorridos}
+                        onChange={(e) =>
+                          setDraft((p) =>
+                            p ? { ...p, kmRecorridos: e.target.value } : p,
+                          )
+                        }
+                        placeholder="0"
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
+                  {isVisible("edicion_viaje", "litrosConsumidos") && (
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Litros consumidos</span>
+                      <input
+                        type="number"
+                        value={draft.litrosConsumidos}
+                        onChange={(e) =>
+                          setDraft((p) =>
+                            p ? { ...p, litrosConsumidos: e.target.value } : p,
+                          )
+                        }
+                        placeholder="0"
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Productos</span>
-                <ViajeProductosLista
-                  groupId="viaje-edit"
-                  value={draft.productoItems}
-                  onChange={(items) =>
-                    setDraft((p) => (p ? { ...p, productoItems: items } : p))
-                  }
-                  opciones={opcionesProducto}
-                  triggerClassName={inputClass}
-                  inputClassName={inputClass}
-                  disabled={saving}
-                  getToken={getToken}
-                  onProductoCreado={onProductoCreado}
-                />
-              </div>
+              {isVisible("edicion_viaje", "productoItems") && (
+                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+                  <span className={labelClass}>Productos</span>
+                  <ViajeProductosLista
+                    groupId="viaje-edit"
+                    value={draft.productoItems}
+                    onChange={(items) =>
+                      setDraft((p) => (p ? { ...p, productoItems: items } : p))
+                    }
+                    opciones={opcionesProducto}
+                    triggerClassName={inputClass}
+                    inputClassName={inputClass}
+                    disabled={saving}
+                    getToken={getToken}
+                    onProductoCreado={onProductoCreado}
+                  />
+                </div>
+              )}
 
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Detalle adicional</span>
-                <textarea
-                  value={draft.detalleCarga}
-                  onChange={(e) =>
-                    setDraft((p) =>
-                      p ? { ...p, detalleCarga: e.target.value } : p,
-                    )
-                  }
-                  placeholder="Notas extra: bultos, temperatura, precinto, etc."
-                  className="min-h-24 border border-black/15 bg-white px-2 py-2 text-sm"
-                />
-              </div>
+              {isVisible("edicion_viaje", "detalleCarga") && (
+                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+                  <span className={labelClass}>Detalle adicional</span>
+                  <textarea
+                    value={draft.detalleCarga}
+                    onChange={(e) =>
+                      setDraft((p) =>
+                        p ? { ...p, detalleCarga: e.target.value } : p,
+                      )
+                    }
+                    placeholder="Notas extra: bultos, temperatura, precinto, etc."
+                    className="min-h-24 border border-black/15 bg-white px-2 py-2 text-sm"
+                  />
+                </div>
+              )}
 
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Observaciones</span>
-                <textarea
-                  value={draft.observaciones}
-                  onChange={(e) =>
-                    setDraft((p) =>
-                      p ? { ...p, observaciones: e.target.value } : p,
-                    )
-                  }
-                  placeholder="Notas adicionales"
-                  className="min-h-24 border border-black/15 bg-white px-2 py-2 text-sm"
-                />
-              </div>
+              {isVisible("edicion_viaje", "observaciones") && (
+                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+                  <span className={labelClass}>Observaciones</span>
+                  <textarea
+                    value={draft.observaciones}
+                    onChange={(e) =>
+                      setDraft((p) =>
+                        p ? { ...p, observaciones: e.target.value } : p,
+                      )
+                    }
+                    placeholder="Notas adicionales"
+                    className="min-h-24 border border-black/15 bg-white px-2 py-2 text-sm"
+                  />
+                </div>
+              )}
 
-              <div className="md:col-span-2 lg:col-span-3">
-                <OtrosGastosFieldset
-                  rows={draft.otrosGastos}
-                  onChange={(rows) =>
-                    setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))
-                  }
-                  tenantId={tenantId}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDraft((p) =>
-                      p
-                        ? {
-                            ...p,
-                            otrosGastos: [
-                              ...p.otrosGastos,
-                              emptyOtroGasto(gastoAutor),
-                            ],
-                          }
-                        : p,
-                    )
-                  }
-                  className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
-                >
-                  + Agregar gasto
-                </button>
-              </div>
+              {isVisible("edicion_viaje", "otrosGastos") && (
+                <div className="md:col-span-2 lg:col-span-3">
+                  <OtrosGastosFieldset
+                    rows={draft.otrosGastos}
+                    onChange={(rows) =>
+                      setDraft((p) => (p ? { ...p, otrosGastos: rows } : p))
+                    }
+                    tenantId={tenantId}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft((p) =>
+                        p
+                          ? {
+                              ...p,
+                              otrosGastos: [...p.otrosGastos, emptyOtroGasto(gastoAutor)],
+                            }
+                          : p,
+                      )
+                    }
+                    className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+                  >
+                    + Agregar gasto
+                  </button>
+                </div>
+              )}
 
-              {muestraPagosTransportista && (
+              {muestraPagosTransportista && isVisible("edicion_viaje", "pagosTransportista") && (
                 <div className="md:col-span-2 lg:col-span-3">
                   <PagosTransportistaFieldset
                     rows={draft.pagosTransportista}
                     onChange={(rows) =>
-                      setDraft((p) =>
-                        p ? { ...p, pagosTransportista: rows } : p,
-                      )
+                      setDraft((p) => (p ? { ...p, pagosTransportista: rows } : p))
                     }
                     saldoContext={pagosSaldoContext}
                   />
@@ -879,9 +894,7 @@ export function ViajeEditModal({
                               ...p,
                               pagosTransportista: [
                                 ...p.pagosTransportista,
-                                emptyPagoTransportista(
-                                  p.monedaPrecioTransportistaExterno,
-                                ),
+                                emptyPagoTransportista(p.monedaPrecioTransportistaExterno),
                               ],
                             }
                           : p,
@@ -915,9 +928,11 @@ export function ViajeEditModal({
                   onClick={onFacturar}
                   disabled={facturarDeshabilitado}
                   title={
-                    !draft.clienteId.trim()
-                      ? "Elegí un cliente para poder facturar este viaje"
-                      : undefined
+                    facturarBloqueoMotivo
+                      ? facturarBloqueoMotivo
+                      : !draft.clienteId.trim()
+                        ? "Elegí un cliente para poder facturar este viaje"
+                        : undefined
                   }
                   className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
                 >

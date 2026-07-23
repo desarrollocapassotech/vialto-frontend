@@ -7,7 +7,7 @@ import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
 import { apiJson } from '@/lib/api';
-import { canAccessCombustible, canAccessFacturacion } from '@/lib/tenantModules';
+import { canAccessCombustible, canAccessFacturacion, canAccessViajes } from '@/lib/tenantModules';
 import type { Factura, Viaje } from '@/types/api';
 
 export function TenantHomePage() {
@@ -50,11 +50,14 @@ export function TenantHomePage() {
   const alertas = dash.data?.alertas;
   const showAlertsBlock =
     tenant != null &&
-    (canAccessFacturacion(tenant.modules) || canAccessCombustible(tenant.modules)) &&
+    (canAccessFacturacion(tenant.modules) ||
+      canAccessCombustible(tenant.modules) ||
+      canAccessViajes(tenant.modules)) &&
     alertas != null &&
     (alertas.facturasVencidas.cantidad > 0 ||
       alertas.viajesSinFactura.cantidad > 0 ||
-      (alertas.cargasSospechosas?.cantidad ?? 0) > 0);
+      (alertas.cargasSospechosas?.cantidad ?? 0) > 0 ||
+      (alertas.margenBajo?.cantidad ?? 0) > 0);
 
   return (
     <div className="w-full">
@@ -100,7 +103,12 @@ export function TenantHomePage() {
       )}
 
       {organization && !loading && !error && tenant && (
-        <TenantOwnerDashboard modules={tenant.modules} dash={dash} />
+        <TenantOwnerDashboard
+          modules={tenant.modules}
+          dash={dash}
+          onViewViaje={(id) => void handleViewViaje(id)}
+          loadingViajeId={loadingViajeId}
+        />
       )}
 
       {viewingFactura && (

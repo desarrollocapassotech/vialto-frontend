@@ -24,6 +24,10 @@ import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import {
+  MSG_ARCA_NO_FACTURA_USD,
+  arcaBloqueaFacturarUsd,
+} from "@/lib/arcaUsdRestriction";
 import { Landmark } from "lucide-react";
 import {
   monedaUnicaDeViajes,
@@ -100,7 +104,11 @@ function fmtFecha(iso: string | null) {
 
 type FacturaNuevaNavState = {
   tenantId?: string;
-  newFacturaDraft?: { clienteId: string; viajeIds: string[] };
+  newFacturaDraft?: {
+    clienteId: string;
+    viajeIds: string[];
+    letraComprobante?: "a" | "b";
+  };
   expandFacturaId?: string;
   viewFacturaId?: string;
 };
@@ -192,20 +200,20 @@ export function FacturacionTenantPage({
   const expandFacturaHandledRef = useRef(false);
   const viewFacturaHandledRef = useRef(false);
 
-  const viajesNuevaFactura = useMemo(
-    () =>
-      viajesFiltradosParaFactura(
-        viajes,
-        draft.tipo,
-        draft.clienteId,
-        draft.transportistaId,
-      ),
-    [viajes, draft.tipo, draft.clienteId, draft.transportistaId],
-  );
+  const viajesNuevaFactura = useMemo(() => {
+    const list = viajesFiltradosParaFactura(
+      viajes,
+      draft.tipo,
+      draft.clienteId,
+      draft.transportistaId,
+    );
+    if (!hasArca) return list;
+    return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
+  }, [viajes, draft.tipo, draft.clienteId, draft.transportistaId, hasArca]);
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];
-    return viajesFiltradosParaFactura(
+    const list = viajesFiltradosParaFactura(
       viajes,
       editDraft.tipo,
       editDraft.clienteId,
@@ -215,7 +223,13 @@ export function FacturacionTenantPage({
         viajeIdsFacturaEdicion: editDraft.viajeIds,
       },
     );
-  }, [viajes, editDraft, editingId]);
+    if (!hasArca) return list;
+    return list.filter(
+      (v) =>
+        editDraft.viajeIds.includes(v.id) ||
+        !arcaBloqueaFacturarUsd(true, v.monedaMonto),
+    );
+  }, [viajes, editDraft, editingId, hasArca]);
 
   const facturaEdicionSnapshot = useMemo(
     () =>
@@ -487,11 +501,12 @@ export function FacturacionTenantPage({
     if (!state) return;
     if (state.expandFacturaId?.trim()) return;
     if (!state.newFacturaDraft) return;
-    const { clienteId, viajeIds } = state.newFacturaDraft;
+    const { clienteId, viajeIds, letraComprobante } = state.newFacturaDraft;
     setDraft({
       ...emptyFacturaDraft(),
       clienteId: clienteId ?? "",
       viajeIds: viajeIds ?? [],
+      letraComprobante: letraComprobante ?? null,
     });
     setCreating(true);
     void ensureViajesLoaded();
@@ -579,6 +594,16 @@ export function FacturacionTenantPage({
       setDraftError(
         "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.",
       );
+      return;
+    }
+    if (
+      hasArca &&
+      draft.viajeIds.some((id) => {
+        const v = viajes.find((x) => x.id === id);
+        return v ? arcaBloqueaFacturarUsd(true, v.monedaMonto) : false;
+      })
+    ) {
+      setDraftError(MSG_ARCA_NO_FACTURA_USD);
       return;
     }
     setSaving(true);

@@ -30,9 +30,11 @@ function fmtNum(n: number) {
 export function CargaCombustibleViewModal({
   cargaId,
   onClose,
+  onUpdate,
 }: {
   cargaId: string;
   onClose: () => void;
+  onUpdate?: (cargaActualizada: CargaCombustible) => void;
 }) {
   const { getToken } = useAuth();
 
@@ -67,7 +69,6 @@ export function CargaCombustibleViewModal({
       if (!isSilent) setLoading(true);
       setError(null);
       try {
-        // Ejecutamos en paralelo la carga del detalle y los catálogos de choferes y vehículos
         const [row, ch, ve] = await Promise.all([
           apiJson<CargaCombustible>(
             `/api/combustible/${encodeURIComponent(cargaId)}`,
@@ -84,9 +85,13 @@ export function CargaCombustibleViewModal({
         setCarga(row);
         setChoferes(ch);
         setVehiculos(ve);
+
+        return row;
       } catch (e) {
         setCarga(null);
         setError(friendlyError(e, "combustible"));
+
+        return null;
       } finally {
         if (!isSilent) setLoading(false);
       }
@@ -117,9 +122,13 @@ export function CargaCombustibleViewModal({
       <CargaCombustibleEditModal
         carga={carga}
         onClose={() => setIsEditing(false)}
-        onSaved={() => {
+        onSaved={async () => {
           setIsEditing(false);
-          loadData(true);
+          const datosActualizados = await loadData(true);
+
+          if (datosActualizados && onUpdate) {
+            onUpdate(datosActualizados);
+          }
         }}
       />
     );
@@ -247,7 +256,8 @@ export function CargaCombustibleViewModal({
               </p>
               <p
                 className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
-                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "litros")
+                  carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "litros")
                     ? "text-amber-700"
                     : "text-vialto-charcoal"
                 }`}
@@ -291,7 +301,8 @@ export function CargaCombustibleViewModal({
               </p>
               <p
                 className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
-                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "importe")
+                  carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "importe")
                     ? "text-amber-700"
                     : "text-vialto-charcoal"
                 }`}
@@ -309,7 +320,8 @@ export function CargaCombustibleViewModal({
               </p>
               <p
                 className={`mt-1 flex items-center gap-1.5 text-sm font-medium ${
-                  carga.sospechoso && motivoAfectaCampo(carga.motivoSospecha, "km")
+                  carga.sospechoso &&
+                  motivoAfectaCampo(carga.motivoSospecha, "km")
                     ? "text-amber-700"
                     : "text-vialto-charcoal"
                 }`}
@@ -321,18 +333,18 @@ export function CargaCombustibleViewModal({
                   )}
               </p>
             </div>
-            {[
-              { label: "Forma de pago", value: carga.formaPago ?? "—" },
-            ].map((c, i) => (
-              <div key={i}>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                  {c.label}
-                </p>
-                <p className="mt-1 text-sm font-medium text-vialto-charcoal">
-                  {c.value}
-                </p>
-              </div>
-            ))}
+            {[{ label: "Forma de pago", value: carga.formaPago ?? "—" }].map(
+              (c, i) => (
+                <div key={i}>
+                  <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                    {c.label}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-vialto-charcoal">
+                    {c.value}
+                  </p>
+                </div>
+              ),
+            )}
           </div>
 
           <div className="border-t border-black/10 pt-6">
