@@ -1,3 +1,12 @@
+## Multi-tenant (obligatorio antes de tocar llamadas a la API)
+
+Antes de crear o modificar llamadas a la API o manejar datos de empresa, seguí las reglas
+de higiene multi-tenant. **No las dupliques acá**: la fuente de verdad es un solo archivo.
+
+@docs/reglas-multitenant.md
+
+---
+
 ## Arquitectura del proyecto
 
 A continuación se incluye el contenido completo del documento de arquitectura

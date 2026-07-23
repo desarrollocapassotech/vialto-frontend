@@ -163,6 +163,13 @@ export function FinancieroDashboardSection({
         ))}
       </div>
 
+      {loading && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-vialto-steel">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-vialto-steel border-t-transparent" />
+          Actualizando…
+        </p>
+      )}
+
       <div className="mt-3">
         {tabActivo === "margen" && (
           <div className="flex flex-col gap-4">

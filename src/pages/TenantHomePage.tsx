@@ -4,11 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { TenantOwnerDashboard, AlertsPanel } from '@/components/tenant/TenantOwnerDashboard';
 import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
 import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
+import { ViajeEditModal } from '@/components/viajes/ViajeEditModal';
+import { FacturaCreateModal } from '@/components/facturacion/FacturaEditModal';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { useTenantOwnerDashboard } from '@/hooks/useTenantOwnerDashboard';
+import { useMaestroData } from '@/hooks/useMaestroData';
+import { useViajeEditor } from '@/hooks/useViajeEditor';
+import { useFacturaCreator } from '@/hooks/useFacturaCreator';
 import { apiJson } from '@/lib/api';
-import { canAccessCombustible, canAccessFacturacion, canAccessViajes } from '@/lib/tenantModules';
-import type { Factura, Viaje } from '@/types/api';
+import {
+  canAccessCombustible,
+  canAccessFacturacion,
+  canAccessIntegracionArca,
+  canAccessViajes,
+} from '@/lib/tenantModules';
+import type { Factura, Producto, Viaje } from '@/types/api';
 
 export function TenantHomePage() {
   const { getToken } = useAuth();
@@ -16,10 +26,47 @@ export function TenantHomePage() {
   const navigate = useNavigate();
   const { tenant, loading, error } = useCurrentTenant();
   const dash = useTenantOwnerDashboard();
+  const maestro = useMaestroData();
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [loadingFacturaId, setLoadingFacturaId] = useState<string | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+  const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
+  const [abriendoFacturar, setAbriendoFacturar] = useState(false);
+
+  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
+  const facturaCreator = useFacturaCreator({
+    getToken,
+    apiUrlViajes: '/api/viajes',
+    apiUrlFacturasCreate: '/api/facturacion/facturas',
+    hasArca,
+    showComprobanteAdjunto: !hasArca,
+  });
+
+  const viajeEditor = useViajeEditor({
+    getToken,
+    apiUrlParaViaje: (id) => `/api/viajes/${encodeURIComponent(id)}`,
+    clientes: maestro.clientes,
+    choferes: maestro.choferes,
+    transportistas: maestro.transportistas,
+    vehiculos: maestro.vehiculos,
+    refreshMaestroListas: async () => {
+      const [clientes, choferes, transportistas, vehiculos] = await Promise.all([
+        maestro.refreshClientes(),
+        maestro.refreshChoferes(),
+        maestro.refreshTransportistas(),
+        maestro.refreshVehiculos(),
+      ]);
+      return { clientes, choferes, transportistas, vehiculos };
+    },
+    fetchProductosCatalogo: async () => {
+      const d = await apiJson<{ items: Producto[] }>(
+        '/api/stock/productos/paginated?page=1&pageSize=100&filtroActivo=activos',
+        () => getToken(),
+      );
+      return d.items;
+    },
+  });
 
   async function handleViewFactura(id: string) {
     setLoadingFacturaId(id);
@@ -75,7 +122,12 @@ export function TenantHomePage() {
             loadingFacturaId={loadingFacturaId}
             onViewViaje={(id) => void handleViewViaje(id)}
             loadingViajeId={loadingViajeId}
-            shouldClose={viewingFactura !== null || viewingViaje !== null}
+            shouldClose={
+              viewingFactura !== null ||
+              viewingViaje !== null ||
+              viajeEditor.editingId !== null ||
+              facturaCreator.creating
+            }
           />
         )}
       </div>
@@ -126,12 +178,96 @@ export function TenantHomePage() {
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
+          editando={abriendoEditorViaje}
+          facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {
-            const id = viewingViaje.id;
-            setViewingViaje(null);
-            navigate(`/viajes?viaje=${encodeURIComponent(id)}`);
+            const v = viewingViaje;
+            void (async () => {
+              setAbriendoEditorViaje(true);
+              try {
+                await viajeEditor.beginEditViaje(v, 'remoto');
+                setViewingViaje(null);
+              } finally {
+                setAbriendoEditorViaje(false);
+              }
+            })();
           }}
+          onFacturar={
+            tenant && canAccessFacturacion(tenant.modules)
+              ? () => {
+                  const v = viewingViaje;
+                  void (async () => {
+                    setAbriendoFacturar(true);
+                    try {
+                      facturaCreator.prepararDraftParaViaje(v);
+                      await facturaCreator.ensureViajesLoaded();
+                      facturaCreator.abrir();
+                      setViewingViaje(null);
+                    } finally {
+                      setAbriendoFacturar(false);
+                    }
+                  })();
+                }
+              : undefined
+          }
+        />
+      )}
+
+      <FacturaCreateModal
+        open={facturaCreator.creating}
+        draft={facturaCreator.draft}
+        setDraft={facturaCreator.setDraft}
+        clientes={maestro.clientes}
+        transportistas={maestro.transportistas}
+        viajes={facturaCreator.viajes}
+        viajesNueva={facturaCreator.viajesNueva}
+        viajesLoading={facturaCreator.viajesLoading}
+        onClose={facturaCreator.cancelar}
+        onSave={() => void facturaCreator.handleCreate()}
+        saving={facturaCreator.saving}
+        error={facturaCreator.error}
+        showComprobanteAdjunto={!hasArca}
+      />
+
+      {viajeEditor.editingId && viajeEditor.draft && viajeEditor.viajeSnapshot && (
+        <ViajeEditModal
+          open
+          draft={viajeEditor.draft}
+          setDraft={viajeEditor.setDraft}
+          snapshotViaje={viajeEditor.viajeSnapshot}
+          opcionesProducto={viajeEditor.opcionesProducto}
+          clientes={viajeEditor.edicionMaestro?.clientes ?? maestro.clientes}
+          choferes={viajeEditor.edicionMaestro?.choferes ?? maestro.choferes}
+          transportistas={viajeEditor.edicionMaestro?.transportistas ?? maestro.transportistas}
+          vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? maestro.vehiculos}
+          choferesPropios={viajeEditor.choferesPropios}
+          vehiculosPropios={viajeEditor.vehiculosPropios}
+          viajesConFactura={viajeEditor.viajesConFactura}
+          onModoChange={viajeEditor.applyDraftModo}
+          ayudaFlota={viajeEditor.ayudaFlota}
+          viajeEditHint={viajeEditor.viajeEditHint}
+          fechaCargaError={viajeEditor.fechaCargaError}
+          fechaDescargaError={viajeEditor.fechaDescargaError}
+          destinosError={viajeEditor.destinosError}
+          onClearDestinosError={viajeEditor.onClearDestinosError}
+          transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
+          onClearTransportistaEfectivoError={
+            viajeEditor.onClearTransportistaEfectivoError
+          }
+          onDraftFechasPatch={viajeEditor.onDraftFechasPatch}
+          onClose={viajeEditor.cancelEdit}
+          onSave={() => void viajeEditor.saveInline()}
+          saving={viajeEditor.saving}
+          error={viajeEditor.error}
+          getToken={getToken}
+          onProductoCreado={viajeEditor.onProductoCreado}
+          onClienteCreado={(c) => viajeEditor.upsertMaestroEdicion('clientes', c)}
+          onTransportistaCreado={(t) =>
+            viajeEditor.upsertMaestroEdicion('transportistas', t)
+          }
+          onChoferCreado={(c) => viajeEditor.upsertMaestroEdicion('choferes', c)}
+          onVehiculoCreado={(v) => viajeEditor.upsertMaestroEdicion('vehiculos', v)}
         />
       )}
     </div>

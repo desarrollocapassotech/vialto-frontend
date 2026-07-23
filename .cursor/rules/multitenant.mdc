@@ -1,0 +1,10 @@
+---
+description: Reglas de higiene multi-tenant del frontend (llamadas a la API y datos de empresa)
+alwaysApply: true
+---
+
+Antes de crear o modificar llamadas a la API o manejar datos de empresa, seguí las reglas
+de higiene multi-tenant del frontend. **No dupliques las reglas acá**: la fuente de verdad
+es un solo archivo. Leelo y aplicalo siempre:
+
+@docs/reglas-multitenant.md
