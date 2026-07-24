@@ -104,6 +104,13 @@ export interface Viaje {
   }[];
   createdAt: string;
   createdBy: string;
+  montoFacturadoReal?: number | null;
+  /** Moneda de la factura */
+  monedaMontoFacturadoReal?: string | null;
+  /** Costo real prorrateado a partir del líquido de la liquidación emitida (sin anulaciones) */
+  costoLiquidadoReal?: number | null;
+  /** Moneda de la liquidación (generalmente ARS para AFIP) */
+  monedaCostoLiquidadoReal?: string | null;
 }
 
 /** Respuesta de GET /api/platform/* (superadmin). */
