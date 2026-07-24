@@ -19,7 +19,7 @@ export function useCombustibleValidation(
   precioPorLitroRaw: string,
   importeRaw: string,
   kmRaw: string,
-  excludeId?: string
+  excludeId?: string,
 ) {
   const [bounds, setBounds] = useState<KmBounds | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -39,7 +39,10 @@ export function useCombustibleValidation(
       qs.set("fecha", fecha);
       if (excludeId) qs.set("excludeId", excludeId);
 
-      apiJson<KmBounds>(`/api/combustible/limites-km?${qs.toString()}`, getToken)
+      apiJson<KmBounds>(
+        `/api/combustible/limites-km?${qs.toString()}`,
+        getToken,
+      )
         .then((res) => {
           if (!cancelled) setBounds(res);
         })
