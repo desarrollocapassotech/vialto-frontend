@@ -2,8 +2,8 @@ import {
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
-} from '@/lib/currencyMask';
-import type { PagoTransportista, Viaje } from '@/types/api';
+} from "@/lib/currencyMask";
+import type { PagoTransportista, Viaje } from "@/types/api";
 
 export type PagoTransportistaMontoDraft = {
   montoStr: string;
@@ -18,18 +18,23 @@ export type PagosTransportistaDraftFormInput = {
 };
 
 export const METODO_PAGO_LABELS: Record<string, string> = {
-  efectivo: 'Efectivo',
-  transferencia: 'Transferencia',
-  cheque: 'Cheque',
-  otro: 'Otro',
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  cheque: "Cheque",
+  otro: "Otro",
 };
 
-export const METODOS_PAGO = ['efectivo', 'transferencia', 'cheque', 'otro'] as const;
+export const METODOS_PAGO = [
+  "efectivo",
+  "transferencia",
+  "cheque",
+  "otro",
+] as const;
 export const PAGO_TRANSPORTISTA_SALDO_ERROR =
-  'El monto del pago no puede superar el saldo pendiente del viaje';
+  "El monto del pago no puede superar el saldo pendiente del viaje";
 
 export type SaldoTransportistaMeta = {
-  moneda: 'ARS' | 'USD';
+  moneda: "ARS" | "USD";
   totalAcordado: number;
   totalPagado: number;
   saldo: number;
@@ -38,49 +43,92 @@ export type SaldoTransportistaMeta = {
 
 export type ViajeSaldoTransportistaInput = Pick<
   Viaje,
-  'transportistaId' | 'precioTransportistaExterno' | 'monedaPrecioTransportistaExterno'
+  | "transportistaId"
+  | "precioTransportistaExterno"
+  | "monedaPrecioTransportistaExterno"
+  | "liquidacionesViaje"
 > & {
   pagosTransportista?: PagoTransportista[];
 };
 
 export function viajeRequierePagosTransportista(
-  v: Pick<Viaje, 'transportistaId'>,
+  v: Pick<Viaje, "transportistaId">,
 ): boolean {
-  return !!String(v.transportistaId ?? '').trim();
+  return !!String(v.transportistaId ?? "").trim();
 }
 
 /** Alineado con GET /viajes/paginated?pagoTransportista=… y saldo-pendiente-transportista. */
-export type EstadoPagoTransportistaExterno = 'no_aplica' | 'sin_precio' | 'sin_pago' | 'pagado';
+export type EstadoPagoTransportistaExterno =
+  | "no_aplica"
+  | "sin_precio"
+  | "sin_pago"
+  | "pagado";
 
-function totalPagadoTransportistaEnMonedaAcordada(v: ViajeSaldoTransportistaInput): {
-  moneda: 'ARS' | 'USD';
+function totalPagadoTransportistaEnMonedaAcordada(
+  v: ViajeSaldoTransportistaInput,
+): {
+  moneda: "ARS" | "USD";
   totalAcordado: number;
   totalPagado: number;
 } | null {
   if (!viajeRequierePagosTransportista(v)) return null;
   const moneda = normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
-  const totalAcordado = v.precioTransportistaExterno ?? 0;
+
   const totalPagado = (v.pagosTransportista ?? [])
-    .filter((p) => (p.moneda === 'USD' ? 'USD' : 'ARS') === moneda)
+    .filter((p) => (p.moneda === "USD" ? "USD" : "ARS") === moneda)
     .reduce((acc, p) => acc + p.monto, 0);
+
+  // 1. Partimos del estimado original como base
+  let totalAcordado = v.precioTransportistaExterno ?? 0;
+
+  // 2. Si el viaje tiene liquidaciones emitidas, sobreescribimos con el monto real
+  if (v.liquidacionesViaje && v.liquidacionesViaje.length > 0) {
+    let montoReal = 0;
+    let tieneMontoReal = false;
+
+    for (const lv of v.liquidacionesViaje) {
+      const liq = lv.liquidacion;
+
+      // Ignoramos liquidaciones fallidas o anuladas
+      if (liq && (liq.estado === "anulado" || liq.estado === "error")) continue;
+
+      // Si tenés el monto guardado en la tabla pivote (ideal para liquidaciones multi-viaje)
+      if (typeof lv.monto === "number") {
+        montoReal += lv.monto;
+        tieneMontoReal = true;
+      }
+      // Si no hay monto en pivote, usamos el 'liquido' de la liquidación principal
+      else if (liq && typeof liq.liquido === "number") {
+        montoReal += liq.liquido;
+        tieneMontoReal = true;
+      }
+    }
+
+    if (tieneMontoReal) {
+      totalAcordado = montoReal;
+    }
+  }
+
   return { moneda, totalAcordado, totalPagado };
 }
 
 /** Transportista externo con precio acordado > 0: pendiente o liquidado al 100 %. */
-export function estadoPagoTransportistaExterno(v: Viaje): EstadoPagoTransportistaExterno {
+export function estadoPagoTransportistaExterno(
+  v: Viaje,
+): EstadoPagoTransportistaExterno {
   const t = totalPagadoTransportistaEnMonedaAcordada(v);
-  if (!t) return 'no_aplica';
-  if (t.totalAcordado <= 0) return 'sin_precio';
-  if (t.totalPagado >= t.totalAcordado - 1e-6) return 'pagado';
-  return 'sin_pago';
+  if (!t) return "no_aplica";
+  if (t.totalAcordado <= 0) return "sin_precio";
+  if (t.totalPagado >= t.totalAcordado - 1e-6) return "pagado";
+  return "sin_pago";
 }
 
 export function viajeCoincideFiltroPagoTransportista(
   v: Viaje,
-  filtro: 'sin_pagar' | 'pagado',
+  filtro: "sin_pagar" | "pagado",
 ): boolean {
   const estado = estadoPagoTransportistaExterno(v);
-  return filtro === 'sin_pagar' ? estado === 'sin_pago' : estado === 'pagado';
+  return filtro === "sin_pagar" ? estado === "sin_pago" : estado === "pagado";
 }
 
 export function calcularSaldoTransportista(
@@ -123,10 +171,13 @@ function totalPagadoDesdeDraftsEnMonedaAcordada(
 
     const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
     if (monto == null || monto <= 0) {
-      return { totalPagado: 0, error: 'Ingresá un monto válido en cada pago al transportista.' };
+      return {
+        totalPagado: 0,
+        error: "Ingresá un monto válido en cada pago al transportista.",
+      };
     }
 
-    const rowMoneda = row.moneda === 'USD' ? 'USD' : 'ARS';
+    const rowMoneda = row.moneda === "USD" ? "USD" : "ARS";
     if (rowMoneda !== monedaAcordada) {
       return {
         totalPagado: 0,
@@ -144,7 +195,9 @@ function totalPagadoDesdeDraftsEnMonedaAcordada(
 export function calcularSaldoTransportistaDesdeDraft(
   input: PagosTransportistaDraftFormInput,
 ): SaldoTransportistaMeta | null {
-  if (!viajeRequierePagosTransportista({ transportistaId: input.transportistaId })) {
+  if (
+    !viajeRequierePagosTransportista({ transportistaId: input.transportistaId })
+  ) {
     return null;
   }
 
@@ -165,7 +218,9 @@ export function calcularSaldoTransportistaDesdeDraft(
 export function validarPagosTransportistaDraftForm(
   input: PagosTransportistaDraftFormInput,
 ): string | null {
-  if (!viajeRequierePagosTransportista({ transportistaId: input.transportistaId })) {
+  if (
+    !viajeRequierePagosTransportista({ transportistaId: input.transportistaId })
+  ) {
     return null;
   }
 

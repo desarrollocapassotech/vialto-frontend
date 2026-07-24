@@ -74,6 +74,30 @@ export function emptyFacturaDraft(): FacturaDraft {
   };
 }
 
+/** Payload para POST/PATCH de factura a partir del draft del formulario (crear y editar). */
+export function facturaPayloadFromDraft(
+  draft: FacturaDraft,
+  comprobanteUrl?: string | null,
+) {
+  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
+  const base: Record<string, unknown> = {
+    numero: draft.numero.trim(),
+    tipo: "cliente",
+    viajeIds: draft.viajeIds,
+    fechaEmision: draft.fechaEmision,
+    fechaVencimiento: draft.fechaVencimiento || undefined,
+    ivaPct: ivaN,
+  };
+  if (comprobanteUrl !== undefined) {
+    base.comprobanteUrl = comprobanteUrl ?? "";
+  }
+  return {
+    ...base,
+    clienteId: draft.clienteId || undefined,
+    transportistaId: undefined,
+  };
+}
+
 export function facturaToEditDraft(f: Factura): FacturaDraft {
   return {
     numero: f.numero,
