@@ -347,7 +347,25 @@ export function LiquidacionesTenantPage() {
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      onVer: () => setDetail({ mode: "view", liq }),
+      onVer: () => {
+        void (async () => {
+          try {
+            const full = await apiJson<LiquidacionConTransportista>(
+              `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+              () => getToken(),
+            );
+            setDetail({
+              mode: "view",
+              liq: {
+                ...full,
+                transportista: full.transportista ?? liq.transportista,
+              },
+            });
+          } catch {
+            setDetail({ mode: "view", liq });
+          }
+        })();
+      },
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
       onAnular: () => setAnularConfirm(liq),
