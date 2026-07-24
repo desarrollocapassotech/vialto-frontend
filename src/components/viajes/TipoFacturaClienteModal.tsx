@@ -12,9 +12,11 @@ interface Props {
   viaje: Viaje;
   onClose: () => void;
   onConfirm: (letra: FacturaLetra) => void;
+  /** Preparando el paso siguiente (ej. cargando viajes del cliente): bloquea el modal. */
+  busy?: boolean;
 }
 
-export function TipoFacturaClienteModal({ viaje, onClose, onConfirm }: Props) {
+export function TipoFacturaClienteModal({ viaje, onClose, onConfirm, busy = false }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const condicionIva = viaje.cliente?.condicionIva ?? null;
   const sugerido = facturaLetraFromCondicionIva(condicionIva);
@@ -23,17 +25,17 @@ export function TipoFacturaClienteModal({ viaje, onClose, onConfirm }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !busy) onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, busy]);
 
   return (
     <div
       ref={overlayRef}
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (e.target === overlayRef.current && !busy) onClose();
       }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
@@ -52,7 +54,8 @@ export function TipoFacturaClienteModal({ viaje, onClose, onConfirm }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none"
+            disabled={busy}
+            className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             ×
           </button>
@@ -111,16 +114,25 @@ export function TipoFacturaClienteModal({ viaje, onClose, onConfirm }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
+              disabled={busy}
+              className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={() => onConfirm(letra)}
-              className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90"
+              disabled={busy}
+              className="h-9 px-5 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:cursor-wait"
             >
-              Continuar
+              {busy ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Abriendo…
+                </span>
+              ) : (
+                "Continuar"
+              )}
             </button>
           </div>
         </div>

@@ -16,11 +16,6 @@ function fmtMoneyUSD(n: number): string {
   return `USD ${Math.round(n).toLocaleString("es-AR")}`;
 }
 
-function fmtPct(n: number | null): string {
-  if (n === null) return "—";
-  return `${n.toFixed(1)}%`;
-}
-
 function fmtMoneyDualCompact(money: FinancieroMoney): string {
   const parts: string[] = [];
   if (money.ARS !== 0) parts.push(fmtMoney(money.ARS));
@@ -33,7 +28,7 @@ function MoneyDual({ money }: { money: FinancieroMoney }) {
   return (
     <span className="inline-flex flex-col items-end gap-0.5">
       {money.ARS !== 0 && <span>{fmtMoney(money.ARS)}</span>}
-      {money.USD !== 0 && <span className="text-xs text-vialto-steel">{fmtMoneyUSD(money.USD)}</span>}
+      {money.USD !== 0 && <span className="text-xs opacity-75">{fmtMoneyUSD(money.USD)}</span>}
     </span>
   );
 }
@@ -96,7 +91,7 @@ export function MargenResumenPanel({
   const listo = !loading && data?.margen !== undefined;
   const r = data?.margen?.resumen;
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2">
       <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">
         <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
           Facturado
@@ -109,16 +104,6 @@ export function MargenResumenPanel({
         </span>
         <div className="text-right text-emerald-400">{listo && r ? <MoneyDual money={r.margen} /> : "—"}</div>
       </div>
-      <StatTile
-        label="Margen % promedio"
-        value={listo && r ? fmtPct(r.margenPctPromedio) : "—"}
-        sub={listo && r ? "Viajes en una única moneda" : undefined}
-      />
-      <StatTile
-        label="Viajes sin datos suficientes"
-        value={listo && r ? String(r.cantViajesSinDatos) : "—"}
-        sub={listo && r ? "Sin monto o sin costo de transportista cargado" : undefined}
-      />
     </div>
   );
 }
@@ -148,9 +133,6 @@ function MargenEntidadTable({
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Margen
             </th>
-            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Margen %
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -164,7 +146,6 @@ function MargenEntidadTable({
               <td className="py-2 text-right text-vialto-charcoal">
                 <MoneyDual money={it.margen} />
               </td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtPct(it.margenPct)}</td>
             </tr>
           ))}
         </tbody>
@@ -200,9 +181,6 @@ export function MargenPorRutaTable({
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Viajes
             </th>
-            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Margen % promedio
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -210,7 +188,6 @@ export function MargenPorRutaTable({
             <tr key={it.clave} className="border-b border-black/5 last:border-0">
               <td className="py-2 text-vialto-charcoal">{it.clave}</td>
               <td className="py-2 text-right text-vialto-charcoal">{it.cantViajes}</td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtPct(it.margenPctPromedio)}</td>
             </tr>
           ))}
         </tbody>
@@ -252,9 +229,6 @@ export function MargenAlertasList({
               Margen
             </th>
             <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Margen %
-            </th>
-            <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               <span className="sr-only">Acciones</span>
             </th>
           </tr>
@@ -271,7 +245,6 @@ export function MargenAlertasList({
               <td className={`py-2 text-right ${a.margen < 0 ? "text-rose-600" : "text-amber-700"}`}>
                 {a.moneda === "USD" ? fmtMoneyUSD(a.margen) : fmtMoney(a.margen)}
               </td>
-              <td className="py-2 text-right text-vialto-charcoal">{fmtPct(a.margenPct)}</td>
               <td className="py-2 text-right">
                 {onViewViaje ? (
                   <button
@@ -304,12 +277,40 @@ export function MargenAlertasList({
 export function ViajesFunnelPanel({
   data,
   loading,
+  onViewViaje,
+  loadingViajeId,
 }: {
   data: FinancieroDashboardResponse | null;
   loading: boolean;
+  onViewViaje?: (id: string) => void;
+  loadingViajeId?: string | null;
 }) {
   const funnel = data?.viajesFunnel;
   if (loading || !funnel) return <EmptyState text="Cargando…" />;
+
+  function renderVerViajeAction(id: string) {
+    const cargando = loadingViajeId === id;
+    if (onViewViaje) {
+      return (
+        <button
+          type="button"
+          disabled={cargando}
+          onClick={() => onViewViaje(id)}
+          className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire disabled:cursor-wait disabled:opacity-60"
+        >
+          {cargando ? "Cargando…" : "Ver viaje →"}
+        </button>
+      );
+    }
+    return (
+      <Link
+        to={`/viajes?viaje=${encodeURIComponent(id)}`}
+        className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+      >
+        Ver viaje →
+      </Link>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -335,27 +336,40 @@ export function ViajesFunnelPanel({
           <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
             Finalizados sin liquidar al transportista
           </p>
-          <p className="mb-2 text-2xl font-[family-name:var(--font-display)] text-vialto-charcoal">
+          <p className="mb-3 text-2xl font-[family-name:var(--font-display)] text-vialto-charcoal">
             {funnel.sinLiquidar.cantidad}
           </p>
-          <div className="mb-3 text-sm text-vialto-steel">
-            <MoneyDual money={funnel.sinLiquidar.montoPendiente} />
-          </div>
           {funnel.sinLiquidar.items.length === 0 ? (
             <EmptyState text="Sin viajes pendientes de liquidar." />
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {funnel.sinLiquidar.items.map((it) => (
-                <li key={it.id}>
-                  <Link
-                    to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
-                    className="text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                  >
-                    #{it.numero || it.id.slice(0, 8)} · {it.transportistaNombre ?? "—"} →
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-black/10">
+                    <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      Viaje
+                    </th>
+                    <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      Transportista
+                    </th>
+                    <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      <span className="sr-only">Acciones</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnel.sinLiquidar.items.map((it) => (
+                    <tr key={it.id} className="border-b border-black/5 last:border-0">
+                      <td className="py-2 font-medium text-vialto-charcoal">
+                        {it.numero || it.id.slice(0, 8)}
+                      </td>
+                      <td className="py-2 text-vialto-charcoal">{it.transportistaNombre ?? "—"}</td>
+                      <td className="py-2 text-right">{renderVerViajeAction(it.id)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
@@ -363,27 +377,40 @@ export function ViajesFunnelPanel({
           <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
             Finalizados sin facturar al cliente
           </p>
-          <p className="mb-2 text-2xl font-[family-name:var(--font-display)] text-vialto-charcoal">
+          <p className="mb-3 text-2xl font-[family-name:var(--font-display)] text-vialto-charcoal">
             {funnel.sinFacturar.cantidad}
           </p>
-          <div className="mb-3 text-sm text-vialto-steel">
-            <MoneyDual money={funnel.sinFacturar.montoTotal} />
-          </div>
           {funnel.sinFacturar.items.length === 0 ? (
             <EmptyState text="Sin viajes pendientes de facturar." />
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {funnel.sinFacturar.items.map((it) => (
-                <li key={it.id}>
-                  <Link
-                    to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
-                    className="text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
-                  >
-                    #{it.numero || it.id.slice(0, 8)} · {it.clienteNombre} →
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-black/10">
+                    <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      Viaje
+                    </th>
+                    <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      Cliente
+                    </th>
+                    <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
+                      <span className="sr-only">Acciones</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnel.sinFacturar.items.map((it) => (
+                    <tr key={it.id} className="border-b border-black/5 last:border-0">
+                      <td className="py-2 font-medium text-vialto-charcoal">
+                        {it.numero || it.id.slice(0, 8)}
+                      </td>
+                      <td className="py-2 text-vialto-charcoal">{it.clienteNombre}</td>
+                      <td className="py-2 text-right">{renderVerViajeAction(it.id)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
@@ -403,136 +430,67 @@ export function LiquidacionesPanel({
   const liq = data?.liquidaciones;
   if (loading || !liq) return <EmptyState text="Cargando…" />;
 
+  const acordadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
+  const pagadoTotal: FinancieroMoney = { ARS: 0, USD: 0 };
+  const pendienteTotal: FinancieroMoney = { ARS: 0, USD: 0 };
+  let cantViajesTotal = 0;
+  for (const t of liq.aPagarPorTransportista) {
+    acordadoTotal.ARS += t.acordado.ARS;
+    acordadoTotal.USD += t.acordado.USD;
+    pagadoTotal.ARS += t.pagado.ARS;
+    pagadoTotal.USD += t.pagado.USD;
+    pendienteTotal.ARS += t.pendiente.ARS;
+    pendienteTotal.USD += t.pendiente.USD;
+    cantViajesTotal += t.cantViajes;
+  }
+
+  const liquidoTotal = liq.rankingPorLiquidado.reduce((s, t) => s + t.liquido, 0);
+  const cantLiquidacionesTotal = liq.rankingPorLiquidado.reduce((s, t) => s + t.cantLiquidaciones, 0);
+  const brutoTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.bruto, 0);
+  const comisionTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.comision, 0);
+  const gastosAdminTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.gastosAdmin, 0);
+
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-          A pagar por transportista — pendiente vs. pagado
-        </p>
-        {liq.aPagarPorTransportista.length === 0 ? (
-          <EmptyState text="Sin viajes con costo de transportista en el período." />
-        ) : (
-          <div className="overflow-x-auto bg-white border border-black/10 p-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-black/10">
-                  <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Transportista
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Acordado
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Pagado
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Pendiente
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Viajes
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {liq.aPagarPorTransportista.map((t) => (
-                  <tr key={t.transportistaId} className="border-b border-black/5 last:border-0">
-                    <td className="py-2 font-medium text-vialto-charcoal">{t.nombre}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">
-                      <MoneyDual money={t.acordado} />
-                    </td>
-                    <td className="py-2 text-right text-emerald-700">
-                      <MoneyDual money={t.pagado} />
-                    </td>
-                    <td className="py-2 text-right text-rose-700">
-                      <MoneyDual money={t.pendiente} />
-                    </td>
-                    <td className="py-2 text-right text-vialto-charcoal">{t.cantViajes}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <StatTile label="Transportistas" value={String(liq.aPagarPorTransportista.length)} />
+        <StatTile label="Viajes" value={String(cantViajesTotal)} />
+        <StatTile label="Liquidaciones CVLP" value={String(cantLiquidacionesTotal)} />
+        <StatTile label="Períodos" value={String(liq.cvlpPorPeriodo.length)} />
       </div>
 
-      <div>
-        <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-          Ranking por monto liquidado (CVLP)
-        </p>
-        {liq.rankingPorLiquidado.length === 0 ? (
-          <EmptyState text="Sin liquidaciones CVLP en el período." />
-        ) : (
-          <div className="overflow-x-auto bg-white border border-black/10 p-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-black/10">
-                  <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Transportista
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Líquido
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Liquidaciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {liq.rankingPorLiquidado.map((t) => (
-                  <tr key={t.transportistaId} className="border-b border-black/5 last:border-0">
-                    <td className="py-2 font-medium text-vialto-charcoal">{t.nombre}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(t.liquido)}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{t.cantLiquidaciones}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
+        <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
+            Acordado
+          </span>
+          <div className="text-right text-white">
+            <MoneyDual money={acordadoTotal} />
           </div>
-        )}
+        </div>
+        <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
+            Pagado
+          </span>
+          <div className="text-right text-emerald-400">
+            <MoneyDual money={pagadoTotal} />
+          </div>
+        </div>
+        <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
+          <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
+            Pendiente
+          </span>
+          <div className="text-right text-rose-400">
+            <MoneyDual money={pendienteTotal} />
+          </div>
+        </div>
       </div>
 
-      <div>
-        <p className="mb-2 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-          Liquidaciones emitidas por período
-        </p>
-        {liq.cvlpPorPeriodo.length === 0 ? (
-          <EmptyState text="Sin liquidaciones en el período." />
-        ) : (
-          <div className="overflow-x-auto bg-white border border-black/10 p-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-black/10">
-                  <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Período
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Bruto
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Comisión
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Gastos admin.
-                  </th>
-                  <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                    Líquido
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {liq.cvlpPorPeriodo.map((p) => (
-                  <tr key={p.periodo} className="border-b border-black/5 last:border-0">
-                    <td className="py-2 text-vialto-charcoal">{p.periodo}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.bruto)}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.comision)}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.gastosAdmin)}</td>
-                    <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(p.liquido)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <StatTile label="Bruto (CVLP)" value={fmtMoney(brutoTotal)} />
+        <StatTile label="Comisión" value={fmtMoney(comisionTotal)} />
+        <StatTile label="Gastos admin." value={fmtMoney(gastosAdminTotal)} />
+        <StatTile label="Líquido total" value={fmtMoney(liquidoTotal)} />
       </div>
     </div>
   );
@@ -641,79 +599,3 @@ export function FacturacionPanel({
   );
 }
 
-// ── Cashflow ─────────────────────────────────────────────────────────────
-
-export function CashflowPanel({
-  data,
-  loading,
-}: {
-  data: FinancieroDashboardResponse | null;
-  loading: boolean;
-}) {
-  const cf = data?.cashflow;
-  if (loading || !cf) return <EmptyState text="Cargando…" />;
-
-  const { promedioDiasCobro, promedioDiasPago, alerta } = cf.diferenciaTiming;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-xs text-vialto-steel">
-        Proyección simple de cobros a clientes según vencimiento de factura. Los pagos a
-        transportistas no tienen fecha de vencimiento registrada en el sistema, por lo que se
-        muestra el total pendiente sin distribuir por fecha.
-      </p>
-
-      <div className="overflow-x-auto bg-white border border-black/10 p-4">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-black/10">
-              <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                Ventana
-              </th>
-              <th className="pb-2 text-right font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-                A cobrar
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {cf.aCobrarProyeccion.map((b) => (
-              <tr key={b.bucket} className="border-b border-black/5 last:border-0">
-                <td className="py-2 text-vialto-charcoal">{b.bucket}</td>
-                <td className="py-2 text-right text-vialto-charcoal">
-                  <MoneyDual money={b.monto} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex min-h-[90px] flex-col justify-between bg-vialto-graphite p-5">
-        <span className="font-[family-name:var(--font-ui)] text-xs uppercase tracking-[0.15em] text-white/80 lg:text-sm">
-          A pagar a transportistas (pendiente total)
-        </span>
-        <div className="text-right text-rose-400">
-          <MoneyDual money={cf.aPagarPendienteTotal} />
-        </div>
-      </div>
-
-      <div className={`p-4 ${alerta ? "border-2 border-amber-500/70 bg-amber-50" : "bg-white border border-black/10"}`}>
-        <p className="mb-1 font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-[0.2em] text-vialto-steel">
-          Timing de cobro vs. pago
-        </p>
-        <p className="text-sm text-vialto-charcoal">
-          Promedio de días entre emisión de factura y cobro:{" "}
-          <span className="font-semibold">{promedioDiasCobro ?? "—"}</span>. Promedio de días entre
-          finalización del viaje y pago al transportista:{" "}
-          <span className="font-semibold">{promedioDiasPago ?? "—"}</span>.
-        </p>
-        {alerta && (
-          <p className="mt-2 text-sm font-medium text-amber-800">
-            Se le está pagando al transportista antes de cobrarle al cliente: revisá el capital de
-            trabajo necesario para sostener ese desfasaje.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}

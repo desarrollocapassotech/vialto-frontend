@@ -39,7 +39,14 @@ export type OwnerDashboardResponse = {
       cantidad: number;
       montoTotal: number;
       montosPorMoneda?: { ARS: number; USD: number };
-      items?: Array<{ id: string; numero: string }>;
+      items?: Array<{
+        id: string;
+        numero: string;
+        clienteNombre?: string;
+        fecha?: string | null;
+        origen?: string | null;
+        destino?: string | null;
+      }>;
     };
     /** Cargas de combustible marcadas `sospechoso` (snapshot actual, no filtrado por período). */
     cargasSospechosas?: {

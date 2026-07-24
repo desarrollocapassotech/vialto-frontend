@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Banknote, Receipt } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -43,22 +44,38 @@ export function ViajeViewModal({
   onClose,
   onEditar,
   tenantId,
+  editando = false,
+  onFacturar,
+  facturando = false,
+  onLiquidar,
+  liquidando = false,
 }: {
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
+  /** El editor se está preparando (fetch de listas maestras, etc.): bloquea el modal hasta que esté listo. */
+  editando?: boolean;
+  /** Si se pasa, muestra un botón "Facturar" junto a "Editar" (hoy solo desde el dashboard). */
+  onFacturar?: () => void;
+  /** El creador de factura se está preparando: bloquea el modal hasta que esté listo. */
+  facturando?: boolean;
+  /** Si se pasa, muestra un botón "Liquidar" (registrar pago al transportista, hoy solo desde el dashboard). */
+  onLiquidar?: () => void;
+  /** El registro de pago se está preparando: bloquea el modal hasta que esté listo. */
+  liquidando?: boolean;
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
+  const bloqueado = editando || facturando || liquidando;
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !bloqueado) onClose();
     }
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, bloqueado]);
 
   const clienteNombre = viaje.cliente?.nombre ?? viaje.clienteId;
   const transportistaNombre =
@@ -142,20 +159,73 @@ export function ViajeViewModal({
           </span>
         </span>
       }
-      onClose={onClose}
+      onClose={bloqueado ? () => {} : onClose}
       maxWidthClass="sm:max-w-2xl"
       scrollBody
       footer={
         <>
-          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={bloqueado}
+            className={`${viewModalBtnGhost} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
             Cerrar
           </button>
+          {onFacturar && (
+            <button
+              type="button"
+              onClick={onFacturar}
+              disabled={bloqueado}
+              className={`${viewModalBtnGhost} disabled:cursor-wait disabled:opacity-50`}
+            >
+              {facturando ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Abriendo…
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Receipt className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  Facturar
+                </span>
+              )}
+            </button>
+          )}
+          {onLiquidar && (
+            <button
+              type="button"
+              onClick={onLiquidar}
+              disabled={bloqueado}
+              className={`${viewModalBtnGhost} disabled:cursor-wait disabled:opacity-50`}
+            >
+              {liquidando ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Abriendo…
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Banknote className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  Liquidar
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={onEditar}
-            className={viewModalBtnPrimary}
+            disabled={bloqueado}
+            className={`${viewModalBtnPrimary} disabled:cursor-wait`}
           >
-            Editar
+            {editando ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Abriendo…
+              </span>
+            ) : (
+              "Editar"
+            )}
           </button>
         </>
       }

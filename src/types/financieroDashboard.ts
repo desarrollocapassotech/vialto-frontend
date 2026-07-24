@@ -108,13 +108,4 @@ export type FinancieroDashboardResponse = {
       pendienteCobro: FinancieroMoney;
     };
   };
-  cashflow?: {
-    aCobrarProyeccion: Array<{ bucket: string; monto: FinancieroMoney }>;
-    aPagarPendienteTotal: FinancieroMoney;
-    diferenciaTiming: {
-      promedioDiasCobro: number | null;
-      promedioDiasPago: number | null;
-      alerta: boolean;
-    };
-  };
 };

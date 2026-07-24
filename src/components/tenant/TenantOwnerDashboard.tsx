@@ -15,6 +15,7 @@ import { modalOverlayClass } from '@/lib/modalLayers';
 import { SelectorOpcionesSheet, selectorTriggerClass } from '@/components/ui/SelectorOpcionesSheet';
 import { CombustibleDashboardSection } from '@/components/combustible/CombustibleDashboardSection';
 import { FinancieroDashboardSection } from '@/components/financiero/FinancieroDashboardSection';
+import { soloCiudadDesdeEtiquetaUbicacion } from '@/lib/ciudades/soloCiudadDesdeEtiqueta';
 
 function formatMoney(n: number) {
   return `$ ${n.toLocaleString('es-AR', {
@@ -30,6 +31,15 @@ function formatMoneyUSD(n: number) {
   })}`;
 }
 
+function fmtFechaCorta(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(iso));
+}
 
 function MetricCard({
   title,
@@ -323,6 +333,78 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
     );
   }
 
+  function renderViajesSinFacturaActions() {
+    const linkClass =
+      'flex w-full flex-col gap-0.5 rounded border border-amber-400/40 bg-amber-950/30 px-2 py-1.5 text-left hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors disabled:cursor-wait disabled:opacity-60';
+    const spinnerClass =
+      'inline-block h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent';
+
+    if (itemsViajesSinFactura.length === 0) {
+      return (
+        <div className="mt-3 flex flex-col gap-2">
+          <Link
+            to="/viajes"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded border border-amber-400/40 bg-amber-950/30 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-amber-100 hover:bg-amber-900/40 hover:border-amber-300/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
+            onClick={closePanel}
+          >
+            Ir a viajes →
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-3 flex flex-col gap-1.5">
+        {itemsViajesSinFactura.map((it) => {
+          const fecha = fmtFechaCorta(it.fecha);
+          const ruta =
+            it.origen || it.destino
+              ? `${soloCiudadDesdeEtiquetaUbicacion(it.origen)} → ${soloCiudadDesdeEtiquetaUbicacion(it.destino)}`
+              : null;
+          const cargando = loadingViajeId === it.id;
+          const contenido = (
+            <>
+              <span className="flex items-center justify-between gap-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.1em] text-amber-100">
+                <span className="truncate">
+                  {fecha ?? '—'} · {it.clienteNombre ?? 'Cliente'}
+                </span>
+                {!cargando && <span className="shrink-0">→</span>}
+              </span>
+              {cargando ? (
+                <span className="flex items-center gap-1.5 text-[10px] text-amber-200/70">
+                  <span className={spinnerClass} />
+                  Cargando…
+                </span>
+              ) : (
+                ruta && <span className="truncate text-[10px] text-amber-200/70">{ruta}</span>
+              )}
+            </>
+          );
+          return onViewViaje ? (
+            <button
+              key={it.id}
+              type="button"
+              disabled={cargando}
+              onClick={() => onViewViaje(it.id)}
+              className={linkClass}
+            >
+              {contenido}
+            </button>
+          ) : (
+            <Link
+              key={it.id}
+              to={`/viajes?viaje=${encodeURIComponent(it.id)}`}
+              className={linkClass}
+              onClick={closePanel}
+            >
+              {contenido}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderAlertList() {
     return (
       <div className="flex flex-col gap-3">
@@ -342,14 +424,18 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
                 </span>
               </p>
               <div className="mt-1 space-y-0.5 text-xs text-rose-100/90">
-                <p>
-                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">ARS</span>
-                  {vencMon.ARS === 0 ? '—' : formatMoney(vencMon.ARS)}
-                </p>
-                <p>
-                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">USD</span>
-                  {vencMon.USD === 0 ? '—' : formatMoneyUSD(vencMon.USD)}
-                </p>
+                {vencMon.ARS !== 0 && (
+                  <p>
+                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">ARS</span>
+                    {formatMoney(vencMon.ARS)}
+                  </p>
+                )}
+                {vencMon.USD !== 0 && (
+                  <p>
+                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-rose-200/70">USD</span>
+                    {formatMoneyUSD(vencMon.USD)}
+                  </p>
+                )}
               </div>
               {renderAlertActions(
                 'rose',
@@ -380,24 +466,20 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
                 </span>
               </p>
               <div className="mt-1 space-y-0.5 text-xs text-amber-100/90">
-                <p>
-                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">ARS</span>
-                  {sinFacturaMon.ARS === 0 ? '—' : formatMoney(sinFacturaMon.ARS)}
-                </p>
-                <p>
-                  <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">USD</span>
-                  {sinFacturaMon.USD === 0 ? '—' : formatMoneyUSD(sinFacturaMon.USD)}
-                </p>
+                {sinFacturaMon.ARS !== 0 && (
+                  <p>
+                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">ARS</span>
+                    {formatMoney(sinFacturaMon.ARS)}
+                  </p>
+                )}
+                {sinFacturaMon.USD !== 0 && (
+                  <p>
+                    <span className="mr-1.5 text-[10px] uppercase tracking-wider text-amber-200/70">USD</span>
+                    {formatMoneyUSD(sinFacturaMon.USD)}
+                  </p>
+                )}
               </div>
-              {renderAlertActions(
-                'amber',
-                itemsViajesSinFactura,
-                '/viajes',
-                'Ir a viajes →',
-                'Viaje',
-                onViewViaje,
-                loadingViajeId,
-              )}
+              {renderViajesSinFacturaActions()}
             </div>
           </div>
         )}
@@ -949,6 +1031,12 @@ export function TenantOwnerDashboard({ modules, dash, onViewViaje, loadingViajeI
           >
             Stock
           </h2>
+          {dash.loading && (
+            <p className="mb-2 flex items-center gap-1.5 text-xs text-vialto-steel">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-vialto-steel border-t-transparent" />
+              Actualizando…
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <MetricCard
               title="Productos en catálogo"

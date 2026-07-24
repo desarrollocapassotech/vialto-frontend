@@ -8,6 +8,7 @@ import {
   emptyFacturaDraft,
   FacturaCreateModal,
   FacturaEditModal,
+  facturaPayloadFromDraft,
   facturaToEditDraft,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
@@ -57,29 +58,6 @@ type FacturasPaginatedResponse = {
   items: Factura[];
   meta: PaginatedMeta;
 };
-
-function facturaPayloadFromDraft(
-  draft: FacturaDraft,
-  comprobanteUrl?: string | null,
-) {
-  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
-  const base: Record<string, unknown> = {
-    numero: draft.numero.trim(),
-    tipo: "cliente",
-    viajeIds: draft.viajeIds,
-    fechaEmision: draft.fechaEmision,
-    fechaVencimiento: draft.fechaVencimiento || undefined,
-    ivaPct: ivaN,
-  };
-  if (comprobanteUrl !== undefined) {
-    base.comprobanteUrl = comprobanteUrl ?? "";
-  }
-  return {
-    ...base,
-    clienteId: draft.clienteId || undefined,
-    transportistaId: undefined,
-  };
-}
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: "PENDIENTE",
