@@ -90,7 +90,7 @@ export function LiquidacionViewModal({
 
   const transportistaNombre =
     liq.transportista?.nombre ?? liq.transportistaId;
-  const ivaBase = liq.bruto - liq.comision - liq.gastosAdmin;
+  const ivaBase = liq.bruto - liq.comision;
   const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
 
   return (
@@ -156,9 +156,6 @@ export function LiquidacionViewModal({
             label={`Comisión (${liq.comisionPct}%)`}
             value={fmtMoney(liq.comision)}
           />
-          {liq.gastosAdmin > 0 && (
-            <Campo label="Gastos admin." value={fmtMoney(liq.gastosAdmin)} />
-          )}
           <Campo label="Neto gravado" value={fmtMoney(ivaBase)} />
           <Campo label={ivaLabel} value={fmtMoney(liq.gastosAdminIva)} />
           <Campo label="Total neto a liquidar" value={fmtMoney(liq.liquido)} />

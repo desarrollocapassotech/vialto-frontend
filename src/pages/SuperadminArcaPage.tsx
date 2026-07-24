@@ -546,7 +546,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       </div>
 
-      {/* Gastos administrativos */}
+      {/* IVA sobre neto (campo legacy: ivaGastosAdmin) */}
       <div className="flex flex-col gap-1.5">
         <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
         <TextInput
