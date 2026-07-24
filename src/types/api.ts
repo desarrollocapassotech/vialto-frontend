@@ -2,7 +2,7 @@
 
 export interface PagoTransportista {
   monto: number;
-  moneda: 'ARS' | 'USD';
+  moneda: "ARS" | "USD";
   fecha: string;
   observaciones?: string;
   metodo?: string;
@@ -13,7 +13,7 @@ export interface PagoTransportista {
 export interface OtroGasto {
   descripcion: string;
   monto: number;
-  moneda: 'ARS' | 'USD';
+  moneda: "ARS" | "USD";
   fecha?: string;
   createdBy?: string;
   /** Nombre o correo resuelto vía Clerk (solo en detalle). */
@@ -38,13 +38,16 @@ export interface Viaje {
   transportistaEfectivo?: { id: string; nombre: string } | null;
   choferId: string | null;
   /** Presente en listados/detalle cuando el backend incluye la relación. */
-  chofer?: Pick<Chofer, 'id' | 'nombre' | 'dni' | 'cuit' | 'telefono' | 'transportistaId'> | null;
+  chofer?: Pick<
+    Chofer,
+    "id" | "nombre" | "dni" | "cuit" | "telefono" | "transportistaId"
+  > | null;
   /** Vehículos asociados al viaje (orden = orden operativo). */
   vehiculosViaje?: Array<{
     id: string;
     vehiculoId: string;
     orden: number;
-    vehiculo: Pick<Vehiculo, 'id' | 'patente' | 'tipo'>;
+    vehiculo: Pick<Vehiculo, "id" | "patente" | "tipo">;
   }>;
   origen: string | null;
   /** Denormalizado: último destino de la ruta (legacy / compat). */
@@ -91,7 +94,14 @@ export interface Viaje {
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
   factura?: { id: string; numero: string } | null;
-  liquidacionesViaje?: { liquidacionId: string }[];
+  liquidacionesViaje?: {
+    liquidacionId: string;
+    monto?: number;
+    liquidacion?: {
+      liquido: number;
+      estado: string;
+    };
+  }[];
   createdAt: string;
   createdBy: string;
 }
@@ -259,7 +269,7 @@ export interface Factura {
   id: string;
   tenantId: string;
   numero: string;
-  tipo: 'cliente' | 'transportista_externo';
+  tipo: "cliente" | "transportista_externo";
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
@@ -267,7 +277,7 @@ export interface Factura {
   moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;
-  estado: 'pendiente' | 'cobrada' | 'vencida';
+  estado: "pendiente" | "cobrada" | "vencida";
   diferencia: number | null;
   ivaPct: number | null;
   comprobanteUrl: string | null;
@@ -283,7 +293,7 @@ export interface ImportRowError {
 
 export interface ImportCiudadAdvertencia {
   fila: number;
-  campo: 'origen' | 'destino';
+  campo: "origen" | "destino";
   valor: string;
   mensaje: string;
 }
@@ -310,7 +320,7 @@ export interface ImportPreviewViaje {
 }
 
 export interface ImportPreviewFactura {
-  tipo: 'cliente' | 'transportista_externo';
+  tipo: "cliente" | "transportista_externo";
   numero: string;
   nombre: string | null;
   importe: number;
@@ -342,7 +352,7 @@ export interface ImportPreviewResult {
 
 export interface ImportLogDetalle {
   fila: number;
-  estado: 'ok' | 'error';
+  estado: "ok" | "error";
   id?: string;
   mensaje?: string;
 }
@@ -352,7 +362,7 @@ export interface ImportLog {
   tenantId: string;
   modulo: string;
   nombreArchivo: string;
-  estado: 'completado' | 'con_errores' | 'fallido';
+  estado: "completado" | "con_errores" | "fallido";
   totalFilas: number;
   exitosas: number;
   errores: number;
@@ -414,14 +424,19 @@ export interface MovimientoStock {
   tenantId: string;
   operacionId?: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  producto?: {
+    id: string;
+    nombre: string;
+    unidad1Nombre: string;
+    unidad2Nombre: string | null;
+  };
   presentacionId?: string | null;
   presentacion?: ProductoPresentacion | null;
   clienteId: string;
   cliente?: { id: string; nombre: string };
   depositoId: string;
   deposito?: { id: string; nombre: string };
-  tipo: 'ingreso' | 'egreso' | 'division';
+  tipo: "ingreso" | "egreso" | "division";
   cantidad1: number;
   cantidad2: number;
   numeroRemito?: string | null;
@@ -461,7 +476,7 @@ export interface ArcaConfig {
   logoUrl: string | null;
   ptoVentaCvlp: number;
   ptoVentaFactura: number;
-  ambiente: 'homologacion' | 'produccion';
+  ambiente: "homologacion" | "produccion";
   comisionPctDefault: number;
   comisionPctAlt: number;
   ivaGastosAdmin: number;
@@ -470,9 +485,14 @@ export interface ArcaConfig {
   keyConfigurado: boolean;
 }
 
-export type LiquidacionEstado = 'borrador' | 'pendiente_cae' | 'autorizado' | 'error' | 'anulado';
+export type LiquidacionEstado =
+  | "borrador"
+  | "pendiente_cae"
+  | "autorizado"
+  | "error"
+  | "anulado";
 
-export type ConceptoLiquidacionSigno = 'favor' | 'contra';
+export type ConceptoLiquidacionSigno = "favor" | "contra";
 
 export interface ConceptoLiquidacion {
   id: string;
@@ -541,7 +561,12 @@ export interface StockItem {
   id: string;
   tenantId: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidad1Nombre: string; unidad2Nombre: string | null };
+  producto?: {
+    id: string;
+    nombre: string;
+    unidad1Nombre: string;
+    unidad2Nombre: string | null;
+  };
   presentacionId: string;
   presentacion?: ProductoPresentacion;
   clienteId: string;
@@ -556,7 +581,12 @@ export interface StockItem {
 export interface StockOperacionLinea {
   id: string;
   productoId: string;
-  producto?: { id: string; nombre: string; unidad1Nombre?: string; unidad2Nombre?: string | null };
+  producto?: {
+    id: string;
+    nombre: string;
+    unidad1Nombre?: string;
+    unidad2Nombre?: string | null;
+  };
   presentacionId?: string | null;
   presentacion?: ProductoPresentacion | null;
   bultos: number;
@@ -569,7 +599,7 @@ export interface StockOperacionLinea {
 export interface StockOperacion {
   id: string;
   tenantId: string;
-  tipo: 'ingreso' | 'egreso' | 'division';
+  tipo: "ingreso" | "egreso" | "division";
   fecha: string;
   clienteId: string;
   cliente?: { id: string; nombre: string };
@@ -579,7 +609,7 @@ export interface StockOperacion {
   remitoUrl?: string | null;
   numeroRemito?: string | null;
   /** Número de remito del proveedor, informado manualmente al registrar un ingreso. */
-  numeroRemitoProveedor?: string | null; 
+  numeroRemitoProveedor?: string | null;
   entregadoPor?: string | null;
   destinatario?: string | null;
   destinoFinal?: string | null;

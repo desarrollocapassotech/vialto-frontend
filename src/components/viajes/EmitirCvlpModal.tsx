@@ -41,12 +41,6 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function sumGastosAdminArs(viaje: Viaje): number {
-  return (viaje.otrosGastos ?? [])
-    .filter((g) => (g.moneda ?? 'ARS') === 'ARS')
-    .reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
-}
-
 export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -115,7 +109,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   }, [getToken, viaje.transportistaId, viaje.clienteId]);
 
   const transportistaNombre = viaje.transportista?.nombre ?? viaje.transportistaId ?? '—';
-  const gastosAdminArs = useMemo(() => sumGastosAdminArs(viaje), [viaje]);
   const periodoInvalido =
     Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
   const periodoCompleto =
@@ -484,21 +477,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
 
               <section className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-                  Gastos administrativos
-                </p>
-                {gastosAdminArs > 0 ? (
-                  <p className="text-sm tabular-nums text-vialto-charcoal">
-                    {fmtMoney(gastosAdminArs)}
-                  </p>
-                ) : (
-                  <p className="text-sm text-vialto-steel">
-                    No hay gastos administrativos.
-                  </p>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                   Comisión por flete
                 </p>
                 <div className="flex items-center gap-2">
@@ -613,9 +591,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                {liquidacion.gastosAdmin > 0 && (
-                  <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
-                )}
                 <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>
@@ -682,9 +657,6 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                {liquidacion.gastosAdmin > 0 && (
-                  <Row label="Gastos admin" value={fmtMoney(liquidacion.gastosAdmin)} />
-                )}
                 <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>

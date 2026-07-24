@@ -157,6 +157,7 @@ export function EmitirLiquidacionModal({
   }, [liq.id, getToken, detalleUrl, configUrl, arcaConfigProp, liq]);
 
   const source = detail ?? liq;
+  const conceptosLineas = source.conceptosLineas ?? [];
   const missingEmitFields = useMemo(
     () =>
       collectCvlpEmitMissingFields({
@@ -168,7 +169,7 @@ export function EmitirLiquidacionModal({
         },
         cliente: source.viajes?.[0]?.viaje?.cliente ?? null,
       }),
-    [arcaConfig, detail, liq],
+    [arcaConfig, source],
   );
   const missingEmitMessage = formatCvlpEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
@@ -200,7 +201,10 @@ export function EmitirLiquidacionModal({
     }
   }
 
-  const cbteTipoLabel = CBTE_TIPO[liq.cbteTipo] ?? `Tipo ${liq.cbteTipo}`;
+  const cbteTipoLabel = CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`;
+  /** Neto implícito del total persistido (incluye efecto de conceptos). */
+  const netoGravado =
+    Math.round((source.liquido - source.gastosAdminIva) * 100) / 100;
 
   return (
     <div
@@ -259,37 +263,51 @@ export function EmitirLiquidacionModal({
             <div className="rounded border border-black/10 bg-white px-4 py-1">
               <Fila
                 label="Período"
-                value={`${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`}
+                value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
                 muted
               />
-              <Fila label="Viajes" value={liq.cantViajes} muted />
-              <Fila label="Sub total" value={fmtMoney(liq.bruto)} />
+              <Fila label="Viajes" value={source.cantViajes} muted />
+              <Fila label="Sub total" value={fmtMoney(source.bruto)} />
               <Fila
-                label={`Comisión según convenio ${liq.comisionPct}%`}
-                value={fmtMoney(liq.comision)}
+                label={`Comisión según convenio ${source.comisionPct}%`}
+                value={fmtMoney(source.comision)}
                 muted
               />
-              {liq.gastosAdmin > 0 && (
-                <Fila label="Otras" value={fmtMoney(liq.gastosAdmin)} muted />
+              {(source.gastosAdmin ?? 0) > 0 && (
+                <Fila
+                  label="Otras"
+                  value={fmtMoney(source.gastosAdmin)}
+                  muted
+                />
               )}
+              {conceptosLineas.map((l) => {
+                const signed = l.signo === "favor" ? l.monto : -l.monto;
+                return (
+                  <Fila
+                    key={l.id}
+                    label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
+                    value={`${signed >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(signed))}`}
+                    muted
+                  />
+                );
+              })}
               {(() => {
-                const ivaBase = liq.bruto - liq.comision;
                 const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
                 return (
                   <>
                     <Fila
-                      label="Sub total"
-                      value={fmtMoney(ivaBase)}
+                      label="Neto gravado"
+                      value={fmtMoney(netoGravado)}
                       separator
                     />
                     <Fila
                       label={ivaLabel}
-                      value={fmtMoney(liq.gastosAdminIva)}
+                      value={fmtMoney(source.gastosAdminIva)}
                       muted
                     />
                     <Fila
                       label="Total neto a liquidar"
-                      value={fmtMoney(liq.liquido)}
+                      value={fmtMoney(source.liquido)}
                       bold
                       separator
                     />

@@ -144,6 +144,10 @@ export function LiquidacionEditModal({
       return;
     }
     setFieldErrors({});
+    if (canEditDatos && lineasLoading) {
+      setError("Esperá a que terminen de cargar los conceptos.");
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -212,7 +216,7 @@ export function LiquidacionEditModal({
           <button
             type="submit"
             form="liquidacion-edit-form"
-            disabled={saving}
+            disabled={saving || lineasLoading}
             className={viewModalBtnPrimary}
           >
             {saving ? (
@@ -220,6 +224,8 @@ export function LiquidacionEditModal({
                 <Spinner className="h-3.5 w-3.5" />
                 Guardando…
               </span>
+            ) : lineasLoading ? (
+              "Cargando…"
             ) : (
               "Guardar cambios"
             )}

@@ -448,7 +448,6 @@ export function LiquidacionesPanel({
   const cantLiquidacionesTotal = liq.rankingPorLiquidado.reduce((s, t) => s + t.cantLiquidaciones, 0);
   const brutoTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.bruto, 0);
   const comisionTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.comision, 0);
-  const gastosAdminTotal = liq.cvlpPorPeriodo.reduce((s, p) => s + p.gastosAdmin, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -486,10 +485,9 @@ export function LiquidacionesPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
         <StatTile label="Bruto (CVLP)" value={fmtMoney(brutoTotal)} />
         <StatTile label="Comisión" value={fmtMoney(comisionTotal)} />
-        <StatTile label="Gastos admin." value={fmtMoney(gastosAdminTotal)} />
         <StatTile label="Líquido total" value={fmtMoney(liquidoTotal)} />
       </div>
     </div>
