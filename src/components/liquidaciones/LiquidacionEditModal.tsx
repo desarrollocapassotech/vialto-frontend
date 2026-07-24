@@ -43,6 +43,7 @@ export function LiquidacionEditModal({
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (updated: LiquidacionConTransportista) => void;
+  tenantId?: string;
 }) {
   const { showToast } = useToast();
   const canEditDatos =
@@ -51,19 +52,24 @@ export function LiquidacionEditModal({
     liq.estado === "pendiente_cae";
   const showComprobante = !hasArca;
 
-  const [periodoDesde, setPeriodoDesde] = useState(toDateInput(liq.periodoDesde));
-  const [periodoHasta, setPeriodoHasta] = useState(toDateInput(liq.periodoHasta));
+  const [periodoDesde, setPeriodoDesde] = useState(
+    toDateInput(liq.periodoDesde),
+  );
+  const [periodoHasta, setPeriodoHasta] = useState(
+    toDateInput(liq.periodoHasta),
+  );
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
-  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(() =>
-    (liq.conceptosLineas ?? [])
-      .filter((l) => l.conceptoLiquidacionId)
-      .map((l) => ({
-        conceptoLiquidacionId: l.conceptoLiquidacionId as string,
-        monto: l.monto,
-        nombre: l.nombreSnapshot,
-        signo: l.signo,
-        ivaPct: l.ivaPct,
-      })),
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
+    () =>
+      (liq.conceptosLineas ?? [])
+        .filter((l) => l.conceptoLiquidacionId)
+        .map((l) => ({
+          conceptoLiquidacionId: l.conceptoLiquidacionId as string,
+          monto: l.monto,
+          nombre: l.nombreSnapshot,
+          signo: l.signo,
+          ivaPct: l.ivaPct,
+        })),
   );
   const [lineasLoading, setLineasLoading] = useState(canEditDatos);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
@@ -125,7 +131,8 @@ export function LiquidacionEditModal({
       if (!periodoDesde) errs.periodoDesde = "Ingresá la fecha desde.";
       if (!periodoHasta) errs.periodoHasta = "Ingresá la fecha hasta.";
       if (periodoDesde && periodoHasta && periodoHasta < periodoDesde) {
-        errs.periodoHasta = "La fecha hasta debe ser posterior o igual a desde.";
+        errs.periodoHasta =
+          "La fecha hasta debe ser posterior o igual a desde.";
       }
       const pct = Number(comisionPct);
       if (comisionPct.trim() !== "" && (isNaN(pct) || pct < 0 || pct > 100)) {
@@ -184,8 +191,7 @@ export function LiquidacionEditModal({
     }
   }
 
-  const transportistaNombre =
-    liq.transportista?.nombre ?? liq.transportistaId;
+  const transportistaNombre = liq.transportista?.nombre ?? liq.transportistaId;
 
   return (
     <ViewModalShell
