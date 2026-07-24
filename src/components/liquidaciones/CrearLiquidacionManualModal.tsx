@@ -1,55 +1,62 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
   type ConceptoLineaDraft,
-} from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
-import { ComprobanteAdjuntoField } from '@/components/shared/ComprobanteAdjuntoField';
-import { Spinner } from '@/components/ui/Spinner';
-import { apiJson } from '@/lib/api';
-import { uploadComprobante } from '@/lib/comprobanteUpload';
+} from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
+import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { Spinner } from "@/components/ui/Spinner";
+import { apiJson } from "@/lib/api";
+import { uploadComprobante } from "@/lib/comprobanteUpload";
 import {
   normalizeViajeMoneda,
   type ViajeMonedaCodigo,
-} from '@/lib/currencyMask';
-import { friendlyError } from '@/lib/friendlyError';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
-import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
-import type { Liquidacion, Transportista, Viaje, ArcaConfig } from '@/types/api';
+} from "@/lib/currencyMask";
+import { friendlyError } from "@/lib/friendlyError";
+import { formatViajeImporteForListado } from "@/lib/viajesFlota";
+import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import type {
+  Liquidacion,
+  Transportista,
+  Viaje,
+  ArcaConfig,
+} from "@/types/api";
 
 type ViajeItem = Pick<
   Viaje,
-  | 'id'
-  | 'numero'
-  | 'fechaCarga'
-  | 'origen'
-  | 'destino'
-  | 'precioTransportistaExterno'
-  | 'monedaPrecioTransportistaExterno'
-  | 'liquidacionesViaje'
-  | 'otrosGastos'
+  | "id"
+  | "numero"
+  | "fechaCarga"
+  | "origen"
+  | "destino"
+  | "precioTransportistaExterno"
+  | "monedaPrecioTransportistaExterno"
+  | "liquidacionesViaje"
+  | "otrosGastos"
 >;
 
 function fmtDate(iso: string | null) {
-  if (!iso) return '—';
-  const [y, m, d] = iso.slice(0, 10).split('-');
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 }
 
 function fmtMoney(n: number | null, moneda?: string | null) {
-  if (n == null) return '—';
+  if (n == null) return "—";
   return formatViajeImporteForListado(n, moneda);
 }
 
-function monedaViaje(v: Pick<ViajeItem, 'monedaPrecioTransportistaExterno'>): ViajeMonedaCodigo {
+function monedaViaje(
+  v: Pick<ViajeItem, "monedaPrecioTransportistaExterno">,
+): ViajeMonedaCodigo {
   return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
 }
 
 const inputClass =
-  'h-9 w-full rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35';
+  "h-9 w-full rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35";
 const selectClass = inputClass;
 const labelClass =
-  'block font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel mb-1';
+  "block font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel mb-1";
 
 interface Props {
   /** Si se provee, la liquidación es para este viaje específico (transportista y viaje bloqueados). */
@@ -59,6 +66,7 @@ interface Props {
   getToken: () => Promise<string | null>;
   onSuccess: (liq: Liquidacion) => void;
   onClose: () => void;
+  tenantId?: string;
 }
 
 export function CrearLiquidacionManualModal({
@@ -72,12 +80,16 @@ export function CrearLiquidacionManualModal({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // — Campos del formulario —
-  const [transportistaId, setTransportistaId] = useState(viajeInicial?.transportistaId ?? '');
-  const [periodoDesde, setPeriodoDesde] = useState('');
-  const [periodoHasta, setPeriodoHasta] = useState('');
-  const [comisionPct, setComisionPct] = useState('');
-  const [ivaPct, setIvaPct] = useState('21');
-  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
+  const [transportistaId, setTransportistaId] = useState(
+    viajeInicial?.transportistaId ?? "",
+  );
+  const [periodoDesde, setPeriodoDesde] = useState("");
+  const [periodoHasta, setPeriodoHasta] = useState("");
+  const [comisionPct, setComisionPct] = useState("");
+  const [ivaPct, setIvaPct] = useState("21");
+  const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
+    [],
+  );
 
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
@@ -123,15 +135,17 @@ export function CrearLiquidacionManualModal({
         if (!cancelled) setViajesLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [transportistaId, viajeInicial, getToken]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !submitting) onClose();
+      if (e.key === "Escape" && !submitting) onClose();
     }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [submitting, onClose]);
 
   const selectedViajes = useMemo(() => {
@@ -168,9 +182,11 @@ export function CrearLiquidacionManualModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!periodoDesde || !periodoHasta) return;
-    const viajeIds = viajeInicial ? [viajeInicial.id] : Array.from(selectedViajeIds);
+    const viajeIds = viajeInicial
+      ? [viajeInicial.id]
+      : Array.from(selectedViajeIds);
     if (viajeIds.length === 0) {
-      setError('Seleccioná al menos un viaje.');
+      setError("Seleccioná al menos un viaje.");
       return;
     }
     if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
@@ -182,7 +198,9 @@ export function CrearLiquidacionManualModal({
     if (!viajeInicial && selectedViajes.length > 0) {
       const monedas = new Set(selectedViajes.map((v) => monedaViaje(v)));
       if (monedas.size > 1) {
-        setError('Una liquidación no puede mezclar viajes en distintas monedas.');
+        setError(
+          "Una liquidación no puede mezclar viajes en distintas monedas.",
+        );
         return;
       }
     }
@@ -194,7 +212,7 @@ export function CrearLiquidacionManualModal({
         comprobanteUrl = await uploadComprobante(
           () => getToken(),
           comprobanteFile,
-          'facturacion',
+          "facturacion",
         );
       }
       const body: Record<string, unknown> = {
@@ -203,19 +221,19 @@ export function CrearLiquidacionManualModal({
         periodoHasta,
         viajeIds,
       };
-      if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
-      if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
+      if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
+      if (ivaPct.trim() !== "") body.ivaPct = Number(ivaPct);
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
       const liq = await apiJson<Liquidacion>(
-        '/api/integracion-arca/liquidaciones',
+        "/api/integracion-arca/liquidaciones",
         () => getToken(),
-        { method: 'POST', body: JSON.stringify(body) },
+        { method: "POST", body: JSON.stringify(body) },
       );
       onSuccess(liq);
     } catch (err) {
-      setError(friendlyError(err, 'liquidaciones'));
+      setError(friendlyError(err, "liquidaciones"));
     } finally {
       setSubmitting(false);
     }
@@ -228,18 +246,30 @@ export function CrearLiquidacionManualModal({
 
   // — Resumen de montos —
   const monedaResumen =
-    monedaSeleccionada ??
-    (viajeInicial ? monedaViaje(viajeInicial) : 'ARS');
-  const anyHasPrice = selectedViajes.some((v) => v.precioTransportistaExterno != null);
-  const bruto = selectedViajes.reduce((sum, v) => sum + (v.precioTransportistaExterno ?? 0), 0);
-  const comisionNum = comisionPct.trim() !== '' ? Number(comisionPct) : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ?? config?.comisionPctDefault ?? 0);
+    monedaSeleccionada ?? (viajeInicial ? monedaViaje(viajeInicial) : "ARS");
+  const anyHasPrice = selectedViajes.some(
+    (v) => v.precioTransportistaExterno != null,
+  );
+  const bruto = selectedViajes.reduce(
+    (sum, v) => sum + (v.precioTransportistaExterno ?? 0),
+    0,
+  );
+  const comisionNum =
+    comisionPct.trim() !== ""
+      ? Number(comisionPct)
+      : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
+        config?.comisionPctDefault ??
+        0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   // Neto = bruto − comisión. Los gastos del viaje van en `otrosGastos`, no en la liquidación.
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
-  const ivaPctNum = ivaPct.trim() !== '' ? Number(ivaPct) : 21;
-  const ivaMonto = netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
-  const totalALiquidar = netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
-  const showSummary = anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
+  const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 21;
+  const ivaMonto =
+    netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
+  const totalALiquidar =
+    netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
+  const showSummary =
+    anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
   const canSubmit =
     Boolean(transportistaId) &&
@@ -250,7 +280,9 @@ export function CrearLiquidacionManualModal({
   return (
     <div
       ref={overlayRef}
-      onClick={(e) => { if (e.target === overlayRef.current && !submitting) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current && !submitting) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div
@@ -264,16 +296,26 @@ export function CrearLiquidacionManualModal({
             Nueva liquidación
           </h2>
           {!submitting && (
-            <button type="button" onClick={onClose} className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none">×</button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none"
+            >
+              ×
+            </button>
           )}
         </div>
 
         {/* Body */}
-        <form onSubmit={(e) => void handleSubmit(e)} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="overflow-y-auto flex-1 px-6 py-5 space-y-5"
+        >
           {/* Transportista */}
           <div>
-            <label className={labelClass}>Transportista <span className="text-red-500">*</span></label>
+            <label className={labelClass}>
+              Transportista <span className="text-red-500">*</span>
+            </label>
             {viajeInicial ? (
               <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
                 {transportistaNombre}
@@ -287,7 +329,9 @@ export function CrearLiquidacionManualModal({
               >
                 <option value="">— Seleccioná un transportista —</option>
                 {transportistas.map((t) => (
-                  <option key={t.id} value={t.id}>{t.nombre}</option>
+                  <option key={t.id} value={t.id}>
+                    {t.nombre}
+                  </option>
                 ))}
               </select>
             )}
@@ -296,7 +340,9 @@ export function CrearLiquidacionManualModal({
           {/* Período */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="periodoDesde" className={labelClass}>Desde <span className="text-red-500">*</span></label>
+              <label htmlFor="periodoDesde" className={labelClass}>
+                Desde <span className="text-red-500">*</span>
+              </label>
               <input
                 id="periodoDesde"
                 type="date"
@@ -307,7 +353,9 @@ export function CrearLiquidacionManualModal({
               />
             </div>
             <div>
-              <label htmlFor="periodoHasta" className={labelClass}>Hasta <span className="text-red-500">*</span></label>
+              <label htmlFor="periodoHasta" className={labelClass}>
+                Hasta <span className="text-red-500">*</span>
+              </label>
               <input
                 id="periodoHasta"
                 type="date"
@@ -323,7 +371,9 @@ export function CrearLiquidacionManualModal({
           {/* Comisión e IVA */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="comisionPct" className={labelClass}>Comisión (%)</label>
+              <label htmlFor="comisionPct" className={labelClass}>
+                Comisión (%)
+              </label>
               <input
                 id="comisionPct"
                 type="number"
@@ -337,7 +387,9 @@ export function CrearLiquidacionManualModal({
               />
             </div>
             <div>
-              <label htmlFor="ivaPct" className={labelClass}>IVA (%) <span className="text-red-500">*</span></label>
+              <label htmlFor="ivaPct" className={labelClass}>
+                IVA (%) <span className="text-red-500">*</span>
+              </label>
               <input
                 id="ivaPct"
                 type="number"
@@ -374,15 +426,18 @@ export function CrearLiquidacionManualModal({
                 </p>
                 {(viajeInicial.origen || viajeInicial.destino) && (
                   <p className="text-xs text-vialto-steel">
-                    {viajeInicial.origen ?? '—'} → {viajeInicial.destino ?? '—'}
+                    {viajeInicial.origen ?? "—"} → {viajeInicial.destino ?? "—"}
                   </p>
                 )}
                 <p className="text-xs text-vialto-charcoal">
-                  Moneda: <span className="font-medium">{monedaViaje(viajeInicial)}</span>
+                  Moneda:{" "}
+                  <span className="font-medium">
+                    {monedaViaje(viajeInicial)}
+                  </span>
                 </p>
                 {viajeInicial.precioTransportistaExterno != null && (
                   <p className="text-xs text-vialto-charcoal tabular-nums">
-                    Bruto:{' '}
+                    Bruto:{" "}
                     {fmtMoney(
                       viajeInicial.precioTransportistaExterno,
                       viajeInicial.monedaPrecioTransportistaExterno,
@@ -400,8 +455,9 @@ export function CrearLiquidacionManualModal({
                 Viajes a incluir <span className="text-red-500">*</span>
                 {selectedViajeIds.size > 0 && (
                   <span className="ml-1 normal-case text-vialto-charcoal">
-                    ({selectedViajeIds.size} seleccionado{selectedViajeIds.size !== 1 ? 's' : ''}
-                    {monedaSeleccionada ? ` · ${monedaSeleccionada}` : ''})
+                    ({selectedViajeIds.size} seleccionado
+                    {selectedViajeIds.size !== 1 ? "s" : ""}
+                    {monedaSeleccionada ? ` · ${monedaSeleccionada}` : ""})
                   </span>
                 )}
               </p>
@@ -417,7 +473,8 @@ export function CrearLiquidacionManualModal({
                 <>
                   {monedaSeleccionada && (
                     <p className="mb-1.5 text-[11px] text-vialto-steel">
-                      Solo podés incluir viajes en {monedaSeleccionada}. Los de otra moneda quedan deshabilitados.
+                      Solo podés incluir viajes en {monedaSeleccionada}. Los de
+                      otra moneda quedan deshabilitados.
                     </p>
                   )}
                   <div className="max-h-44 overflow-y-auto rounded border border-black/10 divide-y divide-black/5">
@@ -438,8 +495,8 @@ export function CrearLiquidacionManualModal({
                           }
                           className={`flex items-start gap-3 px-3 py-2.5 ${
                             disabledByMoneda
-                              ? 'cursor-not-allowed opacity-50 bg-vialto-mist/30'
-                              : 'cursor-pointer hover:bg-vialto-mist/60'
+                              ? "cursor-not-allowed opacity-50 bg-vialto-mist/30"
+                              : "cursor-pointer hover:bg-vialto-mist/60"
                           }`}
                         >
                           <input
@@ -463,7 +520,7 @@ export function CrearLiquidacionManualModal({
                             </p>
                             {(v.origen || v.destino) && (
                               <p className="text-[11px] text-vialto-steel truncate">
-                                {v.origen ?? '—'} → {v.destino ?? '—'}
+                                {v.origen ?? "—"} → {v.destino ?? "—"}
                               </p>
                             )}
                             {v.precioTransportistaExterno != null && (
@@ -489,7 +546,9 @@ export function CrearLiquidacionManualModal({
             <div className="rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 space-y-1.5">
               <div className="flex justify-between items-baseline">
                 <span className={labelClass}>Moneda</span>
-                <span className="text-sm font-medium text-vialto-charcoal">{monedaResumen}</span>
+                <span className="text-sm font-medium text-vialto-charcoal">
+                  {monedaResumen}
+                </span>
               </div>
               <div className="flex justify-between items-baseline">
                 <span className={labelClass}>Sub Total</span>
@@ -500,7 +559,9 @@ export function CrearLiquidacionManualModal({
               {anyHasPrice && comisionMonto > 0 && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>Comisión {comisionNum}%</span>
-                  <span className="tabular-nums">− {fmtMoney(comisionMonto, monedaResumen)}</span>
+                  <span className="tabular-nums">
+                    − {fmtMoney(comisionMonto, monedaResumen)}
+                  </span>
                 </div>
               )}
               {netoGravado !== null && (
@@ -514,7 +575,9 @@ export function CrearLiquidacionManualModal({
               {ivaMonto !== null && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
                   <span>IVA {ivaPctNum}%</span>
-                  <span className="tabular-nums">+ {fmtMoney(ivaMonto, monedaResumen)}</span>
+                  <span className="tabular-nums">
+                    + {fmtMoney(ivaMonto, monedaResumen)}
+                  </span>
                 </div>
               )}
               {totalALiquidar !== null && (
@@ -559,7 +622,7 @@ export function CrearLiquidacionManualModal({
             className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
           >
             {submitting && <Spinner />}
-            {submitting ? 'Creando…' : 'Crear liquidación'}
+            {submitting ? "Creando…" : "Crear liquidación"}
           </button>
         </div>
       </div>

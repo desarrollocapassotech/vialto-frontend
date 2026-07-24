@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Receipt } from 'lucide-react';
-import { apiJson } from '@/lib/api';
+import { useEffect, useMemo, useState } from "react";
+import { Receipt } from "lucide-react";
+import { apiJson } from "@/lib/api";
 import {
   collectCvlpEmitMissingFields,
   formatCvlpEmitMissingMessage,
-} from '@/lib/cvlpEmitValidation';
-import { friendlyError } from '@/lib/friendlyError';
-import { Spinner } from '@/components/ui/Spinner';
-import type { ArcaConfig, Liquidacion } from '@/types/api';
+} from "@/lib/cvlpEmitValidation";
+import { friendlyError } from "@/lib/friendlyError";
+import { Spinner } from "@/components/ui/Spinner";
+import type { ArcaConfig, Liquidacion } from "@/types/api";
 
 type LiquidacionEmitDetail = Liquidacion & {
   transportista?: {
@@ -29,19 +29,19 @@ type LiquidacionEmitDetail = Liquidacion & {
 };
 
 const CBTE_TIPO: Record<number, string> = {
-  60: 'CVLP Tipo 60 (clase A)',
-  61: 'CVLP Tipo 61 (clase B)',
-  1: 'Factura A',
-  6: 'Factura B',
+  60: "CVLP Tipo 60 (clase A)",
+  61: "CVLP Tipo 61 (clase B)",
+  1: "Factura A",
+  6: "Factura B",
 };
 
 function fmtMoney(n: number) {
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtDate(iso: string) {
-  if (!iso) return '—';
-  const [y, m, d] = iso.slice(0, 10).split('-');
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 }
 
@@ -59,9 +59,17 @@ function Fila({
   separator?: boolean;
 }) {
   return (
-    <div className={`flex items-baseline justify-between gap-4 py-1.5 ${separator ? 'border-t border-black/10 mt-1' : 'border-b border-black/5 last:border-0'}`}>
-      <span className={`text-xs ${muted ? 'text-vialto-steel' : bold ? 'font-medium text-vialto-charcoal' : 'text-vialto-charcoal'}`}>{label}</span>
-      <span className={`text-sm tabular-nums ${bold ? 'font-semibold text-vialto-charcoal' : muted ? 'text-vialto-steel' : 'text-vialto-charcoal'}`}>
+    <div
+      className={`flex items-baseline justify-between gap-4 py-1.5 ${separator ? "border-t border-black/10 mt-1" : "border-b border-black/5 last:border-0"}`}
+    >
+      <span
+        className={`text-xs ${muted ? "text-vialto-steel" : bold ? "font-medium text-vialto-charcoal" : "text-vialto-charcoal"}`}
+      >
+        {label}
+      </span>
+      <span
+        className={`text-sm tabular-nums ${bold ? "font-semibold text-vialto-charcoal" : muted ? "text-vialto-steel" : "text-vialto-charcoal"}`}
+      >
         {value}
       </span>
     </div>
@@ -93,19 +101,22 @@ export function EmitirLiquidacionModal({
   arcaConfig?: ArcaConfig | null;
   /** Porcentaje de IVA configurado (ej: 21). Si no se pasa, se deduce de los valores guardados. */
   ivaPct?: number;
+  tenantId?: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<LiquidacionEmitDetail | null>(null);
-  const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(arcaConfigProp ?? null);
+  const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(
+    arcaConfigProp ?? null,
+  );
   const [datosReady, setDatosReady] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !submitting) onClose();
+      if (e.key === "Escape" && !submitting) onClose();
     }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [submitting, onClose]);
 
   useEffect(() => {
@@ -114,7 +125,8 @@ export function EmitirLiquidacionModal({
     void (async () => {
       try {
         const det = await apiJson<LiquidacionEmitDetail>(
-          detalleUrl ?? `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+          detalleUrl ??
+            `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
           () => getToken(),
         );
         if (!cancelled) setDetail(det);
@@ -130,7 +142,7 @@ export function EmitirLiquidacionModal({
       }
       try {
         const cfg = await apiJson<ArcaConfig>(
-          configUrl ?? '/api/integracion-arca/config',
+          configUrl ?? "/api/integracion-arca/config",
           () => getToken(),
         );
         if (!cancelled) setArcaConfig(cfg);
@@ -139,7 +151,9 @@ export function EmitirLiquidacionModal({
       }
       if (!cancelled) setDatosReady(true);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [liq.id, getToken, detalleUrl, configUrl, arcaConfigProp, liq]);
 
   const source = detail ?? liq;
@@ -168,15 +182,20 @@ export function EmitirLiquidacionModal({
     setSubmitting(true);
     setError(null);
     try {
-      const url = emitirUrl ?? `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`;
+      const url =
+        emitirUrl ??
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`;
       const updated = await apiJson<LiquidacionEmitDetail>(
         url,
         () => getToken(),
-        { method: 'POST' },
+        { method: "POST" },
       );
-      onSuccess({ ...updated, transportista: source.transportista ?? liq.transportista });
+      onSuccess({
+        ...updated,
+        transportista: source.transportista ?? liq.transportista,
+      });
     } catch (e) {
-      setError(friendlyError(e, 'arca'));
+      setError(friendlyError(e, "arca"));
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +209,9 @@ export function EmitirLiquidacionModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) onClose();
+      }}
     >
       <div
         role="dialog"
@@ -220,11 +241,16 @@ export function EmitirLiquidacionModal({
             </p>
             <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
               <p className="font-medium text-vialto-charcoal">
-                {source.transportista?.nombre ?? liq.transportista?.nombre ?? liq.transportistaId}
+                {source.transportista?.nombre ??
+                  liq.transportista?.nombre ??
+                  liq.transportistaId}
               </p>
-              {(source.transportista?.idFiscal ?? liq.transportista?.idFiscal) && (
+              {(source.transportista?.idFiscal ??
+                liq.transportista?.idFiscal) && (
                 <p className="text-xs text-vialto-steel mt-0.5">
-                  CUIT {source.transportista?.idFiscal ?? liq.transportista?.idFiscal}
+                  CUIT{" "}
+                  {source.transportista?.idFiscal ??
+                    liq.transportista?.idFiscal}
                 </p>
               )}
             </div>
@@ -248,25 +274,37 @@ export function EmitirLiquidacionModal({
                 muted
               />
               {(source.gastosAdmin ?? 0) > 0 && (
-                <Fila label="Otras" value={fmtMoney(source.gastosAdmin)} muted />
+                <Fila
+                  label="Otras"
+                  value={fmtMoney(source.gastosAdmin)}
+                  muted
+                />
               )}
               {conceptosLineas.map((l) => {
-                const signed = l.signo === 'favor' ? l.monto : -l.monto;
+                const signed = l.signo === "favor" ? l.monto : -l.monto;
                 return (
                   <Fila
                     key={l.id}
-                    label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ''}`}
-                    value={`${signed >= 0 ? '+' : '−'} ${fmtMoney(Math.abs(signed))}`}
+                    label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
+                    value={`${signed >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(signed))}`}
                     muted
                   />
                 );
               })}
               {(() => {
-                const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : 'IVA';
+                const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
                 return (
                   <>
-                    <Fila label="Neto gravado" value={fmtMoney(netoGravado)} separator />
-                    <Fila label={ivaLabel} value={fmtMoney(source.gastosAdminIva)} muted />
+                    <Fila
+                      label="Neto gravado"
+                      value={fmtMoney(netoGravado)}
+                      separator
+                    />
+                    <Fila
+                      label={ivaLabel}
+                      value={fmtMoney(source.gastosAdminIva)}
+                      muted
+                    />
                     <Fila
                       label="Total neto a liquidar"
                       value={fmtMoney(source.liquido)}
@@ -283,12 +321,19 @@ export function EmitirLiquidacionModal({
             <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel">
               Comprobante
             </span>
-            <span className="text-sm text-vialto-charcoal">{cbteTipoLabel}</span>
+            <span className="text-sm text-vialto-charcoal">
+              {cbteTipoLabel}
+            </span>
           </div>
 
           {datosEmitIncompletos && (
-            <div className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900" role="alert">
-              <p className="font-medium">Completá estos datos antes de emitir</p>
+            <div
+              className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+              role="alert"
+            >
+              <p className="font-medium">
+                Completá estos datos antes de emitir
+              </p>
               <ul className="mt-1 list-disc pl-4 space-y-0.5">
                 {missingEmitFields.map((f) => (
                   <li key={f}>{f}</li>
@@ -299,12 +344,16 @@ export function EmitirLiquidacionModal({
 
           {!datosEmitIncompletos && (
             <div className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-              Al confirmar se enviará el comprobante a ARCA para su autorización. Una vez emitido no puede modificarse.
+              Al confirmar se enviará el comprobante a ARCA para su
+              autorización. Una vez emitido no puede modificarse.
             </div>
           )}
 
           {error && (
-            <div className="rounded border border-red-300/50 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            <div
+              className="rounded border border-red-300/50 bg-red-50 px-4 py-3 text-sm text-red-800"
+              role="alert"
+            >
               {error}
             </div>
           )}
@@ -325,8 +374,16 @@ export function EmitirLiquidacionModal({
             onClick={() => void confirmar()}
             className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-fire font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-bright disabled:opacity-50"
           >
-            {submitting ? <Spinner /> : <Receipt className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />}
-            {submitting ? 'Emitiendo…' : 'Emitir comprobante'}
+            {submitting ? (
+              <Spinner />
+            ) : (
+              <Receipt
+                className="h-4 w-4 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            )}
+            {submitting ? "Emitiendo…" : "Emitir comprobante"}
           </button>
         </div>
       </div>
