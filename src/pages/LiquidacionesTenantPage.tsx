@@ -60,6 +60,8 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
 
+// a
+
 function caeCell(liq: LiquidacionConTransportista) {
   if (liq.cae) {
     return (
