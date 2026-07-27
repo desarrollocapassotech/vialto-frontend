@@ -1046,7 +1046,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         }
         message={
           confirmModal?.type === "anular"
-            ? "¿Deseas anular esta liquidación? Esta acción no se puede deshacer."
+            ? "¿Deseas anular esta liquidación? Se emitirá un comprobante de ajuste en ARCA. Esta acción no se puede deshacer."
             : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
         }
         confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}

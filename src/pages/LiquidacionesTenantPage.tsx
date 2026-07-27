@@ -703,7 +703,7 @@ export function LiquidacionesTenantPage() {
         title="Anular liquidación"
         message={
           anularConfirm
-            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante negativo en ARCA.`
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante de ajuste en ARCA y no se puede deshacer.`
             : ""
         }
         confirmLabel="Anular"
