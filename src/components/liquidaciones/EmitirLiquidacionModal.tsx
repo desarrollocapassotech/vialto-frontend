@@ -273,13 +273,6 @@ export function EmitirLiquidacionModal({
                 value={fmtMoney(source.comision)}
                 muted
               />
-              {(source.gastosAdmin ?? 0) > 0 && (
-                <Fila
-                  label="Otras"
-                  value={fmtMoney(source.gastosAdmin)}
-                  muted
-                />
-              )}
               {conceptosLineas.map((l) => {
                 const signed = l.signo === "favor" ? l.monto : -l.monto;
                 return (
