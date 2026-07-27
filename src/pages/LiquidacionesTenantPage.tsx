@@ -13,6 +13,7 @@ import {
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
@@ -323,7 +324,7 @@ export function LiquidacionesTenantPage() {
     }
   }
 
-  async function confirmAnular() {
+  async function confirmAnular(motivo: string) {
     const liq = anularConfirm;
     if (!liq || busyId) return;
     setActionError(null);
@@ -331,9 +332,9 @@ export function LiquidacionesTenantPage() {
     try {
       const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`, // <-- Ruta corregida
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`,
         () => getToken(),
-        { method: "POST" },
+        { method: "POST", body: JSON.stringify({ motivo }) },
       );
       setRows(
         (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
@@ -700,21 +701,23 @@ export function LiquidacionesTenantPage() {
         />
       )}
 
-      <ConfirmDialog
+      <AnularLiquidacionModal
         open={anularConfirm != null}
-        title="Anular liquidación"
         message={
           anularConfirm
-            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante negativo en ARCA.`
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emite un comprobante de ajuste en ARCA y los viajes quedan disponibles para una nueva liquidación.`
             : ""
         }
-        confirmLabel="Anular"
-        tone="danger"
         busy={busyId === anularConfirm?.id}
+        error={
+          anularConfirm && actionError?.id === anularConfirm.id
+            ? actionError.msg
+            : null
+        }
         onCancel={() => {
           if (!busyId) setAnularConfirm(null);
         }}
-        onConfirm={() => void confirmAnular()}
+        onConfirm={(motivo) => void confirmAnular(motivo)}
       />
 
       <ConfirmDialog

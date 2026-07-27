@@ -48,6 +48,19 @@ function fmtDate(iso: string | null | undefined) {
   return `${d}/${m}/${y}`;
 }
 
+function fmtDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fmtDate(iso);
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function Campo({
   label,
   value,
@@ -190,6 +203,24 @@ export function LiquidacionViewModal({
           )}
           <Campo label="Creada" value={fmtDate(liq.createdAt)} />
         </div>
+
+        {liq.estado === "anulado" && (
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Anulación
+            </p>
+            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
+              <Campo label="Motivo" value={liq.motivoAnulacion} />
+              <div className={viewModalGridClass}>
+                <Campo label="Anulada el" value={fmtDateTime(liq.anuladoAt)} />
+                <Campo
+                  label="Anulada por"
+                  value={liq.anuladoPorNombre ?? liq.anuladoPor}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {liq.arcaError && (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

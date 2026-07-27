@@ -541,6 +541,11 @@ export interface Liquidacion {
   arcaError: string | null;
   reintentos: number;
   comprobanteUrl: string | null;
+  motivoAnulacion?: string | null;
+  anuladoPor?: string | null;
+  /** Nombre legible resuelto desde Clerk (virtual; no se persiste). */
+  anuladoPorNombre?: string | null;
+  anuladoAt?: string | null;
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
