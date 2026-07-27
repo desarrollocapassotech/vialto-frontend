@@ -9,6 +9,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
+import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
@@ -37,7 +38,6 @@ type FormatoExport = "xlsx" | "csv";
 
 // ─── Helpers de formato ────────────────────────────────────────────────────
 
-// Helper para normalizar textos: quita espacios, pasa a minúsculas y elimina tildes
 function normalizeString(str: string): string {
   return str
     .trim()
@@ -194,6 +194,9 @@ export function CombustibleTenantPage() {
   );
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // 2. ESTADO PARA CONTROLAR EL MODAL DE VISTA
+  const [viewTargetId, setViewTargetId] = useState<string | null>(null);
 
   const [downloading, setDownloading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -617,18 +620,29 @@ export function CombustibleTenantPage() {
       {
         id: "acciones",
         header: "Acciones",
+        // 3. AÑADIDO EL BOTÓN VER EN LAS ACCIONES
         cell: (r) => (
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteError(null);
-              setDeleteTarget(r);
-            }}
-            className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
-            aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
-          >
-            Eliminar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewTargetId(r.id)}
+              className="inline-flex h-8 items-center px-3 border border-black/15 bg-white text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors"
+              aria-label={`Ver detalle de carga del ${fmtFecha(r.fecha)}`}
+            >
+              Ver
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteTarget(r);
+              }}
+              className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
+              aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
+            >
+              Eliminar
+            </button>
+          </div>
         ),
       },
     ],
@@ -988,6 +1002,16 @@ export function CombustibleTenantPage() {
             setPage(1);
             setReloadKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {/* 4. RENDERIZAR EL MODAL DE VISTA AL FINAL */}
+      {viewTargetId && (
+        <CargaCombustibleViewModal
+          cargaId={viewTargetId}
+          tenantId={activeTenantId}
+          onClose={() => setViewTargetId(null)}
+          onUpdate={() => setReloadKey((k) => k + 1)}
         />
       )}
     </div>
