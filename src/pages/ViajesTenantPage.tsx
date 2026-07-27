@@ -121,6 +121,8 @@ import {
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
 import { selectorTabClass } from "@/components/ui/SelectorOpcionesSheet";
 
+//comentario para nuevo PR
+
 type ViajesPaginatedResponse = {
   items: Viaje[];
   meta: PaginatedMeta;
@@ -352,14 +354,19 @@ export function ViajesTenantPage({
         mergeMaestroPorId(prev, [item as unknown as T]);
       if (key === "clientes") setClientesP((prev) => mergeOne(prev));
       if (key === "choferes") setChoferesP((prev) => mergeOne(prev));
-      if (key === "transportistas") setTransportistasP((prev) => mergeOne(prev));
+      if (key === "transportistas")
+        setTransportistasP((prev) => mergeOne(prev));
       if (key === "vehiculos") setVehiculosP((prev) => mergeOne(prev));
     },
     onViajeRefetched: (viaje) => {
-      setRows((prev) => (prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev));
+      setRows((prev) =>
+        prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
+      );
     },
     onViajeSaved: (viaje) => {
-      setRows((prev) => (prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev));
+      setRows((prev) =>
+        prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
+      );
     },
     fetchProductosCatalogo: fetchProductosCatalogoParaEditor,
   });
@@ -895,8 +902,10 @@ export function ViajesTenantPage({
   }, [clienteIdFiltroActivo]);
 
   function esElegibleFacturarLote(v: Viaje): boolean {
-    if (!viajePermiteBotonFacturar(v) || viajesConFactura.has(v.id)) return false;
-    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto)) return false;
+    if (!viajePermiteBotonFacturar(v) || viajesConFactura.has(v.id))
+      return false;
+    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto))
+      return false;
     return true;
   }
 
@@ -1173,7 +1182,6 @@ export function ViajesTenantPage({
       setFacturarOpcionBusy(false);
     }
   }
-
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
   /** Cliente + transp. externo + estado + recorrido + fechas + monto + ganancia bruta [+ acciones]. */
@@ -2134,86 +2142,96 @@ export function ViajesTenantPage({
       )}
 
       {/* Editor Modal Inferior para Editar Viajes en Listado */}
-      {viajeEditor.editingId && viajeEditor.draft && viajeEditor.viajeSnapshot && (
-        <ViajeEditModal
-          open
-          draft={viajeEditor.draft}
-          setDraft={viajeEditor.setDraft}
-          snapshotViaje={viajeEditor.viajeSnapshot}
-          opcionesProducto={viajeEditor.opcionesProducto}
-          clientes={viajeEditor.edicionMaestro?.clientes ?? clientes}
-          choferes={viajeEditor.edicionMaestro?.choferes ?? choferes}
-          transportistas={viajeEditor.edicionMaestro?.transportistas ?? transportistas}
-          vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
-          choferesPropios={viajeEditor.choferesPropios}
-          vehiculosPropios={viajeEditor.vehiculosPropios}
-          viajesConFactura={viajesConFactura}
-          onModoChange={viajeEditor.applyDraftModo}
-          ayudaFlota={viajeEditor.ayudaFlota}
-          viajeEditHint={viajeEditor.viajeEditHint}
-          fechaCargaError={viajeEditor.fechaCargaError}
-          fechaDescargaError={viajeEditor.fechaDescargaError}
-          destinosError={viajeEditor.destinosError}
-          onClearDestinosError={viajeEditor.onClearDestinosError}
-          transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
-          onClearTransportistaEfectivoError={
-            viajeEditor.onClearTransportistaEfectivoError
-          }
-          onDraftFechasPatch={viajeEditor.onDraftFechasPatch}
-          onClose={cancelEdit}
-          onSave={() => void viajeEditor.saveInline()}
-          onFacturar={() => {
-            const draft = viajeEditor.draft!;
-            const snapshot = viajeEditor.viajeSnapshot!;
-            const v = {
-              ...snapshot,
-              clienteId: draft.clienteId.trim() || snapshot.clienteId,
-              monedaMonto: draft.monedaMonto,
-              monedaPrecioTransportistaExterno:
-                draft.monedaPrecioTransportistaExterno,
-              transportistaId:
-                draft.operacionModo === "externo"
-                  ? draft.transportistaId
-                  : snapshot.transportistaId,
-            };
-            openFacturarFlow(v);
-          }}
-          facturarBloqueoMotivo={motivoBloqueoAccionFacturarArcaUsd(
-            hasLiquidacionesArca,
-            {
-              ...viajeEditor.viajeSnapshot,
-              estado: viajeEditor.draft.estado,
-              clienteId:
-                viajeEditor.draft.clienteId.trim() ||
-                viajeEditor.viajeSnapshot.clienteId,
-              monedaMonto: viajeEditor.draft.monedaMonto,
-              monedaPrecioTransportistaExterno:
-                viajeEditor.draft.monedaPrecioTransportistaExterno,
-              transportistaId:
-                viajeEditor.draft.operacionModo === "externo"
-                  ? viajeEditor.draft.transportistaId
-                  : viajeEditor.viajeSnapshot.transportistaId,
-            },
-          )}
-          onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
-          saving={viajeEditor.saving}
-          error={viajeEditor.error}
-          crearVehiculoHref={
-            platform
-              ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}`
-              : undefined
-          }
-          getToken={getToken}
-          tenantId={platform ? tid : undefined}
-          onProductoCreado={viajeEditor.onProductoCreado}
-          onClienteCreado={(c) => viajeEditor.upsertMaestroEdicion("clientes", c)}
-          onTransportistaCreado={(t) =>
-            viajeEditor.upsertMaestroEdicion("transportistas", t)
-          }
-          onChoferCreado={(c) => viajeEditor.upsertMaestroEdicion("choferes", c)}
-          onVehiculoCreado={(v) => viajeEditor.upsertMaestroEdicion("vehiculos", v)}
-        />
-      )}
+      {viajeEditor.editingId &&
+        viajeEditor.draft &&
+        viajeEditor.viajeSnapshot && (
+          <ViajeEditModal
+            open
+            draft={viajeEditor.draft}
+            setDraft={viajeEditor.setDraft}
+            snapshotViaje={viajeEditor.viajeSnapshot}
+            opcionesProducto={viajeEditor.opcionesProducto}
+            clientes={viajeEditor.edicionMaestro?.clientes ?? clientes}
+            choferes={viajeEditor.edicionMaestro?.choferes ?? choferes}
+            transportistas={
+              viajeEditor.edicionMaestro?.transportistas ?? transportistas
+            }
+            vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
+            choferesPropios={viajeEditor.choferesPropios}
+            vehiculosPropios={viajeEditor.vehiculosPropios}
+            viajesConFactura={viajesConFactura}
+            onModoChange={viajeEditor.applyDraftModo}
+            ayudaFlota={viajeEditor.ayudaFlota}
+            viajeEditHint={viajeEditor.viajeEditHint}
+            fechaCargaError={viajeEditor.fechaCargaError}
+            fechaDescargaError={viajeEditor.fechaDescargaError}
+            destinosError={viajeEditor.destinosError}
+            onClearDestinosError={viajeEditor.onClearDestinosError}
+            transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
+            onClearTransportistaEfectivoError={
+              viajeEditor.onClearTransportistaEfectivoError
+            }
+            onDraftFechasPatch={viajeEditor.onDraftFechasPatch}
+            onClose={cancelEdit}
+            onSave={() => void viajeEditor.saveInline()}
+            onFacturar={() => {
+              const draft = viajeEditor.draft!;
+              const snapshot = viajeEditor.viajeSnapshot!;
+              const v = {
+                ...snapshot,
+                clienteId: draft.clienteId.trim() || snapshot.clienteId,
+                monedaMonto: draft.monedaMonto,
+                monedaPrecioTransportistaExterno:
+                  draft.monedaPrecioTransportistaExterno,
+                transportistaId:
+                  draft.operacionModo === "externo"
+                    ? draft.transportistaId
+                    : snapshot.transportistaId,
+              };
+              openFacturarFlow(v);
+            }}
+            facturarBloqueoMotivo={motivoBloqueoAccionFacturarArcaUsd(
+              hasLiquidacionesArca,
+              {
+                ...viajeEditor.viajeSnapshot,
+                estado: viajeEditor.draft.estado,
+                clienteId:
+                  viajeEditor.draft.clienteId.trim() ||
+                  viajeEditor.viajeSnapshot.clienteId,
+                monedaMonto: viajeEditor.draft.monedaMonto,
+                monedaPrecioTransportistaExterno:
+                  viajeEditor.draft.monedaPrecioTransportistaExterno,
+                transportistaId:
+                  viajeEditor.draft.operacionModo === "externo"
+                    ? viajeEditor.draft.transportistaId
+                    : viajeEditor.viajeSnapshot.transportistaId,
+              },
+            )}
+            onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
+            saving={viajeEditor.saving}
+            error={viajeEditor.error}
+            crearVehiculoHref={
+              platform
+                ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}`
+                : undefined
+            }
+            getToken={getToken}
+            tenantId={platform ? tid : undefined}
+            onProductoCreado={viajeEditor.onProductoCreado}
+            onClienteCreado={(c) =>
+              viajeEditor.upsertMaestroEdicion("clientes", c)
+            }
+            onTransportistaCreado={(t) =>
+              viajeEditor.upsertMaestroEdicion("transportistas", t)
+            }
+            onChoferCreado={(c) =>
+              viajeEditor.upsertMaestroEdicion("choferes", c)
+            }
+            onVehiculoCreado={(v) =>
+              viajeEditor.upsertMaestroEdicion("vehiculos", v)
+            }
+          />
+        )}
 
       {/* Modal de selección "Crear nueva factura vs Agregar a la actual" */}
       <FacturarOpcionModal
