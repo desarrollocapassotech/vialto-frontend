@@ -14,7 +14,13 @@ import {
   fmtFormaPagoClave,
 } from "./CombustibleDashboardPanels";
 
-type CombustibleTab = "resumen" | "vehiculo" | "chofer" | "distribucion" | "alertas" | "viajes";
+type CombustibleTab =
+  | "resumen"
+  | "vehiculo"
+  | "chofer"
+  | "distribucion"
+  | "alertas"
+  | "viajes";
 
 function periodToDates(
   period: string,
@@ -30,7 +36,9 @@ function periodToDates(
   }
   if (period === "month") {
     return {
-      from: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10),
+      from: new Date(today.getFullYear(), today.getMonth(), 1)
+        .toISOString()
+        .slice(0, 10),
       to: todayStr,
     };
   }
@@ -114,13 +122,21 @@ export function CombustibleDashboardSection({
     { id: "vehiculo", label: "Por vehículo" },
     { id: "chofer", label: "Por chofer" },
     { id: "distribucion", label: "Distribución" },
-    { id: "alertas", label: "Alertas", badge: cantAlertas > 0 ? cantAlertas : undefined },
+    {
+      id: "alertas",
+      label: "Alertas",
+      badge: cantAlertas > 0 ? cantAlertas : undefined,
+    },
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
   ];
 
   return (
     <section id="combustible-heading" aria-label="Combustible">
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista de combustible">
+      <div
+        className="flex flex-wrap gap-2"
+        role="tablist"
+        aria-label="Vista de combustible"
+      >
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -157,7 +173,10 @@ export function CombustibleDashboardSection({
       <div className="mt-3">
         {tab === "resumen" && <ResumenPanel data={data} loading={loading} />}
         {tab === "vehiculo" && (
-          <VehiculoRankingTable items={data?.porVehiculo ?? []} periodo={periodo} />
+          <VehiculoRankingTable
+            items={data?.porVehiculo ?? []}
+            periodo={periodo}
+          />
         )}
         {tab === "chofer" && (
           <ChoferRankingTable items={data?.porChofer ?? []} periodo={periodo} />
@@ -177,7 +196,9 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && <AlertasList alertas={data?.alertas ?? []} />}
-        {tab === "viajes" && showViajes && <ViajesCruceTable items={data?.viajesCruce ?? []} />}
+        {tab === "viajes" && showViajes && (
+          <ViajesCruceTable items={data?.viajesCruce ?? []} />
+        )}
       </div>
     </section>
   );

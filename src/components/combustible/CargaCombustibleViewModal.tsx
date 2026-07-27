@@ -78,11 +78,11 @@ export function CargaCombustibleViewModal({
             () => getToken(),
           ),
           apiJson<{ id: string; nombre: string }[]>(
-            "/api/platform/choferes${qsTenant}",
+            `/api/platform/choferes${qsTenant}`,
             () => getToken(),
           ).catch(() => []),
           apiJson<{ id: string; patente: string }[]>(
-            "/api/platform/vehiculos${qsTenant}",
+            `/api/platform/vehiculos${qsTenant}`,
             () => getToken(),
           ).catch(() => []),
         ]);
