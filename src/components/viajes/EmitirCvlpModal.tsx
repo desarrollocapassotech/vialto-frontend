@@ -5,6 +5,7 @@ import { Receipt } from 'lucide-react';
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
 } from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
@@ -60,6 +61,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [comisionPct, setComisionPct] = useState('');
   const [ivaPct, setIvaPct] = useState('');
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +172,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       );
       return;
     }
+    const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+    if (!conceptosCheck.ok) {
+      setConceptosIncomplete(conceptosCheck.indices);
+      setError(conceptosCheck.message);
+      return;
+    }
+    setConceptosIncomplete([]);
     setError(null);
     setBusyCrear(true);
     try {
@@ -535,8 +544,12 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <ConceptosLiquidacionLineasEditor
                   getToken={getToken}
                   lineas={conceptosLineas}
-                  onChange={setConceptosLineas}
+                  onChange={(next) => {
+                    setConceptosLineas(next);
+                    setConceptosIncomplete([]);
+                  }}
                   disabled={busyCrear}
+                  incompleteIndices={conceptosIncomplete}
                 />
               </section>
 
