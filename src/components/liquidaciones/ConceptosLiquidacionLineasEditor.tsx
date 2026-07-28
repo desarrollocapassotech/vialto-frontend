@@ -9,6 +9,11 @@ import type { ConceptoLiquidacion, ConceptoLiquidacionSigno } from '@/types/api'
 export type ConceptoLineaDraft = {
   conceptoLiquidacionId: string;
   monto: number;
+  /**
+   * Texto crudo del input de monto. Vacío al agregar una fila para no mostrar "0"
+   * (si no, al tipear queda "0100"). Si falta, se deriva de `monto`.
+   */
+  montoStr?: string;
   nombre?: string;
   signo?: ConceptoLiquidacionSigno;
   ivaPct?: number;
@@ -30,6 +35,20 @@ function signoLabel(s: ConceptoLiquidacionSigno) {
 function signedMonto(signo: ConceptoLiquidacionSigno | undefined, monto: number) {
   if (!signo || !Number.isFinite(monto)) return 0;
   return signo === 'favor' ? monto : -monto;
+}
+
+function montoStrFromNumber(monto: number): string {
+  return Number.isFinite(monto) && monto > 0 ? String(monto) : '';
+}
+
+function parseMontoInput(raw: string): number {
+  if (raw.trim() === '') return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function displayMontoStr(linea: ConceptoLineaDraft): string {
+  return linea.montoStr ?? montoStrFromNumber(linea.monto);
 }
 
 export function ConceptosLiquidacionLineasEditor({
@@ -76,11 +95,16 @@ export function ConceptosLiquidacionLineasEditor({
     void loadCatalogo();
   }, [loadCatalogo]);
 
-  function enrichFromCatalog(id: string, monto: number): ConceptoLineaDraft {
+  function enrichFromCatalog(
+    id: string,
+    monto: number,
+    montoStr?: string,
+  ): ConceptoLineaDraft {
     const c = catalogo.find((x) => x.id === id);
     return {
       conceptoLiquidacionId: id,
       monto,
+      montoStr: montoStr ?? montoStrFromNumber(monto),
       nombre: c?.nombre,
       signo: c?.signo,
       ivaPct: c?.ivaPct,
@@ -92,7 +116,11 @@ export function ConceptosLiquidacionLineasEditor({
       if (i !== index) return l;
       const merged = { ...l, ...patch };
       if (patch.conceptoLiquidacionId != null) {
-        return enrichFromCatalog(patch.conceptoLiquidacionId, merged.monto);
+        return enrichFromCatalog(
+          patch.conceptoLiquidacionId,
+          merged.monto,
+          merged.montoStr,
+        );
       }
       return merged;
     });
@@ -110,7 +138,7 @@ export function ConceptosLiquidacionLineasEditor({
       setShowQuick(true);
       return;
     }
-    onChange([...lineas, enrichFromCatalog(siguiente.id, 0)]);
+    onChange([...lineas, enrichFromCatalog(siguiente.id, 0, '')]);
   }
 
   function removeRow(index: number) {
@@ -167,6 +195,7 @@ export function ConceptosLiquidacionLineasEditor({
         {
           conceptoLiquidacionId: created.id,
           monto: 0,
+          montoStr: '',
           nombre: created.nombre,
           signo: created.signo,
           ivaPct: created.ivaPct,
@@ -324,11 +353,17 @@ export function ConceptosLiquidacionLineasEditor({
                     type="number"
                     min={0}
                     step="0.01"
-                    value={Number.isFinite(linea.monto) ? linea.monto : ''}
+                    inputMode="decimal"
+                    value={displayMontoStr(linea)}
                     disabled={disabled}
-                    onChange={(e) =>
-                      updateRow(index, { monto: e.target.value === '' ? 0 : Number(e.target.value) })
-                    }
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      updateRow(index, {
+                        montoStr: raw,
+                        monto: parseMontoInput(raw),
+                      });
+                    }}
                     className={inputClass}
                   />
                 </label>
