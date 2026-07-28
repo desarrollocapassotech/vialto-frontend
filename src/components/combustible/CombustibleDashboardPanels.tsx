@@ -623,7 +623,13 @@ export function fmtFormaPagoClave(clave: string): string {
 
 // ── Alertas ──────────────────────────────────────────────────────────────
 
-export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
+export function AlertasList({
+  alertas,
+  tenantId,
+}: {
+  alertas: CombustibleAlerta[];
+  tenantId: string; // <-- AÑADIDO
+}) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
   if (alertas.length === 0) {
@@ -638,6 +644,7 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
       <table className="w-full text-sm">
+        {/* ... (el thead queda exactamente igual) ... */}
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
@@ -647,7 +654,7 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
               Fecha
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
-              Vehículosssss
+              Vehículo
             </th>
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
               Conductor
@@ -715,6 +722,7 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
+          tenantId={tenantId} // ✅ AQUÍ SE LO PASAMOS
           onClose={() => setViewingCargaId(null)}
         />
       )}
