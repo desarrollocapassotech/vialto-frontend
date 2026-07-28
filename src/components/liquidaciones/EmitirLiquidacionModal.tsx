@@ -158,6 +158,7 @@ export function EmitirLiquidacionModal({
 
   const source = detail ?? liq;
   const conceptosLineas = source.conceptosLineas ?? [];
+  const ivaPctEfectivo = source.ivaPct ?? ivaPct;
   const missingEmitFields = useMemo(
     () =>
       collectCvlpEmitMissingFields({
@@ -285,7 +286,8 @@ export function EmitirLiquidacionModal({
                 );
               })}
               {(() => {
-                const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
+                const ivaLabel =
+                  ivaPctEfectivo != null ? `IVA ${ivaPctEfectivo}%` : "IVA";
                 return (
                   <>
                     <Fila

@@ -58,6 +58,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
+  const [ivaPct, setIvaPct] = useState('');
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
@@ -180,6 +181,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
         cbteTipo,
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
+      if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       const liq = await apiJson<Liquidacion>(
@@ -504,6 +506,32 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               </section>
 
               <section className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                  IVA
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="ivaPct"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={ivaPct}
+                    onChange={(e) => setIvaPct(e.target.value)}
+                    placeholder={
+                      arcaConfig != null ? String(arcaConfig.ivaGastosAdmin) : ''
+                    }
+                    className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
+                  />
+                  <span className="text-xs text-vialto-steel">%</span>
+                </div>
+                <p className="text-xs text-vialto-steel">
+                  Vacío usa el default del tenant
+                  {arcaConfig != null ? ` (${arcaConfig.ivaGastosAdmin}%).` : '.'}
+                </p>
+              </section>
+
+              <section className="space-y-2">
                 <ConceptosLiquidacionLineasEditor
                   getToken={getToken}
                   lineas={conceptosLineas}
@@ -591,7 +619,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
+                <Row label={`IVA (${liquidacion.ivaPct ?? arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>
                   <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
@@ -657,7 +685,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
                 <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
                 <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
+                <Row label={`IVA (${liquidacion.ivaPct ?? arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
                 <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
                   <span>Líquido a pagar</span>
                   <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
