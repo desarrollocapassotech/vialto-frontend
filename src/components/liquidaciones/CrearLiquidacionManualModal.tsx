@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
@@ -92,6 +93,7 @@ export function CrearLiquidacionManualModal({
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
 
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
@@ -211,6 +213,13 @@ export function CrearLiquidacionManualModal({
         return;
       }
     }
+    const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+    if (!conceptosCheck.ok) {
+      setConceptosIncomplete(conceptosCheck.indices);
+      setError(conceptosCheck.message);
+      return;
+    }
+    setConceptosIncomplete([]);
     setError(null);
     setSubmitting(true);
     try {
@@ -421,8 +430,12 @@ export function CrearLiquidacionManualModal({
           <ConceptosLiquidacionLineasEditor
             getToken={getToken}
             lineas={conceptosLineas}
-            onChange={setConceptosLineas}
+            onChange={(next) => {
+              setConceptosLineas(next);
+              setConceptosIncomplete([]);
+            }}
             disabled={submitting}
+            incompleteIndices={conceptosIncomplete}
           />
 
           {/* Viaje pre-fijado */}
