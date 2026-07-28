@@ -46,9 +46,11 @@ function periodToDates(
 }
 
 export function CombustibleDashboardSection({
+  tenantId,
   dash,
   showViajes,
 }: {
+  tenantId: string;
   dash: ReturnType<typeof useTenantOwnerDashboard>;
   showViajes: boolean;
 }) {
@@ -176,7 +178,9 @@ export function CombustibleDashboardSection({
             />
           </div>
         )}
-        {tab === "alertas" && <AlertasList alertas={data?.alertas ?? []} />}
+        {tab === "alertas" && (
+          <AlertasList tenantId={tenantId} alertas={data?.alertas ?? []} />
+        )}
         {tab === "viajes" && showViajes && <ViajesCruceTable items={data?.viajesCruce ?? []} />}
       </div>
     </section>

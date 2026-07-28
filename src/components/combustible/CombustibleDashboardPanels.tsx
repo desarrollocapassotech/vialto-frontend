@@ -620,7 +620,13 @@ export function fmtFormaPagoClave(clave: string): string {
 
 // ── Alertas ──────────────────────────────────────────────────────────────
 
-export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
+export function AlertasList({
+  tenantId,
+  alertas,
+}: {
+  tenantId: string;
+  alertas: CombustibleAlerta[];
+}) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
   if (alertas.length === 0) {
@@ -712,6 +718,7 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
+          tenantId={tenantId}
           onClose={() => setViewingCargaId(null)}
         />
       )}
