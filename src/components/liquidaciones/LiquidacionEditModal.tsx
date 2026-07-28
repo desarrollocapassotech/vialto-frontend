@@ -59,6 +59,9 @@ export function LiquidacionEditModal({
     toDateInput(liq.periodoHasta),
   );
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
+  const [ivaPct, setIvaPct] = useState(
+    liq.ivaPct != null ? String(liq.ivaPct) : "",
+  );
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     () =>
       (liq.conceptosLineas ?? [])
@@ -94,6 +97,7 @@ export function LiquidacionEditModal({
           () => getToken(),
         );
         if (cancelled) return;
+        if (full.ivaPct != null) setIvaPct(String(full.ivaPct));
         setConceptosLineas(
           (full.conceptosLineas ?? [])
             .filter((l) => l.conceptoLiquidacionId)
@@ -138,6 +142,10 @@ export function LiquidacionEditModal({
       if (comisionPct.trim() !== "" && (isNaN(pct) || pct < 0 || pct > 100)) {
         errs.comisionPct = "La comisión debe ser un número entre 0 y 100.";
       }
+      const iva = Number(ivaPct);
+      if (ivaPct.trim() !== "" && (isNaN(iva) || iva < 0 || iva > 100)) {
+        errs.ivaPct = "El IVA debe ser un número entre 0 y 100.";
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -169,6 +177,9 @@ export function LiquidacionEditModal({
         body.periodoHasta = periodoHasta;
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
+        }
+        if (ivaPct.trim() !== "") {
+          body.ivaPct = Number(ivaPct);
         }
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
@@ -293,26 +304,49 @@ export function LiquidacionEditModal({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="liq-comision" className={LABEL}>
-                Comisión (%)
-              </label>
-              <input
-                id="liq-comision"
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                value={comisionPct}
-                onChange={(e) => setComisionPct(e.target.value)}
-                disabled={saving}
-                className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
-              />
-              {fieldErrors.comisionPct && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                  {fieldErrors.comisionPct}
-                </p>
-              )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="liq-comision" className={LABEL}>
+                  Comisión (%)
+                </label>
+                <input
+                  id="liq-comision"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={comisionPct}
+                  onChange={(e) => setComisionPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.comisionPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.comisionPct}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="liq-iva" className={LABEL}>
+                  IVA (%)
+                </label>
+                <input
+                  id="liq-iva"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={ivaPct}
+                  onChange={(e) => setIvaPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.ivaPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.ivaPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.ivaPct}
+                  </p>
+                )}
+              </div>
             </div>
 
             <ConceptosLiquidacionLineasEditor

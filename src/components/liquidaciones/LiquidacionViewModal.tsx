@@ -93,7 +93,7 @@ export function LiquidacionViewModal({
   const conceptosLineas = liq.conceptosLineas ?? [];
   const netoGravado =
     Math.round((liq.liquido - liq.gastosAdminIva) * 100) / 100;
-  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
+  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : "IVA";
 
   return (
     <ViewModalShell

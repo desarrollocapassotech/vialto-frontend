@@ -86,7 +86,9 @@ export function CrearLiquidacionManualModal({
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
   const [comisionPct, setComisionPct] = useState("");
-  const [ivaPct, setIvaPct] = useState("21");
+  const [ivaPct, setIvaPct] = useState(
+    config?.ivaGastosAdmin != null ? String(config.ivaGastosAdmin) : "",
+  );
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
@@ -104,6 +106,11 @@ export function CrearLiquidacionManualModal({
   // — Estado del submit —
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (config?.ivaGastosAdmin == null) return;
+    setIvaPct((prev) => (prev === "" ? String(config.ivaGastosAdmin) : prev));
+  }, [config?.ivaGastosAdmin]);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -263,7 +270,10 @@ export function CrearLiquidacionManualModal({
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   // Neto = bruto − comisión. Los gastos del viaje van en `otrosGastos`, no en la liquidación.
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
-  const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 21;
+  const ivaPctNum =
+    ivaPct.trim() !== ""
+      ? Number(ivaPct)
+      : (config?.ivaGastosAdmin ?? 21);
   const ivaMonto =
     netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar =
@@ -388,7 +398,7 @@ export function CrearLiquidacionManualModal({
             </div>
             <div>
               <label htmlFor="ivaPct" className={labelClass}>
-                IVA (%) <span className="text-red-500">*</span>
+                IVA (%)
               </label>
               <input
                 id="ivaPct"
@@ -396,9 +406,13 @@ export function CrearLiquidacionManualModal({
                 min="0"
                 max="100"
                 step="0.01"
-                required
                 value={ivaPct}
                 onChange={(e) => setIvaPct(e.target.value)}
+                placeholder={
+                  config?.ivaGastosAdmin != null
+                    ? String(config.ivaGastosAdmin)
+                    : undefined
+                }
                 className={inputClass}
               />
             </div>

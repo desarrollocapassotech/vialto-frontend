@@ -668,7 +668,7 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
           tenantId={activeTenantId}
         />
@@ -745,7 +745,7 @@ export function LiquidacionesTenantPage() {
       {detail?.mode === "view" && (
         <LiquidacionViewModal
           liq={detail.liq}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
