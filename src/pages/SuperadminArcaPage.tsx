@@ -546,7 +546,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         </div>
       </div>
 
-      {/* Gastos administrativos */}
+      {/* IVA sobre neto (campo legacy: ivaGastosAdmin) */}
       <div className="flex flex-col gap-1.5">
         <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
         <TextInput
@@ -1025,7 +1025,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
           detalleUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}?tenantId=${encodeURIComponent(tenantId)}`}
           configUrl={`/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`}
           arcaConfig={arcaConfig}
-          ivaPct={arcaConfig?.ivaGastosAdmin}
+          ivaPct={pendingEmitir.ivaPct ?? arcaConfig?.ivaGastosAdmin}
         />
       )}
 

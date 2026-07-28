@@ -29,10 +29,12 @@ function fmtNum(n: number) {
 
 export function CargaCombustibleViewModal({
   cargaId,
+  tenantId,
   onClose,
   onUpdate,
 }: {
   cargaId: string;
+  tenantId: string;
   onClose: () => void;
   onUpdate?: (cargaActualizada: CargaCombustible) => void;
 }) {
@@ -69,16 +71,19 @@ export function CargaCombustibleViewModal({
       if (!isSilent) setLoading(true);
       setError(null);
       try {
+        const qsTenant = `?tenantId=${encodeURIComponent(tenantId)}`;
         const [row, ch, ve] = await Promise.all([
           apiJson<CargaCombustible>(
-            `/api/combustible/${encodeURIComponent(cargaId)}`,
+            `/api/platform/combustible/${encodeURIComponent(cargaId)}${qsTenant}`,
             () => getToken(),
           ),
-          apiJson<{ id: string; nombre: string }[]>("/api/choferes", () =>
-            getToken(),
+          apiJson<{ id: string; nombre: string }[]>(
+            "/api/platform/choferes${qsTenant}",
+            () => getToken(),
           ).catch(() => []),
-          apiJson<{ id: string; patente: string }[]>("/api/vehiculos", () =>
-            getToken(),
+          apiJson<{ id: string; patente: string }[]>(
+            "/api/platform/vehiculos${qsTenant}",
+            () => getToken(),
           ).catch(() => []),
         ]);
 
@@ -96,7 +101,7 @@ export function CargaCombustibleViewModal({
         if (!isSilent) setLoading(false);
       }
     },
-    [cargaId, getToken],
+    [cargaId, tenantId, getToken],
   );
 
   useEffect(() => {
@@ -121,6 +126,7 @@ export function CargaCombustibleViewModal({
     return (
       <CargaCombustibleEditModal
         carga={carga}
+        tenantId={tenantId}
         onClose={() => setIsEditing(false)}
         onSaved={async () => {
           setIsEditing(false);

@@ -93,17 +93,21 @@ export interface Viaje {
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
-  factura?: { id: string; numero: string } | null;
+  factura?: { id: string; numero: string; estado: string } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
     monto?: number;
-    liquidacion?: {
-      liquido: number;
-      estado: string;
-    };
+    liquidacion: { id: string; estado: string; liquido: number };
   }[];
   createdAt: string;
   createdBy: string;
+  montoFacturadoReal?: number | null;
+  /** Moneda de la factura */
+  monedaMontoFacturadoReal?: string | null;
+  /** Costo real prorrateado a partir del líquido de la liquidación emitida (sin anulaciones) */
+  costoLiquidadoReal?: number | null;
+  /** Moneda de la liquidación (generalmente ARS para AFIP) */
+  monedaCostoLiquidadoReal?: string | null;
 }
 
 /** Respuesta de GET /api/platform/* (superadmin). */
@@ -525,6 +529,8 @@ export interface Liquidacion {
   bruto: number;
   comisionPct: number;
   comision: number;
+  /** Alícuota IVA (%) aplicada a esta liquidación (snapshot). */
+  ivaPct?: number;
   gastosAdmin: number;
   gastosAdminIva: number;
   liquido: number;

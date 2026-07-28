@@ -27,6 +27,7 @@ function normalizeFormaPago(val: string | null | undefined): string {
 
 export function CargaCombustibleEditModal({
   carga,
+  tenantId, // 1. AGREGAMOS EL TENANT ID COMO PROP
   onClose,
   onSaved,
 }: {
@@ -36,6 +37,7 @@ export function CargaCombustibleEditModal({
     chofer?: { id?: string; nombre: string } | null;
     vehiculo?: { id?: string; patente: string } | null;
   };
+  tenantId: string; // 1. TIPAMOS EL TENANT ID
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -64,7 +66,9 @@ export function CargaCombustibleEditModal({
   const defaultDate = toLocalDateString(carga.fecha);
   const [fecha, setFecha] = useState(defaultDate);
   const [litros, setLitros] = useState(String(carga.litros));
-  const [precioPorLitro, setPrecioPorLitro] = useState(String(carga.precioPorLitro ?? ""));
+  const [precioPorLitro, setPrecioPorLitro] = useState(
+    String(carga.precioPorLitro ?? ""),
+  );
   const [importe, setImporte] = useState(String(carga.importe));
   const [km, setKm] = useState(String(carga.km));
 
@@ -76,18 +80,23 @@ export function CargaCombustibleEditModal({
     precioPorLitro,
     importe,
     km,
-    carga.id
+    carga.id,
   );
 
   useEffect(() => {
     let cancelled = false;
+    // 2. CREAMOS EL QUERY STRING DEL TENANT
+    const qsTenant = `?tenantId=${encodeURIComponent(tenantId)}`;
 
     Promise.all([
-      apiJson<{ id: string; nombre: string }[]>("/api/choferes", () =>
-        getToken(),
+      // 3. ACTUALIZAMOS LAS RUTAS DE CHOFERES Y VEHICULOS
+      apiJson<{ id: string; nombre: string }[]>(
+        `/api/platform/choferes${qsTenant}`,
+        () => getToken(),
       ).catch(() => []),
-      apiJson<{ id: string; patente: string }[]>("/api/vehiculos", () =>
-        getToken(),
+      apiJson<{ id: string; patente: string }[]>(
+        `/api/platform/vehiculos${qsTenant}`,
+        () => getToken(),
       ).catch(() => []),
     ]).then(([ch, ve]) => {
       if (!cancelled) {
@@ -108,7 +117,7 @@ export function CargaCombustibleEditModal({
     return () => {
       cancelled = true;
     };
-  }, [getToken, carga, initialChoferId, initialVehiculoId]);
+  }, [getToken, carga, initialChoferId, initialVehiculoId, tenantId]); // Agregamos tenantId a las dependencias
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -138,8 +147,10 @@ export function CargaCombustibleEditModal({
     };
 
     try {
+      // 4. CREAMOS EL QUERY STRING Y ACTUALIZAMOS LA RUTA DEL PATCH
+      const qsTenant = `?tenantId=${encodeURIComponent(tenantId)}`;
       await apiJson(
-        `/api/combustible/${encodeURIComponent(carga.id)}`,
+        `/api/platform/combustible/${encodeURIComponent(carga.id)}${qsTenant}`,
         () => getToken(),
         {
           method: "PATCH",
@@ -157,6 +168,7 @@ export function CargaCombustibleEditModal({
   };
 
   return (
+    // ... Todo el return se mantiene exactamente igual ...
     <ViewModalShell
       title="Editar Carga de Combustible"
       onClose={saving ? () => {} : onClose}

@@ -8,6 +8,44 @@ import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import { calcularSaldoTransportista } from "@/lib/viajesTransportistaPagos";
 import type { OtroGasto, Viaje } from "@/types/api";
 
+// --- HELPERS PARA OBTENER EL MONTO REAL O EL ESTIMADO ---
+
+export function getMontoIngreso(
+  v: Pick<Viaje, "monto" | "montoFacturadoReal">,
+) {
+  return v.montoFacturadoReal ?? v.monto;
+}
+export function getMonedaIngreso(
+  v: Pick<Viaje, "monedaMonto" | "monedaMontoFacturadoReal">,
+) {
+  return normalizeViajeMoneda(
+    v.monedaMontoFacturadoReal ?? v.monedaMonto ?? "ARS",
+  );
+}
+export function getCostoTransportista(
+  v: Pick<Viaje, "precioTransportistaExterno" | "costoLiquidadoReal">,
+) {
+  return v.costoLiquidadoReal ?? v.precioTransportistaExterno;
+}
+export function getMonedaCostoTransportista(
+  v: Pick<
+    Viaje,
+    "monedaPrecioTransportistaExterno" | "monedaCostoLiquidadoReal"
+  >,
+) {
+  return normalizeViajeMoneda(
+    v.monedaCostoLiquidadoReal ?? v.monedaPrecioTransportistaExterno ?? "ARS",
+  );
+}
+export function esIngresoReal(v: Pick<Viaje, "montoFacturadoReal">) {
+  return v.montoFacturadoReal != null;
+}
+export function esCostoReal(v: Pick<Viaje, "costoLiquidadoReal">) {
+  return v.costoLiquidadoReal != null;
+}
+
+// --------------------------------------------------------
+
 export function viajeUsaFlotaPropia(
   v: Pick<Viaje, "transportistaId">,
 ): boolean {
@@ -18,11 +56,21 @@ export function viajeUsaFlotaPropia(
 export function viajeRequiereGananciaBrutaManual(
   v: Pick<
     Viaje,
-    "transportistaId" | "monedaMonto" | "monedaPrecioTransportistaExterno"
+    | "transportistaId"
+    | "monedaMonto"
+    | "monedaPrecioTransportistaExterno"
+    | "montoFacturadoReal"
+    | "monedaMontoFacturadoReal"
+    | "costoLiquidadoReal"
+    | "monedaCostoLiquidadoReal"
   >,
 ): boolean {
   if (viajeUsaFlotaPropia(v)) return false;
-  return monedasFacturacionYPagoDistintas(v);
+  // Si tenemos facturas/liquidaciones, evaluamos la discrepancia con las monedas REALES
+  const monIng = v.monedaMontoFacturadoReal ?? v.monedaMonto;
+  const monCosto =
+    v.monedaCostoLiquidadoReal ?? v.monedaPrecioTransportistaExterno;
+  return monIng !== monCosto;
 }
 
 export function draftRequiereGananciaBrutaManual(draft: {
@@ -34,7 +82,6 @@ export function draftRequiereGananciaBrutaManual(draft: {
   return draft.monedaMonto !== draft.monedaPrecioTransportistaExterno;
 }
 
-/** Reenvía ganancia manual en PATCH parciales (p. ej. solo cambio de estado). */
 export function gananciaBrutaManualEnPatchParcial(
   v: Pick<
     Viaje,
@@ -53,7 +100,6 @@ export function gananciaBrutaManualEnPatchParcial(
   };
 }
 
-/** Valor numérico para ordenar el listado por ganancia bruta (null = sin dato, va al final). */
 export function gananciaBrutaValorOrdenable(v: Viaje): number | null {
   const resumen = resumenDesdeViaje(v);
   if (resumen.gananciaCalculada != null) return resumen.gananciaCalculada;
@@ -67,10 +113,10 @@ export function gananciaBrutaValorOrdenable(v: Viaje): number | null {
 
 function resumenDesdeViaje(v: Viaje): GananciaBrutaResumen {
   return buildGananciaBrutaResumen({
-    monto: v.monto,
-    monedaMonto: v.monedaMonto,
-    precioTransportistaExterno: v.precioTransportistaExterno,
-    monedaPrecioTransportistaExterno: v.monedaPrecioTransportistaExterno,
+    monto: getMontoIngreso(v),
+    monedaMonto: getMonedaIngreso(v),
+    precioTransportistaExterno: getCostoTransportista(v),
+    monedaPrecioTransportistaExterno: getMonedaCostoTransportista(v),
     otrosGastos: v.otrosGastos,
     gananciaBrutaManual: v.gananciaBrutaManual,
     monedaGananciaBrutaManual: v.monedaGananciaBrutaManual,
@@ -135,7 +181,6 @@ function gananciaBrutaMetaDesdeResumen(
 }
 
 export type MonedaBalance = "ARS" | "USD";
-
 const ORDEN_MONEDA: MonedaBalance[] = ["USD", "ARS"];
 
 export type BalanceMonedaLinea = {
@@ -147,9 +192,7 @@ export type BalanceMonedaLinea = {
 export type GananciaBrutaMeta = {
   display: string;
   tooltipParagraphs: string[];
-  /** Razón breve de por qué no se muestra el valor (solo cuando display es '—'). */
   reason?: string;
-  /** Una línea por moneda cuando el viaje es multimoneda. */
   lineasBalance?: BalanceMonedaLinea[];
 };
 
@@ -164,7 +207,6 @@ function desgloseVacio(): DesgloseMoneda {
   return { ingresos: 0, costoTransportista: 0, gastosExtra: 0, gastosCount: 0 };
 }
 
-/** Suma de otrosGastos filtrando por moneda. */
 function sumaOtrosGastos(gastos: OtroGasto[], moneda: MonedaBalance): number {
   return gastos
     .filter((g) => (g.moneda === "USD" ? "USD" : "ARS") === moneda)
@@ -176,12 +218,11 @@ function cuentaOtrosGastos(gastos: OtroGasto[], moneda: MonedaBalance): number {
     .length;
 }
 
-/** Monedas con ingresos o egresos en el viaje (sin convertir). */
 export function monedasImplicadasEnViaje(v: Viaje): MonedaBalance[] {
   const set = new Set<MonedaBalance>();
-  if (v.monto != null) set.add(normalizeViajeMoneda(v.monedaMonto));
-  if (!viajeUsaFlotaPropia(v) && (v.precioTransportistaExterno ?? 0) > 0) {
-    set.add(normalizeViajeMoneda(v.monedaPrecioTransportistaExterno));
+  if (getMontoIngreso(v) != null) set.add(getMonedaIngreso(v));
+  if (!viajeUsaFlotaPropia(v) && (getCostoTransportista(v) ?? 0) > 0) {
+    set.add(getMonedaCostoTransportista(v));
   }
   for (const g of v.otrosGastos ?? []) {
     set.add(normalizeViajeMoneda(g.moneda));
@@ -189,7 +230,6 @@ export function monedasImplicadasEnViaje(v: Viaje): MonedaBalance[] {
   return ORDEN_MONEDA.filter((m) => set.has(m));
 }
 
-/** Ingresos y egresos por moneda; balance = ingresos − costo transp. − gastos extra. */
 export function desgloseBalancesPorMoneda(
   v: Viaje,
 ): Record<MonedaBalance, DesgloseMoneda> {
@@ -199,17 +239,16 @@ export function desgloseBalancesPorMoneda(
   };
   const gastos = v.otrosGastos ?? [];
 
-  if (v.monto != null) {
-    const monedaIng = normalizeViajeMoneda(v.monedaMonto);
-    out[monedaIng].ingresos = v.monto;
+  const ingreso = getMontoIngreso(v);
+  if (ingreso != null) {
+    const monedaIng = getMonedaIngreso(v);
+    out[monedaIng].ingresos = ingreso;
   }
 
   if (!viajeUsaFlotaPropia(v)) {
-    const costo = v.precioTransportistaExterno ?? 0;
+    const costo = getCostoTransportista(v) ?? 0;
     if (costo > 0) {
-      const monedaCosto = normalizeViajeMoneda(
-        v.monedaPrecioTransportistaExterno,
-      );
+      const monedaCosto = getMonedaCostoTransportista(v);
       out[monedaCosto].costoTransportista = costo;
     }
   }
@@ -250,16 +289,19 @@ function parrafosTooltipPorMoneda(
   moneda: MonedaBalance,
   d: DesgloseMoneda,
   flotaPropia: boolean,
+  v: Viaje,
 ): string[] {
   const lines: string[] = [];
   if (d.ingresos > 0) {
+    const label = esIngresoReal(v) ? "Real facturado" : "Estimado";
     lines.push(
-      `Ingresos (${moneda}): +${formatViajeImporteForListado(d.ingresos, moneda)}`,
+      `Ingresos (${moneda}): +${formatViajeImporteForListado(d.ingresos, moneda)} (${label})`,
     );
   }
   if (d.costoTransportista > 0) {
+    const label = esCostoReal(v) ? "Real liquidado" : "Estimado";
     lines.push(
-      `Transportista externo (${moneda}): −${formatViajeImporteForListado(d.costoTransportista, moneda)}`,
+      `Transportista externo (${moneda}): −${formatViajeImporteForListado(d.costoTransportista, moneda)} (${label})`,
     );
   } else if (!flotaPropia && d.ingresos > 0 && monedaTieneMovimiento(d)) {
     lines.push(`Transportista externo (${moneda}): sin cargo (0).`);
@@ -301,7 +343,8 @@ function gananciaBrutaMetaAutomatica(
   paragraphs: string[],
   flotaPropia: boolean,
 ): GananciaBrutaMeta {
-  if (v.monto == null) {
+  const ingMonto = getMontoIngreso(v);
+  if (ingMonto == null) {
     paragraphs.push("Imp. a facturar − Trans. ext. − Gastos extra");
     paragraphs.push("Importe a facturar sin cargar en este viaje.");
     return { display: "—", tooltipParagraphs: paragraphs };
@@ -318,7 +361,7 @@ function gananciaBrutaMetaAutomatica(
     );
     for (const moneda of monedas) {
       paragraphs.push(
-        ...parrafosTooltipPorMoneda(moneda, desglose[moneda], flotaPropia),
+        ...parrafosTooltipPorMoneda(moneda, desglose[moneda], flotaPropia, v),
       );
     }
     paragraphs.push(...parrafosPagoTransportista(v));
@@ -329,13 +372,13 @@ function gananciaBrutaMetaAutomatica(
     };
   }
 
-  const moneda = monedas[0] ?? normalizeViajeMoneda(v.monedaMonto);
+  const moneda = monedas[0] ?? getMonedaIngreso(v);
   const d = desglose[moneda];
   paragraphs.push("Imp. a facturar − Trans. ext. − Gastos extra");
   if (flotaPropia) {
     paragraphs.push("Transportista externo: sin cargo (flota propia).");
   }
-  paragraphs.push(...parrafosTooltipPorMoneda(moneda, d, flotaPropia));
+  paragraphs.push(...parrafosTooltipPorMoneda(moneda, d, flotaPropia, v));
   if (d.gastosExtra <= 0) {
     paragraphs.push("Sin otros gastos.");
   }

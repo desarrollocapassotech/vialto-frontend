@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { Landmark, Receipt } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -13,6 +13,9 @@ import {
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { useTenantsList } from "@/hooks/useTenantsList";
+import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
@@ -56,6 +59,8 @@ function fmtDate(iso: string) {
 function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
+
+// a
 
 function caeCell(liq: LiquidacionConTransportista) {
   if (liq.cae) {
@@ -192,16 +197,27 @@ function LiquidacionAcciones({
 }
 
 export function LiquidacionesTenantPage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
+  const { user } = useUser();
+  const tenants = useTenantsList();
+  const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
   const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
 
-  const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
+  // ─── VALIDACIÓN DE ROL E INYECCIÓN DE TENANT ──────────────────────────────
+  const isSuperAdmin = Boolean(
+    user?.publicMetadata?.role === "superadmin" ||
+    user?.unsafeMetadata?.role === "superadmin" ||
+    JSON.stringify(sessionClaims || {})
+      .toLowerCase()
+      .includes("superadmin"),
+  );
 
+  const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
+
+  const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // Estado para el filtro
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
     "todos",
   );
@@ -239,22 +255,36 @@ export function LiquidacionesTenantPage() {
     );
   }
 
+  // ─── FETCH INICIAL ────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    if (!activeTenantId) {
+      setRows(null);
+      setConfig(null);
+      return;
+    }
+
     let cancelled = false;
+    const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+
     void (async () => {
       try {
         const [data, cfg] = await Promise.all([
           apiJson<LiquidacionConTransportista[]>(
-            "/api/integracion-arca/liquidaciones",
+            `/api/integracion-arca/liquidaciones${qsTenant}`, // <-- Ruta corregida
             () => getToken(),
           ),
-          apiJson<ArcaConfig | null>("/api/integracion-arca/config", () =>
-            getToken(),
+          apiJson<ArcaConfig | null>(
+            `/api/integracion-arca/config${qsTenant}`,
+            () =>
+              // <-- Ruta corregida
+              getToken(),
           ).catch(() => null),
         ]);
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
+          setError(null);
         }
       } catch (err) {
         if (!cancelled) setError(friendlyError(err, "arca"));
@@ -263,7 +293,7 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken]);
+  }, [getToken, isLoaded, isSignedIn, activeTenantId]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
@@ -278,8 +308,9 @@ export function LiquidacionesTenantPage() {
     setActionError(null);
     setBusyId(liq.id);
     try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}${qsTenant}`, // <-- Ruta corregida
         () => getToken(),
         { method: "DELETE" },
       );
@@ -298,8 +329,9 @@ export function LiquidacionesTenantPage() {
     setActionError(null);
     setBusyId(liq.id);
     try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`, // <-- Ruta corregida
         () => getToken(),
         { method: "POST" },
       );
@@ -317,8 +349,9 @@ export function LiquidacionesTenantPage() {
   async function descargarPdf(liq: LiquidacionConTransportista) {
     setDownloading(liq.id);
     try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const res = await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf`,
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`, // <-- Ruta corregida
         () => getToken(),
       );
       if (!res.ok) throw new Error("Error al generar el PDF");
@@ -347,7 +380,25 @@ export function LiquidacionesTenantPage() {
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      onVer: () => setDetail({ mode: "view", liq }),
+      onVer: () => {
+        void (async () => {
+          try {
+            const full = await apiJson<LiquidacionConTransportista>(
+              `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+              () => getToken(),
+            );
+            setDetail({
+              mode: "view",
+              liq: {
+                ...full,
+                transportista: full.transportista ?? liq.transportista,
+              },
+            });
+          } catch {
+            setDetail({ mode: "view", liq });
+          }
+        })();
+      },
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
       onAnular: () => setAnularConfirm(liq),
@@ -358,7 +409,6 @@ export function LiquidacionesTenantPage() {
     };
   }
 
-  // Filtramos primero la data según el select
   const filteredRows = rows
     ? estadoFilter === "todos"
       ? rows
@@ -368,7 +418,6 @@ export function LiquidacionesTenantPage() {
   const totalItems = filteredRows ? filteredRows.length : 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  // Meta que pasa al componente de paginación
   const meta = {
     total: totalItems,
     page,
@@ -378,7 +427,6 @@ export function LiquidacionesTenantPage() {
     hasNext: page < totalPages,
   };
 
-  // Reducimos los datos de la pagina actual para la tabla en base a los filtrados
   const paginatedRows = filteredRows
     ? filteredRows.slice((page - 1) * pageSize, page * pageSize)
     : null;
@@ -389,62 +437,87 @@ export function LiquidacionesTenantPage() {
         Liquidaciones
       </h1>
       <p className="mt-1 text-sm text-vialto-steel">
-        {hasArca
-          ? "Comprobantes CVLP tipo 60 emitidos a transportistas."
-          : "Liquidaciones emitidas a transportistas."}
+        {isSuperAdmin
+          ? "Elegí una empresa para ver y gestionar sus liquidaciones."
+          : hasArca
+            ? "Comprobantes CVLP tipo 60 emitidos a transportistas."
+            : "Liquidaciones emitidas a transportistas."}
       </p>
-      {hasArca && (
+
+      {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
+      {isSuperAdmin && (
+        <div className="mt-6">
+          <EmpresaFilterBar
+            tenants={tenants}
+            value={filtroEmpresa}
+            onChange={(id) => {
+              setPage(1);
+              setRows(null);
+              setError(null);
+              onChangeTenant(id);
+            }}
+          />
+        </div>
+      )}
+
+      {hasArca && activeTenantId && (
         <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
           <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
           Emisión electrónica vía ARCA
         </div>
       )}
+
       <div className="mt-4">
-        {error && (
-          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        {isSuperAdmin && error && (
+          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
             {error}
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
-          {/* Select de filtro por estado */}
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="estadoFilter"
-              className="text-sm font-medium text-vialto-charcoal"
-            >
-              Estado:
-            </label>
-            <select
-              id="estadoFilter"
-              value={estadoFilter}
-              onChange={(e) => {
-                setEstadoFilter(e.target.value as LiquidacionEstado | "todos");
-                setPage(1); // Reiniciamos la página a 1 cuando cambian el filtro
-              }}
-              className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-vialto-charcoal shadow-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-            >
-              <option value="todos">Todos los estados</option>
-              {Object.entries(ESTADO_LABEL).map(([val, label]) => (
-                <option key={val} value={val}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          <div className="flex justify-end gap-2">
-            {!hasArca && (
-              <button
-                type="button"
-                onClick={() => setShowCrear(true)}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+        {activeTenantId && (!error || !isSuperAdmin) && (
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="estadoFilter"
+                className="text-sm font-medium text-vialto-charcoal"
               >
-                Nueva liquidación
-              </button>
-            )}
+                Estado:
+              </label>
+              <select
+                id="estadoFilter"
+                value={estadoFilter}
+                onChange={(e) => {
+                  setEstadoFilter(
+                    e.target.value as LiquidacionEstado | "todos",
+                  );
+                  setPage(1);
+                }}
+                className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-vialto-charcoal shadow-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+              >
+                <option value="todos">Todos los estados</option>
+                {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              {!hasArca && (
+                <button
+                  type="button"
+                  onClick={() => setShowCrear(true)}
+                  className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+                >
+                  Nueva liquidación
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
       <ListadoDatos
         className="mt-6"
         columns={[
@@ -523,12 +596,16 @@ export function LiquidacionesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : paginatedRows}
+        rows={!activeTenantId || error ? [] : paginatedRows}
         rowKey={(liq) => liq.id}
         emptyMessage={
-          error
-            ? "No se pudieron cargar las liquidaciones."
-            : "Todavía no hay liquidaciones..."
+          !activeTenantId
+            ? isSuperAdmin
+              ? "Seleccioná una empresa para ver las liquidaciones."
+              : "Cargando datos de empresa..."
+            : error
+              ? "No se pudieron cargar las liquidaciones."
+              : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
         renderActions={(liq) => <LiquidacionAcciones {...accionesProps(liq)} />}
@@ -569,33 +646,39 @@ export function LiquidacionesTenantPage() {
           />
         )}
       />
-      {/*Componente de paginación */}
-      {filteredRows && filteredRows.length > 0 && (
-        <ListadoPagination
-          meta={meta}
-          pageSize={pageSize}
-          onPageChange={(newPage) => setPage(newPage)}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
-            setPage(1);
-          }}
-        />
-      )}
-      {pendingEmitir && hasArca && (
+
+      {activeTenantId &&
+        (!error || !isSuperAdmin) &&
+        filteredRows &&
+        filteredRows.length > 0 && (
+          <ListadoPagination
+            meta={meta}
+            pageSize={pageSize}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
+        )}
+
+      {pendingEmitir && hasArca && activeTenantId && (
         <EmitirLiquidacionModal
           liq={pendingEmitir}
           getToken={getToken}
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
+          tenantId={activeTenantId}
         />
       )}
-      {showCrear && (
+      {showCrear && activeTenantId && (
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           config={config}
           getToken={getToken}
+          tenantId={activeTenantId}
           onSuccess={(liq) => {
             setRows((prev) =>
               prev
@@ -662,7 +745,7 @@ export function LiquidacionesTenantPage() {
       {detail?.mode === "view" && (
         <LiquidacionViewModal
           liq={detail.liq}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
@@ -674,11 +757,12 @@ export function LiquidacionesTenantPage() {
         />
       )}
 
-      {detail?.mode === "edit" && (
+      {detail?.mode === "edit" && activeTenantId && (
         <LiquidacionEditModal
           liq={detail.liq}
           hasArca={hasArca}
           getToken={getToken}
+          tenantId={activeTenantId}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
           onSaved={(updated) => {
             setRows(

@@ -90,8 +90,10 @@ export function LiquidacionViewModal({
 
   const transportistaNombre =
     liq.transportista?.nombre ?? liq.transportistaId;
-  const ivaBase = liq.bruto - liq.comision - liq.gastosAdmin;
-  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
+  const conceptosLineas = liq.conceptosLineas ?? [];
+  const netoGravado =
+    Math.round((liq.liquido - liq.gastosAdminIva) * 100) / 100;
+  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : "IVA";
 
   return (
     <ViewModalShell
@@ -156,10 +158,17 @@ export function LiquidacionViewModal({
             label={`Comisión (${liq.comisionPct}%)`}
             value={fmtMoney(liq.comision)}
           />
-          {liq.gastosAdmin > 0 && (
-            <Campo label="Gastos admin." value={fmtMoney(liq.gastosAdmin)} />
-          )}
-          <Campo label="Neto gravado" value={fmtMoney(ivaBase)} />
+          {conceptosLineas.map((l) => {
+            const signed = l.signo === "favor" ? l.monto : -l.monto;
+            return (
+              <Campo
+                key={l.id}
+                label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
+                value={`${signed >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(signed))}`}
+              />
+            );
+          })}
+          <Campo label="Neto gravado" value={fmtMoney(netoGravado)} />
           <Campo label={ivaLabel} value={fmtMoney(liq.gastosAdminIva)} />
           <Campo label="Total neto a liquidar" value={fmtMoney(liq.liquido)} />
           <Campo

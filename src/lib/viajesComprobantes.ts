@@ -28,6 +28,8 @@ export function viajePendienteComprobanteTransportista(v: Viaje): boolean {
  * En viajes duales, no se oculta al emitir solo la factura al cliente.
  */
 export function viajePermiteBotonFacturar(v: Viaje): boolean {
+  if (viajeTieneFacturaAsignada(v)) return false;
+  
   const e = String(v.estado).trim().toLowerCase();
   if (e === 'cancelado' || e === 'cobrado' || e === 'finalizado_cobrado') return false;
 
