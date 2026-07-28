@@ -174,6 +174,7 @@ export function TenantHomePage() {
 
       {organization && !loading && !error && tenant && (
         <TenantOwnerDashboard
+          tenantId={tenant.id}
           modules={tenant.modules}
           dash={dash}
           onViewViaje={(id) => void handleViewViaje(id)}

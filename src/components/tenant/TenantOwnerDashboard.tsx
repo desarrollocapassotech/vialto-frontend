@@ -709,6 +709,7 @@ export function AlertsPanel({ alertas, onViewFactura, loadingFacturaId, onViewVi
 }
 
 interface TenantOwnerDashboardProps {
+  tenantId: string;
   modules: string[];
   dash: ReturnType<typeof useTenantOwnerDashboard>;
   onViewViaje?: (id: string) => void;
@@ -717,7 +718,7 @@ interface TenantOwnerDashboardProps {
 
 type ModuloDashboardTab = 'financiero' | 'stock' | 'combustible';
 
-export function TenantOwnerDashboard({ modules, dash, onViewViaje, loadingViajeId }: TenantOwnerDashboardProps) {
+export function TenantOwnerDashboard({ tenantId, modules, dash, onViewViaje, loadingViajeId }: TenantOwnerDashboardProps) {
   const showViajes = canAccessViajes(modules);
   const showFacturacionModulo = canAccessFacturacion(modules);
   const showStock = canAccessStock(modules);
@@ -1075,7 +1076,7 @@ export function TenantOwnerDashboard({ modules, dash, onViewViaje, loadingViajeI
       )}
 
       {moduloActivo === 'combustible' && showCombustible && (
-        <CombustibleDashboardSection dash={dash} showViajes={showViajes} />
+        <CombustibleDashboardSection tenantId={tenantId} dash={dash} showViajes={showViajes} />
       )}
     </div>
   );
