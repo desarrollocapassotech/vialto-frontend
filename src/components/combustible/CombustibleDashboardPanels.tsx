@@ -732,6 +732,7 @@ const CHART_H = 220;
 const CHART_PAD = { top: 16, right: 16, bottom: 28, left: 56 };
 const PLOT_H = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
 
+/** Mide en px el ancho real del elemento referenciado y lo mantiene actualizado ante resize. */
 function useChartWidth<T extends HTMLElement>(): [
   React.RefObject<T | null>,
   number,
