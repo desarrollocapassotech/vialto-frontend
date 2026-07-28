@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
@@ -74,6 +75,7 @@ export function LiquidacionEditModal({
           ivaPct: l.ivaPct,
         })),
   );
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
   const [lineasLoading, setLineasLoading] = useState(canEditDatos);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(
@@ -155,6 +157,15 @@ export function LiquidacionEditModal({
     if (canEditDatos && lineasLoading) {
       setError("Esperá a que terminen de cargar los conceptos.");
       return;
+    }
+    if (canEditDatos) {
+      const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+      if (!conceptosCheck.ok) {
+        setConceptosIncomplete(conceptosCheck.indices);
+        setError(conceptosCheck.message);
+        return;
+      }
+      setConceptosIncomplete([]);
     }
     setSaving(true);
     setError(null);
@@ -352,8 +363,12 @@ export function LiquidacionEditModal({
             <ConceptosLiquidacionLineasEditor
               getToken={getToken}
               lineas={conceptosLineas}
-              onChange={setConceptosLineas}
+              onChange={(next) => {
+                setConceptosLineas(next);
+                setConceptosIncomplete([]);
+              }}
               disabled={saving || lineasLoading}
+              incompleteIndices={conceptosIncomplete}
             />
           </>
         ) : (
