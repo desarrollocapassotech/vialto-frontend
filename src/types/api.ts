@@ -529,6 +529,8 @@ export interface Liquidacion {
   bruto: number;
   comisionPct: number;
   comision: number;
+  /** Alícuota IVA (%) aplicada a esta liquidación (snapshot). */
+  ivaPct?: number;
   gastosAdmin: number;
   gastosAdminIva: number;
   liquido: number;

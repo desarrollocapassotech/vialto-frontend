@@ -158,6 +158,7 @@ export function EmitirLiquidacionModal({
 
   const source = detail ?? liq;
   const conceptosLineas = source.conceptosLineas ?? [];
+  const ivaPctEfectivo = source.ivaPct ?? ivaPct;
   const missingEmitFields = useMemo(
     () =>
       collectCvlpEmitMissingFields({
@@ -273,13 +274,6 @@ export function EmitirLiquidacionModal({
                 value={fmtMoney(source.comision)}
                 muted
               />
-              {(source.gastosAdmin ?? 0) > 0 && (
-                <Fila
-                  label="Otras"
-                  value={fmtMoney(source.gastosAdmin)}
-                  muted
-                />
-              )}
               {conceptosLineas.map((l) => {
                 const signed = l.signo === "favor" ? l.monto : -l.monto;
                 return (
@@ -292,7 +286,8 @@ export function EmitirLiquidacionModal({
                 );
               })}
               {(() => {
-                const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
+                const ivaLabel =
+                  ivaPctEfectivo != null ? `IVA ${ivaPctEfectivo}%` : "IVA";
                 return (
                   <>
                     <Fila

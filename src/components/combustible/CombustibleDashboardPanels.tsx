@@ -4,7 +4,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
@@ -424,19 +424,16 @@ export function ChoferRankingTable({
 
 // ── Distribución (estación / forma de pago) — gráfico de torta ──────────
 
-// Paleta categórica fija — primeros 4 slots del orden validado (únicos 4 que
-// pasan CVD "all-pairs", necesario acá porque en una torta cualquier par de
-// porciones puede terminar siendo vecino, a diferencia de una barra apilada).
 const DONUT_HUES = [
   "#2a78d6", // blue
   "#008300", // green
   "#e87ba4", // magenta
   "#eda100", // yellow
 ];
-const DONUT_OTRAS_HUE = "#c3c2b7"; // gris — no es identidad de serie, es "el resto"
-const DONUT_MAX_SLICES = 4; // + 1 balde "Otras" si sobran más
-const DONUT_GAP_PCT = 0.6; // separador entre porciones, en % de circunferencia
-const DONUT_R = 15.9155; // truco clásico: 2πr ≈ 100, así el % mapea directo al dasharray
+const DONUT_OTRAS_HUE = "#c3c2b7";
+const DONUT_MAX_SLICES = 4;
+const DONUT_GAP_PCT = 0.6;
+const DONUT_R = 15.9155;
 
 type DonutSlice = {
   clave: string;
@@ -624,11 +621,11 @@ export function fmtFormaPagoClave(clave: string): string {
 // ── Alertas ──────────────────────────────────────────────────────────────
 
 export function AlertasList({
-  alertas,
   tenantId,
+  alertas,
 }: {
+  tenantId: string;
   alertas: CombustibleAlerta[];
-  tenantId: string; // <-- AÑADIDO
 }) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
@@ -644,7 +641,6 @@ export function AlertasList({
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
       <table className="w-full text-sm">
-        {/* ... (el thead queda exactamente igual) ... */}
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
@@ -722,7 +718,7 @@ export function AlertasList({
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
-          tenantId={tenantId} // ✅ AQUÍ SE LO PASAMOS
+          tenantId={tenantId}
           onClose={() => setViewingCargaId(null)}
         />
       )}
@@ -732,9 +728,6 @@ export function AlertasList({
 
 // ── Evolución (precio por litro / costo por km) ─────────────────────────
 
-// Alto fijo del gráfico, independiente del ancho — el ancho se mide del contenedor
-// real (ver useChartWidth) y se usa 1:1 como viewBox, así el trazo, los puntos y el
-// texto de los ejes quedan en tamaño físico fijo sin importar cuán ancho sea el dashboard.
 const CHART_H = 220;
 const CHART_PAD = { top: 16, right: 16, bottom: 28, left: 56 };
 const PLOT_H = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
@@ -791,6 +784,7 @@ function EvolucionChartBase({
   unidadSufijo: string;
   mensajeVacio: string;
 }) {
+  const navigate = useNavigate();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [containerRef, chartW] = useChartWidth<HTMLDivElement>();
   const plotW = Math.max(0, chartW - CHART_PAD.left - CHART_PAD.right);
@@ -815,7 +809,6 @@ function EvolucionChartBase({
   const primero = puntos[0].valor;
   const ultimo = puntos[puntos.length - 1].valor;
 
-  // Escala Y con "aire" arriba/abajo y ticks en números redondos.
   const rango = maxVal - minVal;
   const colchon = rango > 0 ? rango * 0.2 : Math.max(1, maxVal * 0.1 || 1);
   const yMin = Math.max(0, minVal - colchon);
@@ -849,7 +842,6 @@ function EvolucionChartBase({
       ? `${pathD} L ${coords[coords.length - 1].x.toFixed(1)} ${baseY} L ${coords[0].x.toFixed(1)} ${baseY} Z`
       : "";
 
-  // Máximo ~6 etiquetas en el eje X para que no se amontonen con muchos puntos.
   const maxXLabels = 6;
   const labelStep = Math.max(1, Math.ceil(puntos.length / maxXLabels));
   const xLabelIndices = new Set<number>();
@@ -870,6 +862,22 @@ function EvolucionChartBase({
       }
     });
     setHoverIndex(nearest);
+  }
+
+  function handleChartClick() {
+    if (hoverIndex !== null) {
+      const p = coords[hoverIndex].p;
+      const qs = new URLSearchParams();
+
+      const fechaPunto = p.desde ? p.desde.split("T")[0] : "";
+
+      if (fechaPunto) {
+        qs.set("from", fechaPunto);
+        qs.set("to", fechaPunto);
+
+        navigate(`/combustible?${qs.toString()}`);
+      }
+    }
   }
 
   const hovered = hoverIndex !== null ? coords[hoverIndex] : null;
@@ -984,6 +992,8 @@ function EvolucionChartBase({
             fill="transparent"
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIndex(null)}
+            onClick={handleChartClick}
+            className={hoverIndex !== null ? "cursor-pointer" : ""}
           />
         </svg>
 
@@ -999,6 +1009,9 @@ function EvolucionChartBase({
               {fmtValor(hovered.p.valor)}
             </p>
             <p className="text-vialto-steel">{hovered.p.etiqueta}</p>
+            <p className="mt-1 font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.1em] text-vialto-fire">
+              Ver cargas →
+            </p>
           </div>
         )}
       </div>
@@ -1038,7 +1051,12 @@ export function EvolucionPrecioChart({
 }) {
   return (
     <EvolucionChartBase
-      puntos={puntos.map((p) => ({ ...p, valor: p.precioPromedio }))}
+      puntos={puntos.map((p: any) => ({
+        ...p,
+        valor: p.precioPromedio,
+        desde: p.desde || p.fechaInicio || p.fecha,
+        hasta: p.hasta || p.fechaFin || p.fecha,
+      }))}
       titulo="Evolución del precio pagado por litro"
       descripcion="Precio promedio ($/L) pagado en cada tramo del período seleccionado."
       unidadSufijo="/L"
@@ -1054,7 +1072,13 @@ export function EvolucionCostoPorKmChart({
 }) {
   return (
     <EvolucionChartBase
-      puntos={puntos.map((p) => ({ ...p, valor: p.costoPorKm }))}
+      puntos={puntos.map((p: any) => ({
+        ...p,
+        valor: p.costoPorKm,
+        // ⚠️ Igual que arriba, aseguramos el mapeo de las fechas.
+        desde: p.desde || p.fechaInicio || p.fecha,
+        hasta: p.hasta || p.fechaFin || p.fecha,
+      }))}
       titulo="Evolución del costo por km recorrido"
       descripcion="Costo promedio ($/km) de la flota en cada tramo del período seleccionado."
       unidadSufijo="/km"

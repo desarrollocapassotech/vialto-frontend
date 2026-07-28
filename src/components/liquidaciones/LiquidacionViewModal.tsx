@@ -93,7 +93,7 @@ export function LiquidacionViewModal({
   const conceptosLineas = liq.conceptosLineas ?? [];
   const netoGravado =
     Math.round((liq.liquido - liq.gastosAdminIva) * 100) / 100;
-  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : "IVA";
+  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : "IVA";
 
   return (
     <ViewModalShell
@@ -158,9 +158,6 @@ export function LiquidacionViewModal({
             label={`Comisión (${liq.comisionPct}%)`}
             value={fmtMoney(liq.comision)}
           />
-          {liq.gastosAdmin > 0 && (
-            <Campo label="Gastos admin." value={fmtMoney(liq.gastosAdmin)} />
-          )}
           {conceptosLineas.map((l) => {
             const signed = l.signo === "favor" ? l.monto : -l.monto;
             return (

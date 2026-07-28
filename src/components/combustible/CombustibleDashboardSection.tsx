@@ -54,9 +54,11 @@ function periodToDates(
 }
 
 export function CombustibleDashboardSection({
+  tenantId,
   dash,
   showViajes,
 }: {
+  tenantId: string;
   dash: ReturnType<typeof useTenantOwnerDashboard>;
   showViajes: boolean;
 }) {
@@ -130,8 +132,6 @@ export function CombustibleDashboardSection({
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
   ];
 
-  const { orgId } = useAuth();
-
   return (
     <section id="combustible-heading" aria-label="Combustible">
       <div
@@ -198,7 +198,7 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && (
-          <AlertasList alertas={data?.alertas ?? []} tenantId={orgId ?? ""} />
+          <AlertasList tenantId={tenantId} alertas={data?.alertas ?? []} />
         )}
         {tab === "viajes" && showViajes && (
           <ViajesCruceTable items={data?.viajesCruce ?? []} />
