@@ -1096,7 +1096,12 @@ export function ViajesTenantPage({
       showToast(MSG_ARCA_NO_FACTURA_USD, "error");
       return;
     }
-    setTipoFacturaViaje(v);
+    // Tipo A/B solo aplica con integración ARCA; sin ARCA va directo al registro manual.
+    if (hasLiquidacionesArca) {
+      setTipoFacturaViaje(v);
+    } else {
+      void navigateToFacturacion(v);
+    }
   }
 
   async function navigateToFacturacion(v: Viaje, letra?: FacturaLetra) {
@@ -2356,8 +2361,13 @@ export function ViajesTenantPage({
               showToast(MSG_ARCA_NO_FACTURA_USD, "error");
               return;
             }
-            setTipoFacturaViaje(selectorViaje);
+            const v = selectorViaje;
             setSelectorViaje(null);
+            if (hasLiquidacionesArca) {
+              setTipoFacturaViaje(v);
+            } else {
+              void navigateToFacturacion(v);
+            }
           }}
           onLiquidacion={() => {
             if (
