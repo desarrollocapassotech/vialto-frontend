@@ -5,6 +5,18 @@ export const FORMA_PAGO_LABELS: Record<string, string> = {
   tarjeta: "Tarjeta",
 };
 
+// Debe coincidir exactamente con la lista de la app del chofer
+// (vialto-combustible/src/components/NewLoadForm.tsx). Si se agrega o
+// renombra una estación ahí, replicar el cambio acá.
+export const SERVICE_STATIONS = [
+  "YPF",
+  "GOTTIG",
+  "AGRO",
+  "AXION",
+  "LA PAZ",
+  "OTRA",
+] as const;
+
 export const TIPO_VEHICULO_LABELS: Record<string, string> = {
   tractor: "Tractor",
   semirremolque: "Semirremolque",
