@@ -8,7 +8,7 @@ import {
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { FORMA_PAGO_LABELS } from "@/lib/combustibleLabels";
+import { FORMA_PAGO_LABELS, SERVICE_STATIONS } from "@/lib/combustibleLabels";
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
@@ -62,6 +62,7 @@ export function CargaCombustibleEditModal({
   const [choferSeleccionado, setChoferSeleccionado] = useState(initialChoferId);
   const [vehiculoSeleccionado, setVehiculoSeleccionado] =
     useState(initialVehiculoId);
+  const [estacion, setEstacion] = useState(carga.estacion ?? "");
 
   const defaultDate = toLocalDateString(carga.fecha);
   const [fecha, setFecha] = useState(defaultDate);
@@ -136,7 +137,7 @@ export function CargaCombustibleEditModal({
       fecha: payloadDate.toISOString(),
       choferId: choferSeleccionado || null,
       vehiculoId: vehiculoSeleccionado || null,
-      estacion: fd.get("estacion"),
+      estacion,
       litros: Number(fd.get("litros")),
       precioPorLitro: fd.get("precioPorLitro")
         ? Number(fd.get("precioPorLitro"))
@@ -284,14 +285,27 @@ export function CargaCombustibleEditModal({
             >
               Estación de Servicio
             </label>
-            <input
-              type="text"
+            <select
               id="estacion"
               name="estacion"
-              defaultValue={carga.estacion}
+              value={estacion}
+              onChange={(e) => setEstacion(e.target.value)}
               required
-              className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-            />
+              className="rounded border border-black/20 bg-white p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+            >
+              <option value="" disabled>
+                Seleccionar
+              </option>
+              {estacion &&
+                !SERVICE_STATIONS.includes(
+                  estacion as (typeof SERVICE_STATIONS)[number],
+                ) && <option value={estacion}>{estacion}</option>}
+              {SERVICE_STATIONS.map((station) => (
+                <option key={station} value={station}>
+                  {station}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col">
