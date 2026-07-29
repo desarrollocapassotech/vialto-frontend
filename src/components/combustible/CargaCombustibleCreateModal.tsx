@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast";
 import {
   FORMA_PAGO_LABELS,
   SERVICE_STATIONS,
+  computePrecioPorLitro,
   fmtTipoVehiculo,
 } from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
@@ -181,6 +182,18 @@ export function CargaCombustibleCreateModal({
     km: "",
     formaPago: "",
   });
+
+  // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
+  const [precioManual, setPrecioManual] = useState(false);
+
+  useEffect(() => {
+    if (precioManual) return;
+    setFormData((prev) => {
+      const calculado = computePrecioPorLitro(prev.litros, prev.importe);
+      if (prev.precioPorLitro === calculado) return prev;
+      return { ...prev, precioPorLitro: calculado };
+    });
+  }, [formData.litros, formData.importe, precioManual]);
 
   // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
   const importeError = useMemo(() => {
@@ -373,21 +386,6 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Precio por Litro *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="precioPorLitro"
-                required
-                value={formData.precioPorLitro}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
               <label className={labelClass}>Monto Total *</label>
               <input
                 type="number"
@@ -403,6 +401,40 @@ export function CargaCombustibleCreateModal({
               {importeError && (
                 <p className="mt-1 text-xs font-semibold text-red-600">
                   ⚠️ {importeError}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-vialto-steel">
+                  Precio por Litro *
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={precioManual}
+                    onChange={(e) => setPrecioManual(e.target.checked)}
+                    className="accent-vialto-charcoal"
+                  />
+                  Editar manualmente
+                </label>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="precioPorLitro"
+                required
+                disabled={!precioManual}
+                value={formData.precioPorLitro}
+                onChange={handleChange}
+                className={`${inputClass} disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel`}
+                placeholder="0.00"
+              />
+              {!precioManual && (
+                <p className="mt-1 text-xs italic text-vialto-steel">
+                  Se calcula automáticamente
                 </p>
               )}
             </div>
