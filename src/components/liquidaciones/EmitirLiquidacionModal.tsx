@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Receipt } from "lucide-react";
+import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { apiJson } from "@/lib/api";
 import {
   collectCvlpEmitMissingFields,
@@ -34,10 +35,6 @@ const CBTE_TIPO: Record<number, string> = {
   1: "Factura A",
   6: "Factura B",
 };
-
-function fmtMoney(n: number) {
-  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function fmtDate(iso: string) {
   if (!iso) return "—";
@@ -157,7 +154,6 @@ export function EmitirLiquidacionModal({
   }, [liq.id, getToken, detalleUrl, configUrl, arcaConfigProp, liq]);
 
   const source = detail ?? liq;
-  const conceptosLineas = source.conceptosLineas ?? [];
   const ivaPctEfectivo = source.ivaPct ?? ivaPct;
   const missingEmitFields = useMemo(
     () =>
@@ -203,9 +199,6 @@ export function EmitirLiquidacionModal({
   }
 
   const cbteTipoLabel = CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`;
-  /** Neto implícito del total persistido (incluye efecto de conceptos). */
-  const netoGravado =
-    Math.round((source.liquido - source.gastosAdminIva) * 100) / 100;
 
   return (
     <div
@@ -268,47 +261,18 @@ export function EmitirLiquidacionModal({
                 muted
               />
               <Fila label="Viajes" value={source.cantViajes} muted />
-              <Fila label="Sub total" value={fmtMoney(source.bruto)} />
-              <Fila
-                label={`Comisión según convenio ${source.comisionPct}%`}
-                value={fmtMoney(source.comision)}
-                muted
-              />
-              {conceptosLineas.map((l) => {
-                const signed = l.signo === "favor" ? l.monto : -l.monto;
-                return (
-                  <Fila
-                    key={l.id}
-                    label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
-                    value={`${signed >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(signed))}`}
-                    muted
-                  />
-                );
-              })}
-              {(() => {
-                const ivaLabel =
-                  ivaPctEfectivo != null ? `IVA ${ivaPctEfectivo}%` : "IVA";
-                return (
-                  <>
-                    <Fila
-                      label="Neto gravado"
-                      value={fmtMoney(netoGravado)}
-                      separator
-                    />
-                    <Fila
-                      label={ivaLabel}
-                      value={fmtMoney(source.gastosAdminIva)}
-                      muted
-                    />
-                    <Fila
-                      label="Total neto a liquidar"
-                      value={fmtMoney(source.liquido)}
-                      bold
-                      separator
-                    />
-                  </>
-                );
-              })()}
+              <div className="border-t border-black/10 mt-1 pt-1">
+                <LiquidacionMontosBreakdown
+                  variant="filas"
+                  bruto={source.bruto}
+                  comision={source.comision}
+                  comisionPct={source.comisionPct}
+                  conceptosLineas={source.conceptosLineas}
+                  gastosAdminIva={source.gastosAdminIva}
+                  ivaPct={ivaPctEfectivo}
+                  liquido={source.liquido}
+                />
+              </div>
             </div>
           </div>
 

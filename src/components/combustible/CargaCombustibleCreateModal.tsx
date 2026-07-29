@@ -3,7 +3,11 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import {
+  FORMA_PAGO_LABELS,
+  SERVICE_STATIONS,
+  fmtTipoVehiculo,
+} from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -149,6 +153,11 @@ interface Props {
   vehiculos: VehiculoOpt[];
   choferes: ChoferOpt[];
   tenantId?: string;
+  /**
+   * Última carga registrada por vehículo (lookup por vehiculoId).
+   * Se usa para validar que el km ingresado no sea inferior al último.
+   */
+  cargasPorVehiculo?: Record<string, { km: number; fecha: string }[]>;
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
@@ -157,6 +166,7 @@ export function CargaCombustibleCreateModal({
   tenantId,
   vehiculos,
   choferes,
+  cargasPorVehiculo = {},
   onClose,
   onSuccess,
 }: Props) {
@@ -195,6 +205,44 @@ export function CargaCombustibleCreateModal({
     return null;
   }, [formData.litros, formData.precioPorLitro, formData.importe]);
 
+  // Validación del kilometraje en tiempo real:
+  // 1) solo números/puntos, 2) no inferior al de la última carga del vehículo.
+  const kmError = useMemo(() => {
+    if (!formData.km) return null;
+
+    if (!/^[\d.]+$/.test(formData.km)) {
+      return "El kilometraje solo puede contener números.";
+    }
+
+    const kmSanitizado = parseInt(formData.km.replace(/\./g, ""), 10);
+    if (isNaN(kmSanitizado)) {
+      return "El kilometraje ingresado no es válido.";
+    }
+
+    const historial = formData.vehiculoId
+      ? (cargasPorVehiculo[formData.vehiculoId] ?? [])
+      : [];
+    const nuevaFecha = formData.fecha; // "YYYY-MM-DD"
+    const fmt = (iso: string) =>
+      iso.slice(0, 10).split("-").reverse().join("/");
+
+    // Carga anterior o del mismo día (fecha <= la nueva): actúa como piso.
+    const anterior = historial
+      .filter((c) => c.fecha.slice(0, 10) <= nuevaFecha)
+      .pop();
+    if (anterior && kmSanitizado < anterior.km) {
+      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser inferior al de la carga anterior registrada el ${fmt(anterior.fecha)} (${anterior.km} km).`;
+    }
+
+    // Carga posterior (fecha estrictamente mayor): actúa como techo.
+    const posterior = historial.find((c) => c.fecha.slice(0, 10) > nuevaFecha);
+    if (posterior && kmSanitizado > posterior.km) {
+      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser superior al de la carga posterior registrada el ${fmt(posterior.fecha)} (${posterior.km} km).`;
+    }
+
+    return null;
+  }, [formData.km, formData.vehiculoId, formData.fecha, cargasPorVehiculo]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -208,6 +256,13 @@ export function CargaCombustibleCreateModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Red de seguridad: no enviar si hay errores de validación en pantalla.
+    if (importeError || kmError) {
+      showToast("Revisá los datos antes de guardar", "error");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -313,15 +368,22 @@ export function CargaCombustibleCreateModal({
 
             <div>
               <label className={labelClass}>Estación *</label>
-              <input
-                type="text"
+              <select
                 name="estacion"
                 required
-                placeholder="Ej: YPF Ruta 9"
                 value={formData.estacion}
                 onChange={handleChange}
                 className={inputClass}
-              />
+              >
+                <option value="" disabled>
+                  Seleccione estación...
+                </option>
+                {SERVICE_STATIONS.map((station) => (
+                  <option key={station} value={station}>
+                    {station}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -408,6 +470,11 @@ export function CargaCombustibleCreateModal({
                 className={inputClass}
                 placeholder="Ej: 450.000"
               />
+              {kmError && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  ⚠️ {kmError}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -439,7 +506,7 @@ export function CargaCombustibleCreateModal({
             </button>
             <button
               type="submit"
-              disabled={loading || Boolean(importeError)}
+              disabled={loading || Boolean(importeError) || Boolean(kmError)}
               className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
             >
               {loading ? "Guardando..." : "Guardar Carga"}
