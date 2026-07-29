@@ -189,9 +189,9 @@ export function LiquidacionEditModal({
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
         }
-        if (ivaPct.trim() !== "") {
-          body.ivaPct = Number(ivaPct);
-        }
+        // Siempre enviar IVA explícito cuando se editan datos (incluye 0 = sin IVA).
+        body.ivaPct =
+          ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
       if (showComprobante) {
