@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast";
 import {
   FORMA_PAGO_LABELS,
   SERVICE_STATIONS,
+  computePrecioPorLitro,
   fmtTipoVehiculo,
 } from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
@@ -188,10 +189,19 @@ export function CargaCombustibleCreateModal({
     formaPago: "",
   });
 
+  // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
+  const [precioManual, setPrecioManual] = useState(false);
+
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // nunca quede un frame con un precio desactualizado frente a la validación.
+  const precioMostrado = precioManual
+    ? formData.precioPorLitro
+    : computePrecioPorLitro(formData.litros, formData.importe);
+
   // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
   const importeError = useMemo(() => {
     const litros = Number(formData.litros);
-    const precio = Number(formData.precioPorLitro);
+    const precio = Number(precioMostrado);
     const importe = Number(formData.importe);
     if (!litros || !precio || !importe) return null;
     const esperado = litros * precio;
@@ -203,7 +213,7 @@ export function CargaCombustibleCreateModal({
       )}).`;
     }
     return null;
-  }, [formData.litros, formData.precioPorLitro, formData.importe]);
+  }, [formData.litros, precioMostrado, formData.importe]);
 
   // Validación del kilometraje en tiempo real:
   // 1) solo números/puntos, 2) no inferior al de la última carga del vehículo.
@@ -250,6 +260,17 @@ export function CargaCombustibleCreateModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setFormData((prev) => ({
+        ...prev,
+        precioPorLitro: computePrecioPorLitro(prev.litros, prev.importe),
+      }));
+    }
+    setPrecioManual(checked);
+  };
+
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -277,7 +298,7 @@ export function CargaCombustibleCreateModal({
         ...formData,
         choferId: formData.choferId || null,
         litros: Number(formData.litros),
-        precioPorLitro: Number(formData.precioPorLitro),
+        precioPorLitro: Number(precioMostrado),
         importe: Number(formData.importe),
         km: kmSanitizado,
       };
@@ -424,21 +445,6 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Precio por Litro *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="precioPorLitro"
-                required
-                value={formData.precioPorLitro}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
               <label className={labelClass}>Monto Total *</label>
               <input
                 type="number"
@@ -454,6 +460,40 @@ export function CargaCombustibleCreateModal({
               {importeError && (
                 <p className="mt-1 text-xs font-semibold text-red-600">
                   ⚠️ {importeError}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-vialto-steel">
+                  Precio por Litro *
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={precioManual}
+                    onChange={(e) => handlePrecioManualToggle(e.target.checked)}
+                    className="accent-vialto-charcoal"
+                  />
+                  Editar manualmente
+                </label>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="precioPorLitro"
+                required
+                disabled={!precioManual}
+                value={precioMostrado}
+                onChange={handleChange}
+                className={`${inputClass} disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel`}
+                placeholder="0.00"
+              />
+              {!precioManual && (
+                <p className="mt-1 text-xs italic text-vialto-steel">
+                  Se calcula automáticamente
                 </p>
               )}
             </div>
