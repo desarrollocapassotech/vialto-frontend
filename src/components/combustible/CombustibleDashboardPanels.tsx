@@ -621,11 +621,11 @@ export function fmtFormaPagoClave(clave: string): string {
 // ── Alertas ──────────────────────────────────────────────────────────────
 
 export function AlertasList({
-  tenantId,
   alertas,
+  tenantId,
 }: {
-  tenantId: string;
   alertas: CombustibleAlerta[];
+  tenantId: string; // <-- AÑADIDO
 }) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
@@ -641,6 +641,7 @@ export function AlertasList({
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
       <table className="w-full text-sm">
+        {/* ... (el thead queda exactamente igual) ... */}
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
