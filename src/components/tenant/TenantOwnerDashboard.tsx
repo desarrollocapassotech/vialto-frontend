@@ -1179,7 +1179,11 @@ export function TenantOwnerDashboard({
       )}
 
       {moduloActivo === "combustible" && showCombustible && (
-        <CombustibleDashboardSection tenantId={tenantId} dash={dash} showViajes={showViajes} />
+        <CombustibleDashboardSection
+          tenantId={tenantId}
+          dash={dash}
+          showViajes={showViajes}
+        />
       )}
     </div>
   );
