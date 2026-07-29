@@ -3,7 +3,11 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import {
+  FORMA_PAGO_LABELS,
+  SERVICE_STATIONS,
+  fmtTipoVehiculo,
+} from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -313,15 +317,22 @@ export function CargaCombustibleCreateModal({
 
             <div>
               <label className={labelClass}>Estación *</label>
-              <input
-                type="text"
+              <select
                 name="estacion"
                 required
-                placeholder="Ej: YPF Ruta 9"
                 value={formData.estacion}
                 onChange={handleChange}
                 className={inputClass}
-              />
+              >
+                <option value="" disabled>
+                  Seleccione estación...
+                </option>
+                {SERVICE_STATIONS.map((station) => (
+                  <option key={station} value={station}>
+                    {station}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
