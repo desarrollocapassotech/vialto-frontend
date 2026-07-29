@@ -612,7 +612,7 @@ export function CrearLiquidacionManualModal({
                     className="flex justify-between items-baseline text-xs text-vialto-steel"
                   >
                     <span>
-                      {l.nombreSnapshot || "Concepto"}
+                      {l.nombre || "Concepto"}
                       {l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}
                     </span>
                     <span className="tabular-nums">
