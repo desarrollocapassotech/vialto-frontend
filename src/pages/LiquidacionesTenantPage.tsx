@@ -202,7 +202,6 @@ export function LiquidacionesTenantPage() {
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
-  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
 
   // ─── VALIDACIÓN DE ROL E INYECCIÓN DE TENANT ──────────────────────────────
   const isSuperAdmin = Boolean(
@@ -214,6 +213,10 @@ export function LiquidacionesTenantPage() {
   );
 
   const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
+  const empresaModules = isSuperAdmin
+    ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
+    : (tenant?.modules ?? []);
+  const hasArca = canAccessIntegracionArca(empresaModules);
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -269,18 +272,16 @@ export function LiquidacionesTenantPage() {
 
     void (async () => {
       try {
-        const [data, cfg] = await Promise.all([
-          apiJson<LiquidacionConTransportista[]>(
-            `/api/integracion-arca/liquidaciones${qsTenant}`, // <-- Ruta corregida
-            () => getToken(),
-          ),
-          apiJson<ArcaConfig | null>(
-            `/api/integracion-arca/config${qsTenant}`,
-            () =>
-              // <-- Ruta corregida
-              getToken(),
-          ).catch(() => null),
-        ]);
+        const data = await apiJson<LiquidacionConTransportista[]>(
+          `/api/integracion-arca/liquidaciones${qsTenant}`,
+          () => getToken(),
+        );
+        const cfg = hasArca
+          ? await apiJson<ArcaConfig | null>(
+              `/api/integracion-arca/config${qsTenant}`,
+              () => getToken(),
+            ).catch(() => null)
+          : null;
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
@@ -293,7 +294,7 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, activeTenantId]);
+  }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
