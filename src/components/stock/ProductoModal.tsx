@@ -37,6 +37,7 @@ export function ProductoModal({
   onEdit,
   baseUrl = "/api/stock/productos",
   tenantId,
+  tenantModules,
 }: {
   modo: "create" | "edit" | "view";
   productoInicial?: Producto;
@@ -46,6 +47,8 @@ export function ProductoModal({
   onEdit?: () => void;
   baseUrl?: string;
   tenantId?: string;
+  /** Módulos del tenant objetivo (p. ej. superadmin). Si no se pasa, se usa el tenant actual. */
+  tenantModules?: string[];
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
   const presentacionesUrl = tenantId
@@ -54,11 +57,14 @@ export function ProductoModal({
 
   const { tenant, tenantLoading } = useMaestroData();
   const { showToast } = useToast();
-  const showStock = tenantId
-    ? true
-    : tenantLoading
-      ? false
-      : canAccessStock(tenant?.modules ?? []);
+  const showStock =
+    tenantModules !== undefined
+      ? canAccessStock(tenantModules)
+      : tenantId
+        ? true
+        : tenantLoading
+          ? false
+          : canAccessStock(tenant?.modules ?? []);
 
   const [nombre, setNombre] = useState(productoInicial?.nombre ?? "");
   const [descripcion, setDescripcion] = useState(
