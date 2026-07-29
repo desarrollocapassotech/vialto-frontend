@@ -99,9 +99,18 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
     void (async () => {
       try {
         const cfg = await apiJson<ArcaConfig>('/api/integracion-arca/config', () => getToken());
-        if (!cancelled) setArcaConfig(cfg);
+        if (!cancelled) {
+          setArcaConfig(cfg);
+          // Precargar IVA del tenant (o 21) para que el valor elegido se envíe siempre.
+          setIvaPct((prev) =>
+            prev === '' ? String(cfg.ivaGastosAdmin ?? 21) : prev,
+          );
+        }
       } catch {
         // config no disponible — la validación de emisión lo reporta
+        if (!cancelled) {
+          setIvaPct((prev) => (prev === '' ? '21' : prev));
+        }
       }
       if (viaje.transportistaId) {
         try {
@@ -197,6 +206,14 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       setError(conceptosCheck.message);
       return;
     }
+    const ivaResolved =
+      ivaPct.trim() !== ''
+        ? Number(ivaPct)
+        : (arcaConfig?.ivaGastosAdmin ?? 21);
+    if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
+      setError('El IVA debe ser un número entre 0 y 100.');
+      return;
+    }
     setConceptosIncomplete([]);
     setError(null);
     setBusyCrear(true);
@@ -209,7 +226,8 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
         cbteTipo,
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
-      if (ivaPct.trim() !== '') body.ivaPct = Number(ivaPct);
+      // Siempre enviar IVA explícito para no caer al default silencioso del backend.
+      body.ivaPct = ivaResolved;
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       let liq = await apiJson<Liquidacion>(
@@ -560,16 +578,13 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                     step="0.01"
                     value={ivaPct}
                     onChange={(e) => setIvaPct(e.target.value)}
-                    placeholder={
-                      arcaConfig != null ? String(arcaConfig.ivaGastosAdmin) : ''
-                    }
                     className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
                   />
                   <span className="text-xs text-vialto-steel">%</span>
                 </div>
                 <p className="text-xs text-vialto-steel">
-                  Vacío usa el default del tenant
-                  {arcaConfig != null ? ` (${arcaConfig.ivaGastosAdmin}%).` : '.'}
+                  Por defecto se aplica {arcaConfig?.ivaGastosAdmin ?? 21}%. Para
+                  liquidar sin IVA ingresá 0.
                 </p>
               </section>
 
