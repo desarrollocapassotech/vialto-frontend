@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useRef, useState } from 'react';
 import { ArcaCertificadoModal } from '@/components/liquidaciones/ArcaCertificadoModal';
 import { ConceptosLiquidacionConfigSection } from '@/components/liquidaciones/ConceptosLiquidacionConfigSection';
@@ -8,6 +8,7 @@ import { useToast } from '@/lib/toast';
 import { Spinner } from '@/components/ui/Spinner';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { isPlatformSuperadmin } from '@/lib/roleLabels';
 import type { ArcaConfig } from '@/types/api';
 
 const CONDICION_IVA = [
@@ -168,6 +169,8 @@ function SectionCard({
 
 export function ArcaConfigTenantPage() {
   const { getToken } = useAuth();
+  const { user } = useUser();
+  const canEditAmbiente = isPlatformSuperadmin(user?.publicMetadata);
   const { showToast } = useToast();
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<FormValues>(EMPTY);
@@ -213,7 +216,10 @@ export function ArcaConfigTenantPage() {
   }
 
   function sectionDirty(keys: readonly (keyof FormValues)[]) {
-    return !existing || keys.some((k) => values[k] !== savedValues[k]);
+    const comparable = canEditAmbiente
+      ? keys
+      : keys.filter((k) => k !== 'ambiente');
+    return !existing || comparable.some((k) => values[k] !== savedValues[k]);
   }
 
   /**
@@ -229,6 +235,10 @@ export function ArcaConfigTenantPage() {
     const v: FormValues = { ...savedValues };
     for (const k of keys) (v as Record<string, string>)[k] = values[k];
     Object.assign(v, overrides ?? {});
+    // No-superadmin: el ambiente siempre sale del valor persistido.
+    if (!canEditAmbiente) {
+      v.ambiente = savedValues.ambiente;
+    }
     const touched = new Set<keyof FormValues>([...keys, ...(Object.keys(overrides ?? {}) as (keyof FormValues)[])]);
 
     // Todavía no hay config guardada: no existe un "cuitEmisor" persistido que reusar, así
@@ -594,12 +604,18 @@ export function ArcaConfigTenantPage() {
                 <select
                   id="ambiente"
                   value={values.ambiente}
+                  disabled={!canEditAmbiente}
                   onChange={(e) => set('ambiente', e.target.value as FormValues['ambiente'])}
-                  className={inputClass}
+                  className={`${inputClass}${!canEditAmbiente ? ' cursor-not-allowed bg-vialto-mist opacity-90' : ''}`}
                 >
                   <option value="homologacion">Homologación (testing)</option>
                   <option value="produccion">Producción</option>
                 </select>
+                {!canEditAmbiente && (
+                  <p className="text-xs text-vialto-steel">
+                    Solo el superadmin de plataforma puede cambiar el ambiente.
+                  </p>
+                )}
               </div>
             </div>
             {values.ambiente === 'produccion' && (
