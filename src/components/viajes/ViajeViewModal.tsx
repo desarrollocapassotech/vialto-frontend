@@ -149,12 +149,10 @@ export function ViajeViewModal({
       isVisible("detalle_viaje", c.key),
   );
 
-  const ESTADOS_LIQUIDACION_BLOQUEAN = ["pendiente_cae", "autorizado", "error"];
-
   const bloqueadoPorFactura = Boolean(viaje.factura);
   const bloqueadoPorLiquidacion =
-    viaje.liquidacionesViaje?.some((lv) =>
-      ESTADOS_LIQUIDACION_BLOQUEAN.includes(lv.liquidacion.estado)
+    viaje.liquidacionesViaje?.some(
+      (lv) => lv.liquidacion.estado !== "anulado"
     ) ?? false;
   const bloqueadoPorComprobante = bloqueadoPorFactura || bloqueadoPorLiquidacion;
 
@@ -230,7 +228,7 @@ export function ViajeViewModal({
                 ? "No se puede editar: el viaje ya fue facturado y/o liquidado."
                 : undefined
             }
-            className={`${viewModalBtnPrimary} disabled:cursor-wait${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : ""}`}
+            className={`${viewModalBtnPrimary}${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : bloqueado ? " cursor-wait" : ""}`}
           >
             {editando ? (
               <span className="inline-flex items-center gap-1.5">
