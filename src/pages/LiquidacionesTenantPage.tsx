@@ -392,10 +392,22 @@ export function LiquidacionesTenantPage() {
               liq: {
                 ...full,
                 transportista: full.transportista ?? liq.transportista,
+                conceptosLineas:
+                  full.conceptosLineas ?? liq.conceptosLineas ?? [],
               },
             });
-          } catch {
-            setDetail({ mode: "view", liq });
+          } catch (err) {
+            setActionError({
+              id: liq.id,
+              msg: friendlyError(err, "liquidaciones"),
+            });
+            setDetail({
+              mode: "view",
+              liq: {
+                ...liq,
+                conceptosLineas: liq.conceptosLineas ?? [],
+              },
+            });
           }
         })();
       },
@@ -747,6 +759,7 @@ export function LiquidacionesTenantPage() {
           liq={detail.liq}
           ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
+          getToken={getToken}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
           onVerComprobante={
@@ -764,12 +777,20 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           tenantId={activeTenantId}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
-          onSaved={(updated) => {
+      onSaved={(updated) => {
+            const withLineas = {
+              ...updated,
+              transportista:
+                updated.transportista ?? detail.liq.transportista,
+              conceptosLineas:
+                updated.conceptosLineas ?? detail.liq.conceptosLineas ?? [],
+            };
             setRows(
               (prev) =>
-                prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+                prev?.map((r) => (r.id === withLineas.id ? withLineas : r)) ??
+                prev,
             );
-            setDetail({ mode: "view", liq: updated });
+            setDetail({ mode: "view", liq: withLineas });
           }}
         />
       )}
