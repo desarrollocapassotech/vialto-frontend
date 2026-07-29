@@ -131,7 +131,6 @@ export function CombustibleDashboardSection({
     },
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
   ];
-  const { orgId } = useAuth();
 
   return (
     <section id="combustible-heading" aria-label="Combustible">
@@ -199,7 +198,7 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && (
-          <AlertasList alertas={data?.alertas ?? []} tenantId={orgId ?? ""} />
+          <AlertasList alertas={data?.alertas ?? []} tenantId={tenantId} />
         )}
         {tab === "viajes" && showViajes && (
           <ViajesCruceTable items={data?.viajesCruce ?? []} />
