@@ -81,20 +81,26 @@ export function CargaCombustibleEditModal({
   // (p. ej. si el usuario solo corrige la fecha y no toca el precio).
   const [precioManual, setPrecioManual] = useState(true);
 
-  useEffect(() => {
-    if (precioManual) return;
-    setPrecioPorLitro((prev) => {
-      const calculado = computePrecioPorLitro(litros, importe);
-      return prev === calculado ? prev : calculado;
-    });
-  }, [litros, importe, precioManual]);
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // la validación de coherencia nunca vea un precio desactualizado.
+  const precioMostrado = precioManual
+    ? precioPorLitro
+    : computePrecioPorLitro(litros, importe);
+
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setPrecioPorLitro(computePrecioPorLitro(litros, importe));
+    }
+    setPrecioManual(checked);
+  };
 
   const { formErrors } = useCombustibleValidation(
     getToken,
     vehiculoSeleccionado,
     fecha,
     litros,
-    precioPorLitro,
+    precioMostrado,
     importe,
     km,
     carga.id,
@@ -155,7 +161,7 @@ export function CargaCombustibleEditModal({
       vehiculoId: vehiculoSeleccionado || null,
       estacion,
       litros: Number(fd.get("litros")),
-      precioPorLitro: Number(precioPorLitro),
+      precioPorLitro: Number(precioMostrado),
       importe: Number(fd.get("importe")),
       km: Number(fd.get("km")),
       formaPago: formaPago,
@@ -377,7 +383,7 @@ export function CargaCombustibleEditModal({
                 <input
                   type="checkbox"
                   checked={precioManual}
-                  onChange={(e) => setPrecioManual(e.target.checked)}
+                  onChange={(e) => handlePrecioManualToggle(e.target.checked)}
                   className="accent-vialto-charcoal"
                 />
                 Editar manualmente
@@ -388,7 +394,7 @@ export function CargaCombustibleEditModal({
               step="0.01"
               id="precioPorLitro"
               name="precioPorLitro"
-              value={precioPorLitro}
+              value={precioMostrado}
               onChange={(e) => setPrecioPorLitro(e.target.value)}
               disabled={!precioManual}
               required

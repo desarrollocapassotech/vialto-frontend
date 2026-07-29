@@ -186,19 +186,16 @@ export function CargaCombustibleCreateModal({
   // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
   const [precioManual, setPrecioManual] = useState(false);
 
-  useEffect(() => {
-    if (precioManual) return;
-    setFormData((prev) => {
-      const calculado = computePrecioPorLitro(prev.litros, prev.importe);
-      if (prev.precioPorLitro === calculado) return prev;
-      return { ...prev, precioPorLitro: calculado };
-    });
-  }, [formData.litros, formData.importe, precioManual]);
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // nunca quede un frame con un precio desactualizado frente a la validación.
+  const precioMostrado = precioManual
+    ? formData.precioPorLitro
+    : computePrecioPorLitro(formData.litros, formData.importe);
 
   // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
   const importeError = useMemo(() => {
     const litros = Number(formData.litros);
-    const precio = Number(formData.precioPorLitro);
+    const precio = Number(precioMostrado);
     const importe = Number(formData.importe);
     if (!litros || !precio || !importe) return null;
     const esperado = litros * precio;
@@ -210,13 +207,24 @@ export function CargaCombustibleCreateModal({
       )}).`;
     }
     return null;
-  }, [formData.litros, formData.precioPorLitro, formData.importe]);
+  }, [formData.litros, precioMostrado, formData.importe]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setFormData((prev) => ({
+        ...prev,
+        precioPorLitro: computePrecioPorLitro(prev.litros, prev.importe),
+      }));
+    }
+    setPrecioManual(checked);
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -239,7 +247,7 @@ export function CargaCombustibleCreateModal({
         ...formData,
         choferId: formData.choferId || null,
         litros: Number(formData.litros),
-        precioPorLitro: Number(formData.precioPorLitro),
+        precioPorLitro: Number(precioMostrado),
         importe: Number(formData.importe),
         km: kmSanitizado,
       };
@@ -414,7 +422,7 @@ export function CargaCombustibleCreateModal({
                   <input
                     type="checkbox"
                     checked={precioManual}
-                    onChange={(e) => setPrecioManual(e.target.checked)}
+                    onChange={(e) => handlePrecioManualToggle(e.target.checked)}
                     className="accent-vialto-charcoal"
                   />
                   Editar manualmente
@@ -427,7 +435,7 @@ export function CargaCombustibleCreateModal({
                 name="precioPorLitro"
                 required
                 disabled={!precioManual}
-                value={formData.precioPorLitro}
+                value={precioMostrado}
                 onChange={handleChange}
                 className={`${inputClass} disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel`}
                 placeholder="0.00"
