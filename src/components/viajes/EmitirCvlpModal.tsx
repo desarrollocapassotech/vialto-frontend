@@ -101,7 +101,12 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
         const cfg = await apiJson<ArcaConfig>('/api/integracion-arca/config', () => getToken());
         if (!cancelled) {
           setArcaConfig(cfg);
-          // Precargar IVA del tenant (o 21) para que el valor elegido se envíe siempre.
+          // Precargar comisión e IVA de Configuración ARCA (editables; vacío = fallback).
+          setComisionPct((prev) =>
+            prev === '' && cfg.comisionPctDefault != null
+              ? String(cfg.comisionPctDefault)
+              : prev,
+          );
           setIvaPct((prev) =>
             prev === '' ? String(cfg.ivaGastosAdmin ?? 21) : prev,
           );
@@ -550,15 +555,12 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                     step="0.01"
                     value={comisionPct}
                     onChange={(e) => setComisionPct(e.target.value)}
-                    placeholder={
-                      arcaConfig != null ? String(arcaConfig.comisionPctDefault) : ''
-                    }
                     className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
                   />
                   <span className="text-xs text-vialto-steel">%</span>
                 </div>
                 <p className="text-xs text-vialto-steel">
-                  Vacío usa el default del tenant
+                  Si lo dejás vacío se usa el default del tenant
                   {arcaConfig != null
                     ? ` (${arcaConfig.comisionPctDefault}%).`
                     : '.'}
@@ -583,8 +585,11 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                   <span className="text-xs text-vialto-steel">%</span>
                 </div>
                 <p className="text-xs text-vialto-steel">
-                  Por defecto se aplica {arcaConfig?.ivaGastosAdmin ?? 21}%. Para
-                  liquidar sin IVA ingresá 0.
+                  Para liquidar sin IVA ingresá 0. Si lo dejás vacío se usa el
+                  default del tenant
+                  {arcaConfig != null
+                    ? ` (${arcaConfig.ivaGastosAdmin ?? 21}%).`
+                    : ' (21%).'}
                 </p>
               </section>
 
