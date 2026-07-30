@@ -60,6 +60,8 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
 
+// a
+
 function caeCell(liq: LiquidacionConTransportista) {
   if (liq.cae) {
     return (
@@ -200,7 +202,6 @@ export function LiquidacionesTenantPage() {
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
-  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
 
   // ─── VALIDACIÓN DE ROL E INYECCIÓN DE TENANT ──────────────────────────────
   const isSuperAdmin = Boolean(
@@ -212,6 +213,10 @@ export function LiquidacionesTenantPage() {
   );
 
   const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
+  const empresaModules = isSuperAdmin
+    ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
+    : (tenant?.modules ?? []);
+  const hasArca = canAccessIntegracionArca(empresaModules);
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -267,18 +272,16 @@ export function LiquidacionesTenantPage() {
 
     void (async () => {
       try {
-        const [data, cfg] = await Promise.all([
-          apiJson<LiquidacionConTransportista[]>(
-            `/api/integracion-arca/liquidaciones${qsTenant}`, // <-- Ruta corregida
-            () => getToken(),
-          ),
-          apiJson<ArcaConfig | null>(
-            `/api/integracion-arca/config${qsTenant}`,
-            () =>
-              // <-- Ruta corregida
-              getToken(),
-          ).catch(() => null),
-        ]);
+        const data = await apiJson<LiquidacionConTransportista[]>(
+          `/api/integracion-arca/liquidaciones${qsTenant}`,
+          () => getToken(),
+        );
+        const cfg = hasArca
+          ? await apiJson<ArcaConfig | null>(
+              `/api/integracion-arca/config${qsTenant}`,
+              () => getToken(),
+            ).catch(() => null)
+          : null;
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
@@ -291,7 +294,7 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, activeTenantId]);
+  }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
@@ -390,10 +393,22 @@ export function LiquidacionesTenantPage() {
               liq: {
                 ...full,
                 transportista: full.transportista ?? liq.transportista,
+                conceptosLineas:
+                  full.conceptosLineas ?? liq.conceptosLineas ?? [],
               },
             });
-          } catch {
-            setDetail({ mode: "view", liq });
+          } catch (err) {
+            setActionError({
+              id: liq.id,
+              msg: friendlyError(err, "liquidaciones"),
+            });
+            setDetail({
+              mode: "view",
+              liq: {
+                ...liq,
+                conceptosLineas: liq.conceptosLineas ?? [],
+              },
+            });
           }
         })();
       },
@@ -666,7 +681,7 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           onSuccess={onEmitirSuccess}
           onClose={() => setPendingEmitir(null)}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
           tenantId={activeTenantId}
         />
@@ -743,8 +758,9 @@ export function LiquidacionesTenantPage() {
       {detail?.mode === "view" && (
         <LiquidacionViewModal
           liq={detail.liq}
-          ivaPct={config?.ivaGastosAdmin}
+          ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
+          getToken={getToken}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
           onVerComprobante={
@@ -762,12 +778,20 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           tenantId={activeTenantId}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
-          onSaved={(updated) => {
+      onSaved={(updated) => {
+            const withLineas = {
+              ...updated,
+              transportista:
+                updated.transportista ?? detail.liq.transportista,
+              conceptosLineas:
+                updated.conceptosLineas ?? detail.liq.conceptosLineas ?? [],
+            };
             setRows(
               (prev) =>
-                prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+                prev?.map((r) => (r.id === withLineas.id ? withLineas : r)) ??
+                prev,
             );
-            setDetail({ mode: "view", liq: updated });
+            setDetail({ mode: "view", liq: withLineas });
           }}
         />
       )}

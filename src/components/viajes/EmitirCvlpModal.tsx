@@ -4,9 +4,12 @@ import { useAuth } from '@clerk/clerk-react';
 import { Receipt } from 'lucide-react';
 import {
   ConceptosLiquidacionLineasEditor,
+  isConceptoLineaCompleta,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
 } from '@/components/liquidaciones/ConceptosLiquidacionLineasEditor';
+import { LiquidacionMontosBreakdown } from '@/components/liquidaciones/LiquidacionMontosBreakdown';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
 import {
   ARCA_CBTE_OVERRIDE_WARNING,
@@ -41,6 +44,23 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Conceptos persistidos, o borrador del formulario si la respuesta aún no los trae. */
+function conceptosParaDetalle(
+  liq: Liquidacion | null,
+  drafts: ConceptoLineaDraft[],
+) {
+  if (liq?.conceptosLineas && liq.conceptosLineas.length > 0) {
+    return liq.conceptosLineas;
+  }
+  return drafts.filter(isConceptoLineaCompleta).map((l, i) => ({
+    id: `draft-${i}-${l.conceptoLiquidacionId}`,
+    nombreSnapshot: l.nombre?.trim() || 'Concepto',
+    signo: (l.signo ?? 'favor') as 'favor' | 'contra',
+    monto: Number(l.monto) || 0,
+    ivaPct: l.ivaPct ?? null,
+  }));
+}
+
 export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -58,7 +78,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [periodoDesde, setPeriodoDesde] = useState('');
   const [periodoHasta, setPeriodoHasta] = useState('');
   const [comisionPct, setComisionPct] = useState('');
+  const [ivaPct, setIvaPct] = useState('');
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>([]);
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,9 +99,18 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
     void (async () => {
       try {
         const cfg = await apiJson<ArcaConfig>('/api/integracion-arca/config', () => getToken());
-        if (!cancelled) setArcaConfig(cfg);
+        if (!cancelled) {
+          setArcaConfig(cfg);
+          // Precargar IVA del tenant (o 21) para que el valor elegido se envíe siempre.
+          setIvaPct((prev) =>
+            prev === '' ? String(cfg.ivaGastosAdmin ?? 21) : prev,
+          );
+        }
       } catch {
         // config no disponible — la validación de emisión lo reporta
+        if (!cancelled) {
+          setIvaPct((prev) => (prev === '' ? '21' : prev));
+        }
       }
       if (viaje.transportistaId) {
         try {
@@ -169,6 +200,21 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       );
       return;
     }
+    const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+    if (!conceptosCheck.ok) {
+      setConceptosIncomplete(conceptosCheck.indices);
+      setError(conceptosCheck.message);
+      return;
+    }
+    const ivaResolved =
+      ivaPct.trim() !== ''
+        ? Number(ivaPct)
+        : (arcaConfig?.ivaGastosAdmin ?? 21);
+    if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
+      setError('El IVA debe ser un número entre 0 y 100.');
+      return;
+    }
+    setConceptosIncomplete([]);
     setError(null);
     setBusyCrear(true);
     try {
@@ -180,13 +226,29 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
         cbteTipo,
       };
       if (comisionPct.trim() !== '') body.comisionPct = Number(comisionPct);
+      // Siempre enviar IVA explícito para no caer al default silencioso del backend.
+      body.ivaPct = ivaResolved;
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
-      const liq = await apiJson<Liquidacion>(
+      let liq = await apiJson<Liquidacion>(
         '/api/integracion-arca/liquidaciones',
         () => getToken(),
         { method: 'POST', body: JSON.stringify(body) },
       );
+      // Asegurar líneas en el detalle (por si el create no las devolvió).
+      if (
+        lineasPayload.length > 0 &&
+        !(liq.conceptosLineas && liq.conceptosLineas.length > 0)
+      ) {
+        try {
+          liq = await apiJson<Liquidacion>(
+            `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+            () => getToken(),
+          );
+        } catch {
+          /* se usa fallback del draft en UI */
+        }
+      }
       setLiquidacion(liq);
       setStep('creada');
       onEmitido(liq);
@@ -504,11 +566,38 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               </section>
 
               <section className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
+                  IVA
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="ivaPct"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={ivaPct}
+                    onChange={(e) => setIvaPct(e.target.value)}
+                    className="w-52 h-9 border border-black/20 px-3 text-sm focus:outline-none focus:border-vialto-charcoal"
+                  />
+                  <span className="text-xs text-vialto-steel">%</span>
+                </div>
+                <p className="text-xs text-vialto-steel">
+                  Por defecto se aplica {arcaConfig?.ivaGastosAdmin ?? 21}%. Para
+                  liquidar sin IVA ingresá 0.
+                </p>
+              </section>
+
+              <section className="space-y-2">
                 <ConceptosLiquidacionLineasEditor
                   getToken={getToken}
                   lineas={conceptosLineas}
-                  onChange={setConceptosLineas}
+                  onChange={(next) => {
+                    setConceptosLineas(next);
+                    setConceptosIncomplete([]);
+                  }}
                   disabled={busyCrear}
+                  incompleteIndices={conceptosIncomplete}
                 />
               </section>
 
@@ -589,13 +678,18 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Tipo" value={cvlpCbteLabel((liquidacion.cbteTipo === 61 ? 61 : 60) as CvlpCbteTipo)} />
                 <Row label="Transportista" value={transportistaNombre} />
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
-                <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
-                <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
-                <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
-                  <span>Líquido a pagar</span>
-                  <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
-                </div>
+                <LiquidacionMontosBreakdown
+                  variant="rows"
+                  brutoLabel="Bruto"
+                  totalLabel="Líquido a pagar"
+                  bruto={liquidacion.bruto}
+                  comision={liquidacion.comision}
+                  comisionPct={liquidacion.comisionPct}
+                  conceptosLineas={conceptosParaDetalle(liquidacion, conceptosLineas)}
+                  gastosAdminIva={liquidacion.gastosAdminIva}
+                  ivaPct={liquidacion.ivaPct ?? arcaConfig?.ivaGastosAdmin}
+                  liquido={liquidacion.liquido}
+                />
               </section>
 
               {datosEmitIncompletos && (
@@ -655,13 +749,18 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
                 <Row label="Tipo" value={cvlpCbteLabel((liquidacion.cbteTipo === 61 ? 61 : 60) as CvlpCbteTipo)} />
                 <Row label="Transportista" value={transportistaNombre} />
                 <Row label="Período" value={`${fmtDate(liquidacion.periodoDesde.slice(0, 10))} — ${fmtDate(liquidacion.periodoHasta.slice(0, 10))}`} />
-                <Row label="Bruto" value={fmtMoney(liquidacion.bruto)} />
-                <Row label={`Comisión (${liquidacion.comisionPct}%)`} value={fmtMoney(liquidacion.comision)} />
-                <Row label={`IVA (${arcaConfig?.ivaGastosAdmin ?? '—'}%)`} value={fmtMoney(liquidacion.gastosAdminIva)} />
-                <div className="flex justify-between text-xs font-semibold text-vialto-charcoal border-t border-black/10 pt-1.5 mt-0.5">
-                  <span>Líquido a pagar</span>
-                  <span className="tabular-nums">{fmtMoney(liquidacion.liquido)}</span>
-                </div>
+                <LiquidacionMontosBreakdown
+                  variant="rows"
+                  brutoLabel="Bruto"
+                  totalLabel="Líquido a pagar"
+                  bruto={liquidacion.bruto}
+                  comision={liquidacion.comision}
+                  comisionPct={liquidacion.comisionPct}
+                  conceptosLineas={conceptosParaDetalle(liquidacion, conceptosLineas)}
+                  gastosAdminIva={liquidacion.gastosAdminIva}
+                  ivaPct={liquidacion.ivaPct ?? arcaConfig?.ivaGastosAdmin}
+                  liquido={liquidacion.liquido}
+                />
               </section>
 
               {error && (

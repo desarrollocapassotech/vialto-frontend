@@ -9,6 +9,11 @@ import type { ConceptoLiquidacion, ConceptoLiquidacionSigno } from '@/types/api'
 export type ConceptoLineaDraft = {
   conceptoLiquidacionId: string;
   monto: number;
+  /**
+   * Texto crudo del input de monto. Vacío al agregar una fila para no mostrar "0"
+   * (si no, al tipear queda "0100"). Si falta, se deriva de `monto`.
+   */
+  montoStr?: string;
   nombre?: string;
   signo?: ConceptoLiquidacionSigno;
   ivaPct?: number;
@@ -32,17 +37,65 @@ function signedMonto(signo: ConceptoLiquidacionSigno | undefined, monto: number)
   return signo === 'favor' ? monto : -monto;
 }
 
+function montoStrFromNumber(monto: number): string {
+  return Number.isFinite(monto) && monto > 0 ? String(monto) : '';
+}
+
+function parseMontoInput(raw: string): number {
+  if (raw.trim() === '') return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function displayMontoStr(linea: ConceptoLineaDraft): string {
+  return linea.montoStr ?? montoStrFromNumber(linea.monto);
+}
+
+/** Una fila agregada cuenta como incompleta si falta concepto o el monto no es > 0. */
+export function isConceptoLineaCompleta(l: ConceptoLineaDraft): boolean {
+  return Boolean(l.conceptoLiquidacionId) && Number(l.monto) > 0;
+}
+
+export function findIncompleteConceptosLineas(
+  lineas: ConceptoLineaDraft[],
+): number[] {
+  return lineas
+    .map((l, i) => (isConceptoLineaCompleta(l) ? -1 : i))
+    .filter((i) => i >= 0);
+}
+
+/** Bloquea guardar si hay filas agregadas sin completar (evita ignorarlas en silencio). */
+export function validateConceptosLineasDraft(
+  lineas: ConceptoLineaDraft[],
+): { ok: true } | { ok: false; message: string; indices: number[] } {
+  const indices = findIncompleteConceptosLineas(lineas);
+  if (indices.length === 0) return { ok: true };
+  const n = indices.length;
+  return {
+    ok: false,
+    indices,
+    message:
+      n === 1
+        ? 'Hay un concepto incompleto. Completá el monto o quitalo antes de guardar.'
+        : `Hay ${n} conceptos incompletos. Completá el monto o quitalos antes de guardar.`,
+  };
+}
+
 export function ConceptosLiquidacionLineasEditor({
   getToken,
   lineas,
   onChange,
   disabled,
+  incompleteIndices,
 }: {
   getToken: () => Promise<string | null>;
   lineas: ConceptoLineaDraft[];
   onChange: (next: ConceptoLineaDraft[]) => void;
   disabled?: boolean;
+  /** Índices de filas a marcar tras un intento de guardar con conceptos incompletos. */
+  incompleteIndices?: number[];
 }) {
+  const incompleteSet = new Set(incompleteIndices ?? []);
   const [catalogo, setCatalogo] = useState<ConceptoLiquidacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +129,16 @@ export function ConceptosLiquidacionLineasEditor({
     void loadCatalogo();
   }, [loadCatalogo]);
 
-  function enrichFromCatalog(id: string, monto: number): ConceptoLineaDraft {
+  function enrichFromCatalog(
+    id: string,
+    monto: number,
+    montoStr?: string,
+  ): ConceptoLineaDraft {
     const c = catalogo.find((x) => x.id === id);
     return {
       conceptoLiquidacionId: id,
       monto,
+      montoStr: montoStr ?? montoStrFromNumber(monto),
       nombre: c?.nombre,
       signo: c?.signo,
       ivaPct: c?.ivaPct,
@@ -92,7 +150,11 @@ export function ConceptosLiquidacionLineasEditor({
       if (i !== index) return l;
       const merged = { ...l, ...patch };
       if (patch.conceptoLiquidacionId != null) {
-        return enrichFromCatalog(patch.conceptoLiquidacionId, merged.monto);
+        return enrichFromCatalog(
+          patch.conceptoLiquidacionId,
+          merged.monto,
+          merged.montoStr,
+        );
       }
       return merged;
     });
@@ -110,7 +172,7 @@ export function ConceptosLiquidacionLineasEditor({
       setShowQuick(true);
       return;
     }
-    onChange([...lineas, enrichFromCatalog(siguiente.id, 0)]);
+    onChange([...lineas, enrichFromCatalog(siguiente.id, 0, '')]);
   }
 
   function removeRow(index: number) {
@@ -167,6 +229,7 @@ export function ConceptosLiquidacionLineasEditor({
         {
           conceptoLiquidacionId: created.id,
           monto: 0,
+          montoStr: '',
           nombre: created.nombre,
           signo: created.signo,
           ivaPct: created.ivaPct,
@@ -291,18 +354,25 @@ export function ConceptosLiquidacionLineasEditor({
         <div className="space-y-2">
           {lineas.map((linea, index) => {
             const efecto = signedMonto(linea.signo, Number(linea.monto) || 0);
+            const rowIncomplete = incompleteSet.has(index);
+            const conceptoMissing = rowIncomplete && !linea.conceptoLiquidacionId;
+            const montoMissing = rowIncomplete && !(Number(linea.monto) > 0);
             return (
               <div
                 key={`${linea.conceptoLiquidacionId}-${index}`}
-                className="grid grid-cols-1 gap-2 border border-black/10 p-2 sm:grid-cols-[1fr_7rem_auto] sm:items-end"
+                className={`grid grid-cols-1 gap-2 border p-2 sm:grid-cols-[1fr_7rem_auto] sm:items-end ${
+                  rowIncomplete ? 'border-red-400' : 'border-black/10'
+                }`}
               >
                 <label className="min-w-0">
-                  <span className={labelClass}>Concepto</span>
+                  <span className={labelClass}>
+                    Concepto <span className="text-red-500">*</span>
+                  </span>
                   <select
                     value={linea.conceptoLiquidacionId}
                     disabled={disabled}
                     onChange={(e) => onConceptoSelect(index, e.target.value)}
-                    className={inputClass}
+                    className={`${inputClass} ${conceptoMissing ? 'border-red-400' : ''}`}
                   >
                     {!catalogo.some((c) => c.id === linea.conceptoLiquidacionId) &&
                       linea.conceptoLiquidacionId && (
@@ -317,19 +387,35 @@ export function ConceptosLiquidacionLineasEditor({
                     ))}
                     <option value="__nuevo__">+ Crear concepto nuevo…</option>
                   </select>
+                  <CrudFieldError
+                    message={conceptoMissing ? 'Seleccioná un concepto.' : undefined}
+                  />
                 </label>
                 <label>
-                  <span className={labelClass}>Monto</span>
+                  <span className={labelClass}>
+                    Monto <span className="text-red-500">*</span>
+                  </span>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    value={Number.isFinite(linea.monto) ? linea.monto : ''}
+                    inputMode="decimal"
+                    value={displayMontoStr(linea)}
                     disabled={disabled}
-                    onChange={(e) =>
-                      updateRow(index, { monto: e.target.value === '' ? 0 : Number(e.target.value) })
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      updateRow(index, {
+                        montoStr: raw,
+                        monto: parseMontoInput(raw),
+                      });
+                    }}
+                    className={`${inputClass} ${montoMissing ? 'border-red-400' : ''}`}
+                  />
+                  <CrudFieldError
+                    message={
+                      montoMissing ? 'Ingresá un monto mayor a 0.' : undefined
                     }
-                    className={inputClass}
                   />
                 </label>
                 <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-end pb-0.5">
@@ -372,10 +458,14 @@ export function ConceptosLiquidacionLineasEditor({
   );
 }
 
-/** Payload para create/update de liquidación. */
+/**
+ * Payload para create/update de liquidación.
+ * Solo incluye filas completas. Antes de llamar, usá
+ * `validateConceptosLineasDraft` para no ignorar filas vacías en silencio.
+ */
 export function toConceptosLineasPayload(lineas: ConceptoLineaDraft[]) {
   return lineas
-    .filter((l) => l.conceptoLiquidacionId && Number(l.monto) > 0)
+    .filter(isConceptoLineaCompleta)
     .map((l) => ({
       conceptoLiquidacionId: l.conceptoLiquidacionId,
       monto: Number(l.monto),

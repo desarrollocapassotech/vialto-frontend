@@ -1,7 +1,6 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import {
   buildGananciaBrutaResumen,
-  monedasFacturacionYPagoDistintas,
   type GananciaBrutaResumen,
 } from "@/lib/viajeGananciaBrutaResumen";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";

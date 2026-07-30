@@ -1025,7 +1025,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
           detalleUrl={`/api/platform/arca/liquidaciones/${encodeURIComponent(pendingEmitir.id)}?tenantId=${encodeURIComponent(tenantId)}`}
           configUrl={`/api/platform/arca/config?tenantId=${encodeURIComponent(tenantId)}`}
           arcaConfig={arcaConfig}
-          ivaPct={arcaConfig?.ivaGastosAdmin}
+          ivaPct={pendingEmitir.ivaPct ?? arcaConfig?.ivaGastosAdmin}
         />
       )}
 

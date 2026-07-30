@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
@@ -59,6 +60,9 @@ export function LiquidacionEditModal({
     toDateInput(liq.periodoHasta),
   );
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
+  const [ivaPct, setIvaPct] = useState(
+    liq.ivaPct != null ? String(liq.ivaPct) : "",
+  );
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     () =>
       (liq.conceptosLineas ?? [])
@@ -71,6 +75,7 @@ export function LiquidacionEditModal({
           ivaPct: l.ivaPct,
         })),
   );
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
   const [lineasLoading, setLineasLoading] = useState(canEditDatos);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(
@@ -94,6 +99,7 @@ export function LiquidacionEditModal({
           () => getToken(),
         );
         if (cancelled) return;
+        if (full.ivaPct != null) setIvaPct(String(full.ivaPct));
         setConceptosLineas(
           (full.conceptosLineas ?? [])
             .filter((l) => l.conceptoLiquidacionId)
@@ -138,6 +144,10 @@ export function LiquidacionEditModal({
       if (comisionPct.trim() !== "" && (isNaN(pct) || pct < 0 || pct > 100)) {
         errs.comisionPct = "La comisión debe ser un número entre 0 y 100.";
       }
+      const iva = Number(ivaPct);
+      if (ivaPct.trim() !== "" && (isNaN(iva) || iva < 0 || iva > 100)) {
+        errs.ivaPct = "El IVA debe ser un número entre 0 y 100.";
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -147,6 +157,15 @@ export function LiquidacionEditModal({
     if (canEditDatos && lineasLoading) {
       setError("Esperá a que terminen de cargar los conceptos.");
       return;
+    }
+    if (canEditDatos) {
+      const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+      if (!conceptosCheck.ok) {
+        setConceptosIncomplete(conceptosCheck.indices);
+        setError(conceptosCheck.message);
+        return;
+      }
+      setConceptosIncomplete([]);
     }
     setSaving(true);
     setError(null);
@@ -170,6 +189,9 @@ export function LiquidacionEditModal({
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
         }
+        // Siempre enviar IVA explícito cuando se editan datos (incluye 0 = sin IVA).
+        body.ivaPct =
+          ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
       if (showComprobante) {
@@ -293,33 +315,60 @@ export function LiquidacionEditModal({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="liq-comision" className={LABEL}>
-                Comisión (%)
-              </label>
-              <input
-                id="liq-comision"
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                value={comisionPct}
-                onChange={(e) => setComisionPct(e.target.value)}
-                disabled={saving}
-                className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
-              />
-              {fieldErrors.comisionPct && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                  {fieldErrors.comisionPct}
-                </p>
-              )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="liq-comision" className={LABEL}>
+                  Comisión (%)
+                </label>
+                <input
+                  id="liq-comision"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={comisionPct}
+                  onChange={(e) => setComisionPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.comisionPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.comisionPct}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="liq-iva" className={LABEL}>
+                  IVA (%)
+                </label>
+                <input
+                  id="liq-iva"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={ivaPct}
+                  onChange={(e) => setIvaPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.ivaPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.ivaPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.ivaPct}
+                  </p>
+                )}
+              </div>
             </div>
 
             <ConceptosLiquidacionLineasEditor
               getToken={getToken}
               lineas={conceptosLineas}
-              onChange={setConceptosLineas}
+              onChange={(next) => {
+                setConceptosLineas(next);
+                setConceptosIncomplete([]);
+              }}
               disabled={saving || lineasLoading}
+              incompleteIndices={conceptosIncomplete}
             />
           </>
         ) : (

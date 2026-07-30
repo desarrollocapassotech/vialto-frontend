@@ -4,7 +4,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
@@ -43,20 +43,35 @@ function fmtFecha(iso: string): string {
 
 function SemaforoDot({ color }: { color: "verde" | "amarillo" | "rojo" }) {
   const cls =
-    color === "rojo" ? "bg-rose-500" : color === "amarillo" ? "bg-amber-400" : "bg-emerald-500";
-  return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${cls}`} aria-hidden />;
+    color === "rojo"
+      ? "bg-rose-500"
+      : color === "amarillo"
+        ? "bg-amber-400"
+        : "bg-emerald-500";
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${cls}`}
+      aria-hidden
+    />
+  );
 }
 
 function TrendBadge({ changePct }: { changePct: number | null | undefined }) {
   if (changePct === null || changePct === undefined) return null;
   if (changePct === 0) {
-    return <span className="text-[11px] text-white/40">Sin cambios vs. período anterior</span>;
+    return (
+      <span className="text-[11px] text-white/40">
+        Sin cambios vs. período anterior
+      </span>
+    );
   }
   const subio = changePct > 0;
   const Icon = subio ? TrendingUp : TrendingDown;
   const colorClass = subio ? "text-rose-400" : "text-emerald-400";
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] ${colorClass}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] ${colorClass}`}
+    >
       <Icon className="h-3 w-3" strokeWidth={2.5} aria-hidden />
       {subio ? "+" : ""}
       {changePct.toFixed(1)}% vs. período anterior
@@ -110,7 +125,9 @@ function StatTile({
   }
 
   return (
-    <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">{inner}</div>
+    <div className="flex min-h-[110px] flex-col justify-between bg-vialto-graphite p-5">
+      {inner}
+    </div>
   );
 }
 
@@ -129,9 +146,13 @@ export function ResumenPanel({
   const vehiculosConKm = (data?.porVehiculo ?? []).filter(
     (v) => v.kmRecorridos != null && v.kmRecorridos > 0,
   );
-  const totalKmFlota = vehiculosConKm.reduce((s, v) => s + (v.kmRecorridos ?? 0), 0);
+  const totalKmFlota = vehiculosConKm.reduce(
+    (s, v) => s + (v.kmRecorridos ?? 0),
+    0,
+  );
   const totalMontoConKm = vehiculosConKm.reduce((s, v) => s + v.monto, 0);
-  const precioPromedioPorKm = totalKmFlota > 0 ? totalMontoConKm / totalKmFlota : 0;
+  const precioPromedioPorKm =
+    totalKmFlota > 0 ? totalMontoConKm / totalKmFlota : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -143,7 +164,9 @@ export function ResumenPanel({
         />
         <StatTile
           label="Costo prom. / km"
-          value={listo && totalKmFlota > 0 ? fmtMoney(precioPromedioPorKm) : "—"}
+          value={
+            listo && totalKmFlota > 0 ? fmtMoney(precioPromedioPorKm) : "—"
+          }
         />
         <StatTile
           label="Costo prom. / litro"
@@ -204,7 +227,9 @@ export function ResumenPanel({
       )}
 
       {listo && data.totalCargas === 0 && (
-        <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>
+        <p className="text-sm text-vialto-steel">
+          Sin cargas en el período seleccionado.
+        </p>
       )}
     </div>
   );
@@ -221,7 +246,11 @@ export function VehiculoRankingTable({
   periodo?: { from: string; to: string } | null;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>;
+    return (
+      <p className="text-sm text-vialto-steel">
+        Sin cargas en el período seleccionado.
+      </p>
+    );
   }
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
@@ -257,12 +286,19 @@ export function VehiculoRankingTable({
             if (periodo?.from) qs.set("from", periodo.from);
             if (periodo?.to) qs.set("to", periodo.to);
             return (
-              <tr key={v.vehiculoId} className="border-b border-black/5 last:border-0">
+              <tr
+                key={v.vehiculoId}
+                className="border-b border-black/5 last:border-0"
+              >
                 <td className="py-2">
                   <span className="inline-flex flex-wrap items-center gap-2">
                     <SemaforoDot color={v.semaforo} />
-                    <span className="font-medium text-vialto-charcoal">{v.patente}</span>
-                    <span className="text-xs text-vialto-steel">{fmtTipoVehiculo(v.tipo)}</span>
+                    <span className="font-medium text-vialto-charcoal">
+                      {v.patente}
+                    </span>
+                    <span className="text-xs text-vialto-steel">
+                      {fmtTipoVehiculo(v.tipo)}
+                    </span>
                     {v.esOutlier && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
                         Consume más que su categoría
@@ -270,15 +306,23 @@ export function VehiculoRankingTable({
                     )}
                   </span>
                 </td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(v.litros)}</td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtLitros(v.litros)}
+                </td>
                 <td className="py-2 text-right text-vialto-charcoal">
                   {v.costoPorKm != null ? fmtMoney(v.costoPorKm) : "—"}
                 </td>
                 <td className="py-2 text-right text-vialto-charcoal">
-                  {v.litrosPor100Km != null ? `${v.litrosPor100Km.toFixed(1)} L` : "—"}
+                  {v.litrosPor100Km != null
+                    ? `${v.litrosPor100Km.toFixed(1)} L`
+                    : "—"}
                 </td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(v.monto)}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{v.cantidad}</td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtMoney(v.monto)}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {v.cantidad}
+                </td>
                 <td className="py-2 text-right">
                   <Link
                     to={`/combustible?${qs.toString()}`}
@@ -307,7 +351,11 @@ export function ChoferRankingTable({
   periodo?: { from: string; to: string } | null;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>;
+    return (
+      <p className="text-sm text-vialto-steel">
+        Sin cargas en el período seleccionado.
+      </p>
+    );
   }
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
@@ -341,11 +389,20 @@ export function ChoferRankingTable({
               if (periodo?.to) qs.set("to", periodo.to);
             }
             return (
-              <tr key={c.choferId ?? "sin-chofer"} className="border-b border-black/5 last:border-0">
+              <tr
+                key={c.choferId ?? "sin-chofer"}
+                className="border-b border-black/5 last:border-0"
+              >
                 <td className="py-2 text-vialto-charcoal">{c.nombre}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(c.litros)}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(c.monto)}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{c.cantidad}</td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtLitros(c.litros)}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtMoney(c.monto)}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {c.cantidad}
+                </td>
                 <td className="py-2 text-right">
                   {qs && (
                     <Link
@@ -367,19 +424,16 @@ export function ChoferRankingTable({
 
 // ── Distribución (estación / forma de pago) — gráfico de torta ──────────
 
-// Paleta categórica fija — primeros 4 slots del orden validado (únicos 4 que
-// pasan CVD "all-pairs", necesario acá porque en una torta cualquier par de
-// porciones puede terminar siendo vecino, a diferencia de una barra apilada).
 const DONUT_HUES = [
   "#2a78d6", // blue
   "#008300", // green
   "#e87ba4", // magenta
   "#eda100", // yellow
 ];
-const DONUT_OTRAS_HUE = "#c3c2b7"; // gris — no es identidad de serie, es "el resto"
-const DONUT_MAX_SLICES = 4; // + 1 balde "Otras" si sobran más
-const DONUT_GAP_PCT = 0.6; // separador entre porciones, en % de circunferencia
-const DONUT_R = 15.9155; // truco clásico: 2πr ≈ 100, así el % mapea directo al dasharray
+const DONUT_OTRAS_HUE = "#c3c2b7";
+const DONUT_MAX_SLICES = 4;
+const DONUT_GAP_PCT = 0.6;
+const DONUT_R = 15.9155;
 
 type DonutSlice = {
   clave: string;
@@ -427,7 +481,13 @@ function buildDonutSlices(
   return slices;
 }
 
-function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) {
+function DonutChart({
+  slices,
+  total,
+}: {
+  slices: DonutSlice[];
+  total: number;
+}) {
   const [hoverClave, setHoverClave] = useState<string | null>(null);
 
   let acumulado = 0;
@@ -515,8 +575,9 @@ function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) 
               </span>
             </span>
             <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
-              {pct.toFixed(1)}% · {fmtMoney(slice.monto)} · {fmtLitros(slice.litros)} ·{" "}
-              {slice.cantidad} {slice.cantidad === 1 ? "carga" : "cargas"}
+              {pct.toFixed(1)}% · {fmtMoney(slice.monto)} ·{" "}
+              {fmtLitros(slice.litros)} · {slice.cantidad}{" "}
+              {slice.cantidad === 1 ? "carga" : "cargas"}
             </span>
           </li>
         ))}
@@ -542,7 +603,9 @@ export function DistribucionPanel({
         {titulo}
       </p>
       {items.length === 0 ? (
-        <p className="text-sm text-vialto-steel">Sin cargas en el período seleccionado.</p>
+        <p className="text-sm text-vialto-steel">
+          Sin cargas en el período seleccionado.
+        </p>
       ) : (
         <DonutChart slices={slices} total={total} />
       )}
@@ -557,19 +620,28 @@ export function fmtFormaPagoClave(clave: string): string {
 
 // ── Alertas ──────────────────────────────────────────────────────────────
 
-export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
+export function AlertasList({
+  alertas,
+  tenantId,
+}: {
+  alertas: CombustibleAlerta[];
+  tenantId: string; // <-- AÑADIDO
+}) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
 
   if (alertas.length === 0) {
     return (
       <div className="bg-white border border-black/10 p-4">
-        <p className="text-sm text-vialto-steel">Sin cargas marcadas como sospechosas en el período.</p>
+        <p className="text-sm text-vialto-steel">
+          Sin cargas marcadas como sospechosas en el período.
+        </p>
       </div>
     );
   }
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
       <table className="w-full text-sm">
+        {/* ... (el thead queda exactamente igual) ... */}
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
@@ -601,19 +673,34 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
         <tbody>
           {alertas.map((a) => {
             return (
-              <tr key={a.cargaId} className="border-b border-black/5 last:border-0">
+              <tr
+                key={a.cargaId}
+                className="border-b border-black/5 last:border-0"
+              >
                 <td className="py-2">
                   <span className="inline-flex items-center gap-2 whitespace-nowrap">
                     <SemaforoDot color="rojo" />
                     {motivoShortLabel(a.motivoSospecha)}
                   </span>
                 </td>
-                <td className="py-2 whitespace-nowrap text-vialto-charcoal">{fmtFecha(a.fecha)}</td>
-                <td className="py-2 font-medium text-vialto-charcoal">{a.patente}</td>
-                <td className="py-2 text-vialto-charcoal">{a.choferNombre ?? "—"}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(a.litros)}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(a.precioPorLitro)}</td>
-                <td className="py-2 text-right text-vialto-charcoal">{fmtMoney(a.importe)}</td>
+                <td className="py-2 whitespace-nowrap text-vialto-charcoal">
+                  {fmtFecha(a.fecha)}
+                </td>
+                <td className="py-2 font-medium text-vialto-charcoal">
+                  {a.patente}
+                </td>
+                <td className="py-2 text-vialto-charcoal">
+                  {a.choferNombre ?? "—"}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtLitros(a.litros)}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtMoney(a.precioPorLitro)}
+                </td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {fmtMoney(a.importe)}
+                </td>
                 <td className="py-2 text-right">
                   <button
                     type="button"
@@ -632,6 +719,7 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
       {viewingCargaId && (
         <CargaCombustibleViewModal
           cargaId={viewingCargaId}
+          tenantId={tenantId}
           onClose={() => setViewingCargaId(null)}
         />
       )}
@@ -641,15 +729,15 @@ export function AlertasList({ alertas }: { alertas: CombustibleAlerta[] }) {
 
 // ── Evolución (precio por litro / costo por km) ─────────────────────────
 
-// Alto fijo del gráfico, independiente del ancho — el ancho se mide del contenedor
-// real (ver useChartWidth) y se usa 1:1 como viewBox, así el trazo, los puntos y el
-// texto de los ejes quedan en tamaño físico fijo sin importar cuán ancho sea el dashboard.
 const CHART_H = 220;
 const CHART_PAD = { top: 16, right: 16, bottom: 28, left: 56 };
 const PLOT_H = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
 
 /** Mide en px el ancho real del elemento referenciado y lo mantiene actualizado ante resize. */
-function useChartWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+function useChartWidth<T extends HTMLElement>(): [
+  React.RefObject<T | null>,
+  number,
+] {
   const ref = useRef<T | null>(null);
   const [width, setWidth] = useState(960);
 
@@ -672,11 +760,17 @@ function niceStep(rawStep: number): number {
   if (rawStep <= 0) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const normalized = rawStep / magnitude;
-  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const niceNormalized =
+    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
   return niceNormalized * magnitude;
 }
 
-type PuntoEvolucion = { etiqueta: string; desde: string; hasta: string; valor: number };
+type PuntoEvolucion = {
+  etiqueta: string;
+  desde: string;
+  hasta: string;
+  valor: number;
+};
 
 function EvolucionChartBase({
   puntos,
@@ -691,6 +785,7 @@ function EvolucionChartBase({
   unidadSufijo: string;
   mensajeVacio: string;
 }) {
+  const navigate = useNavigate();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [containerRef, chartW] = useChartWidth<HTMLDivElement>();
   const plotW = Math.max(0, chartW - CHART_PAD.left - CHART_PAD.right);
@@ -715,18 +810,22 @@ function EvolucionChartBase({
   const primero = puntos[0].valor;
   const ultimo = puntos[puntos.length - 1].valor;
 
-  // Escala Y con "aire" arriba/abajo y ticks en números redondos.
   const rango = maxVal - minVal;
   const colchon = rango > 0 ? rango * 0.2 : Math.max(1, maxVal * 0.1 || 1);
   const yMin = Math.max(0, minVal - colchon);
   const yMax = maxVal + colchon;
   const tickStep = niceStep((yMax - yMin) / 4);
   const yTicks: number[] = [];
-  for (let v = Math.ceil(yMin / tickStep) * tickStep; v <= yMax; v += tickStep) {
+  for (
+    let v = Math.ceil(yMin / tickStep) * tickStep;
+    v <= yMax;
+    v += tickStep
+  ) {
     yTicks.push(Math.round(v * 100) / 100);
   }
   const yRange = yMax - yMin || 1;
-  const yToPx = (v: number) => CHART_PAD.top + PLOT_H - ((v - yMin) / yRange) * PLOT_H;
+  const yToPx = (v: number) =>
+    CHART_PAD.top + PLOT_H - ((v - yMin) / yRange) * PLOT_H;
 
   const stepX = puntos.length > 1 ? plotW / (puntos.length - 1) : 0;
   const coords = puntos.map((p, i) => ({
@@ -735,14 +834,15 @@ function EvolucionChartBase({
     p,
   }));
 
-  const pathD = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const pathD = coords
+    .map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`)
+    .join(" ");
   const baseY = CHART_PAD.top + PLOT_H;
   const areaD =
     coords.length > 0
       ? `${pathD} L ${coords[coords.length - 1].x.toFixed(1)} ${baseY} L ${coords[0].x.toFixed(1)} ${baseY} Z`
       : "";
 
-  // Máximo ~6 etiquetas en el eje X para que no se amontonen con muchos puntos.
   const maxXLabels = 6;
   const labelStep = Math.max(1, Math.ceil(puntos.length / maxXLabels));
   const xLabelIndices = new Set<number>();
@@ -763,6 +863,22 @@ function EvolucionChartBase({
       }
     });
     setHoverIndex(nearest);
+  }
+
+  function handleChartClick() {
+    if (hoverIndex !== null) {
+      const p = coords[hoverIndex].p;
+      const qs = new URLSearchParams();
+
+      const fechaPunto = p.desde ? p.desde.split("T")[0] : "";
+
+      if (fechaPunto) {
+        qs.set("from", fechaPunto);
+        qs.set("to", fechaPunto);
+
+        navigate(`/combustible?${qs.toString()}`);
+      }
+    }
   }
 
   const hovered = hoverIndex !== null ? coords[hoverIndex] : null;
@@ -808,7 +924,9 @@ function EvolucionChartBase({
             );
           })}
 
-          {areaD && <path d={areaD} className="fill-vialto-fire/10" stroke="none" />}
+          {areaD && (
+            <path d={areaD} className="fill-vialto-fire/10" stroke="none" />
+          )}
           <path
             d={pathD}
             fill="none"
@@ -846,9 +964,15 @@ function EvolucionChartBase({
           )}
 
           {coords.map((c, i) => {
-            const esExtremo = (i === maxIdx || i === minIdx) && maxIdx !== minIdx;
+            const esExtremo =
+              (i === maxIdx || i === minIdx) && maxIdx !== minIdx;
             const esHover = i === hoverIndex;
-            const color = i === maxIdx ? "fill-rose-500" : i === minIdx ? "fill-emerald-500" : "fill-vialto-fire";
+            const color =
+              i === maxIdx
+                ? "fill-rose-500"
+                : i === minIdx
+                  ? "fill-emerald-500"
+                  : "fill-vialto-fire";
             return (
               <circle
                 key={i}
@@ -869,6 +993,8 @@ function EvolucionChartBase({
             fill="transparent"
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIndex(null)}
+            onClick={handleChartClick}
+            className={hoverIndex !== null ? "cursor-pointer" : ""}
           />
         </svg>
 
@@ -880,32 +1006,58 @@ function EvolucionChartBase({
               top: `${(hovered.y / CHART_H) * 100}%`,
             }}
           >
-            <p className="font-semibold text-vialto-charcoal">{fmtValor(hovered.p.valor)}</p>
+            <p className="font-semibold text-vialto-charcoal">
+              {fmtValor(hovered.p.valor)}
+            </p>
             <p className="text-vialto-steel">{hovered.p.etiqueta}</p>
+            <p className="mt-1 font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.1em] text-vialto-fire">
+              Ver cargas →
+            </p>
           </div>
         )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-vialto-steel">
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden />
-          Mínimo: <span className="font-medium text-vialto-charcoal">{fmtValor(minVal)}</span> (
-          {puntos[minIdx].etiqueta})
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
+            aria-hidden
+          />
+          Mínimo:{" "}
+          <span className="font-medium text-vialto-charcoal">
+            {fmtValor(minVal)}
+          </span>{" "}
+          ({puntos[minIdx].etiqueta})
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-500" aria-hidden />
-          Máximo: <span className="font-medium text-vialto-charcoal">{fmtValor(maxVal)}</span> (
-          {puntos[maxIdx].etiqueta})
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full bg-rose-500"
+            aria-hidden
+          />
+          Máximo:{" "}
+          <span className="font-medium text-vialto-charcoal">
+            {fmtValor(maxVal)}
+          </span>{" "}
+          ({puntos[maxIdx].etiqueta})
         </span>
       </div>
     </div>
   );
 }
 
-export function EvolucionPrecioChart({ puntos }: { puntos: CombustibleEvolucionPrecioPunto[] }) {
+export function EvolucionPrecioChart({
+  puntos,
+}: {
+  puntos: CombustibleEvolucionPrecioPunto[];
+}) {
   return (
     <EvolucionChartBase
-      puntos={puntos.map((p) => ({ ...p, valor: p.precioPromedio }))}
+      puntos={puntos.map((p: any) => ({
+        ...p,
+        valor: p.precioPromedio,
+        desde: p.desde || p.fechaInicio || p.fecha,
+        hasta: p.hasta || p.fechaFin || p.fecha,
+      }))}
       titulo="Evolución del precio pagado por litro"
       descripcion="Precio promedio ($/L) pagado en cada tramo del período seleccionado."
       unidadSufijo="/L"
@@ -921,7 +1073,13 @@ export function EvolucionCostoPorKmChart({
 }) {
   return (
     <EvolucionChartBase
-      puntos={puntos.map((p) => ({ ...p, valor: p.costoPorKm }))}
+      puntos={puntos.map((p: any) => ({
+        ...p,
+        valor: p.costoPorKm,
+        // ⚠️ Igual que arriba, aseguramos el mapeo de las fechas.
+        desde: p.desde || p.fechaInicio || p.fecha,
+        hasta: p.hasta || p.fechaFin || p.fecha,
+      }))}
       titulo="Evolución del costo por km recorrido"
       descripcion="Costo promedio ($/km) de la flota en cada tramo del período seleccionado."
       unidadSufijo="/km"
@@ -932,16 +1090,22 @@ export function EvolucionCostoPorKmChart({
 
 // ── Cruce con Viajes ──────────────────────────────────────────────────────
 
-export function ViajesCruceTable({ items }: { items: CombustibleViajesCruceItem[] }) {
+export function ViajesCruceTable({
+  items,
+}: {
+  items: CombustibleViajesCruceItem[];
+}) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-vialto-steel">
-        Aproximado: si un viaje usa más de un vehículo (ej. tractor + semirremolque), el km del
-        viaje se cuenta completo para cada uno. Los viajes sin km cargado no participan del
-        cálculo.
+        Aproximado: si un viaje usa más de un vehículo (ej. tractor +
+        semirremolque), el km del viaje se cuenta completo para cada uno. Los
+        viajes sin km cargado no participan del cálculo.
       </p>
       {items.length === 0 ? (
-        <p className="text-sm text-vialto-steel">Sin datos de viajes para cruzar en el período.</p>
+        <p className="text-sm text-vialto-steel">
+          Sin datos de viajes para cruzar en el período.
+        </p>
       ) : (
         <div className="overflow-x-auto bg-white border border-black/10 p-4">
           <table className="w-full text-sm">
@@ -963,11 +1127,18 @@ export function ViajesCruceTable({ items }: { items: CombustibleViajesCruceItem[
             </thead>
             <tbody>
               {items.map((i) => (
-                <tr key={i.vehiculoId} className="border-b border-black/5 last:border-0">
+                <tr
+                  key={i.vehiculoId}
+                  className="border-b border-black/5 last:border-0"
+                >
                   <td className="py-2 text-vialto-charcoal">{i.patente}</td>
-                  <td className="py-2 text-right text-vialto-charcoal">{fmtLitros(i.litrosPeriodo)}</td>
                   <td className="py-2 text-right text-vialto-charcoal">
-                    {i.kmFacturadosPeriodo != null ? `${fmtNum(i.kmFacturadosPeriodo)} km` : "—"}
+                    {fmtLitros(i.litrosPeriodo)}
+                  </td>
+                  <td className="py-2 text-right text-vialto-charcoal">
+                    {i.kmFacturadosPeriodo != null
+                      ? `${fmtNum(i.kmFacturadosPeriodo)} km`
+                      : "—"}
                   </td>
                   <td className="py-2 text-right text-vialto-charcoal">
                     {i.litrosPor100KmFacturado != null

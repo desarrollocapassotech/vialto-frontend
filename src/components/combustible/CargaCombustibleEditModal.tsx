@@ -8,7 +8,11 @@ import {
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { FORMA_PAGO_LABELS } from "@/lib/combustibleLabels";
+import {
+  FORMA_PAGO_LABELS,
+  SERVICE_STATIONS,
+  computePrecioPorLitro,
+} from "@/lib/combustibleLabels";
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
@@ -27,6 +31,7 @@ function normalizeFormaPago(val: string | null | undefined): string {
 
 export function CargaCombustibleEditModal({
   carga,
+  tenantId, // 1. AGREGAMOS EL TENANT ID COMO PROP
   onClose,
   onSaved,
 }: {
@@ -36,6 +41,7 @@ export function CargaCombustibleEditModal({
     chofer?: { id?: string; nombre: string } | null;
     vehiculo?: { id?: string; patente: string } | null;
   };
+  tenantId: string; // 1. TIPAMOS EL TENANT ID
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -60,34 +66,60 @@ export function CargaCombustibleEditModal({
   const [choferSeleccionado, setChoferSeleccionado] = useState(initialChoferId);
   const [vehiculoSeleccionado, setVehiculoSeleccionado] =
     useState(initialVehiculoId);
+  const [estacion, setEstacion] = useState(carga.estacion ?? "");
 
   const defaultDate = toLocalDateString(carga.fecha);
   const [fecha, setFecha] = useState(defaultDate);
   const [litros, setLitros] = useState(String(carga.litros));
-  const [precioPorLitro, setPrecioPorLitro] = useState(String(carga.precioPorLitro ?? ""));
+  const [precioPorLitro, setPrecioPorLitro] = useState(
+    String(carga.precioPorLitro ?? ""),
+  );
   const [importe, setImporte] = useState(String(carga.importe));
   const [km, setKm] = useState(String(carga.km));
+
+  // En edición arranca en modo manual para no pisar un precio ya guardado
+  // (p. ej. si el usuario solo corrige la fecha y no toca el precio).
+  const [precioManual, setPrecioManual] = useState(true);
+
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // la validación de coherencia nunca vea un precio desactualizado.
+  const precioMostrado = precioManual
+    ? precioPorLitro
+    : computePrecioPorLitro(litros, importe);
+
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setPrecioPorLitro(computePrecioPorLitro(litros, importe));
+    }
+    setPrecioManual(checked);
+  };
 
   const { formErrors } = useCombustibleValidation(
     getToken,
     vehiculoSeleccionado,
     fecha,
     litros,
-    precioPorLitro,
+    precioMostrado,
     importe,
     km,
-    carga.id
+    carga.id,
   );
 
   useEffect(() => {
     let cancelled = false;
+    // 2. CREAMOS EL QUERY STRING DEL TENANT
+    const qsTenant = `?tenantId=${encodeURIComponent(tenantId)}`;
 
     Promise.all([
-      apiJson<{ id: string; nombre: string }[]>("/api/choferes", () =>
-        getToken(),
+      // 3. ACTUALIZAMOS LAS RUTAS DE CHOFERES Y VEHICULOS
+      apiJson<{ id: string; nombre: string }[]>(
+        `/api/platform/choferes${qsTenant}`,
+        () => getToken(),
       ).catch(() => []),
-      apiJson<{ id: string; patente: string }[]>("/api/vehiculos", () =>
-        getToken(),
+      apiJson<{ id: string; patente: string }[]>(
+        `/api/platform/vehiculos${qsTenant}`,
+        () => getToken(),
       ).catch(() => []),
     ]).then(([ch, ve]) => {
       if (!cancelled) {
@@ -108,7 +140,7 @@ export function CargaCombustibleEditModal({
     return () => {
       cancelled = true;
     };
-  }, [getToken, carga, initialChoferId, initialVehiculoId]);
+  }, [getToken, carga, initialChoferId, initialVehiculoId, tenantId]); // Agregamos tenantId a las dependencias
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -127,19 +159,19 @@ export function CargaCombustibleEditModal({
       fecha: payloadDate.toISOString(),
       choferId: choferSeleccionado || null,
       vehiculoId: vehiculoSeleccionado || null,
-      estacion: fd.get("estacion"),
+      estacion,
       litros: Number(fd.get("litros")),
-      precioPorLitro: fd.get("precioPorLitro")
-        ? Number(fd.get("precioPorLitro"))
-        : null,
+      precioPorLitro: Number(precioMostrado),
       importe: Number(fd.get("importe")),
       km: Number(fd.get("km")),
       formaPago: formaPago,
     };
 
     try {
+      // 4. CREAMOS EL QUERY STRING Y ACTUALIZAMOS LA RUTA DEL PATCH
+      const qsTenant = `?tenantId=${encodeURIComponent(tenantId)}`;
       await apiJson(
-        `/api/combustible/${encodeURIComponent(carga.id)}`,
+        `/api/platform/combustible/${encodeURIComponent(carga.id)}${qsTenant}`,
         () => getToken(),
         {
           method: "PATCH",
@@ -157,9 +189,10 @@ export function CargaCombustibleEditModal({
   };
 
   return (
+    // ... Todo el return se mantiene exactamente igual ...
     <ViewModalShell
       title="Editar Carga de Combustible"
-      onClose={saving ? () => {} : onClose}
+      onClose={saving ? () => { } : onClose}
       footer={
         <div className="flex w-full items-center justify-end gap-3">
           <button
@@ -272,14 +305,27 @@ export function CargaCombustibleEditModal({
             >
               Estación de Servicio
             </label>
-            <input
-              type="text"
+            <select
               id="estacion"
               name="estacion"
-              defaultValue={carga.estacion}
+              value={estacion}
+              onChange={(e) => setEstacion(e.target.value)}
               required
-              className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-            />
+              className="rounded border border-black/20 bg-white p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+            >
+              <option value="" disabled>
+                Seleccionar
+              </option>
+              {estacion &&
+                !SERVICE_STATIONS.includes(
+                  estacion as (typeof SERVICE_STATIONS)[number],
+                ) && <option value={estacion}>{estacion}</option>}
+              {SERVICE_STATIONS.map((station) => (
+                <option key={station} value={station}>
+                  {station}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col">
@@ -297,24 +343,6 @@ export function CargaCombustibleEditModal({
               value={litros}
               onChange={(e) => setLitros(e.target.value)}
               required
-              className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="precioPorLitro"
-              className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
-            >
-              Precio / L ($)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              id="precioPorLitro"
-              name="precioPorLitro"
-              value={precioPorLitro}
-              onChange={(e) => setPrecioPorLitro(e.target.value)}
               className="rounded border border-black/20 p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
             />
           </div>
@@ -339,6 +367,42 @@ export function CargaCombustibleEditModal({
             {formErrors.importe && (
               <p className="mt-1 text-xs font-semibold text-red-600">
                 ⚠️ {formErrors.importe}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col">
+            <div className="mb-1 flex items-center justify-between">
+              <label
+                htmlFor="precioPorLitro"
+                className="text-xs font-medium uppercase tracking-wider text-vialto-steel"
+              >
+                Precio / L ($)
+              </label>
+              <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={precioManual}
+                  onChange={(e) => handlePrecioManualToggle(e.target.checked)}
+                  className="accent-vialto-charcoal"
+                />
+                Editar manualmente
+              </label>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              id="precioPorLitro"
+              name="precioPorLitro"
+              value={precioMostrado}
+              onChange={(e) => setPrecioPorLitro(e.target.value)}
+              disabled={!precioManual}
+              required
+              className="rounded border border-black/20 bg-white p-2 text-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel"
+            />
+            {!precioManual && (
+              <p className="mt-1 text-xs italic text-vialto-steel">
+                Se calcula automáticamente
               </p>
             )}
           </div>
