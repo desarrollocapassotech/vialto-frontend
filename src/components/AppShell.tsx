@@ -100,18 +100,26 @@ export function AppShell() {
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
+      const memberGroups: NavGroup[] = [];
+
       if (canAccessStock(tenant?.modules ?? [])) {
-        return [
-          {
-            title: "Stock",
-            items: [
-              { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
-              { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
-            ],
-          },
-        ];
+        memberGroups.push({
+          title: "Stock",
+          items: [
+            { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+            { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+          ],
+        });
       }
-      return [];
+
+      if (canAccessCombustible(tenant?.modules ?? [])) {
+        memberGroups.push({
+          title: "Combustible",
+          items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
+        });
+      }
+
+      return memberGroups;
     }
 
     if (isStockViewer(roleCtx)) {
