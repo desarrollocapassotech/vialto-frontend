@@ -148,8 +148,6 @@ export function CombustibleTenantPage({
     () => initialFrom || primerDiaMesActual(),
   );
   const [hasta, setHasta] = useState<string>(() => initialTo || hoyIso());
-  const [desdeInput, setDesdeInput] = useState<string>(desde);
-  const [hastaInput, setHastaInput] = useState<string>(hasta);
   const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
   const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState(initialEstacion);
@@ -184,8 +182,6 @@ export function CombustibleTenantPage({
       const h = hoyIso();
       setDesde(d);
       setHasta(h);
-      setDesdeInput(d);
-      setHastaInput(h);
       setVehiculoId("");
       setChoferId("");
       setEstacion("");
@@ -273,19 +269,9 @@ export function CombustibleTenantPage({
     setPage(1);
   }
 
-  function aplicarFiltroFecha() {
-    setDesde(desdeInput);
-    setHasta(hastaInput);
-    resetPage();
-  }
-
   function handleClearFilters() {
-    const d = primerDiaMesActual();
-    const h = hoyIso();
-    setDesde(d);
-    setHasta(h);
-    setDesdeInput(d);
-    setHastaInput(h);
+    setDesde(primerDiaMesActual());
+    setHasta(hoyIso());
     setVehiculoId("");
     setChoferId("");
     setEstacion("");
@@ -783,9 +769,14 @@ export function CombustibleTenantPage({
               Desde
               <input
                 type="date"
-                value={desdeInput}
-                onChange={(e) => setDesdeInput(e.target.value)}
-                className={`${inputClass} min-w-[150px]`}
+                value={desde}
+                onChange={(e) => {
+                  setDesde(e.target.value);
+                  resetPage();
+                }}
+                className={`${inputClass} min-w-[150px] ${
+                  desde !== primerDiaMesActual() ? "text-vialto-fire" : ""
+                }`}
                 aria-label="Filtrar desde fecha"
               />
             </label>
@@ -793,19 +784,17 @@ export function CombustibleTenantPage({
               Hasta
               <input
                 type="date"
-                value={hastaInput}
-                onChange={(e) => setHastaInput(e.target.value)}
-                className={`${inputClass} min-w-[150px]`}
+                value={hasta}
+                onChange={(e) => {
+                  setHasta(e.target.value);
+                  resetPage();
+                }}
+                className={`${inputClass} min-w-[150px] ${
+                  hasta !== hoyIso() ? "text-vialto-fire" : ""
+                }`}
                 aria-label="Filtrar hasta fecha"
               />
             </label>
-            <button
-              type="button"
-              onClick={aplicarFiltroFecha}
-              className="h-9 border border-black/15 bg-vialto-charcoal px-4 text-xs uppercase tracking-wider text-white hover:bg-black transition-colors"
-            >
-              Filtrar
-            </button>
           </div>
 
           <div className="min-w-[180px]">
