@@ -92,9 +92,11 @@ export function CrearLiquidacionManualModal({
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
   const [comisionPct, setComisionPct] = useState("");
+  /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
   const [ivaPct, setIvaPct] = useState(
-    config?.ivaGastosAdmin != null ? String(config.ivaGastosAdmin) : "",
+    String(config?.ivaGastosAdmin ?? 21),
   );
+  const ivaSyncedFromConfig = useRef(config?.ivaGastosAdmin != null);
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
@@ -115,8 +117,9 @@ export function CrearLiquidacionManualModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (config?.ivaGastosAdmin == null) return;
-    setIvaPct((prev) => (prev === "" ? String(config.ivaGastosAdmin) : prev));
+    if (config?.ivaGastosAdmin == null || ivaSyncedFromConfig.current) return;
+    ivaSyncedFromConfig.current = true;
+    setIvaPct(String(config.ivaGastosAdmin));
   }, [config?.ivaGastosAdmin]);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
@@ -224,6 +227,14 @@ export function CrearLiquidacionManualModal({
       setError(conceptosCheck.message);
       return;
     }
+    const ivaResolved =
+      ivaPct.trim() !== ""
+        ? Number(ivaPct)
+        : (config?.ivaGastosAdmin ?? 21);
+    if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
+      setError("El IVA debe ser un número entre 0 y 100.");
+      return;
+    }
     setConceptosIncomplete([]);
     setError(null);
     setSubmitting(true);
@@ -243,7 +254,8 @@ export function CrearLiquidacionManualModal({
         viajeIds,
       };
       if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
-      if (ivaPct.trim() !== "") body.ivaPct = Number(ivaPct);
+      // Siempre enviar IVA explícito para no caer al default silencioso del backend.
+      body.ivaPct = ivaResolved;
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
@@ -413,7 +425,6 @@ export function CrearLiquidacionManualModal({
                 step="0.01"
                 value={comisionPct}
                 onChange={(e) => setComisionPct(e.target.value)}
-                placeholder="Default del transportista"
                 className={inputClass}
               />
             </div>
@@ -429,13 +440,11 @@ export function CrearLiquidacionManualModal({
                 step="0.01"
                 value={ivaPct}
                 onChange={(e) => setIvaPct(e.target.value)}
-                placeholder={
-                  config?.ivaGastosAdmin != null
-                    ? String(config.ivaGastosAdmin)
-                    : undefined
-                }
                 className={inputClass}
               />
+              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                Por defecto se aplica 21%. Para liquidar sin IVA ingresá 0.
+              </p>
             </div>
           </div>
 
