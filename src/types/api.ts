@@ -539,6 +539,8 @@ export interface Liquidacion {
   ptoVenta: number | null;
   cae: string | null;
   caeFechaVto: string | null;
+  /** Ambiente ARCA con el que se emitió: 'produccion' | 'homologacion'. */
+  ambiente?: string | null;
   estado: LiquidacionEstado;
   arcaError: string | null;
   reintentos: number;
