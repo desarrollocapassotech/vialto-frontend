@@ -539,6 +539,13 @@ export interface Liquidacion {
   ptoVenta: number | null;
   cae: string | null;
   caeFechaVto: string | null;
+  /** Datos de la NC 065 emitida al anular (el CVLP original se conserva arriba). */
+  anulacionCbteTipo?: number | null;
+  anulacionCbteNro?: number | null;
+  anulacionPtoVenta?: number | null;
+  anulacionCae?: string | null;
+  anulacionCaeFechaVto?: string | null;
+  anulacionFecha?: string | null;
   estado: LiquidacionEstado;
   arcaError: string | null;
   reintentos: number;

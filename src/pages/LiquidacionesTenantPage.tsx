@@ -96,6 +96,7 @@ function LiquidacionAcciones({
   onVer,
   onEmitir,
   onPdf,
+  onPdfNc,
   onAnular,
   onEliminar,
   onVerComprobante,
@@ -108,6 +109,7 @@ function LiquidacionAcciones({
   onVer: () => void;
   onEmitir: () => void;
   onPdf: () => void;
+  onPdfNc: () => void;
   onAnular: () => void;
   onEliminar: () => void;
   onVerComprobante: () => void;
@@ -121,6 +123,8 @@ function LiquidacionAcciones({
   const puedeAnular = hasArca && liq.estado === "autorizado";
   const tienePdf =
     hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
+  const tienePdfNc =
+    hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
   const tieneComprobanteAdjunto =
     !hasArca && Boolean(liq.comprobanteUrl?.trim());
 
@@ -157,6 +161,17 @@ function LiquidacionAcciones({
             className={`${listadoTablaAccionClass} h-7 px-3`}
           >
             {isDownloading ? "…" : "PDF"}
+          </button>
+        )}
+        {tienePdfNc && (
+          <button
+            type="button"
+            disabled={isDownloading}
+            onClick={onPdfNc}
+            className={`${listadoTablaAccionClass} h-7 px-3`}
+            title="Nota de crédito 065"
+          >
+            {isDownloading ? "…" : "PDF NC"}
           </button>
         )}
         {tieneComprobanteAdjunto && (
@@ -374,6 +389,32 @@ export function LiquidacionesTenantPage() {
     }
   }
 
+  async function descargarPdfNc(liq: LiquidacionConTransportista) {
+    setDownloading(liq.id);
+    try {
+      const res = await apiFetch(
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf-anulacion`,
+        () => getToken(),
+      );
+      if (!res.ok) throw new Error("Error al generar el PDF de la nota de crédito");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `nc065-${liq.id}.pdf`,
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   function accionesProps(liq: LiquidacionConTransportista) {
     return {
       liq,
@@ -414,6 +455,7 @@ export function LiquidacionesTenantPage() {
       },
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
+      onPdfNc: () => void descargarPdfNc(liq),
       onAnular: () => setAnularConfirm(liq),
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
@@ -718,7 +760,7 @@ export function LiquidacionesTenantPage() {
         title="Anular liquidación"
         message={
           anularConfirm
-            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante de ajuste en ARCA y no se puede deshacer.`
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer.`
             : ""
         }
         confirmLabel="Anular"
