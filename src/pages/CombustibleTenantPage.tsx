@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -16,6 +16,7 @@ import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import { exportarCargasCombustibleCsv } from "@/lib/combustibleCsvExport";
+import { isOrgMember } from "@/lib/roleLabels";
 import type {
   CargaCombustible,
   Chofer,
@@ -120,10 +121,15 @@ export function CombustibleTenantPage({
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
 } = {}) {
-  const { getToken, isLoaded, isSignedIn, orgId } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgId, orgRole } = useAuth();
+  const { user } = useUser();
   const { showToast } = useToast();
 
   const activeTenantId = tenantId?.trim() || (orgId ?? "");
+
+  const isReadOnly = useMemo(() => {
+    return isOrgMember({ orgRole, publicMetadata: user?.publicMetadata });
+  }, [orgRole, user?.publicMetadata]);
 
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -617,22 +623,24 @@ export function CombustibleTenantPage({
             >
               Ver
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteError(null);
-                setDeleteTarget(r);
-              }}
-              className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
-              aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
-            >
-              Eliminar
-            </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteTarget(r);
+                }}
+                className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
+                aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
+              >
+                Eliminar
+              </button>
+            )}
           </div>
         ),
       },
     ],
-    [],
+    [isReadOnly],
   );
 
   return (
@@ -741,19 +749,21 @@ export function CombustibleTenantPage({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          disabled={!activeTenantId}
-          className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
-            activeTenantId
-              ? "bg-vialto-charcoal hover:bg-vialto-graphite"
-              : "bg-vialto-charcoal/50 pointer-events-none"
-          }`}
-          aria-disabled={!activeTenantId}
-        >
-          Nueva carga
-        </button>
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            disabled={!activeTenantId}
+            className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
+              activeTenantId
+                ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+                : "bg-vialto-charcoal/50 pointer-events-none"
+            }`}
+            aria-disabled={!activeTenantId}
+          >
+            Nueva carga
+          </button>
+        )}
       </div>
 
       {embeddedInSuperadmin && error && (
@@ -910,7 +920,7 @@ export function CombustibleTenantPage({
         />
       )}
 
-      {deleteTarget && (
+      {deleteTarget && !isReadOnly && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
           role="dialog"
@@ -971,7 +981,7 @@ export function CombustibleTenantPage({
         </div>
       )}
 
-      {isCreateOpen && activeTenantId && (
+      {isCreateOpen && activeTenantId && !isReadOnly && (
         <CargaCombustibleCreateModal
           tenantId={activeTenantId}
           vehiculos={vehiculos}
@@ -990,6 +1000,7 @@ export function CombustibleTenantPage({
         <CargaCombustibleViewModal
           cargaId={viewTargetId}
           tenantId={activeTenantId}
+          readOnly={isReadOnly}
           onClose={() => setViewTargetId(null)}
           onUpdate={() => setReloadKey((k) => k + 1)}
         />

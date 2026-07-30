@@ -366,7 +366,7 @@ export default function App() {
 
           {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
           <Route element={<RequireModule module="combustible" />}>
-            <Route element={<RequireOrgAdmin />}>
+            <Route element={<RequireNotStockViewer />}>
               <Route path="combustible" element={<CombustiblePage />} />
             </Route>
           </Route>
