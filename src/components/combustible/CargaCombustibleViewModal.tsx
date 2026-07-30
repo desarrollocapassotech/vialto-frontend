@@ -60,7 +60,7 @@ export function CargaCombustibleViewModal({
   const [viewingVehiculo, setViewingVehiculo] = useState(false);
   const [showFechaRegistro, setShowFechaRegistro] = useState(false);
 
-  // Estados para cruzar los datos si el backend no los trae poblados
+  // Estados para cruzar los datos en caso de que el backend no los trae poblados
   const [choferes, setChoferes] = useState<{ id: string; nombre: string }[]>(
     [],
   );
