@@ -29,6 +29,10 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
+// Portal de AFIP donde se emite manualmente la NC 065 / CVLP negativo de anulación
+// (la anulación del CVLP no se puede emitir por web service).
+const AFIP_COMPROBANTES_EN_LINEA_URL = "https://portalcf.cloud.afip.gob.ar/";
+
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "Borrador",
   pendiente_cae: "Pendiente CAE",
@@ -63,9 +67,19 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
 // a
 
 function caeCell(liq: LiquidacionConTransportista) {
+  const esPrueba = Boolean(liq.ambiente) && liq.ambiente !== "produccion";
+  const pruebaBadge = esPrueba ? (
+    <span
+      className="inline-block mb-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800"
+      title="Comprobante emitido en el entorno de pruebas (homologación) — sin validez fiscal"
+    >
+      Prueba
+    </span>
+  ) : null;
   if (liq.cae) {
     return (
       <div>
+        {pruebaBadge}
         <p className="font-mono">{liq.cae}</p>
         {liq.caeFechaVto && (
           <p className="text-[11px]">Vto: {fmtDate(liq.caeFechaVto)}</p>
@@ -76,14 +90,18 @@ function caeCell(liq: LiquidacionConTransportista) {
   if (liq.arcaError) {
     const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
     return (
-      <p
-        className="text-red-600 text-[11px] max-w-[180px] truncate"
-        title={msg}
-      >
-        {msg}
-      </p>
+      <div>
+        {pruebaBadge}
+        <p
+          className="text-red-600 text-[11px] max-w-[180px] truncate"
+          title={msg}
+        >
+          {msg}
+        </p>
+      </div>
     );
   }
+  if (pruebaBadge) return <div>{pruebaBadge}</div>;
   return "—";
 }
 
@@ -342,6 +360,9 @@ export function LiquidacionesTenantPage() {
   async function confirmAnular() {
     const liq = anularConfirm;
     if (!liq || busyId) return;
+    // Abrimos AFIP "Comprobantes en Línea" dentro del gesto del click para que el
+    // navegador no bloquee el pop-up (la NC 065 / CVLP negativo se emite a mano ahí).
+    window.open(AFIP_COMPROBANTES_EN_LINEA_URL, "_blank", "noopener,noreferrer");
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -367,7 +388,7 @@ export function LiquidacionesTenantPage() {
     try {
       const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const res = await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`, // <-- Ruta corregida
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`,
         () => getToken(),
       );
       if (!res.ok) throw new Error("Error al generar el PDF");
@@ -763,7 +784,7 @@ export function LiquidacionesTenantPage() {
             ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer.`
             : ""
         }
-        confirmLabel="Anular"
+        confirmLabel="Anular y abrir AFIP"
         tone="danger"
         busy={busyId === anularConfirm?.id}
         onCancel={() => {

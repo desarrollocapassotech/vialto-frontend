@@ -1,17 +1,22 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
-import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import {
+  fmtLiquidacionMoney,
+  LiquidacionMontosBreakdown,
+} from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
   LiquidacionEstado,
+  LiquidacionViajeItem,
 } from "@/types/api";
 
 export type LiquidacionConTransportista = Liquidacion & {
@@ -173,6 +178,7 @@ export function LiquidacionViewModal({
     source.transportista?.nombre ?? source.transportistaId;
   const ivaPctEfectivo = ivaPct ?? source.ivaPct ?? null;
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
+  const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
 
   return (
     <ViewModalShell
@@ -250,12 +256,61 @@ export function LiquidacionViewModal({
           </div>
         </div>
 
+        <div>
+          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+            Viajes ({viajesIncluidos.length || source.cantViajes})
+          </p>
+          {loadingDetail ? (
+            <div className="flex justify-center rounded border border-black/10 py-6">
+              <Spinner className="h-5 w-5" />
+            </div>
+          ) : viajesIncluidos.length === 0 ? (
+            <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
+              {source.cantViajes > 0
+                ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
+                : "Sin viajes asociados."}
+            </p>
+          ) : (
+            <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
+              {viajesIncluidos.map((row) => {
+                const v = row.viaje;
+                const viajeId = v?.id ?? row.viajeId;
+                const numero = v?.numero ?? "—";
+                return (
+                  <Link
+                    key={row.viajeId}
+                    to={`/viajes?viaje=${encodeURIComponent(viajeId)}`}
+                    onClick={onClose}
+                    className="block px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist"
+                  >
+                    <p className="text-xs font-medium text-vialto-charcoal">
+                      Viaje #{numero}
+                      {v?.fechaCarga && (
+                        <span className="ml-1.5 font-normal text-vialto-steel">
+                          {fmtDate(v.fechaCarga)}
+                        </span>
+                      )}
+                    </p>
+                    {(v?.origen || v?.destino) && (
+                      <p className="text-[11px] text-vialto-steel truncate">
+                        {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                      {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className={viewModalGridClass}>
           <Campo
             label="Período"
             value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
           />
-          <Campo label="Viajes" value={source.cantViajes} />
           <Campo
             label="Tipo de comprobante"
             value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}

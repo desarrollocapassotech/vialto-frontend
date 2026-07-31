@@ -519,6 +519,19 @@ export interface LiquidacionConceptoLinea {
   orden: number;
 }
 
+/** Viaje incluido en una liquidación (join liquidacion_viajes + viaje). */
+export interface LiquidacionViajeItem {
+  viajeId: string;
+  subtotal: number;
+  viaje?: {
+    id: string;
+    numero: string | number | null;
+    fechaCarga: string | null;
+    origen: string | null;
+    destino: string | null;
+  } | null;
+}
+
 export interface Liquidacion {
   id: string;
   tenantId: string;
@@ -553,6 +566,8 @@ export interface Liquidacion {
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
+  /** Presente en GET detalle; no siempre en el listado. */
+  viajes?: LiquidacionViajeItem[];
 }
 
 export interface ArcaLog {
