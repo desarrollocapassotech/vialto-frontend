@@ -716,6 +716,41 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
     }
   }
 
+  async function descargarPdfNc(id: string) {
+    setRowProcessing((prev) => ({ ...prev, [id]: "pdf-nc" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    try {
+      const res = await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}/pdf-anulacion?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+      );
+      if (!res.ok) throw new Error("Error al descargar el PDF de la NC");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `nc065-${id}.pdf`,
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
+    } finally {
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+    }
+  }
+
   async function anular(id: string) {
     setRowProcessing((prev) => ({ ...prev, [id]: "anular" }));
     setRowErrors((prev) => {
@@ -877,6 +912,17 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   {isProc === "pdf" ? "…" : "PDF"}
                 </button>
               )}
+              {liq.estado === "anulado" && liq.anulacionCae && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() => descargarPdfNc(liq.id)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
+                  title="Nota de crédito 065"
+                >
+                  {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                </button>
+              )}
               {liq.estado === "autorizado" && (
                 <button
                   type="button"
@@ -982,6 +1028,17 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                       {isProc === "pdf" ? "…" : "PDF"}
                     </button>
                   )}
+                  {liq.estado === "anulado" && liq.anulacionCae && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() => descargarPdfNc(liq.id)}
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
+                      title="Nota de crédito 065"
+                    >
+                      {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                    </button>
+                  )}
                   {liq.estado === "autorizado" && (
                     <button
                       type="button"
@@ -1046,7 +1103,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         }
         message={
           confirmModal?.type === "anular"
-            ? "¿Deseas anular esta liquidación? Esta acción no se puede deshacer."
+            ? "¿Deseas anular esta liquidación? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer."
             : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
         }
         confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}
