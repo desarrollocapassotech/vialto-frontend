@@ -46,6 +46,19 @@ export type CombustibleAlerta = {
   precioPorLitro: number;
 };
 
+/** COMB-07-T5: carga que el chofer intentó sincronizar offline y el backend rechazó. */
+export type CombustibleErrorSincronizacion = {
+  id: string;
+  mensaje: string;
+  fechaCarga: string | null;
+  reportadoEn: string;
+  choferNombre: string;
+  patente: string;
+  litros: number | null;
+  importe: number | null;
+  estacion: string | null;
+};
+
 export type CombustibleEvolucionPrecioPunto = {
   etiqueta: string;
   desde: string;
@@ -92,6 +105,7 @@ export type CombustibleDashboardResponse = {
   porVehiculo: CombustiblePorVehiculoItem[];
   porChofer: CombustiblePorChoferItem[];
   alertas: CombustibleAlerta[];
+  erroresSincronizacion: CombustibleErrorSincronizacion[];
   evolucionPrecio: CombustibleEvolucionPrecioPunto[];
   evolucionCostoPorKm: CombustibleEvolucionCostoPorKmPunto[];
   viajesCruce: CombustibleViajesCruceItem[] | null;

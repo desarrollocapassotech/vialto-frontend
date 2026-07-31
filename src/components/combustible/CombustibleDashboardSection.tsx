@@ -116,7 +116,8 @@ export function CombustibleDashboardSection({
     };
   }, [dash.period, dash.customFrom, dash.customTo]);
 
-  const cantAlertas = data?.alertas.length ?? 0;
+  const cantAlertas =
+    (data?.alertas.length ?? 0) + (data?.erroresSincronizacion.length ?? 0);
   const periodo = periodToDates(dash.period, dash.customFrom, dash.customTo);
 
   const tabs: { id: CombustibleTab; label: string; badge?: number }[] = [
@@ -198,7 +199,11 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && (
-          <AlertasList alertas={data?.alertas ?? []} tenantId={tenantId} />
+          <AlertasList
+            alertas={data?.alertas ?? []}
+            erroresSincronizacion={data?.erroresSincronizacion ?? []}
+            tenantId={tenantId}
+          />
         )}
         {tab === "viajes" && showViajes && (
           <ViajesCruceTable items={data?.viajesCruce ?? []} />

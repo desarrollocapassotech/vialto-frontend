@@ -6,13 +6,23 @@ import {
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
+import {
+  fmtTipoVehiculo,
+  fmtFormaPago,
+  fmtMensajeErrorSincronizacion,
+} from "@/lib/combustibleLabels";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
 import { motivoShortLabel } from "./SospechaBadge";
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalGridClass,
+} from "@/components/ui/ViewModalShell";
 import type {
   CombustibleAlerta,
   CombustibleDashboardResponse,
   CombustibleDistribucionItem,
+  CombustibleErrorSincronizacion,
   CombustiblePorChoferItem,
   CombustiblePorVehiculoItem,
   CombustibleEvolucionPrecioPunto,
@@ -618,22 +628,133 @@ export function fmtFormaPagoClave(clave: string): string {
   return fmtFormaPago(clave);
 }
 
-// ── Alertas ──────────────────────────────────────────────────────────────
+// ── Alertas (sospechosas + errores de sincronización, COMB-07-T5) ───────
+
+/** Vehículo/patente vacíos también cuentan como "sin dato" (ej. payload sin patente). */
+function patenteOSinIdentificar(patente: string): string {
+  return patente.trim() ? patente : "Sin identificar";
+}
+
+function SyncErrorViewModal({
+  error,
+  onClose,
+}: {
+  error: CombustibleErrorSincronizacion;
+  onClose: () => void;
+}) {
+  return (
+    <ViewModalShell
+      title="Error de sincronización"
+      onClose={onClose}
+      footer={
+        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+          Cerrar
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            Motivo
+          </p>
+          <p className="mt-1 text-sm text-rose-800">
+            {fmtMensajeErrorSincronizacion(error.mensaje)}
+          </p>
+        </div>
+        <div className={viewModalGridClass}>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Carga realizada
+            </p>
+            <p className="mt-1 text-sm">
+              {error.fechaCarga ? fmtFecha(error.fechaCarga) : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Error registrado
+            </p>
+            <p className="mt-1 text-sm">{fmtFecha(error.reportadoEn)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Conductor
+            </p>
+            <p className="mt-1 text-sm">{error.choferNombre || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Vehículo
+            </p>
+            <p className="mt-1 text-sm">
+              {patenteOSinIdentificar(error.patente)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Estación
+            </p>
+            <p className="mt-1 text-sm">{error.estacion ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Litros
+            </p>
+            <p className="mt-1 text-sm">
+              {error.litros != null ? fmtLitros(error.litros) : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Monto
+            </p>
+            <p className="mt-1 text-sm">
+              {error.importe != null ? fmtMoney(error.importe) : "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </ViewModalShell>
+  );
+}
+
+type FilaAlerta =
+  | { kind: "sospechosa"; fecha: string; data: CombustibleAlerta }
+  | { kind: "sync_error"; fecha: string; data: CombustibleErrorSincronizacion };
 
 export function AlertasList({
   alertas,
+  erroresSincronizacion,
   tenantId,
 }: {
   alertas: CombustibleAlerta[];
+  erroresSincronizacion: CombustibleErrorSincronizacion[];
   tenantId: string; // <-- AÑADIDO
 }) {
   const [viewingCargaId, setViewingCargaId] = useState<string | null>(null);
+  const [viewingError, setViewingError] =
+    useState<CombustibleErrorSincronizacion | null>(null);
 
-  if (alertas.length === 0) {
+  const filas: FilaAlerta[] = [
+    ...alertas.map((a) => ({
+      kind: "sospechosa" as const,
+      fecha: a.fecha,
+      data: a,
+    })),
+    ...erroresSincronizacion.map((e) => ({
+      kind: "sync_error" as const,
+      // La fecha de la carga intentada es la referencia natural; si el payload no la
+      // trajo, se ordena por cuándo se registró el error (siempre presente).
+      fecha: e.fechaCarga ?? e.reportadoEn,
+      data: e,
+    })),
+  ].sort((x, y) => new Date(y.fecha).getTime() - new Date(x.fecha).getTime());
+
+  if (filas.length === 0) {
     return (
       <div className="bg-white border border-black/10 p-4">
         <p className="text-sm text-vialto-steel">
-          Sin cargas marcadas como sospechosas en el período.
+          Sin alertas de combustible en el período.
         </p>
       </div>
     );
@@ -641,7 +762,6 @@ export function AlertasList({
   return (
     <div className="overflow-x-auto bg-white border border-black/10 p-4">
       <table className="w-full text-sm">
-        {/* ... (el thead queda exactamente igual) ... */}
         <thead>
           <tr className="border-b border-black/10">
             <th className="pb-2 text-left font-normal text-[11px] uppercase tracking-[0.15em] text-vialto-steel">
@@ -671,43 +791,94 @@ export function AlertasList({
           </tr>
         </thead>
         <tbody>
-          {alertas.map((a) => {
+          {filas.map((fila) => {
+            if (fila.kind === "sospechosa") {
+              const a = fila.data;
+              return (
+                <tr
+                  key={`sospechosa-${a.cargaId}`}
+                  className="border-b border-black/5 last:border-0"
+                >
+                  <td className="py-2">
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <SemaforoDot color="rojo" />
+                      {motivoShortLabel(a.motivoSospecha)}
+                    </span>
+                  </td>
+                  <td className="py-2 whitespace-nowrap text-vialto-charcoal">
+                    {fmtFecha(a.fecha)}
+                  </td>
+                  <td className="py-2 font-medium text-vialto-charcoal">
+                    {a.patente}
+                  </td>
+                  <td className="py-2 text-vialto-charcoal">
+                    {a.choferNombre ?? "—"}
+                  </td>
+                  <td className="py-2 text-right text-vialto-charcoal">
+                    {fmtLitros(a.litros)}
+                  </td>
+                  <td className="py-2 text-right text-vialto-charcoal">
+                    {fmtMoney(a.precioPorLitro)}
+                  </td>
+                  <td className="py-2 text-right text-vialto-charcoal">
+                    {fmtMoney(a.importe)}
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setViewingCargaId(a.cargaId)}
+                      className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
+                    >
+                      Ver carga →
+                    </button>
+                  </td>
+                </tr>
+              );
+            }
+
+            const e = fila.data;
             return (
               <tr
-                key={a.cargaId}
-                className="border-b border-black/5 last:border-0"
+                key={`sync-${e.id}`}
+                className="border-b border-black/5 bg-rose-50/40 last:border-0"
               >
                 <td className="py-2">
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <SemaforoDot color="rojo" />
-                    {motivoShortLabel(a.motivoSospecha)}
-                  </span>
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-800">
+                      <SemaforoDot color="rojo" />
+                      Error de sincronización
+                    </span>
+                    <span
+                      className="max-w-[220px] truncate text-xs text-vialto-steel"
+                      title={fmtMensajeErrorSincronizacion(e.mensaje)}
+                    >
+                      {fmtMensajeErrorSincronizacion(e.mensaje)}
+                    </span>
+                  </div>
                 </td>
                 <td className="py-2 whitespace-nowrap text-vialto-charcoal">
-                  {fmtFecha(a.fecha)}
+                  {e.fechaCarga ? fmtFecha(e.fechaCarga) : fmtFecha(e.reportadoEn)}
                 </td>
                 <td className="py-2 font-medium text-vialto-charcoal">
-                  {a.patente}
+                  {patenteOSinIdentificar(e.patente)}
                 </td>
                 <td className="py-2 text-vialto-charcoal">
-                  {a.choferNombre ?? "—"}
+                  {e.choferNombre || "—"}
                 </td>
                 <td className="py-2 text-right text-vialto-charcoal">
-                  {fmtLitros(a.litros)}
+                  {e.litros != null ? fmtLitros(e.litros) : "—"}
                 </td>
+                <td className="py-2 text-right text-vialto-charcoal">—</td>
                 <td className="py-2 text-right text-vialto-charcoal">
-                  {fmtMoney(a.precioPorLitro)}
-                </td>
-                <td className="py-2 text-right text-vialto-charcoal">
-                  {fmtMoney(a.importe)}
+                  {e.importe != null ? fmtMoney(e.importe) : "—"}
                 </td>
                 <td className="py-2 text-right">
                   <button
                     type="button"
-                    onClick={() => setViewingCargaId(a.cargaId)}
+                    onClick={() => setViewingError(e)}
                     className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
                   >
-                    Ver carga →
+                    Ver →
                   </button>
                 </td>
               </tr>
@@ -721,6 +892,12 @@ export function AlertasList({
           cargaId={viewingCargaId}
           tenantId={tenantId}
           onClose={() => setViewingCargaId(null)}
+        />
+      )}
+      {viewingError && (
+        <SyncErrorViewModal
+          error={viewingError}
+          onClose={() => setViewingError(null)}
         />
       )}
     </div>
