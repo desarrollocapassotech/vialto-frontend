@@ -564,6 +564,8 @@ export interface Liquidacion {
   anulacionFecha?: string | null;
   estado: LiquidacionEstado;
   arcaError: string | null;
+  /** Detalle técnico crudo de AFIP SDK del último error (para "ver error completo"). */
+  arcaErrorDetalle?: string | null;
   reintentos: number;
   comprobanteUrl: string | null;
   createdAt: string;
