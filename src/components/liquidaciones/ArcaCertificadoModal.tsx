@@ -12,6 +12,9 @@ const labelClass =
 const textareaClass =
   'rounded border border-black/10 bg-white px-3 py-2 text-xs font-mono text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35 resize-y';
 
+const maskedBoxClass =
+  'flex h-[15.5rem] flex-col items-center justify-center gap-1.5 rounded border border-black/10 bg-vialto-mist/50 px-3 py-2 text-center select-none';
+
 export function ArcaCertificadoModal({
   certPem,
   keyPem,
@@ -29,6 +32,8 @@ export function ArcaCertificadoModal({
 }) {
   const [localCert, setLocalCert] = useState(certPem);
   const [localKey, setLocalKey] = useState(keyPem);
+  const [editingCert, setEditingCert] = useState(!certConfigurado);
+  const [editingKey, setEditingKey] = useState(!keyConfigurado);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,43 +101,87 @@ export function ArcaCertificadoModal({
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="certPemModal" className={labelClass}>
-            Certificado digital (.crt / .pem)
-            {certConfigurado && <span className="ml-2 normal-case text-green-700">● configurado</span>}
-          </label>
-          <textarea
-            id="certPemModal"
-            rows={10}
-            autoFocus
-            value={localCert}
-            onChange={(e) => setLocalCert(e.target.value)}
-            disabled={saving}
-            placeholder={
-              certConfigurado
-                ? 'Pegá aquí para reemplazar el certificado actual.'
-                : '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'
-            }
-            className={`${textareaClass} disabled:opacity-60`}
-          />
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="certPemModal" className={labelClass}>
+              Certificado digital (.crt / .pem)
+              {certConfigurado && <span className="ml-2 normal-case text-green-700">● configurado</span>}
+            </label>
+            {certConfigurado && !editingCert && (
+              <button
+                type="button"
+                onClick={() => setEditingCert(true)}
+                className="shrink-0 text-[10px] uppercase tracking-wider text-vialto-fire hover:underline"
+              >
+                Editar
+              </button>
+            )}
+          </div>
+          {certConfigurado && !editingCert ? (
+            <div className={maskedBoxClass}>
+              <span className="font-mono text-xs tracking-widest text-vialto-steel">
+                ••••••••••••••••••••••••
+              </span>
+              <span className="text-[11px] text-vialto-steel">
+                Oculto por seguridad. Hacé clic en «Editar» para reemplazarlo.
+              </span>
+            </div>
+          ) : (
+            <textarea
+              id="certPemModal"
+              rows={10}
+              autoFocus
+              value={localCert}
+              onChange={(e) => setLocalCert(e.target.value)}
+              disabled={saving}
+              placeholder={
+                certConfigurado
+                  ? 'Pegá aquí para reemplazar el certificado actual.'
+                  : '-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'
+              }
+              className={`${textareaClass} disabled:opacity-60`}
+            />
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="keyPemModal" className={labelClass}>
-            Clave privada (.key / .pem)
-            {keyConfigurado && <span className="ml-2 normal-case text-green-700">● configurada</span>}
-          </label>
-          <textarea
-            id="keyPemModal"
-            rows={10}
-            value={localKey}
-            onChange={(e) => setLocalKey(e.target.value)}
-            disabled={saving}
-            placeholder={
-              keyConfigurado
-                ? 'Pegá aquí para reemplazar la clave actual.'
-                : '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'
-            }
-            className={`${textareaClass} disabled:opacity-60`}
-          />
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="keyPemModal" className={labelClass}>
+              Clave privada (.key / .pem)
+              {keyConfigurado && <span className="ml-2 normal-case text-green-700">● configurada</span>}
+            </label>
+            {keyConfigurado && !editingKey && (
+              <button
+                type="button"
+                onClick={() => setEditingKey(true)}
+                className="shrink-0 text-[10px] uppercase tracking-wider text-vialto-fire hover:underline"
+              >
+                Editar
+              </button>
+            )}
+          </div>
+          {keyConfigurado && !editingKey ? (
+            <div className={maskedBoxClass}>
+              <span className="font-mono text-xs tracking-widest text-vialto-steel">
+                ••••••••••••••••••••••••
+              </span>
+              <span className="text-[11px] text-vialto-steel">
+                Oculto por seguridad. Hacé clic en «Editar» para reemplazarla.
+              </span>
+            </div>
+          ) : (
+            <textarea
+              id="keyPemModal"
+              rows={10}
+              value={localKey}
+              onChange={(e) => setLocalKey(e.target.value)}
+              disabled={saving}
+              placeholder={
+                keyConfigurado
+                  ? 'Pegá aquí para reemplazar la clave actual.'
+                  : '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'
+              }
+              className={`${textareaClass} disabled:opacity-60`}
+            />
+          )}
         </div>
       </div>
     </ViewModalShell>

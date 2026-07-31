@@ -482,8 +482,9 @@ export interface ArcaConfig {
   ptoVentaFactura: number;
   ambiente: "homologacion" | "produccion";
   comisionPctDefault: number;
-  comisionPctAlt: number;
   ivaGastosAdmin: number;
+  /** Comprobante con que se anula un CVLP: 'nota_credito' (tipo 3/8) | 'nota_debito' (tipo 2/7). */
+  anulacionTipoComprobante?: "nota_credito" | "nota_debito";
   updatedAt: string;
   certConfigurado: boolean;
   keyConfigurado: boolean;
@@ -554,7 +555,7 @@ export interface Liquidacion {
   caeFechaVto: string | null;
   /** Ambiente ARCA en el que se emitió el comprobante (homologacion | produccion). */
   ambiente?: string | null;
-  /** Datos de la NC 065 emitida al anular (el CVLP original se conserva arriba). */
+  /** Datos del comprobante de anulación (Nota de Crédito o Débito); el CVLP original se conserva arriba. */
   anulacionCbteTipo?: number | null;
   anulacionCbteNro?: number | null;
   anulacionPtoVenta?: number | null;
@@ -563,6 +564,8 @@ export interface Liquidacion {
   anulacionFecha?: string | null;
   estado: LiquidacionEstado;
   arcaError: string | null;
+  /** Detalle técnico crudo de AFIP SDK del último error (para "ver error completo"). */
+  arcaErrorDetalle?: string | null;
   reintentos: number;
   comprobanteUrl: string | null;
   createdAt: string;

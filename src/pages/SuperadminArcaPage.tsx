@@ -11,6 +11,7 @@ import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson, apiFetch } from "@/lib/api";
+import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
@@ -100,7 +101,6 @@ function validateConfigForm(values: ConfigFormValues): Record<string, string> {
 
   const porcentajeFields: (keyof ConfigFormValues)[] = [
     "comisionPctDefault",
-    "comisionPctAlt",
     "ivaGastosAdmin",
   ];
   for (const field of porcentajeFields) {
@@ -173,7 +173,6 @@ type ConfigFormValues = {
   ptoVentaFactura: string;
   ambiente: "homologacion" | "produccion";
   comisionPctDefault: string;
-  comisionPctAlt: string;
   ivaGastosAdmin: string;
   certPem: string;
   keyPem: string;
@@ -190,7 +189,6 @@ const EMPTY_FORM: ConfigFormValues = {
   ptoVentaFactura: "1",
   ambiente: "homologacion",
   comisionPctDefault: "8",
-  comisionPctAlt: "7",
   ivaGastosAdmin: "21",
   certPem: "",
   keyPem: "",
@@ -208,7 +206,6 @@ function configToForm(c: ArcaConfig): ConfigFormValues {
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
-    comisionPctAlt: String(c.comisionPctAlt),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
     certPem: "",
     keyPem: "",
@@ -337,7 +334,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         ptoVentaFactura: Number(values.ptoVentaFactura),
         ambiente: values.ambiente,
         comisionPctDefault: Number(values.comisionPctDefault),
-        comisionPctAlt: Number(values.comisionPctAlt),
         ivaGastosAdmin: Number(values.ivaGastosAdmin),
         certPem: values.certPem.trim() || undefined,
         keyPem: values.keyPem.trim() || undefined,
@@ -518,7 +514,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         )}
       </div>
 
-      {/* Comisiones */}
+      {/* Comisión e IVA */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="comisionPctDefault">
@@ -533,29 +529,15 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="comisionPctAlt">
-            Comisión alternativa (%)
-          </FieldLabel>
+          <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
           <TextInput
-            id="comisionPctAlt"
+            id="ivaGastosAdmin"
             type="number"
-            value={values.comisionPctAlt}
-            onChange={(v) => set("comisionPctAlt", v)}
-            error={fieldErrors.comisionPctAlt}
+            value={values.ivaGastosAdmin}
+            onChange={(v) => set("ivaGastosAdmin", v)}
+            error={fieldErrors.ivaGastosAdmin}
           />
         </div>
-      </div>
-
-      {/* IVA sobre neto (campo legacy: ivaGastosAdmin) */}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
-        <TextInput
-          id="ivaGastosAdmin"
-          type="number"
-          value={values.ivaGastosAdmin}
-          onChange={(v) => set("ivaGastosAdmin", v)}
-          error={fieldErrors.ivaGastosAdmin}
-        />
       </div>
 
       {/* Certificado y clave privada */}
@@ -728,10 +710,10 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         `/api/platform/arca/liquidaciones/${id}/pdf-anulacion?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
       );
-      if (!res.ok) throw new Error("Error al descargar el PDF de la NC");
+      if (!res.ok) throw new Error("Error al descargar el PDF de la anulación");
       const filename = filenameFromContentDisposition(
         res.headers.get("Content-Disposition"),
-        `nc065-${id}.pdf`,
+        `anulacion-${id}.pdf`,
       );
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -918,9 +900,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   disabled={!!isProc}
                   onClick={() => descargarPdfNc(liq.id)}
                   className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                  title="Nota de crédito 065"
+                  title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
                 >
-                  {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                  {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                 </button>
               )}
               {liq.estado === "autorizado" && (
@@ -1034,9 +1016,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                       disabled={!!isProc}
                       onClick={() => descargarPdfNc(liq.id)}
                       className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                      title="Nota de crédito 065"
+                      title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
                     >
-                      {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                      {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                     </button>
                   )}
                   {liq.estado === "autorizado" && (
@@ -1103,7 +1085,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         }
         message={
           confirmModal?.type === "anular"
-            ? "¿Deseas anular esta liquidación? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer."
+            ? "¿Deseas anular esta liquidación? Se emitirá en ARCA el comprobante de anulación configurado (Nota de Crédito o Nota de Débito), asociado al CVLP original. Esta acción no se puede deshacer."
             : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
         }
         confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}

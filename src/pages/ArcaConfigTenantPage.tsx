@@ -48,7 +48,6 @@ type FormValues = {
   ptoVentaFactura: string;
   ambiente: 'homologacion' | 'produccion';
   comisionPctDefault: string;
-  comisionPctAlt: string;
   ivaGastosAdmin: string;
   certPem: string;
   keyPem: string;
@@ -65,7 +64,6 @@ const EMPTY: FormValues = {
   ptoVentaFactura: '1',
   ambiente: 'homologacion',
   comisionPctDefault: '8',
-  comisionPctAlt: '7',
   ivaGastosAdmin: '21',
   certPem: '',
   keyPem: '',
@@ -88,7 +86,6 @@ const VENTA_FIELDS = [
 
 const COMISION_FIELDS = [
   'comisionPctDefault',
-  'comisionPctAlt',
   'ivaGastosAdmin',
 ] as const satisfies readonly (keyof FormValues)[];
 
@@ -113,7 +110,6 @@ function configToForm(c: ArcaConfig): FormValues {
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
-    comisionPctAlt: String(c.comisionPctAlt),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
     certPem: '',
     keyPem: '',
@@ -270,7 +266,6 @@ export function ArcaConfigTenantPage() {
         ptoVentaFactura: Number(v.ptoVentaFactura),
         ambiente: v.ambiente,
         comisionPctDefault: Number(v.comisionPctDefault),
-        comisionPctAlt: Number(v.comisionPctAlt),
         ivaGastosAdmin: Number(v.ivaGastosAdmin),
         certPem: v.certPem.trim() || undefined,
         keyPem: v.keyPem.trim() || undefined,
@@ -632,7 +627,7 @@ export function ArcaConfigTenantPage() {
             saving={loading}
             dirty={sectionDirty(COMISION_FIELDS)}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="comisionPctDefault" className={labelClass}>Comisión default (%)</label>
                 <input
@@ -640,16 +635,6 @@ export function ArcaConfigTenantPage() {
                   type="number"
                   value={values.comisionPctDefault}
                   onChange={(e) => set('comisionPctDefault', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="comisionPctAlt" className={labelClass}>Comisión alternativa (%)</label>
-                <input
-                  id="comisionPctAlt"
-                  type="number"
-                  value={values.comisionPctAlt}
-                  onChange={(e) => set('comisionPctAlt', e.target.value)}
                   className={inputClass}
                 />
               </div>

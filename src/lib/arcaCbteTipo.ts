@@ -39,11 +39,17 @@ export function cvlpCbteLabel(cbteTipo: CvlpCbteTipo): string {
     : "CVLP Tipo 61 (clase B)";
 }
 
-/** Código AFIP de Nota de Crédito asociada a CVLP. */
-export const CBTE_TIPO_NC_CVLP = 65 as const;
+/**
+ * Comprobante estándar con el que se anula un CVLP autorizado, asociado (CbtesAsoc)
+ * al 060/061 original: Nota de Crédito (cód. 3 clase A / 8 clase B) o
+ * Nota de Débito (cód. 2 clase A / 7 clase B), a elección del tenant.
+ */
+export function esNotaDebitoAnulacion(cbteTipo: number | null | undefined): boolean {
+  return cbteTipo === 2 || cbteTipo === 7;
+}
 
-export function ncCvlpCbteLabel(cbteTipo: number = CBTE_TIPO_NC_CVLP): string {
-  return `Nota de Crédito Tipo ${String(cbteTipo).padStart(3, "0")}`;
+export function anulacionComprobanteLabel(cbteTipo: number | null | undefined): string {
+  return esNotaDebitoAnulacion(cbteTipo) ? "Nota de Débito" : "Nota de Crédito";
 }
 
 export function facturaLetraLabel(letra: FacturaLetra): string {
