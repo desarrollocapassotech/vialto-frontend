@@ -285,7 +285,20 @@ export interface Factura {
   diferencia: number | null;
   ivaPct: number | null;
   comprobanteUrl: string | null;
+  cbteTipo?: number | null;
+  cbteNro?: number | null;
+  ptoVenta?: number | null;
+  cae?: string | null;
+  caeFechaVto?: string | null;
+  arcaEstado?: "pendiente_cae" | "autorizado" | "error" | null;
+  arcaError?: string | null;
   createdAt: string;
+}
+
+export interface FacturaLineaPayload {
+  descripcion: string;
+  importe: number;
+  ivaPct?: number;
 }
 
 export interface ImportRowError {

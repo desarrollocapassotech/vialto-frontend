@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
+import { Receipt } from 'lucide-react';
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
-import type { Factura } from '@/types/api';
+import { facturaLetraFromCondicionIva, facturaLetraLabel } from '@/lib/arcaCbteTipo';
+import type { Cliente, Factura } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -35,18 +37,36 @@ const ESTADO_BADGE: Record<string, string> = {
   vencida: 'bg-red-100 text-red-950 border-red-400/80',
 };
 
+const ARCA_ESTADO_LABEL: Record<string, string> = {
+  pendiente_cae: 'Pendiente CAE',
+  autorizado: 'Autorizado ARCA',
+  error: 'Error ARCA',
+};
+
+const ARCA_ESTADO_BADGE: Record<string, string> = {
+  pendiente_cae: 'bg-sky-100 text-sky-950 border-sky-300/90',
+  autorizado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
+  error: 'bg-red-100 text-red-950 border-red-400/80',
+};
+
 export function FacturaViewModal({
   factura,
   clienteNombre,
+  cliente,
+  hasArca = false,
   onClose,
   onEditar,
   onVerComprobante,
+  onEmitirArca,
 }: {
   factura: Factura;
   clienteNombre?: string;
+  cliente?: Cliente | null;
+  hasArca?: boolean;
   onClose: () => void;
   onEditar: () => void;
   onVerComprobante?: () => void;
+  onEmitirArca?: () => void;
 }) {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -60,10 +80,21 @@ export function FacturaViewModal({
   const ivaN = factura.ivaPct ?? 0;
   const muestraIva = ivaN > 0 && factura.importe > 0;
   const totalConIva = factura.importe * (1 + ivaN / 100);
+  const letra =
+    hasArca && cliente?.condicionIva != null
+      ? facturaLetraLabel(facturaLetraFromCondicionIva(cliente.condicionIva))
+      : null;
+  const puedeEmitirArca =
+    hasArca &&
+    factura.tipo === 'cliente' &&
+    factura.moneda !== 'USD' &&
+    factura.arcaEstado !== 'autorizado' &&
+    !factura.cae;
 
   const campos: { label: string; value: string | null | undefined }[] = [
     { label: 'Número', value: factura.numero },
     { label: 'Tipo', value: TIPO_LABEL[factura.tipo] ?? factura.tipo },
+    ...(letra ? [{ label: 'Comprobante ARCA', value: letra }] : []),
     { label: 'Cliente', value: clienteNombre },
     { label: 'Importe', value: importeFormato },
     ...(muestraIva
@@ -78,12 +109,19 @@ export function FacturaViewModal({
       label: 'Diferencia',
       value: factura.diferencia != null ? `$ ${factura.diferencia.toLocaleString('es-AR')}` : null,
     },
+    ...(factura.cae ? [{ label: 'CAE', value: factura.cae }] : []),
+    ...(factura.caeFechaVto
+      ? [{ label: 'Vto. CAE', value: fmtDate(factura.caeFechaVto) }]
+      : []),
+    ...(factura.arcaError && factura.arcaEstado === 'error'
+      ? [{ label: 'Error ARCA', value: factura.arcaError }]
+      : []),
   ];
 
   return (
     <ViewModalShell
       title={
-        <span className="inline-flex items-center gap-3">
+        <span className="inline-flex items-center gap-3 flex-wrap">
           <span>Factura {factura.numero}</span>
           <span
             className={[
@@ -93,6 +131,16 @@ export function FacturaViewModal({
           >
             {ESTADO_LABEL[factura.estado] ?? factura.estado}
           </span>
+          {hasArca && factura.arcaEstado && (
+            <span
+              className={[
+                'text-xs font-medium border rounded px-2 py-0.5',
+                ARCA_ESTADO_BADGE[factura.arcaEstado] ?? 'border-black/15 text-vialto-steel',
+              ].join(' ')}
+            >
+              {ARCA_ESTADO_LABEL[factura.arcaEstado] ?? factura.arcaEstado}
+            </span>
+          )}
         </span>
       }
       onClose={onClose}
@@ -101,6 +149,16 @@ export function FacturaViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
+          {puedeEmitirArca && onEmitirArca && (
+            <button
+              type="button"
+              onClick={onEmitirArca}
+              className="inline-flex items-center gap-2 h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <Receipt className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              Emitir a ARCA
+            </button>
+          )}
           <button type="button" onClick={onEditar} className={viewModalBtnPrimary}>
             Editar
           </button>
