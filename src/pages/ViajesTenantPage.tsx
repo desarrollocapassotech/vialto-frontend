@@ -1014,7 +1014,7 @@ export function ViajesTenantPage({
     );
   }, []);
 
-  /** Abrir editor desde enlace (p. ej. panel de alertas): `?viaje=id` */
+  /** Abrir detalle (Ver) desde enlace: `?viaje=id` */
   useEffect(() => {
     const id = searchParams.get("viaje")?.trim();
     if (!id || !isLoaded || !isSignedIn) return;
@@ -1026,7 +1026,7 @@ export function ViajesTenantPage({
           v = await apiJson<Viaje>(viajeApiUrl(id), () => getToken());
         }
         if (cancelled || !v) return;
-        void beginEditViaje(v, "remoto");
+        setViewingViaje(v);
       } catch {
         /* viaje inexistente o sin permiso */
       } finally {
