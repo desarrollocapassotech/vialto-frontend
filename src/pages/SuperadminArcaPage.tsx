@@ -11,6 +11,7 @@ import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson, apiFetch } from "@/lib/api";
+import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
@@ -709,10 +710,10 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         `/api/platform/arca/liquidaciones/${id}/pdf-anulacion?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
       );
-      if (!res.ok) throw new Error("Error al descargar el PDF de la NC");
+      if (!res.ok) throw new Error("Error al descargar el PDF de la anulación");
       const filename = filenameFromContentDisposition(
         res.headers.get("Content-Disposition"),
-        `nc065-${id}.pdf`,
+        `anulacion-${id}.pdf`,
       );
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -899,9 +900,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   disabled={!!isProc}
                   onClick={() => descargarPdfNc(liq.id)}
                   className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                  title="Nota de crédito 065"
+                  title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
                 >
-                  {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                  {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                 </button>
               )}
               {liq.estado === "autorizado" && (
@@ -1015,9 +1016,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                       disabled={!!isProc}
                       onClick={() => descargarPdfNc(liq.id)}
                       className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal disabled:opacity-50`}
-                      title="Nota de crédito 065"
+                      title={anulacionComprobanteLabel(liq.anulacionCbteTipo)}
                     >
-                      {isProc === "pdf-nc" ? "…" : "PDF NC"}
+                      {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                     </button>
                   )}
                   {liq.estado === "autorizado" && (
@@ -1084,7 +1085,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         }
         message={
           confirmModal?.type === "anular"
-            ? "¿Deseas anular esta liquidación? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer."
+            ? "¿Deseas anular esta liquidación? Se emitirá en ARCA el comprobante de anulación configurado (Nota de Crédito o Nota de Débito), asociado al CVLP original. Esta acción no se puede deshacer."
             : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
         }
         confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}

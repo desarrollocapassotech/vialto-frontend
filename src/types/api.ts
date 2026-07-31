@@ -555,7 +555,7 @@ export interface Liquidacion {
   caeFechaVto: string | null;
   /** Ambiente ARCA en el que se emitió el comprobante (homologacion | produccion). */
   ambiente?: string | null;
-  /** Datos de la NC 065 emitida al anular (el CVLP original se conserva arriba). */
+  /** Datos del comprobante de anulación (Nota de Crédito o Débito); el CVLP original se conserva arriba. */
   anulacionCbteTipo?: number | null;
   anulacionCbteNro?: number | null;
   anulacionPtoVenta?: number | null;
