@@ -7,6 +7,8 @@ import {
   formatCvlpEmitMissingMessage,
 } from "@/lib/cvlpEmitValidation";
 import { friendlyError } from "@/lib/friendlyError";
+import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
+import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { Spinner } from "@/components/ui/Spinner";
 import type { ArcaConfig, Liquidacion } from "@/types/api";
 
@@ -102,6 +104,9 @@ export function EmitirLiquidacionModal({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetalle, setErrorDetalle] = useState<string | undefined>(
+    undefined,
+  );
   const [detail, setDetail] = useState<LiquidacionEmitDetail | null>(null);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(
     arcaConfigProp ?? null,
@@ -193,6 +198,7 @@ export function EmitirLiquidacionModal({
       });
     } catch (e) {
       setError(friendlyError(e, "arca"));
+      setErrorDetalle(getArcaErrorDetalle(e));
     } finally {
       setSubmitting(false);
     }
@@ -310,10 +316,10 @@ export function EmitirLiquidacionModal({
 
           {error && (
             <div
-              className="rounded border border-red-300/50 bg-red-50 px-4 py-3 text-sm text-red-800"
+              className="rounded border border-red-300/50 bg-red-50 px-4 py-3 text-sm"
               role="alert"
             >
-              {error}
+              <ArcaErrorMessage message={error} detalle={errorDetalle} />
             </div>
           )}
         </div>

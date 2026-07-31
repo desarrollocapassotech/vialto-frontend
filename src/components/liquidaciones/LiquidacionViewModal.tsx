@@ -11,6 +11,7 @@ import {
   LiquidacionMontosBreakdown,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { Spinner } from "@/components/ui/Spinner";
+import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { apiJson } from "@/lib/api";
 import type {
   Liquidacion,
@@ -329,8 +330,11 @@ export function LiquidacionViewModal({
         </div>
 
         {source.arcaError && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {source.arcaError}
+          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">
+            <ArcaErrorMessage
+              message={source.arcaError}
+              detalle={source.arcaErrorDetalle ?? undefined}
+            />
           </div>
         )}
 

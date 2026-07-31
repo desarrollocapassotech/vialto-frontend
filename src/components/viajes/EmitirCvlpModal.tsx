@@ -23,6 +23,8 @@ import {
   formatCvlpEmitMissingMessage,
 } from '@/lib/cvlpEmitValidation';
 import { friendlyError } from '@/lib/friendlyError';
+import { getArcaErrorDetalle } from '@/lib/arcaErrorDetalle';
+import { ArcaErrorMessage } from '@/components/ui/ArcaErrorMessage';
 import { MSG_ARCA_NO_LIQUIDA_USD, arcaBloqueaLiquidarUsd } from '@/lib/arcaUsdRestriction';
 import { viajeTieneLiquidacionTransportista } from '@/lib/viajesComprobantes';
 import type { ArcaConfig, Cliente, Liquidacion, Transportista, Viaje } from '@/types/api';
@@ -84,6 +86,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
   const [busyCrear, setBusyCrear] = useState(false);
   const [busyArca, setBusyArca] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetalle, setErrorDetalle] = useState<string | undefined>(
+    undefined,
+  );
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [liquidacion, setLiquidacion] = useState<Liquidacion | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -289,6 +294,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       onEmitido(liq);
     } catch (err) {
       setError(friendlyError(err, 'arca'));
+      setErrorDetalle(getArcaErrorDetalle(err));
     } finally {
       setBusyArca(false);
     }
@@ -312,6 +318,7 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
       URL.revokeObjectURL(url);
     } catch (err) {
       setError(friendlyError(err, 'arca'));
+      setErrorDetalle(getArcaErrorDetalle(err));
     } finally {
       setDownloading(false);
     }
@@ -618,9 +625,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               )}
 
               {error && (
-                <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
-                  {error}
-                </p>
+                <div className="text-xs border border-red-200 bg-red-50 px-3 py-2">
+                  <ArcaErrorMessage message={error} detalle={errorDetalle} />
+                </div>
               )}
               {arcaConfigMissing && (
                 <button
@@ -709,9 +716,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               )}
 
               {error && (
-                <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
-                  {error}
-                </p>
+                <div className="text-xs border border-red-200 bg-red-50 px-3 py-2">
+                  <ArcaErrorMessage message={error} detalle={errorDetalle} />
+                </div>
               )}
 
               <div className="flex justify-end gap-3">
@@ -769,9 +776,9 @@ export function EmitirCvlpModal({ viaje, onClose, onEmitido }: Props) {
               </section>
 
               {error && (
-                <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
-                  {error}
-                </p>
+                <div className="text-xs border border-red-200 bg-red-50 px-3 py-2">
+                  <ArcaErrorMessage message={error} detalle={errorDetalle} />
+                </div>
               )}
 
               <div className="flex justify-end gap-3">

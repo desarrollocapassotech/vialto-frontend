@@ -2405,6 +2405,7 @@ export function ViajesTenantPage({
         <CrearLiquidacionManualModal
           viajeInicial={crearLiqViaje}
           transportistas={maestro.transportistas}
+          hasArca={hasLiquidacionesArca}
           getToken={getToken}
           onSuccess={() => {
             setCrearLiqViaje(null);
