@@ -14,6 +14,8 @@ import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEdit
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiFetch, apiJson } from "@/lib/api";
@@ -22,6 +24,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import {
   listadoTablaAccionClass,
+  listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
@@ -253,6 +256,45 @@ export function LiquidacionesTenantPage() {
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
     "todos",
   );
+  const [transportistaFilter, setTransportistaFilter] = useState("");
+  const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
+  const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
+  const [caeFilter, setCaeFilter] = useState("");
+
+  function aplicarFiltroEstado(val: LiquidacionEstado | "todos") {
+    setEstadoFilter(val);
+    setPage(1);
+  }
+  function aplicarFiltroTransportista(val: string) {
+    setTransportistaFilter(val);
+    setPage(1);
+  }
+  function aplicarPeriodoDesdeFilter(val: string) {
+    setPeriodoDesdeFilter(val);
+    setPage(1);
+  }
+  function aplicarPeriodoHastaFilter(val: string) {
+    setPeriodoHastaFilter(val);
+    setPage(1);
+  }
+  function aplicarFiltroCae(val: string) {
+    setCaeFilter(val);
+    setPage(1);
+  }
+  function limpiarFiltros() {
+    setEstadoFilter("todos");
+    setTransportistaFilter("");
+    setPeriodoDesdeFilter("");
+    setPeriodoHastaFilter("");
+    setCaeFilter("");
+    setPage(1);
+  }
+  const anyFiltroActivo =
+    estadoFilter !== "todos" ||
+    !!transportistaFilter ||
+    !!periodoDesdeFilter ||
+    !!periodoHastaFilter ||
+    !!caeFilter.trim();
 
   const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -485,9 +527,20 @@ export function LiquidacionesTenantPage() {
   }
 
   const filteredRows = rows
-    ? estadoFilter === "todos"
-      ? rows
-      : rows.filter((r) => r.estado === estadoFilter)
+    ? rows.filter((r) => {
+        if (estadoFilter !== "todos" && r.estado !== estadoFilter) return false;
+        if (transportistaFilter && r.transportistaId !== transportistaFilter)
+          return false;
+        if (periodoDesdeFilter && r.periodoHasta.slice(0, 10) < periodoDesdeFilter)
+          return false;
+        if (periodoHastaFilter && r.periodoDesde.slice(0, 10) > periodoHastaFilter)
+          return false;
+        if (caeFilter.trim()) {
+          const q = caeFilter.trim().toLowerCase();
+          if (!(r.cae ?? "").toLowerCase().includes(q)) return false;
+        }
+        return true;
+      })
     : null;
 
   const totalItems = filteredRows ? filteredRows.length : 0;
@@ -549,36 +602,19 @@ export function LiquidacionesTenantPage() {
           </div>
         )}
 
-        {activeTenantId && (!error || !isSuperAdmin) && (
-          <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="estadoFilter"
-                className="text-sm font-medium text-vialto-charcoal"
-              >
-                Estado:
-              </label>
-              <select
-                id="estadoFilter"
-                value={estadoFilter}
-                onChange={(e) => {
-                  setEstadoFilter(
-                    e.target.value as LiquidacionEstado | "todos",
-                  );
-                  setPage(1);
-                }}
-                className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-vialto-charcoal shadow-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-              >
-                <option value="todos">Todos los estados</option>
-                {Object.entries(ESTADO_LABEL).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex justify-end gap-2">
+        {activeTenantId &&
+          (!error || !isSuperAdmin) &&
+          (anyFiltroActivo || !hasArca) && (
+            <div className="flex justify-end gap-2 mt-2">
+              {anyFiltroActivo && (
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
+                  className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+                >
+                  Limpiar filtros
+                </button>
+              )}
               {!hasArca && (
                 <button
                   type="button"
@@ -589,12 +625,131 @@ export function LiquidacionesTenantPage() {
                 </button>
               )}
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <ListadoDatos
         className="mt-6"
+        tableColSpan={9}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Transportista"
+                filterActive={!!transportistaFilter}
+                filterSignature={transportistaFilter}
+              >
+                <TransportistaSearchSelect
+                  id="liquidaciones-col-filtro-transportista"
+                  transportistas={transportistas}
+                  value={transportistaFilter}
+                  onChange={(id) => aplicarFiltroTransportista(id)}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  aria-label="Filtrar listado por transportista"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    transportistaFilter
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Período"
+                filterActive={
+                  !!periodoDesdeFilter.trim() || !!periodoHastaFilter.trim()
+                }
+                filterSignature={`${periodoDesdeFilter}|${periodoHastaFilter}`}
+              >
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={periodoDesdeFilter}
+                      onChange={(e) => aplicarPeriodoDesdeFilter(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={periodoHastaFilter}
+                      onChange={(e) => aplicarPeriodoHastaFilter(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Viajes
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Bruto
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Comisión
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Líquido
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={estadoFilter !== "todos"}
+                filterSignature={estadoFilter}
+              >
+                <select
+                  value={estadoFilter}
+                  onChange={(e) =>
+                    aplicarFiltroEstado(
+                      e.target.value as LiquidacionEstado | "todos",
+                    )
+                  }
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    estadoFilter !== "todos"
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar listado por estado"
+                >
+                  <option value="todos">Todos</option>
+                  {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                    <option key={val} value={val}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="CAE"
+                filterActive={!!caeFilter.trim()}
+                filterSignature={caeFilter}
+              >
+                <input
+                  type="text"
+                  value={caeFilter}
+                  onChange={(e) => aplicarFiltroCae(e.target.value)}
+                  placeholder="Buscar CAE..."
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    caeFilter.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar listado por CAE"
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "transportista",
