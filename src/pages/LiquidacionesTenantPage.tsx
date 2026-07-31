@@ -29,10 +29,6 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
-// Portal de AFIP donde se emite manualmente la NC 065 / CVLP negativo de anulación
-// (la anulación del CVLP no se puede emitir por web service).
-const AFIP_COMPROBANTES_EN_LINEA_URL = "https://portalcf.cloud.afip.gob.ar/";
-
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "Borrador",
   pendiente_cae: "Pendiente CAE",
@@ -273,6 +269,9 @@ export function LiquidacionesTenantPage() {
     useState<LiquidacionConTransportista | null>(null);
   const [eliminarConfirm, setEliminarConfirm] =
     useState<LiquidacionConTransportista | null>(null);
+  const [anularTipo, setAnularTipo] = useState<
+    "nota_credito" | "nota_debito"
+  >("nota_credito");
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
@@ -360,9 +359,6 @@ export function LiquidacionesTenantPage() {
   async function confirmAnular() {
     const liq = anularConfirm;
     if (!liq || busyId) return;
-    // Abrimos AFIP "Comprobantes en Línea" dentro del gesto del click para que el
-    // navegador no bloquee el pop-up (la NC 065 / CVLP negativo se emite a mano ahí).
-    window.open(AFIP_COMPROBANTES_EN_LINEA_URL, "_blank", "noopener,noreferrer");
     setActionError(null);
     setBusyId(liq.id);
     try {
@@ -370,7 +366,10 @@ export function LiquidacionesTenantPage() {
       const updated = await apiJson<LiquidacionConTransportista>(
         `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`, // <-- Ruta corregida
         () => getToken(),
-        { method: "POST" },
+        {
+          method: "POST",
+          body: JSON.stringify({ tipoAnulacion: anularTipo }),
+        },
       );
       setRows(
         (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
@@ -420,7 +419,7 @@ export function LiquidacionesTenantPage() {
       if (!res.ok) throw new Error("Error al generar el PDF de la nota de crédito");
       const filename = filenameFromContentDisposition(
         res.headers.get("Content-Disposition"),
-        `nc065-${liq.id}.pdf`,
+        `nota-credito-${liq.id}.pdf`,
       );
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -781,17 +780,32 @@ export function LiquidacionesTenantPage() {
         title="Anular liquidación"
         message={
           anularConfirm
-            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emitirá una Nota de Crédito 065 en ARCA asociada al CVLP original. Esta acción no se puede deshacer.`
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emite el comprobante de anulación en ARCA asociado al original. Esta acción no se puede deshacer.`
             : ""
         }
-        confirmLabel="Anular y abrir AFIP"
+        confirmLabel="Anular"
         tone="danger"
         busy={busyId === anularConfirm?.id}
         onCancel={() => {
           if (!busyId) setAnularConfirm(null);
         }}
         onConfirm={() => void confirmAnular()}
-      />
+      >
+        <label className="flex flex-col gap-1 text-xs uppercase tracking-wider text-vialto-steel">
+          Comprobante de anulación
+          <select
+            value={anularTipo}
+            onChange={(e) =>
+              setAnularTipo(e.target.value as "nota_credito" | "nota_debito")
+            }
+            disabled={busyId === anularConfirm?.id}
+            className="mt-0.5 border border-black/20 px-2 py-1.5 text-sm normal-case tracking-normal text-vialto-charcoal disabled:opacity-50"
+          >
+            <option value="nota_credito">Nota de Crédito (cód. 3/8)</option>
+            <option value="nota_debito">Nota de Débito (cód. 2/7)</option>
+          </select>
+        </label>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={eliminarConfirm != null}

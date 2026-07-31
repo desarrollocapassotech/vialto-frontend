@@ -484,6 +484,8 @@ export interface ArcaConfig {
   comisionPctDefault: number;
   comisionPctAlt: number;
   ivaGastosAdmin: number;
+  /** Comprobante con que se anula un CVLP: 'nota_credito' (tipo 3/8) | 'nota_debito' (tipo 2/7). */
+  anulacionTipoComprobante?: "nota_credito" | "nota_debito";
   updatedAt: string;
   certConfigurado: boolean;
   keyConfigurado: boolean;
