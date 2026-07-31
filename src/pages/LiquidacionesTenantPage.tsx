@@ -567,9 +567,7 @@ export function LiquidacionesTenantPage() {
       <p className="mt-1 text-sm text-vialto-steel">
         {isSuperAdmin
           ? "Elegí una empresa para ver y gestionar sus liquidaciones."
-          : hasArca
-            ? "Comprobantes CVLP tipo 60 emitidos a transportistas."
-            : "Liquidaciones emitidas a transportistas."}
+          : "Liquidaciones emitidas a transportistas."}
       </p>
 
       {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
@@ -602,30 +600,26 @@ export function LiquidacionesTenantPage() {
           </div>
         )}
 
-        {activeTenantId &&
-          (!error || !isSuperAdmin) &&
-          (anyFiltroActivo || !hasArca) && (
-            <div className="flex justify-end gap-2 mt-2">
-              {anyFiltroActivo && (
-                <button
-                  type="button"
-                  onClick={limpiarFiltros}
-                  className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-              {!hasArca && (
-                <button
-                  type="button"
-                  onClick={() => setShowCrear(true)}
-                  className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-                >
-                  Nueva liquidación
-                </button>
-              )}
-            </div>
-          )}
+        {activeTenantId && (!error || !isSuperAdmin) && (
+          <div className="flex justify-end gap-2 mt-2">
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              >
+                Limpiar filtros
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowCrear(true)}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva liquidación
+            </button>
+          </div>
+        )}
       </div>
 
       <ListadoDatos
@@ -644,7 +638,6 @@ export function LiquidacionesTenantPage() {
                   transportistas={transportistas}
                   value={transportistaFilter}
                   onChange={(id) => aplicarFiltroTransportista(id)}
-                  allowEmptyValue
                   emptyListChoiceLabel="Todos"
                   placeholderCerrado="Todos"
                   aria-label="Filtrar listado por transportista"
@@ -907,6 +900,7 @@ export function LiquidacionesTenantPage() {
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           config={config}
+          hasArca={hasArca}
           getToken={getToken}
           tenantId={activeTenantId}
           onSuccess={(liq) => {

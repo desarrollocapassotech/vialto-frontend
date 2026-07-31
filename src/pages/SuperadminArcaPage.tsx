@@ -100,7 +100,6 @@ function validateConfigForm(values: ConfigFormValues): Record<string, string> {
 
   const porcentajeFields: (keyof ConfigFormValues)[] = [
     "comisionPctDefault",
-    "comisionPctAlt",
     "ivaGastosAdmin",
   ];
   for (const field of porcentajeFields) {
@@ -173,7 +172,6 @@ type ConfigFormValues = {
   ptoVentaFactura: string;
   ambiente: "homologacion" | "produccion";
   comisionPctDefault: string;
-  comisionPctAlt: string;
   ivaGastosAdmin: string;
   certPem: string;
   keyPem: string;
@@ -190,7 +188,6 @@ const EMPTY_FORM: ConfigFormValues = {
   ptoVentaFactura: "1",
   ambiente: "homologacion",
   comisionPctDefault: "8",
-  comisionPctAlt: "7",
   ivaGastosAdmin: "21",
   certPem: "",
   keyPem: "",
@@ -208,7 +205,6 @@ function configToForm(c: ArcaConfig): ConfigFormValues {
     ptoVentaFactura: String(c.ptoVentaFactura),
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
-    comisionPctAlt: String(c.comisionPctAlt),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
     certPem: "",
     keyPem: "",
@@ -337,7 +333,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         ptoVentaFactura: Number(values.ptoVentaFactura),
         ambiente: values.ambiente,
         comisionPctDefault: Number(values.comisionPctDefault),
-        comisionPctAlt: Number(values.comisionPctAlt),
         ivaGastosAdmin: Number(values.ivaGastosAdmin),
         certPem: values.certPem.trim() || undefined,
         keyPem: values.keyPem.trim() || undefined,
@@ -518,7 +513,7 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         )}
       </div>
 
-      {/* Comisiones */}
+      {/* Comisión e IVA */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="comisionPctDefault">
@@ -533,29 +528,15 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="comisionPctAlt">
-            Comisión alternativa (%)
-          </FieldLabel>
+          <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
           <TextInput
-            id="comisionPctAlt"
+            id="ivaGastosAdmin"
             type="number"
-            value={values.comisionPctAlt}
-            onChange={(v) => set("comisionPctAlt", v)}
-            error={fieldErrors.comisionPctAlt}
+            value={values.ivaGastosAdmin}
+            onChange={(v) => set("ivaGastosAdmin", v)}
+            error={fieldErrors.ivaGastosAdmin}
           />
         </div>
-      </div>
-
-      {/* IVA sobre neto (campo legacy: ivaGastosAdmin) */}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
-        <TextInput
-          id="ivaGastosAdmin"
-          type="number"
-          value={values.ivaGastosAdmin}
-          onChange={(v) => set("ivaGastosAdmin", v)}
-          error={fieldErrors.ivaGastosAdmin}
-        />
       </div>
 
       {/* Certificado y clave privada */}

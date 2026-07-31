@@ -11,6 +11,7 @@ import {
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
@@ -69,6 +70,8 @@ interface Props {
   viajeInicial?: Viaje;
   transportistas: Transportista[];
   config?: ArcaConfig | null;
+  /** Tenants con ARCA emiten el comprobante electrónico luego, desde la grilla; no adjuntan comprobante manual acá. */
+  hasArca: boolean;
   getToken: () => Promise<string | null>;
   onSuccess: (liq: Liquidacion) => void;
   onClose: () => void;
@@ -79,10 +82,12 @@ export function CrearLiquidacionManualModal({
   viajeInicial,
   transportistas,
   config,
+  hasArca,
   getToken,
   onSuccess,
   onClose,
 }: Props) {
+  const showComprobante = !hasArca;
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // — Campos del formulario —
@@ -91,7 +96,9 @@ export function CrearLiquidacionManualModal({
   );
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
+  /** Precargada con la comisión propia del transportista o, a falta de ésta, la de config ARCA. */
   const [comisionPct, setComisionPct] = useState("");
+  const comisionEditadaManualmente = useRef(false);
   /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
   const [ivaPct, setIvaPct] = useState(
     String(config?.ivaGastosAdmin ?? 21),
@@ -121,6 +128,14 @@ export function CrearLiquidacionManualModal({
     ivaSyncedFromConfig.current = true;
     setIvaPct(String(config.ivaGastosAdmin));
   }, [config?.ivaGastosAdmin]);
+
+  useEffect(() => {
+    if (comisionEditadaManualmente.current) return;
+    const porDefecto =
+      transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
+      config?.comisionPctDefault;
+    setComisionPct(porDefecto != null ? String(porDefecto) : "");
+  }, [transportistaId, transportistas, config?.comisionPctDefault]);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -331,7 +346,7 @@ export function CrearLiquidacionManualModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-lg bg-white border border-black/10 shadow-xl flex flex-col max-h-[90dvh]"
+        className="w-full max-w-3xl bg-white border border-black/10 shadow-xl flex flex-col max-h-[90dvh]"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
@@ -424,7 +439,10 @@ export function CrearLiquidacionManualModal({
                 max="100"
                 step="0.01"
                 value={comisionPct}
-                onChange={(e) => setComisionPct(e.target.value)}
+                onChange={(e) => {
+                  comisionEditadaManualmente.current = true;
+                  setComisionPct(e.target.value);
+                }}
                 className={inputClass}
               />
             </div>
@@ -443,7 +461,7 @@ export function CrearLiquidacionManualModal({
                 className={inputClass}
               />
               <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Por defecto se aplica 21%. Para liquidar sin IVA ingresá 0.
+                Para liquidar sin IVA ingresá 0.
               </p>
             </div>
           </div>
@@ -509,83 +527,37 @@ export function CrearLiquidacionManualModal({
                   </span>
                 )}
               </p>
-              {viajesLoading ? (
-                <div className="flex items-center gap-2 py-3 text-xs text-vialto-steel">
-                  <Spinner /> Cargando viajes…
-                </div>
-              ) : viajes.length === 0 ? (
-                <p className="text-xs text-vialto-steel py-2">
-                  No hay viajes registrados para este transportista.
+              {monedaSeleccionada && (
+                <p className="mb-1.5 text-[11px] text-vialto-steel">
+                  Solo podés incluir viajes en {monedaSeleccionada}. Los de
+                  otra moneda quedan deshabilitados.
                 </p>
-              ) : (
-                <>
-                  {monedaSeleccionada && (
-                    <p className="mb-1.5 text-[11px] text-vialto-steel">
-                      Solo podés incluir viajes en {monedaSeleccionada}. Los de
-                      otra moneda quedan deshabilitados.
-                    </p>
-                  )}
-                  <div className="max-h-44 overflow-y-auto rounded border border-black/10 divide-y divide-black/5">
-                    {viajes.map((v) => {
-                      const moneda = monedaViaje(v);
-                      const selected = selectedViajeIds.has(v.id);
-                      const disabledByMoneda =
-                        !selected &&
-                        monedaSeleccionada != null &&
-                        moneda !== monedaSeleccionada;
-                      return (
-                        <label
-                          key={v.id}
-                          title={
-                            disabledByMoneda
-                              ? `Este viaje está en ${moneda}. La liquidación ya tiene viajes en ${monedaSeleccionada}.`
-                              : undefined
-                          }
-                          className={`flex items-start gap-3 px-3 py-2.5 ${
-                            disabledByMoneda
-                              ? "cursor-not-allowed opacity-50 bg-vialto-mist/30"
-                              : "cursor-pointer hover:bg-vialto-mist/60"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 shrink-0"
-                            checked={selected}
-                            disabled={disabledByMoneda}
-                            onChange={() => toggleViaje(v.id)}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-vialto-charcoal">
-                              Viaje #{v.numero}
-                              <span className="ml-1.5 font-normal text-vialto-steel">
-                                {moneda}
-                              </span>
-                              {v.fechaCarga && (
-                                <span className="font-normal text-vialto-steel ml-1.5">
-                                  {fmtDate(v.fechaCarga)}
-                                </span>
-                              )}
-                            </p>
-                            {(v.origen || v.destino) && (
-                              <p className="text-[11px] text-vialto-steel truncate">
-                                {v.origen ?? "—"} → {v.destino ?? "—"}
-                              </p>
-                            )}
-                            {v.precioTransportistaExterno != null && (
-                              <p className="text-[11px] text-vialto-charcoal tabular-nums">
-                                {fmtMoney(
-                                  v.precioTransportistaExterno,
-                                  v.monedaPrecioTransportistaExterno,
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </>
               )}
+              <ViajesSeleccionTabla
+                viajes={viajes}
+                selectedIds={Array.from(selectedViajeIds)}
+                onToggle={toggleViaje}
+                renderMonto={(v) =>
+                  fmtMoney(
+                    v.precioTransportistaExterno,
+                    v.monedaPrecioTransportistaExterno,
+                  )
+                }
+                disabledCheck={(v) => {
+                  const moneda = monedaViaje(v);
+                  const disabled =
+                    monedaSeleccionada != null && moneda !== monedaSeleccionada;
+                  return {
+                    disabled,
+                    title: disabled
+                      ? `Este viaje está en ${moneda}. La liquidación ya tiene viajes en ${monedaSeleccionada}.`
+                      : undefined,
+                  };
+                }}
+                loading={viajesLoading}
+                maxHeightClass="max-h-72"
+                emptyMessage="No hay viajes registrados para este transportista."
+              />
             </div>
           )}
 
@@ -660,11 +632,13 @@ export function CrearLiquidacionManualModal({
             </div>
           )}
 
-          <ComprobanteAdjuntoField
-            file={comprobanteFile}
-            onFileChange={setComprobanteFile}
-            disabled={submitting}
-          />
+          {showComprobante && (
+            <ComprobanteAdjuntoField
+              file={comprobanteFile}
+              onFileChange={setComprobanteFile}
+              disabled={submitting}
+            />
+          )}
 
           {error && (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
