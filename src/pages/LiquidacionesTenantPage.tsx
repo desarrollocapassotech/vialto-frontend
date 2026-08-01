@@ -5,6 +5,7 @@ import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import {
   LiquidacionViewModal,
@@ -24,6 +25,7 @@ import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelec
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
@@ -200,6 +202,7 @@ function LiquidacionAccionesMenu({
 export function LiquidacionesTenantPage() {
   const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
   const { user } = useUser();
+  const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
@@ -339,6 +342,11 @@ export function LiquidacionesTenantPage() {
       (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
     );
     setPendingEmitir(null);
+    showToast(
+      updated.cae
+        ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
+        : "Comprobante emitido correctamente.",
+    );
   }
 
   async function confirmEliminar() {
@@ -761,11 +769,14 @@ export function LiquidacionesTenantPage() {
             id: "estado",
             header: "Estado",
             cell: (liq) => (
-              <span
-                className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-              >
-                {ESTADO_LABEL[liq.estado]}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                >
+                  {ESTADO_LABEL[liq.estado]}
+                </span>
+                <AmbienteTestBadge ambiente={liq.ambiente} />
+              </div>
             ),
             tdClassName: listadoTablaTdClass,
           },
@@ -806,11 +817,14 @@ export function LiquidacionesTenantPage() {
               {
                 label: "Estado",
                 value: (
-                  <span
-                    className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-                  >
-                    {ESTADO_LABEL[liq.estado]}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                    >
+                      {ESTADO_LABEL[liq.estado]}
+                    </span>
+                    <AmbienteTestBadge ambiente={liq.ambiente} />
+                  </div>
                 ),
               },
             ]}
@@ -948,9 +962,14 @@ export function LiquidacionesTenantPage() {
           liq={detail.liq}
           ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
+          hasArca={hasArca}
           getToken={getToken}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
+          onEmitir={() => {
+            setPendingEmitir(detail.liq);
+            setDetail(null);
+          }}
           onVerComprobante={
             !hasArca && detail.liq.comprobanteUrl?.trim()
               ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)

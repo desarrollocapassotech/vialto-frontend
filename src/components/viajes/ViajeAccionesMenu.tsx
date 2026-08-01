@@ -56,7 +56,7 @@ export function ViajeAccionesMenu({
     if (permiteFacturar) {
       items.push({
         id: 'facturar',
-        label: 'Facturar',
+        label: 'Emitir comprobante',
         icon: Receipt,
         onClick: onFacturar,
         disabled: Boolean(facturarBloqueoArcaUsd),
