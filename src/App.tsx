@@ -54,6 +54,7 @@ import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
 import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
+import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -330,6 +331,10 @@ export default function App() {
             <Route
               path="configuracion/arca"
               element={<ArcaConfigTenantPage />}
+            />
+            <Route
+              path="configuracion/conceptos"
+              element={<ConceptosConfigTenantPage />}
             />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
