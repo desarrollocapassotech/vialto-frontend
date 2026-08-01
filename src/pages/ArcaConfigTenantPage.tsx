@@ -49,8 +49,8 @@ type FormValues = {
   ambiente: 'homologacion' | 'produccion';
   comisionPctDefault: string;
   ivaGastosAdmin: string;
-  certPem: string;
-  keyPem: string;
+  certPemProduccion: string;
+  keyPemProduccion: string;
 };
 
 const EMPTY: FormValues = {
@@ -65,8 +65,8 @@ const EMPTY: FormValues = {
   ambiente: 'homologacion',
   comisionPctDefault: '8',
   ivaGastosAdmin: '21',
-  certPem: '',
-  keyPem: '',
+  certPemProduccion: '',
+  keyPemProduccion: '',
 };
 
 const EMISOR_FIELDS = [
@@ -81,6 +81,9 @@ const EMISOR_FIELDS = [
 const VENTA_FIELDS = [
   'ptoVentaCvlp',
   'ptoVentaFactura',
+] as const satisfies readonly (keyof FormValues)[];
+
+const AMBIENTE_FIELDS = [
   'ambiente',
 ] as const satisfies readonly (keyof FormValues)[];
 
@@ -89,13 +92,15 @@ const COMISION_FIELDS = [
   'ivaGastosAdmin',
 ] as const satisfies readonly (keyof FormValues)[];
 
-const CERT_FIELDS = ['certPem', 'keyPem'] as const satisfies readonly (keyof FormValues)[];
+const CERT_FIELDS = [
+  'certPemProduccion',
+  'keyPemProduccion',
+] as const satisfies readonly (keyof FormValues)[];
 
-const ALL_FIELDS = [
+const GENERAL_FIELDS = [
   ...EMISOR_FIELDS,
   ...VENTA_FIELDS,
   ...COMISION_FIELDS,
-  ...CERT_FIELDS,
 ] as const satisfies readonly (keyof FormValues)[];
 
 function configToForm(c: ArcaConfig): FormValues {
@@ -111,8 +116,8 @@ function configToForm(c: ArcaConfig): FormValues {
     ambiente: c.ambiente,
     comisionPctDefault: String(c.comisionPctDefault),
     ivaGastosAdmin: String(c.ivaGastosAdmin),
-    certPem: '',
-    keyPem: '',
+    certPemProduccion: '',
+    keyPemProduccion: '',
   };
 }
 
@@ -180,7 +185,7 @@ export function ArcaConfigTenantPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
-  const [tab, setTab] = useState<'config' | 'conceptos'>('config');
+  const [tab, setTab] = useState<'general' | 'ambiente' | 'conceptos'>('general');
 
   useEffect(() => {
     let cancelled = false;
@@ -267,8 +272,8 @@ export function ArcaConfigTenantPage() {
         ambiente: v.ambiente,
         comisionPctDefault: Number(v.comisionPctDefault),
         ivaGastosAdmin: Number(v.ivaGastosAdmin),
-        certPem: v.certPem.trim() || undefined,
-        keyPem: v.keyPem.trim() || undefined,
+        certPemProduccion: v.certPemProduccion.trim() || undefined,
+        keyPemProduccion: v.keyPemProduccion.trim() || undefined,
       };
       const config = await apiJson<ArcaConfig>(
         '/api/integracion-arca/config',
@@ -343,15 +348,16 @@ export function ArcaConfigTenantPage() {
     }
   }
 
-  const dirty = !existing || JSON.stringify(values) !== JSON.stringify(savedValues);
+  const generalDirty = sectionDirty(GENERAL_FIELDS);
 
-  function onSubmit(e: React.FormEvent) {
+  function onSubmitGeneral(e: React.FormEvent) {
     e.preventDefault();
-    void saveSection(ALL_FIELDS).catch(() => {});
+    void saveSection(GENERAL_FIELDS).catch(() => {});
   }
 
-  const TABS: { id: 'config' | 'conceptos'; label: string }[] = [
-    { id: 'config', label: 'Configuración' },
+  const TABS: { id: 'general' | 'ambiente' | 'conceptos'; label: string }[] = [
+    { id: 'general', label: 'General' },
+    { id: 'ambiente', label: 'Ambiente y certificados' },
     { id: 'conceptos', label: 'Conceptos de liquidación' },
   ];
 
@@ -398,10 +404,10 @@ export function ArcaConfigTenantPage() {
         </div>
       )}
 
-      {tab === 'config' && initialLoading ? (
+      {(tab === 'general' || tab === 'ambiente') && initialLoading ? (
         <p className="mt-8 text-sm text-vialto-steel">Cargando configuración…</p>
-      ) : tab === 'config' ? (
-        <form onSubmit={onSubmit} className="mt-6 space-y-6">
+      ) : tab === 'general' ? (
+        <form onSubmit={onSubmitGeneral} className="mt-6 space-y-6">
           {error && (
             <div className="rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
               {error}
@@ -568,12 +574,12 @@ export function ArcaConfigTenantPage() {
           </SectionCard>
 
           <SectionCard
-            title="Puntos de venta y ambiente"
+            title="Puntos de venta"
             onSave={() => void saveSection(VENTA_FIELDS).catch(() => {})}
             saving={loading}
             dirty={sectionDirty(VENTA_FIELDS)}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="ptoVentaCvlp" className={labelClass}>Pto. Venta CVLP</label>
                 <input
@@ -594,30 +600,7 @@ export function ArcaConfigTenantPage() {
                   className={inputClass}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="ambiente" className={labelClass}>Ambiente</label>
-                <select
-                  id="ambiente"
-                  value={values.ambiente}
-                  disabled={!canEditAmbiente}
-                  onChange={(e) => set('ambiente', e.target.value as FormValues['ambiente'])}
-                  className={`${inputClass}${!canEditAmbiente ? ' cursor-not-allowed bg-vialto-mist opacity-90' : ''}`}
-                >
-                  <option value="homologacion">Homologación (testing)</option>
-                  <option value="produccion">Producción</option>
-                </select>
-                {!canEditAmbiente && (
-                  <p className="text-xs text-vialto-steel">
-                    Solo el superadmin de plataforma puede cambiar el ambiente.
-                  </p>
-                )}
-              </div>
             </div>
-            {values.ambiente === 'produccion' && (
-              <p className="text-xs text-red-700">
-                Los comprobantes emitidos en producción son reales y tienen validez fiscal ante AFIP.
-              </p>
-            )}
           </SectionCard>
 
           <SectionCard
@@ -651,9 +634,59 @@ export function ArcaConfigTenantPage() {
             </div>
           </SectionCard>
 
+          <button
+            type="submit"
+            disabled={loading || !generalDirty}
+            className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
+          >
+            {loading && <Spinner />}
+            {loading ? 'Aplicando…' : generalDirty ? 'Aplicar cambios' : 'Sin cambios para aplicar'}
+          </button>
+        </form>
+      ) : tab === 'ambiente' ? (
+        <div className="mt-6 space-y-6">
+          {error && (
+            <div className="rounded border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+              {error}
+            </div>
+          )}
+
+          <SectionCard
+            title="Ambiente"
+            onSave={() => void saveSection(AMBIENTE_FIELDS).catch(() => {})}
+            saving={loading}
+            dirty={sectionDirty(AMBIENTE_FIELDS)}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ambiente" className={labelClass}>Ambiente</label>
+                <select
+                  id="ambiente"
+                  value={values.ambiente}
+                  disabled={!canEditAmbiente}
+                  onChange={(e) => set('ambiente', e.target.value as FormValues['ambiente'])}
+                  className={`${inputClass}${!canEditAmbiente ? ' cursor-not-allowed bg-vialto-mist opacity-90' : ''}`}
+                >
+                  <option value="homologacion">Homologación (testing)</option>
+                  <option value="produccion">Producción</option>
+                </select>
+                {!canEditAmbiente && (
+                  <p className="text-xs text-vialto-steel">
+                    Solo el superadmin de plataforma puede cambiar el ambiente.
+                  </p>
+                )}
+              </div>
+            </div>
+            {values.ambiente === 'produccion' && (
+              <p className="text-xs text-red-700">
+                Los comprobantes emitidos en producción son reales y tienen validez fiscal ante AFIP.
+              </p>
+            )}
+          </SectionCard>
+
           <SectionCard
             title="Certificado y clave privada"
-            description="Archivos PEM generados en AFIP y vinculados al servicio WSFE."
+            description="En homologación se usa automáticamente el CUIT de prueba de AFIP, sin certificado. Solo hace falta cargar el certificado real para producción."
           >
             <div className="flex flex-wrap items-center gap-4">
               <button
@@ -661,55 +694,48 @@ export function ArcaConfigTenantPage() {
                 onClick={() => setCertModalOpen(true)}
                 className="inline-flex h-10 items-center gap-2 rounded border border-black/20 bg-white px-4 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
               >
-                {existing?.certConfigurado || existing?.keyConfigurado
-                  ? 'Editar certificado y clave'
-                  : 'Cargar certificado y clave'}
+                Ver / editar certificado
               </button>
-              <div className="flex flex-col gap-1 text-xs text-vialto-steel">
-                <span>
+              <div className="text-xs text-vialto-steel">
+                <p className="mb-0.5 font-medium text-emerald-800">Producción</p>
+                <p>
                   Certificado:{' '}
-                  {values.certPem ? (
+                  {values.certPemProduccion ? (
                     <span className="text-amber-700">● pendiente de guardar</span>
-                  ) : existing?.certConfigurado ? (
+                  ) : existing?.certConfiguradoProduccion ? (
                     <span className="text-green-700">● configurado</span>
                   ) : (
                     <span>○ sin configurar</span>
                   )}
-                </span>
-                <span>
+                </p>
+                <p>
                   Clave privada:{' '}
-                  {values.keyPem ? (
+                  {values.keyPemProduccion ? (
                     <span className="text-amber-700">● pendiente de guardar</span>
-                  ) : existing?.keyConfigurado ? (
+                  ) : existing?.keyConfiguradoProduccion ? (
                     <span className="text-green-700">● configurada</span>
                   ) : (
                     <span>○ sin configurar</span>
                   )}
-                </span>
+                </p>
               </div>
             </div>
           </SectionCard>
-
-          <button
-            type="submit"
-            disabled={loading || !dirty}
-            className="inline-flex items-center gap-2 h-10 rounded bg-vialto-fire px-6 font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-white transition-colors hover:bg-vialto-bright disabled:opacity-50"
-          >
-            {loading && <Spinner />}
-            {loading ? 'Aplicando…' : dirty ? 'Aplicar cambios' : 'Sin cambios para aplicar'}
-          </button>
-        </form>
+        </div>
       ) : null}
 
       {certModalOpen && (
         <ArcaCertificadoModal
-          certPem={values.certPem}
-          keyPem={values.keyPem}
-          certConfigurado={existing?.certConfigurado}
-          keyConfigurado={existing?.keyConfigurado}
+          ambienteActivo={existing?.ambiente ?? values.ambiente}
+          produccion={{
+            cert: values.certPemProduccion,
+            key: values.keyPemProduccion,
+            certConfigurado: existing?.certConfiguradoProduccion,
+            keyConfigurado: existing?.keyConfiguradoProduccion,
+          }}
           onClose={() => setCertModalOpen(false)}
-          onSave={async ({ certPem, keyPem }) => {
-            await saveSection(CERT_FIELDS, { certPem, keyPem });
+          onSave={async (fields) => {
+            await saveSection(CERT_FIELDS, fields);
             setCertModalOpen(false);
           }}
         />

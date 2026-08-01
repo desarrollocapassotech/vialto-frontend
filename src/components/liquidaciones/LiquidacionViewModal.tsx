@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { RotateCw } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -12,6 +13,7 @@ import {
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { apiJson } from "@/lib/api";
 import type {
   Liquidacion,
@@ -100,20 +102,26 @@ export function LiquidacionViewModal({
   liq,
   ivaPct,
   canEdit = true,
+  hasArca = false,
   getToken,
   detalleUrl,
   onClose,
   onEditar,
+  onEmitir,
   onVerComprobante,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
   canEdit?: boolean;
+  /** Tenant con integración ARCA: habilita el botón de emitir/reintentar. */
+  hasArca?: boolean;
   /** Si se pasa, el modal refetch el detalle (incluye conceptosLineas). */
   getToken?: () => Promise<string | null>;
   detalleUrl?: string;
   onClose: () => void;
   onEditar: () => void;
+  /** Si se pasa, muestra "Emitir"/"Reintentar emisión" cuando el estado es borrador o error. */
+  onEmitir?: () => void;
   onVerComprobante?: () => void;
 }) {
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
@@ -194,6 +202,7 @@ export function LiquidacionViewModal({
           >
             {ESTADO_LABEL[source.estado]}
           </span>
+          <AmbienteTestBadge ambiente={source.ambiente} />
         </span>
       }
       onClose={onClose}
@@ -204,6 +213,24 @@ export function LiquidacionViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
+          {hasArca &&
+            onEmitir &&
+            (source.estado === "borrador" || source.estado === "error") && (
+              <button
+                type="button"
+                onClick={onEmitir}
+                className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+              >
+                {source.estado === "error" && (
+                  <RotateCw
+                    className="h-3.5 w-3.5 shrink-0"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                )}
+                {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
+              </button>
+            )}
           {canEdit && (
             <button
               type="button"
@@ -325,6 +352,16 @@ export function LiquidacionViewModal({
           {source.cae && <Campo label="CAE" value={source.cae} />}
           {source.caeFechaVto && (
             <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
+          )}
+          {source.ambiente && (
+            <Campo
+              label="Ambiente"
+              value={
+                source.ambiente === "homologacion"
+                  ? "Homologación (prueba)"
+                  : "Producción"
+              }
+            />
           )}
           <Campo label="Creada" value={fmtDate(source.createdAt)} />
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Receipt } from "lucide-react";
 import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
@@ -11,6 +12,7 @@ import {
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
@@ -20,6 +22,7 @@ import {
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import type {
@@ -88,6 +91,7 @@ export function CrearLiquidacionManualModal({
   onClose,
 }: Props) {
   const showComprobante = !hasArca;
+  const { showToast } = useToast();
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // — Campos del formulario —
@@ -104,6 +108,11 @@ export function CrearLiquidacionManualModal({
     String(config?.ivaGastosAdmin ?? 21),
   );
   const ivaSyncedFromConfig = useRef(config?.ivaGastosAdmin != null);
+  /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
+  const [ptoVenta, setPtoVenta] = useState(
+    config?.ptoVentaCvlp != null ? String(config.ptoVentaCvlp) : "",
+  );
+  const ptoVentaSyncedFromConfig = useRef(config?.ptoVentaCvlp != null);
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
@@ -120,7 +129,10 @@ export function CrearLiquidacionManualModal({
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
 
   // — Estado del submit —
-  const [submitting, setSubmitting] = useState(false);
+  const [submitAction, setSubmitAction] = useState<
+    "borrador" | "emitir" | null
+  >(null);
+  const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,6 +140,14 @@ export function CrearLiquidacionManualModal({
     ivaSyncedFromConfig.current = true;
     setIvaPct(String(config.ivaGastosAdmin));
   }, [config?.ivaGastosAdmin]);
+
+  useEffect(() => {
+    if (config?.ptoVentaCvlp == null || ptoVentaSyncedFromConfig.current) {
+      return;
+    }
+    ptoVentaSyncedFromConfig.current = true;
+    setPtoVenta(String(config.ptoVentaCvlp));
+  }, [config?.ptoVentaCvlp]);
 
   useEffect(() => {
     if (comisionEditadaManualmente.current) return;
@@ -211,7 +231,10 @@ export function CrearLiquidacionManualModal({
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(
+    e: React.FormEvent,
+    action: "borrador" | "emitir" = "borrador",
+  ) {
     e.preventDefault();
     if (!periodoDesde || !periodoHasta) return;
     const viajeIds = viajeInicial
@@ -250,9 +273,16 @@ export function CrearLiquidacionManualModal({
       setError("El IVA debe ser un número entre 0 y 100.");
       return;
     }
+    const ptoVentaNum = Number(ptoVenta);
+    const ptoVentaInvalido =
+      !ptoVenta.trim() || !Number.isInteger(ptoVentaNum) || ptoVentaNum < 1;
+    if (action === "emitir" && ptoVentaInvalido) {
+      setError("Ingresá un punto de venta válido.");
+      return;
+    }
     setConceptosIncomplete([]);
     setError(null);
-    setSubmitting(true);
+    setSubmitAction(action);
     try {
       let comprobanteUrl: string | undefined;
       if (comprobanteFile) {
@@ -274,16 +304,54 @@ export function CrearLiquidacionManualModal({
       const lineasPayload = toConceptosLineasPayload(conceptosLineas);
       if (lineasPayload.length > 0) body.conceptosLineas = lineasPayload;
       if (comprobanteUrl) body.comprobanteUrl = comprobanteUrl;
-      const liq = await apiJson<Liquidacion>(
+      let liq = await apiJson<Liquidacion>(
         "/api/integracion-arca/liquidaciones",
         () => getToken(),
         { method: "POST", body: JSON.stringify(body) },
       );
+      let emitFailed = false;
+      if (action === "emitir") {
+        try {
+          liq = await apiJson<Liquidacion>(
+            `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/emitir`,
+            () => getToken(),
+            {
+              method: "POST",
+              body: JSON.stringify({ ptoVenta: ptoVentaNum }),
+            },
+          );
+        } catch (emitErr) {
+          emitFailed = true;
+          // La liquidación ya se creó (quedó en error/pendiente_cae); refrescamos
+          // su estado real para no dejar la grilla desactualizada.
+          try {
+            liq = await apiJson<Liquidacion>(
+              `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+              () => getToken(),
+            );
+          } catch {
+            /* si falla el refresh, se usa el borrador ya creado */
+          }
+          showToast(
+            `La liquidación se creó, pero no se pudo emitir: ${friendlyError(emitErr, "arca")}. Podés reintentar desde la grilla.`,
+            "error",
+          );
+        }
+      }
+      if (action === "emitir" && !emitFailed) {
+        showToast(
+          liq.cae
+            ? `Comprobante emitido correctamente. CAE: ${liq.cae}`
+            : "Comprobante emitido correctamente.",
+        );
+      } else if (action === "borrador") {
+        showToast("Liquidación creada en borrador.");
+      }
       onSuccess(liq);
     } catch (err) {
       setError(friendlyError(err, "liquidaciones"));
     } finally {
-      setSubmitting(false);
+      setSubmitAction(null);
     }
   }
 
@@ -334,6 +402,11 @@ export function CrearLiquidacionManualModal({
     Boolean(periodoDesde) &&
     Boolean(periodoHasta) &&
     (viajeInicial ? true : selectedViajeIds.size > 0);
+  const ptoVentaNumPreview = Number(ptoVenta);
+  const ptoVentaInvalidoPreview =
+    !ptoVenta.trim() ||
+    !Number.isInteger(ptoVentaNumPreview) ||
+    ptoVentaNumPreview < 1;
 
   return (
     <div
@@ -465,6 +538,26 @@ export function CrearLiquidacionManualModal({
               </p>
             </div>
           </div>
+
+          {hasArca && (
+            <div>
+              <label htmlFor="ptoVentaLiquidacion" className={labelClass}>
+                Punto de venta
+              </label>
+              <input
+                id="ptoVentaLiquidacion"
+                type="number"
+                min={1}
+                value={ptoVenta}
+                onChange={(e) => setPtoVenta(e.target.value)}
+                className={`${inputClass} w-52`}
+              />
+              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                Solo se usa si emitís la liquidación ahora. Se precarga con el
+                de Configuración ARCA.
+              </p>
+            </div>
+          )}
 
           <ConceptosLiquidacionLineasEditor
             getToken={getToken}
@@ -645,6 +738,10 @@ export function CrearLiquidacionManualModal({
               {error}
             </div>
           )}
+
+          {hasArca && (
+            <AmbienteHomologacionWarning ambiente={config?.ambiente} />
+          )}
         </form>
 
         {/* Footer */}
@@ -657,16 +754,52 @@ export function CrearLiquidacionManualModal({
           >
             Cancelar
           </button>
-          <button
-            type="submit"
-            form=""
-            disabled={submitting || !canSubmit}
-            onClick={(e) => void handleSubmit(e as unknown as React.FormEvent)}
-            className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
-          >
-            {submitting && <Spinner />}
-            {submitting ? "Creando…" : "Crear liquidación"}
-          </button>
+          {hasArca ? (
+            <>
+              <button
+                type="button"
+                disabled={submitting || !canSubmit}
+                onClick={(e) =>
+                  void handleSubmit(e as unknown as React.FormEvent, "borrador")
+                }
+                className="inline-flex items-center gap-2 h-9 px-5 rounded border border-black/20 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
+              >
+                {submitAction === "borrador" && <Spinner />}
+                {submitAction === "borrador" ? "Creando…" : "Crear borrador"}
+              </button>
+              <button
+                type="button"
+                disabled={submitting || !canSubmit || ptoVentaInvalidoPreview}
+                onClick={(e) =>
+                  void handleSubmit(e as unknown as React.FormEvent, "emitir")
+                }
+                className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
+              >
+                {submitAction === "emitir" ? (
+                  <Spinner />
+                ) : (
+                  <Receipt
+                    className="h-3.5 w-3.5 shrink-0"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                )}
+                {submitAction === "emitir" ? "Emitiendo…" : "Emitir liquidación"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={submitting || !canSubmit}
+              onClick={(e) =>
+                void handleSubmit(e as unknown as React.FormEvent, "borrador")
+              }
+              className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-charcoal font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-charcoal/90 disabled:opacity-50"
+            >
+              {submitting && <Spinner />}
+              {submitting ? "Creando…" : "Crear liquidación"}
+            </button>
+          )}
         </div>
       </div>
     </div>
