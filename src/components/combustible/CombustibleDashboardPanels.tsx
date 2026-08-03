@@ -10,6 +10,7 @@ import {
   fmtTipoVehiculo,
   fmtFormaPago,
   fmtMensajeErrorSincronizacion,
+  motivoCortoErrorSincronizacion,
 } from "@/lib/combustibleLabels";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
 import { motivoShortLabel } from "./SospechaBadge";
@@ -837,22 +838,26 @@ export function AlertasList({
             }
 
             const e = fila.data;
+            const costoPorLitro =
+              e.litros != null && e.litros > 0 && e.importe != null
+                ? e.importe / e.litros
+                : null;
             return (
               <tr
                 key={`sync-${e.id}`}
-                className="border-b border-black/5 bg-rose-50/40 last:border-0"
+                className="border-b border-black/5 last:border-0"
               >
                 <td className="py-2">
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-800">
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <SemaforoDot color="rojo" />
                       Error de sincronización
                     </span>
                     <span
-                      className="max-w-[220px] truncate text-xs text-vialto-steel"
+                      className="text-xs text-vialto-steel"
                       title={fmtMensajeErrorSincronizacion(e.mensaje)}
                     >
-                      {fmtMensajeErrorSincronizacion(e.mensaje)}
+                      {motivoCortoErrorSincronizacion(e.mensaje)}
                     </span>
                   </div>
                 </td>
@@ -868,7 +873,9 @@ export function AlertasList({
                 <td className="py-2 text-right text-vialto-charcoal">
                   {e.litros != null ? fmtLitros(e.litros) : "—"}
                 </td>
-                <td className="py-2 text-right text-vialto-charcoal">—</td>
+                <td className="py-2 text-right text-vialto-charcoal">
+                  {costoPorLitro != null ? fmtMoney(costoPorLitro) : "—"}
+                </td>
                 <td className="py-2 text-right text-vialto-charcoal">
                   {e.importe != null ? fmtMoney(e.importe) : "—"}
                 </td>
@@ -878,7 +885,7 @@ export function AlertasList({
                     onClick={() => setViewingError(e)}
                     className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
                   >
-                    Ver →
+                    Ver carga →
                   </button>
                 </td>
               </tr>

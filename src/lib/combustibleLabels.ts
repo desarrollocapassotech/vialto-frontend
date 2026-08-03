@@ -106,6 +106,24 @@ export function fmtMensajeErrorSincronizacion(mensaje: string): string {
   return mensaje;
 }
 
+// Etiqueta corta para la columna "Tipo" de la tabla (el mensaje completo, que puede ser
+// largo, va en el modal de detalle vía fmtMensajeErrorSincronizacion). Reconoce los mismos
+// mensajes de negocio conocidos del backend (combustible.service.ts); ante uno nuevo o no
+// reconocido, cae a una etiqueta genérica en vez de truncar el texto a lo bruto.
+const REGLAS_MOTIVO_CORTO: { patron: RegExp; label: string }[] = [
+  { patron: /should not be empty|must be a (number|string)|must be a valid ISO/, label: "Datos incompletos" },
+  { patron: /^El importe ingresado/, label: "Importe inconsistente" },
+  { patron: /^El kilometraje ingresado/, label: "Kilometraje inconsistente" },
+  { patron: /^No se encontró el vehículo/, label: "Vehículo no encontrado" },
+];
+
+export function motivoCortoErrorSincronizacion(mensaje: string): string {
+  const texto = mensaje?.trim();
+  if (!texto) return "Error de sincronización";
+  const regla = REGLAS_MOTIVO_CORTO.find((r) => r.patron.test(texto));
+  return regla?.label ?? "Error de sincronización";
+}
+
 // precioPorLitro = montoTotal / litros, redondeado al entero más cercano
 // (sin decimales: más claro para el usuario que un valor con centavos).
 // Devuelve "" si falta algún dato o litros es 0 (evita NaN/Infinity).
