@@ -25,11 +25,10 @@ export function viajePendienteComprobanteTransportista(v: Viaje): boolean {
 
 /**
  * Muestra la acción «Facturar» mientras falte algún comprobante del ciclo financiero.
- * En viajes duales, no se oculta al emitir solo la factura al cliente.
+ * En viajes duales (cliente + transportista), el botón sigue visible si falta uno de los
+ * dos — no importa el orden (factura primero o liquidación primero).
  */
 export function viajePermiteBotonFacturar(v: Viaje): boolean {
-  if (viajeTieneFacturaAsignada(v)) return false;
-  
   const e = String(v.estado).trim().toLowerCase();
   if (e === 'cancelado' || e === 'cobrado' || e === 'finalizado_cobrado') return false;
 
@@ -39,6 +38,8 @@ export function viajePermiteBotonFacturar(v: Viaje): boolean {
     );
   }
 
+  // Sin transportista externo: solo factura al cliente.
+  if (viajeTieneFacturaAsignada(v)) return false;
   if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return false;
   return true;
 }

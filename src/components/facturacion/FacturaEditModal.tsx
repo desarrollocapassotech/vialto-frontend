@@ -1,7 +1,6 @@
 import {
   useEffect,
-  useRef,
-  useState,
+  useMemo,
   type Dispatch,
   type SetStateAction,
   useCallback,
@@ -12,6 +11,7 @@ import {
   TransportistaSearchSelect,
 } from "@/components/forms/MaestroSearchSelects";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   monedaUnicaDeViajes,
@@ -190,72 +190,6 @@ function FacturaContraparteField({
 const clienteInputClass =
   "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 
-export function ViajesCheckboxList({
-  viajes,
-  selected,
-  onChange,
-  loading,
-  maxHeightClass = "max-h-40",
-}: {
-  viajes: Viaje[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-  loading?: boolean;
-  /** Clases Tailwind para la caja con scroll (p. ej. max-h-56 en modal). */
-  maxHeightClass?: string;
-}) {
-  function toggle(id: string) {
-    onChange(
-      selected.includes(id)
-        ? selected.filter((x) => x !== id)
-        : [...selected, id],
-    );
-  }
-
-  if (loading) {
-    return <p className="text-sm text-vialto-steel py-1">Cargando…</p>;
-  }
-
-  if (viajes.length === 0) {
-    return (
-      <p className="text-sm text-vialto-steel py-1">
-        No hay viajes disponibles.
-      </p>
-    );
-  }
-
-  return (
-    <div
-      className={`${maxHeightClass} overflow-y-auto divide-y divide-black/5 rounded border border-black/15 bg-white`}
-    >
-      {viajes.map((v) => (
-        <label
-          key={v.id}
-          className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-vialto-mist/60"
-        >
-          <input
-            type="checkbox"
-            checked={selected.includes(v.id)}
-            onChange={() => toggle(v.id)}
-            className="accent-vialto-charcoal"
-          />
-          <span className="font-medium">{v.numero}</span>
-          {(v.origen || v.destino) && (
-            <span className="text-xs text-vialto-steel">
-              {v.origen ?? "?"} → {v.destino ?? "?"}
-            </span>
-          )}
-          {v.monto != null && (
-            <span className="ml-auto text-xs tabular-nums text-vialto-steel">
-              {textoMontoFacturarListado(v)}
-            </span>
-          )}
-        </label>
-      ))}
-    </div>
-  );
-}
-
 // ─── viajes vinculados editor ─────────────────────────────────────────────────
 
 export function ViajesVinculadosEditor({
@@ -277,130 +211,52 @@ export function ViajesVinculadosEditor({
   clienteId: string;
   transportistaId: string;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    function handler(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setPickerOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [pickerOpen]);
-
-  const linkedViajes = selected
-    .map(
-      (id) =>
-        viajes.find((v) => v.id === id) ?? disponibles.find((v) => v.id === id),
-    )
-    .filter(Boolean) as Viaje[];
-
-  const available = disponibles.filter((v) => !selected.includes(v.id));
   const showClienteHint = tipo === "cliente" && !clienteId.trim();
   const showTransportistaHint =
     tipo === "transportista_externo" && !transportistaId.trim();
   const showContraparteHint = showClienteHint || showTransportistaHint;
 
-  function remove(id: string) {
-    onChange(selected.filter((x) => x !== id));
+  // Candidatos filtrados + los ya seleccionados que hayan quedado fuera del filtro actual.
+  const pool = useMemo(() => {
+    const porId = new Map<string, Viaje>();
+    for (const v of disponibles) porId.set(v.id, v);
+    for (const id of selected) {
+      if (!porId.has(id)) {
+        const v = viajes.find((x) => x.id === id);
+        if (v) porId.set(id, v);
+      }
+    }
+    return Array.from(porId.values());
+  }, [disponibles, selected, viajes]);
+
+  function toggle(id: string) {
+    onChange(
+      selected.includes(id)
+        ? selected.filter((x) => x !== id)
+        : [...selected, id],
+    );
   }
 
-  function add(id: string) {
-    onChange([...selected, id]);
+  if (showContraparteHint) {
+    return (
+      <p className="text-[11px] text-vialto-steel">
+        {showTransportistaHint
+          ? "Elegí un transportista para poder vincular viajes."
+          : "Elegí un cliente para poder vincular viajes."}
+      </p>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {linkedViajes.length === 0 ? (
-        <p className="py-1 text-sm text-vialto-steel">
-          No hay viajes vinculados.
-        </p>
-      ) : (
-        <div className="divide-y divide-black/5 rounded border border-black/15 bg-white">
-          {linkedViajes.map((v) => (
-            <div key={v.id} className="flex items-center gap-3 px-3 py-2">
-              <span className="shrink-0 text-sm font-medium">{v.numero}</span>
-              {(v.origen || v.destino) && (
-                <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">
-                  {v.origen ?? "?"} → {v.destino ?? "?"}
-                </span>
-              )}
-              {v.monto != null && (
-                <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
-                  {textoMontoFacturarListado(v)}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => remove(v.id)}
-                aria-label={`Desvincular ${v.numero}`}
-                className="shrink-0 px-1 text-base leading-none text-vialto-steel hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div ref={pickerRef} className="relative">
-        {showContraparteHint ? (
-          <p className="text-[11px] text-vialto-steel">
-            {showTransportistaHint
-              ? "Elegí un transportista para poder vincular viajes."
-              : "Elegí un cliente para poder vincular viajes."}
-          </p>
-        ) : loading || available.length > 0 ? (
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => setPickerOpen((o) => !o)}
-            className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-          >
-            {loading ? "Cargando…" : "+ Vincular viaje existente"}
-          </button>
-        ) : null}
-
-        {pickerOpen && !showContraparteHint && available.length > 0 && (
-          <div className="absolute left-0 top-full z-50 mt-1 min-w-[22rem] max-w-full border border-black/20 bg-white shadow-lg">
-            <div className="max-h-52 overflow-y-auto divide-y divide-black/5">
-              {available.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => add(v.id)}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-vialto-mist/60"
-                >
-                  <span className="shrink-0 text-sm font-medium">
-                    {v.numero}
-                  </span>
-                  {(v.origen || v.destino) && (
-                    <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">
-                      {v.origen ?? "?"} → {v.destino ?? "?"}
-                    </span>
-                  )}
-                  {v.monto != null && (
-                    <span className="shrink-0 text-xs tabular-nums text-vialto-steel">
-                      {textoMontoFacturarListado(v)}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <ViajesSeleccionTabla
+      viajes={pool}
+      selectedIds={selected}
+      onToggle={toggle}
+      renderMonto={(v) => textoMontoFacturarListado(v)}
+      loading={loading}
+      maxHeightClass="max-h-72"
+      emptyMessage="No hay viajes disponibles para vincular."
+    />
   );
 }
 
@@ -483,7 +339,7 @@ export function FacturaCreateModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="factura-create-modal-title"
-        className="relative flex h-full max-h-[100dvh] w-full max-w-[min(56rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
+        className="relative flex h-full max-h-[100dvh] w-full max-w-[min(72rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
@@ -761,7 +617,7 @@ export function FacturaEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="factura-edit-modal-title"
-        className="relative flex h-full max-h-[100dvh] w-full max-w-[min(56rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
+        className="relative flex h-full max-h-[100dvh] w-full max-w-[min(72rem,calc(100vw-1rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">

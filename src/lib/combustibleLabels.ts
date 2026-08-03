@@ -33,3 +33,16 @@ export function fmtFormaPago(v: string | null) {
 export function fmtTipoVehiculo(tipo: string): string {
   return TIPO_VEHICULO_LABELS[tipo] ?? tipo;
 }
+
+// precioPorLitro = montoTotal / litros, redondeado al entero más cercano
+// (sin decimales: más claro para el usuario que un valor con centavos).
+// Devuelve "" si falta algún dato o litros es 0 (evita NaN/Infinity).
+export function computePrecioPorLitro(
+  litrosRaw: string,
+  importeRaw: string,
+): string {
+  const litros = Number(litrosRaw);
+  const importe = Number(importeRaw);
+  if (!litrosRaw || !importeRaw || !(litros > 0) || isNaN(importe)) return "";
+  return String(Math.round(importe / litros));
+}

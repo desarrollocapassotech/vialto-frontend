@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { modalOverlayClass } from '@/lib/modalLayers';
 
@@ -11,6 +11,8 @@ export type ConfirmDialogProps = {
   /** default: acción principal oscura; danger: estilo eliminación */
   tone?: 'default' | 'danger';
   busy?: boolean;
+  /** Contenido extra entre el mensaje y los botones (ej. un selector). */
+  children?: ReactNode;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 };
@@ -26,6 +28,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancelar',
   tone = 'default',
   busy = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -76,6 +79,7 @@ export function ConfirmDialog({
         <p id={descId} className="mt-2 text-sm text-vialto-steel">
           {message}
         </p>
+        {children && <div className="mt-3">{children}</div>}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"

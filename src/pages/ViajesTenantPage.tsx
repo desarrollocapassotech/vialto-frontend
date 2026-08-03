@@ -19,7 +19,6 @@ import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
-import { FacturarOpcionModal } from "@/components/viajes/FacturarOpcionModal";
 import { AgregarGastoModal } from "@/components/viajes/AgregarGastoModal";
 import { RegistrarPagoTransportistaModal } from "@/components/viajes/RegistrarPagoTransportistaModal";
 import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
@@ -53,6 +52,7 @@ import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
 import { pagoTransportistaDraftFromApi } from "@/components/viajes/PagosTransportistaFieldset";
 import { type PaisCodigo } from "@/lib/ciudades";
@@ -177,12 +177,6 @@ export function ViajesTenantPage({
     return `/api/platform/facturas?tenantId=${encodeURIComponent(tid)}&clienteId=${encodeURIComponent(clienteId)}`;
   }
 
-  function facturaPatchUrl(facturaId: string) {
-    if (!platform)
-      return `/api/facturacion/facturas/${encodeURIComponent(facturaId)}`;
-    return `/api/platform/facturas/${encodeURIComponent(facturaId)}?tenantId=${encodeURIComponent(tid)}`;
-  }
-
   const facturacionNavExtras = () => (platform ? { tenantId: tid } : {});
 
   // ─── ESTADOS GLOBALES DE LA VISTA ─────────────────────────────────────────
@@ -272,14 +266,6 @@ export function ViajesTenantPage({
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
 
-  /** Modal de elección al facturar: nueva factura o agregar a una existente del cliente. */
-  const [facturarOpcionState, setFacturarOpcionState] = useState<{
-    viaje: Viaje;
-    facturas: Factura[];
-    letra?: FacturaLetra;
-  } | null>(null);
-  const [facturarOpcionBusy, setFacturarOpcionBusy] = useState(false);
-
   // Modales de acciones secundarias
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(
     null,
@@ -291,6 +277,9 @@ export function ViajesTenantPage({
   const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
   const [tipoFacturaViaje, setTipoFacturaViaje] = useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
+  const [facturandoLoadingId, setFacturandoLoadingId] = useState<
+    string | null
+  >(null);
 
   /** Conteos globales para los chips de acceso rápido en la UI. */
   const [resumen, setResumen] = useState<{
@@ -984,7 +973,6 @@ export function ViajesTenantPage({
       if (emitirCvlpViaje?.id === v.id) setEmitirCvlpViaje(null);
       if (selectorViaje?.id === v.id) setSelectorViaje(null);
       if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
-      if (facturarOpcionState?.viaje.id === v.id) setFacturarOpcionState(null);
       setViajeDeleteConfirm(null);
     } catch (e) {
       setError(friendlyError(e, platform ? "plataforma" : "viajes"));
@@ -1014,7 +1002,7 @@ export function ViajesTenantPage({
     );
   }, []);
 
-  /** Abrir editor desde enlace (p. ej. panel de alertas): `?viaje=id` */
+  /** Abrir detalle (Ver) desde enlace: `?viaje=id` */
   useEffect(() => {
     const id = searchParams.get("viaje")?.trim();
     if (!id || !isLoaded || !isSignedIn) return;
@@ -1026,7 +1014,7 @@ export function ViajesTenantPage({
           v = await apiJson<Viaje>(viajeApiUrl(id), () => getToken());
         }
         if (cancelled || !v) return;
-        void beginEditViaje(v, "remoto");
+        setViewingViaje(v);
       } catch {
         /* viaje inexistente o sin permiso */
       } finally {
@@ -1096,10 +1084,16 @@ export function ViajesTenantPage({
       showToast(MSG_ARCA_NO_FACTURA_USD, "error");
       return;
     }
-    setTipoFacturaViaje(v);
+    // Tipo A/B solo aplica con integración ARCA; sin ARCA va directo al registro manual.
+    if (hasLiquidacionesArca) {
+      setTipoFacturaViaje(v);
+    } else {
+      void navigateToFacturacion(v);
+    }
   }
 
   async function navigateToFacturacion(v: Viaje, letra?: FacturaLetra) {
+    setFacturandoLoadingId(v.id);
     try {
       const facturasCliente = await apiJson<Factura[]>(
         facturasPorClienteUrl(v.clienteId ?? ""),
@@ -1114,12 +1108,10 @@ export function ViajesTenantPage({
         });
         return;
       }
-      if (facturasCliente.length > 0) {
-        setFacturarOpcionState({ viaje: v, facturas: facturasCliente, letra });
-        return;
-      }
     } catch {
       // si falla la consulta, igualmente navegamos
+    } finally {
+      setFacturandoLoadingId(null);
     }
     navigate("/facturacion", {
       state: {
@@ -1131,56 +1123,6 @@ export function ViajesTenantPage({
         },
       },
     });
-  }
-
-  // ─── OPERACIÓN AL CONFIRMAR AÑADIR A FACTURA EXISTENTE O NUEVA ────────────
-  async function handleFacturarOpcionConfirm(
-    opcion: "nueva" | { facturaId: string },
-  ) {
-    if (!facturarOpcionState) return;
-    const { viaje, facturas, letra } = facturarOpcionState;
-    if (opcion === "nueva") {
-      setFacturarOpcionState(null);
-      navigate("/facturacion", {
-        state: {
-          ...facturacionNavExtras(),
-          newFacturaDraft: {
-            clienteId: viaje.clienteId ?? "",
-            viajeIds: [viaje.id],
-            letraComprobante: letra,
-          },
-        },
-      });
-      return;
-    }
-
-    // Proceso de agregar a una factura preexistente
-    const facturaTarget = facturas.find((f) => f.id === opcion.facturaId);
-    if (!facturaTarget) return;
-    setFacturarOpcionBusy(true);
-    try {
-      await apiJson(facturaPatchUrl(opcion.facturaId), () => getToken(), {
-        method: "PATCH",
-        body: JSON.stringify({
-          viajeIds: [...facturaTarget.viajeIds, viaje.id],
-        }),
-      });
-      setFacturarOpcionState(null);
-
-      // --> TOAST INYECTADO: ÉXITO AL ASOCIAR A LA FACTURA <--
-      showToast("Viaje agregado a la factura exitosamente", "success");
-
-      navigate("/facturacion", {
-        state: { ...facturacionNavExtras(), expandFacturaId: opcion.facturaId },
-      });
-    } catch (e) {
-      setError(friendlyError(e, "facturacion"));
-
-      // --> TOAST INYECTADO: ERROR AL ASOCIAR A LA FACTURA <--
-      showToast("No se pudo agregar el viaje a la factura", "error");
-    } finally {
-      setFacturarOpcionBusy(false);
-    }
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
@@ -2233,17 +2175,18 @@ export function ViajesTenantPage({
           />
         )}
 
-      {/* Modal de selección "Crear nueva factura vs Agregar a la actual" */}
-      <FacturarOpcionModal
-        open={facturarOpcionState != null}
-        facturas={facturarOpcionState?.facturas ?? []}
-        busy={facturarOpcionBusy}
-        onNuevaFactura={() => void handleFacturarOpcionConfirm("nueva")}
-        onAgregarAExistente={(facturaId) =>
-          void handleFacturarOpcionConfirm({ facturaId })
-        }
-        onClose={() => setFacturarOpcionState(null)}
-      />
+      {facturandoLoadingId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-5 py-4 shadow-lg">
+            <Spinner className="h-5 w-5 text-vialto-fire" />
+            <span className="text-sm text-vialto-charcoal">Abriendo…</span>
+          </div>
+        </div>
+      )}
 
       <AgregarGastoModal
         open={agregarGastoViaje != null}
@@ -2356,8 +2299,13 @@ export function ViajesTenantPage({
               showToast(MSG_ARCA_NO_FACTURA_USD, "error");
               return;
             }
-            setTipoFacturaViaje(selectorViaje);
+            const v = selectorViaje;
             setSelectorViaje(null);
+            if (hasLiquidacionesArca) {
+              setTipoFacturaViaje(v);
+            } else {
+              void navigateToFacturacion(v);
+            }
           }}
           onLiquidacion={() => {
             if (
@@ -2395,6 +2343,7 @@ export function ViajesTenantPage({
         <CrearLiquidacionManualModal
           viajeInicial={crearLiqViaje}
           transportistas={maestro.transportistas}
+          hasArca={hasLiquidacionesArca}
           getToken={getToken}
           onSuccess={() => {
             setCrearLiqViaje(null);

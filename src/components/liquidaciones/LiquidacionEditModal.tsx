@@ -4,6 +4,7 @@ import {
   toConceptosLineasPayload,
   validateConceptosLineasDraft,
   type ConceptoLineaDraft,
+  type ViajeOpcionDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import {
@@ -30,6 +31,39 @@ function toDateInput(iso: string | null | undefined) {
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Extrae los viajes de una liquidación soportando tanto array directo ("viajes")
+ * como tabla intermedia de Prisma ("liquidacionesViaje").
+ */
+function extraerViajesDeLiquidacion(data: any): ViajeOpcionDraft[] {
+  if (!data) return [];
+
+  // Buscamos el array donde vengan los viajes (ya sea "viajes" o "liquidacionesViaje")
+  const lista =
+    Array.isArray(data.viajes) && data.viajes.length > 0
+      ? data.viajes
+      : Array.isArray(data.liquidacionesViaje) &&
+          data.liquidacionesViaje.length > 0
+        ? data.liquidacionesViaje
+        : [];
+
+  if (lista.length === 0) return [];
+
+  return lista
+    .map((item: any) => {
+      // Si viene anidado dentro de ".viaje" (tabla intermedia de Prisma), lo desenvolvemos:
+      const v = item.viaje ?? item;
+
+      // El ID real del viaje está en v.id o en item.viajeId
+      const id = v.id ?? item.viajeId ?? item.id;
+      // El número real del viaje está en v.numero
+      const numero = v.numero ?? item.numero ?? "Sin Nº";
+
+      return id ? { id, numero } : null;
+    })
+    .filter((x: any): x is ViajeOpcionDraft => Boolean(x));
 }
 
 export function LiquidacionEditModal({
@@ -63,6 +97,11 @@ export function LiquidacionEditModal({
   const [ivaPct, setIvaPct] = useState(
     liq.ivaPct != null ? String(liq.ivaPct) : "",
   );
+
+  const [viajesDisponibles, setViajesDisponibles] = useState<
+    ViajeOpcionDraft[]
+  >(() => extraerViajesDeLiquidacion(liq));
+
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     () =>
       (liq.conceptosLineas ?? [])
@@ -73,6 +112,7 @@ export function LiquidacionEditModal({
           nombre: l.nombreSnapshot,
           signo: l.signo,
           ivaPct: l.ivaPct,
+          viajeId: (l as any).viajeId ?? null,
         })),
   );
   const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
@@ -92,6 +132,7 @@ export function LiquidacionEditModal({
     }
     let cancelled = false;
     setLineasLoading(true);
+
     void (async () => {
       try {
         const full = await apiJson<LiquidacionConTransportista>(
@@ -100,6 +141,12 @@ export function LiquidacionEditModal({
         );
         if (cancelled) return;
         if (full.ivaPct != null) setIvaPct(String(full.ivaPct));
+
+        const viajesExtraidos = extraerViajesDeLiquidacion(full);
+        if (viajesExtraidos.length > 0) {
+          setViajesDisponibles(viajesExtraidos);
+        }
+
         setConceptosLineas(
           (full.conceptosLineas ?? [])
             .filter((l) => l.conceptoLiquidacionId)
@@ -109,6 +156,7 @@ export function LiquidacionEditModal({
               nombre: l.nombreSnapshot,
               signo: l.signo,
               ivaPct: l.ivaPct,
+              viajeId: (l as any).viajeId ?? null,
             })),
         );
       } catch {
@@ -189,9 +237,9 @@ export function LiquidacionEditModal({
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
         }
-        if (ivaPct.trim() !== "") {
-          body.ivaPct = Number(ivaPct);
-        }
+        // Siempre enviar IVA explícito cuando se editan datos (incluye 0 = sin IVA).
+        body.ivaPct =
+          ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
       if (showComprobante) {
@@ -363,6 +411,7 @@ export function LiquidacionEditModal({
             <ConceptosLiquidacionLineasEditor
               getToken={getToken}
               lineas={conceptosLineas}
+              viajesDisponibles={viajesDisponibles}
               onChange={(next) => {
                 setConceptosLineas(next);
                 setConceptosIncomplete([]);

@@ -241,8 +241,22 @@ export function TenantHomePage() {
                     showToast(MSG_ARCA_NO_FACTURA_USD, "error");
                     return;
                   }
-                  setFacturaLetraViaje(v);
                   setViewingViaje(null);
+                  // Tipo A/B solo aplica con integración ARCA.
+                  if (hasArca) {
+                    setFacturaLetraViaje(v);
+                    return;
+                  }
+                  void (async () => {
+                    setAbriendoFacturar(true);
+                    try {
+                      facturaCreator.prepararDraftParaViaje(v);
+                      await facturaCreator.ensureViajesLoaded();
+                      facturaCreator.abrir();
+                    } finally {
+                      setAbriendoFacturar(false);
+                    }
+                  })();
                 }
               : undefined
           }
@@ -285,6 +299,7 @@ export function TenantHomePage() {
         <CrearLiquidacionManualModal
           viajeInicial={crearLiqViaje}
           transportistas={maestro.transportistas}
+          hasArca={hasArca}
           getToken={getToken}
           onSuccess={() => setCrearLiqViaje(null)}
           onClose={() => setCrearLiqViaje(null)}

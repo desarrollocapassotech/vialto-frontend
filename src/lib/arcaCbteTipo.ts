@@ -8,6 +8,13 @@ export type CvlpCbteTipo = 60 | 61;
 export type FacturaLetra = "a" | "b";
 export type FacturaCbteTipo = 1 | 6;
 
+/**
+ * CUIT de prueba estándar de AFIP SDK para homologación (ver arca.util.ts en el backend).
+ * En homologación el backend lo usa automáticamente en lugar del CUIT real del emisor,
+ * sin certificado propio.
+ */
+export const CUIT_TEST_HOMOLOGACION = "20409378472";
+
 export const ARCA_CBTE_OVERRIDE_WARNING =
   "Este tipo corresponde a la condición frente al IVA de la contraparte. Modificarlo manualmente puede provocar el rechazo del comprobante por parte de ARCA.";
 
@@ -37,6 +44,19 @@ export function cvlpCbteLabel(cbteTipo: CvlpCbteTipo): string {
   return cbteTipo === 60
     ? "CVLP Tipo 60 (clase A)"
     : "CVLP Tipo 61 (clase B)";
+}
+
+/**
+ * Comprobante estándar con el que se anula un CVLP autorizado, asociado (CbtesAsoc)
+ * al 060/061 original: Nota de Crédito (cód. 3 clase A / 8 clase B) o
+ * Nota de Débito (cód. 2 clase A / 7 clase B), a elección del tenant.
+ */
+export function esNotaDebitoAnulacion(cbteTipo: number | null | undefined): boolean {
+  return cbteTipo === 2 || cbteTipo === 7;
+}
+
+export function anulacionComprobanteLabel(cbteTipo: number | null | undefined): string {
+  return esNotaDebitoAnulacion(cbteTipo) ? "Nota de Débito" : "Nota de Crédito";
 }
 
 export function facturaLetraLabel(letra: FacturaLetra): string {

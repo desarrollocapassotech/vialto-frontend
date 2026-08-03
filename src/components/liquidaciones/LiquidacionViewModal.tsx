@@ -1,11 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { RotateCw } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
-import type { Liquidacion, LiquidacionEstado } from "@/types/api";
+import {
+  fmtLiquidacionMoney,
+  LiquidacionMontosBreakdown,
+} from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import { Spinner } from "@/components/ui/Spinner";
+import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { apiJson } from "@/lib/api";
+import type {
+  Liquidacion,
+  LiquidacionConceptoLinea,
+  LiquidacionEstado,
+  LiquidacionViajeItem,
+} from "@/types/api";
 
 export type LiquidacionConTransportista = Liquidacion & {
   transportista?: {
@@ -38,10 +53,6 @@ const CBTE_TIPO: Record<number, string> = {
   6: "Factura B",
 };
 
-function fmtMoney(n: number) {
-  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -65,21 +76,57 @@ function Campo({
   );
 }
 
+/** Normaliza líneas por si el payload viene incompleto o con alias. */
+function normalizeConceptosLineas(
+  raw: LiquidacionConceptoLinea[] | null | undefined,
+): LiquidacionConceptoLinea[] {
+  if (!raw?.length) return [];
+  return raw.map((l, i) => {
+    const row = l as LiquidacionConceptoLinea & { nombre?: string };
+    const signo =
+      String(row.signo ?? "").toLowerCase() === "contra" ? "contra" : "favor";
+    return {
+      ...row,
+      id: row.id || `linea-${i}`,
+      nombreSnapshot: row.nombreSnapshot || row.nombre || "Concepto",
+      signo,
+      monto: Number(row.monto) || 0,
+      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : 0,
+      orden: row.orden ?? i,
+      conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
+    };
+  });
+}
+
 export function LiquidacionViewModal({
   liq,
   ivaPct,
   canEdit = true,
+  hasArca = false,
+  getToken,
+  detalleUrl,
   onClose,
   onEditar,
+  onEmitir,
   onVerComprobante,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
   canEdit?: boolean;
+  /** Tenant con integración ARCA: habilita el botón de emitir/reintentar. */
+  hasArca?: boolean;
+  /** Si se pasa, el modal refetch el detalle (incluye conceptosLineas). */
+  getToken?: () => Promise<string | null>;
+  detalleUrl?: string;
   onClose: () => void;
   onEditar: () => void;
+  /** Si se pasa, muestra "Emitir"/"Reintentar emisión" cuando el estado es borrador o error. */
+  onEmitir?: () => void;
   onVerComprobante?: () => void;
 }) {
+  const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
+  const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -88,12 +135,59 @@ export function LiquidacionViewModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!getToken) {
+      setDetail({
+        ...liq,
+        conceptosLineas: normalizeConceptosLineas(liq.conceptosLineas),
+      });
+      setLoadingDetail(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDetail(true);
+    void (async () => {
+      try {
+        const full = await apiJson<LiquidacionConTransportista>(
+          detalleUrl ??
+            `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
+          () => getToken(),
+        );
+        if (!cancelled) {
+          setDetail({
+            ...full,
+            transportista: full.transportista ?? liq.transportista,
+            conceptosLineas: normalizeConceptosLineas(
+              full.conceptosLineas?.length
+                ? full.conceptosLineas
+                : liq.conceptosLineas,
+            ),
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setDetail({
+            ...liq,
+            conceptosLineas: normalizeConceptosLineas(liq.conceptosLineas),
+          });
+        }
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Solo re-fetch al cambiar de liquidación (mismo patrón que EditModal).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- liq se usa como fallback
+  }, [getToken, detalleUrl, liq.id]);
+
+  const source = detail;
   const transportistaNombre =
-    liq.transportista?.nombre ?? liq.transportistaId;
-  const conceptosLineas = liq.conceptosLineas ?? [];
-  const netoGravado =
-    Math.round((liq.liquido - liq.gastosAdminIva) * 100) / 100;
-  const ivaLabel = ivaPct != null ? `IVA ${ivaPct}%` : liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : "IVA";
+    source.transportista?.nombre ?? source.transportistaId;
+  const ivaPctEfectivo = ivaPct ?? source.ivaPct ?? null;
+  const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
+  const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
 
   return (
     <ViewModalShell
@@ -103,11 +197,12 @@ export function LiquidacionViewModal({
           <span
             className={[
               "text-xs font-medium border rounded px-2 py-0.5",
-              ESTADO_BADGE[liq.estado],
+              ESTADO_BADGE[source.estado],
             ].join(" ")}
           >
-            {ESTADO_LABEL[liq.estado]}
+            {ESTADO_LABEL[source.estado]}
           </span>
+          <AmbienteTestBadge ambiente={source.ambiente} />
         </span>
       }
       onClose={onClose}
@@ -118,6 +213,24 @@ export function LiquidacionViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
+          {hasArca &&
+            onEmitir &&
+            (source.estado === "borrador" || source.estado === "error") && (
+              <button
+                type="button"
+                onClick={onEmitir}
+                className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+              >
+                {source.estado === "error" && (
+                  <RotateCw
+                    className="h-3.5 w-3.5 shrink-0"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                )}
+                {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
+              </button>
+            )}
           {canEdit && (
             <button
               type="button"
@@ -139,62 +252,130 @@ export function LiquidacionViewModal({
             <p className="font-medium text-vialto-charcoal">
               {transportistaNombre}
             </p>
-            {liq.transportista?.idFiscal && (
+            {source.transportista?.idFiscal && (
               <p className="mt-0.5 text-xs text-vialto-steel">
-                CUIT {liq.transportista.idFiscal}
+                CUIT {source.transportista.idFiscal}
               </p>
             )}
           </div>
         </div>
 
+        <div>
+          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+            Detalle del comprobante
+          </p>
+          <div className="rounded border border-black/10 bg-white px-4 py-1 min-h-[4rem]">
+            {loadingDetail ? (
+              <div className="flex justify-center py-6">
+                <Spinner className="h-5 w-5" />
+              </div>
+            ) : (
+              <LiquidacionMontosBreakdown
+                variant="filas"
+                bruto={source.bruto}
+                comision={source.comision}
+                comisionPct={source.comisionPct}
+                conceptosLineas={conceptosLineas}
+                gastosAdminIva={source.gastosAdminIva}
+                ivaPct={ivaPctEfectivo}
+                liquido={source.liquido}
+              />
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+            Viajes ({viajesIncluidos.length || source.cantViajes})
+          </p>
+          {loadingDetail ? (
+            <div className="flex justify-center rounded border border-black/10 py-6">
+              <Spinner className="h-5 w-5" />
+            </div>
+          ) : viajesIncluidos.length === 0 ? (
+            <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
+              {source.cantViajes > 0
+                ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
+                : "Sin viajes asociados."}
+            </p>
+          ) : (
+            <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
+              {viajesIncluidos.map((row) => {
+                const v = row.viaje;
+                const viajeId = v?.id ?? row.viajeId;
+                const numero = v?.numero ?? "—";
+                return (
+                  <Link
+                    key={row.viajeId}
+                    to={`/viajes?viaje=${encodeURIComponent(viajeId)}`}
+                    onClick={onClose}
+                    className="block px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist"
+                  >
+                    <p className="text-xs font-medium text-vialto-charcoal">
+                      Viaje #{numero}
+                      {v?.fechaCarga && (
+                        <span className="ml-1.5 font-normal text-vialto-steel">
+                          {fmtDate(v.fechaCarga)}
+                        </span>
+                      )}
+                    </p>
+                    {(v?.origen || v?.destino) && (
+                      <p className="text-[11px] text-vialto-steel truncate">
+                        {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                      {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className={viewModalGridClass}>
           <Campo
             label="Período"
-            value={`${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`}
+            value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
           />
-          <Campo label="Viajes" value={liq.cantViajes} />
-          <Campo label="Sub total" value={fmtMoney(liq.bruto)} />
-          <Campo
-            label={`Comisión (${liq.comisionPct}%)`}
-            value={fmtMoney(liq.comision)}
-          />
-          {conceptosLineas.map((l) => {
-            const signed = l.signo === "favor" ? l.monto : -l.monto;
-            return (
-              <Campo
-                key={l.id}
-                label={`${l.nombreSnapshot}${l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}`}
-                value={`${signed >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(signed))}`}
-              />
-            );
-          })}
-          <Campo label="Neto gravado" value={fmtMoney(netoGravado)} />
-          <Campo label={ivaLabel} value={fmtMoney(liq.gastosAdminIva)} />
-          <Campo label="Total neto a liquidar" value={fmtMoney(liq.liquido)} />
           <Campo
             label="Tipo de comprobante"
-            value={CBTE_TIPO[liq.cbteTipo] ?? `Tipo ${liq.cbteTipo}`}
+            value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
           />
-          {liq.cbteNro != null && (
-            <Campo label="Nº comprobante" value={liq.cbteNro} />
+          {source.cbteNro != null && (
+            <Campo label="Nº comprobante" value={source.cbteNro} />
           )}
-          {liq.ptoVenta != null && (
-            <Campo label="Punto de venta" value={liq.ptoVenta} />
+          {source.ptoVenta != null && (
+            <Campo label="Punto de venta" value={source.ptoVenta} />
           )}
-          {liq.cae && <Campo label="CAE" value={liq.cae} />}
-          {liq.caeFechaVto && (
-            <Campo label="Vto. CAE" value={fmtDate(liq.caeFechaVto)} />
+          {source.cae && <Campo label="CAE" value={source.cae} />}
+          {source.caeFechaVto && (
+            <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
           )}
-          <Campo label="Creada" value={fmtDate(liq.createdAt)} />
+          {source.ambiente && (
+            <Campo
+              label="Ambiente"
+              value={
+                source.ambiente === "homologacion"
+                  ? "Homologación (prueba)"
+                  : "Producción"
+              }
+            />
+          )}
+          <Campo label="Creada" value={fmtDate(source.createdAt)} />
         </div>
 
-        {liq.arcaError && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {liq.arcaError}
+        {source.arcaError && (
+          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">
+            <ArcaErrorMessage
+              message={source.arcaError}
+              detalle={source.arcaErrorDetalle ?? undefined}
+            />
           </div>
         )}
 
-        {onVerComprobante && liq.comprobanteUrl?.trim() && (
+        {onVerComprobante && source.comprobanteUrl?.trim() && (
           <div className="border-t border-black/10 pt-4">
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
               Comprobante

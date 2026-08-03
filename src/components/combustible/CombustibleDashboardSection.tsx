@@ -198,7 +198,7 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && (
-          <AlertasList tenantId={tenantId} alertas={data?.alertas ?? []} />
+          <AlertasList alertas={data?.alertas ?? []} tenantId={tenantId} />
         )}
         {tab === "viajes" && showViajes && (
           <ViajesCruceTable items={data?.viajesCruce ?? []} />

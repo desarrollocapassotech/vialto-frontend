@@ -32,10 +32,12 @@ export function CargaCombustibleViewModal({
   tenantId,
   onClose,
   onUpdate,
+  readOnly = false, // <-- 1. Recibimos readOnly con valor por defecto false
 }: {
   cargaId: string;
   tenantId: string;
   onClose: () => void;
+  readOnly?: boolean;
   onUpdate?: (cargaActualizada: CargaCombustible) => void;
 }) {
   const { getToken } = useAuth();
@@ -58,7 +60,7 @@ export function CargaCombustibleViewModal({
   const [viewingVehiculo, setViewingVehiculo] = useState(false);
   const [showFechaRegistro, setShowFechaRegistro] = useState(false);
 
-  // Estados para cruzar los datos si el backend no los trae poblados
+  // Estados para cruzar los datos en caso de que el backend no los trae poblados
   const [choferes, setChoferes] = useState<{ id: string; nombre: string }[]>(
     [],
   );
@@ -177,14 +179,17 @@ export function CargaCombustibleViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            disabled={loading || !carga}
-            className={viewModalBtnPrimary}
-          >
-            Editar
-          </button>
+          {/* 2. Ocultamos el botón Editar si readOnly es verdadero */}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              disabled={loading || !carga}
+              className={viewModalBtnPrimary}
+            >
+              Editar
+            </button>
+          )}
         </div>
       }
     >
@@ -437,7 +442,11 @@ export function CargaCombustibleViewModal({
           vehiculoId={resolvedVehiculoId}
           patenteTitulo={vehiculoPatente}
           onClose={() => setViewingVehiculo(false)}
-          editTo={`/vehiculos/${encodeURIComponent(resolvedVehiculoId)}/editar`}
+          editTo={
+            readOnly
+              ? undefined
+              : `/vehiculos/${encodeURIComponent(resolvedVehiculoId)}/editar`
+          }
         />
       )}
     </ViewModalShell>
