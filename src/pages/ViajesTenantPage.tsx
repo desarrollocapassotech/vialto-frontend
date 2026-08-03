@@ -112,7 +112,6 @@ import type {
   Viaje,
 } from "@/types/api";
 import {
-  VIAJE_SORT_DEFAULT,
   appendViajeSortQuery,
   sortViajesListado,
   type ViajeSortDir,
