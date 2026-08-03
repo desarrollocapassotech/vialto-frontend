@@ -189,6 +189,8 @@ export function CargaCombustibleCreateModal({
     formaPago: "",
   });
 
+  type CargaHist = { km: number; fecha: string };
+
   // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
   const [precioManual, setPrecioManual] = useState(false);
 
@@ -239,13 +241,23 @@ export function CargaCombustibleCreateModal({
     // Carga anterior o del mismo día (fecha <= la nueva): actúa como piso.
     const anterior = historial
       .filter((c) => c.fecha.slice(0, 10) <= nuevaFecha)
-      .pop();
+      .reduce<CargaHist | null>(
+        (max, c) => (max == null || c.km > max.km ? c : max),
+        null,
+      );
+
     if (anterior && kmSanitizado < anterior.km) {
       return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser inferior al de la carga anterior registrada el ${fmt(anterior.fecha)} (${anterior.km} km).`;
     }
 
     // Carga posterior (fecha estrictamente mayor): actúa como techo.
-    const posterior = historial.find((c) => c.fecha.slice(0, 10) > nuevaFecha);
+    const posterior = historial
+      .filter((c) => c.fecha.slice(0, 10) > nuevaFecha)
+      .reduce<CargaHist | null>(
+        (min, c) => (min == null || c.km < min.km ? c : min),
+        null,
+      );
+
     if (posterior && kmSanitizado > posterior.km) {
       return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser superior al de la carga posterior registrada el ${fmt(posterior.fecha)} (${posterior.km} km).`;
     }
