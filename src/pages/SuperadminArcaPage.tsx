@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
 import { MaskedPemField } from "@/components/liquidaciones/ArcaCertificadoModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
@@ -659,10 +660,8 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const [pendingEmitir, setPendingEmitir] = useState<Liquidacion | null>(null);
 
   // Estado para la ventana de confirmación
-  const [confirmModal, setConfirmModal] = useState<{
-    id: string;
-    type: "anular" | "eliminar";
-  } | null>(null);
+  const [anularId, setAnularId] = useState<string | null>(null);
+  const [eliminarId, setEliminarId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -771,7 +770,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
     }
   }
 
-  async function anular(id: string) {
+  async function anular(id: string, motivo: string) {
     setRowProcessing((prev) => ({ ...prev, [id]: "anular" }));
     setRowErrors((prev) => {
       const n = { ...prev };
@@ -782,8 +781,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
       await apiFetch(
         `/api/platform/arca/liquidaciones/${id}/anular?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
-        { method: "POST" },
+        { method: "POST", body: JSON.stringify({ motivo }) },
       );
+      setAnularId(null);
       load(); // Refrescamos todo para tener el estado actualizado desde el backend
     } catch (e) {
       setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
@@ -810,6 +810,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         { method: "DELETE" },
       );
       setItems((prev) => prev?.filter((r) => r.id !== id) ?? prev);
+      setEliminarId(null);
     } catch (e) {
       setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
     } finally {
@@ -950,9 +951,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                 <button
                   type="button"
                   disabled={!!isProc}
-                  onClick={() =>
-                    setConfirmModal({ id: liq.id, type: "anular" })
-                  }
+                  onClick={() => setAnularId(liq.id)}
                   className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
                 >
                   {isProc === "anular" ? "…" : "Anular"}
@@ -964,9 +963,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                 <button
                   type="button"
                   disabled={!!isProc}
-                  onClick={() =>
-                    setConfirmModal({ id: liq.id, type: "eliminar" })
-                  }
+                  onClick={() => setEliminarId(liq.id)}
                   className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
                 >
                   {isProc === "eliminar" ? "…" : "Eliminar"}
@@ -1069,9 +1066,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                     <button
                       type="button"
                       disabled={!!isProc}
-                      onClick={() =>
-                        setConfirmModal({ id: liq.id, type: "anular" })
-                      }
+                      onClick={() => setAnularId(liq.id)}
                       className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
                     >
                       {isProc === "anular" ? "…" : "Anular"}
@@ -1083,9 +1078,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                     <button
                       type="button"
                       disabled={!!isProc}
-                      onClick={() =>
-                        setConfirmModal({ id: liq.id, type: "eliminar" })
-                      }
+                      onClick={() => setEliminarId(liq.id)}
                       className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-red-600 hover:text-red-700 disabled:opacity-50`}
                     >
                       {isProc === "eliminar" ? "…" : "Eliminar"}
@@ -1112,27 +1105,35 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         />
       )}
 
-      {/* Modal de confirmación para Anular / Eliminar */}
-      <ConfirmModal
-        isOpen={!!confirmModal}
-        onClose={() => setConfirmModal(null)}
-        onConfirm={() => {
-          if (!confirmModal) return;
-          if (confirmModal.type === "anular") anular(confirmModal.id);
-          if (confirmModal.type === "eliminar") eliminar(confirmModal.id);
-          setConfirmModal(null);
+      <AnularLiquidacionModal
+        open={anularId != null}
+        message="¿Deseás anular esta liquidación? Se emite un comprobante de ajuste en ARCA y los viajes quedan disponibles para una nueva liquidación."
+        busy={anularId != null && rowProcessing[anularId] === "anular"}
+        error={anularId != null ? (rowErrors[anularId] ?? null) : null}
+        onCancel={() => {
+          if (anularId && rowProcessing[anularId] === "anular") return;
+          setAnularId(null);
         }}
-        title={
-          confirmModal?.type === "anular"
-            ? "Anular liquidación"
-            : "Eliminar liquidación"
-        }
-        message={
-          confirmModal?.type === "anular"
-            ? "¿Deseas anular esta liquidación? Se emitirá en ARCA el comprobante de anulación configurado (Nota de Crédito o Nota de Débito), asociado al CVLP original. Esta acción no se puede deshacer."
-            : "¿Deseas eliminar esta liquidación? Esta acción no se puede deshacer."
-        }
-        confirmText={confirmModal?.type === "anular" ? "Anular" : "Eliminar"}
+        onConfirm={(motivo) => {
+          if (!anularId) return;
+          void anular(anularId, motivo);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={eliminarId != null}
+        onClose={() => {
+          if (eliminarId && rowProcessing[eliminarId] === "eliminar") return;
+          setEliminarId(null);
+        }}
+        onConfirm={() => {
+          if (!eliminarId) return;
+          void eliminar(eliminarId);
+          setEliminarId(null);
+        }}
+        title="Eliminar liquidación"
+        message="¿Deseás eliminar esta liquidación? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
       />
     </div>
   );

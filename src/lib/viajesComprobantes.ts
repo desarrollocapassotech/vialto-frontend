@@ -8,10 +8,24 @@ export function viajeRequiereComprobanteDual(
   return Boolean(String(v.transportistaId ?? '').trim());
 }
 
-export function viajeTieneLiquidacionTransportista(v: {
-  liquidacionesViaje?: { liquidacionId: string }[] | null;
+/** Liquidación que sigue ocupando el viaje (anuladas no cuentan). */
+function liquidacionActivaEnViaje(lv: {
+  liquidacionId: string;
+  liquidacion?: { estado?: string } | null;
 }): boolean {
-  return (v.liquidacionesViaje?.length ?? 0) > 0;
+  const estado = String(lv.liquidacion?.estado ?? "").trim().toLowerCase();
+  // Sin include de liquidación, asumimos activa (evita liberar de más).
+  if (!estado) return true;
+  return estado !== "anulado";
+}
+
+export function viajeTieneLiquidacionTransportista(v: {
+  liquidacionesViaje?: {
+    liquidacionId: string;
+    liquidacion?: { estado?: string } | null;
+  }[] | null;
+}): boolean {
+  return (v.liquidacionesViaje ?? []).some(liquidacionActivaEnViaje);
 }
 
 export function viajePendienteComprobanteCliente(v: Viaje): boolean {
