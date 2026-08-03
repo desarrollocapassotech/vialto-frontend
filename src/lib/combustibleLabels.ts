@@ -44,6 +44,8 @@ export function fmtTipoVehiculo(tipo: string): string {
 // negocio en español y se muestra tal cual, sin tocarlo.
 const CAMPO_CARGA_LABELS: Record<string, string> = {
   patente: "Patente",
+  vehiculoId: "Vehículo",
+  choferId: "Conductor",
   estacion: "Estación",
   litros: "Litros",
   precioPorLitro: "Precio por litro",
