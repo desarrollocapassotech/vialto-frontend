@@ -16,12 +16,11 @@ import {
 import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
-function toLocalDateString(isoDate: string | null | undefined) {
+function toUtcDateString(isoDate: string | null | undefined) {
   if (!isoDate) return "";
   const d = new Date(isoDate);
   if (isNaN(d.getTime())) return "";
-  const offset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - offset).toISOString().slice(0, 10);
+  return d.toISOString().slice(0, 10);
 }
 
 function normalizeFormaPago(val: string | null | undefined): string {
@@ -68,7 +67,7 @@ export function CargaCombustibleEditModal({
     useState(initialVehiculoId);
   const [estacion, setEstacion] = useState(carga.estacion ?? "");
 
-  const defaultDate = toLocalDateString(carga.fecha);
+  const defaultDate = toUtcDateString(carga.fecha);
   const [fecha, setFecha] = useState(defaultDate);
   const [litros, setLitros] = useState(String(carga.litros));
   const [precioPorLitro, setPrecioPorLitro] = useState(
@@ -192,7 +191,7 @@ export function CargaCombustibleEditModal({
     // ... Todo el return se mantiene exactamente igual ...
     <ViewModalShell
       title="Editar Carga de Combustible"
-      onClose={saving ? () => { } : onClose}
+      onClose={saving ? () => {} : onClose}
       footer={
         <div className="flex w-full items-center justify-end gap-3">
           <button
