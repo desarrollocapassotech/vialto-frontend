@@ -100,18 +100,26 @@ export function AppShell() {
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
+      const memberGroups: NavGroup[] = [];
+
       if (canAccessStock(tenant?.modules ?? [])) {
-        return [
-          {
-            title: "Stock",
-            items: [
-              { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
-              { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
-            ],
-          },
-        ];
+        memberGroups.push({
+          title: "Stock",
+          items: [
+            { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+            { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
+          ],
+        });
       }
-      return [];
+
+      if (canAccessCombustible(tenant?.modules ?? [])) {
+        memberGroups.push({
+          title: "Combustible",
+          items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
+        });
+      }
+
+      return memberGroups;
     }
 
     if (isStockViewer(roleCtx)) {
@@ -172,8 +180,10 @@ export function AppShell() {
       superadmin || canAccessFacturacion(tenant?.modules ?? []);
     const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
     const hasLiquidaciones = superadmin || hasFacturacion || hasArca;
+
     if (hasFacturacion || hasArca) {
       const facturacionItems: NavItem[] = [];
+
       if (hasFacturacion) {
         facturacionItems.push({
           to: "/facturacion",
@@ -182,6 +192,7 @@ export function AppShell() {
           end: true,
         });
       }
+
       if (hasLiquidaciones) {
         facturacionItems.push({
           to: "/liquidaciones",
@@ -189,14 +200,26 @@ export function AppShell() {
           icon: Calculator,
           end: true,
         });
-        if (!superadmin && hasArca) {
-          facturacionItems.push({
-            to: "/configuracion/arca",
-            label: "Configuración ARCA",
-            icon: Landmark,
-          });
+
+        // --- NUEVA LÓGICA DE CONFIGURACIÓN ---
+        if (!superadmin) {
+          if (hasArca) {
+            facturacionItems.push({
+              to: "/configuracion/arca",
+              label: "Configuración ARCA",
+              icon: Landmark,
+            });
+          } else if (hasFacturacion) {
+            facturacionItems.push({
+              to: "/configuracion/conceptos",
+              label: "Configuración de conceptos",
+              icon: SlidersHorizontal, // Podés usar SlidersHorizontal o importar Settings / FileText
+            });
+          }
         }
+        // -------------------------------------
       }
+
       groups.push({ title: "Facturación", items: facturacionItems });
     }
 

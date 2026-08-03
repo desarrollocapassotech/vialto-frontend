@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { modalOverlayClass } from "@/lib/modalLayers";
@@ -13,6 +13,8 @@ type Props = {
   busy?: boolean;
   /** Error de API al confirmar (se muestra en el modal). */
   error?: string | null;
+  /** Contenido extra entre el motivo y los botones (ej. selector NC/ND). */
+  children?: ReactNode;
   onConfirm: (motivo: string) => void | Promise<void>;
   onCancel: () => void;
 };
@@ -23,6 +25,7 @@ export function AnularLiquidacionModal({
   message,
   busy = false,
   error = null,
+  children,
   onConfirm,
   onCancel,
 }: Props) {
@@ -109,6 +112,8 @@ export function AnularLiquidacionModal({
           />
           <CrudFieldError message={fieldError ?? undefined} />
         </label>
+
+        {children && <div className="mt-4">{children}</div>}
 
         {error && (
           <p role="alert" className="mt-3 text-sm font-medium text-red-600">

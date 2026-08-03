@@ -53,6 +53,8 @@ import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
 import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
+import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
+import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -198,7 +200,12 @@ function RequireModule({ module }: { module: string }) {
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
 
   // Usuarios de tenant: esperar organización activa (se auto-selecciona al entrar).
-  if (!isLoaded || !orgLoaded || (!superadmin && !organization) || tenantLoading) {
+  if (
+    !isLoaded ||
+    !orgLoaded ||
+    (!superadmin && !organization) ||
+    tenantLoading
+  ) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center text-vialto-steel">
         Un momento…
@@ -325,6 +332,10 @@ export default function App() {
               path="configuracion/arca"
               element={<ArcaConfigTenantPage />}
             />
+            <Route
+              path="configuracion/conceptos"
+              element={<ConceptosConfigTenantPage />}
+            />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
             <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
@@ -360,7 +371,7 @@ export default function App() {
 
           {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
           <Route element={<RequireModule module="combustible" />}>
-            <Route element={<RequireOrgAdmin />}>
+            <Route element={<RequireNotStockViewer />}>
               <Route path="combustible" element={<CombustiblePage />} />
             </Route>
           </Route>
@@ -409,7 +420,14 @@ export default function App() {
           />
           <Route path="superadmin/usuarios" element={<SuperadminUsersPage />} />
           <Route path="superadmin/arca" element={<SuperadminArcaPage />} />
-          <Route path="superadmin/campos-empresa" element={<CamposEmpresaPage />} />
+          <Route
+            path="superadmin/campos-empresa"
+            element={<CamposEmpresaPage />}
+          />
+          <Route
+            path="superadmin/combustible"
+            element={<CombustibleSuperadminPage />}
+          />
           <Route
             path="superadmin/usuarios/nuevo"
             element={<SuperadminUserCreatePage />}

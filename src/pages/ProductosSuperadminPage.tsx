@@ -46,6 +46,11 @@ export function ProductosSuperadminPage() {
   >("todos");
   const [modal, setModal] = useState<ModalState>({ mode: "closed" });
 
+  const empresaModules = useMemo(
+    () => tenants?.find((t) => t.clerkOrgId === filtroEmpresa)?.modules,
+    [tenants, filtroEmpresa],
+  );
+
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
     const params = new URLSearchParams({
@@ -470,6 +475,7 @@ export function ProductosSuperadminPage() {
           productoInicial={modal.producto}
           baseUrl="/api/platform/stock/productos"
           tenantId={filtroEmpresa}
+          tenantModules={empresaModules}
           getToken={getToken}
           onClose={() => setModal({ mode: "closed" })}
           onSaved={() => {}}
@@ -481,6 +487,7 @@ export function ProductosSuperadminPage() {
           modo="create"
           baseUrl="/api/platform/stock/productos"
           tenantId={filtroEmpresa}
+          tenantModules={empresaModules}
           getToken={getToken}
           onClose={() => setModal({ mode: "closed" })}
           onSaved={async () => {
@@ -495,6 +502,7 @@ export function ProductosSuperadminPage() {
           productoInicial={modal.producto}
           baseUrl="/api/platform/stock/productos"
           tenantId={filtroEmpresa}
+          tenantModules={empresaModules}
           getToken={getToken}
           onClose={() => setModal({ mode: "closed" })}
           onSaved={async () => {

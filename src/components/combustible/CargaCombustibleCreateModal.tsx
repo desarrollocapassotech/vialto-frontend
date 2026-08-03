@@ -3,7 +3,12 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
+import {
+  FORMA_PAGO_LABELS,
+  SERVICE_STATIONS,
+  computePrecioPorLitro,
+  fmtTipoVehiculo,
+} from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -149,6 +154,11 @@ interface Props {
   vehiculos: VehiculoOpt[];
   choferes: ChoferOpt[];
   tenantId?: string;
+  /**
+   * Última carga registrada por vehículo (lookup por vehiculoId).
+   * Se usa para validar que el km ingresado no sea inferior al último.
+   */
+  cargasPorVehiculo?: Record<string, { km: number; fecha: string }[]>;
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
@@ -157,6 +167,7 @@ export function CargaCombustibleCreateModal({
   tenantId,
   vehiculos,
   choferes,
+  cargasPorVehiculo = {},
   onClose,
   onSuccess,
 }: Props) {
@@ -178,10 +189,19 @@ export function CargaCombustibleCreateModal({
     formaPago: "",
   });
 
+  // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
+  const [precioManual, setPrecioManual] = useState(false);
+
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // nunca quede un frame con un precio desactualizado frente a la validación.
+  const precioMostrado = precioManual
+    ? formData.precioPorLitro
+    : computePrecioPorLitro(formData.litros, formData.importe);
+
   // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
   const importeError = useMemo(() => {
     const litros = Number(formData.litros);
-    const precio = Number(formData.precioPorLitro);
+    const precio = Number(precioMostrado);
     const importe = Number(formData.importe);
     if (!litros || !precio || !importe) return null;
     const esperado = litros * precio;
@@ -193,7 +213,45 @@ export function CargaCombustibleCreateModal({
       )}).`;
     }
     return null;
-  }, [formData.litros, formData.precioPorLitro, formData.importe]);
+  }, [formData.litros, precioMostrado, formData.importe]);
+
+  // Validación del kilometraje en tiempo real:
+  // 1) solo números/puntos, 2) no inferior al de la última carga del vehículo.
+  const kmError = useMemo(() => {
+    if (!formData.km) return null;
+
+    if (!/^[\d.]+$/.test(formData.km)) {
+      return "El kilometraje solo puede contener números.";
+    }
+
+    const kmSanitizado = parseInt(formData.km.replace(/\./g, ""), 10);
+    if (isNaN(kmSanitizado)) {
+      return "El kilometraje ingresado no es válido.";
+    }
+
+    const historial = formData.vehiculoId
+      ? (cargasPorVehiculo[formData.vehiculoId] ?? [])
+      : [];
+    const nuevaFecha = formData.fecha; // "YYYY-MM-DD"
+    const fmt = (iso: string) =>
+      iso.slice(0, 10).split("-").reverse().join("/");
+
+    // Carga anterior o del mismo día (fecha <= la nueva): actúa como piso.
+    const anterior = historial
+      .filter((c) => c.fecha.slice(0, 10) <= nuevaFecha)
+      .pop();
+    if (anterior && kmSanitizado < anterior.km) {
+      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser inferior al de la carga anterior registrada el ${fmt(anterior.fecha)} (${anterior.km} km).`;
+    }
+
+    // Carga posterior (fecha estrictamente mayor): actúa como techo.
+    const posterior = historial.find((c) => c.fecha.slice(0, 10) > nuevaFecha);
+    if (posterior && kmSanitizado > posterior.km) {
+      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser superior al de la carga posterior registrada el ${fmt(posterior.fecha)} (${posterior.km} km).`;
+    }
+
+    return null;
+  }, [formData.km, formData.vehiculoId, formData.fecha, cargasPorVehiculo]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -202,12 +260,30 @@ export function CargaCombustibleCreateModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setFormData((prev) => ({
+        ...prev,
+        precioPorLitro: computePrecioPorLitro(prev.litros, prev.importe),
+      }));
+    }
+    setPrecioManual(checked);
+  };
+
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Red de seguridad: no enviar si hay errores de validación en pantalla.
+    if (importeError || kmError) {
+      showToast("Revisá los datos antes de guardar", "error");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -222,7 +298,7 @@ export function CargaCombustibleCreateModal({
         ...formData,
         choferId: formData.choferId || null,
         litros: Number(formData.litros),
-        precioPorLitro: Number(formData.precioPorLitro),
+        precioPorLitro: Number(precioMostrado),
         importe: Number(formData.importe),
         km: kmSanitizado,
       };
@@ -313,15 +389,22 @@ export function CargaCombustibleCreateModal({
 
             <div>
               <label className={labelClass}>Estación *</label>
-              <input
-                type="text"
+              <select
                 name="estacion"
                 required
-                placeholder="Ej: YPF Ruta 9"
                 value={formData.estacion}
                 onChange={handleChange}
                 className={inputClass}
-              />
+              >
+                <option value="" disabled>
+                  Seleccione estación...
+                </option>
+                {SERVICE_STATIONS.map((station) => (
+                  <option key={station} value={station}>
+                    {station}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -362,21 +445,6 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Precio por Litro *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="precioPorLitro"
-                required
-                value={formData.precioPorLitro}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
               <label className={labelClass}>Monto Total *</label>
               <input
                 type="number"
@@ -397,6 +465,40 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-vialto-steel">
+                  Precio por Litro *
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={precioManual}
+                    onChange={(e) => handlePrecioManualToggle(e.target.checked)}
+                    className="accent-vialto-charcoal"
+                  />
+                  Editar manualmente
+                </label>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="precioPorLitro"
+                required
+                disabled={!precioManual}
+                value={precioMostrado}
+                onChange={handleChange}
+                className={`${inputClass} disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel`}
+                placeholder="0.00"
+              />
+              {!precioManual && (
+                <p className="mt-1 text-xs italic text-vialto-steel">
+                  Se calcula automáticamente
+                </p>
+              )}
+            </div>
+
+            <div>
               <label className={labelClass}>Kilómetros *</label>
               <input
                 type="text"
@@ -408,6 +510,11 @@ export function CargaCombustibleCreateModal({
                 className={inputClass}
                 placeholder="Ej: 450.000"
               />
+              {kmError && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  ⚠️ {kmError}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -439,7 +546,7 @@ export function CargaCombustibleCreateModal({
             </button>
             <button
               type="submit"
-              disabled={loading || Boolean(importeError)}
+              disabled={loading || Boolean(importeError) || Boolean(kmError)}
               className="inline-flex h-10 items-center px-6 bg-vialto-fire text-sm font-medium uppercase tracking-wider text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
             >
               {loading ? "Guardando..." : "Guardar Carga"}

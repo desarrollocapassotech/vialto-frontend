@@ -1,4 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -62,6 +63,7 @@ function UsuarioModal({
   modal,
   currentUserId,
   busy,
+  tieneModuloStock,
   onClose,
   onStartEditRole,
   onSaveRole,
@@ -71,6 +73,7 @@ function UsuarioModal({
   modal: Extract<ModalState, { mode: "view" | "edit-role" }>;
   currentUserId: string | null | undefined;
   busy: boolean;
+  tieneModuloStock: boolean;
   onClose: () => void;
   onStartEditRole: () => void;
   onSaveRole: () => void;
@@ -115,7 +118,9 @@ function UsuarioModal({
             <strong className="text-vialto-charcoal">{nombre}</strong>.
           </p>
           <div className="flex flex-col gap-2">
-            {(["admin", "member", "stock_viewer"] as const).map((r) => (
+            {(["admin", "member", "stock_viewer"] as const)
+              .filter((r) => r !== "stock_viewer" || tieneModuloStock)
+              .map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -203,11 +208,13 @@ function UsuarioModal({
 function CreateUserModal({
   busy,
   error,
+  tieneModuloStock,
   onClose,
   onSubmit,
 }: {
   busy: boolean;
   error: string | null;
+  tieneModuloStock: boolean;
   onClose: () => void;
   onSubmit: (
     name: string,
@@ -327,7 +334,9 @@ function CreateUserModal({
             Rol
           </p>
           <div className="flex flex-col gap-2">
-            {(["member", "admin", "stock_viewer"] as const).map((r) => (
+            {(["member", "admin", "stock_viewer"] as const)
+              .filter((r) => r !== "stock_viewer" || tieneModuloStock)
+              .map((r) => (
               <label
                 key={r}
                 className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
@@ -366,6 +375,9 @@ function CreateUserModal({
 export function UsuariosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  const { tenant } = useCurrentTenant();
+  const tieneModuloStock = tenant?.modules?.includes("stock") ?? false;
 
   const [rows, setRows] = useState<TenantUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -590,6 +602,7 @@ export function UsuariosTenantPage() {
           modal={modal}
           currentUserId={user?.id}
           busy={busy}
+          tieneModuloStock={tieneModuloStock}
           onClose={() => setModal(null)}
           onStartEditRole={() =>
             setModal({
@@ -610,6 +623,7 @@ export function UsuariosTenantPage() {
         <CreateUserModal
           busy={busy}
           error={actionError}
+          tieneModuloStock={tieneModuloStock}
           onClose={() => setModal(null)}
           onSubmit={handleCreate}
         />

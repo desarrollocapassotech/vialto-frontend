@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
+  validateConceptosLineasDraft,
   type ConceptoLineaDraft,
+  type ViajeOpcionDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import {
@@ -29,6 +31,39 @@ function toDateInput(iso: string | null | undefined) {
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Extrae los viajes de una liquidación soportando tanto array directo ("viajes")
+ * como tabla intermedia de Prisma ("liquidacionesViaje").
+ */
+function extraerViajesDeLiquidacion(data: any): ViajeOpcionDraft[] {
+  if (!data) return [];
+
+  // Buscamos el array donde vengan los viajes (ya sea "viajes" o "liquidacionesViaje")
+  const lista =
+    Array.isArray(data.viajes) && data.viajes.length > 0
+      ? data.viajes
+      : Array.isArray(data.liquidacionesViaje) &&
+          data.liquidacionesViaje.length > 0
+        ? data.liquidacionesViaje
+        : [];
+
+  if (lista.length === 0) return [];
+
+  return lista
+    .map((item: any) => {
+      // Si viene anidado dentro de ".viaje" (tabla intermedia de Prisma), lo desenvolvemos:
+      const v = item.viaje ?? item;
+
+      // El ID real del viaje está en v.id o en item.viajeId
+      const id = v.id ?? item.viajeId ?? item.id;
+      // El número real del viaje está en v.numero
+      const numero = v.numero ?? item.numero ?? "Sin Nº";
+
+      return id ? { id, numero } : null;
+    })
+    .filter((x: any): x is ViajeOpcionDraft => Boolean(x));
 }
 
 export function LiquidacionEditModal({
@@ -59,6 +94,14 @@ export function LiquidacionEditModal({
     toDateInput(liq.periodoHasta),
   );
   const [comisionPct, setComisionPct] = useState(String(liq.comisionPct ?? ""));
+  const [ivaPct, setIvaPct] = useState(
+    liq.ivaPct != null ? String(liq.ivaPct) : "",
+  );
+
+  const [viajesDisponibles, setViajesDisponibles] = useState<
+    ViajeOpcionDraft[]
+  >(() => extraerViajesDeLiquidacion(liq));
+
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     () =>
       (liq.conceptosLineas ?? [])
@@ -69,8 +112,10 @@ export function LiquidacionEditModal({
           nombre: l.nombreSnapshot,
           signo: l.signo,
           ivaPct: l.ivaPct,
+          viajeId: (l as any).viajeId ?? null,
         })),
   );
+  const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
   const [lineasLoading, setLineasLoading] = useState(canEditDatos);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(
@@ -87,6 +132,7 @@ export function LiquidacionEditModal({
     }
     let cancelled = false;
     setLineasLoading(true);
+
     void (async () => {
       try {
         const full = await apiJson<LiquidacionConTransportista>(
@@ -94,6 +140,13 @@ export function LiquidacionEditModal({
           () => getToken(),
         );
         if (cancelled) return;
+        if (full.ivaPct != null) setIvaPct(String(full.ivaPct));
+
+        const viajesExtraidos = extraerViajesDeLiquidacion(full);
+        if (viajesExtraidos.length > 0) {
+          setViajesDisponibles(viajesExtraidos);
+        }
+
         setConceptosLineas(
           (full.conceptosLineas ?? [])
             .filter((l) => l.conceptoLiquidacionId)
@@ -103,6 +156,7 @@ export function LiquidacionEditModal({
               nombre: l.nombreSnapshot,
               signo: l.signo,
               ivaPct: l.ivaPct,
+              viajeId: (l as any).viajeId ?? null,
             })),
         );
       } catch {
@@ -138,6 +192,10 @@ export function LiquidacionEditModal({
       if (comisionPct.trim() !== "" && (isNaN(pct) || pct < 0 || pct > 100)) {
         errs.comisionPct = "La comisión debe ser un número entre 0 y 100.";
       }
+      const iva = Number(ivaPct);
+      if (ivaPct.trim() !== "" && (isNaN(iva) || iva < 0 || iva > 100)) {
+        errs.ivaPct = "El IVA debe ser un número entre 0 y 100.";
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -147,6 +205,15 @@ export function LiquidacionEditModal({
     if (canEditDatos && lineasLoading) {
       setError("Esperá a que terminen de cargar los conceptos.");
       return;
+    }
+    if (canEditDatos) {
+      const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
+      if (!conceptosCheck.ok) {
+        setConceptosIncomplete(conceptosCheck.indices);
+        setError(conceptosCheck.message);
+        return;
+      }
+      setConceptosIncomplete([]);
     }
     setSaving(true);
     setError(null);
@@ -170,6 +237,9 @@ export function LiquidacionEditModal({
         if (comisionPct.trim() !== "") {
           body.comisionPct = Number(comisionPct);
         }
+        // Siempre enviar IVA explícito cuando se editan datos (incluye 0 = sin IVA).
+        body.ivaPct =
+          ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
       if (showComprobante) {
@@ -293,33 +363,61 @@ export function LiquidacionEditModal({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="liq-comision" className={LABEL}>
-                Comisión (%)
-              </label>
-              <input
-                id="liq-comision"
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                value={comisionPct}
-                onChange={(e) => setComisionPct(e.target.value)}
-                disabled={saving}
-                className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
-              />
-              {fieldErrors.comisionPct && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                  {fieldErrors.comisionPct}
-                </p>
-              )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="liq-comision" className={LABEL}>
+                  Comisión (%)
+                </label>
+                <input
+                  id="liq-comision"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={comisionPct}
+                  onChange={(e) => setComisionPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.comisionPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.comisionPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.comisionPct}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="liq-iva" className={LABEL}>
+                  IVA (%)
+                </label>
+                <input
+                  id="liq-iva"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={ivaPct}
+                  onChange={(e) => setIvaPct(e.target.value)}
+                  disabled={saving}
+                  className={`${INPUT} ${fieldErrors.ivaPct ? "border-red-400" : ""}`}
+                />
+                {fieldErrors.ivaPct && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {fieldErrors.ivaPct}
+                  </p>
+                )}
+              </div>
             </div>
 
             <ConceptosLiquidacionLineasEditor
               getToken={getToken}
               lineas={conceptosLineas}
-              onChange={setConceptosLineas}
+              viajesDisponibles={viajesDisponibles}
+              onChange={(next) => {
+                setConceptosLineas(next);
+                setConceptosIncomplete([]);
+              }}
               disabled={saving || lineasLoading}
+              incompleteIndices={conceptosIncomplete}
             />
           </>
         ) : (
