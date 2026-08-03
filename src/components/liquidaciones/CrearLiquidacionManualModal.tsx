@@ -104,9 +104,7 @@ export function CrearLiquidacionManualModal({
   const [comisionPct, setComisionPct] = useState("");
   const comisionEditadaManualmente = useRef(false);
   /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
-  const [ivaPct, setIvaPct] = useState(
-    String(config?.ivaGastosAdmin ?? 21),
-  );
+  const [ivaPct, setIvaPct] = useState(String(config?.ivaGastosAdmin ?? 21));
   const ivaSyncedFromConfig = useRef(config?.ivaGastosAdmin != null);
   /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
   const [ptoVenta, setPtoVenta] = useState(
@@ -141,6 +139,21 @@ export function CrearLiquidacionManualModal({
     setIvaPct(String(config.ivaGastosAdmin));
   }, [config?.ivaGastosAdmin]);
 
+  // Manejo de limpieza de viajeId si se deselecciona un viaje en la UI
+  useEffect(() => {
+    if (viajeInicial || selectedViajeIds.size === 0) return;
+
+    setConceptosLineas((prev) =>
+      prev.map((linea) => {
+        if (linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
+          return { ...linea, viajeId: null }; // Vuelve a General
+        }
+        return linea;
+      }),
+    );
+  }, [selectedViajeIds, viajeInicial]);
+
+  // Autocompletado de la comisión por defecto al cambiar el transportista
   useEffect(() => {
     if (config?.ptoVentaCvlp == null || ptoVentaSyncedFromConfig.current) {
       return;
@@ -266,9 +279,7 @@ export function CrearLiquidacionManualModal({
       return;
     }
     const ivaResolved =
-      ivaPct.trim() !== ""
-        ? Number(ivaPct)
-        : (config?.ivaGastosAdmin ?? 21);
+      ivaPct.trim() !== "" ? Number(ivaPct) : (config?.ivaGastosAdmin ?? 21);
     if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
       setError("El IVA debe ser un número entre 0 y 100.");
       return;
@@ -387,9 +398,7 @@ export function CrearLiquidacionManualModal({
     ? bruto - comisionMonto + conceptosEfecto
     : null;
   const ivaPctNum =
-    ivaPct.trim() !== ""
-      ? Number(ivaPct)
-      : (config?.ivaGastosAdmin ?? 21);
+    ivaPct.trim() !== "" ? Number(ivaPct) : (config?.ivaGastosAdmin ?? 21);
   const ivaMonto =
     netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
   const totalALiquidar =
@@ -562,6 +571,10 @@ export function CrearLiquidacionManualModal({
           <ConceptosLiquidacionLineasEditor
             getToken={getToken}
             lineas={conceptosLineas}
+            viajesDisponibles={selectedViajes.map((v) => ({
+              id: v.id,
+              numero: v.numero,
+            }))}
             onChange={(next) => {
               setConceptosLineas(next);
               setConceptosIncomplete([]);
@@ -622,8 +635,8 @@ export function CrearLiquidacionManualModal({
               </p>
               {monedaSeleccionada && (
                 <p className="mb-1.5 text-[11px] text-vialto-steel">
-                  Solo podés incluir viajes en {monedaSeleccionada}. Los de
-                  otra moneda quedan deshabilitados.
+                  Solo podés incluir viajes en {monedaSeleccionada}. Los de otra
+                  moneda quedan deshabilitados.
                 </p>
               )}
               <ViajesSeleccionTabla
