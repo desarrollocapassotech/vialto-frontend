@@ -705,6 +705,7 @@ export function ViajesTenantPage({
     }
   }
 
+  //Comentario para hacer pr desde rama develop
   function aplicarTipoFechaFiltro(val: "" | "carga" | "descarga") {
     if (!val) {
       filtrosAplicadosRef.current = {
