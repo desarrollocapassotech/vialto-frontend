@@ -4,6 +4,10 @@ import {
   fmtSignedLiquidacionMoney,
   round2,
 } from "@/lib/liquidacionMoney";
+import {
+  ivaGeneralSobreBase,
+  signedMontoConIvaConcepto,
+} from "@/lib/liquidacionConceptosIva";
 
 // Re-export para no romper imports existentes.
 export { fmtLiquidacionMoney, fmtSignedLiquidacionMoney };
@@ -95,49 +99,6 @@ function coerceIvaPct(raw: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * IVA del comprobante = neto gravado × alícuota de la liquidación.
- * No se usa `gastosAdminIva` persistido: puede estar desfasado por bugs
- * previos (remap AFIP 10%→21% / 10%→10.5%).
- */
-function resolveIvaYTotal(args: {
-  bruto: number;
-  comision: number;
-  conceptosLineas: ConceptoLineaDisplay[];
-  ivaPct?: number | string | null;
-  gastosAdminIva: number;
-  liquido: number;
-}): { netoGravado: number; ivaMonto: number; total: number; ivaPct: number | null } {
-  const efectoConceptos = args.conceptosLineas.reduce((s, l) => {
-    const m = Number(l.monto) || 0;
-    return s + (l.signo === "favor" ? m : -m);
-  }, 0);
-  const netoGravado = round2(
-    Number(args.bruto) - Number(args.comision) + efectoConceptos,
-  );
-  const pct = coerceIvaPct(args.ivaPct);
-
-  if (pct == null) {
-    return {
-      netoGravado: round2(Number(args.liquido) - Number(args.gastosAdminIva)),
-      ivaMonto: Number(args.gastosAdminIva) || 0,
-      total: Number(args.liquido) || 0,
-      ivaPct: null,
-    };
-  }
-
-  // Misma regla que el backend: el IVA de la liquidación aplica a todo el neto
-  // (flete − comisión ± conceptos). El campo IVA del formulario es la fuente de verdad.
-  const impIva = round2((netoGravado * pct) / 100);
-
-  return {
-    netoGravado,
-    ivaMonto: impIva,
-    total: round2(netoGravado + impIva),
-    ivaPct: pct,
-  };
-}
-
 function formatIvaLabel(pct: number | null): string {
   if (pct == null) return "IVA";
   // Deja claro 10 vs 10,5 (AFIP) para no confundir al usuario.
@@ -153,7 +114,8 @@ function formatIvaLabel(pct: number | null): string {
 
 /**
  * Desglose de montos del comprobante CVLP / liquidación:
- * subtotal, comisión (−), conceptos (+/−), neto gravado, IVA (+), total.
+ * subtotal, comisión (−), conceptos c/IVA propio (+/−), IVA general (sobre bruto−comisión), total.
+ * El IVA de cada concepto va en el valor de la línea; el IVA general no lo incluye.
  */
 export function LiquidacionMontosBreakdown({
   bruto,
@@ -167,17 +129,18 @@ export function LiquidacionMontosBreakdown({
   brutoLabel = "Sub total",
   totalLabel = "Total neto a liquidar",
 }: Props) {
-  const { netoGravado, ivaMonto, total, ivaPct: pctEfectivo } = resolveIvaYTotal(
-    {
-      bruto,
-      comision,
-      conceptosLineas,
-      ivaPct,
-      gastosAdminIva,
-      liquido,
-    },
-  );
-  const ivaLabel = formatIvaLabel(pctEfectivo);
+  // Preferimos recalcular el IVA general sobre (bruto − comisión) para no mezclarlo
+  // con el IVA ya incluido en cada línea de concepto. Fallback: monto persistido.
+  const ivaGeneral =
+    ivaPct != null && Number.isFinite(ivaPct)
+      ? ivaGeneralSobreBase(bruto, comision, ivaPct)
+      : Number(gastosAdminIva) || 0;
+  const netoBase = round2(bruto - comision);
+  const pctEfectivo = coerceIvaPct(ivaPct);
+  const ivaLabel =
+    pctEfectivo != null
+      ? `${formatIvaLabel(pctEfectivo)} (flete/comisión)`
+      : "IVA (flete/comisión)";
   const comisionLabel = `Comisión (${comisionPct}%)`;
 
   const lineItems: {
@@ -201,7 +164,7 @@ export function LiquidacionMontosBreakdown({
     },
     ...conceptosLineas.map((l, idx) => {
       const row = l as ConceptoLineaDisplay & { nombre?: string };
-      const signed = row.signo === "favor" ? row.monto : -row.monto;
+      const signed = signedMontoConIvaConcepto(row.signo, row.monto, row.ivaPct);
       const nombre = row.nombreSnapshot || row.nombre || "Concepto";
       const linePct = coerceIvaPct(row.ivaPct);
       return {
@@ -216,20 +179,20 @@ export function LiquidacionMontosBreakdown({
     }),
     {
       key: "neto",
-      label: "Neto gravado",
-      value: fmtLiquidacionMoney(netoGravado),
+      label: "Neto gravado (flete/comisión)",
+      value: fmtLiquidacionMoney(netoBase),
       separator: true,
     },
     {
       key: "iva",
       label: ivaLabel,
-      value: fmtSignedLiquidacionMoney(ivaMonto, "plus"),
+      value: fmtSignedLiquidacionMoney(ivaGeneral, "plus"),
       muted: true,
     },
     {
       key: "total",
       label: totalLabel,
-      value: fmtLiquidacionMoney(total),
+      value: fmtLiquidacionMoney(liquido),
       bold: true,
       separator: true,
     },
