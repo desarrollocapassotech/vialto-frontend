@@ -4,6 +4,7 @@ import { CrudFieldLabel } from "@/components/crud/CrudFields";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
 import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
@@ -43,14 +44,6 @@ function fmtMoney(n: number) {
 
 function signoLabel(s: ConceptoLiquidacionSigno) {
   return s === "favor" ? "A favor" : "En contra";
-}
-
-function signedMonto(
-  signo: ConceptoLiquidacionSigno | undefined,
-  monto: number,
-) {
-  if (!signo || !Number.isFinite(monto)) return 0;
-  return signo === "favor" ? monto : -monto;
 }
 
 function montoStrFromNumber(monto: number): string {
@@ -273,7 +266,9 @@ export function ConceptosLiquidacionLineasEditor({
   }
 
   const efectoNeto = lineas.reduce(
-    (sum, l) => sum + signedMonto(l.signo, Number(l.monto) || 0),
+    (sum, l) =>
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
     0,
   );
 
@@ -395,7 +390,12 @@ export function ConceptosLiquidacionLineasEditor({
             // El signo viene del catálogo al elegir el concepto; no inferirlo del
             // monto (con monto 0, +0 y −0 se ven iguales y el UI no se actualiza).
             const aFavor = linea.signo !== "contra";
-            const montoAbs = Math.abs(Number(linea.monto) || 0);
+            const efecto = signedMontoConIvaConcepto(
+              linea.signo,
+              Number(linea.monto) || 0,
+              linea.ivaPct,
+            );
+            const montoAbs = Math.abs(efecto);
             const rowIncomplete = incompleteSet.has(index);
             const conceptoMissing =
               rowIncomplete && !linea.conceptoLiquidacionId;

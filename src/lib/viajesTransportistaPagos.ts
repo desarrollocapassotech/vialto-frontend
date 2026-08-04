@@ -3,6 +3,7 @@ import {
   parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
+import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
 import type { PagoTransportista, Viaje } from "@/types/api";
 
 export type PagoTransportistaMontoDraft = {
@@ -60,6 +61,7 @@ export type ViajeSaldoTransportistaInput = Pick<
       conceptosLineas?: Array<{
         monto?: number | null;
         signo?: string | null;
+        ivaPct?: number | null;
         viajeId?: string | null;
       }>;
     } | null;
@@ -91,6 +93,7 @@ function calcularConceptosParaViaje(
   conceptos: Array<{
     monto?: number | null;
     signo?: string | null;
+    ivaPct?: number | null;
     viajeId?: string | null;
   }> = [],
   totalViajesEnLiquidacion: number = 1,
@@ -101,7 +104,8 @@ function calcularConceptosParaViaje(
     const monto = Number(l.monto) || 0;
     if (!monto) return sum;
 
-    const conSigno = l.signo === "contra" ? -monto : monto;
+    // Incluye el IVA propio del concepto en el aporte de la línea.
+    const conSigno = signedMontoConIvaConcepto(l.signo, monto, l.ivaPct);
 
     // 1. Asignado específicamente a ESTE viaje (100%)
     if (l.viajeId && String(l.viajeId) === String(viajeId)) {
@@ -161,11 +165,11 @@ function totalPagadoTransportistaEnMonedaAcordada(
           Number(liq.cantViajes) || 1,
         );
 
-        const netoGravado = brutoViaje - comisionMonto + efectoConceptos;
+        // IVA general solo sobre (bruto − comisión); los conceptos ya traen su IVA.
         const ivaPct = Number(liq.ivaPct) || 0;
-        const ivaMonto = (netoGravado * ivaPct) / 100;
+        const ivaMonto = ((brutoViaje - comisionMonto) * ivaPct) / 100;
 
-        montoReal += netoGravado + ivaMonto;
+        montoReal += brutoViaje - comisionMonto + ivaMonto + efectoConceptos;
         tieneMontoReal = true;
       }
       // Fallback: Si tenés el monto guardado en la tabla pivote
