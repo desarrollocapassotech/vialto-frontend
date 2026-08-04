@@ -388,7 +388,9 @@ export function CargaCombustibleCreateModal({
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className={labelClass}>Fecha *</label>
+              <label className={labelClass}>
+                Fecha <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
                 name="fecha"
@@ -400,7 +402,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Estación *</label>
+              <label className={labelClass}>
+                Estación <span className="text-red-500">*</span>
+              </label>
               <select
                 name="estacion"
                 required
@@ -420,7 +424,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Vehículo *</label>
+              <label className={labelClass}>
+                Vehículo <span className="text-red-500">*</span>
+              </label>
               <SearchableSelect
                 name="vehiculoId"
                 options={vehiculosOptions}
@@ -442,7 +448,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Litros *</label>
+              <label className={labelClass}>
+                Litros <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -457,7 +465,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Monto Total *</label>
+              <label className={labelClass}>
+                Monto Total <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -479,7 +489,7 @@ export function CargaCombustibleCreateModal({
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-vialto-steel">
-                  Precio por Litro *
+                  Precio por Litro <span className="text-red-500">*</span>
                 </label>
                 <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
                   <input
@@ -511,7 +521,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Kilómetros *</label>
+              <label className={labelClass}>
+                Kilómetros <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -530,7 +542,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div className="sm:col-span-2">
-              <label className={labelClass}>Forma de pago *</label>
+              <label className={labelClass}>
+                Forma de pago <span className="text-red-500">*</span>
+              </label>
               <select
                 name="formaPago"
                 required

@@ -226,7 +226,7 @@ export function CargaCombustibleEditModal({
               htmlFor="fecha"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Fecha
+              Fecha <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -273,7 +273,7 @@ export function CargaCombustibleEditModal({
               htmlFor="vehiculoId"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Vehículo
+              Vehículo <span className="text-red-500">*</span>
             </label>
             <select
               id="vehiculoId"
@@ -302,7 +302,7 @@ export function CargaCombustibleEditModal({
               htmlFor="estacion"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Estación de Servicio
+              Estación de Servicio <span className="text-red-500">*</span>
             </label>
             <select
               id="estacion"
@@ -332,7 +332,7 @@ export function CargaCombustibleEditModal({
               htmlFor="litros"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Litros
+              Litros <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -351,7 +351,7 @@ export function CargaCombustibleEditModal({
               htmlFor="importe"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Monto Total ($)
+              Monto Total ($) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -376,7 +376,7 @@ export function CargaCombustibleEditModal({
                 htmlFor="precioPorLitro"
                 className="text-xs font-medium uppercase tracking-wider text-vialto-steel"
               >
-                Precio / L ($)
+                Precio / L ($) <span className="text-red-500">*</span>
               </label>
               <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
                 <input
@@ -411,7 +411,7 @@ export function CargaCombustibleEditModal({
               htmlFor="km"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Kilometraje
+              Kilometraje <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -434,7 +434,7 @@ export function CargaCombustibleEditModal({
               htmlFor="formaPago"
               className="mb-1 text-xs font-medium uppercase tracking-wider text-vialto-steel"
             >
-              Forma de Pago
+              Forma de Pago <span className="text-red-500">*</span>
             </label>
             <select
               id="formaPago"
