@@ -24,8 +24,13 @@ function nombreDesdeUrl(url: string, tipo: AdjuntoPreviewTipo): string {
   try {
     const path = new URL(url).pathname;
     const last = path.split('/').filter(Boolean).pop();
-    if (last && /\.[a-z0-9]{2,5}$/i.test(last)) {
-      return decodeURIComponent(last);
+    if (last) {
+      const decoded = decodeURIComponent(last);
+      if (/\.[a-z0-9]{2,5}$/i.test(decoded)) {
+        return decoded;
+      }
+      if (tipo === 'pdf') return `${decoded}.pdf`;
+      if (tipo === 'imagen') return `${decoded}.jpg`;
     }
   } catch {
     /* ignore */

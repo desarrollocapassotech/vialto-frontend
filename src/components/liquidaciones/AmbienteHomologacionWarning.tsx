@@ -17,6 +17,9 @@ export function AmbienteHomologacionWarning({
       <p className="mt-0.5">
         Está seleccionado el ambiente de homologación: el comprobante se va a
         emitir con el CUIT de prueba de AFIP y no va a tener validez fiscal.
+        Los CUIT reales de clientes/transportistas no están en el padrón de
+        pruebas — AFIP recibe datos de receptor de testing (Factura B → consumidor
+        final; Factura A → CUIT 30668346908).
       </p>
     </div>
   );
