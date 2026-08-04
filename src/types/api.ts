@@ -516,7 +516,8 @@ export interface LiquidacionConceptoLinea {
   conceptoLiquidacionId: string | null;
   nombreSnapshot: string;
   signo: ConceptoLiquidacionSigno;
-  ivaPct: number;
+  /** null = heredar el IVA de la liquidación; 0 = exento. */
+  ivaPct: number | null;
   monto: number;
   orden: number;
 }

@@ -94,17 +94,17 @@ function normalizeConceptosLineas(
   raw: LiquidacionConceptoLinea[] | null | undefined,
 ): LiquidacionConceptoLinea[] {
   if (!raw?.length) return [];
-  return raw.map((l, i) => {
+  return raw.map((l, i): LiquidacionConceptoLinea => {
     const row = l as LiquidacionConceptoLinea & { nombre?: string };
-    const signo =
+    const signo: LiquidacionConceptoLinea["signo"] =
       String(row.signo ?? "").toLowerCase() === "contra" ? "contra" : "favor";
     return {
-      ...row,
       id: row.id || `linea-${i}`,
       nombreSnapshot: row.nombreSnapshot || row.nombre || "Concepto",
       signo,
       monto: Number(row.monto) || 0,
-      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : 0,
+      // null = usar el IVA de la liquidación; 0 = exento (no confundir).
+      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : null,
       orden: row.orden ?? i,
       conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
     };
@@ -198,7 +198,12 @@ export function LiquidacionViewModal({
   const source = detail;
   const transportistaNombre =
     source.transportista?.nombre ?? source.transportistaId;
-  const ivaPctEfectivo = ivaPct ?? source.ivaPct ?? null;
+  const ivaPctEfectivo = (() => {
+    const raw = ivaPct ?? source.ivaPct ?? null;
+    if (raw == null) return null;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) ? n : null;
+  })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
   const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
 
