@@ -100,7 +100,13 @@ export function AppShell() {
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
-      const memberGroups: NavGroup[] = [];
+      // 1. Inicializamos el grupo de navegación del Miembro incluyendo "Inicio"
+      const memberGroups: NavGroup[] = [
+        {
+          title: null,
+          items: [{ to: "/", label: "Inicio", icon: House, end: true }],
+        },
+      ];
 
       if (canAccessStock(tenant?.modules ?? [])) {
         memberGroups.push({
