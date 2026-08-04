@@ -54,6 +54,7 @@ import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
 import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
 import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
+import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -331,6 +332,10 @@ export default function App() {
               path="configuracion/arca"
               element={<ArcaConfigTenantPage />}
             />
+            <Route
+              path="configuracion/conceptos"
+              element={<ConceptosConfigTenantPage />}
+            />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
             <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
@@ -366,7 +371,7 @@ export default function App() {
 
           {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
           <Route element={<RequireModule module="combustible" />}>
-            <Route element={<RequireOrgAdmin />}>
+            <Route element={<RequireNotStockViewer />}>
               <Route path="combustible" element={<CombustiblePage />} />
             </Route>
           </Route>

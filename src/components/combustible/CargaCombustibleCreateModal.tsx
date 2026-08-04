@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast";
 import {
   FORMA_PAGO_LABELS,
   SERVICE_STATIONS,
+  computePrecioPorLitro,
   fmtTipoVehiculo,
 } from "@/lib/combustibleLabels";
 import type { CargaCombustible } from "@/types/api";
@@ -188,10 +189,21 @@ export function CargaCombustibleCreateModal({
     formaPago: "",
   });
 
+  type CargaHist = { km: number; fecha: string };
+
+  // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
+  const [precioManual, setPrecioManual] = useState(false);
+
+  // Se deriva en el mismo render que litros/importe (no vía efecto) para que
+  // nunca quede un frame con un precio desactualizado frente a la validación.
+  const precioMostrado = precioManual
+    ? formData.precioPorLitro
+    : computePrecioPorLitro(formData.litros, formData.importe);
+
   // Coherencia importe ≈ litros × precioPorLitro (1% de tolerancia).
   const importeError = useMemo(() => {
     const litros = Number(formData.litros);
-    const precio = Number(formData.precioPorLitro);
+    const precio = Number(precioMostrado);
     const importe = Number(formData.importe);
     if (!litros || !precio || !importe) return null;
     const esperado = litros * precio;
@@ -203,7 +215,7 @@ export function CargaCombustibleCreateModal({
       )}).`;
     }
     return null;
-  }, [formData.litros, formData.precioPorLitro, formData.importe]);
+  }, [formData.litros, precioMostrado, formData.importe]);
 
   // Validación del kilometraje en tiempo real:
   // 1) solo números/puntos, 2) no inferior al de la última carga del vehículo.
@@ -229,13 +241,23 @@ export function CargaCombustibleCreateModal({
     // Carga anterior o del mismo día (fecha <= la nueva): actúa como piso.
     const anterior = historial
       .filter((c) => c.fecha.slice(0, 10) <= nuevaFecha)
-      .pop();
+      .reduce<CargaHist | null>(
+        (max, c) => (max == null || c.km > max.km ? c : max),
+        null,
+      );
+
     if (anterior && kmSanitizado < anterior.km) {
       return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser inferior al de la carga anterior registrada el ${fmt(anterior.fecha)} (${anterior.km} km).`;
     }
 
     // Carga posterior (fecha estrictamente mayor): actúa como techo.
-    const posterior = historial.find((c) => c.fecha.slice(0, 10) > nuevaFecha);
+    const posterior = historial
+      .filter((c) => c.fecha.slice(0, 10) > nuevaFecha)
+      .reduce<CargaHist | null>(
+        (min, c) => (min == null || c.km < min.km ? c : min),
+        null,
+      );
+
     if (posterior && kmSanitizado > posterior.km) {
       return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser superior al de la carga posterior registrada el ${fmt(posterior.fecha)} (${posterior.km} km).`;
     }
@@ -248,6 +270,17 @@ export function CargaCombustibleCreateModal({
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePrecioManualToggle = (checked: boolean) => {
+    if (checked) {
+      // Al pasar a manual, arranca desde el último valor calculado.
+      setFormData((prev) => ({
+        ...prev,
+        precioPorLitro: computePrecioPorLitro(prev.litros, prev.importe),
+      }));
+    }
+    setPrecioManual(checked);
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -277,7 +310,7 @@ export function CargaCombustibleCreateModal({
         ...formData,
         choferId: formData.choferId || null,
         litros: Number(formData.litros),
-        precioPorLitro: Number(formData.precioPorLitro),
+        precioPorLitro: Number(precioMostrado),
         importe: Number(formData.importe),
         km: kmSanitizado,
       };
@@ -355,7 +388,9 @@ export function CargaCombustibleCreateModal({
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className={labelClass}>Fecha *</label>
+              <label className={labelClass}>
+                Fecha <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
                 name="fecha"
@@ -367,7 +402,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Estación *</label>
+              <label className={labelClass}>
+                Estación <span className="text-red-500">*</span>
+              </label>
               <select
                 name="estacion"
                 required
@@ -387,7 +424,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Vehículo *</label>
+              <label className={labelClass}>
+                Vehículo <span className="text-red-500">*</span>
+              </label>
               <SearchableSelect
                 name="vehiculoId"
                 options={vehiculosOptions}
@@ -409,7 +448,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Litros *</label>
+              <label className={labelClass}>
+                Litros <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -424,22 +465,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Precio por Litro *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="precioPorLitro"
-                required
-                value={formData.precioPorLitro}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Monto Total *</label>
+              <label className={labelClass}>
+                Monto Total <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -459,7 +487,43 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Kilómetros *</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-vialto-steel">
+                  Precio por Litro <span className="text-red-500">*</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-normal normal-case tracking-normal text-vialto-steel cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={precioManual}
+                    onChange={(e) => handlePrecioManualToggle(e.target.checked)}
+                    className="accent-vialto-charcoal"
+                  />
+                  Editar manualmente
+                </label>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="precioPorLitro"
+                required
+                disabled={!precioManual}
+                value={precioMostrado}
+                onChange={handleChange}
+                className={`${inputClass} disabled:cursor-not-allowed disabled:bg-black/5 disabled:text-vialto-steel`}
+                placeholder="0.00"
+              />
+              {!precioManual && (
+                <p className="mt-1 text-xs italic text-vialto-steel">
+                  Se calcula automáticamente
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Kilómetros <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -478,7 +542,9 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div className="sm:col-span-2">
-              <label className={labelClass}>Forma de pago *</label>
+              <label className={labelClass}>
+                Forma de pago <span className="text-red-500">*</span>
+              </label>
               <select
                 name="formaPago"
                 required

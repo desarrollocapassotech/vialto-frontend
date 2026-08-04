@@ -43,15 +43,15 @@ export function VehiculoViewModal({
   patenteTitulo?: string;
   tenantId?: string;
   onClose: () => void;
-  editTo: string;
+  editTo?: string; // <-- 1. Ahora es opcional para poder ocultar el botón en modo lectura
 }) {
   const { getToken } = useAuth();
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ultimoKmCombustible, setUltimoKmCombustible] = useState<
-    number | null
-  >(null);
+  const [ultimoKmCombustible, setUltimoKmCombustible] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -117,7 +117,8 @@ export function VehiculoViewModal({
 
   const titulo = vehiculo?.patente ?? patenteTitulo ?? "Vehículo";
   const anio = vehiculo ? (vehiculo.año ?? vehiculo.anio) : null;
-  const kmActualEsFallback = vehiculo?.kmActual === 0 && ultimoKmCombustible != null;
+  const kmActualEsFallback =
+    vehiculo?.kmActual === 0 && ultimoKmCombustible != null;
   const kmActualMostrado = kmActualEsFallback
     ? ultimoKmCombustible
     : vehiculo?.kmActual;
@@ -131,9 +132,12 @@ export function VehiculoViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
-          <Link to={editTo} className={viewModalBtnPrimary}>
-            Editar
-          </Link>
+          {/* 2. Solo mostramos el botón Editar si nos pasaron editTo */}
+          {editTo && (
+            <Link to={editTo} className={viewModalBtnPrimary}>
+              Editar
+            </Link>
+          )}
         </>
       }
     >

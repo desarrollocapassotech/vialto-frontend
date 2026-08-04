@@ -1,17 +1,25 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { RotateCw } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
-import { LiquidacionMontosBreakdown } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
+import {
+  fmtLiquidacionMoney,
+  LiquidacionMontosBreakdown,
+} from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { Spinner } from "@/components/ui/Spinner";
+import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { apiJson } from "@/lib/api";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
   LiquidacionEstado,
+  LiquidacionViajeItem,
 } from "@/types/api";
 
 export type LiquidacionConTransportista = Liquidacion & {
@@ -51,6 +59,19 @@ function fmtDate(iso: string | null | undefined) {
   return `${d}/${m}/${y}`;
 }
 
+function fmtDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fmtDate(iso);
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function Campo({
   label,
   value,
@@ -73,17 +94,17 @@ function normalizeConceptosLineas(
   raw: LiquidacionConceptoLinea[] | null | undefined,
 ): LiquidacionConceptoLinea[] {
   if (!raw?.length) return [];
-  return raw.map((l, i) => {
+  return raw.map((l, i): LiquidacionConceptoLinea => {
     const row = l as LiquidacionConceptoLinea & { nombre?: string };
-    const signo =
+    const signo: LiquidacionConceptoLinea["signo"] =
       String(row.signo ?? "").toLowerCase() === "contra" ? "contra" : "favor";
     return {
-      ...row,
       id: row.id || `linea-${i}`,
       nombreSnapshot: row.nombreSnapshot || row.nombre || "Concepto",
       signo,
       monto: Number(row.monto) || 0,
-      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : 0,
+      // null = usar el IVA de la liquidación; 0 = exento (no confundir).
+      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : null,
       orden: row.orden ?? i,
       conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
     };
@@ -94,20 +115,26 @@ export function LiquidacionViewModal({
   liq,
   ivaPct,
   canEdit = true,
+  hasArca = false,
   getToken,
   detalleUrl,
   onClose,
   onEditar,
+  onEmitir,
   onVerComprobante,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
   canEdit?: boolean;
+  /** Tenant con integración ARCA: habilita el botón de emitir/reintentar. */
+  hasArca?: boolean;
   /** Si se pasa, el modal refetch el detalle (incluye conceptosLineas). */
   getToken?: () => Promise<string | null>;
   detalleUrl?: string;
   onClose: () => void;
   onEditar: () => void;
+  /** Si se pasa, muestra "Emitir"/"Reintentar emisión" cuando el estado es borrador o error. */
+  onEmitir?: () => void;
   onVerComprobante?: () => void;
 }) {
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
@@ -171,8 +198,14 @@ export function LiquidacionViewModal({
   const source = detail;
   const transportistaNombre =
     source.transportista?.nombre ?? source.transportistaId;
-  const ivaPctEfectivo = ivaPct ?? source.ivaPct ?? null;
+  const ivaPctEfectivo = (() => {
+    const raw = ivaPct ?? source.ivaPct ?? null;
+    if (raw == null) return null;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) ? n : null;
+  })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
+  const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
 
   return (
     <ViewModalShell
@@ -187,6 +220,7 @@ export function LiquidacionViewModal({
           >
             {ESTADO_LABEL[source.estado]}
           </span>
+          <AmbienteTestBadge ambiente={source.ambiente} />
         </span>
       }
       onClose={onClose}
@@ -197,6 +231,24 @@ export function LiquidacionViewModal({
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
           </button>
+          {hasArca &&
+            onEmitir &&
+            (source.estado === "borrador" || source.estado === "error") && (
+              <button
+                type="button"
+                onClick={onEmitir}
+                className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+              >
+                {source.estado === "error" && (
+                  <RotateCw
+                    className="h-3.5 w-3.5 shrink-0"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                )}
+                {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
+              </button>
+            )}
           {canEdit && (
             <button
               type="button"
@@ -250,12 +302,61 @@ export function LiquidacionViewModal({
           </div>
         </div>
 
+        <div>
+          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+            Viajes ({viajesIncluidos.length || source.cantViajes})
+          </p>
+          {loadingDetail ? (
+            <div className="flex justify-center rounded border border-black/10 py-6">
+              <Spinner className="h-5 w-5" />
+            </div>
+          ) : viajesIncluidos.length === 0 ? (
+            <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
+              {source.cantViajes > 0
+                ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
+                : "Sin viajes asociados."}
+            </p>
+          ) : (
+            <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
+              {viajesIncluidos.map((row) => {
+                const v = row.viaje;
+                const viajeId = v?.id ?? row.viajeId;
+                const numero = v?.numero ?? "—";
+                return (
+                  <Link
+                    key={row.viajeId}
+                    to={`/viajes?viaje=${encodeURIComponent(viajeId)}`}
+                    onClick={onClose}
+                    className="block px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist"
+                  >
+                    <p className="text-xs font-medium text-vialto-charcoal">
+                      Viaje #{numero}
+                      {v?.fechaCarga && (
+                        <span className="ml-1.5 font-normal text-vialto-steel">
+                          {fmtDate(v.fechaCarga)}
+                        </span>
+                      )}
+                    </p>
+                    {(v?.origen || v?.destino) && (
+                      <p className="text-[11px] text-vialto-steel truncate">
+                        {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                      {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className={viewModalGridClass}>
           <Campo
             label="Período"
             value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
           />
-          <Campo label="Viajes" value={source.cantViajes} />
           <Campo
             label="Tipo de comprobante"
             value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
@@ -270,12 +371,43 @@ export function LiquidacionViewModal({
           {source.caeFechaVto && (
             <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
           )}
+          {source.ambiente && (
+            <Campo
+              label="Ambiente"
+              value={
+                source.ambiente === "homologacion"
+                  ? "Homologación (prueba)"
+                  : "Producción"
+              }
+            />
+          )}
           <Campo label="Creada" value={fmtDate(source.createdAt)} />
         </div>
 
+        {source.estado === "anulado" && (
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Anulación
+            </p>
+            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
+              <Campo label="Motivo" value={source.motivoAnulacion} />
+              <div className={viewModalGridClass}>
+                <Campo label="Anulada el" value={fmtDateTime(source.anuladoAt)} />
+                <Campo
+                  label="Anulada por"
+                  value={source.anuladoPorNombre ?? source.anuladoPor}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {source.arcaError && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {source.arcaError}
+          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">
+            <ArcaErrorMessage
+              message={source.arcaError}
+              detalle={source.arcaErrorDetalle ?? undefined}
+            />
           </div>
         )}
 

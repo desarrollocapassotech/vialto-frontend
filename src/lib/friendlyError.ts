@@ -1,5 +1,6 @@
 import { ApiError } from "./api";
 import { sanitizeArcaApiError } from "./arcaFriendlyError";
+import { fmtMensajeErrorSincronizacion } from "./combustibleLabels";
 
 export type FriendlyErrorContext =
   | "tablero"
@@ -96,7 +97,16 @@ export function friendlyError(
       return "No se puede completar la acción porque el registro está siendo utilizado por otros elementos.";
     }
     if (err.status === 400) {
-      if (err.message && err.message !== "Bad Request") return err.message;
+      if (err.message && err.message !== "Bad Request") {
+        if (context === "arca") {
+          return sanitizeArcaApiError(err.message) ?? err.message;
+        }
+        // ValidationPipe de Nest devuelve mensajes técnicos en inglés (class-validator).
+        if (context === "combustible") {
+          return fmtMensajeErrorSincronizacion(err.message);
+        }
+        return err.message;
+      }
       return "Algunos datos no son válidos. Revisá la información e intentá de nuevo.";
     }
     if (err.status === 422) {
@@ -106,7 +116,7 @@ export function friendlyError(
         !err.message.match(/^HTTP \d+$/i)
       ) {
         if (context === "arca") {
-          return sanitizeArcaApiError(err.message) ?? fallback.arca;
+          return sanitizeArcaApiError(err.message) ?? err.message;
         }
         return err.message;
       }

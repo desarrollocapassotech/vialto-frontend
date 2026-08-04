@@ -495,11 +495,13 @@ export interface ArcaConfig {
   ptoVentaFactura: number;
   ambiente: "homologacion" | "produccion";
   comisionPctDefault: number;
-  comisionPctAlt: number;
   ivaGastosAdmin: number;
+  /** Comprobante con que se anula un CVLP: 'nota_credito' (tipo 3/8) | 'nota_debito' (tipo 2/7). */
+  anulacionTipoComprobante?: "nota_credito" | "nota_debito";
   updatedAt: string;
-  certConfigurado: boolean;
-  keyConfigurado: boolean;
+  /** En homologación se usa el CUIT de prueba de AFIP sin certificado propio; solo hace falta para producción. */
+  certConfiguradoProduccion: boolean;
+  keyConfiguradoProduccion: boolean;
 }
 
 export type LiquidacionEstado =
@@ -527,9 +529,23 @@ export interface LiquidacionConceptoLinea {
   conceptoLiquidacionId: string | null;
   nombreSnapshot: string;
   signo: ConceptoLiquidacionSigno;
-  ivaPct: number;
+  /** null = heredar el IVA de la liquidación; 0 = exento. */
+  ivaPct: number | null;
   monto: number;
   orden: number;
+}
+
+/** Viaje incluido en una liquidación (join liquidacion_viajes + viaje). */
+export interface LiquidacionViajeItem {
+  viajeId: string;
+  subtotal: number;
+  viaje?: {
+    id: string;
+    numero: string | number | null;
+    fechaCarga: string | null;
+    origen: string | null;
+    destino: string | null;
+  } | null;
 }
 
 export interface Liquidacion {
@@ -552,13 +568,31 @@ export interface Liquidacion {
   ptoVenta: number | null;
   cae: string | null;
   caeFechaVto: string | null;
+  /** Ambiente ARCA en el que se emitió el comprobante (homologacion | produccion). */
+  ambiente?: string | null;
+  /** Datos del comprobante de anulación (Nota de Crédito o Débito); el CVLP original se conserva arriba. */
+  anulacionCbteTipo?: number | null;
+  anulacionCbteNro?: number | null;
+  anulacionPtoVenta?: number | null;
+  anulacionCae?: string | null;
+  anulacionCaeFechaVto?: string | null;
+  anulacionFecha?: string | null;
   estado: LiquidacionEstado;
   arcaError: string | null;
+  /** Detalle técnico crudo de AFIP SDK del último error (para "ver error completo"). */
+  arcaErrorDetalle?: string | null;
   reintentos: number;
   comprobanteUrl: string | null;
+  motivoAnulacion?: string | null;
+  anuladoPor?: string | null;
+  /** Nombre legible resuelto desde Clerk (virtual; no se persiste). */
+  anuladoPorNombre?: string | null;
+  anuladoAt?: string | null;
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
+  /** Presente en GET detalle; no siempre en el listado. */
+  viajes?: LiquidacionViajeItem[];
 }
 
 export interface ArcaLog {

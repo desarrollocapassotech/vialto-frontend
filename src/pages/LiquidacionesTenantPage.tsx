@@ -1,10 +1,11 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { Landmark, Receipt } from "lucide-react";
+import { Ban, Download, Eye, FileText, Landmark, Receipt, Trash2 } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import {
   LiquidacionViewModal,
@@ -12,20 +13,32 @@ import {
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
+import { AccionesMenuTrigger } from "@/components/ui/AccionesMenuTrigger";
+import {
+  AccionesOpcionesSheet,
+  type AccionOpcion,
+} from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
+import { Spinner } from "@/components/ui/Spinner";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
+import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
-import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
+import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
+import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import {
-  listadoTablaAccionClass,
+  listadoTablaHeadRowClass,
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
@@ -60,42 +73,17 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
 
-// a
-
-function caeCell(liq: LiquidacionConTransportista) {
-  if (liq.cae) {
-    return (
-      <div>
-        <p className="font-mono">{liq.cae}</p>
-        {liq.caeFechaVto && (
-          <p className="text-[11px]">Vto: {fmtDate(liq.caeFechaVto)}</p>
-        )}
-      </div>
-    );
-  }
-  if (liq.arcaError) {
-    const msg = formatStoredArcaError(liq.arcaError) ?? liq.arcaError;
-    return (
-      <p
-        className="text-red-600 text-[11px] max-w-[180px] truncate"
-        title={msg}
-      >
-        {msg}
-      </p>
-    );
-  }
-  return "—";
-}
-
-function LiquidacionAcciones({
+function LiquidacionAccionesMenu({
   liq,
   hasArca,
   isBusy,
   isDownloading,
   actionErrorMsg,
+  actionErrorDetalle,
   onVer,
   onEmitir,
   onPdf,
+  onPdfNc,
   onAnular,
   onEliminar,
   onVerComprobante,
@@ -105,13 +93,17 @@ function LiquidacionAcciones({
   isBusy: boolean;
   isDownloading: boolean;
   actionErrorMsg?: string;
+  actionErrorDetalle?: string;
   onVer: () => void;
   onEmitir: () => void;
   onPdf: () => void;
+  onPdfNc: () => void;
   onAnular: () => void;
   onEliminar: () => void;
   onVerComprobante: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+
   const puedeEmitir =
     hasArca && (liq.estado === "borrador" || liq.estado === "error");
   const puedeEliminar =
@@ -121,76 +113,88 @@ function LiquidacionAcciones({
   const puedeAnular = hasArca && liq.estado === "autorizado";
   const tienePdf =
     hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
+  const tienePdfNc =
+    hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
   const tieneComprobanteAdjunto =
     !hasArca && Boolean(liq.comprobanteUrl?.trim());
 
+  const options: AccionOpcion[] = [
+    { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
+  ];
+  if (puedeEmitir) {
+    options.push({
+      id: "emitir",
+      label: isBusy ? "Emitiendo…" : "Emitir",
+      icon: Receipt,
+      onClick: onEmitir,
+      disabled: isBusy,
+    });
+  }
+  if (tienePdf) {
+    options.push({
+      id: "pdf",
+      label: isDownloading ? "Descargando…" : "PDF",
+      icon: Download,
+      onClick: onPdf,
+      disabled: isDownloading,
+    });
+  }
+  if (tienePdfNc) {
+    const comprobanteLabel = anulacionComprobanteLabel(liq.anulacionCbteTipo);
+    options.push({
+      id: "pdf-nc",
+      label: isDownloading ? "Descargando…" : "PDF anulación",
+      description: comprobanteLabel,
+      icon: Download,
+      onClick: onPdfNc,
+      disabled: isDownloading,
+    });
+  }
+  if (tieneComprobanteAdjunto) {
+    options.push({
+      id: "comprobante",
+      label: "Ver comprobante",
+      icon: FileText,
+      onClick: onVerComprobante,
+    });
+  }
+  if (puedeAnular) {
+    options.push({
+      id: "anular",
+      label: isBusy ? "Anulando…" : "Anular",
+      icon: Ban,
+      onClick: onAnular,
+      danger: true,
+      disabled: isBusy,
+    });
+  }
+  if (puedeEliminar) {
+    options.push({
+      id: "eliminar",
+      label: isBusy ? "Eliminando…" : "Eliminar",
+      icon: Trash2,
+      onClick: onEliminar,
+      danger: true,
+      disabled: isBusy,
+    });
+  }
+
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onVer}
-          className={`${listadoTablaAccionClass} h-7 px-3`}
-        >
-          Ver
-        </button>
-        {puedeEmitir && (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onEmitir}
-            className={`${listadoTablaAccionClass} inline-flex items-center gap-1.5 h-7 px-3`}
-          >
-            <Receipt
-              className="h-3.5 w-3.5 shrink-0"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            {isBusy ? "…" : "Emitir"}
-          </button>
-        )}
-        {tienePdf && (
-          <button
-            type="button"
-            disabled={isDownloading}
-            onClick={onPdf}
-            className={`${listadoTablaAccionClass} h-7 px-3`}
-          >
-            {isDownloading ? "…" : "PDF"}
-          </button>
-        )}
-        {tieneComprobanteAdjunto && (
-          <button
-            type="button"
-            onClick={onVerComprobante}
-            className={`${listadoTablaAccionClass} h-7 px-3`}
-          >
-            Ver comprobante
-          </button>
-        )}
-        {puedeAnular && (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onAnular}
-            className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
-          >
-            {isBusy ? "…" : "Anular"}
-          </button>
-        )}
-        {puedeEliminar && (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onEliminar}
-            className={`${listadoTablaAccionClass} h-7 px-3 text-red-700 hover:bg-red-50`}
-          >
-            {isBusy ? "…" : "Eliminar"}
-          </button>
-        )}
-      </div>
+    <div className="flex flex-col items-end gap-1">
+      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
+      <AccionesOpcionesSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        subtitle={transportistaNombre(liq)}
+        options={options}
+      />
       {actionErrorMsg && (
-        <p className="mt-1 text-right text-xs text-red-700">{actionErrorMsg}</p>
+        <ArcaErrorMessage
+          message={actionErrorMsg}
+          detalle={actionErrorDetalle}
+          align="right"
+          className="text-xs"
+        />
       )}
     </div>
   );
@@ -199,10 +203,10 @@ function LiquidacionAcciones({
 export function LiquidacionesTenantPage() {
   const { getToken, isLoaded, isSignedIn, sessionClaims, orgId } = useAuth();
   const { user } = useUser();
+  const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
-  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
 
   // ─── VALIDACIÓN DE ROL E INYECCIÓN DE TENANT ──────────────────────────────
   const isSuperAdmin = Boolean(
@@ -214,6 +218,10 @@ export function LiquidacionesTenantPage() {
   );
 
   const activeTenantId = isSuperAdmin ? filtroEmpresa : (orgId ?? "");
+  const empresaModules = isSuperAdmin
+    ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
+    : (tenant?.modules ?? []);
+  const hasArca = canAccessIntegracionArca(empresaModules);
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -221,6 +229,38 @@ export function LiquidacionesTenantPage() {
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
     "todos",
   );
+  const [transportistaFilter, setTransportistaFilter] = useState("");
+  const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
+  const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
+
+  function aplicarFiltroEstado(val: LiquidacionEstado | "todos") {
+    setEstadoFilter(val);
+    setPage(1);
+  }
+  function aplicarFiltroTransportista(val: string) {
+    setTransportistaFilter(val);
+    setPage(1);
+  }
+  function aplicarPeriodoDesdeFilter(val: string) {
+    setPeriodoDesdeFilter(val);
+    setPage(1);
+  }
+  function aplicarPeriodoHastaFilter(val: string) {
+    setPeriodoHastaFilter(val);
+    setPage(1);
+  }
+  function limpiarFiltros() {
+    setEstadoFilter("todos");
+    setTransportistaFilter("");
+    setPeriodoDesdeFilter("");
+    setPeriodoHastaFilter("");
+    setPage(1);
+  }
+  const anyFiltroActivo =
+    estadoFilter !== "todos" ||
+    !!transportistaFilter ||
+    !!periodoDesdeFilter ||
+    !!periodoHastaFilter;
 
   const [config, setConfig] = useState<ArcaConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -228,8 +268,10 @@ export function LiquidacionesTenantPage() {
   const [actionError, setActionError] = useState<{
     id: string;
     msg: string;
+    detalle?: string;
   } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [verLoadingId, setVerLoadingId] = useState<string | null>(null);
   const [pendingEmitir, setPendingEmitir] =
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
@@ -237,6 +279,9 @@ export function LiquidacionesTenantPage() {
     useState<LiquidacionConTransportista | null>(null);
   const [eliminarConfirm, setEliminarConfirm] =
     useState<LiquidacionConTransportista | null>(null);
+  const [anularTipo, setAnularTipo] = useState<
+    "nota_credito" | "nota_debito"
+  >("nota_credito");
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
@@ -269,18 +314,16 @@ export function LiquidacionesTenantPage() {
 
     void (async () => {
       try {
-        const [data, cfg] = await Promise.all([
-          apiJson<LiquidacionConTransportista[]>(
-            `/api/integracion-arca/liquidaciones${qsTenant}`, // <-- Ruta corregida
-            () => getToken(),
-          ),
-          apiJson<ArcaConfig | null>(
-            `/api/integracion-arca/config${qsTenant}`,
-            () =>
-              // <-- Ruta corregida
-              getToken(),
-          ).catch(() => null),
-        ]);
+        const data = await apiJson<LiquidacionConTransportista[]>(
+          `/api/integracion-arca/liquidaciones${qsTenant}`,
+          () => getToken(),
+        );
+        const cfg = hasArca
+          ? await apiJson<ArcaConfig | null>(
+              `/api/integracion-arca/config${qsTenant}`,
+              () => getToken(),
+            ).catch(() => null)
+          : null;
         if (!cancelled) {
           setRows(data);
           setConfig(cfg);
@@ -293,13 +336,18 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, activeTenantId]);
+  }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
       (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
     );
     setPendingEmitir(null);
+    showToast(
+      updated.cae
+        ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
+        : "Comprobante emitido correctamente.",
+    );
   }
 
   async function confirmEliminar() {
@@ -317,13 +365,17 @@ export function LiquidacionesTenantPage() {
       setRows((prev) => prev?.filter((r) => r.id !== liq.id) ?? prev);
       setEliminarConfirm(null);
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
     } finally {
       setBusyId(null);
     }
   }
 
-  async function confirmAnular() {
+  async function confirmAnular(motivo: string) {
     const liq = anularConfirm;
     if (!liq || busyId) return;
     setActionError(null);
@@ -331,16 +383,23 @@ export function LiquidacionesTenantPage() {
     try {
       const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const updated = await apiJson<LiquidacionConTransportista>(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`, // <-- Ruta corregida
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/anular${qsTenant}`,
         () => getToken(),
-        { method: "POST" },
+        {
+          method: "POST",
+          body: JSON.stringify({ motivo, tipoAnulacion: anularTipo }),
+        },
       );
       setRows(
         (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
       );
       setAnularConfirm(null);
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
     } finally {
       setBusyId(null);
     }
@@ -351,7 +410,7 @@ export function LiquidacionesTenantPage() {
     try {
       const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       const res = await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`, // <-- Ruta corregida
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`,
         () => getToken(),
       );
       if (!res.ok) throw new Error("Error al generar el PDF");
@@ -367,7 +426,41 @@ export function LiquidacionesTenantPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setActionError({ id: liq.id, msg: friendlyError(err, "arca") });
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  async function descargarPdfNc(liq: LiquidacionConTransportista) {
+    setDownloading(liq.id);
+    try {
+      const res = await apiFetch(
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf-anulacion`,
+        () => getToken(),
+      );
+      if (!res.ok) throw new Error("Error al generar el PDF de la anulación");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `anulacion-${liq.id}.pdf`,
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
     } finally {
       setDownloading(null);
     }
@@ -380,7 +473,10 @@ export function LiquidacionesTenantPage() {
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
+      actionErrorDetalle:
+        actionError?.id === liq.id ? actionError.detalle : undefined,
       onVer: () => {
+        setVerLoadingId(liq.id);
         void (async () => {
           try {
             const full = await apiJson<LiquidacionConTransportista>(
@@ -408,11 +504,14 @@ export function LiquidacionesTenantPage() {
                 conceptosLineas: liq.conceptosLineas ?? [],
               },
             });
+          } finally {
+            setVerLoadingId(null);
           }
         })();
       },
       onEmitir: () => setPendingEmitir(liq),
       onPdf: () => void descargarPdf(liq),
+      onPdfNc: () => void descargarPdfNc(liq),
       onAnular: () => setAnularConfirm(liq),
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
@@ -422,9 +521,16 @@ export function LiquidacionesTenantPage() {
   }
 
   const filteredRows = rows
-    ? estadoFilter === "todos"
-      ? rows
-      : rows.filter((r) => r.estado === estadoFilter)
+    ? rows.filter((r) => {
+        if (estadoFilter !== "todos" && r.estado !== estadoFilter) return false;
+        if (transportistaFilter && r.transportistaId !== transportistaFilter)
+          return false;
+        if (periodoDesdeFilter && r.periodoHasta.slice(0, 10) < periodoDesdeFilter)
+          return false;
+        if (periodoHastaFilter && r.periodoDesde.slice(0, 10) > periodoHastaFilter)
+          return false;
+        return true;
+      })
     : null;
 
   const totalItems = filteredRows ? filteredRows.length : 0;
@@ -451,9 +557,7 @@ export function LiquidacionesTenantPage() {
       <p className="mt-1 text-sm text-vialto-steel">
         {isSuperAdmin
           ? "Elegí una empresa para ver y gestionar sus liquidaciones."
-          : hasArca
-            ? "Comprobantes CVLP tipo 60 emitidos a transportistas."
-            : "Liquidaciones emitidas a transportistas."}
+          : "Liquidaciones emitidas a transportistas."}
       </p>
 
       {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
@@ -487,51 +591,127 @@ export function LiquidacionesTenantPage() {
         )}
 
         {activeTenantId && (!error || !isSuperAdmin) && (
-          <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="estadoFilter"
-                className="text-sm font-medium text-vialto-charcoal"
+          <div className="flex justify-end gap-2 mt-2">
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
               >
-                Estado:
-              </label>
-              <select
-                id="estadoFilter"
-                value={estadoFilter}
-                onChange={(e) => {
-                  setEstadoFilter(
-                    e.target.value as LiquidacionEstado | "todos",
-                  );
-                  setPage(1);
-                }}
-                className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-vialto-charcoal shadow-sm focus:border-vialto-charcoal focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-              >
-                <option value="todos">Todos los estados</option>
-                {Object.entries(ESTADO_LABEL).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              {!hasArca && (
-                <button
-                  type="button"
-                  onClick={() => setShowCrear(true)}
-                  className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-                >
-                  Nueva liquidación
-                </button>
-              )}
-            </div>
+                Limpiar filtros
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowCrear(true)}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva liquidación
+            </button>
           </div>
         )}
       </div>
 
       <ListadoDatos
         className="mt-6"
+        tableColSpan={7}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Transportista"
+                filterActive={!!transportistaFilter}
+                filterSignature={transportistaFilter}
+              >
+                <TransportistaSearchSelect
+                  id="liquidaciones-col-filtro-transportista"
+                  transportistas={transportistas}
+                  value={transportistaFilter}
+                  onChange={(id) => aplicarFiltroTransportista(id)}
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  aria-label="Filtrar listado por transportista"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    transportistaFilter
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Período"
+                filterActive={
+                  !!periodoDesdeFilter.trim() || !!periodoHastaFilter.trim()
+                }
+                filterSignature={`${periodoDesdeFilter}|${periodoHastaFilter}`}
+              >
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={periodoDesdeFilter}
+                      onChange={(e) => aplicarPeriodoDesdeFilter(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={periodoHastaFilter}
+                      onChange={(e) => aplicarPeriodoHastaFilter(e.target.value)}
+                      className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Bruto
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Comisión
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              A liquidar
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={estadoFilter !== "todos"}
+                filterSignature={estadoFilter}
+              >
+                <select
+                  value={estadoFilter}
+                  onChange={(e) =>
+                    aplicarFiltroEstado(
+                      e.target.value as LiquidacionEstado | "todos",
+                    )
+                  }
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    estadoFilter !== "todos"
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar listado por estado"
+                >
+                  <option value="todos">Todos</option>
+                  {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                    <option key={val} value={val}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "transportista",
@@ -552,16 +732,13 @@ export function LiquidacionesTenantPage() {
           {
             id: "periodo",
             header: "Período",
-            cell: (liq) =>
-              `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+            cell: (liq) => (
+              <div className="flex flex-col leading-tight">
+                <span>{fmtDate(liq.periodoDesde)}</span>
+                <span>{fmtDate(liq.periodoHasta)}</span>
+              </div>
+            ),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-          },
-          {
-            id: "viajes",
-            header: "Viajes",
-            cell: (liq) => liq.cantViajes,
-            thClassName: `${listadoTablaThClass} text-right`,
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "bruto",
@@ -584,7 +761,7 @@ export function LiquidacionesTenantPage() {
           },
           {
             id: "liquido",
-            header: "Líquido",
+            header: "A liquidar",
             cell: (liq) => fmtMoney(liq.liquido),
             thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
@@ -593,19 +770,16 @@ export function LiquidacionesTenantPage() {
             id: "estado",
             header: "Estado",
             cell: (liq) => (
-              <span
-                className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-              >
-                {ESTADO_LABEL[liq.estado]}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                >
+                  {ESTADO_LABEL[liq.estado]}
+                </span>
+                <AmbienteTestBadge ambiente={liq.ambiente} />
+              </div>
             ),
             tdClassName: listadoTablaTdClass,
-          },
-          {
-            id: "cae",
-            header: "CAE",
-            cell: (liq) => caeCell(liq),
-            tdClassName: `${listadoTablaTdClass} text-xs text-vialto-steel`,
           },
         ]}
         rows={!activeTenantId || error ? [] : paginatedRows}
@@ -620,7 +794,7 @@ export function LiquidacionesTenantPage() {
               : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
-        renderActions={(liq) => <LiquidacionAcciones {...accionesProps(liq)} />}
+        renderActions={(liq) => <LiquidacionAccionesMenu {...accionesProps(liq)} />}
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
@@ -630,7 +804,6 @@ export function LiquidacionesTenantPage() {
                 label: "Período",
                 value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
               },
-              { label: "Viajes", value: liq.cantViajes },
               { label: "Bruto", value: fmtMoney(liq.bruto) },
               {
                 label: "Comisión",
@@ -641,20 +814,22 @@ export function LiquidacionesTenantPage() {
                   </>
                 ),
               },
-              { label: "Líquido", value: fmtMoney(liq.liquido) },
+              { label: "A liquidar", value: fmtMoney(liq.liquido) },
               {
                 label: "Estado",
                 value: (
-                  <span
-                    className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-                  >
-                    {ESTADO_LABEL[liq.estado]}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                    >
+                      {ESTADO_LABEL[liq.estado]}
+                    </span>
+                    <AmbienteTestBadge ambiente={liq.ambiente} />
+                  </div>
                 ),
               },
-              { label: "CAE", value: caeCell(liq) },
             ]}
-            actions={<LiquidacionAcciones {...accionesProps(liq)} />}
+            actions={<LiquidacionAccionesMenu {...accionesProps(liq)} />}
           />
         )}
       />
@@ -689,6 +864,7 @@ export function LiquidacionesTenantPage() {
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           config={config}
+          hasArca={hasArca}
           getToken={getToken}
           tenantId={activeTenantId}
           onSuccess={(liq) => {
@@ -712,22 +888,39 @@ export function LiquidacionesTenantPage() {
         />
       )}
 
-      <ConfirmDialog
+      <AnularLiquidacionModal
         open={anularConfirm != null}
-        title="Anular liquidación"
         message={
           anularConfirm
-            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Esta acción emite un comprobante negativo en ARCA.`
+            ? `¿Anulás la liquidación de ${transportistaNombre(anularConfirm)}? Se emite el comprobante de anulación en ARCA asociado al original y los viajes quedan disponibles para una nueva liquidación.`
             : ""
         }
-        confirmLabel="Anular"
-        tone="danger"
         busy={busyId === anularConfirm?.id}
+        error={
+          anularConfirm && actionError?.id === anularConfirm.id
+            ? actionError.msg
+            : null
+        }
         onCancel={() => {
           if (!busyId) setAnularConfirm(null);
         }}
-        onConfirm={() => void confirmAnular()}
-      />
+        onConfirm={(motivo) => void confirmAnular(motivo)}
+      >
+        <label className="flex flex-col gap-1 text-xs uppercase tracking-wider text-vialto-steel">
+          Comprobante de anulación
+          <select
+            value={anularTipo}
+            onChange={(e) =>
+              setAnularTipo(e.target.value as "nota_credito" | "nota_debito")
+            }
+            disabled={busyId === anularConfirm?.id}
+            className="mt-0.5 border border-black/20 px-2 py-1.5 text-sm normal-case tracking-normal text-vialto-charcoal disabled:opacity-50"
+          >
+            <option value="nota_credito">Nota de Crédito (cód. 3/8)</option>
+            <option value="nota_debito">Nota de Débito (cód. 2/7)</option>
+          </select>
+        </label>
+      </AnularLiquidacionModal>
 
       <ConfirmDialog
         open={eliminarConfirm != null}
@@ -746,6 +939,19 @@ export function LiquidacionesTenantPage() {
         onConfirm={() => void confirmEliminar()}
       />
 
+      {verLoadingId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-5 py-4 shadow-lg">
+            <Spinner className="h-5 w-5 text-vialto-fire" />
+            <span className="text-sm text-vialto-charcoal">Abriendo…</span>
+          </div>
+        </div>
+      )}
+
       {previewComprobanteUrl && (
         <AdjuntoPreviewModal
           url={previewComprobanteUrl}
@@ -759,9 +965,14 @@ export function LiquidacionesTenantPage() {
           liq={detail.liq}
           ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
+          hasArca={hasArca}
           getToken={getToken}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
+          onEmitir={() => {
+            setPendingEmitir(detail.liq);
+            setDetail(null);
+          }}
           onVerComprobante={
             !hasArca && detail.liq.comprobanteUrl?.trim()
               ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)

@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiJson } from "@/lib/api";
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
@@ -91,32 +91,46 @@ export function CombustibleDashboardSection({
     );
   }, [searchParams, setSearchParams]);
 
-  useEffect(() => {
+  // Evita que el polling dispare una fetch nueva mientras la anterior sigue en vuelo
+  // (red lenta, pestaña en segundo plano) — sin esto, dos respuestas fuera de orden
+  // podrían pisarse entre sí en setData.
+  const isFetchingRef = useRef(false);
+
+  const fetchDashboard = useCallback(async () => {
     const dates = periodToDates(dash.period, dash.customFrom, dash.customTo);
-    if (!dates) return;
-    let cancelled = false;
+    if (!dates || isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setLoading(true);
-    void (async () => {
-      try {
-        const qs = new URLSearchParams({ from: dates.from, to: dates.to });
-        const res = await apiJson<CombustibleDashboardResponse>(
-          `/api/combustible/dashboard?${qs.toString()}`,
-          () => getTokenRef.current(),
-        );
-        if (!cancelled) {
-          setData(res);
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const qs = new URLSearchParams({ from: dates.from, to: dates.to });
+      const res = await apiJson<CombustibleDashboardResponse>(
+        `/api/combustible/dashboard?${qs.toString()}`,
+        () => getTokenRef.current(),
+      );
+      setData(res);
+    } catch {
+      // silencioso: se reintenta solo en el próximo fetch (cambio de período o polling)
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
   }, [dash.period, dash.customFrom, dash.customTo]);
 
-  const cantAlertas = data?.alertas.length ?? 0;
+  useEffect(() => {
+    void fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Refresco automático de la pestaña Alertas: un error de sincronización
+  // puede resolverse (o aparecer uno nuevo) sin que el admin cambie de
+  // período, así que se refresca sola mientras la está mirando.
+  useEffect(() => {
+    if (tab !== "alertas") return;
+    const interval = setInterval(() => void fetchDashboard(), 30000);
+    return () => clearInterval(interval);
+  }, [tab, fetchDashboard]);
+
+  const cantAlertas =
+    (data?.alertas.length ?? 0) + (data?.erroresSincronizacion.length ?? 0);
   const periodo = periodToDates(dash.period, dash.customFrom, dash.customTo);
 
   const tabs: { id: CombustibleTab; label: string; badge?: number }[] = [
@@ -198,7 +212,11 @@ export function CombustibleDashboardSection({
           </div>
         )}
         {tab === "alertas" && (
-          <AlertasList alertas={data?.alertas ?? []} tenantId={tenantId} />
+          <AlertasList
+            alertas={data?.alertas ?? []}
+            erroresSincronizacion={data?.erroresSincronizacion ?? []}
+            tenantId={tenantId}
+          />
         )}
         {tab === "viajes" && showViajes && (
           <ViajesCruceTable items={data?.viajesCruce ?? []} />

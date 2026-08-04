@@ -8,10 +8,24 @@ export function viajeRequiereComprobanteDual(
   return Boolean(String(v.transportistaId ?? '').trim());
 }
 
-export function viajeTieneLiquidacionTransportista(v: {
-  liquidacionesViaje?: { liquidacionId: string }[] | null;
+/** Liquidación que sigue ocupando el viaje (anuladas no cuentan). */
+function liquidacionActivaEnViaje(lv: {
+  liquidacionId: string;
+  liquidacion?: { estado?: string } | null;
 }): boolean {
-  return (v.liquidacionesViaje?.length ?? 0) > 0;
+  const estado = String(lv.liquidacion?.estado ?? "").trim().toLowerCase();
+  // Sin include de liquidación, asumimos activa (evita liberar de más).
+  if (!estado) return true;
+  return estado !== "anulado";
+}
+
+export function viajeTieneLiquidacionTransportista(v: {
+  liquidacionesViaje?: {
+    liquidacionId: string;
+    liquidacion?: { estado?: string } | null;
+  }[] | null;
+}): boolean {
+  return (v.liquidacionesViaje ?? []).some(liquidacionActivaEnViaje);
 }
 
 export function viajePendienteComprobanteCliente(v: Viaje): boolean {
@@ -25,11 +39,10 @@ export function viajePendienteComprobanteTransportista(v: Viaje): boolean {
 
 /**
  * Muestra la acción «Facturar» mientras falte algún comprobante del ciclo financiero.
- * En viajes duales, no se oculta al emitir solo la factura al cliente.
+ * En viajes duales (cliente + transportista), el botón sigue visible si falta uno de los
+ * dos — no importa el orden (factura primero o liquidación primero).
  */
 export function viajePermiteBotonFacturar(v: Viaje): boolean {
-  if (viajeTieneFacturaAsignada(v)) return false;
-  
   const e = String(v.estado).trim().toLowerCase();
   if (e === 'cancelado' || e === 'cobrado' || e === 'finalizado_cobrado') return false;
 
@@ -39,6 +52,8 @@ export function viajePermiteBotonFacturar(v: Viaje): boolean {
     );
   }
 
+  // Sin transportista externo: solo factura al cliente.
+  if (viajeTieneFacturaAsignada(v)) return false;
   if (e === 'finalizado_facturado' || e === 'facturado_sin_cobrar') return false;
   return true;
 }
