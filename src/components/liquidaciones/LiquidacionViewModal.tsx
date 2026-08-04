@@ -59,6 +59,19 @@ function fmtDate(iso: string | null | undefined) {
   return `${d}/${m}/${y}`;
 }
 
+function fmtDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fmtDate(iso);
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function Campo({
   label,
   value,
@@ -81,17 +94,17 @@ function normalizeConceptosLineas(
   raw: LiquidacionConceptoLinea[] | null | undefined,
 ): LiquidacionConceptoLinea[] {
   if (!raw?.length) return [];
-  return raw.map((l, i) => {
+  return raw.map((l, i): LiquidacionConceptoLinea => {
     const row = l as LiquidacionConceptoLinea & { nombre?: string };
-    const signo =
+    const signo: LiquidacionConceptoLinea["signo"] =
       String(row.signo ?? "").toLowerCase() === "contra" ? "contra" : "favor";
     return {
-      ...row,
       id: row.id || `linea-${i}`,
       nombreSnapshot: row.nombreSnapshot || row.nombre || "Concepto",
       signo,
       monto: Number(row.monto) || 0,
-      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : 0,
+      // null = usar el IVA de la liquidación; 0 = exento (no confundir).
+      ivaPct: row.ivaPct != null ? Number(row.ivaPct) : null,
       orden: row.orden ?? i,
       conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
     };
@@ -185,7 +198,12 @@ export function LiquidacionViewModal({
   const source = detail;
   const transportistaNombre =
     source.transportista?.nombre ?? source.transportistaId;
-  const ivaPctEfectivo = ivaPct ?? source.ivaPct ?? null;
+  const ivaPctEfectivo = (() => {
+    const raw = ivaPct ?? source.ivaPct ?? null;
+    if (raw == null) return null;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(n) ? n : null;
+  })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
   const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
 
@@ -365,6 +383,24 @@ export function LiquidacionViewModal({
           )}
           <Campo label="Creada" value={fmtDate(source.createdAt)} />
         </div>
+
+        {source.estado === "anulado" && (
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Anulación
+            </p>
+            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
+              <Campo label="Motivo" value={source.motivoAnulacion} />
+              <div className={viewModalGridClass}>
+                <Campo label="Anulada el" value={fmtDateTime(source.anuladoAt)} />
+                <Campo
+                  label="Anulada por"
+                  value={source.anuladoPorNombre ?? source.anuladoPor}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {source.arcaError && (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">

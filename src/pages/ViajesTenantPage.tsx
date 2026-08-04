@@ -112,7 +112,6 @@ import type {
   Viaje,
 } from "@/types/api";
 import {
-  VIAJE_SORT_DEFAULT,
   appendViajeSortQuery,
   sortViajesListado,
   type ViajeSortDir,
@@ -196,17 +195,13 @@ export function ViajesTenantPage({
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<ViajeSortField>(
-    VIAJE_SORT_DEFAULT.sortBy,
-  );
-  const [sortDir, setSortDir] = useState<ViajeSortDir>(
-    VIAJE_SORT_DEFAULT.sortDir,
-  );
+  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_carga");
+  const [sortDir, setSortDir] = useState<ViajeSortDir>("desc");
 
   /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
   const ordenamientoAplicadoRef = useRef({
-    sortBy: VIAJE_SORT_DEFAULT.sortBy,
-    sortDir: VIAJE_SORT_DEFAULT.sortDir,
+    sortBy: "fecha_carga" as ViajeSortField,
+    sortDir: "desc" as ViajeSortDir,
   });
 
   const initialEstadoFromUrl = searchParams.get("estado")?.trim() ?? "";
@@ -683,15 +678,22 @@ export function ViajesTenantPage({
   ) {
     if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
       const sortByFecha = tf === "carga" ? "fecha_carga" : "fecha_descarga";
+
+      const dirActual =
+        ordenamientoAplicadoRef.current.sortBy === sortByFecha
+          ? ordenamientoAplicadoRef.current.sortDir
+          : "desc";
+
       ordenamientoAplicadoRef.current = {
         sortBy: sortByFecha,
-        sortDir: "asc",
+        sortDir: dirActual,
       };
       setSortBy(sortByFecha);
-      setSortDir("asc");
+      setSortDir(dirActual);
     }
   }
 
+  //Comentario para hacer pr desde rama develop
   function aplicarTipoFechaFiltro(val: "" | "carga" | "descarga") {
     if (!val) {
       filtrosAplicadosRef.current = {

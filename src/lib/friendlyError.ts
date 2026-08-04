@@ -1,5 +1,6 @@
 import { ApiError } from "./api";
 import { sanitizeArcaApiError } from "./arcaFriendlyError";
+import { fmtMensajeErrorSincronizacion } from "./combustibleLabels";
 
 export type FriendlyErrorContext =
   | "tablero"
@@ -99,6 +100,10 @@ export function friendlyError(
       if (err.message && err.message !== "Bad Request") {
         if (context === "arca") {
           return sanitizeArcaApiError(err.message) ?? err.message;
+        }
+        // ValidationPipe de Nest devuelve mensajes técnicos en inglés (class-validator).
+        if (context === "combustible") {
+          return fmtMensajeErrorSincronizacion(err.message);
         }
         return err.message;
       }

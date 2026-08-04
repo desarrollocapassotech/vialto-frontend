@@ -516,7 +516,8 @@ export interface LiquidacionConceptoLinea {
   conceptoLiquidacionId: string | null;
   nombreSnapshot: string;
   signo: ConceptoLiquidacionSigno;
-  ivaPct: number;
+  /** null = heredar el IVA de la liquidación; 0 = exento. */
+  ivaPct: number | null;
   monto: number;
   orden: number;
 }
@@ -569,6 +570,11 @@ export interface Liquidacion {
   arcaErrorDetalle?: string | null;
   reintentos: number;
   comprobanteUrl: string | null;
+  motivoAnulacion?: string | null;
+  anuladoPor?: string | null;
+  /** Nombre legible resuelto desde Clerk (virtual; no se persiste). */
+  anuladoPorNombre?: string | null;
+  anuladoAt?: string | null;
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
