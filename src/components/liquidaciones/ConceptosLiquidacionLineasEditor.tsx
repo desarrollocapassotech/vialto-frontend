@@ -4,6 +4,7 @@ import { CrudFieldLabel } from "@/components/crud/CrudFields";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
 import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
@@ -43,14 +44,6 @@ function fmtMoney(n: number) {
 
 function signoLabel(s: ConceptoLiquidacionSigno) {
   return s === "favor" ? "A favor" : "En contra";
-}
-
-function signedMonto(
-  signo: ConceptoLiquidacionSigno | undefined,
-  monto: number,
-) {
-  if (!signo || !Number.isFinite(monto)) return 0;
-  return signo === "favor" ? monto : -monto;
 }
 
 function montoStrFromNumber(monto: number): string {
@@ -273,7 +266,9 @@ export function ConceptosLiquidacionLineasEditor({
   }
 
   const efectoNeto = lineas.reduce(
-    (sum, l) => sum + signedMonto(l.signo, Number(l.monto) || 0),
+    (sum, l) =>
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
     0,
   );
 
@@ -392,7 +387,11 @@ export function ConceptosLiquidacionLineasEditor({
       ) : (
         <div className="space-y-2">
           {lineas.map((linea, index) => {
-            const efecto = signedMonto(linea.signo, Number(linea.monto) || 0);
+            const efecto = signedMontoConIvaConcepto(
+              linea.signo,
+              Number(linea.monto) || 0,
+              linea.ivaPct,
+            );
             const rowIncomplete = incompleteSet.has(index);
             const conceptoMissing =
               rowIncomplete && !linea.conceptoLiquidacionId;
