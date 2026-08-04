@@ -543,7 +543,7 @@ export function CrearLiquidacionManualModal({
                 className={inputClass}
               />
               <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Para liquidar sin IVA ingresá 0.
+                Por defecto se aplica 21%. Para liquidar sin IVA ingresá 0.
               </p>
             </div>
           </div>

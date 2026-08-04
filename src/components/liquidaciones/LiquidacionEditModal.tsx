@@ -400,6 +400,9 @@ export function LiquidacionEditModal({
                   disabled={saving}
                   className={`${INPUT} ${fieldErrors.ivaPct ? "border-red-400" : ""}`}
                 />
+                <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                  Por defecto se aplica 21%. Para liquidar sin IVA ingresá 0.
+                </p>
                 {fieldErrors.ivaPct && (
                   <p className="mt-1 text-xs font-medium text-red-600">
                     {fieldErrors.ivaPct}
