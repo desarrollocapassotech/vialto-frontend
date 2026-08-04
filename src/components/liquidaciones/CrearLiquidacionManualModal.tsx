@@ -22,6 +22,10 @@ import {
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
+import {
+  ivaGeneralSobreBase,
+  signedMontoConIvaConcepto,
+} from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
 import { formatViajeImporteForListado } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
@@ -389,20 +393,25 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
-  const conceptosEfecto = conceptosCompletos.reduce((sum, l) => {
-    const monto = Number(l.monto) || 0;
-    return sum + (l.signo === "favor" ? monto : -monto);
-  }, 0);
-  // Neto = bruto − comisión ± conceptos. Los gastos del viaje van en `otrosGastos`.
-  const netoGravado = anyHasPrice
-    ? bruto - comisionMonto + conceptosEfecto
-    : null;
+  // Cada concepto aporta monto + su IVA propio (no el IVA general del comprobante).
+  const conceptosEfecto = conceptosCompletos.reduce(
+    (sum, l) =>
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+    0,
+  );
+  // Neto gravado del IVA general = solo flete − comisión (sin conceptos).
+  const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum =
     ivaPct.trim() !== "" ? Number(ivaPct) : (config?.ivaGastosAdmin ?? 21);
   const ivaMonto =
-    netoGravado !== null ? (netoGravado * ivaPctNum) / 100 : null;
+    netoGravado !== null
+      ? ivaGeneralSobreBase(bruto, comisionMonto, ivaPctNum)
+      : null;
   const totalALiquidar =
-    netoGravado !== null && ivaMonto !== null ? netoGravado + ivaMonto : null;
+    netoGravado !== null && ivaMonto !== null
+      ? netoGravado + ivaMonto + conceptosEfecto
+      : null;
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
@@ -691,8 +700,11 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
               {conceptosCompletos.map((l, idx) => {
-                const monto = Number(l.monto) || 0;
-                const aFavor = l.signo === "favor";
+                const conIva = signedMontoConIvaConcepto(
+                  l.signo,
+                  Number(l.monto) || 0,
+                  l.ivaPct,
+                );
                 return (
                   <div
                     key={`${l.conceptoLiquidacionId}-${idx}`}
@@ -704,8 +716,8 @@ export function CrearLiquidacionManualModal({
                     </span>
                     <span className="tabular-nums">
                       {fmtSignedLiquidacionMoney(
-                        monto,
-                        aFavor ? "plus" : "minus",
+                        Math.abs(conIva),
+                        conIva >= 0 ? "plus" : "minus",
                       )}
                     </span>
                   </div>
@@ -713,7 +725,7 @@ export function CrearLiquidacionManualModal({
               })}
               {netoGravado !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
-                  <span className={labelClass}>Neto gravado</span>
+                  <span className={labelClass}>Neto gravado (flete/comisión)</span>
                   <span className="tabular-nums text-sm font-medium text-vialto-charcoal">
                     {fmtLiquidacionMoney(netoGravado)}
                   </span>
@@ -721,7 +733,7 @@ export function CrearLiquidacionManualModal({
               )}
               {ivaMonto !== null && (
                 <div className="flex justify-between items-baseline text-xs text-vialto-steel">
-                  <span>IVA {ivaPctNum}%</span>
+                  <span>IVA {ivaPctNum}% (flete/comisión)</span>
                   <span className="tabular-nums">
                     {fmtSignedLiquidacionMoney(ivaMonto, "plus")}
                   </span>
