@@ -387,11 +387,15 @@ export function ConceptosLiquidacionLineasEditor({
       ) : (
         <div className="space-y-2">
           {lineas.map((linea, index) => {
+            // El signo viene del catálogo al elegir el concepto; no inferirlo del
+            // monto (con monto 0, +0 y −0 se ven iguales y el UI no se actualiza).
+            const aFavor = linea.signo !== "contra";
             const efecto = signedMontoConIvaConcepto(
               linea.signo,
               Number(linea.monto) || 0,
               linea.ivaPct,
             );
+            const montoAbs = Math.abs(efecto);
             const rowIncomplete = incompleteSet.has(index);
             const conceptoMissing =
               rowIncomplete && !linea.conceptoLiquidacionId;
@@ -491,10 +495,11 @@ export function ConceptosLiquidacionLineasEditor({
                 <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-end pb-0.5">
                   <span
                     className={`text-xs tabular-nums ${
-                      efecto >= 0 ? "text-emerald-700" : "text-red-700"
+                      aFavor ? "text-emerald-700" : "text-red-700"
                     }`}
+                    title={aFavor ? "A favor" : "En contra"}
                   >
-                    {efecto >= 0 ? "+" : "−"} {fmtMoney(Math.abs(efecto))}
+                    {aFavor ? "+" : "−"} {fmtMoney(montoAbs)}
                   </span>
                   {!disabled && (
                     <button
