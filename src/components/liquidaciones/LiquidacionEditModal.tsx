@@ -111,7 +111,7 @@ export function LiquidacionEditModal({
           monto: l.monto,
           nombre: l.nombreSnapshot,
           signo: l.signo,
-          ivaPct: l.ivaPct,
+          ivaPct: l.ivaPct ?? undefined,
           viajeId: (l as any).viajeId ?? null,
         })),
   );
@@ -155,7 +155,7 @@ export function LiquidacionEditModal({
               monto: l.monto,
               nombre: l.nombreSnapshot,
               signo: l.signo,
-              ivaPct: l.ivaPct,
+              ivaPct: l.ivaPct ?? undefined,
               viajeId: (l as any).viajeId ?? null,
             })),
         );
