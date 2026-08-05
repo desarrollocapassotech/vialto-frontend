@@ -3,6 +3,7 @@ import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -11,11 +12,14 @@ import {
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
+  listadoTablaHeadRowClass,
   listadoTablaTdClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import type { PlatformUser } from "@/types/api";
 
@@ -389,6 +393,12 @@ export function UsuariosTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const [nombreFiltroInput, setNombreFiltroInput] = useState("");
+  const [nombreFiltro, setNombreFiltro] = useState("");
+  const [emailFiltroInput, setEmailFiltroInput] = useState("");
+  const [emailFiltro, setEmailFiltro] = useState("");
+  const [rolFiltro, setRolFiltro] = useState("");
+
   const load = useCallback(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -477,9 +487,134 @@ export function UsuariosTenantPage() {
     }
   }
 
-  const meta = useMemo(() => {
+  const filteredRows = useMemo(() => {
     if (!rows) return null;
-    const total = rows.length;
+    const nombreQ = nombreFiltro.trim().toLowerCase();
+    const emailQ = emailFiltro.trim().toLowerCase();
+    return rows.filter((u) => {
+      if (nombreQ) {
+        const nombre = [u.firstName, u.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!nombre.includes(nombreQ)) return false;
+      }
+      if (emailQ && !(u.email ?? "").toLowerCase().includes(emailQ)) {
+        return false;
+      }
+      if (rolFiltro && u.role !== rolFiltro) return false;
+      return true;
+    });
+  }, [rows, nombreFiltro, emailFiltro, rolFiltro]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [nombreFiltro, emailFiltro, rolFiltro]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (nombreFiltro.trim()) n += 1;
+    if (emailFiltro.trim()) n += 1;
+    if (rolFiltro) n += 1;
+    return n;
+  }, [nombreFiltro, emailFiltro, rolFiltro]);
+
+  function limpiarFiltros() {
+    setNombreFiltroInput("");
+    setNombreFiltro("");
+    setEmailFiltroInput("");
+    setEmailFiltro("");
+    setRolFiltro("");
+  }
+
+  const rolOpciones = useMemo(
+    () =>
+      [
+        { value: "", label: "Todos" },
+        { value: "org:admin", label: "Administrador" },
+        { value: "org:member", label: "Miembro" },
+        ...(tieneModuloStock
+          ? [{ value: "org:stock_viewer", label: "Consulta de stock" }]
+          : []),
+      ] as const,
+    [tieneModuloStock],
+  );
+
+  const rolSelectClass = (activo: boolean) =>
+    `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+      activo ? "text-vialto-fire" : "text-vialto-charcoal"
+    }`;
+
+  const usuariosListadoFiltros = (
+    <>
+      <ListadoFiltroCampo label="Nombre" active={!!nombreFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={nombreFiltroInput}
+            onChange={(e) => setNombreFiltroInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setNombreFiltro(nombreFiltroInput.trim());
+            }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+              nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+            }`}
+            aria-label="Filtrar por nombre de usuario"
+          />
+          <button
+            type="button"
+            onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Email" active={!!emailFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={emailFiltroInput}
+            onChange={(e) => setEmailFiltroInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setEmailFiltro(emailFiltroInput.trim());
+            }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+              emailFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+            }`}
+            aria-label="Filtrar por email de usuario"
+          />
+          <button
+            type="button"
+            onClick={() => setEmailFiltro(emailFiltroInput.trim())}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Rol" active={!!rolFiltro}>
+        <select
+          value={rolFiltro}
+          onChange={(e) => setRolFiltro(e.target.value)}
+          className={rolSelectClass(!!rolFiltro)}
+          aria-label="Filtrar por rol de usuario"
+        >
+          {rolOpciones.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </ListadoFiltroCampo>
+    </>
+  );
+
+  const meta = useMemo(() => {
+    if (!filteredRows) return null;
+    const total = filteredRows.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       total,
@@ -489,13 +624,13 @@ export function UsuariosTenantPage() {
       hasPrev: page > 1,
       hasNext: page < totalPages,
     };
-  }, [rows, page, pageSize]);
+  }, [filteredRows, page, pageSize]);
 
   const paginatedRows = useMemo(() => {
-    if (!rows) return null;
+    if (!filteredRows) return null;
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -506,7 +641,22 @@ export function UsuariosTenantPage() {
         Miembros de tu organización y sus roles de acceso.
       </p>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors lg:inline-flex"
+          >
+            Limpiar filtros
+            <span
+              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+              aria-hidden
+            >
+              {activeFilterCount}
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -533,6 +683,108 @@ export function UsuariosTenantPage() {
 
       <ListadoDatos
         className="mt-8"
+        filters={usuariosListadoFiltros}
+        activeFilterCount={activeFilterCount}
+        onClearFilters={limpiarFiltros}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!nombreFiltro.trim()}
+                filterSignature={nombreFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={nombreFiltroInput}
+                    onChange={(e) => setNombreFiltroInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        setNombreFiltro(nombreFiltroInput.trim());
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      nombreFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por nombre de usuario"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Email"
+                filterActive={!!emailFiltro.trim()}
+                filterSignature={emailFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={emailFiltroInput}
+                    onChange={(e) => setEmailFiltroInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        setEmailFiltro(emailFiltroInput.trim());
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      emailFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por email de usuario"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEmailFiltro(emailFiltroInput.trim())}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Rol"
+                filterActive={!!rolFiltro}
+                filterSignature={rolFiltro}
+              >
+                <select
+                  value={rolFiltro}
+                  onChange={(e) => setRolFiltro(e.target.value)}
+                  className={rolSelectClass(!!rolFiltro)}
+                  aria-label="Filtrar por rol de usuario"
+                >
+                  {rolOpciones.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              Alta
+            </th>
+            <th
+              scope="col"
+              className={`${listadoTablaThClass} text-right align-top`}
+            >
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -563,7 +815,11 @@ export function UsuariosTenantPage() {
         ]}
         rows={error ? [] : paginatedRows}
         rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
-        emptyMessage="No hay usuarios en esta organización."
+        emptyMessage={
+          activeFilterCount > 0
+            ? "No hay usuarios que coincidan con el criterio."
+            : "No hay usuarios en esta organización."
+        }
         loadingMessage="Cargando…"
         renderActions={(u) =>
           u.userId ? (
@@ -583,7 +839,7 @@ export function UsuariosTenantPage() {
         }
       />
 
-      {meta && (rows?.length ?? 0) > 0 && (
+      {meta && (filteredRows?.length ?? 0) > 0 && (
         <div className="mt-4">
           <ListadoPagination
             meta={meta}
