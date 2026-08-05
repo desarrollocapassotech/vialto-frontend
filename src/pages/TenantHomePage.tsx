@@ -9,7 +9,6 @@ import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
-import { EmitirCvlpModal } from "@/components/viajes/EmitirCvlpModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaEditModal";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -54,7 +53,6 @@ export function TenantHomePage() {
     null,
   );
   const [abriendoFacturar, setAbriendoFacturar] = useState(false);
-  const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
 
   const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
@@ -160,7 +158,6 @@ export function TenantHomePage() {
               viajeEditor.editingId !== null ||
               facturaLetraViaje !== null ||
               facturaCreator.creating ||
-              emitirCvlpViaje !== null ||
               crearLiqViaje !== null
             }
           />
@@ -275,23 +272,11 @@ export function TenantHomePage() {
                     showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
                     return;
                   }
-                  if (hasArca) {
-                    setEmitirCvlpViaje(v);
-                  } else {
-                    setCrearLiqViaje(v);
-                  }
+                  setCrearLiqViaje(v);
                   setViewingViaje(null);
                 }
               : undefined
           }
-        />
-      )}
-
-      {emitirCvlpViaje && (
-        <EmitirCvlpModal
-          viaje={emitirCvlpViaje}
-          onClose={() => setEmitirCvlpViaje(null)}
-          onEmitido={() => setEmitirCvlpViaje(null)}
         />
       )}
 
