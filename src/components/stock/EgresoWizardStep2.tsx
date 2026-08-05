@@ -54,6 +54,7 @@ export function EgresoWizardStep2({
   continuarLoading = false,
   onVolver,
   onContinuar,
+  isVisible,
 }: {
   fechaMov: string;
   horaMov: string;
@@ -88,6 +89,7 @@ export function EgresoWizardStep2({
   continuarLoading?: boolean;
   onVolver: () => void;
   onContinuar: () => void;
+  isVisible: (form: string, campo: string) => boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -120,37 +122,41 @@ export function EgresoWizardStep2({
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <div className="space-y-1">
-            <label className={LABEL}>Conductor</label>
-            <ChoferSearchSelect
-              choferes={choferes}
-              value={choferId}
-              onChange={onChoferIdChange}
-              loading={choferesLoading}
-              allowEmptyValue
-              emptyListChoiceLabel="Sin conductor"
-              placeholderCerrado="Sin conductor"
-              inputClassName={INPUT}
-              aria-label="Conductor del egreso"
-              onNuevo={onNuevoChofer}
-            />
-          </div>
+          {isVisible("alta_egreso", "choferId") && (
+            <div className="space-y-1">
+              <label className={LABEL}>Conductor</label>
+              <ChoferSearchSelect
+                choferes={choferes}
+                value={choferId}
+                onChange={onChoferIdChange}
+                loading={choferesLoading}
+                allowEmptyValue
+                emptyListChoiceLabel="Sin conductor"
+                placeholderCerrado="Sin conductor"
+                inputClassName={INPUT}
+                aria-label="Conductor del egreso"
+                onNuevo={onNuevoChofer}
+              />
+            </div>
+          )}
 
-          <div className="space-y-1">
-            <label className={LABEL}>Destinatario</label>
-            <DestinatarioSearchSelect
-              destinatarios={destinatarios}
-              value={destinatarioId}
-              onChange={onDestinatarioIdChange}
-              loading={destinatariosLoading}
-              allowEmptyValue
-              emptyListChoiceLabel="Sin destinatario"
-              placeholderCerrado="Sin destinatario"
-              inputClassName={INPUT}
-              aria-label="Destinatario del egreso"
-              onNuevo={onNuevoDestinatario}
-            />
-          </div>
+          {isVisible("alta_egreso", "destinatarioId") && (
+            <div className="space-y-1">
+              <label className={LABEL}>Destinatario</label>
+              <DestinatarioSearchSelect
+                destinatarios={destinatarios}
+                value={destinatarioId}
+                onChange={onDestinatarioIdChange}
+                loading={destinatariosLoading}
+                allowEmptyValue
+                emptyListChoiceLabel="Sin destinatario"
+                placeholderCerrado="Sin destinatario"
+                inputClassName={INPUT}
+                aria-label="Destinatario del egreso"
+                onNuevo={onNuevoDestinatario}
+              />
+            </div>
+          )}
 
           <div className="space-y-1 sm:col-span-2">
             <p className={LABEL}>
@@ -195,30 +201,34 @@ export function EgresoWizardStep2({
             <CrudFieldError message={documentoExternoError} />
           </div>
 
-          <div className="space-y-1 sm:col-span-2">
-            <label className={LABEL}>Dirección / Ruta de entrega</label>
-            <DireccionEntregaSearchSelect
-              direcciones={direccionesEntrega}
-              value={direccionEntregaId}
-              onChange={onDireccionEntregaChange}
-              loading={direccionesEntregaLoading}
-              inputClassName={INPUT}
-              allowEmptyValue
-              emptyListChoiceLabel="Sin dirección"
-              onNuevo={onNuevaDireccionEntrega}
-            />
-          </div>
+          {isVisible("alta_egreso", "direccionEntregaId") && (
+            <div className="space-y-1 sm:col-span-2">
+              <label className={LABEL}>Dirección / Ruta de entrega</label>
+              <DireccionEntregaSearchSelect
+                direcciones={direccionesEntrega}
+                value={direccionEntregaId}
+                onChange={onDireccionEntregaChange}
+                loading={direccionesEntregaLoading}
+                inputClassName={INPUT}
+                allowEmptyValue
+                emptyListChoiceLabel="Sin dirección"
+                onNuevo={onNuevaDireccionEntrega}
+              />
+            </div>
+          )}
 
-          <div className="space-y-1 sm:col-span-2">
-            <label className={LABEL}>Observaciones</label>
-            <textarea
-              value={observaciones}
-              onChange={(e) => onObservacionesChange(e.target.value)}
-              rows={2}
-              className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
-              placeholder="Notas internas…"
-            />
-          </div>
+          {isVisible("alta_egreso", "observaciones") && (
+            <div className="space-y-1 sm:col-span-2">
+              <label className={LABEL}>Observaciones</label>
+              <textarea
+                value={observaciones}
+                onChange={(e) => onObservacionesChange(e.target.value)}
+                rows={2}
+                className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
+                placeholder="Notas internas…"
+              />
+            </div>
+          )}
         </div>
       </div>
 

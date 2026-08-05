@@ -15,6 +15,7 @@ import { IngresoWizardStep1 } from '@/components/stock/IngresoWizardStep1';
 import { IngresoWizardStep2 } from '@/components/stock/IngresoWizardStep2';
 import { IngresoWizardStep3, emptyRow, type IngresoRow } from '@/components/stock/IngresoWizardStep3';
 import { isOrgAdmin } from '@/lib/roleLabels';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type WizardStep = 1 | 2 | 3;
@@ -105,6 +106,8 @@ export function IngresosStockTenantPage({
   const platform = Boolean(tenantId);
   const canCreateProducto =
     platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
+
+  const { isVisible } = useFieldConfig('stock');
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
@@ -369,6 +372,7 @@ export function IngresosStockTenantPage({
           saving={saving}
           clienteNombre={clienteNombre}
           depositoNombre={depositoNombre}
+          isVisible={isVisible}
           onVolver={() => {
             setStep(1);
             setFieldErrors({});
