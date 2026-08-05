@@ -139,6 +139,7 @@ function stubChofer(
     licenciaVence: null,
     telefono: ch.telefono ?? null,
     transportistaId: ch.transportistaId ?? null,
+    activo: true,
     createdAt: "",
   };
 }
@@ -163,6 +164,7 @@ function stubVehiculo(
     tara: null,
     precinto: null,
     transportistaId: null,
+    activo: true,
     createdAt: "",
   };
 }

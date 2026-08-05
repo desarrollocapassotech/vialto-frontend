@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -42,68 +42,55 @@ export function VehiculosTenantPage() {
   );
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
 
-  // Estados de los filtros de columna
+  // Estados de los filtros
+  const [patenteInput, setPatenteInput] = useState("");
   const [filtroPatente, setFiltroPatente] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
+  const [marcaInput, setMarcaInput] = useState("");
   const [filtroMarca, setFiltroMarca] = useState("");
+  const [modeloInput, setModeloInput] = useState("");
+  const [filtroModelo, setFiltroModelo] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
 
-  function limpiarFiltros() {
-    setFiltroPatente("");
-    setFiltroTipo("");
-    setFiltroMarca("");
-    setPage(1);
-  }
-
-  const anyFiltroActivo = !!filtroPatente || !!filtroTipo || !!filtroMarca;
-
-  // Extracción de opciones únicas para los selectores
-  const opcionesPatente = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.patente).filter((v): v is string => !!v),
-        ),
-      ).sort(),
-    [rows],
-  );
-  const opcionesMarca = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.marca).filter((v): v is string => !!v),
-        ),
-      ).sort(),
-    [rows],
-  );
-
-  const rowsFiltradas = useMemo(() => {
-    if (!rows) return [];
-    return rows.filter((r) => {
-      if (filtroPatente && r.patente !== filtroPatente) return false;
-      if (filtroTipo && r.tipo !== filtroTipo) return false;
-      if (filtroMarca && r.marca !== filtroMarca) return false;
-      return true;
+  const load = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      filtroActivo,
     });
-  }, [rows, filtroPatente, filtroTipo, filtroMarca]);
+    if (filtroPatente) params.set("patente", filtroPatente);
+    if (filtroTipo) params.set("tipo", filtroTipo);
+    if (filtroMarca) params.set("marca", filtroMarca);
+    if (filtroModelo) params.set("modelo", filtroModelo);
+
+    const data = await apiJson<VehiculosPaginatedResponse>(
+      `/api/vehiculos/paginated?${params.toString()}`,
+      () => getToken(),
+    );
+    setRows(data.items);
+    setServerMeta(data.meta);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    filtroPatente,
+    filtroTipo,
+    filtroMarca,
+    filtroModelo,
+    filtroActivo,
+  ]);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(pageSize),
-        });
-        const data = await apiJson<VehiculosPaginatedResponse>(
-          `/api/vehiculos/paginated?${params.toString()}`,
-          () => getToken(),
-        );
-        if (!cancelled) {
-          setRows(data.items);
-          setServerMeta(data.meta);
-          setError(null);
-        }
+        await load();
+        if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
@@ -115,9 +102,49 @@ export function VehiculosTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+  }, [load]);
 
-  const tipoSelectClass = (activo: boolean) =>
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filtroPatente) n += 1;
+    if (filtroTipo) n += 1;
+    if (filtroMarca) n += 1;
+    if (filtroModelo) n += 1;
+    if (filtroActivo !== "todos") n += 1;
+    return n;
+  }, [filtroPatente, filtroTipo, filtroMarca, filtroModelo, filtroActivo]);
+
+  function limpiarFiltros() {
+    setPatenteInput("");
+    setFiltroPatente("");
+    setFiltroTipo("");
+    setMarcaInput("");
+    setFiltroMarca("");
+    setModeloInput("");
+    setFiltroModelo("");
+    setFiltroActivo("todos");
+    setPage(1);
+  }
+
+  async function toggleActivo(v: Vehiculo) {
+    const mensaje = v.activo
+      ? `¿Desactivar el vehículo "${v.patente}"?`
+      : `¿Reactivar el vehículo "${v.patente}"?`;
+    if (!window.confirm(mensaje)) return;
+    setError(null);
+    try {
+      await apiJson<Vehiculo>(
+        `/api/vehiculos/${encodeURIComponent(v.id)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify({ activo: !v.activo }) },
+      );
+      await load();
+    } catch (e) {
+      setError(friendlyError(e, "vehiculos"));
+    }
+  }
+
+  const selectClass = (activo: boolean) =>
     `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
       activo ? "text-vialto-fire" : "text-vialto-charcoal"
     }`;
@@ -131,8 +158,8 @@ export function VehiculosTenantPage() {
         Patentes, tipo y marca de cada unidad de tu flota.
       </p>
 
-      <div className="mt-4 flex justify-end gap-2">
-        {anyFiltroActivo && (
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        {activeFilterCount > 0 && (
           <button
             type="button"
             onClick={limpiarFiltros}
@@ -157,7 +184,7 @@ export function VehiculosTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={5}
+        tableColSpan={6}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -166,24 +193,35 @@ export function VehiculosTenantPage() {
                 filterActive={!!filtroPatente}
                 filterSignature={filtroPatente}
               >
-                <select
-                  value={filtroPatente}
-                  onChange={(e) => {
-                    setFiltroPatente(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroPatente ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Patente"
-                >
-                  <option value="">Todas</option>
-                  {opcionesPatente.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={patenteInput}
+                    onChange={(e) => setPatenteInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setFiltroPatente(patenteInput.trim());
+                        setPage(1);
+                      }
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
+                      patenteInput.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroPatente(patenteInput.trim());
+                      setPage(1);
+                    }}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -198,7 +236,7 @@ export function VehiculosTenantPage() {
                     setFiltroTipo(e.target.value);
                     setPage(1);
                   }}
-                  className={tipoSelectClass(!!filtroTipo)}
+                  className={selectClass(!!filtroTipo)}
                   aria-label="Filtrar por tipo de vehículo"
                 >
                   {TIPO_OPCIONES.map((o) => (
@@ -215,30 +253,101 @@ export function VehiculosTenantPage() {
                 filterActive={!!filtroMarca}
                 filterSignature={filtroMarca}
               >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={marcaInput}
+                    onChange={(e) => setMarcaInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setFiltroMarca(marcaInput.trim());
+                        setPage(1);
+                      }
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      marcaInput.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroMarca(marcaInput.trim());
+                      setPage(1);
+                    }}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Modelo"
+                filterActive={!!filtroModelo}
+                filterSignature={filtroModelo}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={modeloInput}
+                    onChange={(e) => setModeloInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setFiltroModelo(modeloInput.trim());
+                        setPage(1);
+                      }
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      modeloInput.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroModelo(modeloInput.trim());
+                      setPage(1);
+                    }}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={filtroActivo !== "todos"}
+                filterSignature={filtroActivo}
+              >
                 <select
-                  value={filtroMarca}
+                  value={filtroActivo}
                   onChange={(e) => {
-                    setFiltroMarca(e.target.value);
+                    setFiltroActivo(
+                      e.target.value as "todos" | "activos" | "inactivos",
+                    );
                     setPage(1);
                   }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroMarca ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Marca"
+                  className={selectClass(filtroActivo !== "todos")}
+                  aria-label="Filtrar por estado del vehículo"
                 >
-                  <option value="">Todas</option>
-                  {opcionesMarca.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
+                  <option value="todos">Todos</option>
+                  <option value="activos">Solo activos</option>
+                  <option value="inactivos">Solo inactivos</option>
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Modelo
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+            <th
+              scope="col"
+              className={`${listadoTablaThClass} text-right align-top`}
+            >
               Acciones
             </th>
           </tr>
@@ -269,13 +378,29 @@ export function VehiculosTenantPage() {
             cell: (v) => v.modelo ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
+          {
+            id: "estado",
+            header: "Estado",
+            cell: (v) => (
+              <span
+                className={
+                  v.activo
+                    ? "text-xs uppercase tracking-wider text-emerald-800"
+                    : "text-xs uppercase tracking-wider text-vialto-steel"
+                }
+              >
+                {v.activo ? "Activo" : "Inactivo"}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
         ]}
-        rows={error ? [] : rowsFiltradas}
+        rows={error ? [] : rows || []}
         rowKey={(v) => v.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los vehículos."
-            : anyFiltroActivo
+            : activeFilterCount > 0
               ? "No hay vehículos que coincidan con los filtros aplicados."
               : "Todavía no tenés vehículos cargados."
         }
@@ -298,6 +423,23 @@ export function VehiculosTenantPage() {
             >
               Editar
             </Link>
+            {v.activo ? (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+              >
+                Desactivar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
+              >
+                Reactivar
+              </button>
+            )}
           </div>
         )}
       />

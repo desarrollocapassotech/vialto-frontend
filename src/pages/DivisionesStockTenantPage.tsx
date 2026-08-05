@@ -28,6 +28,7 @@ import type {
   StockItem,
 } from "@/types/api";
 import { fechaHoraToIso, isoToFechaHora } from "@/lib/viajeFechaHora";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 
@@ -59,6 +60,7 @@ export function DivisionesStockTenantPage({
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
+  const { isVisible } = useFieldConfig("stock");
 
   const clientes = useMemo(
     () => clientesExternos ?? maestro.clientes,
@@ -639,26 +641,28 @@ export function DivisionesStockTenantPage({
             errorFechaCarga={fechaMovError}
           />
 
-          {mostrarObs ? (
-            <div className="space-y-1">
-              <label className={LABEL}>Observaciones</label>
-              <textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                rows={2}
-                className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
-                placeholder="Notas internas…"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setMostrarObs(true)}
-              className="text-xs text-vialto-steel hover:text-vialto-charcoal underline"
-            >
-              + Agregar observación
-            </button>
+          {isVisible("division_bultos", "observaciones") && (
+            mostrarObs ? (
+              <div className="space-y-1">
+                <label className={LABEL}>Observaciones</label>
+                <textarea
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  rows={2}
+                  className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
+                  placeholder="Notas internas…"
+                  autoFocus
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMostrarObs(true)}
+                className="text-xs text-vialto-steel hover:text-vialto-charcoal underline"
+              >
+                + Agregar observación
+              </button>
+            )
           )}
 
           <CrudFormErrorAlert message={formError} />
