@@ -650,10 +650,6 @@ export function CombustibleTenantPage({
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Combustible
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-3xl">
-            Visualizá y gestioná las cargas de combustible de tu empresa. El
-            listado lo filtra el servidor.
-          </p>
         </>
       )}
 
