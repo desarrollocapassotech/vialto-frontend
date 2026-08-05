@@ -36,6 +36,7 @@ import type {
 import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, egresoFieldKey, egresoRowsToApiLineas, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type EgresoResult = { id: string; numeroRemito: string | null; movimientosCount: number };
@@ -121,6 +122,7 @@ export function EgresosStockTenantPage({
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
+  const { isVisible } = useFieldConfig('stock');
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
@@ -642,6 +644,7 @@ export function EgresosStockTenantPage({
             setFechaMovError(null);
           }}
           onContinuar={handleContinuar3}
+          isVisible={isVisible}
         />
       )}
 

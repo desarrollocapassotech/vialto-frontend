@@ -30,6 +30,8 @@ export function IngresoWizardStep2({
   depositoNombre,
   onVolver,
   onContinuar,
+  isVisible,
+
 }: {
   fechaMov: string;
   horaMov: string;
@@ -48,6 +50,7 @@ export function IngresoWizardStep2({
   depositoNombre: string;
   onVolver: () => void;
   onContinuar: () => void;
+  isVisible: (form: string, campo: string) => boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -85,35 +88,41 @@ export function IngresoWizardStep2({
           <CrudFieldError message={fieldErrors.fechaMov} />
         </div>
 
-        <div className="space-y-1">
-          <label className={LABEL}>N° de remito del proveedor</label>
-          <input
-            type="text"
-            value={numeroRemitoProveedor}
-            onChange={(e) => onNumeroRemitoProveedorChange(e.target.value)}
-            className={INPUT}
-            placeholder="Opcional"
-          />
-        </div>
+        {isVisible("alta_ingreso", "numeroRemitoProveedor") && (
+          <div className="space-y-1">
+            <label className={LABEL}>N° de remito del proveedor</label>
+            <input
+              type="text"
+              value={numeroRemitoProveedor}
+              onChange={(e) => onNumeroRemitoProveedorChange(e.target.value)}
+              className={INPUT}
+              placeholder="Opcional"
+            />
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <label className={LABEL}>Observaciones</label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => onObservacionesChange(e.target.value)}
-            rows={3}
-            className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
-            placeholder="Notas internas sobre este ingreso…"
-          />
-        </div>
+        {isVisible("alta_ingreso", "observaciones") && (
+          <div className="space-y-1">
+            <label className={LABEL}>Observaciones</label>
+            <textarea
+              value={observaciones}
+              onChange={(e) => onObservacionesChange(e.target.value)}
+              rows={3}
+              className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
+              placeholder="Notas internas sobre este ingreso…"
+            />
+          </div>
+        )}
 
-        <FotosIngresoField
-          files={fotoFiles}
-          onChange={onFotosChange}
-          onPreview={onFotoPreview}
-          disabled={saving}
-          error={fieldErrors.fotosUrls}
-        />
+        {isVisible("alta_ingreso", "fotoFiles") && (
+          <FotosIngresoField
+            files={fotoFiles}
+            onChange={onFotosChange}
+            onPreview={onFotoPreview}
+            disabled={saving}
+            error={fieldErrors.fotosUrls}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between">
