@@ -13,6 +13,7 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
+import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -24,6 +25,7 @@ import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTenantsList } from "@/hooks/useTenantsList";
 import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import {
   MSG_ARCA_NO_FACTURA_USD,
@@ -104,11 +106,21 @@ export function FacturacionTenantPage({
   const maestro = useMaestroData();
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
-  const hasArca =
-    !platform && canAccessIntegracionArca(maestro.tenant?.modules ?? []);
-  /** Adjunto manual solo para tenants sin integración ARCA. */
-  const showComprobanteAdjunto = !platform && !hasArca;
   const tid = tenantId?.trim() ?? "";
+  const tenantsList = useTenantsList({ enabled: platform });
+  const platformTenant = useMemo(
+    () =>
+      platform
+        ? tenantsList?.find((t) => t.clerkOrgId === tid || t.id === tid) ?? null
+        : null,
+    [platform, tenantsList, tid],
+  );
+  const tenantModules = platform
+    ? (platformTenant?.modules ?? [])
+    : (maestro.tenant?.modules ?? []);
+  const hasArca = canAccessIntegracionArca(tenantModules);
+  /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
+  const showComprobanteAdjunto = !platform && !hasArca;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const [transportistasPlatform, setTransportistasPlatform] = useState<
     Transportista[]
@@ -161,6 +173,7 @@ export function FacturacionTenantPage({
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
@@ -693,6 +706,28 @@ export function FacturacionTenantPage({
     return clientes.find((c) => c.id === id)?.nombre ?? id;
   }
 
+  function clienteById(id: string | null | undefined) {
+    if (!id) return null;
+    return clientes.find((c) => c.id === id) ?? null;
+  }
+
+  function abrirEmitirArca(f: Factura) {
+    setViewingFactura(null);
+    setEmittingFactura(f);
+  }
+
+  function handleFacturaEmitida(f: Factura) {
+    setFacturas((prev) =>
+      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+    );
+    if (viewingFactura?.id === f.id) setViewingFactura(f);
+    setEmittingFactura(f);
+  }
+
+  function verComprobanteUrl(url: string | null | undefined) {
+    if (url?.trim()) setPreviewComprobanteUrl(url);
+  }
+
   function nombreContraparte(f: Factura) {
     return nombreCliente(f.clienteId);
   }
@@ -884,6 +919,13 @@ export function FacturacionTenantPage({
             </div>
           )}
         </>
+      )}
+
+      {embeddedInSuperadmin && hasArca && (
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+          <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+          Emisión electrónica vía ARCA
+        </div>
       )}
 
       <div className="mt-4">
@@ -1123,11 +1165,13 @@ export function FacturacionTenantPage({
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
+                hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onVerComprobante={
-                  showComprobanteAdjunto && f.comprobanteUrl
-                    ? () => setPreviewComprobanteUrl(f.comprobanteUrl)
+                  f.comprobanteUrl
+                    ? () => verComprobanteUrl(f.comprobanteUrl)
                     : undefined
                 }
               />
@@ -1163,11 +1207,13 @@ export function FacturacionTenantPage({
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
+                hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onVerComprobante={
-                  showComprobanteAdjunto && f.comprobanteUrl
-                    ? () => setPreviewComprobanteUrl(f.comprobanteUrl)
+                  f.comprobanteUrl
+                    ? () => verComprobanteUrl(f.comprobanteUrl)
                     : undefined
                 }
               />
@@ -1210,17 +1256,35 @@ export function FacturacionTenantPage({
         <FacturaViewModal
           factura={viewingFactura}
           clienteNombre={nombreCliente(viewingFactura.clienteId)}
+          cliente={clienteById(viewingFactura.clienteId)}
+          hasArca={hasArca}
           onClose={() => setViewingFactura(null)}
           onEditar={() => {
             const f = viewingFactura;
             setViewingFactura(null);
             startEdit(f);
           }}
+          onEmitirArca={
+            hasArca ? () => abrirEmitirArca(viewingFactura) : undefined
+          }
           onVerComprobante={
-            showComprobanteAdjunto && viewingFactura.comprobanteUrl
-              ? () => setPreviewComprobanteUrl(viewingFactura.comprobanteUrl)
+            viewingFactura.comprobanteUrl
+              ? () => verComprobanteUrl(viewingFactura.comprobanteUrl)
               : undefined
           }
+        />
+      )}
+
+      {emittingFactura && (
+        <EmitirFacturaModal
+          factura={emittingFactura}
+          viajes={viajes}
+          tenantId={platform ? tid : undefined}
+          clienteInicial={clienteById(emittingFactura.clienteId)}
+          onClose={() => setEmittingFactura(null)}
+          onEmitido={(f) => {
+            handleFacturaEmitida(f);
+          }}
         />
       )}
 

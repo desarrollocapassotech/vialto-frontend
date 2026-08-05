@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Eye, FileText, Trash2 } from 'lucide-react';
+import { Eye, FileText, Receipt, Trash2 } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -7,17 +7,21 @@ import type { Factura } from '@/types/api';
 interface Props {
   factura: Factura;
   deleting: boolean;
+  hasArca?: boolean;
   onVer: () => void;
   onEliminar: () => void;
   onVerComprobante?: () => void;
+  onEmitirArca?: () => void;
 }
 
 export function FacturaAccionesMenu({
   factura,
   deleting,
+  hasArca = false,
   onVer,
   onEliminar,
   onVerComprobante,
+  onEmitirArca,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -25,6 +29,20 @@ export function FacturaAccionesMenu({
     const opts: AccionOpcion[] = [
       { id: 'ver', label: 'Ver', icon: Eye, onClick: onVer },
     ];
+    const puedeEmitirArca =
+      hasArca &&
+      factura.tipo === 'cliente' &&
+      factura.moneda !== 'USD' &&
+      factura.arcaEstado !== 'autorizado' &&
+      !factura.cae;
+    if (puedeEmitirArca && onEmitirArca) {
+      opts.push({
+        id: 'emitir-arca',
+        label: 'Emitir a ARCA',
+        icon: Receipt,
+        onClick: onEmitirArca,
+      });
+    }
     if (onVerComprobante && factura.comprobanteUrl?.trim()) {
       opts.push({
         id: 'comprobante',
@@ -42,7 +60,7 @@ export function FacturaAccionesMenu({
       disabled: deleting,
     });
     return opts;
-  }, [factura.comprobanteUrl, onVer, onVerComprobante, onEliminar, deleting]);
+  }, [factura, hasArca, onVer, onEmitirArca, onVerComprobante, onEliminar, deleting]);
 
   return (
     <>
