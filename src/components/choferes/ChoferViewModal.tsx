@@ -127,6 +127,12 @@ export function ChoferViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Estado</p>
+            <p className={`mt-1 text-sm ${chofer.activo ? 'text-emerald-800' : 'text-vialto-steel'}`}>
+              {chofer.activo ? 'Activo' : 'Inactivo'}
+            </p>
+          </div>
           {showPin && (
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">PIN combustible</p>

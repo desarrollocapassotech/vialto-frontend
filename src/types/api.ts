@@ -139,6 +139,8 @@ export interface Chofer {
   transportistaId: string | null;
   /** true si el chofer tiene PIN configurado para la app vialto-combustible. El hash nunca se expone. */
   pinConfigured?: boolean;
+  /** false = no puede loguearse en la app vialto-combustible. */
+  activo: boolean;
   createdAt: string;
 }
 
@@ -172,6 +174,7 @@ export interface Vehiculo {
   tara: number | null;
   precinto: string | null;
   transportistaId: string | null;
+  activo: boolean;
   createdAt: string;
 }
 

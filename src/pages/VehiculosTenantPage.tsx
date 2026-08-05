@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
@@ -50,29 +50,47 @@ export function VehiculosTenantPage() {
   const [marcaFiltro, setMarcaFiltro] = useState("");
   const [modeloFiltroInput, setModeloFiltroInput] = useState("");
   const [modeloFiltro, setModeloFiltro] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
+
+  const load = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      filtroActivo,
+    });
+    if (patenteFiltro) params.set("patente", patenteFiltro);
+    if (tipoFiltro) params.set("tipo", tipoFiltro);
+    if (marcaFiltro) params.set("marca", marcaFiltro);
+    if (modeloFiltro) params.set("modelo", modeloFiltro);
+    const data = await apiJson<VehiculosPaginatedResponse>(
+      `/api/vehiculos/paginated?${params.toString()}`,
+      () => getToken(),
+    );
+    setRows(data.items);
+    setMeta(data.meta);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    patenteFiltro,
+    tipoFiltro,
+    marcaFiltro,
+    modeloFiltro,
+    filtroActivo,
+  ]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(pageSize),
-        });
-        if (patenteFiltro) params.set("patente", patenteFiltro);
-        if (tipoFiltro) params.set("tipo", tipoFiltro);
-        if (marcaFiltro) params.set("marca", marcaFiltro);
-        if (modeloFiltro) params.set("modelo", modeloFiltro);
-        const data = await apiJson<VehiculosPaginatedResponse>(
-          `/api/vehiculos/paginated?${params.toString()}`,
-          () => getToken(),
-        );
-        if (!cancelled) {
-          setRows(data.items);
-          setMeta(data.meta);
-          setError(null);
-        }
+        await load();
+        if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
@@ -84,21 +102,11 @@ export function VehiculosTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    getToken,
-    isLoaded,
-    isSignedIn,
-    page,
-    pageSize,
-    patenteFiltro,
-    tipoFiltro,
-    marcaFiltro,
-    modeloFiltro,
-  ]);
+  }, [isLoaded, isSignedIn, load]);
 
   useEffect(() => {
     setPage(1);
-  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro]);
+  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro, filtroActivo]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -106,8 +114,9 @@ export function VehiculosTenantPage() {
     if (tipoFiltro) n += 1;
     if (marcaFiltro.trim()) n += 1;
     if (modeloFiltro.trim()) n += 1;
+    if (filtroActivo !== "todos") n += 1;
     return n;
-  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro]);
+  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro, filtroActivo]);
 
   function limpiarFiltros() {
     setPatenteFiltroInput("");
@@ -117,9 +126,28 @@ export function VehiculosTenantPage() {
     setMarcaFiltro("");
     setModeloFiltroInput("");
     setModeloFiltro("");
+    setFiltroActivo("todos");
   }
 
-  const tipoSelectClass = (activo: boolean) =>
+  async function toggleActivo(v: Vehiculo) {
+    const mensaje = v.activo
+      ? `¿Desactivar el vehículo "${v.patente}"?`
+      : `¿Reactivar el vehículo "${v.patente}"?`;
+    if (!window.confirm(mensaje)) return;
+    setError(null);
+    try {
+      await apiJson<Vehiculo>(
+        `/api/vehiculos/${encodeURIComponent(v.id)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify({ activo: !v.activo }) },
+      );
+      await load();
+    } catch (e) {
+      setError(friendlyError(e, "vehiculos"));
+    }
+  }
+
+  const selectClass = (activo: boolean) =>
     `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
       activo ? "text-vialto-fire" : "text-vialto-charcoal"
     }`;
@@ -157,7 +185,7 @@ export function VehiculosTenantPage() {
         <select
           value={tipoFiltro}
           onChange={(e) => setTipoFiltro(e.target.value)}
-          className={tipoSelectClass(!!tipoFiltro)}
+          className={selectClass(!!tipoFiltro)}
           aria-label="Filtrar por tipo de vehículo"
         >
           {TIPO_OPCIONES.map((o) => (
@@ -216,6 +244,20 @@ export function VehiculosTenantPage() {
           </button>
         </div>
       </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
+        <select
+          value={filtroActivo}
+          onChange={(e) =>
+            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
+          }
+          className={selectClass(filtroActivo !== "todos")}
+          aria-label="Filtrar por estado del vehículo"
+        >
+          <option value="todos">Todos</option>
+          <option value="activos">Solo activos</option>
+          <option value="inactivos">Solo inactivos</option>
+        </select>
+      </ListadoFiltroCampo>
     </>
   );
 
@@ -224,9 +266,6 @@ export function VehiculosTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Vehículos
       </h1>
-      <p className="mt-2 text-vialto-steel">
-        Patentes, tipo y marca de cada unidad de tu flota.
-      </p>
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
         {activeFilterCount > 0 && (
           <button
@@ -306,7 +345,7 @@ export function VehiculosTenantPage() {
                 <select
                   value={tipoFiltro}
                   onChange={(e) => setTipoFiltro(e.target.value)}
-                  className={tipoSelectClass(!!tipoFiltro)}
+                  className={selectClass(!!tipoFiltro)}
                   aria-label="Filtrar por tipo de vehículo"
                 >
                   {TIPO_OPCIONES.map((o) => (
@@ -385,6 +424,28 @@ export function VehiculosTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={filtroActivo !== "todos"}
+                filterSignature={filtroActivo}
+              >
+                <select
+                  value={filtroActivo}
+                  onChange={(e) =>
+                    setFiltroActivo(
+                      e.target.value as "todos" | "activos" | "inactivos",
+                    )
+                  }
+                  className={selectClass(filtroActivo !== "todos")}
+                  aria-label="Filtrar por estado del vehículo"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="activos">Solo activos</option>
+                  <option value="inactivos">Solo inactivos</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
             <th
               scope="col"
               className={`${listadoTablaThClass} text-right align-top`}
@@ -419,6 +480,22 @@ export function VehiculosTenantPage() {
             cell: (v) => v.modelo ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
+          {
+            id: "estado",
+            header: "Estado",
+            cell: (v) => (
+              <span
+                className={
+                  v.activo
+                    ? "text-xs uppercase tracking-wider text-emerald-800"
+                    : "text-xs uppercase tracking-wider text-vialto-steel"
+                }
+              >
+                {v.activo ? "Activo" : "Inactivo"}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
         ]}
         rows={error ? [] : rows}
         rowKey={(v) => v.id}
@@ -448,6 +525,23 @@ export function VehiculosTenantPage() {
             >
               Editar
             </Link>
+            {v.activo ? (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+              >
+                Desactivar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
+              >
+                Reactivar
+              </button>
+            )}
           </div>
         )}
       />

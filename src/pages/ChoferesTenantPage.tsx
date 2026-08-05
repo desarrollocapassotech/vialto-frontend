@@ -1,9 +1,10 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -34,32 +35,50 @@ export function ChoferesTenantPage() {
   const [pageSize, setPageSize] = useState(10);
   const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
   const [viewingChoferNombre, setViewingChoferNombre] = useState("");
+  const [confirmToggle, setConfirmToggle] = useState<Chofer | null>(null);
+  const [toggleBusy, setToggleBusy] = useState(false);
 
   const [nombreFiltroInput, setNombreFiltroInput] = useState("");
   const [nombreFiltro, setNombreFiltro] = useState("");
   const [dniFiltroInput, setDniFiltroInput] = useState("");
   const [dniFiltro, setDniFiltro] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
+
+  const load = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      filtroActivo,
+    });
+    if (nombreFiltro) params.set("nombre", nombreFiltro);
+    if (dniFiltro) params.set("dni", dniFiltro);
+    const data = await apiJson<ChoferesPaginatedResponse>(
+      `/api/choferes/paginated?${params.toString()}`,
+      () => getToken(),
+    );
+    setRows(data.items);
+    setMeta(data.meta);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    nombreFiltro,
+    dniFiltro,
+    filtroActivo,
+  ]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(pageSize),
-        });
-        if (nombreFiltro) params.set("nombre", nombreFiltro);
-        if (dniFiltro) params.set("dni", dniFiltro);
-        const data = await apiJson<ChoferesPaginatedResponse>(
-          `/api/choferes/paginated?${params.toString()}`,
-          () => getToken(),
-        );
-        if (!cancelled) {
-          setRows(data.items);
-          setMeta(data.meta);
-          setError(null);
-        }
+        await load();
+        if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
@@ -71,25 +90,52 @@ export function ChoferesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize, nombreFiltro, dniFiltro]);
+  }, [isLoaded, isSignedIn, load]);
 
   useEffect(() => {
     setPage(1);
-  }, [nombreFiltro, dniFiltro]);
+  }, [nombreFiltro, dniFiltro, filtroActivo]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (nombreFiltro.trim()) n += 1;
     if (dniFiltro.trim()) n += 1;
+    if (filtroActivo !== "todos") n += 1;
     return n;
-  }, [nombreFiltro, dniFiltro]);
+  }, [nombreFiltro, dniFiltro, filtroActivo]);
 
   function limpiarFiltros() {
     setNombreFiltroInput("");
     setNombreFiltro("");
     setDniFiltroInput("");
     setDniFiltro("");
+    setFiltroActivo("todos");
   }
+
+  async function handleToggleActivo() {
+    if (!confirmToggle) return;
+    setError(null);
+    setToggleBusy(true);
+    try {
+      await apiJson<Chofer>(
+        `/api/choferes/${encodeURIComponent(confirmToggle.id)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify({ activo: !confirmToggle.activo }) },
+      );
+      setConfirmToggle(null);
+      await load();
+    } catch (e) {
+      setError(friendlyError(e, "choferes"));
+      setConfirmToggle(null);
+    } finally {
+      setToggleBusy(false);
+    }
+  }
+
+  const estadoSelectClass = (activo: boolean) =>
+    `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+      activo ? "text-vialto-fire" : "text-vialto-charcoal"
+    }`;
 
   const choferesListadoFiltros = (
     <>
@@ -141,6 +187,20 @@ export function ChoferesTenantPage() {
           </button>
         </div>
       </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
+        <select
+          value={filtroActivo}
+          onChange={(e) =>
+            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
+          }
+          className={estadoSelectClass(filtroActivo !== "todos")}
+          aria-label="Filtrar por estado del chofer"
+        >
+          <option value="todos">Todos</option>
+          <option value="activos">Solo activos</option>
+          <option value="inactivos">Solo inactivos</option>
+        </select>
+      </ListadoFiltroCampo>
     </>
   );
 
@@ -149,9 +209,6 @@ export function ChoferesTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Choferes
       </h1>
-      <p className="mt-2 text-vialto-steel">
-        Quienes manejan tus unidades, con datos de contacto a mano.
-      </p>
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
         {activeFilterCount > 0 && (
           <button
@@ -254,10 +311,26 @@ export function ChoferesTenantPage() {
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              Licencia
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              Teléfono
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={filtroActivo !== "todos"}
+                filterSignature={filtroActivo}
+              >
+                <select
+                  value={filtroActivo}
+                  onChange={(e) =>
+                    setFiltroActivo(
+                      e.target.value as "todos" | "activos" | "inactivos",
+                    )
+                  }
+                  className={estadoSelectClass(filtroActivo !== "todos")}
+                  aria-label="Filtrar por estado del chofer"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="activos">Solo activos</option>
+                  <option value="inactivos">Solo inactivos</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
             </th>
             <th
               scope="col"
@@ -282,16 +355,20 @@ export function ChoferesTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {
-            id: "licencia",
-            header: "Licencia",
-            cell: (c) => c.licencia ?? "—",
-            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
-            id: "telefono",
-            header: "Teléfono",
-            cell: (c) => c.telefono ?? "—",
-            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+            id: "estado",
+            header: "Estado",
+            cell: (c) => (
+              <span
+                className={
+                  c.activo
+                    ? "text-xs uppercase tracking-wider text-emerald-800"
+                    : "text-xs uppercase tracking-wider text-vialto-steel"
+                }
+              >
+                {c.activo ? "Activo" : "Inactivo"}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
           },
         ]}
         rows={error ? [] : rows}
@@ -322,6 +399,23 @@ export function ChoferesTenantPage() {
             >
               Editar
             </Link>
+            {c.activo ? (
+              <button
+                type="button"
+                onClick={() => setConfirmToggle(c)}
+                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+              >
+                Desactivar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmToggle(c)}
+                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
+              >
+                Reactivar
+              </button>
+            )}
           </div>
         )}
       />
@@ -352,6 +446,21 @@ export function ChoferesTenantPage() {
           editTo={`/choferes/${encodeURIComponent(viewingChoferId)}/editar`}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirmToggle}
+        title={confirmToggle?.activo ? "Desactivar chofer" : "Reactivar chofer"}
+        message={
+          confirmToggle?.activo
+            ? `¿Desactivar a "${confirmToggle?.nombre}"? No va a poder loguearse en la app de combustible hasta que lo reactives.`
+            : `¿Reactivar a "${confirmToggle?.nombre}"?`
+        }
+        confirmLabel={confirmToggle?.activo ? "Desactivar" : "Reactivar"}
+        tone={confirmToggle?.activo ? "danger" : "default"}
+        busy={toggleBusy}
+        onConfirm={handleToggleActivo}
+        onCancel={() => setConfirmToggle(null)}
+      />
     </div>
   );
 }

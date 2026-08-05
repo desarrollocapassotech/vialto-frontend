@@ -205,6 +205,16 @@ export function VehiculoViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Estado
+            </p>
+            <p
+              className={`mt-1 text-sm ${vehiculo.activo ? "text-emerald-800" : "text-vialto-steel"}`}
+            >
+              {vehiculo.activo ? "Activo" : "Inactivo"}
+            </p>
+          </div>
         </div>
       )}
     </ViewModalShell>
