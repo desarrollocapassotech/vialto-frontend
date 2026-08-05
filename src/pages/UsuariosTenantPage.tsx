@@ -15,8 +15,8 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
   listadoTablaHeadRowClass,
+  listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";

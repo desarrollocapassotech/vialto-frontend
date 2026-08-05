@@ -4,22 +4,31 @@ import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { labelVehiculoTipo } from "@/lib/labels";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
   listadoTablaHeadRowClass,
+  listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PaginatedMeta, Vehiculo } from "@/types/api";
 
 type VehiculosPaginatedResponse = {
   items: Vehiculo[];
   meta: PaginatedMeta;
 };
+
+const TIPO_OPCIONES = [
+  { value: "", label: "Todos" },
+  { value: "tractor", label: "Tractor" },
+  { value: "semirremolque", label: "Semirremolque" },
+  { value: "camion", label: "Camión" },
+  { value: "utilitario", label: "Utilitario" },
+  { value: "otro", label: "Otro" },
+] as const;
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -57,15 +66,6 @@ export function VehiculosTenantPage() {
       ).sort(),
     [rows],
   );
-  const opcionesTipo = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.tipo).filter((v): v is string => !!v),
-        ),
-      ).sort(),
-    [rows],
-  );
   const opcionesMarca = useMemo(
     () =>
       Array.from(
@@ -91,8 +91,12 @@ export function VehiculosTenantPage() {
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
         const data = await apiJson<VehiculosPaginatedResponse>(
-          `/api/vehiculos/paginated?page=${page}&pageSize=${pageSize}`,
+          `/api/vehiculos/paginated?${params.toString()}`,
           () => getToken(),
         );
         if (!cancelled) {
@@ -112,6 +116,11 @@ export function VehiculosTenantPage() {
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+
+  const tipoSelectClass = (activo: boolean) =>
+    `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+      activo ? "text-vialto-fire" : "text-vialto-charcoal"
+    }`;
 
   return (
     <div className="w-full">
@@ -189,15 +198,12 @@ export function VehiculosTenantPage() {
                     setFiltroTipo(e.target.value);
                     setPage(1);
                   }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroTipo ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Tipo"
+                  className={tipoSelectClass(!!filtroTipo)}
+                  aria-label="Filtrar por tipo de vehículo"
                 >
-                  <option value="">Todos</option>
-                  {opcionesTipo.map((o) => (
-                    <option key={o} value={o}>
-                      {labelVehiculoTipo(o)}
+                  {TIPO_OPCIONES.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>

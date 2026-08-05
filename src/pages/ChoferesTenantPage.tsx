@@ -8,8 +8,8 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
-  listadoTablaTdClass,
   listadoTablaHeadRowClass,
+  listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { canAccessCombustible } from "@/lib/tenantModules";
@@ -90,8 +90,12 @@ export function ChoferesTenantPage() {
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
         const data = await apiJson<ChoferesPaginatedResponse>(
-          `/api/choferes/paginated?page=${page}&pageSize=${pageSize}`,
+          `/api/choferes/paginated?${params.toString()}`,
           () => getToken(),
         );
         if (!cancelled) {
