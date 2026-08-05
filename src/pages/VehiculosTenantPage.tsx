@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -10,7 +10,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PaginatedMeta, Vehiculo } from "@/types/api";
 
 type VehiculosPaginatedResponse = {
@@ -21,7 +24,7 @@ type VehiculosPaginatedResponse = {
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
-  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+  const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -29,6 +32,59 @@ export function VehiculosTenantPage() {
     null,
   );
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
+
+  // Estados de los filtros de columna
+  const [filtroPatente, setFiltroPatente] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroMarca, setFiltroMarca] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroPatente("");
+    setFiltroTipo("");
+    setFiltroMarca("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroPatente || !!filtroTipo || !!filtroMarca;
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesPatente = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.patente).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesTipo = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.tipo).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesMarca = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.marca).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroPatente && r.patente !== filtroPatente) return false;
+      if (filtroTipo && r.tipo !== filtroTipo) return false;
+      if (filtroMarca && r.marca !== filtroMarca) return false;
+      return true;
+    });
+  }, [rows, filtroPatente, filtroTipo, filtroMarca]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -41,13 +97,13 @@ export function VehiculosTenantPage() {
         );
         if (!cancelled) {
           setRows(data.items);
-          setMeta(data.meta);
+          setServerMeta(data.meta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setMeta(null);
+          setServerMeta(null);
           setError(friendlyError(e, "vehiculos"));
         }
       }
@@ -65,7 +121,17 @@ export function VehiculosTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Patentes, tipo y marca de cada unidad de tu flota.
       </p>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to="/vehiculos/nuevo"
           className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -73,13 +139,104 @@ export function VehiculosTenantPage() {
           Crear vehículo
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
+
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={5}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Patente"
+                filterActive={!!filtroPatente}
+                filterSignature={filtroPatente}
+              >
+                <select
+                  value={filtroPatente}
+                  onChange={(e) => {
+                    setFiltroPatente(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPatente ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Patente"
+                >
+                  <option value="">Todas</option>
+                  {opcionesPatente.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Tipo"
+                filterActive={!!filtroTipo}
+                filterSignature={filtroTipo}
+              >
+                <select
+                  value={filtroTipo}
+                  onChange={(e) => {
+                    setFiltroTipo(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroTipo ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Tipo"
+                >
+                  <option value="">Todos</option>
+                  {opcionesTipo.map((o) => (
+                    <option key={o} value={o}>
+                      {labelVehiculoTipo(o)}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Marca"
+                filterActive={!!filtroMarca}
+                filterSignature={filtroMarca}
+              >
+                <select
+                  value={filtroMarca}
+                  onChange={(e) => {
+                    setFiltroMarca(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroMarca ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Marca"
+                >
+                  <option value="">Todas</option>
+                  {opcionesMarca.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Modelo
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "patente",
@@ -107,12 +264,14 @@ export function VehiculosTenantPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : rowsFiltradas}
         rowKey={(v) => v.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los vehículos."
-            : "Todavía no tenés vehículos cargados."
+            : anyFiltroActivo
+              ? "No hay vehículos que coincidan con los filtros aplicados."
+              : "Todavía no tenés vehículos cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(v) => (
@@ -137,10 +296,10 @@ export function VehiculosTenantPage() {
         )}
       />
 
-      {meta && (
+      {serverMeta && (
         <div className="mt-4">
           <ListadoPagination
-            meta={meta}
+            meta={serverMeta}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(newSize) => {

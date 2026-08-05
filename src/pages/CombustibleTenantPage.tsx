@@ -9,10 +9,15 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { listadoTablaTdClass } from "@/lib/listadoTabla";
+import {
+  listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
+} from "@/lib/listadoTabla";
 import { FORMA_PAGO_LABELS, fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import { exportarCargasCombustible } from "@/lib/combustibleExcelExport";
 import { exportarCargasCombustibleCsv } from "@/lib/combustibleCsvExport";
@@ -614,7 +619,7 @@ export function CombustibleTenantPage({
         id: "acciones",
         header: "Acciones",
         cell: (r) => (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-end">
             <button
               type="button"
               onClick={() => setViewTargetId(r.id)}
@@ -773,116 +778,6 @@ export function CombustibleTenantPage({
       )}
 
       {activeTenantId && (!error || !embeddedInSuperadmin) && (
-        <div className="mt-6 flex flex-wrap items-end gap-3">
-          <div className="flex items-end gap-2">
-            <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-              Desde
-              <input
-                type="date"
-                value={desde}
-                onChange={(e) => {
-                  setDesde(e.target.value);
-                  resetPage();
-                }}
-                className={`${inputClass} min-w-[150px] ${
-                  desde !== primerDiaMesActual() ? "text-vialto-fire" : ""
-                }`}
-                aria-label="Filtrar desde fecha"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
-              Hasta
-              <input
-                type="date"
-                value={hasta}
-                onChange={(e) => {
-                  setHasta(e.target.value);
-                  resetPage();
-                }}
-                className={`${inputClass} min-w-[150px] ${
-                  hasta !== hoyIso() ? "text-vialto-fire" : ""
-                }`}
-                aria-label="Filtrar hasta fecha"
-              />
-            </label>
-          </div>
-
-          <div className="min-w-[180px]">
-            <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-vialto-steel">
-              Conductor
-            </span>
-            <SearchableSelect
-              value={choferId}
-              onChange={(v) => {
-                setChoferId(v);
-                resetPage();
-              }}
-              options={choferOptions}
-              placeholder="Todos"
-              searchPlaceholder="Buscar conductor…"
-              triggerClassName={choferId ? "text-vialto-fire" : ""}
-              ariaLabel="Filtrar por conductor"
-            />
-          </div>
-
-          <div className="min-w-[180px]">
-            <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-vialto-steel">
-              Vehículo
-            </span>
-            <SearchableSelect
-              value={vehiculoId}
-              onChange={(v) => {
-                setVehiculoId(v);
-                resetPage();
-              }}
-              options={vehiculoOptions}
-              placeholder="Todos"
-              searchPlaceholder="Buscar vehículo…"
-              triggerClassName={vehiculoId ? "text-vialto-fire" : ""}
-              ariaLabel="Filtrar por vehículo"
-            />
-          </div>
-
-          <div className="min-w-[180px]">
-            <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-vialto-steel">
-              Estación
-            </span>
-            <SearchableSelect
-              value={estacion}
-              onChange={(v) => {
-                setEstacion(v);
-                resetPage();
-              }}
-              options={estacionOptions}
-              placeholder="Todas"
-              searchPlaceholder="Buscar estación…"
-              triggerClassName={estacion ? "text-vialto-fire" : ""}
-              ariaLabel="Filtrar por estación"
-            />
-          </div>
-
-          <div className="min-w-[160px]">
-            <span className="mb-0.5 block text-[10px] uppercase tracking-wider text-vialto-steel">
-              Forma de pago
-            </span>
-            <select
-              value={formaPago}
-              onChange={(e) => {
-                setFormaPago(e.target.value);
-                resetPage();
-              }}
-              className={`${inputClass} ${formaPago ? "text-vialto-fire" : ""}`}
-              aria-label="Filtrar por forma de pago"
-            >
-              <option value="">Todas</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="efectivo">Efectivo</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {activeTenantId && (!error || !embeddedInSuperadmin) && (
         <p className="mt-4 text-xs text-vialto-steel">
           Mostrando cargas del {fmtFecha(desde)} al {fmtFecha(hasta)}
         </p>
@@ -890,6 +785,140 @@ export function CombustibleTenantPage({
 
       <ListadoDatos<CargaCombustible>
         className="mt-6"
+        tableColSpan={9}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className="w-8 px-2 py-3 align-top"></th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Fecha"
+                filterActive={!rangoFechaPorDefecto}
+                filterSignature={`${desde}|${hasta}`}
+              >
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Desde
+                    <input
+                      type="date"
+                      value={desde}
+                      onChange={(e) => {
+                        setDesde(e.target.value);
+                        resetPage();
+                      }}
+                      className={`${inputClass} min-w-[140px] ${
+                        desde !== primerDiaMesActual() ? "text-vialto-fire" : ""
+                      }`}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Hasta
+                    <input
+                      type="date"
+                      value={hasta}
+                      onChange={(e) => {
+                        setHasta(e.target.value);
+                        resetPage();
+                      }}
+                      className={`${inputClass} min-w-[140px] ${
+                        hasta !== hoyIso() ? "text-vialto-fire" : ""
+                      }`}
+                    />
+                  </label>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Conductor"
+                filterActive={!!choferId}
+                filterSignature={choferId}
+              >
+                <SearchableSelect
+                  value={choferId}
+                  onChange={(v) => {
+                    setChoferId(v);
+                    resetPage();
+                  }}
+                  options={choferOptions}
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar conductor…"
+                  triggerClassName={choferId ? "text-vialto-fire" : ""}
+                  ariaLabel="Filtrar por conductor"
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Vehículo"
+                filterActive={!!vehiculoId}
+                filterSignature={vehiculoId}
+              >
+                <SearchableSelect
+                  value={vehiculoId}
+                  onChange={(v) => {
+                    setVehiculoId(v);
+                    resetPage();
+                  }}
+                  options={vehiculoOptions}
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar vehículo…"
+                  triggerClassName={vehiculoId ? "text-vialto-fire" : ""}
+                  ariaLabel="Filtrar por vehículo"
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estación"
+                filterActive={!!estacion}
+                filterSignature={estacion}
+              >
+                <SearchableSelect
+                  value={estacion}
+                  onChange={(v) => {
+                    setEstacion(v);
+                    resetPage();
+                  }}
+                  options={estacionOptions}
+                  placeholder="Todas"
+                  searchPlaceholder="Buscar estación…"
+                  triggerClassName={estacion ? "text-vialto-fire" : ""}
+                  ariaLabel="Filtrar por estación"
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Pago"
+                filterActive={!!formaPago}
+                filterSignature={formaPago}
+              >
+                <select
+                  value={formaPago}
+                  onChange={(e) => {
+                    setFormaPago(e.target.value);
+                    resetPage();
+                  }}
+                  className={`${inputClass} ${formaPago ? "text-vialto-fire" : ""}`}
+                  aria-label="Filtrar por forma de pago"
+                >
+                  <option value="">Todas</option>
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="efectivo">Efectivo</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Litros
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Monto
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={columns}
         rows={!activeTenantId || error ? [] : rows}
         rowKey={(r) => r.id}

@@ -14,7 +14,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser, PaginatedMeta } from "@/types/api";
 
 function formatRole(role: string, platformRole?: string | null) {
@@ -39,6 +42,10 @@ function formatDate(value: number | string) {
   }
 }
 
+function getFullName(u: PlatformUser) {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || "—";
+}
+
 export function SuperadminUsersPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const tenants = useTenantsList();
@@ -55,6 +62,61 @@ export function SuperadminUsersPage() {
     LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
   );
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEmail, setFiltroEmail] = useState("");
+  const [filtroRol, setFiltroRol] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEmail("");
+    setFiltroRol("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEmail || !!filtroRol;
+
+  // Extracción de opciones únicas para los selectores (sobre la página actual)
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || [])
+            .map(getFullName)
+            .filter((v): v is string => !!v && v !== "—"),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesEmail = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.email).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesRol = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.role).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && getFullName(r) !== filtroNombre) return false;
+      if (filtroEmail && r.email !== filtroEmail) return false;
+      if (filtroRol && r.role !== filtroRol) return false;
+      return true;
+    });
+  }, [rows, filtroNombre, filtroEmail, filtroRol]);
 
   // Reiniciar a la página 1 cuando se cambia de empresa
   useEffect(() => {
@@ -153,14 +215,28 @@ export function SuperadminUsersPage() {
         <p className="mt-2 text-vialto-steel max-w-3xl">
           Visualizá miembros de cada empresa para control de accesos y roles.
         </p>
+
         <div className="mt-6">
           <EmpresaFilterBar
             tenants={tenants}
             value={filtroEmpresa}
-            onChange={onChangeTenant}
+            onChange={(id) => {
+              limpiarFiltros();
+              onChangeTenant(id);
+            }}
           />
         </div>
-        <div className="mt-4 flex justify-end">
+
+        <div className="mt-4 flex justify-end gap-2">
+          {anyFiltroActivo && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Limpiar filtros
+            </button>
+          )}
           <Link
             to={
               filtroEmpresa
@@ -191,14 +267,102 @@ export function SuperadminUsersPage() {
         )}
 
         <ListadoDatos
-          className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+          className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+          tableColSpan={5}
+          tableHead={
+            <tr className={listadoTablaHeadRowClass}>
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Nombre"
+                  filterActive={!!filtroNombre}
+                  filterSignature={filtroNombre}
+                >
+                  <select
+                    value={filtroNombre}
+                    onChange={(e) => {
+                      setFiltroNombre(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por Nombre"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesNombre.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Email"
+                  filterActive={!!filtroEmail}
+                  filterSignature={filtroEmail}
+                >
+                  <select
+                    value={filtroEmail}
+                    onChange={(e) => {
+                      setFiltroEmail(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroEmail ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por Email"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesEmail.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Rol"
+                  filterActive={!!filtroRol}
+                  filterSignature={filtroRol}
+                >
+                  <select
+                    value={filtroRol}
+                    onChange={(e) => {
+                      setFiltroRol(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroRol ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por Rol"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesRol.map((o) => (
+                      <option key={o} value={o}>
+                        {formatRole(o)}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+              <th scope="col" className={listadoTablaThClass}>
+                Alta
+              </th>
+              <th scope="col" className={`${listadoTablaThClass} text-right`}>
+                Acciones
+              </th>
+            </tr>
+          }
           columns={[
             {
               id: "nombre",
               header: "Nombre",
               primary: true,
-              cell: (u) =>
-                [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
+              cell: (u) => getFullName(u),
               tdClassName: listadoTablaTdClass,
             },
             {
@@ -220,14 +384,16 @@ export function SuperadminUsersPage() {
               tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
             },
           ]}
-          rows={!filtroEmpresa || error ? [] : rows}
+          rows={!filtroEmpresa || error ? [] : rowsFiltradas}
           rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
           emptyMessage={
             !filtroEmpresa
               ? "Seleccioná una empresa para ver sus usuarios."
               : error
                 ? "No se pudieron cargar los usuarios."
-                : "No hay usuarios en esta empresa."
+                : anyFiltroActivo
+                  ? "No hay usuarios que coincidan con los filtros aplicados."
+                  : "No hay usuarios en esta empresa."
           }
           loadingMessage="Cargando…"
           renderActions={(u) =>

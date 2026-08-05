@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -13,7 +13,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, Destinatario, PaginatedMeta } from "@/types/api";
 
 export function DestinatariosSuperadminPage() {
@@ -34,7 +37,51 @@ export function DestinatariosSuperadminPage() {
   );
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
 
-  // Reiniciar a la página 1 cuando se cambia de empresa
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEmpresaCol, setFiltroEmpresaCol] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEmpresaCol("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEmpresaCol;
+
+  // Extracción de opciones únicas
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesEmpresa = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || [])
+            .map((r) => r.empresaNombre)
+            .filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroEmpresaCol && r.empresaNombre !== filtroEmpresaCol)
+        return false;
+      return true;
+    });
+  }, [rows, filtroNombre, filtroEmpresaCol]);
+
+  // Reiniciar a la página 1 cuando se cambia de empresa principal
   useEffect(() => {
     setPage(1);
   }, [filtroEmpresa]);
@@ -127,10 +174,23 @@ export function DestinatariosSuperadminPage() {
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
-          onChange={onChangeTenant}
+          onChange={(id) => {
+            limpiarFiltros();
+            onChangeTenant(id);
+          }}
         />
       </div>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to={
             filtroEmpresa
@@ -147,13 +207,77 @@ export function DestinatariosSuperadminPage() {
           Crear destinatario
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
+
       <ListadoDatos
-        className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        tableColSpan={3}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Empresa"
+                filterActive={!!filtroEmpresaCol}
+                filterSignature={filtroEmpresaCol}
+              >
+                <select
+                  value={filtroEmpresaCol}
+                  onChange={(e) => {
+                    setFiltroEmpresaCol(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroEmpresaCol
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Empresa"
+                >
+                  <option value="">Todas</option>
+                  {opcionesEmpresa.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -169,14 +293,16 @@ export function DestinatariosSuperadminPage() {
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
         ]}
-        rows={filtroEmpresa ? (error ? [] : rows) : []}
+        rows={filtroEmpresa ? (error ? [] : rowsFiltradas) : []}
         rowKey={(d) => d.id}
         emptyMessage={
           !filtroEmpresa
             ? "Seleccioná una empresa para ver destinatarios."
             : error
               ? "No se pudieron cargar los destinatarios."
-              : "No hay destinatarios para esta empresa."
+              : anyFiltroActivo
+                ? "No hay destinatarios que coincidan con los filtros aplicados."
+                : "No hay destinatarios para esta empresa."
         }
         loadingMessage="Cargando…"
         renderActions={(d) => (

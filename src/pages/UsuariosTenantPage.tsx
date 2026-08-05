@@ -16,7 +16,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser } from "@/types/api";
 
 type TenantUser = Pick<
@@ -57,6 +60,10 @@ function toApiRole(role: string): "admin" | "member" | "stock_viewer" {
   return "member";
 }
 
+function getFullName(u: TenantUser) {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || "—";
+}
+
 // ─── Modal de usuario (ver / editar rol) ────────────────────────────────────
 
 function UsuarioModal({
@@ -81,8 +88,7 @@ function UsuarioModal({
   onDelete: () => void;
 }) {
   const user = modal.user;
-  const nombre =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+  const nombre = getFullName(user);
   const esMismoUsuario = user.userId === currentUserId;
 
   if (modal.mode === "edit-role") {
@@ -121,27 +127,27 @@ function UsuarioModal({
             {(["admin", "member", "stock_viewer"] as const)
               .filter((r) => r !== "stock_viewer" || tieneModuloStock)
               .map((r) => (
-              <label
-                key={r}
-                className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value={r}
-                  checked={modal.selectedRole === r}
-                  onChange={() => onSetSelectedRole(r)}
-                  className="accent-vialto-fire"
-                />
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === "admin"
-                    ? "Administrador"
-                    : r === "stock_viewer"
-                      ? "Consulta de stock"
-                      : "Miembro"}
-                </span>
-              </label>
-            ))}
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={modal.selectedRole === r}
+                    onChange={() => onSetSelectedRole(r)}
+                    className="accent-vialto-fire"
+                  />
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {r === "admin"
+                      ? "Administrador"
+                      : r === "stock_viewer"
+                        ? "Consulta de stock"
+                        : "Miembro"}
+                  </span>
+                </label>
+              ))}
           </div>
         </div>
       </ViewModalShell>
@@ -337,27 +343,27 @@ function CreateUserModal({
             {(["member", "admin", "stock_viewer"] as const)
               .filter((r) => r !== "stock_viewer" || tieneModuloStock)
               .map((r) => (
-              <label
-                key={r}
-                className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
-              >
-                <input
-                  type="radio"
-                  name="cu-role"
-                  value={r}
-                  checked={role === r}
-                  onChange={() => setRole(r)}
-                  className="accent-vialto-fire"
-                />
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === "admin"
-                    ? "Administrador"
-                    : r === "stock_viewer"
-                      ? "Consulta de stock"
-                      : "Miembro"}
-                </span>
-              </label>
-            ))}
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
+                >
+                  <input
+                    type="radio"
+                    name="cu-role"
+                    value={r}
+                    checked={role === r}
+                    onChange={() => setRole(r)}
+                    className="accent-vialto-fire"
+                  />
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {r === "admin"
+                      ? "Administrador"
+                      : r === "stock_viewer"
+                        ? "Consulta de stock"
+                        : "Miembro"}
+                  </span>
+                </label>
+              ))}
           </div>
         </div>
         {error && (
@@ -379,7 +385,7 @@ export function UsuariosTenantPage() {
   const { tenant } = useCurrentTenant();
   const tieneModuloStock = tenant?.modules?.includes("stock") ?? false;
 
-  const [rows, setRows] = useState<TenantUser[] | null>(null);
+  const [allRows, setAllRows] = useState<TenantUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -389,22 +395,77 @@ export function UsuariosTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEmail, setFiltroEmail] = useState("");
+  const [filtroRol, setFiltroRol] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEmail("");
+    setFiltroRol("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEmail || !!filtroRol;
+
+  // Extracción de opciones únicas
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || [])
+            .map(getFullName)
+            .filter((v): v is string => !!v && v !== "—"),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesEmail = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.email).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesRol = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.role).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!allRows) return [];
+    return allRows.filter((r) => {
+      if (filtroNombre && getFullName(r) !== filtroNombre) return false;
+      if (filtroEmail && r.email !== filtroEmail) return false;
+      if (filtroRol && r.role !== filtroRol) return false;
+      return true;
+    });
+  }, [allRows, filtroNombre, filtroEmail, filtroRol]);
+
   const load = useCallback(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setRows(null);
+    setAllRows(null);
     (async () => {
       try {
         const data = await apiJson<TenantUser[]>("/api/users", () =>
           getToken(),
         );
         if (!cancelled) {
-          setRows(data);
+          setAllRows(data);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
-          setRows(null);
+          setAllRows(null);
           setError(friendlyError(e, "usuarios"));
         }
       }
@@ -478,8 +539,8 @@ export function UsuariosTenantPage() {
   }
 
   const meta = useMemo(() => {
-    if (!rows) return null;
-    const total = rows.length;
+    if (!rowsFiltradas) return null;
+    const total = rowsFiltradas.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       total,
@@ -489,13 +550,13 @@ export function UsuariosTenantPage() {
       hasPrev: page > 1,
       hasNext: page < totalPages,
     };
-  }, [rows, page, pageSize]);
+  }, [rowsFiltradas, page, pageSize]);
 
   const paginatedRows = useMemo(() => {
-    if (!rows) return null;
+    if (!rowsFiltradas) return null;
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return rowsFiltradas.slice(start, start + pageSize);
+  }, [rowsFiltradas, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -506,7 +567,16 @@ export function UsuariosTenantPage() {
         Miembros de tu organización y sus roles de acceso.
       </p>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -532,14 +602,102 @@ export function UsuariosTenantPage() {
       )}
 
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={5}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Email"
+                filterActive={!!filtroEmail}
+                filterSignature={filtroEmail}
+              >
+                <select
+                  value={filtroEmail}
+                  onChange={(e) => {
+                    setFiltroEmail(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroEmail ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Email"
+                >
+                  <option value="">Todos</option>
+                  {opcionesEmail.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Rol"
+                filterActive={!!filtroRol}
+                filterSignature={filtroRol}
+              >
+                <select
+                  value={filtroRol}
+                  onChange={(e) => {
+                    setFiltroRol(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroRol ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Rol"
+                >
+                  <option value="">Todos</option>
+                  {opcionesRol.map((o) => (
+                    <option key={o} value={o}>
+                      {formatRole(o)}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Alta
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
             header: "Nombre",
             primary: true,
-            cell: (u) =>
-              [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
+            cell: (u) => getFullName(u),
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -563,7 +721,11 @@ export function UsuariosTenantPage() {
         ]}
         rows={error ? [] : paginatedRows}
         rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
-        emptyMessage="No hay usuarios en esta organización."
+        emptyMessage={
+          anyFiltroActivo
+            ? "No hay usuarios que coincidan con los filtros aplicados."
+            : "No hay usuarios en esta organización."
+        }
         loadingMessage="Cargando…"
         renderActions={(u) =>
           u.userId ? (
@@ -583,7 +745,7 @@ export function UsuariosTenantPage() {
         }
       />
 
-      {meta && (rows?.length ?? 0) > 0 && (
+      {meta && (rowsFiltradas?.length ?? 0) > 0 && (
         <div className="mt-4">
           <ListadoPagination
             meta={meta}
@@ -632,7 +794,7 @@ export function UsuariosTenantPage() {
       <ConfirmDialog
         open={!!confirmDelete}
         title="Eliminar usuario"
-        message={`¿Eliminás a ${[confirmDelete?.firstName, confirmDelete?.lastName].filter(Boolean).join(" ") || confirmDelete?.email} de la organización? Perderá acceso de inmediato.`}
+        message={`¿Eliminás a ${getFullName(confirmDelete!)} de la organización? Perderá acceso de inmediato.`}
         confirmLabel="Eliminar"
         tone="danger"
         busy={busy}

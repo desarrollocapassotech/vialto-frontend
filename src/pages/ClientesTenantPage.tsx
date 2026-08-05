@@ -1,17 +1,18 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { ListadoToolbar } from "@/components/listado/ListadoToolbar";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
-import { useListadoFiltros } from "@/hooks/useListadoFiltros";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Cliente, PaginatedMeta } from "@/types/api";
 
 type ClientesPaginatedResponse = {
@@ -22,22 +23,64 @@ type ClientesPaginatedResponse = {
 export function ClientesTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [rows, setRows] = useState<Cliente[] | null>(null);
-  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+  const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
-  const {
-    busqueda,
-    setBusqueda,
-    filtroPais,
-    setFiltroPais,
-    paisesList,
-    rowsFiltradas,
-    onClear,
-    activeFilterCount,
-  } = useListadoFiltros(rows, ["nombre", "idFiscal"]);
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroIdFiscal, setFiltroIdFiscal] = useState("");
+  const [filtroPais, setFiltroPais] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroIdFiscal("");
+    setFiltroPais("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroIdFiscal || !!filtroPais;
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesIdFiscal = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesPais = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.pais).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroIdFiscal && r.idFiscal !== filtroIdFiscal) return false;
+      if (filtroPais && r.pais !== filtroPais) return false;
+      return true;
+    });
+  }, [rows, filtroNombre, filtroIdFiscal, filtroPais]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -50,13 +93,13 @@ export function ClientesTenantPage() {
         );
         if (!cancelled) {
           setRows(data.items);
-          setMeta(data.meta);
+          setServerMeta(data.meta);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setMeta(null);
+          setServerMeta(null);
           setError(friendlyError(e, "clientes"));
         }
       }
@@ -74,7 +117,17 @@ export function ClientesTenantPage() {
       <p className="mt-2 text-vialto-steel">
         Las empresas o personas a las que les prestás el servicio.
       </p>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to="/clientes/nuevo"
           className="inline-flex min-h-11 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite md:min-h-0 md:h-10"
@@ -82,29 +135,107 @@ export function ClientesTenantPage() {
           Crear cliente
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
 
-      <ListadoToolbar
-        searchValue={busqueda}
-        onSearchChange={setBusqueda}
-        searchPlaceholder="Buscar por nombre o ID fiscal"
-        filtros={[
-          {
-            value: filtroPais,
-            onChange: setFiltroPais,
-            placeholder: "Todos los países",
-            opciones: paisesList.map((p) => ({ value: p, label: p })),
-          },
-        ]}
-        onClear={onClear}
-      />
-
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={6}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="ID Fiscal"
+                filterActive={!!filtroIdFiscal}
+                filterSignature={filtroIdFiscal}
+              >
+                <select
+                  value={filtroIdFiscal}
+                  onChange={(e) => {
+                    setFiltroIdFiscal(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por ID Fiscal"
+                >
+                  <option value="">Todos</option>
+                  {opcionesIdFiscal.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="País"
+                filterActive={!!filtroPais}
+                filterSignature={filtroPais}
+              >
+                <select
+                  value={filtroPais}
+                  onChange={(e) => {
+                    setFiltroPais(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPais ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por País"
+                >
+                  <option value="">Todos</option>
+                  {opcionesPais.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Email
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Teléfono
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -143,7 +274,7 @@ export function ClientesTenantPage() {
         emptyMessage={
           error
             ? "No se pudieron cargar los clientes."
-            : activeFilterCount > 0
+            : anyFiltroActivo
               ? "No hay clientes que coincidan con los filtros aplicados."
               : "Todavía no tenés clientes cargados."
         }
@@ -159,10 +290,10 @@ export function ClientesTenantPage() {
         )}
       />
 
-      {meta && (
+      {serverMeta && (
         <div className="mt-4">
           <ListadoPagination
-            meta={meta}
+            meta={serverMeta}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(newSize) => {

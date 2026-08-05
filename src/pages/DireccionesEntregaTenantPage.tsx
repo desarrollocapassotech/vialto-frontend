@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DireccionEntregaViewModal } from "@/components/direcciones-entrega/DireccionEntregaViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -10,7 +10,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { DireccionEntrega, PaginatedMeta } from "@/types/api";
 
 export function DireccionesEntregaTenantPage() {
@@ -28,6 +31,35 @@ export function DireccionesEntregaTenantPage() {
     LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
   );
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Estados de los filtros de columna
+  const [filtroDireccion, setFiltroDireccion] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroDireccion("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroDireccion;
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesDireccion = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.direccion).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroDireccion && r.direccion !== filtroDireccion) return false;
+      return true;
+    });
+  }, [rows, filtroDireccion]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -111,7 +143,16 @@ export function DireccionesEntregaTenantPage() {
         Direcciones y rutas frecuentes para egresos de stock.
       </p>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to="/direcciones-entrega/nuevo"
           className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -127,7 +168,43 @@ export function DireccionesEntregaTenantPage() {
       )}
 
       <ListadoDatos
-        className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        tableColSpan={2}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Dirección / Ruta"
+                filterActive={!!filtroDireccion}
+                filterSignature={filtroDireccion}
+              >
+                <select
+                  value={filtroDireccion}
+                  onChange={(e) => {
+                    setFiltroDireccion(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroDireccion
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Dirección"
+                >
+                  <option value="">Todas</option>
+                  {opcionesDireccion.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "direccion",
@@ -137,12 +214,14 @@ export function DireccionesEntregaTenantPage() {
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : rowsFiltradas}
         rowKey={(d) => d.id}
         emptyMessage={
           error
             ? "No se pudieron cargar las direcciones."
-            : "Todavía no hay direcciones cargadas."
+            : anyFiltroActivo
+              ? "No hay direcciones que coincidan con los filtros aplicados."
+              : "Todavía no hay direcciones cargadas."
         }
         loadingMessage="Cargando…"
         renderActions={(d) => (
@@ -160,7 +239,7 @@ export function DireccionesEntregaTenantPage() {
       />
 
       {/* COMPONENTE DE PAGINACIÓN */}
-      {meta && rows && rows.length > 0 && (
+      {meta && (rowsFiltradas?.length ?? 0) > 0 && (
         <ListadoPagination
           meta={meta}
           pageSize={pageSize}
