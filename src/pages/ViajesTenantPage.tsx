@@ -22,7 +22,6 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { AgregarGastoModal } from "@/components/viajes/AgregarGastoModal";
 import { RegistrarPagoTransportistaModal } from "@/components/viajes/RegistrarPagoTransportistaModal";
 import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
-import { EmitirCvlpModal } from "@/components/viajes/EmitirCvlpModal";
 import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import type { FacturaLetra } from "@/lib/arcaCbteTipo";
@@ -104,7 +103,6 @@ import type {
   Chofer,
   Cliente,
   Factura,
-  Liquidacion,
   PaginatedMeta,
   Producto,
   Transportista,
@@ -268,7 +266,6 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(
     null,
   );
-  const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
   const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
   const [tipoFacturaViaje, setTipoFacturaViaje] = useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
@@ -972,7 +969,7 @@ export function ViajesTenantPage({
       if (exportarViaje?.id === v.id) setExportarViaje(null);
       if (agregarGastoViaje?.id === v.id) setAgregarGastoViaje(null);
       if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
-      if (emitirCvlpViaje?.id === v.id) setEmitirCvlpViaje(null);
+      if (crearLiqViaje?.id === v.id) setCrearLiqViaje(null);
       if (selectorViaje?.id === v.id) setSelectorViaje(null);
       if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
       setViajeDeleteConfirm(null);
@@ -2248,16 +2245,6 @@ export function ViajesTenantPage({
         />
       )}
 
-      {emitirCvlpViaje && (
-        <EmitirCvlpModal
-          viaje={emitirCvlpViaje}
-          onClose={() => setEmitirCvlpViaje(null)}
-          onEmitido={(_liq: Liquidacion) => {
-            setListadoQueryVersion((v) => v + 1);
-          }}
-        />
-      )}
-
       {selectorViaje && (
         <FacturarSelectorModal
           onClose={() => setSelectorViaje(null)}
@@ -2319,11 +2306,7 @@ export function ViajesTenantPage({
               showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
               return;
             }
-            if (hasLiquidacionesArca) {
-              setEmitirCvlpViaje(selectorViaje);
-            } else {
-              setCrearLiqViaje(selectorViaje);
-            }
+            setCrearLiqViaje(selectorViaje);
             setSelectorViaje(null);
           }}
         />
