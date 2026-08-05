@@ -16,6 +16,17 @@ import { AmbienteHomologacionWarning } from "@/components/liquidaciones/Ambiente
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
+import {
+  ARCA_CBTE_OVERRIDE_WARNING,
+  condicionIvaLabel,
+  cvlpCbteLabel,
+  cvlpCbteTipoFromCondicionIva,
+  type CvlpCbteTipo,
+} from "@/lib/arcaCbteTipo";
+import {
+  MSG_ARCA_NO_LIQUIDA_USD,
+  arcaBloqueaLiquidarUsd,
+} from "@/lib/arcaUsdRestriction";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import {
   normalizeViajeMoneda,
@@ -77,7 +88,7 @@ interface Props {
   viajeInicial?: Viaje;
   transportistas: Transportista[];
   config?: ArcaConfig | null;
-  /** Tenants con ARCA emiten el comprobante electrónico luego, desde la grilla; no adjuntan comprobante manual acá. */
+  /** Tenants con ARCA: tipo CVLP, pto venta y emisión electrónica. Sin ARCA: adjunto manual. */
   hasArca: boolean;
   getToken: () => Promise<string | null>;
   onSuccess: (liq: Liquidacion) => void;
@@ -88,7 +99,7 @@ interface Props {
 export function CrearLiquidacionManualModal({
   viajeInicial,
   transportistas,
-  config,
+  config: configProp,
   hasArca,
   getToken,
   onSuccess,
@@ -97,6 +108,10 @@ export function CrearLiquidacionManualModal({
   const showComprobante = !hasArca;
   const { showToast } = useToast();
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
+    configProp ?? null,
+  );
 
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
@@ -108,17 +123,29 @@ export function CrearLiquidacionManualModal({
   const [comisionPct, setComisionPct] = useState("");
   const comisionEditadaManualmente = useRef(false);
   /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
-  const [ivaPct, setIvaPct] = useState(String(config?.ivaGastosAdmin ?? 21));
-  const ivaSyncedFromConfig = useRef(config?.ivaGastosAdmin != null);
+  const [ivaPct, setIvaPct] = useState(
+    String(configProp?.ivaGastosAdmin ?? 21),
+  );
+  const ivaSyncedFromConfig = useRef(configProp?.ivaGastosAdmin != null);
   /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
   const [ptoVenta, setPtoVenta] = useState(
-    config?.ptoVentaCvlp != null ? String(config.ptoVentaCvlp) : "",
+    configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
   );
-  const ptoVentaSyncedFromConfig = useRef(config?.ptoVentaCvlp != null);
+  const ptoVentaSyncedFromConfig = useRef(configProp?.ptoVentaCvlp != null);
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     [],
   );
   const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
+
+  const condicionIvaInicial =
+    viajeInicial?.transportista?.condicionIva ??
+    transportistas.find((t) => t.id === (viajeInicial?.transportistaId ?? ""))
+      ?.condicionIva ??
+    null;
+  const [cbteTipo, setCbteTipo] = useState<CvlpCbteTipo>(
+    cvlpCbteTipoFromCondicionIva(condicionIvaInicial),
+  );
+  const cbteTipoEditadoManualmente = useRef(false);
 
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
@@ -137,11 +164,48 @@ export function CrearLiquidacionManualModal({
   const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
 
+  // Cargar config ARCA si no vino por props (p. ej. desde Viajes).
   useEffect(() => {
-    if (config?.ivaGastosAdmin == null || ivaSyncedFromConfig.current) return;
+    if (configProp) {
+      setResolvedConfig(configProp);
+      return;
+    }
+    if (!hasArca) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cfg = await apiJson<ArcaConfig>(
+          "/api/integracion-arca/config",
+          () => getToken(),
+        );
+        if (!cancelled) setResolvedConfig(cfg);
+      } catch {
+        /* validación de emisión / defaults locales alcanzan */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [configProp, hasArca, getToken]);
+
+  useEffect(() => {
+    if (resolvedConfig?.ivaGastosAdmin == null || ivaSyncedFromConfig.current) {
+      return;
+    }
     ivaSyncedFromConfig.current = true;
-    setIvaPct(String(config.ivaGastosAdmin));
-  }, [config?.ivaGastosAdmin]);
+    setIvaPct(String(resolvedConfig.ivaGastosAdmin));
+  }, [resolvedConfig?.ivaGastosAdmin]);
+
+  useEffect(() => {
+    if (
+      resolvedConfig?.ptoVentaCvlp == null ||
+      ptoVentaSyncedFromConfig.current
+    ) {
+      return;
+    }
+    ptoVentaSyncedFromConfig.current = true;
+    setPtoVenta(String(resolvedConfig.ptoVentaCvlp));
+  }, [resolvedConfig?.ptoVentaCvlp]);
 
   // Manejo de limpieza de viajeId si se deselecciona un viaje en la UI
   useEffect(() => {
@@ -150,7 +214,7 @@ export function CrearLiquidacionManualModal({
     setConceptosLineas((prev) =>
       prev.map((linea) => {
         if (linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-          return { ...linea, viajeId: null }; // Vuelve a General
+          return { ...linea, viajeId: null };
         }
         return linea;
       }),
@@ -159,20 +223,25 @@ export function CrearLiquidacionManualModal({
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
   useEffect(() => {
-    if (config?.ptoVentaCvlp == null || ptoVentaSyncedFromConfig.current) {
-      return;
-    }
-    ptoVentaSyncedFromConfig.current = true;
-    setPtoVenta(String(config.ptoVentaCvlp));
-  }, [config?.ptoVentaCvlp]);
-
-  useEffect(() => {
     if (comisionEditadaManualmente.current) return;
     const porDefecto =
       transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
-      config?.comisionPctDefault;
+      resolvedConfig?.comisionPctDefault;
     setComisionPct(porDefecto != null ? String(porDefecto) : "");
-  }, [transportistaId, transportistas, config?.comisionPctDefault]);
+  }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
+
+  const condicionIva =
+    viajeInicial?.transportista?.condicionIva ??
+    transportistas.find((t) => t.id === transportistaId)?.condicionIva ??
+    null;
+  const cbteSugerido = cvlpCbteTipoFromCondicionIva(condicionIva);
+  const overrideManual = hasArca && cbteTipo !== cbteSugerido;
+
+  // Al cambiar transportista, realinear tipo CVLP al sugerido (salvo override manual).
+  useEffect(() => {
+    if (!hasArca || cbteTipoEditadoManualmente.current) return;
+    setCbteTipo(cbteSugerido);
+  }, [hasArca, cbteSugerido]);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -189,8 +258,6 @@ export function CrearLiquidacionManualModal({
           `/api/viajes/paginated?transportistaId=${encodeURIComponent(transportistaId)}&pageSize=100&page=1&sinLiquidacionActiva=1`,
           () => getToken(),
         );
-        // Defensa en cliente: oculta viajes que aún traigan liquidación activa
-        // (p. ej. backend sin el filtro o include sin estado).
         if (!cancelled) {
           setViajes(
             (res.items ?? []).filter(
@@ -228,6 +295,10 @@ export function CrearLiquidacionManualModal({
     return monedaViaje(selectedViajes[0]);
   }, [selectedViajes]);
 
+  const bloqueadoUsd = selectedViajes.some((v) =>
+    arcaBloqueaLiquidarUsd(hasArca, v.monedaPrecioTransportistaExterno),
+  );
+
   function toggleViaje(id: string) {
     setSelectedViajeIds((prev) => {
       const next = new Set(prev);
@@ -254,11 +325,19 @@ export function CrearLiquidacionManualModal({
   ) {
     e.preventDefault();
     if (!periodoDesde || !periodoHasta) return;
+    if (periodoHasta < periodoDesde) {
+      setError("La fecha Hasta no puede ser anterior a Desde.");
+      return;
+    }
     const viajeIds = viajeInicial
       ? [viajeInicial.id]
       : Array.from(selectedViajeIds);
     if (viajeIds.length === 0) {
       setError("Seleccioná al menos un viaje.");
+      return;
+    }
+    if (bloqueadoUsd) {
+      setError(MSG_ARCA_NO_LIQUIDA_USD);
       return;
     }
     if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
@@ -283,7 +362,9 @@ export function CrearLiquidacionManualModal({
       return;
     }
     const ivaResolved =
-      ivaPct.trim() !== "" ? Number(ivaPct) : (config?.ivaGastosAdmin ?? 21);
+      ivaPct.trim() !== ""
+        ? Number(ivaPct)
+        : (resolvedConfig?.ivaGastosAdmin ?? 21);
     if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
       setError("El IVA debe ser un número entre 0 y 100.");
       return;
@@ -313,6 +394,7 @@ export function CrearLiquidacionManualModal({
         periodoHasta,
         viajeIds,
       };
+      if (hasArca) body.cbteTipo = cbteTipo;
       if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
       // Siempre enviar IVA explícito para no caer al default silencioso del backend.
       body.ivaPct = ivaResolved;
@@ -337,8 +419,6 @@ export function CrearLiquidacionManualModal({
           );
         } catch (emitErr) {
           emitFailed = true;
-          // La liquidación ya se creó (quedó en error/pendiente_cae); refrescamos
-          // su estado real para no dejar la grilla desactualizada.
           try {
             liq = await apiJson<Liquidacion>(
               `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}`,
@@ -360,7 +440,11 @@ export function CrearLiquidacionManualModal({
             : "Comprobante emitido correctamente.",
         );
       } else if (action === "borrador") {
-        showToast("Liquidación creada en borrador.");
+        showToast(
+          hasArca
+            ? "Liquidación guardada en borrador."
+            : "Liquidación creada en borrador.",
+        );
       }
       onSuccess(liq);
     } catch (err) {
@@ -389,21 +473,21 @@ export function CrearLiquidacionManualModal({
     comisionPct.trim() !== ""
       ? Number(comisionPct)
       : (transportistas.find((t) => t.id === transportistaId)?.comisionPct ??
-        config?.comisionPctDefault ??
+        resolvedConfig?.comisionPctDefault ??
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
-  // Cada concepto aporta monto + su IVA propio (no el IVA general del comprobante).
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
       sum +
       signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
     0,
   );
-  // Neto gravado del IVA general = solo flete − comisión (sin conceptos).
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum =
-    ivaPct.trim() !== "" ? Number(ivaPct) : (config?.ivaGastosAdmin ?? 21);
+    ivaPct.trim() !== ""
+      ? Number(ivaPct)
+      : (resolvedConfig?.ivaGastosAdmin ?? 21);
   const ivaMonto =
     netoGravado !== null
       ? ivaGeneralSobreBase(bruto, comisionMonto, ivaPctNum)
@@ -415,10 +499,14 @@ export function CrearLiquidacionManualModal({
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
+  const periodoInvalido =
+    Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
   const canSubmit =
     Boolean(transportistaId) &&
     Boolean(periodoDesde) &&
     Boolean(periodoHasta) &&
+    !periodoInvalido &&
+    !bloqueadoUsd &&
     (viajeInicial ? true : selectedViajeIds.size > 0);
   const ptoVentaNumPreview = Number(ptoVenta);
   const ptoVentaInvalidoPreview =
@@ -455,35 +543,111 @@ export function CrearLiquidacionManualModal({
           )}
         </div>
 
-        {/* Body */}
+        {/* Body — una sola pantalla (sin pasos) */}
         <form
           onSubmit={(e) => void handleSubmit(e)}
           className="overflow-y-auto flex-1 px-6 py-5 space-y-5"
         >
-          {/* Transportista */}
-          <div>
-            <label className={labelClass}>
-              Transportista <span className="text-red-500">*</span>
-            </label>
-            {viajeInicial ? (
-              <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
-                {transportistaNombre}
+          {/* Tipo de comprobante (solo ARCA) */}
+          {hasArca && (
+            <div className="space-y-2">
+              <p className={labelClass}>
+                Tipo de comprobante <span className="text-red-500">*</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {([60, 61] as CvlpCbteTipo[]).map((t) => {
+                  const selected = cbteTipo === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={bloqueadoUsd}
+                      onClick={() => {
+                        cbteTipoEditadoManualmente.current = true;
+                        setCbteTipo(t);
+                      }}
+                      className={[
+                        "flex flex-col items-center justify-center border py-3 px-2 text-xs uppercase tracking-wider transition-colors",
+                        bloqueadoUsd
+                          ? "border-black/10 bg-vialto-mist/40 text-vialto-steel cursor-not-allowed opacity-60"
+                          : selected
+                            ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                            : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist",
+                      ].join(" ")}
+                    >
+                      CVLP
+                      <span className="mt-1 text-[10px] normal-case tracking-normal opacity-80">
+                        {cvlpCbteLabel(t)}
+                      </span>
+                      {t === cbteSugerido && (
+                        <span className="mt-1 text-[10px] normal-case tracking-normal opacity-70">
+                          Sugerido
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              <select
-                required
-                value={transportistaId}
-                onChange={(e) => setTransportistaId(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">— Seleccioná un transportista —</option>
-                {transportistas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre}
-                  </option>
-                ))}
-              </select>
-            )}
+              <div className="rounded border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950 space-y-1">
+                <p>
+                  Condición frente al IVA del transportista:{" "}
+                  <span className="font-medium">
+                    {condicionIvaLabel(condicionIva)}
+                  </span>
+                  {" → "}
+                  <span className="font-medium">
+                    {cvlpCbteLabel(cbteSugerido)}
+                  </span>
+                  .
+                </p>
+                <p>{ARCA_CBTE_OVERRIDE_WARNING}</p>
+                {overrideManual && (
+                  <p className="font-medium text-amber-900">
+                    Estás usando un tipo distinto al sugerido (
+                    {cvlpCbteLabel(cbteTipo)}).
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Transportista + condición IVA */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>
+                Transportista <span className="text-red-500">*</span>
+              </label>
+              {viajeInicial ? (
+                <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
+                  {transportistaNombre}
+                </div>
+              ) : (
+                <select
+                  required
+                  value={transportistaId}
+                  onChange={(e) => {
+                    cbteTipoEditadoManualmente.current = false;
+                    setTransportistaId(e.target.value);
+                  }}
+                  className={selectClass}
+                >
+                  <option value="">— Seleccioná un transportista —</option>
+                  {transportistas.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <p className={labelClass}>Condición frente al IVA</p>
+              <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
+                {transportistaId
+                  ? condicionIvaLabel(condicionIva)
+                  : "—"}
+              </div>
+            </div>
           </div>
 
           {/* Período */}
@@ -497,7 +661,13 @@ export function CrearLiquidacionManualModal({
                 type="date"
                 required
                 value={periodoDesde}
-                onChange={(e) => setPeriodoDesde(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setPeriodoDesde(next);
+                  if (periodoHasta && next && periodoHasta < next) {
+                    setPeriodoHasta("");
+                  }
+                }}
                 className={inputClass}
               />
             </div>
@@ -509,127 +679,64 @@ export function CrearLiquidacionManualModal({
                 id="periodoHasta"
                 type="date"
                 required
-                min={periodoDesde}
+                min={periodoDesde || undefined}
                 value={periodoHasta}
                 onChange={(e) => setPeriodoHasta(e.target.value)}
-                className={inputClass}
+                className={`${inputClass} ${periodoInvalido ? "border-red-400" : ""}`}
               />
+              {periodoInvalido && (
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  Hasta no puede ser anterior a Desde.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Comisión e IVA */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="comisionPct" className={labelClass}>
-                Comisión (%)
-              </label>
-              <input
-                id="comisionPct"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={comisionPct}
-                onChange={(e) => {
-                  comisionEditadaManualmente.current = true;
-                  setComisionPct(e.target.value);
-                }}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="ivaPct" className={labelClass}>
-                IVA (%)
-              </label>
-              <input
-                id="ivaPct"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={ivaPct}
-                onChange={(e) => setIvaPct(e.target.value)}
-                className={inputClass}
-              />
-              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Por defecto se aplica 21%. Para liquidar sin IVA ingresá 0.
-              </p>
-            </div>
-          </div>
-
-          {hasArca && (
-            <div>
-              <label htmlFor="ptoVentaLiquidacion" className={labelClass}>
-                Punto de venta
-              </label>
-              <input
-                id="ptoVentaLiquidacion"
-                type="number"
-                min={1}
-                value={ptoVenta}
-                onChange={(e) => setPtoVenta(e.target.value)}
-                className={`${inputClass} w-52`}
-              />
-              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Solo se usa si emitís la liquidación ahora. Se precarga con el
-                de Configuración ARCA.
-              </p>
-            </div>
-          )}
-
-          <ConceptosLiquidacionLineasEditor
-            getToken={getToken}
-            lineas={conceptosLineas}
-            viajesDisponibles={selectedViajes.map((v) => ({
-              id: v.id,
-              numero: v.numero,
-            }))}
-            onChange={(next) => {
-              setConceptosLineas(next);
-              setConceptosIncomplete([]);
-            }}
-            disabled={submitting}
-            incompleteIndices={conceptosIncomplete}
-          />
-
-          {/* Viaje pre-fijado */}
+          {/* Viaje pre-fijado (entrada desde un viaje puntual) */}
           {viajeInicial && (
             <div>
-              <p className={labelClass}>Viaje incluido</p>
-              <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 space-y-0.5">
-                <p className="text-sm font-medium text-vialto-charcoal">
-                  Viaje #{viajeInicial.numero}
-                  {viajeInicial.fechaCarga && (
-                    <span className="font-normal text-vialto-steel ml-2">
-                      — {fmtDate(viajeInicial.fechaCarga)}
-                    </span>
-                  )}
-                </p>
-                {(viajeInicial.origen || viajeInicial.destino) && (
-                  <p className="text-xs text-vialto-steel">
-                    {viajeInicial.origen ?? "—"} → {viajeInicial.destino ?? "—"}
-                  </p>
-                )}
-                <p className="text-xs text-vialto-charcoal">
-                  Moneda:{" "}
-                  <span className="font-medium">
-                    {monedaViaje(viajeInicial)}
+              <p className={labelClass}>Detalle del viaje</p>
+              <div className="rounded border border-black/10 bg-vialto-mist/50 px-3 py-2.5 space-y-1.5 text-xs">
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">Número</span>
+                  <span className="tabular-nums text-vialto-charcoal font-medium">
+                    #{viajeInicial.numero}
                   </span>
-                </p>
-                {viajeInicial.precioTransportistaExterno != null && (
-                  <p className="text-xs text-vialto-charcoal tabular-nums">
-                    Bruto:{" "}
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">Fecha de carga</span>
+                  <span className="tabular-nums text-vialto-charcoal">
+                    {viajeInicial.fechaCarga
+                      ? fmtDate(viajeInicial.fechaCarga)
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">Origen</span>
+                  <span className="text-vialto-charcoal text-right">
+                    {viajeInicial.origen ?? "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">Destino</span>
+                  <span className="text-vialto-charcoal text-right">
+                    {viajeInicial.destino ?? "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">Bruto</span>
+                  <span className="tabular-nums text-vialto-charcoal font-medium">
                     {fmtMoney(
                       viajeInicial.precioTransportistaExterno,
                       viajeInicial.monedaPrecioTransportistaExterno,
                     )}
-                  </p>
-                )}
+                  </span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Selección de viajes (modo sin viajeInicial) */}
+          {/* Selección de viajes (entrada desde Liquidaciones) */}
           {!viajeInicial && transportistaId && (
             <div>
               <p className={labelClass}>
@@ -676,6 +783,98 @@ export function CrearLiquidacionManualModal({
             </div>
           )}
 
+          {bloqueadoUsd && (
+            <p
+              className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-3 py-2"
+              role="alert"
+            >
+              {MSG_ARCA_NO_LIQUIDA_USD}
+            </p>
+          )}
+
+          {/* Comisión e IVA */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="comisionPct" className={labelClass}>
+                Comisión por flete (%)
+              </label>
+              <input
+                id="comisionPct"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={comisionPct}
+                onChange={(e) => {
+                  comisionEditadaManualmente.current = true;
+                  setComisionPct(e.target.value);
+                }}
+                className={inputClass}
+              />
+              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                Si lo dejás vacío se usa el default del tenant
+                {resolvedConfig?.comisionPctDefault != null
+                  ? ` (${resolvedConfig.comisionPctDefault}%).`
+                  : "."}
+              </p>
+            </div>
+            <div>
+              <label htmlFor="ivaPct" className={labelClass}>
+                IVA sobre comisión (%)
+              </label>
+              <input
+                id="ivaPct"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={ivaPct}
+                onChange={(e) => setIvaPct(e.target.value)}
+                className={inputClass}
+              />
+              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                Por defecto se aplica{" "}
+                {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin IVA
+                ingresá 0.
+              </p>
+            </div>
+          </div>
+
+          {hasArca && (
+            <div>
+              <label htmlFor="ptoVentaLiquidacion" className={labelClass}>
+                Punto de venta
+              </label>
+              <input
+                id="ptoVentaLiquidacion"
+                type="number"
+                min={1}
+                value={ptoVenta}
+                onChange={(e) => setPtoVenta(e.target.value)}
+                className={`${inputClass} w-52`}
+              />
+              <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
+                Solo se usa si emitís el comprobante ahora. Se precarga con el
+                de Configuración ARCA.
+              </p>
+            </div>
+          )}
+
+          <ConceptosLiquidacionLineasEditor
+            getToken={getToken}
+            lineas={conceptosLineas}
+            viajesDisponibles={selectedViajes.map((v) => ({
+              id: v.id,
+              numero: v.numero,
+            }))}
+            onChange={(next) => {
+              setConceptosLineas(next);
+              setConceptosIncomplete([]);
+            }}
+            disabled={submitting}
+            incompleteIndices={conceptosIncomplete}
+          />
+
           {/* Resumen de montos */}
           {showSummary && (
             <div className="rounded border border-black/10 bg-vialto-mist/60 px-4 py-3 space-y-1.5">
@@ -686,7 +885,7 @@ export function CrearLiquidacionManualModal({
                 </span>
               </div>
               <div className="flex justify-between items-baseline">
-                <span className={labelClass}>Sub Total</span>
+                <span className={labelClass}>Bruto</span>
                 <span className="tabular-nums text-sm font-medium text-vialto-charcoal">
                   {fmtSignedLiquidacionMoney(bruto, "plus")}
                 </span>
@@ -725,7 +924,9 @@ export function CrearLiquidacionManualModal({
               })}
               {netoGravado !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
-                  <span className={labelClass}>Neto gravado (flete/comisión)</span>
+                  <span className={labelClass}>
+                    Subtotal (flete − comisión)
+                  </span>
                   <span className="tabular-nums text-sm font-medium text-vialto-charcoal">
                     {fmtLiquidacionMoney(netoGravado)}
                   </span>
@@ -739,9 +940,20 @@ export function CrearLiquidacionManualModal({
                   </span>
                 </div>
               )}
+              {conceptosCompletos.length > 0 && (
+                <div className="flex justify-between items-baseline text-xs text-vialto-steel">
+                  <span>Efecto neto de conceptos</span>
+                  <span className="tabular-nums">
+                    {fmtSignedLiquidacionMoney(
+                      Math.abs(conceptosEfecto),
+                      conceptosEfecto >= 0 ? "plus" : "minus",
+                    )}
+                  </span>
+                </div>
+              )}
               {totalALiquidar !== null && (
                 <div className="flex justify-between items-baseline border-t border-black/10 pt-1.5">
-                  <span className={labelClass}>Total neto a liquidar</span>
+                  <span className={labelClass}>Total a liquidar</span>
                   <span className="tabular-nums text-base font-semibold text-vialto-charcoal">
                     {fmtLiquidacionMoney(totalALiquidar)}
                   </span>
@@ -765,12 +977,12 @@ export function CrearLiquidacionManualModal({
           )}
 
           {hasArca && (
-            <AmbienteHomologacionWarning ambiente={config?.ambiente} />
+            <AmbienteHomologacionWarning ambiente={resolvedConfig?.ambiente} />
           )}
         </form>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
+        <div className="flex flex-wrap justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">
           <button
             type="button"
             disabled={submitting}
@@ -790,7 +1002,9 @@ export function CrearLiquidacionManualModal({
                 className="inline-flex items-center gap-2 h-9 px-5 rounded border border-black/20 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
               >
                 {submitAction === "borrador" && <Spinner />}
-                {submitAction === "borrador" ? "Creando…" : "Crear borrador"}
+                {submitAction === "borrador"
+                  ? "Guardando…"
+                  : "Guardar borrador"}
               </button>
               <button
                 type="button"
@@ -809,7 +1023,9 @@ export function CrearLiquidacionManualModal({
                     aria-hidden
                   />
                 )}
-                {submitAction === "emitir" ? "Emitiendo…" : "Emitir liquidación"}
+                {submitAction === "emitir"
+                  ? "Emitiendo…"
+                  : "Emitir comprobante a ARCA"}
               </button>
             </>
           ) : (

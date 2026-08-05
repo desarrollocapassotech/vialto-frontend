@@ -110,6 +110,25 @@ export interface Viaje {
   monedaCostoLiquidadoReal?: string | null;
 }
 
+/** Liquidación asociada a un viaje, devuelta por DELETE /viajes/:id cuando hay impacto. */
+export interface ViajeEliminacionLiquidacionImpacto {
+  id: string;
+  transportistaNombre: string;
+  estado: LiquidacionEstado;
+  tieneCae: boolean;
+  cbteNro: number | null;
+  ptoVenta: number | null;
+  periodoDesde: string;
+  periodoHasta: string;
+}
+
+/** Body de error 409 de DELETE /viajes/:id cuando el viaje tiene liquidaciones asociadas. */
+export interface ViajeEliminacionConflicto {
+  message: string;
+  code: "VIAJE_LIQUIDACION_AUTORIZADA" | "VIAJE_TIENE_LIQUIDACIONES";
+  liquidaciones: ViajeEliminacionLiquidacionImpacto[];
+}
+
 /** Respuesta de GET /api/platform/* (superadmin). */
 export type ConEmpresa<T> = T & { empresaNombre: string };
 

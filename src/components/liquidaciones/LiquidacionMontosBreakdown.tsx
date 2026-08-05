@@ -28,7 +28,7 @@ type Props = {
   gastosAdminIva: number;
   ivaPct?: number | null;
   liquido: number;
-  /** `rows` = EmitirCvlpModal; `filas` = EmitirLiquidacionModal; `campos` = ViewModal grid */
+  /** `rows` / `filas` = modales de emisión; `campos` = ViewModal grid */
   variant?: "rows" | "filas" | "campos";
   /** Etiqueta del bruto (Sub total vs Bruto). */
   brutoLabel?: string;

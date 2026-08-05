@@ -22,11 +22,10 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { AgregarGastoModal } from "@/components/viajes/AgregarGastoModal";
 import { RegistrarPagoTransportistaModal } from "@/components/viajes/RegistrarPagoTransportistaModal";
 import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
-import { EmitirCvlpModal } from "@/components/viajes/EmitirCvlpModal";
 import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import type { FacturaLetra } from "@/lib/arcaCbteTipo";
-import { apiJson } from "@/lib/api";
+import { apiJson, ApiError } from "@/lib/api";
 import { useToast } from "@/lib/toast"; // <-- IMPORTACIÓN DEL TOAST
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -104,12 +103,12 @@ import type {
   Chofer,
   Cliente,
   Factura,
-  Liquidacion,
   PaginatedMeta,
   Producto,
   Transportista,
   Vehiculo,
   Viaje,
+  ViajeEliminacionConflicto,
 } from "@/types/api";
 import {
   appendViajeSortQuery,
@@ -164,9 +163,12 @@ export function ViajesTenantPage({
   const vehiculos = platform ? vehiculosP : maestro.vehiculos;
 
   // ─── CONSTRUCCIÓN DE RUTAS DE API ────────────────────────────────────────
-  function viajeApiUrl(id: string) {
-    if (!platform) return `/api/viajes/${encodeURIComponent(id)}`;
-    return `/api/platform/viajes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+  function viajeApiUrl(id: string, opts?: { force?: boolean }) {
+    const base = !platform
+      ? `/api/viajes/${encodeURIComponent(id)}`
+      : `/api/platform/viajes/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+    if (!opts?.force) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}force=true`;
   }
 
   function facturasPorClienteUrl(clienteId: string) {
@@ -192,15 +194,20 @@ export function ViajesTenantPage({
   const [viajeDeleteConfirm, setViajeDeleteConfirm] = useState<Viaje | null>(
     null,
   );
+  /** Viaje + liquidaciones asociadas que también se borrarían; se llena cuando el backend responde 409. */
+  const [viajeDeleteImpacto, setViajeDeleteImpacto] = useState<{
+    viaje: Viaje;
+    conflicto: ViajeEliminacionConflicto;
+  } | null>(null);
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_carga");
+  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_creacion");
   const [sortDir, setSortDir] = useState<ViajeSortDir>("desc");
 
   /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
   const ordenamientoAplicadoRef = useRef({
-    sortBy: "fecha_carga" as ViajeSortField,
+    sortBy: "fecha_creacion" as ViajeSortField,
     sortDir: "desc" as ViajeSortDir,
   });
 
@@ -268,13 +275,12 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(
     null,
   );
-  const [emitirCvlpViaje, setEmitirCvlpViaje] = useState<Viaje | null>(null);
   const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
   const [tipoFacturaViaje, setTipoFacturaViaje] = useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
-  const [facturandoLoadingId, setFacturandoLoadingId] = useState<
-    string | null
-  >(null);
+  const [facturandoLoadingId, setFacturandoLoadingId] = useState<string | null>(
+    null,
+  );
 
   /** Conteos globales para los chips de acceso rápido en la UI. */
   const [resumen, setResumen] = useState<{
@@ -953,6 +959,24 @@ export function ViajesTenantPage({
     setViajeDeleteConfirm(v);
   }
 
+  /** Limpieza de estado local compartida por el borrado directo y el borrado forzado. */
+  function onViajeEliminadoOk(v: Viaje) {
+    showToast("Viaje eliminado correctamente", "success");
+    setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
+    setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
+    setIdsFacturarSeleccion((ids) => ids.filter((id) => id !== v.id));
+    if (viajeEditor.editingId === v.id) cancelEdit();
+    if (viewingViaje?.id === v.id) setViewingViaje(null);
+    if (exportarViaje?.id === v.id) setExportarViaje(null);
+    if (agregarGastoViaje?.id === v.id) setAgregarGastoViaje(null);
+    if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
+    if (crearLiqViaje?.id === v.id) setCrearLiqViaje(null);
+    if (selectorViaje?.id === v.id) setSelectorViaje(null);
+    if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
+    setViajeDeleteConfirm(null);
+    setViajeDeleteImpacto(null);
+  }
+
   // ─── ELIMINACIÓN DEFINITIVA ────────────────────────────────────────────────
   async function confirmDeleteViaje() {
     const v = viajeDeleteConfirm;
@@ -960,27 +984,40 @@ export function ViajesTenantPage({
     setDeletingViajeId(v.id);
     try {
       await apiJson(viajeApiUrl(v.id), () => getToken(), { method: "DELETE" });
+      onViajeEliminadoOk(v);
+    } catch (e) {
+      // El backend devuelve 409 + code cuando el viaje tiene liquidaciones asociadas.
+      if (e instanceof ApiError && e.status === 409) {
+        const body = e.body as Partial<ViajeEliminacionConflicto> | undefined;
+        if (body?.code === "VIAJE_TIENE_LIQUIDACIONES") {
+          setViajeDeleteConfirm(null);
+          setViajeDeleteImpacto({ viaje: v, conflicto: body as ViajeEliminacionConflicto });
+          setDeletingViajeId(null);
+          return;
+        }
+      }
+      setError(friendlyError(e, platform ? "plataforma" : "viajes"));
+      showToast("Ocurrió un error al intentar eliminar", "error");
+    } finally {
+      setDeletingViajeId(null);
+    }
+  }
 
-      // --> TOAST INYECTADO: ÉXITO AL ELIMINAR <--
-      showToast("Viaje eliminado correctamente", "success");
-
-      setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
-      setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
-      setIdsFacturarSeleccion((ids) => ids.filter((id) => id !== v.id));
-      if (viajeEditor.editingId === v.id) cancelEdit();
-      if (viewingViaje?.id === v.id) setViewingViaje(null);
-      if (exportarViaje?.id === v.id) setExportarViaje(null);
-      if (agregarGastoViaje?.id === v.id) setAgregarGastoViaje(null);
-      if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
-      if (emitirCvlpViaje?.id === v.id) setEmitirCvlpViaje(null);
-      if (selectorViaje?.id === v.id) setSelectorViaje(null);
-      if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
-      setViajeDeleteConfirm(null);
+  /** Confirmación del segundo paso: borra el viaje junto con sus liquidaciones sin autorizar. */
+  async function confirmDeleteViajeForzado() {
+    const impacto = viajeDeleteImpacto;
+    if (!impacto || deletingViajeId) return;
+    const v = impacto.viaje;
+    setDeletingViajeId(v.id);
+    try {
+      await apiJson(viajeApiUrl(v.id, { force: true }), () => getToken(), {
+        method: "DELETE",
+      });
+      onViajeEliminadoOk(v);
     } catch (e) {
       setError(friendlyError(e, platform ? "plataforma" : "viajes"));
-
-      // --> TOAST INYECTADO: ERROR AL ELIMINAR <--
       showToast("Ocurrió un error al intentar eliminar", "error");
+      setViajeDeleteImpacto(null);
     } finally {
       setDeletingViajeId(null);
     }
@@ -2248,16 +2285,6 @@ export function ViajesTenantPage({
         />
       )}
 
-      {emitirCvlpViaje && (
-        <EmitirCvlpModal
-          viaje={emitirCvlpViaje}
-          onClose={() => setEmitirCvlpViaje(null)}
-          onEmitido={(_liq: Liquidacion) => {
-            setListadoQueryVersion((v) => v + 1);
-          }}
-        />
-      )}
-
       {selectorViaje && (
         <FacturarSelectorModal
           onClose={() => setSelectorViaje(null)}
@@ -2319,11 +2346,7 @@ export function ViajesTenantPage({
               showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
               return;
             }
-            if (hasLiquidacionesArca) {
-              setEmitirCvlpViaje(selectorViaje);
-            } else {
-              setCrearLiqViaje(selectorViaje);
-            }
+            setCrearLiqViaje(selectorViaje);
             setSelectorViaje(null);
           }}
         />
@@ -2375,6 +2398,46 @@ export function ViajesTenantPage({
         }}
         onConfirm={() => void confirmDeleteViaje()}
       />
+
+      <ConfirmDialog
+        open={viajeDeleteImpacto != null}
+        title="Este viaje tiene liquidaciones asociadas"
+        message={
+          viajeDeleteImpacto
+            ? `El viaje ${viajeDeleteImpacto.viaje.numero} está incluido en ${
+                viajeDeleteImpacto.conflicto.liquidaciones.length === 1
+                  ? "esta liquidación sin autorizar por AFIP"
+                  : "estas liquidaciones sin autorizar por AFIP"
+              }. Si continuás, se van a eliminar también:`
+            : ""
+        }
+        confirmLabel="Eliminar todo"
+        tone="danger"
+        busy={
+          !!deletingViajeId &&
+          viajeDeleteImpacto != null &&
+          deletingViajeId === viajeDeleteImpacto.viaje.id
+        }
+        onCancel={() => {
+          if (!deletingViajeId) setViajeDeleteImpacto(null);
+        }}
+        onConfirm={() => void confirmDeleteViajeForzado()}
+      >
+        <ul className="space-y-1.5 rounded border border-black/10 bg-vialto-mist/60 p-2.5 text-xs text-vialto-charcoal">
+          {viajeDeleteImpacto?.conflicto.liquidaciones.map((l) => (
+            <li key={l.id} className="flex flex-col">
+              <span className="font-medium">
+                Liquidación a {l.transportistaNombre}
+              </span>
+              <span className="text-vialto-steel">
+                Período {new Date(l.periodoDesde).toLocaleDateString("es-AR")}{" "}
+                – {new Date(l.periodoHasta).toLocaleDateString("es-AR")} ·
+                estado: {l.estado}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
     </div>
   );
 }
