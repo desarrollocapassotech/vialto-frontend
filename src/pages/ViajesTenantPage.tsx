@@ -195,12 +195,12 @@ export function ViajesTenantPage({
   const [deletingViajeId, setDeletingViajeId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_carga");
+  const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_creacion");
   const [sortDir, setSortDir] = useState<ViajeSortDir>("desc");
 
   /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
   const ordenamientoAplicadoRef = useRef({
-    sortBy: "fecha_carga" as ViajeSortField,
+    sortBy: "fecha_creacion" as ViajeSortField,
     sortDir: "desc" as ViajeSortDir,
   });
 
@@ -272,9 +272,9 @@ export function ViajesTenantPage({
   const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
   const [tipoFacturaViaje, setTipoFacturaViaje] = useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
-  const [facturandoLoadingId, setFacturandoLoadingId] = useState<
-    string | null
-  >(null);
+  const [facturandoLoadingId, setFacturandoLoadingId] = useState<string | null>(
+    null,
+  );
 
   /** Conteos globales para los chips de acceso rápido en la UI. */
   const [resumen, setResumen] = useState<{
