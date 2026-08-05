@@ -1,15 +1,19 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
+import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { labelVehiculoTipo } from "@/lib/labels";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
+  listadoTablaHeadRowClass,
   listadoTablaTdClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import type { PaginatedMeta, Vehiculo } from "@/types/api";
 
@@ -17,6 +21,15 @@ type VehiculosPaginatedResponse = {
   items: Vehiculo[];
   meta: PaginatedMeta;
 };
+
+const TIPO_OPCIONES = [
+  { value: "", label: "Todos" },
+  { value: "tractor", label: "Tractor" },
+  { value: "semirremolque", label: "Semirremolque" },
+  { value: "camion", label: "Camión" },
+  { value: "utilitario", label: "Utilitario" },
+  { value: "otro", label: "Otro" },
+] as const;
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -30,20 +43,54 @@ export function VehiculosTenantPage() {
   );
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
 
+  const [patenteFiltroInput, setPatenteFiltroInput] = useState("");
+  const [patenteFiltro, setPatenteFiltro] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
+  const [marcaFiltroInput, setMarcaFiltroInput] = useState("");
+  const [marcaFiltro, setMarcaFiltro] = useState("");
+  const [modeloFiltroInput, setModeloFiltroInput] = useState("");
+  const [modeloFiltro, setModeloFiltro] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
+
+  const load = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      filtroActivo,
+    });
+    if (patenteFiltro) params.set("patente", patenteFiltro);
+    if (tipoFiltro) params.set("tipo", tipoFiltro);
+    if (marcaFiltro) params.set("marca", marcaFiltro);
+    if (modeloFiltro) params.set("modelo", modeloFiltro);
+    const data = await apiJson<VehiculosPaginatedResponse>(
+      `/api/vehiculos/paginated?${params.toString()}`,
+      () => getToken(),
+    );
+    setRows(data.items);
+    setMeta(data.meta);
+  }, [
+    getToken,
+    isLoaded,
+    isSignedIn,
+    page,
+    pageSize,
+    patenteFiltro,
+    tipoFiltro,
+    marcaFiltro,
+    modeloFiltro,
+    filtroActivo,
+  ]);
+
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiJson<VehiculosPaginatedResponse>(
-          `/api/vehiculos/paginated?page=${page}&pageSize=${pageSize}`,
-          () => getToken(),
-        );
-        if (!cancelled) {
-          setRows(data.items);
-          setMeta(data.meta);
-          setError(null);
-        }
+        await load();
+        if (!cancelled) setError(null);
       } catch (e) {
         if (!cancelled) {
           setRows(null);
@@ -55,17 +102,186 @@ export function VehiculosTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
+  }, [isLoaded, isSignedIn, load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro, filtroActivo]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (patenteFiltro.trim()) n += 1;
+    if (tipoFiltro) n += 1;
+    if (marcaFiltro.trim()) n += 1;
+    if (modeloFiltro.trim()) n += 1;
+    if (filtroActivo !== "todos") n += 1;
+    return n;
+  }, [patenteFiltro, tipoFiltro, marcaFiltro, modeloFiltro, filtroActivo]);
+
+  function limpiarFiltros() {
+    setPatenteFiltroInput("");
+    setPatenteFiltro("");
+    setTipoFiltro("");
+    setMarcaFiltroInput("");
+    setMarcaFiltro("");
+    setModeloFiltroInput("");
+    setModeloFiltro("");
+    setFiltroActivo("todos");
+  }
+
+  async function toggleActivo(v: Vehiculo) {
+    const mensaje = v.activo
+      ? `¿Desactivar el vehículo "${v.patente}"?`
+      : `¿Reactivar el vehículo "${v.patente}"?`;
+    if (!window.confirm(mensaje)) return;
+    setError(null);
+    try {
+      await apiJson<Vehiculo>(
+        `/api/vehiculos/${encodeURIComponent(v.id)}`,
+        () => getToken(),
+        { method: "PATCH", body: JSON.stringify({ activo: !v.activo }) },
+      );
+      await load();
+    } catch (e) {
+      setError(friendlyError(e, "vehiculos"));
+    }
+  }
+
+  const selectClass = (activo: boolean) =>
+    `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+      activo ? "text-vialto-fire" : "text-vialto-charcoal"
+    }`;
+
+  const vehiculosListadoFiltros = (
+    <>
+      <ListadoFiltroCampo label="Patente" active={!!patenteFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={patenteFiltroInput}
+            onChange={(e) => setPatenteFiltroInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")
+                setPatenteFiltro(patenteFiltroInput.trim());
+            }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
+              patenteFiltro.trim()
+                ? "text-vialto-fire"
+                : "text-vialto-charcoal"
+            }`}
+            aria-label="Filtrar por patente"
+          />
+          <button
+            type="button"
+            onClick={() => setPatenteFiltro(patenteFiltroInput.trim())}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Tipo" active={!!tipoFiltro}>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className={selectClass(!!tipoFiltro)}
+          aria-label="Filtrar por tipo de vehículo"
+        >
+          {TIPO_OPCIONES.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Marca" active={!!marcaFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={marcaFiltroInput}
+            onChange={(e) => setMarcaFiltroInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setMarcaFiltro(marcaFiltroInput.trim());
+            }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+              marcaFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+            }`}
+            aria-label="Filtrar por marca"
+          />
+          <button
+            type="button"
+            onClick={() => setMarcaFiltro(marcaFiltroInput.trim())}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Modelo" active={!!modeloFiltro.trim()}>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={modeloFiltroInput}
+            onChange={(e) => setModeloFiltroInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")
+                setModeloFiltro(modeloFiltroInput.trim());
+            }}
+            placeholder="Buscar…"
+            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+              modeloFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+            }`}
+            aria-label="Filtrar por modelo"
+          />
+          <button
+            type="button"
+            onClick={() => setModeloFiltro(modeloFiltroInput.trim())}
+            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+          >
+            OK
+          </button>
+        </div>
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
+        <select
+          value={filtroActivo}
+          onChange={(e) =>
+            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
+          }
+          className={selectClass(filtroActivo !== "todos")}
+          aria-label="Filtrar por estado del vehículo"
+        >
+          <option value="todos">Todos</option>
+          <option value="activos">Solo activos</option>
+          <option value="inactivos">Solo inactivos</option>
+        </select>
+      </ListadoFiltroCampo>
+    </>
+  );
 
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Vehículos
       </h1>
-      <p className="mt-2 text-vialto-steel">
-        Patentes, tipo y marca de cada unidad de tu flota.
-      </p>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors lg:inline-flex"
+          >
+            Limpiar filtros
+            <span
+              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+              aria-hidden
+            >
+              {activeFilterCount}
+            </span>
+          </button>
+        )}
         <Link
           to="/vehiculos/nuevo"
           className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -80,6 +296,164 @@ export function VehiculosTenantPage() {
       )}
       <ListadoDatos
         className="mt-8"
+        filters={vehiculosListadoFiltros}
+        activeFilterCount={activeFilterCount}
+        onClearFilters={limpiarFiltros}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Patente"
+                filterActive={!!patenteFiltro.trim()}
+                filterSignature={patenteFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={patenteFiltroInput}
+                    onChange={(e) => setPatenteFiltroInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        setPatenteFiltro(patenteFiltroInput.trim());
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 font-mono text-sm ${
+                      patenteFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por patente"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPatenteFiltro(patenteFiltroInput.trim())
+                    }
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Tipo"
+                filterActive={!!tipoFiltro}
+                filterSignature={tipoFiltro}
+              >
+                <select
+                  value={tipoFiltro}
+                  onChange={(e) => setTipoFiltro(e.target.value)}
+                  className={selectClass(!!tipoFiltro)}
+                  aria-label="Filtrar por tipo de vehículo"
+                >
+                  {TIPO_OPCIONES.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Marca"
+                filterActive={!!marcaFiltro.trim()}
+                filterSignature={marcaFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={marcaFiltroInput}
+                    onChange={(e) => setMarcaFiltroInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        setMarcaFiltro(marcaFiltroInput.trim());
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      marcaFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por marca"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMarcaFiltro(marcaFiltroInput.trim())}
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Modelo"
+                filterActive={!!modeloFiltro.trim()}
+                filterSignature={modeloFiltro}
+              >
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={modeloFiltroInput}
+                    onChange={(e) => setModeloFiltroInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        setModeloFiltro(modeloFiltroInput.trim());
+                    }}
+                    placeholder="Buscar…"
+                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
+                      modeloFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por modelo"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setModeloFiltro(modeloFiltroInput.trim())
+                    }
+                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    OK
+                  </button>
+                </div>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={filtroActivo !== "todos"}
+                filterSignature={filtroActivo}
+              >
+                <select
+                  value={filtroActivo}
+                  onChange={(e) =>
+                    setFiltroActivo(
+                      e.target.value as "todos" | "activos" | "inactivos",
+                    )
+                  }
+                  className={selectClass(filtroActivo !== "todos")}
+                  aria-label="Filtrar por estado del vehículo"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="activos">Solo activos</option>
+                  <option value="inactivos">Solo inactivos</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th
+              scope="col"
+              className={`${listadoTablaThClass} text-right align-top`}
+            >
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "patente",
@@ -106,13 +480,31 @@ export function VehiculosTenantPage() {
             cell: (v) => v.modelo ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
+          {
+            id: "estado",
+            header: "Estado",
+            cell: (v) => (
+              <span
+                className={
+                  v.activo
+                    ? "text-xs uppercase tracking-wider text-emerald-800"
+                    : "text-xs uppercase tracking-wider text-vialto-steel"
+                }
+              >
+                {v.activo ? "Activo" : "Inactivo"}
+              </span>
+            ),
+            tdClassName: listadoTablaTdClass,
+          },
         ]}
         rows={error ? [] : rows}
         rowKey={(v) => v.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los vehículos."
-            : "Todavía no tenés vehículos cargados."
+            : activeFilterCount > 0
+              ? "No hay vehículos que coincidan con el criterio."
+              : "Todavía no tenés vehículos cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(v) => (
@@ -133,6 +525,23 @@ export function VehiculosTenantPage() {
             >
               Editar
             </Link>
+            {v.activo ? (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-red-900 hover:bg-red-50`}
+              >
+                Desactivar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void toggleActivo(v)}
+                className={`${listadoTablaAccionClass} text-emerald-900 hover:bg-emerald-50`}
+              >
+                Reactivar
+              </button>
+            )}
           </div>
         )}
       />
