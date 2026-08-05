@@ -16,6 +16,7 @@ import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { tooltipPanelClass } from "@/lib/tooltip";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -155,6 +156,14 @@ export function ViajeViewModal({
       (lv) => lv.liquidacion.estado !== "anulado"
     ) ?? false;
   const bloqueadoPorComprobante = bloqueadoPorFactura || bloqueadoPorLiquidacion;
+  const razonNoEditable =
+    bloqueadoPorFactura && bloqueadoPorLiquidacion
+      ? "No se puede editar: el viaje ya tiene una factura emitida y una liquidación activa."
+      : bloqueadoPorFactura
+        ? "No se puede editar: el viaje ya tiene una factura emitida."
+        : bloqueadoPorLiquidacion
+          ? "No se puede editar: el viaje está incluido en una liquidación activa."
+          : null;
 
   return (
     <ViewModalShell
@@ -219,26 +228,28 @@ export function ViajeViewModal({
               )}
             </button>
           )}
-          <button
-            type="button"
-            onClick={onEditar}
-            disabled={bloqueado || bloqueadoPorComprobante}
-            title={
-              bloqueadoPorComprobante
-                ? "No se puede editar: el viaje ya fue facturado y/o liquidado."
-                : undefined
-            }
-            className={`${viewModalBtnPrimary}${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : bloqueado ? " cursor-wait" : ""}`}
-          >
-            {editando ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Abriendo…
-              </span>
-            ) : (
-              "Editar"
+          <span className="group relative inline-block">
+            <button
+              type="button"
+              onClick={onEditar}
+              disabled={bloqueado || bloqueadoPorComprobante}
+              className={`${viewModalBtnPrimary}${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : bloqueado ? " cursor-wait" : ""}`}
+            >
+              {editando ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Abriendo…
+                </span>
+              ) : (
+                "Editar"
+              )}
+            </button>
+            {razonNoEditable && (
+              <div className={tooltipPanelClass} role="tooltip">
+                {razonNoEditable}
+              </div>
             )}
-          </button>
+          </span>
         </>
       }
     >
