@@ -63,7 +63,10 @@ export function EmitirFacturaModal({
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
   const bloqueadoUsd = arcaBloqueaFacturarUsd(true, factura.moneda);
-  const yaAutorizada = factura.arcaEstado === 'autorizado' || Boolean(factura.cae);
+  const yaAutorizada =
+    factura.arcaEstado === 'autorizado' ||
+    factura.arcaEstado === 'anulado' ||
+    Boolean(factura.cae);
 
   const [step, setStep] = useState<Step>('revision');
   const [lineas, setLineas] = useState<FacturaLineaDraft[]>(() =>

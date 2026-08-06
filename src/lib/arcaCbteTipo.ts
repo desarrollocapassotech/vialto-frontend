@@ -7,6 +7,8 @@
 export type CvlpCbteTipo = 60 | 61;
 export type FacturaLetra = "a" | "b";
 export type FacturaCbteTipo = 1 | 6;
+/** Nota de Crédito que anula Factura A (1→3) o Factura B (6→8). */
+export type FacturaNcCbteTipo = 3 | 8;
 
 /**
  * CUIT de prueba estándar de AFIP SDK para homologación (ver arca.util.ts en el backend).
@@ -38,6 +40,33 @@ export function facturaLetraFromCondicionIva(
 
 export function facturaCbteTipoFromLetra(letra: FacturaLetra): FacturaCbteTipo {
   return letra === "a" ? 1 : 6;
+}
+
+export function facturaLetraFromCbteTipo(
+  cbteTipo: number | null | undefined,
+): FacturaLetra | null {
+  if (cbteTipo === 1 || cbteTipo === 3) return "a";
+  if (cbteTipo === 6 || cbteTipo === 8) return "b";
+  return null;
+}
+
+/**
+ * Factura A (01) → NC A (03); Factura B (06) → NC B (08).
+ * Misma correspondencia de clase A/B que la anulación de CVLP (3/8).
+ */
+export function facturaNcCbteTipoFromFactura(
+  cbteTipo: number | null | undefined,
+  condicionIvaCliente?: number | null,
+): FacturaNcCbteTipo {
+  if (cbteTipo === 1 || cbteTipo === 3) return 3;
+  if (cbteTipo === 6 || cbteTipo === 8) return 8;
+  return isResponsableInscripto(condicionIvaCliente) ? 3 : 8;
+}
+
+export function facturaNcLabel(ncTipo: FacturaNcCbteTipo): string {
+  return ncTipo === 3
+    ? "Nota de Crédito A (cód. 03)"
+    : "Nota de Crédito B (cód. 08)";
 }
 
 export function cvlpCbteLabel(cbteTipo: CvlpCbteTipo): string {
