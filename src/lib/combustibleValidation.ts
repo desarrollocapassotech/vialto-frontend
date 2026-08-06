@@ -33,6 +33,10 @@ export function useCombustibleValidation(
       return;
     }
 
+    // Limpiamos los topes previos para que no se muestre info inconsistente
+    // mientras corre el debounce o se espera la respuesta del servidor.
+    setBounds(null);
+
     const timer = setTimeout(() => {
       const qs = new URLSearchParams();
       qs.set("vehiculoId", vehiculoId);

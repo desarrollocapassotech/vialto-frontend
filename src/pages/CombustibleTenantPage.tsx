@@ -173,9 +173,7 @@ export function CombustibleTenantPage({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [viewTargetId, setViewTargetId] = useState<string | null>(null);
-  const [cargasPorVehiculo, setCargasPorVehiculo] = useState<
-    Record<string, { km: number; fecha: string }[]>
-  >({});
+
   const [downloading, setDownloading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -198,42 +196,7 @@ export function CombustibleTenantPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenantId, embeddedInSuperadmin]);
 
-  useEffect(() => {
-    if (!isCreateOpen || !activeTenantId) return;
-    let cancelled = false;
 
-    void (async () => {
-      try {
-        const qs = new URLSearchParams();
-        qs.set("tenantId", activeTenantId);
-        qs.set("page", "1");
-        qs.set("limit", "10000");
-
-        const data = await apiJson<CombustibleListResponse>(
-          `/api/platform/combustible?${qs.toString()}`,
-          () => getToken(),
-        );
-        if (cancelled) return;
-
-        const map: Record<string, { km: number; fecha: string }[]> = {};
-        for (const c of data.cargas) {
-          const vId = c.vehiculoId;
-          if (!vId) continue;
-          (map[vId] ??= []).push({ km: c.km, fecha: c.fecha });
-        }
-        for (const vId of Object.keys(map)) {
-          map[vId].sort((a, b) => a.fecha.localeCompare(b.fecha));
-        }
-        setCargasPorVehiculo(map);
-      } catch {
-        // silencioso
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isCreateOpen, activeTenantId, getToken]);
 
   useEffect(() => {
     setSearchParams(
@@ -982,7 +945,7 @@ export function CombustibleTenantPage({
           tenantId={activeTenantId}
           vehiculos={vehiculos}
           choferes={choferes}
-          cargasPorVehiculo={cargasPorVehiculo}
+
           onClose={() => setIsCreateOpen(false)}
           onSuccess={() => {
             setIsCreateOpen(false);
