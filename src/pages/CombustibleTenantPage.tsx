@@ -873,6 +873,7 @@ export function CombustibleTenantPage({
               <option value="">Todas</option>
               <option value="tarjeta">Tarjeta</option>
               <option value="efectivo">Efectivo</option>
+              <option value="cuenta_corriente">Cuenta Corriente</option>
             </select>
           </div>
         </div>

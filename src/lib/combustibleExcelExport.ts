@@ -62,7 +62,13 @@ export function cargaCombustibleColumnas(): ExcelColDef<CargaCombustible>[] {
     },
     // En el ejemplo PAGO aparece como valor crudo en mayúsculas (ej. "TARJETA"),
     // que no está mapeado en FORMA_PAGO_LABELS, por eso no aplico el label.
-    { id: "pago", label: "PAGO", getValue: (c) => upper(c.formaPago) },
+    // El guion bajo se reemplaza por espacio para valores compuestos (ej.
+    // "cuenta_corriente" -> "CUENTA CORRIENTE").
+    {
+      id: "pago",
+      label: "PAGO",
+      getValue: (c) => upper(c.formaPago).replace(/_/g, " "),
+    },
   ];
 }
 
