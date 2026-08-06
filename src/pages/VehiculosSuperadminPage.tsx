@@ -18,8 +18,11 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { ConEmpresa, PaginatedMeta, Vehiculo } from "@/types/api";
 
 export function VehiculosSuperadminPage() {
@@ -45,6 +48,61 @@ export function VehiculosSuperadminPage() {
   const [viewingVehiculoPatente, setViewingVehiculoPatente] = useState("");
   const tenants = useTenantsList();
   const [allRows, setAllRows] = useState<ConEmpresa<Vehiculo>[] | null>(null);
+
+  // Estados de los filtros de columna
+  const [filtroPatente, setFiltroPatente] = useState("");
+  const [filtroPertenencia, setFiltroPertenencia] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroPatente("");
+    setFiltroPertenencia("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroPatente || !!filtroPertenencia;
+
+  // Extracción de opciones únicas
+  const opcionesPatente = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.patente).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesPertenencia = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || [])
+            .map((r) =>
+              labelAsignacionTransportista(
+                r.transportistaId,
+                nombresTransportistas,
+              ),
+            )
+            .filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows, nombresTransportistas],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!allRows) return [];
+    return allRows.filter((r) => {
+      if (filtroPatente && r.patente !== filtroPatente) return false;
+      if (
+        filtroPertenencia &&
+        labelAsignacionTransportista(
+          r.transportistaId,
+          nombresTransportistas,
+        ) !== filtroPertenencia
+      )
+        return false;
+      return true;
+    });
+  }, [allRows, filtroPatente, filtroPertenencia, nombresTransportistas]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -85,12 +143,12 @@ export function VehiculosSuperadminPage() {
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
   const { rows, meta } = useMemo(() => {
-    if (allRows === null) return { rows: null, meta: null };
-    const total = allRows.length;
+    if (rowsFiltradas === null) return { rows: null, meta: null };
+    const total = rowsFiltradas.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const pageSafe = Math.min(page, totalPages);
     const start = (pageSafe - 1) * pageSize;
-    const slice = allRows.slice(start, start + pageSize);
+    const slice = rowsFiltradas.slice(start, start + pageSize);
     const meta: PaginatedMeta = {
       page: pageSafe,
       pageSize,
@@ -100,7 +158,7 @@ export function VehiculosSuperadminPage() {
       hasNext: pageSafe < totalPages,
     };
     return { rows: slice, meta };
-  }, [allRows, page, pageSize]);
+  }, [rowsFiltradas, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -111,17 +169,29 @@ export function VehiculosSuperadminPage() {
         Elegí una empresa para ver sus vehículos. El listado lo filtra el
         servidor.
       </p>
+
       <div className="mt-6">
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
           onChange={(id) => {
             setPage(1);
+            limpiarFiltros();
             onChangeTenant(id);
           }}
         />
       </div>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to={
             filtroEmpresa
@@ -138,6 +208,7 @@ export function VehiculosSuperadminPage() {
           Crear vehículo
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
@@ -145,7 +216,72 @@ export function VehiculosSuperadminPage() {
       )}
 
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={4}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Patente"
+                filterActive={!!filtroPatente}
+                filterSignature={filtroPatente}
+              >
+                <select
+                  value={filtroPatente}
+                  onChange={(e) => {
+                    setFiltroPatente(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPatente ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Patente"
+                >
+                  <option value="">Todas</option>
+                  {opcionesPatente.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Tipo y marca
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Pertenencia"
+                filterActive={!!filtroPertenencia}
+                filterSignature={filtroPertenencia}
+              >
+                <select
+                  value={filtroPertenencia}
+                  onChange={(e) => {
+                    setFiltroPertenencia(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPertenencia
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Pertenencia"
+                >
+                  <option value="">Todas</option>
+                  {opcionesPertenencia.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "patente",
@@ -183,7 +319,9 @@ export function VehiculosSuperadminPage() {
             ? "Seleccioná una empresa para ver los vehículos."
             : error
               ? "No se pudieron cargar los vehículos."
-              : "No hay vehículos cargados para esta empresa."
+              : anyFiltroActivo
+                ? "No hay vehículos que coincidan con los filtros aplicados."
+                : "No hay vehículos cargados para esta empresa."
         }
         loadingMessage="Cargando…"
         renderActions={(v) => (

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { TenantsTable } from "@/components/superadmin/TenantsTable";
-import { TenantsToolbar } from "@/components/superadmin/TenantsToolbar";
 import { usePaginatedTenants } from "@/hooks/usePaginatedTenants";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -11,11 +10,7 @@ export function SuperadminEmpresasPage() {
     meta,
     loading,
     error,
-    searchInput,
-    setSearchInput,
     pageSize,
-    applySearch,
-    clearSearch,
     onChangePageSize,
     statusUpdatingByOrgId,
     toggleTenantEnabled,
@@ -48,13 +43,6 @@ export function SuperadminEmpresasPage() {
             {error}
           </div>
         )}
-
-        <TenantsToolbar
-          searchInput={searchInput}
-          onSearchInputChange={setSearchInput}
-          onSearch={applySearch}
-          onClear={clearSearch}
-        />
 
         <TenantsTable
           loading={loading}
