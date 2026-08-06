@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Receipt } from "lucide-react";
+import { Receipt, HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
@@ -479,8 +479,7 @@ export function CrearLiquidacionManualModal({
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
-      sum +
-      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      sum + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -499,8 +498,9 @@ export function CrearLiquidacionManualModal({
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
-  const periodoInvalido =
-    Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
+  const periodoInvalido = Boolean(
+    periodoDesde && periodoHasta && periodoHasta < periodoDesde,
+  );
   const canSubmit =
     Boolean(transportistaId) &&
     Boolean(periodoDesde) &&
@@ -643,9 +643,7 @@ export function CrearLiquidacionManualModal({
             <div>
               <p className={labelClass}>Condición frente al IVA</p>
               <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
-                {transportistaId
-                  ? condicionIvaLabel(condicionIva)
-                  : "—"}
+                {transportistaId ? condicionIvaLabel(condicionIva) : "—"}
               </div>
             </div>
           </div>
@@ -819,8 +817,18 @@ export function CrearLiquidacionManualModal({
               </p>
             </div>
             <div>
-              <label htmlFor="ivaPct" className={labelClass}>
-                IVA sobre comisión (%)
+              <label
+                htmlFor="ivaPct"
+                className="flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel mb-1"
+              >
+                <span>IVA sobre comisión (%)</span>
+                <div className="group relative flex items-center">
+                  <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%
+                    <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+                  </div>
+                </div>
               </label>
               <input
                 id="ivaPct"
@@ -833,9 +841,8 @@ export function CrearLiquidacionManualModal({
                 className={inputClass}
               />
               <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Por defecto se aplica{" "}
-                {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin IVA
-                ingresá 0.
+                Por defecto se aplica {resolvedConfig?.ivaGastosAdmin ?? 21}%.
+                Para liquidar sin IVA ingresá 0.
               </p>
             </div>
           </div>
