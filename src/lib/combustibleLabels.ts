@@ -3,6 +3,7 @@ export const FORMA_PAGO_LABELS: Record<string, string> = {
   cheque: "Cheque",
   efectivo: "Efectivo",
   tarjeta: "Tarjeta",
+  cuenta_corriente: "Cuenta Corriente",
 };
 
 // Debe coincidir exactamente con la lista de la app del chofer

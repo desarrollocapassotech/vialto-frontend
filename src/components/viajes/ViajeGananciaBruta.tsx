@@ -4,9 +4,7 @@ import { gananciaBrutaMetaDesdeViaje } from '@/lib/viajesGananciaBruta';
 import type { Viaje } from '@/types/api';
 
 import { listadoColHideUntilLg } from '@/lib/listadoTabla';
-
-const tooltipPanelClass =
-  'pointer-events-none invisible absolute bottom-full right-0 z-20 mb-1 w-[min(22rem,calc(100vw-2.5rem))] rounded border border-black/10 bg-vialto-charcoal px-3 py-2 text-left text-xs font-normal normal-case tracking-normal text-white shadow-md opacity-0 transition-[opacity,visibility] group-hover:visible group-hover:opacity-100';
+import { tooltipPanelClass } from '@/lib/tooltip';
 
 /** Encabezado de columna (sin tooltip; la ayuda está al pasar el mouse sobre cada celda). */
 export function ViajeGananciaBrutaColumnHeader() {

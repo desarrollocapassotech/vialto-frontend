@@ -449,6 +449,9 @@ export function CargaCombustibleEditModal({
               </option>
               <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
               <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
+              <option value="cuenta_corriente">
+                {FORMA_PAGO_LABELS.cuenta_corriente}
+              </option>
             </select>
           </div>
         </div>
