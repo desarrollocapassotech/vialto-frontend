@@ -13,6 +13,7 @@ import {
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
+import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -174,6 +175,7 @@ export function FacturacionTenantPage({
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
+  const [anularFactura, setAnularFactura] = useState<Factura | null>(null);
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
@@ -713,7 +715,14 @@ export function FacturacionTenantPage({
 
   function abrirEmitirArca(f: Factura) {
     setViewingFactura(null);
+    setAnularFactura(null);
     setEmittingFactura(f);
+  }
+
+  function abrirAnularFactura(f: Factura) {
+    setViewingFactura(null);
+    setEmittingFactura(null);
+    setAnularFactura(f);
   }
 
   function handleFacturaEmitida(f: Factura) {
@@ -724,8 +733,26 @@ export function FacturacionTenantPage({
     setEmittingFactura(f);
   }
 
+  function handleFacturaAnulada(f: Factura) {
+    setFacturas((prev) =>
+      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+    );
+    if (viewingFactura?.id === f.id) setViewingFactura(f);
+    setAnularFactura(f);
+  }
+
   function verComprobanteUrl(url: string | null | undefined) {
     if (url?.trim()) setPreviewComprobanteUrl(url);
+  }
+
+  function verNotaCredito(f: Factura) {
+    if (f.notaCreditoUrl?.trim()) {
+      setPreviewComprobanteUrl(f.notaCreditoUrl);
+      return;
+    }
+    // Sin URL en Cloudinary aún: abrir el modal de anulación en modo ya-anulada
+    // (permite descargar el PDF generado on-demand).
+    abrirAnularFactura(f);
   }
 
   function nombreContraparte(f: Factura) {
@@ -1169,9 +1196,15 @@ export function FacturacionTenantPage({
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
+                onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
                   f.comprobanteUrl
                     ? () => verComprobanteUrl(f.comprobanteUrl)
+                    : undefined
+                }
+                onVerNotaCredito={
+                  hasArca && f.arcaEstado === "anulado"
+                    ? () => verNotaCredito(f)
                     : undefined
                 }
               />
@@ -1211,9 +1244,15 @@ export function FacturacionTenantPage({
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
+                onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
                   f.comprobanteUrl
                     ? () => verComprobanteUrl(f.comprobanteUrl)
+                    : undefined
+                }
+                onVerNotaCredito={
+                  hasArca && f.arcaEstado === "anulado"
+                    ? () => verNotaCredito(f)
                     : undefined
                 }
               />
@@ -1267,9 +1306,17 @@ export function FacturacionTenantPage({
           onEmitirArca={
             hasArca ? () => abrirEmitirArca(viewingFactura) : undefined
           }
+          onAnular={
+            hasArca ? () => abrirAnularFactura(viewingFactura) : undefined
+          }
           onVerComprobante={
             viewingFactura.comprobanteUrl
               ? () => verComprobanteUrl(viewingFactura.comprobanteUrl)
+              : undefined
+          }
+          onVerNotaCredito={
+            hasArca && viewingFactura.arcaEstado === "anulado"
+              ? () => verNotaCredito(viewingFactura)
               : undefined
           }
         />
@@ -1285,6 +1332,17 @@ export function FacturacionTenantPage({
           onEmitido={(f) => {
             handleFacturaEmitida(f);
           }}
+        />
+      )}
+
+      {anularFactura && (
+        <AnularFacturaModal
+          factura={anularFactura}
+          viajes={viajes}
+          tenantId={platform ? tid : undefined}
+          clienteInicial={clienteById(anularFactura.clienteId)}
+          onClose={() => setAnularFactura(null)}
+          onAnulada={handleFacturaAnulada}
         />
       )}
 

@@ -312,8 +312,21 @@ export interface Factura {
   ptoVenta?: number | null;
   cae?: string | null;
   caeFechaVto?: string | null;
-  arcaEstado?: "pendiente_cae" | "autorizado" | "error" | null;
+  arcaEstado?: "pendiente_cae" | "autorizado" | "error" | "anulado" | null;
   arcaError?: string | null;
+  /** Datos del comprobante de anulación (Nota de Crédito A/B); la factura original se conserva arriba. */
+  anulacionCbteTipo?: number | null;
+  anulacionCbteNro?: number | null;
+  anulacionPtoVenta?: number | null;
+  anulacionCae?: string | null;
+  anulacionCaeFechaVto?: string | null;
+  anulacionFecha?: string | null;
+  motivoAnulacion?: string | null;
+  anuladoPor?: string | null;
+  anuladoPorNombre?: string | null;
+  anuladoAt?: string | null;
+  /** PDF de la NC en Cloudinary (equivalente a comprobanteUrl del original). */
+  notaCreditoUrl?: string | null;
   createdAt: string;
 }
 
