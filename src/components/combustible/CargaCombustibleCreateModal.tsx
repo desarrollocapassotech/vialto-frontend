@@ -9,6 +9,7 @@ import {
   computePrecioPorLitro,
   fmtTipoVehiculo,
 } from "@/lib/combustibleLabels";
+import { useCombustibleValidation } from "@/lib/combustibleValidation";
 import type { CargaCombustible } from "@/types/api";
 
 function fmtVehiculoLabel(v: {
@@ -154,11 +155,7 @@ interface Props {
   vehiculos: VehiculoOpt[];
   choferes: ChoferOpt[];
   tenantId?: string;
-  /**
-   * Última carga registrada por vehículo (lookup por vehiculoId).
-   * Se usa para validar que el km ingresado no sea inferior al último.
-   */
-  cargasPorVehiculo?: Record<string, { km: number; fecha: string }[]>;
+
   onClose: () => void;
   onSuccess: (nuevaCarga: CargaCombustible) => void;
 }
@@ -167,7 +164,6 @@ export function CargaCombustibleCreateModal({
   tenantId,
   vehiculos,
   choferes,
-  cargasPorVehiculo = {},
   onClose,
   onSuccess,
 }: Props) {
@@ -188,8 +184,6 @@ export function CargaCombustibleCreateModal({
     km: "",
     formaPago: "",
   });
-
-  type CargaHist = { km: number; fecha: string };
 
   // Por defecto el precio por litro se calcula solo; se destraba con el checkbox.
   const [precioManual, setPrecioManual] = useState(false);
@@ -217,53 +211,17 @@ export function CargaCombustibleCreateModal({
     return null;
   }, [formData.litros, precioMostrado, formData.importe]);
 
-  // Validación del kilometraje en tiempo real:
-  // 1) solo números/puntos, 2) no inferior al de la última carga del vehículo.
-  const kmError = useMemo(() => {
-    if (!formData.km) return null;
-
-    if (!/^[\d.]+$/.test(formData.km)) {
-      return "El kilometraje solo puede contener números.";
-    }
-
-    const kmSanitizado = parseInt(formData.km.replace(/\./g, ""), 10);
-    if (isNaN(kmSanitizado)) {
-      return "El kilometraje ingresado no es válido.";
-    }
-
-    const historial = formData.vehiculoId
-      ? (cargasPorVehiculo[formData.vehiculoId] ?? [])
-      : [];
-    const nuevaFecha = formData.fecha; // "YYYY-MM-DD"
-    const fmt = (iso: string) =>
-      iso.slice(0, 10).split("-").reverse().join("/");
-
-    // Carga anterior o del mismo día (fecha <= la nueva): actúa como piso.
-    const anterior = historial
-      .filter((c) => c.fecha.slice(0, 10) <= nuevaFecha)
-      .reduce<CargaHist | null>(
-        (max, c) => (max == null || c.km > max.km ? c : max),
-        null,
-      );
-
-    if (anterior && kmSanitizado < anterior.km) {
-      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser inferior al de la carga anterior registrada el ${fmt(anterior.fecha)} (${anterior.km} km).`;
-    }
-
-    // Carga posterior (fecha estrictamente mayor): actúa como techo.
-    const posterior = historial
-      .filter((c) => c.fecha.slice(0, 10) > nuevaFecha)
-      .reduce<CargaHist | null>(
-        (min, c) => (min == null || c.km < min.km ? c : min),
-        null,
-      );
-
-    if (posterior && kmSanitizado > posterior.km) {
-      return `El kilometraje ingresado (${kmSanitizado} km) es inconsistente: no puede ser superior al de la carga posterior registrada el ${fmt(posterior.fecha)} (${posterior.km} km).`;
-    }
-
-    return null;
-  }, [formData.km, formData.vehiculoId, formData.fecha, cargasPorVehiculo]);
+  const { formErrors } = useCombustibleValidation(
+    getToken,
+    formData.vehiculoId,
+    formData.fecha,
+    formData.litros,
+    precioMostrado,
+    formData.importe,
+    formData.km,
+  );
+  
+  const kmError = formErrors.km;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
