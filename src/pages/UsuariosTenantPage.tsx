@@ -794,7 +794,11 @@ export function UsuariosTenantPage() {
       <ConfirmDialog
         open={!!confirmDelete}
         title="Eliminar usuario"
-        message={`¿Eliminás a ${getFullName(confirmDelete!)} de la organización? Perderá acceso de inmediato.`}
+        message={
+          confirmDelete
+            ? `¿Eliminás a ${getFullName(confirmDelete)} de la organización? Perderá acceso de inmediato.`
+            : ""
+        }
         confirmLabel="Eliminar"
         tone="danger"
         busy={busy}
