@@ -14,7 +14,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Presentacion } from "@/types/api";
 import { ConfirmDialog } from "@/components/crud/ConfirmDialog";
 
@@ -36,6 +39,41 @@ export function PresentacionesTenantPage() {
 
   const [confirmTarget, setConfirmTarget] = useState<Presentacion | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEstado("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEstado;
+
+  // Extracción de opciones únicas
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroEstado) {
+        const isActive = filtroEstado === "true";
+        if (r.activo !== isActive) return false;
+      }
+      return true;
+    });
+  }, [rows, filtroNombre, filtroEstado]);
 
   const editing = rows?.find((r) => r.id === editingId) ?? null;
 
@@ -138,8 +176,8 @@ export function PresentacionesTenantPage() {
   }
 
   const meta = useMemo(() => {
-    if (!rows) return null;
-    const total = rows.length;
+    if (!rowsFiltradas) return null;
+    const total = rowsFiltradas.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       total,
@@ -149,13 +187,13 @@ export function PresentacionesTenantPage() {
       hasPrev: page > 1,
       hasNext: page < totalPages,
     };
-  }, [rows, page, pageSize]);
+  }, [rowsFiltradas, page, pageSize]);
 
   const paginatedRows = useMemo(() => {
-    if (!rows) return null;
+    if (!rowsFiltradas) return null;
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return rowsFiltradas.slice(start, start + pageSize);
+  }, [rowsFiltradas, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -167,6 +205,15 @@ export function PresentacionesTenantPage() {
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -193,6 +240,63 @@ export function PresentacionesTenantPage() {
 
       <ListadoDatos
         className="mt-8"
+        tableColSpan={3}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={!!filtroEstado}
+                filterSignature={filtroEstado}
+              >
+                <select
+                  value={filtroEstado}
+                  onChange={(e) => {
+                    setFiltroEstado(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroEstado ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Estado"
+                >
+                  <option value="">Todos</option>
+                  <option value="true">Activa</option>
+                  <option value="false">Inactiva</option>
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -223,7 +327,9 @@ export function PresentacionesTenantPage() {
         emptyMessage={
           loadError
             ? "No se pudieron cargar las presentaciones."
-            : "No hay presentaciones cargadas. Creá una para usarla en los productos."
+            : anyFiltroActivo
+              ? "No hay presentaciones que coincidan con los filtros aplicados."
+              : "No hay presentaciones cargadas. Creá una para usarla en los productos."
         }
         loadingMessage="Cargando…"
         renderActions={(row) => (
@@ -249,7 +355,7 @@ export function PresentacionesTenantPage() {
         )}
       />
 
-      {meta && (rows?.length ?? 0) > 0 && (
+      {meta && (rowsFiltradas?.length ?? 0) > 0 && (
         <div className="mt-4">
           <ListadoPagination
             meta={meta}
@@ -320,7 +426,6 @@ export function PresentacionesTenantPage() {
           </form>
         </div>
       )}
-
       <ConfirmDialog
         open={confirmTarget !== null}
         destructive

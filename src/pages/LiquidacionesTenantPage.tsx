@@ -1,6 +1,14 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { Ban, Download, Eye, FileText, Landmark, Receipt, Trash2 } from "lucide-react";
+import {
+  Ban,
+  Download,
+  Eye,
+  FileText,
+  Landmark,
+  Receipt,
+  Trash2,
+} from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -208,7 +216,6 @@ export function LiquidacionesTenantPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const { tenant, transportistas } = useMaestroData();
 
-  // ─── VALIDACIÓN DE ROL E INYECCIÓN DE TENANT ──────────────────────────────
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
     user?.unsafeMetadata?.role === "superadmin" ||
@@ -226,6 +233,7 @@ export function LiquidacionesTenantPage() {
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
   const [estadoFilter, setEstadoFilter] = useState<LiquidacionEstado | "todos">(
     "todos",
   );
@@ -256,8 +264,9 @@ export function LiquidacionesTenantPage() {
     setPeriodoHastaFilter("");
     setPage(1);
   }
+
   const anyFiltroActivo =
-    estadoFilter !== "todos" ||
+    (hasArca && estadoFilter !== "todos") ||
     !!transportistaFilter ||
     !!periodoDesdeFilter ||
     !!periodoHastaFilter;
@@ -279,9 +288,9 @@ export function LiquidacionesTenantPage() {
     useState<LiquidacionConTransportista | null>(null);
   const [eliminarConfirm, setEliminarConfirm] =
     useState<LiquidacionConTransportista | null>(null);
-  const [anularTipo, setAnularTipo] = useState<
-    "nota_credito" | "nota_debito"
-  >("nota_credito");
+  const [anularTipo, setAnularTipo] = useState<"nota_credito" | "nota_debito">(
+    "nota_credito",
+  );
   const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
     string | null
   >(null);
@@ -300,7 +309,6 @@ export function LiquidacionesTenantPage() {
     );
   }
 
-  // ─── FETCH INICIAL ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (!activeTenantId) {
@@ -358,7 +366,7 @@ export function LiquidacionesTenantPage() {
     try {
       const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
       await apiFetch(
-        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}${qsTenant}`, // <-- Ruta corregida
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}${qsTenant}`,
         () => getToken(),
         { method: "DELETE" },
       );
@@ -522,12 +530,19 @@ export function LiquidacionesTenantPage() {
 
   const filteredRows = rows
     ? rows.filter((r) => {
-        if (estadoFilter !== "todos" && r.estado !== estadoFilter) return false;
+        if (hasArca && estadoFilter !== "todos" && r.estado !== estadoFilter)
+          return false;
         if (transportistaFilter && r.transportistaId !== transportistaFilter)
           return false;
-        if (periodoDesdeFilter && r.periodoHasta.slice(0, 10) < periodoDesdeFilter)
+        if (
+          periodoDesdeFilter &&
+          r.periodoHasta.slice(0, 10) < periodoDesdeFilter
+        )
           return false;
-        if (periodoHastaFilter && r.periodoDesde.slice(0, 10) > periodoHastaFilter)
+        if (
+          periodoHastaFilter &&
+          r.periodoDesde.slice(0, 10) > periodoHastaFilter
+        )
           return false;
         return true;
       })
@@ -560,7 +575,6 @@ export function LiquidacionesTenantPage() {
           : "Liquidaciones emitidas a transportistas."}
       </p>
 
-      {/* RENDERIZADO CONDICIONAL DEL BUSCADOR SOLO PARA SUPERADMINS */}
       {isSuperAdmin && (
         <div className="mt-6">
           <EmpresaFilterBar
@@ -570,6 +584,7 @@ export function LiquidacionesTenantPage() {
               setPage(1);
               setRows(null);
               setError(null);
+              limpiarFiltros();
               onChangeTenant(id);
             }}
           />
@@ -577,9 +592,12 @@ export function LiquidacionesTenantPage() {
       )}
 
       {hasArca && activeTenantId && (
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-          <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-          Emisión electrónica vía ARCA
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+            Emisión electrónica vía ARCA
+          </div>
+          <AmbienteTestBadge ambiente={config?.ambiente} />
         </div>
       )}
 
@@ -614,7 +632,7 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={7}
+        tableColSpan={hasArca ? 7 : 6}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -653,7 +671,9 @@ export function LiquidacionesTenantPage() {
                     <input
                       type="date"
                       value={periodoDesdeFilter}
-                      onChange={(e) => aplicarPeriodoDesdeFilter(e.target.value)}
+                      onChange={(e) =>
+                        aplicarPeriodoDesdeFilter(e.target.value)
+                      }
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
                     />
                   </label>
@@ -662,7 +682,9 @@ export function LiquidacionesTenantPage() {
                     <input
                       type="date"
                       value={periodoHastaFilter}
-                      onChange={(e) => aplicarPeriodoHastaFilter(e.target.value)}
+                      onChange={(e) =>
+                        aplicarPeriodoHastaFilter(e.target.value)
+                      }
                       className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
                     />
                   </label>
@@ -678,35 +700,37 @@ export function LiquidacionesTenantPage() {
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               A liquidar
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Estado"
-                filterActive={estadoFilter !== "todos"}
-                filterSignature={estadoFilter}
-              >
-                <select
-                  value={estadoFilter}
-                  onChange={(e) =>
-                    aplicarFiltroEstado(
-                      e.target.value as LiquidacionEstado | "todos",
-                    )
-                  }
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    estadoFilter !== "todos"
-                      ? "text-vialto-fire"
-                      : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar listado por estado"
+            {hasArca && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Estado"
+                  filterActive={estadoFilter !== "todos"}
+                  filterSignature={estadoFilter}
                 >
-                  <option value="todos">Todos</option>
-                  {Object.entries(ESTADO_LABEL).map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
+                  <select
+                    value={estadoFilter}
+                    onChange={(e) =>
+                      aplicarFiltroEstado(
+                        e.target.value as LiquidacionEstado | "todos",
+                      )
+                    }
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      estadoFilter !== "todos"
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar listado por estado"
+                  >
+                    <option value="todos">Todos</option>
+                    {Object.entries(ESTADO_LABEL).map(([val, label]) => (
+                      <option key={val} value={val}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
@@ -766,21 +790,25 @@ export function LiquidacionesTenantPage() {
             thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums font-medium`,
           },
-          {
-            id: "estado",
-            header: "Estado",
-            cell: (liq) => (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span
-                  className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-                >
-                  {ESTADO_LABEL[liq.estado]}
-                </span>
-                <AmbienteTestBadge ambiente={liq.ambiente} />
-              </div>
-            ),
-            tdClassName: listadoTablaTdClass,
-          },
+          ...(hasArca
+            ? [
+                {
+                  id: "estado",
+                  header: "Estado",
+                  cell: (liq: LiquidacionConTransportista) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                      >
+                        {ESTADO_LABEL[liq.estado]}
+                      </span>
+                      <AmbienteTestBadge ambiente={liq.ambiente} />
+                    </div>
+                  ),
+                  tdClassName: listadoTablaTdClass,
+                },
+              ]
+            : []),
         ]}
         rows={!activeTenantId || error ? [] : paginatedRows}
         rowKey={(liq) => liq.id}
@@ -794,7 +822,9 @@ export function LiquidacionesTenantPage() {
               : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
-        renderActions={(liq) => <LiquidacionAccionesMenu {...accionesProps(liq)} />}
+        renderActions={(liq) => (
+          <LiquidacionAccionesMenu {...accionesProps(liq)} />
+        )}
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
@@ -815,19 +845,23 @@ export function LiquidacionesTenantPage() {
                 ),
               },
               { label: "A liquidar", value: fmtMoney(liq.liquido) },
-              {
-                label: "Estado",
-                value: (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
-                    >
-                      {ESTADO_LABEL[liq.estado]}
-                    </span>
-                    <AmbienteTestBadge ambiente={liq.ambiente} />
-                  </div>
-                ),
-              },
+              ...(hasArca
+                ? [
+                    {
+                      label: "Estado",
+                      value: (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                          >
+                            {ESTADO_LABEL[liq.estado]}
+                          </span>
+                          <AmbienteTestBadge ambiente={liq.ambiente} />
+                        </div>
+                      ),
+                    },
+                  ]
+                : []),
             ]}
             actions={<LiquidacionAccionesMenu {...accionesProps(liq)} />}
           />
@@ -988,11 +1022,10 @@ export function LiquidacionesTenantPage() {
           getToken={getToken}
           tenantId={activeTenantId}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
-      onSaved={(updated) => {
+          onSaved={(updated) => {
             const withLineas = {
               ...updated,
-              transportista:
-                updated.transportista ?? detail.liq.transportista,
+              transportista: updated.transportista ?? detail.liq.transportista,
               conceptosLineas:
                 updated.conceptosLineas ?? detail.liq.conceptosLineas ?? [],
             };

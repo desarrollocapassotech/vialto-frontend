@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Receipt } from "lucide-react";
+import { Receipt, HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
@@ -12,16 +12,15 @@ import {
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
-import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import {
-  ARCA_CBTE_OVERRIDE_WARNING,
+  CVLP_CLASE_B_WARNING,
   condicionIvaLabel,
   cvlpCbteLabel,
-  cvlpCbteTipoFromCondicionIva,
-  type CvlpCbteTipo,
+  cvlpClaseBEsperada,
 } from "@/lib/arcaCbteTipo";
 import {
   MSG_ARCA_NO_LIQUIDA_USD,
@@ -137,16 +136,6 @@ export function CrearLiquidacionManualModal({
   );
   const [conceptosIncomplete, setConceptosIncomplete] = useState<number[]>([]);
 
-  const condicionIvaInicial =
-    viajeInicial?.transportista?.condicionIva ??
-    transportistas.find((t) => t.id === (viajeInicial?.transportistaId ?? ""))
-      ?.condicionIva ??
-    null;
-  const [cbteTipo, setCbteTipo] = useState<CvlpCbteTipo>(
-    cvlpCbteTipoFromCondicionIva(condicionIvaInicial),
-  );
-  const cbteTipoEditadoManualmente = useRef(false);
-
   // — Selección de viajes (solo cuando no hay viajeInicial) —
   const [viajes, setViajes] = useState<ViajeItem[]>([]);
   const [viajesLoading, setViajesLoading] = useState(false);
@@ -234,14 +223,7 @@ export function CrearLiquidacionManualModal({
     viajeInicial?.transportista?.condicionIva ??
     transportistas.find((t) => t.id === transportistaId)?.condicionIva ??
     null;
-  const cbteSugerido = cvlpCbteTipoFromCondicionIva(condicionIva);
-  const overrideManual = hasArca && cbteTipo !== cbteSugerido;
-
-  // Al cambiar transportista, realinear tipo CVLP al sugerido (salvo override manual).
-  useEffect(() => {
-    if (!hasArca || cbteTipoEditadoManualmente.current) return;
-    setCbteTipo(cbteSugerido);
-  }, [hasArca, cbteSugerido]);
+  const cvlpClaseBAlerta = hasArca && cvlpClaseBEsperada(condicionIva);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -376,6 +358,12 @@ export function CrearLiquidacionManualModal({
       setError("Ingresá un punto de venta válido.");
       return;
     }
+    if (action === "emitir" && hasArca && cvlpClaseBEsperada(condicionIva)) {
+      setError(
+        "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
+      );
+      return;
+    }
     setConceptosIncomplete([]);
     setError(null);
     setSubmitAction(action);
@@ -394,7 +382,6 @@ export function CrearLiquidacionManualModal({
         periodoHasta,
         viajeIds,
       };
-      if (hasArca) body.cbteTipo = cbteTipo;
       if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
       // Siempre enviar IVA explícito para no caer al default silencioso del backend.
       body.ivaPct = ivaResolved;
@@ -479,8 +466,7 @@ export function CrearLiquidacionManualModal({
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
-      sum +
-      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      sum + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -499,8 +485,9 @@ export function CrearLiquidacionManualModal({
   const showSummary =
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
-  const periodoInvalido =
-    Boolean(periodoDesde && periodoHasta && periodoHasta < periodoDesde);
+  const periodoInvalido = Boolean(
+    periodoDesde && periodoHasta && periodoHasta < periodoDesde,
+  );
   const canSubmit =
     Boolean(transportistaId) &&
     Boolean(periodoDesde) &&
@@ -529,9 +516,14 @@ export function CrearLiquidacionManualModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-            Nueva liquidación
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+              Nueva liquidación
+            </h2>
+            {hasArca && (
+              <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
+            )}
+          </div>
           {!submitting && (
             <button
               type="button"
@@ -550,64 +542,11 @@ export function CrearLiquidacionManualModal({
         >
           {/* Tipo de comprobante (solo ARCA) */}
           {hasArca && (
-            <div className="space-y-2">
-              <p className={labelClass}>
-                Tipo de comprobante <span className="text-red-500">*</span>
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {([60, 61] as CvlpCbteTipo[]).map((t) => {
-                  const selected = cbteTipo === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      disabled={bloqueadoUsd}
-                      onClick={() => {
-                        cbteTipoEditadoManualmente.current = true;
-                        setCbteTipo(t);
-                      }}
-                      className={[
-                        "flex flex-col items-center justify-center border py-3 px-2 text-xs uppercase tracking-wider transition-colors",
-                        bloqueadoUsd
-                          ? "border-black/10 bg-vialto-mist/40 text-vialto-steel cursor-not-allowed opacity-60"
-                          : selected
-                            ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                            : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist",
-                      ].join(" ")}
-                    >
-                      CVLP
-                      <span className="mt-1 text-[10px] normal-case tracking-normal opacity-80">
-                        {cvlpCbteLabel(t)}
-                      </span>
-                      {t === cbteSugerido && (
-                        <span className="mt-1 text-[10px] normal-case tracking-normal opacity-70">
-                          Sugerido
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="rounded border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950 space-y-1">
-                <p>
-                  Condición frente al IVA del transportista:{" "}
-                  <span className="font-medium">
-                    {condicionIvaLabel(condicionIva)}
-                  </span>
-                  {" → "}
-                  <span className="font-medium">
-                    {cvlpCbteLabel(cbteSugerido)}
-                  </span>
-                  .
-                </p>
-                <p>{ARCA_CBTE_OVERRIDE_WARNING}</p>
-                {overrideManual && (
-                  <p className="font-medium text-amber-900">
-                    Estás usando un tipo distinto al sugerido (
-                    {cvlpCbteLabel(cbteTipo)}).
-                  </p>
-                )}
-              </div>
+            <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
+              <span className={labelClass}>Comprobante</span>
+              <span className="text-sm text-vialto-charcoal">
+                {cvlpCbteLabel(60)}
+              </span>
             </div>
           )}
 
@@ -625,10 +564,7 @@ export function CrearLiquidacionManualModal({
                 <select
                   required
                   value={transportistaId}
-                  onChange={(e) => {
-                    cbteTipoEditadoManualmente.current = false;
-                    setTransportistaId(e.target.value);
-                  }}
+                  onChange={(e) => setTransportistaId(e.target.value)}
                   className={selectClass}
                 >
                   <option value="">— Seleccioná un transportista —</option>
@@ -643,9 +579,7 @@ export function CrearLiquidacionManualModal({
             <div>
               <p className={labelClass}>Condición frente al IVA</p>
               <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
-                {transportistaId
-                  ? condicionIvaLabel(condicionIva)
-                  : "—"}
+                {transportistaId ? condicionIvaLabel(condicionIva) : "—"}
               </div>
             </div>
           </div>
@@ -819,8 +753,18 @@ export function CrearLiquidacionManualModal({
               </p>
             </div>
             <div>
-              <label htmlFor="ivaPct" className={labelClass}>
-                IVA sobre comisión (%)
+              <label
+                htmlFor="ivaPct"
+                className="flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel mb-1"
+              >
+                <span>IVA sobre comisión (%)</span>
+                <div className="group relative flex items-center">
+                  <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%
+                    <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+                  </div>
+                </div>
               </label>
               <input
                 id="ivaPct"
@@ -833,9 +777,8 @@ export function CrearLiquidacionManualModal({
                 className={inputClass}
               />
               <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                Por defecto se aplica{" "}
-                {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin IVA
-                ingresá 0.
+                Por defecto se aplica {resolvedConfig?.ivaGastosAdmin ?? 21}%.
+                Para liquidar sin IVA ingresá 0.
               </p>
             </div>
           </div>
@@ -976,8 +919,21 @@ export function CrearLiquidacionManualModal({
             </div>
           )}
 
-          {hasArca && (
-            <AmbienteHomologacionWarning ambiente={resolvedConfig?.ambiente} />
+          {cvlpClaseBAlerta && (
+            <div
+              className="rounded border border-red-300/60 bg-red-50 px-4 py-3 text-xs text-red-900"
+              role="alert"
+            >
+              <p className="font-medium">No corresponde emitir CVLP 060</p>
+              <p className="mt-1">
+                Condición frente al IVA del transportista:{" "}
+                <span className="font-medium">
+                  {condicionIvaLabel(condicionIva)}
+                </span>
+                . {CVLP_CLASE_B_WARNING} No se puede emitir el comprobante;
+                podés guardar la liquidación como borrador.
+              </p>
+            </div>
           )}
         </form>
 
@@ -1008,7 +964,12 @@ export function CrearLiquidacionManualModal({
               </button>
               <button
                 type="button"
-                disabled={submitting || !canSubmit || ptoVentaInvalidoPreview}
+                disabled={
+                  submitting ||
+                  !canSubmit ||
+                  ptoVentaInvalidoPreview ||
+                  cvlpClaseBAlerta
+                }
                 onClick={(e) =>
                   void handleSubmit(e as unknown as React.FormEvent, "emitir")
                 }

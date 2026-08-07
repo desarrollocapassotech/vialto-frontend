@@ -3,7 +3,6 @@ import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -12,7 +11,6 @@ import {
   viewModalBtnPrimary,
   viewModalGridClass,
 } from "@/components/ui/ViewModalShell";
-import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiFetch, apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -21,6 +19,7 @@ import {
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { PlatformUser } from "@/types/api";
 
 type TenantUser = Pick<
@@ -61,6 +60,10 @@ function toApiRole(role: string): "admin" | "member" | "stock_viewer" {
   return "member";
 }
 
+function getFullName(u: TenantUser) {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || "—";
+}
+
 // ─── Modal de usuario (ver / editar rol) ────────────────────────────────────
 
 function UsuarioModal({
@@ -85,8 +88,7 @@ function UsuarioModal({
   onDelete: () => void;
 }) {
   const user = modal.user;
-  const nombre =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+  const nombre = getFullName(user);
   const esMismoUsuario = user.userId === currentUserId;
 
   if (modal.mode === "edit-role") {
@@ -125,27 +127,27 @@ function UsuarioModal({
             {(["admin", "member", "stock_viewer"] as const)
               .filter((r) => r !== "stock_viewer" || tieneModuloStock)
               .map((r) => (
-              <label
-                key={r}
-                className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value={r}
-                  checked={modal.selectedRole === r}
-                  onChange={() => onSetSelectedRole(r)}
-                  className="accent-vialto-fire"
-                />
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === "admin"
-                    ? "Administrador"
-                    : r === "stock_viewer"
-                      ? "Consulta de stock"
-                      : "Miembro"}
-                </span>
-              </label>
-            ))}
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={modal.selectedRole === r}
+                    onChange={() => onSetSelectedRole(r)}
+                    className="accent-vialto-fire"
+                  />
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {r === "admin"
+                      ? "Administrador"
+                      : r === "stock_viewer"
+                        ? "Consulta de stock"
+                        : "Miembro"}
+                  </span>
+                </label>
+              ))}
           </div>
         </div>
       </ViewModalShell>
@@ -341,27 +343,27 @@ function CreateUserModal({
             {(["member", "admin", "stock_viewer"] as const)
               .filter((r) => r !== "stock_viewer" || tieneModuloStock)
               .map((r) => (
-              <label
-                key={r}
-                className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
-              >
-                <input
-                  type="radio"
-                  name="cu-role"
-                  value={r}
-                  checked={role === r}
-                  onChange={() => setRole(r)}
-                  className="accent-vialto-fire"
-                />
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {r === "admin"
-                    ? "Administrador"
-                    : r === "stock_viewer"
-                      ? "Consulta de stock"
-                      : "Miembro"}
-                </span>
-              </label>
-            ))}
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-center gap-3 rounded border border-black/10 px-4 py-3 hover:bg-vialto-mist"
+                >
+                  <input
+                    type="radio"
+                    name="cu-role"
+                    value={r}
+                    checked={role === r}
+                    onChange={() => setRole(r)}
+                    className="accent-vialto-fire"
+                  />
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {r === "admin"
+                      ? "Administrador"
+                      : r === "stock_viewer"
+                        ? "Consulta de stock"
+                        : "Miembro"}
+                  </span>
+                </label>
+              ))}
           </div>
         </div>
         {error && (
@@ -383,7 +385,7 @@ export function UsuariosTenantPage() {
   const { tenant } = useCurrentTenant();
   const tieneModuloStock = tenant?.modules?.includes("stock") ?? false;
 
-  const [rows, setRows] = useState<TenantUser[] | null>(null);
+  const [allRows, setAllRows] = useState<TenantUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -393,28 +395,77 @@ export function UsuariosTenantPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [nombreFiltroInput, setNombreFiltroInput] = useState("");
-  const [nombreFiltro, setNombreFiltro] = useState("");
-  const [emailFiltroInput, setEmailFiltroInput] = useState("");
-  const [emailFiltro, setEmailFiltro] = useState("");
-  const [rolFiltro, setRolFiltro] = useState("");
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEmail, setFiltroEmail] = useState("");
+  const [filtroRol, setFiltroRol] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEmail("");
+    setFiltroRol("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEmail || !!filtroRol;
+
+  // Extracción de opciones únicas
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || [])
+            .map(getFullName)
+            .filter((v): v is string => !!v && v !== "—"),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesEmail = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.email).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesRol = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.role).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!allRows) return [];
+    return allRows.filter((r) => {
+      if (filtroNombre && getFullName(r) !== filtroNombre) return false;
+      if (filtroEmail && r.email !== filtroEmail) return false;
+      if (filtroRol && r.role !== filtroRol) return false;
+      return true;
+    });
+  }, [allRows, filtroNombre, filtroEmail, filtroRol]);
 
   const load = useCallback(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setRows(null);
+    setAllRows(null);
     (async () => {
       try {
         const data = await apiJson<TenantUser[]>("/api/users", () =>
           getToken(),
         );
         if (!cancelled) {
-          setRows(data);
+          setAllRows(data);
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
-          setRows(null);
+          setAllRows(null);
           setError(friendlyError(e, "usuarios"));
         }
       }
@@ -487,134 +538,9 @@ export function UsuariosTenantPage() {
     }
   }
 
-  const filteredRows = useMemo(() => {
-    if (!rows) return null;
-    const nombreQ = nombreFiltro.trim().toLowerCase();
-    const emailQ = emailFiltro.trim().toLowerCase();
-    return rows.filter((u) => {
-      if (nombreQ) {
-        const nombre = [u.firstName, u.lastName]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!nombre.includes(nombreQ)) return false;
-      }
-      if (emailQ && !(u.email ?? "").toLowerCase().includes(emailQ)) {
-        return false;
-      }
-      if (rolFiltro && u.role !== rolFiltro) return false;
-      return true;
-    });
-  }, [rows, nombreFiltro, emailFiltro, rolFiltro]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [nombreFiltro, emailFiltro, rolFiltro]);
-
-  const activeFilterCount = useMemo(() => {
-    let n = 0;
-    if (nombreFiltro.trim()) n += 1;
-    if (emailFiltro.trim()) n += 1;
-    if (rolFiltro) n += 1;
-    return n;
-  }, [nombreFiltro, emailFiltro, rolFiltro]);
-
-  function limpiarFiltros() {
-    setNombreFiltroInput("");
-    setNombreFiltro("");
-    setEmailFiltroInput("");
-    setEmailFiltro("");
-    setRolFiltro("");
-  }
-
-  const rolOpciones = useMemo(
-    () =>
-      [
-        { value: "", label: "Todos" },
-        { value: "org:admin", label: "Administrador" },
-        { value: "org:member", label: "Miembro" },
-        ...(tieneModuloStock
-          ? [{ value: "org:stock_viewer", label: "Consulta de stock" }]
-          : []),
-      ] as const,
-    [tieneModuloStock],
-  );
-
-  const rolSelectClass = (activo: boolean) =>
-    `h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-      activo ? "text-vialto-fire" : "text-vialto-charcoal"
-    }`;
-
-  const usuariosListadoFiltros = (
-    <>
-      <ListadoFiltroCampo label="Nombre" active={!!nombreFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={nombreFiltroInput}
-            onChange={(e) => setNombreFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setNombreFiltro(nombreFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por nombre de usuario"
-          />
-          <button
-            type="button"
-            onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Email" active={!!emailFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={emailFiltroInput}
-            onChange={(e) => setEmailFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setEmailFiltro(emailFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              emailFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por email de usuario"
-          />
-          <button
-            type="button"
-            onClick={() => setEmailFiltro(emailFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Rol" active={!!rolFiltro}>
-        <select
-          value={rolFiltro}
-          onChange={(e) => setRolFiltro(e.target.value)}
-          className={rolSelectClass(!!rolFiltro)}
-          aria-label="Filtrar por rol de usuario"
-        >
-          {rolOpciones.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </ListadoFiltroCampo>
-    </>
-  );
-
   const meta = useMemo(() => {
-    if (!filteredRows) return null;
-    const total = filteredRows.length;
+    if (!rowsFiltradas) return null;
+    const total = rowsFiltradas.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       total,
@@ -624,13 +550,13 @@ export function UsuariosTenantPage() {
       hasPrev: page > 1,
       hasNext: page < totalPages,
     };
-  }, [filteredRows, page, pageSize]);
+  }, [rowsFiltradas, page, pageSize]);
 
   const paginatedRows = useMemo(() => {
-    if (!filteredRows) return null;
+    if (!rowsFiltradas) return null;
     const start = (page - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, page, pageSize]);
+    return rowsFiltradas.slice(start, start + pageSize);
+  }, [rowsFiltradas, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -641,20 +567,14 @@ export function UsuariosTenantPage() {
         Miembros de tu organización y sus roles de acceso.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        {activeFilterCount > 0 && (
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
           <button
             type="button"
             onClick={limpiarFiltros}
-            className="hidden h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors lg:inline-flex"
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
           >
             Limpiar filtros
-            <span
-              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-              aria-hidden
-            >
-              {activeFilterCount}
-            </span>
           </button>
         )}
         <button
@@ -682,105 +602,92 @@ export function UsuariosTenantPage() {
       )}
 
       <ListadoDatos
-        className="mt-8"
-        filters={usuariosListadoFiltros}
-        activeFilterCount={activeFilterCount}
-        onClearFilters={limpiarFiltros}
+        className="mt-6"
+        tableColSpan={5}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Nombre"
-                filterActive={!!nombreFiltro.trim()}
-                filterSignature={nombreFiltro}
-              >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={nombreFiltroInput}
-                    onChange={(e) => setNombreFiltroInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        setNombreFiltro(nombreFiltroInput.trim());
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      nombreFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por nombre de usuario"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Email"
-                filterActive={!!emailFiltro.trim()}
-                filterSignature={emailFiltro}
-              >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={emailFiltroInput}
-                    onChange={(e) => setEmailFiltroInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        setEmailFiltro(emailFiltroInput.trim());
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      emailFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por email de usuario"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEmailFiltro(emailFiltroInput.trim())}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Rol"
-                filterActive={!!rolFiltro}
-                filterSignature={rolFiltro}
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
               >
                 <select
-                  value={rolFiltro}
-                  onChange={(e) => setRolFiltro(e.target.value)}
-                  className={rolSelectClass(!!rolFiltro)}
-                  aria-label="Filtrar por rol de usuario"
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
                 >
-                  {rolOpciones.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
                     </option>
                   ))}
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Email"
+                filterActive={!!filtroEmail}
+                filterSignature={filtroEmail}
+              >
+                <select
+                  value={filtroEmail}
+                  onChange={(e) => {
+                    setFiltroEmail(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroEmail ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Email"
+                >
+                  <option value="">Todos</option>
+                  {opcionesEmail.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Rol"
+                filterActive={!!filtroRol}
+                filterSignature={filtroRol}
+              >
+                <select
+                  value={filtroRol}
+                  onChange={(e) => {
+                    setFiltroRol(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroRol ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Rol"
+                >
+                  <option value="">Todos</option>
+                  {opcionesRol.map((o) => (
+                    <option key={o} value={o}>
+                      {formatRole(o)}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
               Alta
             </th>
-            <th
-              scope="col"
-              className={`${listadoTablaThClass} text-right align-top`}
-            >
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
           </tr>
@@ -790,8 +697,7 @@ export function UsuariosTenantPage() {
             id: "nombre",
             header: "Nombre",
             primary: true,
-            cell: (u) =>
-              [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
+            cell: (u) => getFullName(u),
             tdClassName: listadoTablaTdClass,
           },
           {
@@ -816,8 +722,8 @@ export function UsuariosTenantPage() {
         rows={error ? [] : paginatedRows}
         rowKey={(u) => u.userId ?? u.email ?? `${u.firstName}-${u.lastName}`}
         emptyMessage={
-          activeFilterCount > 0
-            ? "No hay usuarios que coincidan con el criterio."
+          anyFiltroActivo
+            ? "No hay usuarios que coincidan con los filtros aplicados."
             : "No hay usuarios en esta organización."
         }
         loadingMessage="Cargando…"
@@ -839,7 +745,7 @@ export function UsuariosTenantPage() {
         }
       />
 
-      {meta && (filteredRows?.length ?? 0) > 0 && (
+      {meta && (rowsFiltradas?.length ?? 0) > 0 && (
         <div className="mt-4">
           <ListadoPagination
             meta={meta}
@@ -888,7 +794,11 @@ export function UsuariosTenantPage() {
       <ConfirmDialog
         open={!!confirmDelete}
         title="Eliminar usuario"
-        message={`¿Eliminás a ${[confirmDelete?.firstName, confirmDelete?.lastName].filter(Boolean).join(" ") || confirmDelete?.email} de la organización? Perderá acceso de inmediato.`}
+        message={
+          confirmDelete
+            ? `¿Eliminás a ${getFullName(confirmDelete)} de la organización? Perderá acceso de inmediato.`
+            : ""
+        }
         confirmLabel="Eliminar"
         tone="danger"
         busy={busy}

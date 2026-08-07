@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
@@ -15,9 +14,9 @@ import {
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { canAccessCombustible } from "@/lib/tenantModules";
-import type { Chofer, PaginatedMeta } from "@/types/api";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import type { Chofer, PaginatedMeta } from "@/types/api";
 
 type ChoferesPaginatedResponse = {
   items: Chofer[];
@@ -29,7 +28,7 @@ export function ChoferesTenantPage() {
   const maestro = useMaestroData();
   const hasCombustible = canAccessCombustible(maestro.tenant?.modules ?? []);
   const [rows, setRows] = useState<Chofer[] | null>(null);
-  const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+  const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -38,39 +37,65 @@ export function ChoferesTenantPage() {
   const [confirmToggle, setConfirmToggle] = useState<Chofer | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
 
-  const [nombreFiltroInput, setNombreFiltroInput] = useState("");
-  const [nombreFiltro, setNombreFiltro] = useState("");
-  const [dniFiltroInput, setDniFiltroInput] = useState("");
-  const [dniFiltro, setDniFiltro] = useState("");
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroDni, setFiltroDni] = useState("");
   const [filtroActivo, setFiltroActivo] = useState<
     "todos" | "activos" | "inactivos"
   >("todos");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroDni("");
+    setFiltroActivo("todos");
+    setPage(1);
+  }
+
+  const anyFiltroActivo =
+    !!filtroNombre || !!filtroDni || filtroActivo !== "todos";
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesDni = useMemo(
+    () =>
+      Array.from(
+        new Set((rows || []).map((r) => r.dni).filter((v): v is string => !!v)),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroDni && r.dni !== filtroDni) return false;
+      if (filtroActivo === "activos" && !r.activo) return false;
+      if (filtroActivo === "inactivos" && r.activo) return false;
+      return true;
+    });
+  }, [rows, filtroNombre, filtroDni, filtroActivo]);
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
-      filtroActivo,
     });
-    if (nombreFiltro) params.set("nombre", nombreFiltro);
-    if (dniFiltro) params.set("dni", dniFiltro);
     const data = await apiJson<ChoferesPaginatedResponse>(
       `/api/choferes/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
-    setMeta(data.meta);
-  }, [
-    getToken,
-    isLoaded,
-    isSignedIn,
-    page,
-    pageSize,
-    nombreFiltro,
-    dniFiltro,
-    filtroActivo,
-  ]);
+    setServerMeta(data.meta);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -82,7 +107,7 @@ export function ChoferesTenantPage() {
       } catch (e) {
         if (!cancelled) {
           setRows(null);
-          setMeta(null);
+          setServerMeta(null);
           setError(friendlyError(e, "choferes"));
         }
       }
@@ -91,26 +116,6 @@ export function ChoferesTenantPage() {
       cancelled = true;
     };
   }, [isLoaded, isSignedIn, load]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [nombreFiltro, dniFiltro, filtroActivo]);
-
-  const activeFilterCount = useMemo(() => {
-    let n = 0;
-    if (nombreFiltro.trim()) n += 1;
-    if (dniFiltro.trim()) n += 1;
-    if (filtroActivo !== "todos") n += 1;
-    return n;
-  }, [nombreFiltro, dniFiltro, filtroActivo]);
-
-  function limpiarFiltros() {
-    setNombreFiltroInput("");
-    setNombreFiltro("");
-    setDniFiltroInput("");
-    setDniFiltro("");
-    setFiltroActivo("todos");
-  }
 
   async function handleToggleActivo() {
     if (!confirmToggle) return;
@@ -137,92 +142,23 @@ export function ChoferesTenantPage() {
       activo ? "text-vialto-fire" : "text-vialto-charcoal"
     }`;
 
-  const choferesListadoFiltros = (
-    <>
-      <ListadoFiltroCampo label="Nombre" active={!!nombreFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={nombreFiltroInput}
-            onChange={(e) => setNombreFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setNombreFiltro(nombreFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por nombre de chofer"
-          />
-          <button
-            type="button"
-            onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="DNI" active={!!dniFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={dniFiltroInput}
-            onChange={(e) => setDniFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setDniFiltro(dniFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              dniFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por DNI de chofer"
-          />
-          <button
-            type="button"
-            onClick={() => setDniFiltro(dniFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
-        <select
-          value={filtroActivo}
-          onChange={(e) =>
-            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
-          }
-          className={estadoSelectClass(filtroActivo !== "todos")}
-          aria-label="Filtrar por estado del chofer"
-        >
-          <option value="todos">Todos</option>
-          <option value="activos">Solo activos</option>
-          <option value="inactivos">Solo inactivos</option>
-        </select>
-      </ListadoFiltroCampo>
-    </>
-  );
-
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Choferes
       </h1>
+      <p className="mt-2 text-vialto-steel">
+        Quienes manejan tus unidades, con datos de contacto a mano.
+      </p>
+
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        {activeFilterCount > 0 && (
+        {anyFiltroActivo && (
           <button
             type="button"
             onClick={limpiarFiltros}
-            className="hidden h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors lg:inline-flex"
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
           >
             Limpiar filtros
-            <span
-              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-              aria-hidden
-            >
-              {activeFilterCount}
-            </span>
           </button>
         )}
         <Link
@@ -232,82 +168,68 @@ export function ChoferesTenantPage() {
           Crear chofer
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
+
       <ListadoDatos
-        className="mt-8"
-        filters={choferesListadoFiltros}
-        activeFilterCount={activeFilterCount}
-        onClearFilters={limpiarFiltros}
+        className="mt-6"
+        tableColSpan={4}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Nombre"
-                filterActive={!!nombreFiltro.trim()}
-                filterSignature={nombreFiltro}
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
               >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={nombreFiltroInput}
-                    onChange={(e) => setNombreFiltroInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        setNombreFiltro(nombreFiltroInput.trim());
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      nombreFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por nombre de chofer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="DNI"
-                filterActive={!!dniFiltro.trim()}
-                filterSignature={dniFiltro}
+                filterActive={!!filtroDni}
+                filterSignature={filtroDni}
               >
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={dniFiltroInput}
-                    onChange={(e) => setDniFiltroInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        setDniFiltro(dniFiltroInput.trim());
-                    }}
-                    placeholder="Buscar…"
-                    className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-                      dniFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar por DNI de chofer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setDniFiltro(dniFiltroInput.trim())}
-                    className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                  >
-                    OK
-                  </button>
-                </div>
+                <select
+                  value={filtroDni}
+                  onChange={(e) => {
+                    setFiltroDni(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroDni ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por DNI"
+                >
+                  <option value="">Todos</option>
+                  {opcionesDni.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -318,11 +240,12 @@ export function ChoferesTenantPage() {
               >
                 <select
                   value={filtroActivo}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFiltroActivo(
                       e.target.value as "todos" | "activos" | "inactivos",
-                    )
-                  }
+                    );
+                    setPage(1);
+                  }}
                   className={estadoSelectClass(filtroActivo !== "todos")}
                   aria-label="Filtrar por estado del chofer"
                 >
@@ -332,10 +255,7 @@ export function ChoferesTenantPage() {
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th
-              scope="col"
-              className={`${listadoTablaThClass} text-right align-top`}
-            >
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
           </tr>
@@ -371,13 +291,13 @@ export function ChoferesTenantPage() {
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : rowsFiltradas}
         rowKey={(c) => c.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los choferes."
-            : activeFilterCount > 0
-              ? "No hay choferes que coincidan con el criterio."
+            : anyFiltroActivo
+              ? "No hay choferes que coincidan con los filtros aplicados."
               : "Todavía no tenés choferes cargados."
         }
         loadingMessage="Cargando…"
@@ -420,10 +340,10 @@ export function ChoferesTenantPage() {
         )}
       />
 
-      {meta && (
+      {serverMeta && (
         <div className="mt-4">
           <ListadoPagination
-            meta={meta}
+            meta={serverMeta}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(newSize) => {

@@ -4,18 +4,19 @@ import { Link } from "react-router-dom";
 import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
-import { ListadoToolbar } from "@/components/listado/ListadoToolbar";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
-import { useListadoFiltros } from "@/hooks/useListadoFiltros";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
 
 export function ClientesSuperadminPage() {
@@ -30,16 +31,59 @@ export function ClientesSuperadminPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
-  const {
-    busqueda,
-    setBusqueda,
-    filtroPais,
-    setFiltroPais,
-    paisesList,
-    rowsFiltradas,
-    onClear,
-    activeFilterCount,
-  } = useListadoFiltros(rows, ["nombre", "idFiscal"]);
+
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroIdFiscal, setFiltroIdFiscal] = useState("");
+  const [filtroPais, setFiltroPais] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroIdFiscal("");
+    setFiltroPais("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroIdFiscal || !!filtroPais;
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesIdFiscal = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.idFiscal).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+  const opcionesPais = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.pais).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroIdFiscal && r.idFiscal !== filtroIdFiscal) return false;
+      if (filtroPais && r.pais !== filtroPais) return false;
+      return true;
+    });
+  }, [rows, filtroNombre, filtroIdFiscal, filtroPais]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -108,17 +152,29 @@ export function ClientesSuperadminPage() {
         Elegí una empresa para ver sus clientes. Los datos los filtra el
         servidor.
       </p>
+
       <div className="mt-6">
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
           onChange={(id) => {
             setPage(1);
+            limpiarFiltros();
             onChangeTenant(id);
           }}
         />
       </div>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to={
             filtroEmpresa
@@ -135,40 +191,107 @@ export function ClientesSuperadminPage() {
           Crear cliente
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
         </p>
       )}
 
-      {filtroEmpresa && !error && (
-        <ListadoToolbar
-          searchValue={busqueda}
-          onSearchChange={(v) => {
-            setPage(1);
-            setBusqueda(v);
-          }}
-          searchPlaceholder="Buscar por nombre o ID fiscal"
-          filtros={[
-            {
-              value: filtroPais,
-              onChange: (v) => {
-                setPage(1);
-                setFiltroPais(v);
-              },
-              placeholder: "Todos los países",
-              opciones: paisesList.map((p) => ({ value: p, label: p })),
-            },
-          ]}
-          onClear={() => {
-            setPage(1);
-            onClear();
-          }}
-        />
-      )}
-
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={6}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="ID Fiscal"
+                filterActive={!!filtroIdFiscal}
+                filterSignature={filtroIdFiscal}
+              >
+                <select
+                  value={filtroIdFiscal}
+                  onChange={(e) => {
+                    setFiltroIdFiscal(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por ID Fiscal"
+                >
+                  <option value="">Todos</option>
+                  {opcionesIdFiscal.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="País"
+                filterActive={!!filtroPais}
+                filterSignature={filtroPais}
+              >
+                <select
+                  value={filtroPais}
+                  onChange={(e) => {
+                    setFiltroPais(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPais ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por País"
+                >
+                  <option value="">Todos</option>
+                  {opcionesPais.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Dirección
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Contacto
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -209,7 +332,7 @@ export function ClientesSuperadminPage() {
             ? "Seleccioná una empresa para ver los clientes."
             : error
               ? "No se pudieron cargar los clientes."
-              : activeFilterCount > 0
+              : anyFiltroActivo
                 ? "No hay clientes que coincidan con los filtros aplicados."
                 : "No hay clientes cargados para esta empresa."
         }

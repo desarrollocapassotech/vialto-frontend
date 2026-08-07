@@ -13,6 +13,7 @@ import {
   type FacturaLineaDraft,
 } from '@/components/facturacion/FacturaLineasEditor';
 import { ApiError, apiFetch, apiJson } from '@/lib/api';
+import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
 import {
   condicionIvaLabel,
   facturaLetraFromCondicionIva,
@@ -63,7 +64,10 @@ export function EmitirFacturaModal({
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
   const bloqueadoUsd = arcaBloqueaFacturarUsd(true, factura.moneda);
-  const yaAutorizada = factura.arcaEstado === 'autorizado' || Boolean(factura.cae);
+  const yaAutorizada =
+    factura.arcaEstado === 'autorizado' ||
+    factura.arcaEstado === 'anulado' ||
+    Boolean(factura.cae);
 
   const [step, setStep] = useState<Step>('revision');
   const [lineas, setLineas] = useState<FacturaLineaDraft[]>(() =>
@@ -323,9 +327,12 @@ export function EmitirFacturaModal({
       >
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
           <div>
-            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-              Emitir factura a ARCA
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+                Emitir factura a ARCA
+              </h2>
+              <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
+            </div>
             <p className="text-xs text-vialto-steel mt-0.5">
               Factura {factura.numero}
             </p>

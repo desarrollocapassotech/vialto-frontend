@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { DestinatarioViewModal } from "@/components/destinatarios/DestinatarioViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -10,7 +10,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Destinatario, PaginatedMeta } from "@/types/api";
 
 export function DestinatariosTenantPage() {
@@ -28,6 +31,35 @@ export function DestinatariosTenantPage() {
     LISTADO_PAGE_SIZE_OPTIONS[0] || 10,
   );
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
+
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre;
+
+  // Extracción de opciones únicas para los selectores
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (rows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [rows],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      return true;
+    });
+  }, [rows, filtroNombre]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -107,7 +139,16 @@ export function DestinatariosTenantPage() {
         Empresas o personas que reciben mercadería en egresos de stock.
       </p>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to="/destinatarios/nuevo"
           className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
@@ -123,7 +164,41 @@ export function DestinatariosTenantPage() {
       )}
 
       <ListadoDatos
-        className={`mt-8 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+        tableColSpan={2}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -133,12 +208,14 @@ export function DestinatariosTenantPage() {
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
         ]}
-        rows={error ? [] : rows}
+        rows={error ? [] : rowsFiltradas}
         rowKey={(d) => d.id}
         emptyMessage={
           error
             ? "No se pudieron cargar los destinatarios."
-            : "Todavía no hay destinatarios cargados."
+            : anyFiltroActivo
+              ? "No hay destinatarios que coincidan con los filtros aplicados."
+              : "Todavía no hay destinatarios cargados."
         }
         loadingMessage="Cargando…"
         renderActions={(d) => (

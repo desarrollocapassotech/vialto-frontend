@@ -1,17 +1,17 @@
-import { useAuth } from '@clerk/clerk-react';
-import { useState, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
-import type { Viaje, Chofer } from '@/types/api';
-import { viajePermiteGenerarMicCrt } from '@/lib/viajesEstados';
-import { viajeUsaFlotaPropia } from '@/lib/viajesGananciaBruta';
-import { apiFetch, apiJson } from '@/lib/api';
-import { MicCrtExportModal } from '@/components/viajes/MicCrtExportModal';
-import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
+import { useAuth } from "@clerk/clerk-react";
+import { useState, useEffect } from "react";
+import { Spinner } from "@/components/ui/Spinner";
+import type { Viaje, Chofer } from "@/types/api";
+import { viajePermiteGenerarMicCrt } from "@/lib/viajesEstados";
+import { viajeUsaFlotaPropia } from "@/lib/viajesGananciaBruta";
+import { apiFetch, apiJson } from "@/lib/api";
+import { MicCrtExportModal } from "@/components/viajes/MicCrtExportModal";
+import { ViajeExportMissingFieldsPanel } from "@/components/viajes/ViajeExportMissingFieldsPanel";
 import {
   mensajeBloqueoMicCrt,
   missingGroupsMicCrtDesdeViaje,
   type ViajeExportMissingGroup,
-} from '@/lib/viajeExportMissingFields';
+} from "@/lib/viajeExportMissingFields";
 
 type Props = {
   viaje: Viaje;
@@ -27,15 +27,23 @@ type DescargaError = {
 };
 
 function fmtFecha(iso: string | null | undefined): string {
-  if (!iso) return '';
+  if (!iso) return "";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
-export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Props) {
+export function ExportarViajeModal({
+  viaje: viajeProp,
+  onClose,
+  tenantId,
+}: Props) {
   const { getToken } = useAuth();
-  const tid = tenantId?.trim() ?? '';
+  const tid = tenantId?.trim() ?? "";
   const platform = Boolean(tid);
 
   const [viaje, setViaje] = useState(viajeProp);
@@ -57,19 +65,33 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
     return `/api/viajes/${encodeURIComponent(viaje.id)}`;
   }
 
-  function viajePdfUrl(suffix: 'paut' | 'mic-crt') {
-    if (platform) {
-      return `/api/platform/viajes/${encodeURIComponent(viaje.id)}/${suffix}?tenantId=${encodeURIComponent(tid)}`;
+  // Modificado para aceptar opcionalmente el ID del transportista emisor
+  function viajePdfUrl(suffix: "paut" | "mic-crt", emisorId?: string | null) {
+    let url = platform
+      ? `/api/platform/viajes/${encodeURIComponent(viaje.id)}/${suffix}?tenantId=${encodeURIComponent(tid)}`
+      : `/api/viajes/${encodeURIComponent(viaje.id)}/${suffix}`;
+
+    if (emisorId) {
+      url +=
+        (url.includes("?") ? "&" : "?") +
+        `emisorId=${encodeURIComponent(emisorId)}`;
     }
-    return `/api/viajes/${encodeURIComponent(viaje.id)}/${suffix}`;
+
+    return url;
   }
 
   const [generandoPaut, setGenerandoPaut] = useState(false);
   const [micCrtValidando, setMicCrtValidando] = useState(false);
   const [micCrtAbierto, setMicCrtAbierto] = useState(false);
-  const [micCrtBloqueo, setMicCrtBloqueo] = useState<Record<string, ViajeExportMissingGroup> | null>(null);
+  const [micCrtBloqueo, setMicCrtBloqueo] = useState<Record<
+    string,
+    ViajeExportMissingGroup
+  > | null>(null);
   const [error, setError] = useState<DescargaError | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  // Nuevo estado para la vista de selección de transportista de Nómina
+  const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
   const permitePaut = !viajeUsaFlotaPropia(viaje);
@@ -81,19 +103,24 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
     return v;
   }
 
-  async function validarRequisitosMicCrt(v: Viaje): Promise<Record<string, ViajeExportMissingGroup> | null> {
+  async function validarRequisitosMicCrt(
+    v: Viaje,
+  ): Promise<Record<string, ViajeExportMissingGroup> | null> {
     const groups = missingGroupsMicCrtDesdeViaje(v);
     if (groups) return groups;
 
     const choferId = v.choferId?.trim();
     if (choferId && !v.chofer?.dni?.trim()) {
       if (v.chofer) {
-        return { Chofer: { fields: ['DNI'], entityId: choferId } };
+        return { Chofer: { fields: ["DNI"], entityId: choferId } };
       }
       try {
-        const chofer = await apiJson<Chofer>(maestroPatchUrl('choferes', choferId), getToken);
+        const chofer = await apiJson<Chofer>(
+          maestroPatchUrl("choferes", choferId),
+          getToken,
+        );
         if (!chofer.dni?.trim()) {
-          return { Chofer: { fields: ['DNI'], entityId: choferId } };
+          return { Chofer: { fields: ["DNI"], entityId: choferId } };
         }
       } catch {
         /* si no se puede verificar, dejar pasar y el backend validará */
@@ -117,16 +144,19 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
     }
   }
 
-  async function descargarPdf(endpoint: string, filename: string): Promise<DescargaError | null> {
+  async function descargarPdf(
+    endpoint: string,
+    filename: string,
+  ): Promise<DescargaError | null> {
     try {
-      const res = await apiFetch(endpoint, getToken, { cache: 'no-store' });
+      const res = await apiFetch(endpoint, getToken, { cache: "no-store" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as {
           message?: string;
           missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
         return {
-          message: data.message ?? 'No se pudo generar el documento',
+          message: data.message ?? "No se pudo generar el documento",
           groups: data.missingGroups,
           endpoint,
           filename,
@@ -134,7 +164,7 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       a.click();
@@ -142,20 +172,50 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
       return null;
     } catch (e) {
       return {
-        message: e instanceof Error ? e.message : 'Error de red al generar el documento.',
+        message:
+          e instanceof Error
+            ? e.message
+            : "Error de red al generar el documento.",
         endpoint,
         filename,
       };
     }
   }
 
-  async function ejecutarDescarga(endpoint: string, filename: string, setGenerando: (v: boolean) => void) {
+  async function ejecutarDescarga(
+    endpoint: string,
+    filename: string,
+    setGenerando: (v: boolean) => void,
+  ) {
     setError(null);
     setGenerando(true);
     const err = await descargarPdf(endpoint, filename);
     setGenerando(false);
     if (err) setError(err);
   }
+
+  // --- NUEVAS FUNCIONES PARA NÓMINA ---
+  function handleClickNominaInit() {
+    // Si existe el objeto transportistaEfectivo, significa que el flete
+    // lo realiza una empresa distinta al contratante.
+    const fleteTercerizado = Boolean(viaje.transportistaEfectivo?.id);
+
+    if (fleteTercerizado) {
+      setSelectorNominaAbierto(true);
+      setError(null); // Limpiamos errores previos si los hubiera
+    } else {
+      emitirNomina(); // Flujo normal
+    }
+  }
+
+  function emitirNomina(emisorId?: string | null) {
+    void ejecutarDescarga(
+      viajePdfUrl("paut", emisorId),
+      `NOMINA-${viaje.numero}.pdf`,
+      setGenerandoPaut,
+    );
+  }
+  // ------------------------------------
 
   async function reintentarPautTrasCorreccion() {
     if (!error) return;
@@ -164,6 +224,7 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
       await refetchViaje();
       setError(null);
       setGenerandoPaut(true);
+      // Acá reusa el error.endpoint que YA TIENE el ?emisorId=... guardado en la URL
       const retryErr = await descargarPdf(error.endpoint, error.filename);
       setGenerandoPaut(false);
       if (retryErr) setError(retryErr);
@@ -194,19 +255,24 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
         <div className="w-full max-w-sm border border-black/15 bg-white p-5 shadow-lg overflow-y-auto max-h-[90vh]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 id="exportar-title" className="text-sm font-semibold text-vialto-charcoal">
+              <h2
+                id="exportar-title"
+                className="text-sm font-semibold text-vialto-charcoal"
+              >
                 Exportar
               </h2>
-              <p className="mt-0.5 text-xs text-vialto-steel">Viaje #{viaje.numero}</p>
+              <p className="mt-0.5 text-xs text-vialto-steel">
+                Viaje #{viaje.numero}
+              </p>
               {(viaje.origen || viaje.destino) && (
                 <p className="mt-1 text-xs text-vialto-steel">
-                  {[viaje.origen, viaje.destino].filter(Boolean).join(' → ')}
+                  {[viaje.origen, viaje.destino].filter(Boolean).join(" → ")}
                 </p>
               )}
               {(viaje.fechaCarga || viaje.fechaDescarga) && (
                 <p className="mt-0.5 text-xs text-vialto-steel">
                   {fmtFecha(viaje.fechaCarga)}
-                  {viaje.fechaCarga && viaje.fechaDescarga && ' – '}
+                  {viaje.fechaCarga && viaje.fechaDescarga && " – "}
                   {fmtFecha(viaje.fechaDescarga)}
                 </p>
               )}
@@ -222,38 +288,96 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
             </button>
           </div>
 
-          <div className="mt-5 flex flex-col gap-2">
-            {permitePaut ? (
+          {selectorNominaAbierto ? (
+            /* --- VISTA DE SELECCIÓN DE TRANSPORTISTA PARA NÓMINA --- */
+            <div className="mt-5 flex flex-col gap-3">
+              <p className="text-sm font-medium text-vialto-charcoal">
+                ¿Con qué transportista emitir la nómina?
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => emitirNomina(viaje.transportistaId)}
+                  className="flex flex-col border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {viaje.transportista?.nombre || "Transportista contratante"}
+                  </span>
+                  <span className="text-xs text-vialto-steel">Contratante</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => emitirNomina(viaje.transportistaEfectivo?.id)}
+                  className="flex flex-col border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {viaje.transportistaEfectivo?.nombre ||
+                      "Transportista ejecutor"}
+                  </span>
+                  <span className="text-xs text-vialto-steel">
+                    Realiza el flete
+                  </span>
+                </button>
+              </div>
+              <div className="mt-2 flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => setSelectorNominaAbierto(false)}
+                  className="text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-charcoal"
+                >
+                  ← Volver
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* --- VISTA NORMAL DE BOTONES --- */
+            <div className="mt-5 flex flex-col gap-2">
+              {permitePaut ? (
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={handleClickNominaInit}
+                  className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm font-medium text-vialto-charcoal">
+                    {generandoPaut ? "Generando…" : "NOMINA"}
+                  </span>
+                  {!generandoPaut && (
+                    <span className="text-xs text-vialto-steel">↓ PDF</span>
+                  )}
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                disabled={ocupado}
-                onClick={() =>
-                  void ejecutarDescarga(viajePdfUrl('paut'), `NOMINA-${viaje.numero}.pdf`, setGenerandoPaut)
-                }
+                disabled={ocupado || !permiteMicCrt}
+                onClick={() => void abrirMicCrt()}
                 className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  !permiteMicCrt
+                    ? "No disponible para viajes cancelados"
+                    : undefined
+                }
               >
                 <span className="text-sm font-medium text-vialto-charcoal">
-                  {generandoPaut ? 'Generando…' : 'NOMINA'}
+                  {micCrtValidando ? "Verificando…" : "MIC/CRT"}
                 </span>
-                {!generandoPaut && <span className="text-xs text-vialto-steel">↓ PDF</span>}
+                <span className="text-xs text-vialto-steel">
+                  {permiteMicCrt ? (
+                    micCrtValidando ? (
+                      <Spinner className="h-3.5 w-3.5" />
+                    ) : (
+                      "Formulario"
+                    )
+                  ) : (
+                    "No disponible"
+                  )}
+                </span>
               </button>
-            ) : null}
-
-            <button
-              type="button"
-              disabled={ocupado || !permiteMicCrt}
-              onClick={() => void abrirMicCrt()}
-              className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!permiteMicCrt ? 'No disponible para viajes cancelados' : undefined}
-            >
-              <span className="text-sm font-medium text-vialto-charcoal">
-                {micCrtValidando ? 'Verificando…' : 'MIC/CRT'}
-              </span>
-              <span className="text-xs text-vialto-steel">
-                {permiteMicCrt ? (micCrtValidando ? <Spinner className="h-3.5 w-3.5" /> : 'Formulario') : 'No disponible'}
-              </span>
-            </button>
-          </div>
+            </div>
+          )}
 
           {micCrtBloqueo && (
             <div className="mt-4">
@@ -286,16 +410,18 @@ export function ExportarViajeModal({ viaje: viajeProp, onClose, tenantId }: Prop
             </div>
           ) : null}
 
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={onClose}
-              className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
-            >
-              Cerrar
-            </button>
-          </div>
+          {!selectorNominaAbierto && (
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={onClose}
+                className="text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 hover:bg-vialto-mist disabled:opacity-50"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

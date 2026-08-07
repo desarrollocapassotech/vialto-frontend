@@ -7,6 +7,8 @@
 export type CvlpCbteTipo = 60 | 61;
 export type FacturaLetra = "a" | "b";
 export type FacturaCbteTipo = 1 | 6;
+/** Nota de Crédito que anula Factura A (1→3) o Factura B (6→8). */
+export type FacturaNcCbteTipo = 3 | 8;
 
 /**
  * CUIT de prueba estándar de AFIP SDK para homologación (ver arca.util.ts en el backend).
@@ -24,11 +26,22 @@ export function isResponsableInscripto(
   return condicionIva === 1;
 }
 
-export function cvlpCbteTipoFromCondicionIva(
+/**
+ * true si la condición IVA del transportista normalmente correspondería a un
+ * CVLP clase B (061), que ya no se emite — el sistema emite siempre CVLP 060
+ * (clase A), ver "Gotchas operativos de ARCA" en vialto-backend/CLAUDE.md.
+ * No bloquea nada: solo dispara la leyenda de advertencia antes de
+ * crear/emitir. Si la condición IVA todavía no está cargada, no advierte
+ * acá — ese caso ya lo cubre la validación existente de datos faltantes.
+ */
+export function cvlpClaseBEsperada(
   condicionIva: number | null | undefined,
-): CvlpCbteTipo {
-  return isResponsableInscripto(condicionIva) ? 60 : 61;
+): boolean {
+  return condicionIva != null && !isResponsableInscripto(condicionIva);
 }
+
+export const CVLP_CLASE_B_WARNING =
+  "La condición frente al IVA de este transportista normalmente correspondería a un comprobante Líquido Producto clase B (CVLP 061), pero el sistema emite siempre CVLP 060 (clase A).";
 
 export function facturaLetraFromCondicionIva(
   condicionIva: number | null | undefined,
@@ -38,6 +51,33 @@ export function facturaLetraFromCondicionIva(
 
 export function facturaCbteTipoFromLetra(letra: FacturaLetra): FacturaCbteTipo {
   return letra === "a" ? 1 : 6;
+}
+
+export function facturaLetraFromCbteTipo(
+  cbteTipo: number | null | undefined,
+): FacturaLetra | null {
+  if (cbteTipo === 1 || cbteTipo === 3) return "a";
+  if (cbteTipo === 6 || cbteTipo === 8) return "b";
+  return null;
+}
+
+/**
+ * Factura A (01) → NC A (03); Factura B (06) → NC B (08).
+ * Misma correspondencia de clase A/B que la anulación de CVLP (3/8).
+ */
+export function facturaNcCbteTipoFromFactura(
+  cbteTipo: number | null | undefined,
+  condicionIvaCliente?: number | null,
+): FacturaNcCbteTipo {
+  if (cbteTipo === 1 || cbteTipo === 3) return 3;
+  if (cbteTipo === 6 || cbteTipo === 8) return 8;
+  return isResponsableInscripto(condicionIvaCliente) ? 3 : 8;
+}
+
+export function facturaNcLabel(ncTipo: FacturaNcCbteTipo): string {
+  return ncTipo === 3
+    ? "Nota de Crédito A (cód. 03)"
+    : "Nota de Crédito B (cód. 08)";
 }
 
 export function cvlpCbteLabel(cbteTipo: CvlpCbteTipo): string {

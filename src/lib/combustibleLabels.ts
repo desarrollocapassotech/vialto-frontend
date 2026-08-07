@@ -10,11 +10,13 @@ export const FORMA_PAGO_LABELS: Record<string, string> = {
 // (vialto-combustible/src/components/NewLoadForm.tsx). Si se agrega o
 // renombra una estación ahí, replicar el cambio acá.
 export const SERVICE_STATIONS = [
-  "YPF",
+  "YPF EN RUTA",
   "GOTTIG",
   "AGRO",
   "AXION",
   "LA PAZ",
+  "SHELL FLOTA",
+  "AXION CARD",
   "OTRA",
 ] as const;
 

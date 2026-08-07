@@ -17,8 +17,11 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Chofer, ConEmpresa, PaginatedMeta } from "@/types/api";
 
 export function ChoferesSuperadminPage() {
@@ -42,6 +45,61 @@ export function ChoferesSuperadminPage() {
   const [viewingChoferId, setViewingChoferId] = useState<string | null>(null);
   const [viewingChoferNombre, setViewingChoferNombre] = useState("");
   const tenants = useTenantsList();
+
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroPertenencia, setFiltroPertenencia] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroPertenencia("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroPertenencia;
+
+  // Extracción de opciones únicas
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || []).map((r) => r.nombre).filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows],
+  );
+  const opcionesPertenencia = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (allRows || [])
+            .map((r) =>
+              labelAsignacionTransportista(
+                r.transportistaId,
+                nombresTransportistas,
+              ),
+            )
+            .filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [allRows, nombresTransportistas],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!allRows) return [];
+    return allRows.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (
+        filtroPertenencia &&
+        labelAsignacionTransportista(
+          r.transportistaId,
+          nombresTransportistas,
+        ) !== filtroPertenencia
+      )
+        return false;
+      return true;
+    });
+  }, [allRows, filtroNombre, filtroPertenencia, nombresTransportistas]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -82,12 +140,12 @@ export function ChoferesSuperadminPage() {
   }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
   const { rows, meta } = useMemo(() => {
-    if (allRows === null) return { rows: null, meta: null };
-    const total = allRows.length;
+    if (rowsFiltradas === null) return { rows: null, meta: null };
+    const total = rowsFiltradas.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const pageSafe = Math.min(page, totalPages);
     const start = (pageSafe - 1) * pageSize;
-    const slice = allRows.slice(start, start + pageSize);
+    const slice = rowsFiltradas.slice(start, start + pageSize);
     const meta: PaginatedMeta = {
       page: pageSafe,
       pageSize,
@@ -97,7 +155,7 @@ export function ChoferesSuperadminPage() {
       hasNext: pageSafe < totalPages,
     };
     return { rows: slice, meta };
-  }, [allRows, page, pageSize]);
+  }, [rowsFiltradas, page, pageSize]);
 
   return (
     <div className="w-full">
@@ -107,17 +165,29 @@ export function ChoferesSuperadminPage() {
       <p className="mt-2 text-vialto-steel max-w-3xl">
         Elegí una empresa para ver sus choferes. El listado lo arma el servidor.
       </p>
+
       <div className="mt-6">
         <EmpresaFilterBar
           tenants={tenants}
           value={filtroEmpresa}
           onChange={(id) => {
             setPage(1);
+            limpiarFiltros();
             onChangeTenant(id);
           }}
         />
       </div>
-      <div className="mt-4 flex justify-end">
+
+      <div className="mt-4 flex justify-end gap-2">
+        {anyFiltroActivo && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Limpiar filtros
+          </button>
+        )}
         <Link
           to={
             filtroEmpresa
@@ -134,6 +204,7 @@ export function ChoferesSuperadminPage() {
           Crear chofer
         </Link>
       </div>
+
       {error && (
         <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
           {error}
@@ -141,7 +212,72 @@ export function ChoferesSuperadminPage() {
       )}
 
       <ListadoDatos
-        className="mt-8"
+        className="mt-6"
+        tableColSpan={4}
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Nombre"
+                filterActive={!!filtroNombre}
+                filterSignature={filtroNombre}
+              >
+                <select
+                  value={filtroNombre}
+                  onChange={(e) => {
+                    setFiltroNombre(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroNombre ? "text-vialto-fire" : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Nombre"
+                >
+                  <option value="">Todos</option>
+                  {opcionesNombre.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Contacto
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Pertenencia"
+                filterActive={!!filtroPertenencia}
+                filterSignature={filtroPertenencia}
+              >
+                <select
+                  value={filtroPertenencia}
+                  onChange={(e) => {
+                    setFiltroPertenencia(e.target.value);
+                    setPage(1);
+                  }}
+                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    filtroPertenencia
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                  aria-label="Filtrar por Pertenencia"
+                >
+                  <option value="">Todas</option>
+                  {opcionesPertenencia.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
         columns={[
           {
             id: "nombre",
@@ -174,7 +310,9 @@ export function ChoferesSuperadminPage() {
             ? "Seleccioná una empresa para ver los choferes."
             : error
               ? "No se pudieron cargar los choferes."
-              : "No hay choferes cargados para esta empresa."
+              : anyFiltroActivo
+                ? "No hay choferes que coincidan con los filtros aplicados."
+                : "No hay choferes cargados para esta empresa."
         }
         loadingMessage="Cargando…"
         renderActions={(c) => (

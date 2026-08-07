@@ -10,7 +10,10 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
   listadoTablaTdClass,
+  listadoTablaHeadRowClass,
+  listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Deposito, PaginatedMeta } from "@/types/api";
 
 type DepositoFormState = {
@@ -71,6 +74,43 @@ export function DepositosPage({
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Estados de los filtros de columna
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+
+  function limpiarFiltros() {
+    setFiltroNombre("");
+    setFiltroEstado("");
+    setPage(1);
+  }
+
+  const anyFiltroActivo = !!filtroNombre || !!filtroEstado;
+
+  // Extracción de opciones únicas para el selector de Nombre
+  const opcionesNombre = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (depositos || [])
+            .map((r) => r.nombre)
+            .filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [depositos],
+  );
+
+  const rowsFiltradas = useMemo(() => {
+    if (!depositos) return [];
+    return depositos.filter((r) => {
+      if (filtroNombre && r.nombre !== filtroNombre) return false;
+      if (filtroEstado) {
+        const isActive = filtroEstado === "true";
+        if (r.activo !== isActive) return false;
+      }
+      return true;
+    });
+  }, [depositos, filtroNombre, filtroEstado]);
+
   const editarDeposito = useMemo(
     () => depositos?.find((d) => d.id === editingDepositoId) ?? null,
     [depositos, editingDepositoId],
@@ -83,6 +123,7 @@ export function DepositosPage({
     setEditingDepositoId(null);
     setDepositos(null);
     setError(null);
+    limpiarFiltros();
   }, [activeTenantId]);
 
   useEffect(() => {
@@ -288,6 +329,15 @@ export function DepositosPage({
       {(!isPlatform || activeTenantId) && (
         <>
           <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              >
+                Limpiar filtros
+              </button>
+            )}
             <button
               type="button"
               onClick={openCreateForm}
@@ -304,7 +354,71 @@ export function DepositosPage({
           )}
 
           <ListadoDatos
-            className="mt-8"
+            className={`mt-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}
+            tableColSpan={4}
+            tableHead={
+              <tr className={listadoTablaHeadRowClass}>
+                <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                  <ViajesListadoHeaderFiltro
+                    title="Nombre"
+                    filterActive={!!filtroNombre}
+                    filterSignature={filtroNombre}
+                  >
+                    <select
+                      value={filtroNombre}
+                      onChange={(e) => {
+                        setFiltroNombre(e.target.value);
+                        setPage(1);
+                      }}
+                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                        filtroNombre
+                          ? "text-vialto-fire"
+                          : "text-vialto-charcoal"
+                      }`}
+                      aria-label="Filtrar por Nombre"
+                    >
+                      <option value="">Todos</option>
+                      {opcionesNombre.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </ViajesListadoHeaderFiltro>
+                </th>
+                <th scope="col" className={listadoTablaThClass}>
+                  Dirección
+                </th>
+                <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                  <ViajesListadoHeaderFiltro
+                    title="Activo"
+                    filterActive={!!filtroEstado}
+                    filterSignature={filtroEstado}
+                  >
+                    <select
+                      value={filtroEstado}
+                      onChange={(e) => {
+                        setFiltroEstado(e.target.value);
+                        setPage(1);
+                      }}
+                      className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                        filtroEstado
+                          ? "text-vialto-fire"
+                          : "text-vialto-charcoal"
+                      }`}
+                      aria-label="Filtrar por Estado"
+                    >
+                      <option value="">Todos</option>
+                      <option value="true">Sí</option>
+                      <option value="false">No</option>
+                    </select>
+                  </ViajesListadoHeaderFiltro>
+                </th>
+                <th scope="col" className={`${listadoTablaThClass} text-right`}>
+                  Acciones
+                </th>
+              </tr>
+            }
             columns={[
               {
                 id: "nombre",
@@ -326,12 +440,14 @@ export function DepositosPage({
                 tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
               },
             ]}
-            rows={loading ? null : error ? [] : depositos}
+            rows={loading ? null : error ? [] : rowsFiltradas}
             rowKey={(deposito) => deposito.id}
             emptyMessage={
               error
                 ? "No se pudieron cargar los depósitos."
-                : "Todavía no tenés depósitos cargados."
+                : anyFiltroActivo
+                  ? "No hay depósitos que coincidan con los filtros aplicados."
+                  : "Todavía no tenés depósitos cargados."
             }
             loadingMessage="Cargando…"
             renderActions={(deposito) => (
@@ -345,7 +461,7 @@ export function DepositosPage({
             )}
           />
 
-          {meta && (
+          {meta && (rowsFiltradas?.length ?? 0) > 0 && (
             <ListadoPagination
               meta={meta}
               pageSize={pageSize}
