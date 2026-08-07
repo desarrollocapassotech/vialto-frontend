@@ -3,11 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChoferViewModal } from "@/components/choferes/ChoferViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
-<<<<<<< HEAD
-=======
-import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -41,20 +37,22 @@ export function ChoferesTenantPage() {
   const [confirmToggle, setConfirmToggle] = useState<Chofer | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
 
-<<<<<<< HEAD
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroDni, setFiltroDni] = useState("");
-  const [filtroLicencia, setFiltroLicencia] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<
+    "todos" | "activos" | "inactivos"
+  >("todos");
 
   function limpiarFiltros() {
     setFiltroNombre("");
     setFiltroDni("");
-    setFiltroLicencia("");
+    setFiltroActivo("todos");
     setPage(1);
   }
 
-  const anyFiltroActivo = !!filtroNombre || !!filtroDni || !!filtroLicencia;
+  const anyFiltroActivo =
+    !!filtroNombre || !!filtroDni || filtroActivo !== "todos";
 
   // Extracción de opciones únicas para los selectores
   const opcionesNombre = useMemo(
@@ -73,84 +71,39 @@ export function ChoferesTenantPage() {
       ).sort(),
     [rows],
   );
-  const opcionesLicencia = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          (rows || []).map((r) => r.licencia).filter((v): v is string => !!v),
-        ),
-      ).sort(),
-    [rows],
-  );
 
   const rowsFiltradas = useMemo(() => {
     if (!rows) return [];
     return rows.filter((r) => {
       if (filtroNombre && r.nombre !== filtroNombre) return false;
       if (filtroDni && r.dni !== filtroDni) return false;
-      if (filtroLicencia && r.licencia !== filtroLicencia) return false;
+      if (filtroActivo === "activos" && !r.activo) return false;
+      if (filtroActivo === "inactivos" && r.activo) return false;
       return true;
     });
-  }, [rows, filtroNombre, filtroDni, filtroLicencia]);
-=======
-  const [nombreFiltroInput, setNombreFiltroInput] = useState("");
-  const [nombreFiltro, setNombreFiltro] = useState("");
-  const [dniFiltroInput, setDniFiltroInput] = useState("");
-  const [dniFiltro, setDniFiltro] = useState("");
-  const [filtroActivo, setFiltroActivo] = useState<
-    "todos" | "activos" | "inactivos"
-  >("todos");
+  }, [rows, filtroNombre, filtroDni, filtroActivo]);
 
   const load = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
-      filtroActivo,
     });
-    if (nombreFiltro) params.set("nombre", nombreFiltro);
-    if (dniFiltro) params.set("dni", dniFiltro);
     const data = await apiJson<ChoferesPaginatedResponse>(
       `/api/choferes/paginated?${params.toString()}`,
       () => getToken(),
     );
     setRows(data.items);
-    setMeta(data.meta);
-  }, [
-    getToken,
-    isLoaded,
-    isSignedIn,
-    page,
-    pageSize,
-    nombreFiltro,
-    dniFiltro,
-    filtroActivo,
-  ]);
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
+    setServerMeta(data.meta);
+  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
-<<<<<<< HEAD
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(pageSize),
-        });
-        const data = await apiJson<ChoferesPaginatedResponse>(
-          `/api/choferes/paginated?${params.toString()}`,
-          () => getToken(),
-        );
-        if (!cancelled) {
-          setRows(data.items);
-          setServerMeta(data.meta);
-          setError(null);
-        }
-=======
         await load();
         if (!cancelled) setError(null);
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
       } catch (e) {
         if (!cancelled) {
           setRows(null);
@@ -162,30 +115,7 @@ export function ChoferesTenantPage() {
     return () => {
       cancelled = true;
     };
-<<<<<<< HEAD
-  }, [getToken, isLoaded, isSignedIn, page, pageSize]);
-=======
   }, [isLoaded, isSignedIn, load]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [nombreFiltro, dniFiltro, filtroActivo]);
-
-  const activeFilterCount = useMemo(() => {
-    let n = 0;
-    if (nombreFiltro.trim()) n += 1;
-    if (dniFiltro.trim()) n += 1;
-    if (filtroActivo !== "todos") n += 1;
-    return n;
-  }, [nombreFiltro, dniFiltro, filtroActivo]);
-
-  function limpiarFiltros() {
-    setNombreFiltroInput("");
-    setNombreFiltro("");
-    setDniFiltroInput("");
-    setDniFiltro("");
-    setFiltroActivo("todos");
-  }
 
   async function handleToggleActivo() {
     if (!confirmToggle) return;
@@ -212,90 +142,17 @@ export function ChoferesTenantPage() {
       activo ? "text-vialto-fire" : "text-vialto-charcoal"
     }`;
 
-  const choferesListadoFiltros = (
-    <>
-      <ListadoFiltroCampo label="Nombre" active={!!nombreFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={nombreFiltroInput}
-            onChange={(e) => setNombreFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setNombreFiltro(nombreFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              nombreFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por nombre de chofer"
-          />
-          <button
-            type="button"
-            onClick={() => setNombreFiltro(nombreFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="DNI" active={!!dniFiltro.trim()}>
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={dniFiltroInput}
-            onChange={(e) => setDniFiltroInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setDniFiltro(dniFiltroInput.trim());
-            }}
-            placeholder="Buscar…"
-            className={`h-9 min-w-0 flex-1 border border-black/15 bg-white px-2 text-sm ${
-              dniFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
-            }`}
-            aria-label="Filtrar por DNI de chofer"
-          />
-          <button
-            type="button"
-            onClick={() => setDniFiltro(dniFiltroInput.trim())}
-            className="h-9 shrink-0 border border-black/15 bg-white px-2 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-          >
-            OK
-          </button>
-        </div>
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo label="Estado" active={filtroActivo !== "todos"}>
-        <select
-          value={filtroActivo}
-          onChange={(e) =>
-            setFiltroActivo(e.target.value as "todos" | "activos" | "inactivos")
-          }
-          className={estadoSelectClass(filtroActivo !== "todos")}
-          aria-label="Filtrar por estado del chofer"
-        >
-          <option value="todos">Todos</option>
-          <option value="activos">Solo activos</option>
-          <option value="inactivos">Solo inactivos</option>
-        </select>
-      </ListadoFiltroCampo>
-    </>
-  );
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
-
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Choferes
       </h1>
-<<<<<<< HEAD
       <p className="mt-2 text-vialto-steel">
         Quienes manejan tus unidades, con datos de contacto a mano.
       </p>
 
-      <div className="mt-4 flex justify-end gap-2">
-        {anyFiltroActivo && (
-=======
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        {activeFilterCount > 0 && (
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
+        {anyFiltroActivo && (
           <button
             type="button"
             onClick={limpiarFiltros}
@@ -320,7 +177,7 @@ export function ChoferesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={5}
+        tableColSpan={4}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -377,45 +234,18 @@ export function ChoferesTenantPage() {
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-<<<<<<< HEAD
-                title="Licencia"
-                filterActive={!!filtroLicencia}
-                filterSignature={filtroLicencia}
-              >
-                <select
-                  value={filtroLicencia}
-                  onChange={(e) => {
-                    setFiltroLicencia(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroLicencia ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por Licencia"
-                >
-                  <option value="">Todas</option>
-                  {opcionesLicencia.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Teléfono
-=======
                 title="Estado"
                 filterActive={filtroActivo !== "todos"}
                 filterSignature={filtroActivo}
               >
                 <select
                   value={filtroActivo}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFiltroActivo(
                       e.target.value as "todos" | "activos" | "inactivos",
-                    )
-                  }
+                    );
+                    setPage(1);
+                  }}
                   className={estadoSelectClass(filtroActivo !== "todos")}
                   aria-label="Filtrar por estado del chofer"
                 >
@@ -424,7 +254,6 @@ export function ChoferesTenantPage() {
                   <option value="inactivos">Solo inactivos</option>
                 </select>
               </ViajesListadoHeaderFiltro>
->>>>>>> 6c7c97c21e4884630f198452435ca34f6c8534fa
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
