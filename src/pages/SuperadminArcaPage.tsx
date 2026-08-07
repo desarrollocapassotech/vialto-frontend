@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { Receipt } from "lucide-react";
+import { Receipt, HelpCircle } from "lucide-react"; // <-- Agregamos HelpCircle
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { useToast } from "@/lib/toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,7 +14,10 @@ import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { apiJson, apiFetch } from "@/lib/api";
-import { anulacionComprobanteLabel, CUIT_TEST_HOMOLOGACION } from "@/lib/arcaCbteTipo";
+import {
+  anulacionComprobanteLabel,
+  CUIT_TEST_HOMOLOGACION,
+} from "@/lib/arcaCbteTipo";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { friendlyError } from "@/lib/friendlyError";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
@@ -70,14 +73,12 @@ const CONDICION_IVA_EMISOR = [
 
 // Helpers para la fecha (UI ↔ ARCA format)
 function isoToArcaDate(iso: string): string {
-  // "YYYY-MM-DD" → "DD/MM/YYYY"
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
 
 function arcaDateToIso(arca: string): string {
-  // "DD/MM/YYYY" → "YYYY-MM-DD"
   if (!arca) return "";
   const [d, m, y] = arca.split("/");
   if (!y) return "";
@@ -215,19 +216,31 @@ function configToForm(c: ArcaConfig): ConfigFormValues {
   };
 }
 
+// 👇 FieldLabel actualizado para soportar tooltips
 function FieldLabel({
   htmlFor,
   children,
+  helpText,
 }: {
   htmlFor?: string;
   children: React.ReactNode;
+  helpText?: string;
 }) {
   return (
     <label
       htmlFor={htmlFor}
-      className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel"
+      className="flex items-center gap-1.5 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-vialto-steel"
     >
-      {children}
+      <span>{children}</span>
+      {helpText && (
+        <div className="group relative flex items-center">
+          <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+            {helpText}
+            <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+          </div>
+        </div>
+      )}
     </label>
   );
 }
@@ -298,7 +311,6 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           }
         }
       } catch {
-        // 404 = no config todavía
         if (!cancelled) {
           setExisting(null);
           setValues(EMPTY_FORM);
@@ -542,7 +554,12 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="ivaGastosAdmin">IVA sobre neto (%)</FieldLabel>
+          <FieldLabel
+            htmlFor="ivaGastosAdmin"
+            helpText="Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%"
+          >
+            IVA sobre neto (%)
+          </FieldLabel>
           <TextInput
             id="ivaGastosAdmin"
             type="number"
@@ -558,8 +575,8 @@ function ConfigTab({ tenantId }: { tenantId: string }) {
         <div>
           <FieldLabel>Certificado y clave privada</FieldLabel>
           <p className="text-xs text-vialto-steel mt-1">
-            Solo hace falta cargar el certificado real para producción. Dejá
-            el campo vacío para conservar el valor actual.
+            Solo hace falta cargar el certificado real para producción. Dejá el
+            campo vacío para conservar el valor actual.
           </p>
         </div>
 
@@ -659,7 +676,6 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [pendingEmitir, setPendingEmitir] = useState<Liquidacion | null>(null);
 
-  // Estado para la ventana de confirmación
   const [anularId, setAnularId] = useState<string | null>(null);
   const [eliminarId, setEliminarId] = useState<string | null>(null);
 
@@ -784,7 +800,7 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         { method: "POST", body: JSON.stringify({ motivo }) },
       );
       setAnularId(null);
-      load(); // Refrescamos todo para tener el estado actualizado desde el backend
+      load();
     } catch (e) {
       setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
     } finally {
