@@ -592,9 +592,12 @@ export function LiquidacionesTenantPage() {
       )}
 
       {hasArca && activeTenantId && (
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-          <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-          Emisión electrónica vía ARCA
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+            Emisión electrónica vía ARCA
+          </div>
+          <AmbienteTestBadge ambiente={config?.ambiente} />
         </div>
       )}
 

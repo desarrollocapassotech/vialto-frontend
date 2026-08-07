@@ -12,7 +12,7 @@ import {
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
-import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
@@ -516,9 +516,14 @@ export function CrearLiquidacionManualModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-            Nueva liquidación
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+              Nueva liquidación
+            </h2>
+            {hasArca && (
+              <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
+            )}
+          </div>
           {!submitting && (
             <button
               type="button"
@@ -905,10 +910,6 @@ export function CrearLiquidacionManualModal({
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
               {error}
             </div>
-          )}
-
-          {hasArca && (
-            <AmbienteHomologacionWarning ambiente={resolvedConfig?.ambiente} />
           )}
 
           {cvlpClaseBAlerta && (

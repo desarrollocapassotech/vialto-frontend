@@ -9,7 +9,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
-import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   CVLP_CLASE_B_WARNING,
@@ -259,9 +259,12 @@ export function EmitirLiquidacionModal({
         className="flex w-full max-w-md max-h-[90dvh] flex-col rounded border border-black/10 bg-white shadow-xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-6 py-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-            Emitir comprobante
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+              Emitir comprobante
+            </h2>
+            <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
+          </div>
           {!submitting && (
             <button
               type="button"
@@ -380,8 +383,6 @@ export function EmitirLiquidacionModal({
               <ArcaErrorMessage message={error} detalle={errorDetalle} />
             </div>
           )}
-
-          <AmbienteHomologacionWarning ambiente={arcaConfig?.ambiente} />
 
           {cvlpClaseBAlerta && (
             <div
