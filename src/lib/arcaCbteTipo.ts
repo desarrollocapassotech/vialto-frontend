@@ -26,11 +26,22 @@ export function isResponsableInscripto(
   return condicionIva === 1;
 }
 
-export function cvlpCbteTipoFromCondicionIva(
+/**
+ * true si la condición IVA del transportista normalmente correspondería a un
+ * CVLP clase B (061), que ya no se emite — el sistema emite siempre CVLP 060
+ * (clase A), ver "Gotchas operativos de ARCA" en vialto-backend/CLAUDE.md.
+ * No bloquea nada: solo dispara la leyenda de advertencia antes de
+ * crear/emitir. Si la condición IVA todavía no está cargada, no advierte
+ * acá — ese caso ya lo cubre la validación existente de datos faltantes.
+ */
+export function cvlpClaseBEsperada(
   condicionIva: number | null | undefined,
-): CvlpCbteTipo {
-  return isResponsableInscripto(condicionIva) ? 60 : 61;
+): boolean {
+  return condicionIva != null && !isResponsableInscripto(condicionIva);
 }
+
+export const CVLP_CLASE_B_WARNING =
+  "La condición frente al IVA de este transportista normalmente correspondería a un comprobante Líquido Producto clase B (CVLP 061), pero el sistema emite siempre CVLP 060 (clase A).";
 
 export function facturaLetraFromCondicionIva(
   condicionIva: number | null | undefined,

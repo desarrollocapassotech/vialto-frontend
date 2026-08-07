@@ -11,6 +11,11 @@ import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  CVLP_CLASE_B_WARNING,
+  condicionIvaLabel,
+  cvlpClaseBEsperada,
+} from "@/lib/arcaCbteTipo";
 import type { ArcaConfig, Liquidacion } from "@/types/api";
 
 type LiquidacionEmitDetail = Liquidacion & {
@@ -197,10 +202,19 @@ export function EmitirLiquidacionModal({
   const ptoVentaNum = Number(ptoVenta);
   const ptoVentaInvalido =
     !ptoVenta.trim() || !Number.isInteger(ptoVentaNum) || ptoVentaNum < 1;
+  const cvlpClaseBAlerta =
+    source.cbteTipo === 60 &&
+    cvlpClaseBEsperada(source.transportista?.condicionIva);
 
   async function confirmar() {
     if (datosEmitIncompletos) {
       setError(missingEmitMessage);
+      return;
+    }
+    if (cvlpClaseBAlerta) {
+      setError(
+        "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
+      );
       return;
     }
     if (ptoVentaInvalido) {
@@ -368,6 +382,22 @@ export function EmitirLiquidacionModal({
           )}
 
           <AmbienteHomologacionWarning ambiente={arcaConfig?.ambiente} />
+
+          {cvlpClaseBAlerta && (
+            <div
+              className="rounded border border-red-300/60 bg-red-50 px-4 py-3 text-xs text-red-900"
+              role="alert"
+            >
+              <p className="font-medium">No corresponde emitir CVLP 060</p>
+              <p className="mt-1">
+                Condición frente al IVA del transportista:{" "}
+                <span className="font-medium">
+                  {condicionIvaLabel(source.transportista?.condicionIva)}
+                </span>
+                . {CVLP_CLASE_B_WARNING}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 justify-end gap-3 border-t border-black/10 px-6 py-4">
@@ -385,7 +415,8 @@ export function EmitirLiquidacionModal({
               submitting ||
               !datosReady ||
               datosEmitIncompletos ||
-              ptoVentaInvalido
+              ptoVentaInvalido ||
+              cvlpClaseBAlerta
             }
             onClick={() => void confirmar()}
             className="inline-flex items-center gap-2 h-9 px-5 rounded bg-vialto-fire font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-white hover:bg-vialto-bright disabled:opacity-50"
