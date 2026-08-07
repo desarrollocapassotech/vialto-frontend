@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
@@ -386,8 +387,18 @@ export function LiquidacionEditModal({
                 )}
               </div>
               <div>
-                <label htmlFor="liq-iva" className={LABEL}>
-                  IVA (%)
+                <label
+                  htmlFor="liq-iva"
+                  className="flex items-center gap-1.5 text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel mb-1"
+                >
+                  <span>IVA (%)</span>
+                  <div className="group relative flex items-center">
+                    <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%
+                      <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
+                    </div>
+                  </div>
                 </label>
                 <input
                   id="liq-iva"
