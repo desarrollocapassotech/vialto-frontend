@@ -35,7 +35,6 @@ import {
   nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
-  textoMontoFacturarListado,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -1197,8 +1196,8 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
-  /** Cliente + transp. externo + chofer + estado + recorrido + fechas + monto [+ acciones]. */
-  const tableColSpanBase = 8;
+  /** Cliente + transp. externo + chofer + estado + recorrido + fechas + acciones. */
+  const tableColSpanBase = 7;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
@@ -1774,9 +1773,6 @@ export function ViajesTenantPage({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
-              Monto a facturar
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
           </tr>
@@ -1907,9 +1903,6 @@ export function ViajesTenantPage({
                     {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
                   </span>
                 </div>
-              </td>
-              <td className="px-4 py-3 text-right tabular-nums">
-                {textoMontoFacturarListado(v)}
               </td>
               <td className="px-4 py-3 text-right">
                 <ViajeAccionesMenu
@@ -2080,7 +2073,6 @@ export function ViajesTenantPage({
                     </div>
                   ),
                 },
-                { label: "Monto", value: textoMontoFacturarListado(v) },
               ]}
               actions={
                 <ViajeAccionesMenu

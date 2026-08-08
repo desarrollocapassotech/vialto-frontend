@@ -4,7 +4,10 @@ import {
   gananciaBrutaDesgloseDetalle,
   gananciaBrutaMetaDesdeViaje,
 } from '@/lib/viajesGananciaBruta';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import {
+  formatViajeImporteForListado,
+  textoMontoFacturarListado,
+} from '@/lib/viajesFlota';
 import type { Viaje } from '@/types/api';
 
 import { listadoColHideUntilLg } from '@/lib/listadoTabla';
@@ -68,17 +71,25 @@ export function ViajeGananciaBrutaDetalle({
   const filas = gananciaBrutaDesgloseDetalle(viaje);
   return (
     <div className="sm:col-span-2">
-      <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Ganancia bruta</p>
-      {meta.lineasBalance && meta.lineasBalance.length > 1 ? (
-        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-lg font-medium tabular-nums text-vialto-charcoal">
-          {meta.lineasBalance.map((l) => (
-            <span key={l.moneda}>{l.formatted}</span>
-          ))}
-        </p>
-      ) : (
-        <p className="mt-1 text-lg font-medium tabular-nums text-vialto-charcoal">{meta.display}</p>
-      )}
-      {meta.reason && <p className="text-xs text-vialto-steel">{meta.reason}</p>}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Monto a facturar</p>
+          <p className="mt-1 text-sm">{textoMontoFacturarListado(viaje)}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Ganancia bruta</p>
+          {meta.lineasBalance && meta.lineasBalance.length > 1 ? (
+            <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-lg font-medium tabular-nums text-vialto-charcoal">
+              {meta.lineasBalance.map((l) => (
+                <span key={l.moneda}>{l.formatted}</span>
+              ))}
+            </p>
+          ) : (
+            <p className="mt-1 text-lg font-medium tabular-nums text-vialto-charcoal">{meta.display}</p>
+          )}
+          {meta.reason && <p className="text-xs text-vialto-steel">{meta.reason}</p>}
+        </div>
+      </div>
 
       {filas.length > 0 && (
         <dl className="mt-2 divide-y divide-black/5 border-t border-black/5">
