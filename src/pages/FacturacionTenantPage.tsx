@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -180,10 +180,13 @@ export function FacturacionTenantPage({
       : `/api/facturacion/facturas/${encodeURIComponent(id)}/marcar-cobrada`;
   }
 
-  function facturaUrl(id: string) {
-    if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
-    return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
-  }
+  const facturaUrl = useCallback(
+    (id: string) => {
+      if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
+      return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+    },
+    [platform, tid],
+  );
 
   function facturasCreateUrl() {
     if (!platform) return "/api/facturacion/facturas";
@@ -409,6 +412,10 @@ export function FacturacionTenantPage({
       if (next.length === ed.viajeIds.length) return ed;
       return { ...ed, viajeIds: next };
     });
+    // Deps parciales a propósito: solo estos campos invalidan la lista de viajes
+    // elegibles. Si se agregara `editDraft` completo, este efecto se re-ejecutaría
+    // en cada tecleo del formulario (numero, fechas, notas, etc.).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     editingId,
     editDraft?.clienteId,
@@ -418,21 +425,32 @@ export function FacturacionTenantPage({
     viajesEdicionFactura,
   ]);
 
-  function buildFacturasPaginatedQuery(pageApi: number, pageSizeApi: number) {
-    const params = new URLSearchParams();
-    params.set("page", String(pageApi));
-    params.set("pageSize", String(pageSizeApi));
-    if (numFiltro.trim()) params.set("numero", numFiltro.trim());
-    if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
-    if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
-    if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
-    if (vencimientoDesdeFiltro)
-      params.set("vencimientoDesde", vencimientoDesdeFiltro);
-    if (vencimientoHastaFiltro)
-      params.set("vencimientoHasta", vencimientoHastaFiltro);
-    if (estadoFiltro) params.set("estado", estadoFiltro);
-    return params.toString();
-  }
+  const buildFacturasPaginatedQuery = useCallback(
+    (pageApi: number, pageSizeApi: number) => {
+      const params = new URLSearchParams();
+      params.set("page", String(pageApi));
+      params.set("pageSize", String(pageSizeApi));
+      if (numFiltro.trim()) params.set("numero", numFiltro.trim());
+      if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
+      if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
+      if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
+      if (vencimientoDesdeFiltro)
+        params.set("vencimientoDesde", vencimientoDesdeFiltro);
+      if (vencimientoHastaFiltro)
+        params.set("vencimientoHasta", vencimientoHastaFiltro);
+      if (estadoFiltro) params.set("estado", estadoFiltro);
+      return params.toString();
+    },
+    [
+      numFiltro,
+      clienteIdFiltro,
+      emisionDesdeFiltro,
+      emisionHastaFiltro,
+      vencimientoDesdeFiltro,
+      vencimientoHastaFiltro,
+      estadoFiltro,
+    ],
+  );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -486,13 +504,7 @@ export function FacturacionTenantPage({
     tid,
     page,
     pageSize,
-    numFiltro,
-    clienteIdFiltro,
-    emisionDesdeFiltro,
-    emisionHastaFiltro,
-    vencimientoDesdeFiltro,
-    vencimientoHastaFiltro,
-    estadoFiltro,
+    buildFacturasPaginatedQuery,
   ]);
 
   useEffect(() => {
@@ -528,7 +540,7 @@ export function FacturacionTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, facturaUrl, getToken]);
 
   async function ensureViajesLoaded() {
     if (viajes.length > 0 || viajesLoading) return;
@@ -537,6 +549,7 @@ export function FacturacionTenantPage({
       const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
       setViajes(data);
     } catch {
+      // best-effort: si falla, el selector de viajes de la factura queda vacío
     } finally {
       setViajesLoading(false);
     }
@@ -557,6 +570,9 @@ export function FacturacionTenantPage({
     setCreating(true);
     void ensureViajesLoaded();
     window.history.replaceState({}, "");
+    // Se consume una sola vez al montar: lee el state de navegación inicial y lo
+    // borra del history. No debe re-dispararse si `location.state` cambia después.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -570,9 +586,14 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
         startEdit(f);
-      } catch {}
+      } catch {
+        // si falla, simplemente no se abre el editor automático
+      }
     })();
-  }, [location.state, getToken]);
+    // `startEdit` no está memoizado, pero `expandFacturaHandledRef` ya evita que
+    // este efecto haga trabajo duplicado en renders posteriores.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, getToken, facturaUrl]);
 
   useEffect(() => {
     const viewId = (
@@ -585,9 +606,11 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
         setViewingFactura(f);
-      } catch {}
+      } catch {
+        // si falla, simplemente no se abre el modal de vista automático
+      }
     })();
-  }, [location.state, getToken]);
+  }, [location.state, getToken, facturaUrl]);
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
@@ -609,7 +632,9 @@ export function FacturacionTenantPage({
         setFacturas(data.items);
         setMeta(data.meta);
       }
-    } catch {}
+    } catch {
+      // best-effort: si falla el refetch, se conserva el listado ya cargado
+    }
   }
 
   async function resolveComprobanteUrl(
@@ -784,7 +809,10 @@ export function FacturacionTenantPage({
         ) : puedeMarcarCobrada(f) ? (
           <button
             type="button"
-            onClick={() => abrirMarcarCobrada(f)}
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirMarcarCobrada(f);
+            }}
             title="Marcar como cobrada"
             className={[
               badgeBase,
@@ -1316,7 +1344,11 @@ export function FacturacionTenantPage({
           </tr>
         }
         renderTableRow={(f) => (
-          <tr key={f.id} className={listadoTablaBodyRowClass}>
+          <tr
+            key={f.id}
+            className={`${listadoTablaBodyRowClass} cursor-pointer`}
+            onClick={() => setViewingFactura(f)}
+          >
             <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
               {nombreContraparte(f)}
@@ -1331,7 +1363,10 @@ export function FacturacionTenantPage({
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
               {textoImporteFacturaListado(f, viajes)}
             </td>
-            <td className="px-4 py-3 text-right">
+            <td
+              className="px-4 py-3 text-right"
+              onClick={(e) => e.stopPropagation()}
+            >
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
@@ -1357,6 +1392,7 @@ export function FacturacionTenantPage({
         )}
         renderMobileCard={(f) => (
           <ListadoCard
+            onClick={() => setViewingFactura(f)}
             primary={f.numero}
             fields={[
               { label: "Cliente", value: nombreContraparte(f) },

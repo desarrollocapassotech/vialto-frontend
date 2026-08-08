@@ -902,12 +902,14 @@ export function LiquidacionesTenantPage() {
               : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
+        onRowClick={(liq) => accionesProps(liq).onVer()}
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />
         )}
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
+            onClick={() => accionesProps(liq).onVer()}
             primary={transportistaNombre(liq)}
             fields={[
               {

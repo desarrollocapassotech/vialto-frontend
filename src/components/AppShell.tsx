@@ -112,7 +112,10 @@ export function AppShell() {
   }, [sidebarOpen]);
 
   const navLoading = !userLoaded || tenantLoading;
-  const roleCtx = { orgRole, publicMetadata: user?.publicMetadata };
+  const roleCtx = useMemo(
+    () => ({ orgRole, publicMetadata: user?.publicMetadata }),
+    [orgRole, user?.publicMetadata],
+  );
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -290,7 +293,7 @@ export function AppShell() {
     });
 
     return groups;
-  }, [superadmin, tenant?.modules, orgRole, user?.publicMetadata]);
+  }, [superadmin, tenant?.modules, roleCtx]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === "string"
@@ -363,13 +366,16 @@ export function AppShell() {
         <div className={headerWrapperClass}>
           {collapsed ? (
             <img
-              src="/favicon.svg"
+              src="/favicon.ico"
               alt="Vialto"
               className="h-9 w-9 shrink-0 rounded-md"
             />
           ) : (
             <div className="min-w-0">
-              <Logo heightClass="h-14 max-w-[11rem]" />
+              <Logo
+                src="/vialto-software-white-removebg.png"
+                heightClass="h-20 max-w-[9rem]"
+              />
               <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
                 TRANSPORTE Y LOGISTICA
               </p>

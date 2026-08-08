@@ -211,7 +211,7 @@ export function FacturaViewModal({
             <button
               type="button"
               onClick={onEmitirArca}
-              className="inline-flex items-center gap-2 h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
             >
               <Receipt className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Emitir a ARCA
@@ -221,7 +221,7 @@ export function FacturaViewModal({
             <button
               type="button"
               onClick={onAnular}
-              className="inline-flex items-center gap-2 h-9 px-4 border border-red-300 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-red-300 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
             >
               <Ban className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Anular
@@ -231,7 +231,7 @@ export function FacturaViewModal({
             <button
               type="button"
               onClick={onMarcarCobrada}
-              className="inline-flex items-center gap-2 h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
             >
               <Banknote className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Marcar como cobrada
