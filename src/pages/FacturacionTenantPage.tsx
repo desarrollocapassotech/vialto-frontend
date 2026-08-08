@@ -739,6 +739,10 @@ export function FacturacionTenantPage({
     }
   }
 
+  function puedeMarcarCobrada(f: Factura) {
+    return f.tipo === "cliente" && f.arcaEstado !== "anulado";
+  }
+
   function abrirMarcarCobrada(f: Factura) {
     if (f.estado === "cobrada") {
       showToast("Esta factura ya está cobrada.", "success");
@@ -1262,14 +1266,28 @@ export function FacturacionTenantPage({
               {fmtFecha(f.fechaVencimiento)}
             </td>
             <td className="px-4 py-3">
-              <span
-                className={[
-                  "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                  ESTADO_BADGE[f.estado] ?? "",
-                ].join(" ")}
-              >
-                {ESTADO_LABEL[f.estado] ?? f.estado}
-              </span>
+              {puedeMarcarCobrada(f) ? (
+                <button
+                  type="button"
+                  onClick={() => abrirMarcarCobrada(f)}
+                  title="Marcar como cobrada"
+                  className={[
+                    "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:brightness-95",
+                    ESTADO_BADGE[f.estado] ?? "",
+                  ].join(" ")}
+                >
+                  {ESTADO_LABEL[f.estado] ?? f.estado}
+                </button>
+              ) : (
+                <span
+                  className={[
+                    "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+                    ESTADO_BADGE[f.estado] ?? "",
+                  ].join(" ")}
+                >
+                  {ESTADO_LABEL[f.estado] ?? f.estado}
+                </span>
+              )}
             </td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
               {textoImporteFacturaListado(f, viajes)}
@@ -1307,7 +1325,19 @@ export function FacturacionTenantPage({
               { label: "Vencimiento", value: fmtFecha(f.fechaVencimiento) },
               {
                 label: "Estado",
-                value: (
+                value: puedeMarcarCobrada(f) ? (
+                  <button
+                    type="button"
+                    onClick={() => abrirMarcarCobrada(f)}
+                    title="Marcar como cobrada"
+                    className={[
+                      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:brightness-95",
+                      ESTADO_BADGE[f.estado] ?? "",
+                    ].join(" ")}
+                  >
+                    {ESTADO_LABEL[f.estado] ?? f.estado}
+                  </button>
+                ) : (
                   <span
                     className={[
                       "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",

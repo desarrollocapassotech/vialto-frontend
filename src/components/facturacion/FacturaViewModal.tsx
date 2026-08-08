@@ -171,14 +171,28 @@ export function FacturaViewModal({
       title={
         <span className="inline-flex items-center gap-3 flex-wrap">
           <span>Factura {factura.numero}</span>
-          <span
-            className={[
-              'text-xs font-medium border rounded px-2 py-0.5',
-              ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
-            ].join(' ')}
-          >
-            {ESTADO_LABEL[factura.estado] ?? factura.estado}
-          </span>
+          {factura.tipo === 'cliente' && !anulada && onMarcarCobrada ? (
+            <button
+              type="button"
+              onClick={onMarcarCobrada}
+              title="Marcar como cobrada"
+              className={[
+                'text-xs font-medium border rounded px-2 py-0.5 cursor-pointer hover:brightness-95',
+                ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
+              ].join(' ')}
+            >
+              {ESTADO_LABEL[factura.estado] ?? factura.estado}
+            </button>
+          ) : (
+            <span
+              className={[
+                'text-xs font-medium border rounded px-2 py-0.5',
+                ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
+              ].join(' ')}
+            >
+              {ESTADO_LABEL[factura.estado] ?? factura.estado}
+            </span>
+          )}
           {hasArca && factura.arcaEstado && (
             <span
               className={[
