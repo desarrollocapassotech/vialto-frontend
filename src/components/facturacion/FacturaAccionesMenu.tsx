@@ -14,7 +14,7 @@ interface Props {
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
-  /** Solo facturas a cliente. Se muestra siempre (aunque ya esté cobrada) — ver `onClick` del caller. */
+  /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
 }
 
@@ -74,7 +74,12 @@ export function FacturaAccionesMenu({
         danger: true,
       });
     }
-    if (onMarcarCobrada && factura.tipo === 'cliente' && !anulada) {
+    if (
+      onMarcarCobrada &&
+      factura.tipo === 'cliente' &&
+      !anulada &&
+      !factura.cobrado
+    ) {
       opts.push({
         id: 'marcar-cobrada',
         label: 'Marcar como cobrada',

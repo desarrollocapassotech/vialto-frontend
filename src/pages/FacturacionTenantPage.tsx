@@ -65,16 +65,24 @@ type FacturasPaginatedResponse = {
 };
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "PENDIENTE",
-  cobrada: "COBRADA",
-  vencida: "VENCIDA",
+  borrador: "BORRADOR",
+  esperando_afip: "ESPERANDO AFIP",
+  facturado: "FACTURADO",
+  error_afip: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
-  cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
-  vencida: "bg-red-100 text-red-950 border-red-400/80",
+  borrador: "bg-zinc-100 text-zinc-800 border-zinc-300/90",
+  esperando_afip: "bg-amber-50 text-amber-950 border-amber-200/95",
+  facturado: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
+  error_afip: "bg-red-100 text-red-950 border-red-400/80",
+  anulado: "bg-gray-100 text-gray-500 border-gray-300/80 line-through",
 };
+
+/** Badge adicional de cobro — se muestra junto al de ciclo de vida, nunca lo reemplaza. */
+const COBRADO_BADGE_CLASS = "bg-emerald-200 text-emerald-950 border-emerald-600/90";
+const VENCIDA_BADGE_CLASS = "bg-orange-100 text-orange-950 border-orange-400/80";
 
 function fmtFecha(iso: string | null) {
   if (!iso) return "—";
@@ -342,7 +350,16 @@ export function FacturacionTenantPage({
         return false;
       if (vencimientoHastaFiltro && (!vence || vence > vencimientoHastaFiltro))
         return false;
-      if (estadoFiltro && f.estado !== estadoFiltro) return false;
+      if (estadoFiltro) {
+        if (estadoFiltro === "cobrado" && !f.cobrado) return false;
+        else if (estadoFiltro === "vencida" && !f.vencida) return false;
+        else if (
+          estadoFiltro !== "cobrado" &&
+          estadoFiltro !== "vencida" &&
+          f.estado !== estadoFiltro
+        )
+          return false;
+      }
       return true;
     });
   }, [
@@ -740,15 +757,47 @@ export function FacturacionTenantPage({
   }
 
   function puedeMarcarCobrada(f: Factura) {
-    return f.tipo === "cliente" && f.arcaEstado !== "anulado";
+    return f.tipo === "cliente" && f.arcaEstado !== "anulado" && !f.cobrado;
   }
 
   function abrirMarcarCobrada(f: Factura) {
-    if (f.estado === "cobrada") {
+    if (f.cobrado) {
       showToast("Esta factura ya está cobrada.", "success");
       return;
     }
     setMarcarCobradaConfirm(f);
+  }
+
+  /** Badge de ciclo de vida (estático) + badge de cobro, uno nunca reemplaza al otro. */
+  function renderEstadoBadges(f: Factura) {
+    const badgeBase =
+      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <span className={[badgeBase, ESTADO_BADGE[f.estado] ?? ""].join(" ")}>
+          {ESTADO_LABEL[f.estado] ?? f.estado}
+        </span>
+        {f.cobrado ? (
+          <span className={[badgeBase, COBRADO_BADGE_CLASS].join(" ")}>
+            COBRADO
+          </span>
+        ) : puedeMarcarCobrada(f) ? (
+          <button
+            type="button"
+            onClick={() => abrirMarcarCobrada(f)}
+            title="Marcar como cobrada"
+            className={[
+              badgeBase,
+              "cursor-pointer hover:brightness-95",
+              f.vencida ? VENCIDA_BADGE_CLASS : "border-black/15 text-vialto-steel",
+            ].join(" ")}
+          >
+            {f.vencida ? "VENCIDA" : "MARCAR COBRADA"}
+          </button>
+        ) : null}
+        <AmbienteTestBadge ambiente={f.ambiente} />
+      </span>
+    );
   }
 
   async function confirmMarcarCobrada() {
@@ -1005,8 +1054,12 @@ export function FacturacionTenantPage({
           aria-label="Filtrar por estado"
         >
           <option value="">Todos</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="cobrada">Cobrada</option>
+          {hasArca && <option value="borrador">Borrador</option>}
+          {hasArca && <option value="esperando_afip">Esperando AFIP</option>}
+          <option value="facturado">Facturado</option>
+          <option value="cobrado">Cobrado</option>
+          {hasArca && <option value="error_afip">Error de AFIP</option>}
+          {hasArca && <option value="anulado">Anulado</option>}
           <option value="vencida">Vencida</option>
         </select>
       </ListadoFiltroCampo>
@@ -1029,7 +1082,10 @@ export function FacturacionTenantPage({
                 <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
                 Emisión electrónica vía ARCA
               </div>
-              <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
+              <AmbienteTestBadge
+                ambiente={arcaConfig?.ambiente}
+                to="/configuracion/arca?tab=ambiente"
+              />
             </div>
           )}
         </>
@@ -1239,8 +1295,14 @@ export function FacturacionTenantPage({
                   aria-label="Filtrar por estado"
                 >
                   <option value="">Todos</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="cobrada">Cobrada</option>
+                  {hasArca && <option value="borrador">Borrador</option>}
+                  {hasArca && (
+                    <option value="esperando_afip">Esperando AFIP</option>
+                  )}
+                  <option value="facturado">Facturado</option>
+                  <option value="cobrado">Cobrado</option>
+                  {hasArca && <option value="error_afip">Error de AFIP</option>}
+                  {hasArca && <option value="anulado">Anulado</option>}
                   <option value="vencida">Vencida</option>
                 </select>
               </ViajesListadoHeaderFiltro>
@@ -1265,30 +1327,7 @@ export function FacturacionTenantPage({
             <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaVencimiento)}
             </td>
-            <td className="px-4 py-3">
-              {puedeMarcarCobrada(f) ? (
-                <button
-                  type="button"
-                  onClick={() => abrirMarcarCobrada(f)}
-                  title="Marcar como cobrada"
-                  className={[
-                    "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:brightness-95",
-                    ESTADO_BADGE[f.estado] ?? "",
-                  ].join(" ")}
-                >
-                  {ESTADO_LABEL[f.estado] ?? f.estado}
-                </button>
-              ) : (
-                <span
-                  className={[
-                    "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                    ESTADO_BADGE[f.estado] ?? "",
-                  ].join(" ")}
-                >
-                  {ESTADO_LABEL[f.estado] ?? f.estado}
-                </span>
-              )}
-            </td>
+            <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
               {textoImporteFacturaListado(f, viajes)}
             </td>
@@ -1325,28 +1364,7 @@ export function FacturacionTenantPage({
               { label: "Vencimiento", value: fmtFecha(f.fechaVencimiento) },
               {
                 label: "Estado",
-                value: puedeMarcarCobrada(f) ? (
-                  <button
-                    type="button"
-                    onClick={() => abrirMarcarCobrada(f)}
-                    title="Marcar como cobrada"
-                    className={[
-                      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:brightness-95",
-                      ESTADO_BADGE[f.estado] ?? "",
-                    ].join(" ")}
-                  >
-                    {ESTADO_LABEL[f.estado] ?? f.estado}
-                  </button>
-                ) : (
-                  <span
-                    className={[
-                      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                      ESTADO_BADGE[f.estado] ?? "",
-                    ].join(" ")}
-                  >
-                    {ESTADO_LABEL[f.estado] ?? f.estado}
-                  </span>
-                ),
+                value: renderEstadoBadges(f),
               },
               {
                 label: "Importe",

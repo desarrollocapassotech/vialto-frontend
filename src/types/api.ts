@@ -337,7 +337,12 @@ export interface Factura {
   moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;
-  estado: "pendiente" | "cobrada" | "vencida";
+  /** Ciclo de vida del comprobante. Independiente de `cobrado`/`vencida` — no se reemplazan entre sí. */
+  estado: "borrador" | "esperando_afip" | "facturado" | "error_afip" | "anulado";
+  /** Se puede estar cobrado en cualquier `estado` (ej. cobrado antes de anular). */
+  cobrado: boolean;
+  /** Solo relevante mientras no está cobrado y ya se llegó a "facturado". */
+  vencida: boolean;
   diferencia: number | null;
   ivaPct: number | null;
   comprobanteUrl: string | null;
@@ -348,6 +353,8 @@ export interface Factura {
   caeFechaVto?: string | null;
   arcaEstado?: "pendiente_cae" | "autorizado" | "error" | "anulado" | null;
   arcaError?: string | null;
+  /** Ambiente ARCA con el que se autorizó (snapshot; homologacion | produccion). Null si no aplica. */
+  ambiente?: string | null;
   /** Datos del comprobante de anulación (Nota de Crédito A/B); la factura original se conserva arriba. */
   anulacionCbteTipo?: number | null;
   anulacionCbteNro?: number | null;

@@ -6,6 +6,7 @@ import {
   viewModalBtnPrimary,
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
+import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
 import {
   facturaLetraFromCbteTipo,
   facturaLetraFromCondicionIva,
@@ -43,30 +44,24 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
-  cobrada: 'Cobrada',
-  vencida: 'Vencida',
+  borrador: 'BORRADOR',
+  esperando_afip: 'ESPERANDO AFIP',
+  facturado: 'FACTURADO',
+  error_afip: 'ERROR DE AFIP',
+  anulado: 'ANULADO',
 };
 
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: 'bg-amber-100 text-amber-950 border-amber-300/90',
-  cobrada: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
-  vencida: 'bg-red-100 text-red-950 border-red-400/80',
+  borrador: 'bg-zinc-100 text-zinc-800 border-zinc-300/90',
+  esperando_afip: 'bg-amber-50 text-amber-950 border-amber-200/95',
+  facturado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
+  error_afip: 'bg-red-100 text-red-950 border-red-400/80',
+  anulado: 'bg-gray-100 text-gray-500 border-gray-300/80 line-through',
 };
 
-const ARCA_ESTADO_LABEL: Record<string, string> = {
-  pendiente_cae: 'Pendiente CAE',
-  autorizado: 'Autorizado ARCA',
-  error: 'Error ARCA',
-  anulado: 'Anulado',
-};
-
-const ARCA_ESTADO_BADGE: Record<string, string> = {
-  pendiente_cae: 'bg-sky-100 text-sky-950 border-sky-300/90',
-  autorizado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
-  error: 'bg-red-100 text-red-950 border-red-400/80',
-  anulado: 'bg-gray-100 text-gray-600 border-gray-300/80',
-};
+/** Badge adicional de cobro — se muestra junto al de ciclo de vida, nunca lo reemplaza. */
+const COBRADO_BADGE_CLASS = 'bg-emerald-200 text-emerald-950 border-emerald-600/90';
+const VENCIDA_BADGE_CLASS = 'bg-orange-100 text-orange-950 border-orange-400/80';
 
 export function FacturaViewModal({
   factura,
@@ -91,7 +86,7 @@ export function FacturaViewModal({
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
-  /** Solo facturas a cliente. Se muestra siempre (aunque ya esté cobrada) — ver `onClick` del caller. */
+  /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
 }) {
   useEffect(() => {
@@ -133,6 +128,8 @@ export function FacturaViewModal({
     (factura.arcaEstado === 'autorizado' ||
       factura.arcaEstado === 'pendiente_cae' ||
       factura.arcaEstado === 'error');
+  const puedeMarcarCobrada =
+    factura.tipo === 'cliente' && !anulada && !factura.cobrado;
 
   const campos: { label: string; value: string | null | undefined }[] = [
     { label: 'Número', value: factura.numero },
@@ -171,38 +168,37 @@ export function FacturaViewModal({
       title={
         <span className="inline-flex items-center gap-3 flex-wrap">
           <span>Factura {factura.numero}</span>
-          {factura.tipo === 'cliente' && !anulada && onMarcarCobrada ? (
+          <span
+            className={[
+              'text-xs font-medium border rounded px-2 py-0.5',
+              ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
+            ].join(' ')}
+          >
+            {ESTADO_LABEL[factura.estado] ?? factura.estado}
+          </span>
+          {factura.cobrado ? (
+            <span
+              className={[
+                'text-xs font-medium border rounded px-2 py-0.5',
+                COBRADO_BADGE_CLASS,
+              ].join(' ')}
+            >
+              COBRADO
+            </span>
+          ) : puedeMarcarCobrada && onMarcarCobrada ? (
             <button
               type="button"
               onClick={onMarcarCobrada}
               title="Marcar como cobrada"
               className={[
                 'text-xs font-medium border rounded px-2 py-0.5 cursor-pointer hover:brightness-95',
-                ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
+                factura.vencida ? VENCIDA_BADGE_CLASS : 'border-black/15 text-vialto-steel',
               ].join(' ')}
             >
-              {ESTADO_LABEL[factura.estado] ?? factura.estado}
+              {factura.vencida ? 'VENCIDA' : 'MARCAR COBRADA'}
             </button>
-          ) : (
-            <span
-              className={[
-                'text-xs font-medium border rounded px-2 py-0.5',
-                ESTADO_BADGE[factura.estado] ?? 'border-black/15 text-vialto-steel',
-              ].join(' ')}
-            >
-              {ESTADO_LABEL[factura.estado] ?? factura.estado}
-            </span>
-          )}
-          {hasArca && factura.arcaEstado && (
-            <span
-              className={[
-                'text-xs font-medium border rounded px-2 py-0.5',
-                ARCA_ESTADO_BADGE[factura.arcaEstado] ?? 'border-black/15 text-vialto-steel',
-              ].join(' ')}
-            >
-              {ARCA_ESTADO_LABEL[factura.arcaEstado] ?? factura.arcaEstado}
-            </span>
-          )}
+          ) : null}
+          <AmbienteTestBadge ambiente={factura.ambiente} />
         </span>
       }
       onClose={onClose}
@@ -231,7 +227,7 @@ export function FacturaViewModal({
               Anular
             </button>
           )}
-          {factura.tipo === 'cliente' && !anulada && onMarcarCobrada && (
+          {puedeMarcarCobrada && onMarcarCobrada && (
             <button
               type="button"
               onClick={onMarcarCobrada}

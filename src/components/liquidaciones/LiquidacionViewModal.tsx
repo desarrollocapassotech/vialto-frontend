@@ -31,11 +31,11 @@ export type LiquidacionConTransportista = Liquidacion & {
 };
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
-  borrador: "Borrador",
-  pendiente_cae: "Pendiente CAE",
-  autorizado: "Autorizado",
-  error: "Error",
-  anulado: "Anulado",
+  borrador: "BORRADOR",
+  pendiente_cae: "ESPERANDO AFIP",
+  autorizado: "LIQUIDADO",
+  error: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
 const ESTADO_BADGE: Record<LiquidacionEstado, string> = {
@@ -122,6 +122,7 @@ export function LiquidacionViewModal({
   onEditar,
   onEmitir,
   onVerComprobante,
+  onVerAnulacion,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
@@ -135,7 +136,10 @@ export function LiquidacionViewModal({
   onEditar: () => void;
   /** Si se pasa, muestra "Emitir"/"Reintentar emisión" cuando el estado es borrador o error. */
   onEmitir?: () => void;
+  /** Ver el comprobante: PDF del CVLP autorizado (ARCA) o adjunto manual (sin ARCA), según lo resuelva el caller. */
   onVerComprobante?: () => void;
+  /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'`. */
+  onVerAnulacion?: () => void;
 }) {
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
@@ -398,6 +402,15 @@ export function LiquidacionViewModal({
                   value={source.anuladoPorNombre ?? source.anuladoPor}
                 />
               </div>
+              {onVerAnulacion && (
+                <button
+                  type="button"
+                  onClick={onVerAnulacion}
+                  className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+                >
+                  Ver anulación
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -411,7 +424,7 @@ export function LiquidacionViewModal({
           </div>
         )}
 
-        {onVerComprobante && source.comprobanteUrl?.trim() && (
+        {onVerComprobante && (
           <div className="border-t border-black/10 pt-4">
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
               Comprobante
