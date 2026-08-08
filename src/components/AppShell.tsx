@@ -64,7 +64,7 @@ type NavGroup = {
 };
 
 const sidebarAsideClass =
-  "w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto";
+  "w-fit min-w-[12rem] max-w-[92vw] shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto";
 
 export function AppShell() {
   const { organization } = useOrganization();
@@ -406,7 +406,7 @@ export function AppShell() {
                       className="h-4 w-4 shrink-0"
                       strokeWidth={1.75}
                     />
-                    <span>{item.label}</span>
+                    <span className="whitespace-nowrap">{item.label}</span>
                   </NavLink>
                 ))}
               </div>
@@ -428,7 +428,7 @@ export function AppShell() {
                   appearance={orgSwitcherSidebarAppearance}
                 />
               ) : (
-                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80">
+                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
                   {organization?.name ?? "Empresa no disponible"}
                 </div>
               )}
