@@ -111,7 +111,6 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { selectorTabClass } from "@/components/ui/SelectorOpcionesSheet";
 
 //comentario para nuevo PR
 
@@ -217,6 +216,7 @@ export function ViajesTenantPage({
     transportistaId: "",
     choferId: "",
     estado: initialEstadoFromUrl,
+    facturacionEstado: "",
     pagoTransportista:
       initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro,
     tipoFecha: "" as "" | "carga" | "descarga",
@@ -235,6 +235,7 @@ export function ViajesTenantPage({
     useState("");
   const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
+  const [facturacionFiltro, setFacturacionFiltro] = useState("");
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
     useState<ViajePagoTransportistaFiltro>(initialPagoTransportistaFromUrl);
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<
@@ -478,6 +479,7 @@ export function ViajesTenantPage({
           transportistaId: transpFiltro,
           choferId: choferFiltro,
           estado: estF,
+          facturacionEstado: facEstF,
           pagoTransportista: pagoTranspF,
           tipoFecha: tf,
           fechaDesde: fd,
@@ -492,6 +494,7 @@ export function ViajesTenantPage({
         if (transpFiltro) filtros.set("transportistaId", transpFiltro);
         if (choferFiltro) filtros.set("choferId", choferFiltro);
         if (estF.trim()) filtros.set("etapa", estF.trim());
+        if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
         if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
           filtros.set("pagoTransportista", pagoTranspF);
         }
@@ -672,10 +675,25 @@ export function ViajesTenantPage({
     filtrosAplicadosRef.current = {
       ...filtrosAplicadosRef.current,
       pagoTransportista: p,
-      ...(p ? { estado: "" } : {}),
+      ...(p ? { facturacionEstado: "" } : {}),
     };
     setPagoTransportistaFiltro(p);
-    if (p) setEstadoFiltro("");
+    if (p) setFacturacionFiltro("");
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  /** Chips rápidos "Sin facturar" / "Sin cobrar" — filtran por `facturacionEstado`, independiente de la etapa. */
+  function aplicarFiltroFacturacion(val: string) {
+    const f = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      facturacionEstado: f,
+      ...(f ? { pagoTransportista: "" as ViajePagoTransportistaFiltro } : {}),
+    };
+    setFacturacionFiltro(f);
+    if (f) setPagoTransportistaFiltro("");
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -842,6 +860,7 @@ export function ViajesTenantPage({
       transportistaId: "",
       choferId: "",
       estado: "",
+      facturacionEstado: "",
       pagoTransportista: "",
       tipoFecha: "",
       fechaDesde: "",
@@ -855,6 +874,7 @@ export function ViajesTenantPage({
     setTransportistaIdFiltroActivo("");
     setChoferIdFiltroActivo("");
     setEstadoFiltro("");
+    setFacturacionFiltro("");
     setPagoTransportistaFiltro("");
     setTipoFechaFiltro("");
     setFechaDesdeFiltro("");
@@ -872,6 +892,7 @@ export function ViajesTenantPage({
     !!transportistaIdFiltroActivo.trim() ||
     !!choferIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
+    !!facturacionFiltro.trim() ||
     !!pagoTransportistaFiltro.trim() ||
     !!fechaDesdeFiltro.trim() ||
     !!fechaHastaFiltro.trim() ||
@@ -885,6 +906,7 @@ export function ViajesTenantPage({
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (choferIdFiltroActivo.trim()) n += 1;
     if (estadoFiltro.trim()) n += 1;
+    if (facturacionFiltro.trim()) n += 1;
     if (pagoTransportistaFiltro.trim()) n += 1;
     if (ubicacionFiltro.trim()) n += 1;
     if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) n += 1;
@@ -895,6 +917,7 @@ export function ViajesTenantPage({
     transportistaIdFiltroActivo,
     choferIdFiltroActivo,
     estadoFiltro,
+    facturacionFiltro,
     pagoTransportistaFiltro,
     ubicacionFiltro,
     fechaDesdeFiltro,
@@ -1414,32 +1437,13 @@ export function ViajesTenantPage({
         <div className="mt-3">
           <ViajesResumenFiltros
             resumen={resumen}
-            estadoFiltro={estadoFiltro}
+            facturacionFiltro={facturacionFiltro}
             pagoTransportistaFiltro={pagoTransportistaFiltro}
-            onFiltroEstado={aplicarFiltroEstado}
+            onFiltroFacturacion={aplicarFiltroFacturacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
           />
         </div>
       )}
-
-      <div className="mt-3 grid grid-cols-3 gap-2 lg:flex lg:gap-2">
-        {(
-          [
-            { val: "todos", label: "Todos" },
-            { val: "desde_hoy", label: "Desde hoy" },
-            { val: "anteriores", label: "Anteriores" },
-          ] as const
-        ).map(({ val, label }) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => aplicarPeriodoFiltro(val)}
-            className={selectorTabClass(periodoFiltro === val)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="hidden min-h-10 items-center lg:flex">

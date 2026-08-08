@@ -8,30 +8,26 @@ export type ViajesResumenFiltrosData = {
   pagados: number;
 };
 
-type FiltroId =
-  | 'finalizado_sin_facturar'
-  | 'facturado_sin_cobrar'
-  | 'sin_pagar'
-  | 'pagado';
+type FiltroId = 'sin_facturar' | 'facturado' | 'sin_pagar' | 'pagado';
 
 const OPCIONES: Array<{
   id: FiltroId;
   label: string;
   countKey: keyof ViajesResumenFiltrosData;
-  tipo: 'estado' | 'pago';
+  tipo: 'facturacion' | 'pago';
 }> = [
-  { id: 'finalizado_sin_facturar', label: 'Sin facturar', countKey: 'sinFacturar', tipo: 'estado' },
-  { id: 'facturado_sin_cobrar', label: 'Sin cobrar', countKey: 'sinCobrar', tipo: 'estado' },
+  { id: 'sin_facturar', label: 'Sin facturar', countKey: 'sinFacturar', tipo: 'facturacion' },
+  { id: 'facturado', label: 'Sin cobrar', countKey: 'sinCobrar', tipo: 'facturacion' },
   { id: 'sin_pagar', label: 'Sin pagar', countKey: 'sinPagar', tipo: 'pago' },
   { id: 'pagado', label: 'Pagados', countKey: 'pagados', tipo: 'pago' },
 ];
 
 function activeFilterId(
-  estadoFiltro: string,
+  facturacionFiltro: string,
   pagoTransportistaFiltro: ViajePagoTransportistaFiltro,
 ): FiltroId | null {
-  if (estadoFiltro === 'finalizado_sin_facturar') return 'finalizado_sin_facturar';
-  if (estadoFiltro === 'facturado_sin_cobrar') return 'facturado_sin_cobrar';
+  if (facturacionFiltro === 'sin_facturar') return 'sin_facturar';
+  if (facturacionFiltro === 'facturado') return 'facturado';
   if (pagoTransportistaFiltro === 'sin_pagar') return 'sin_pagar';
   if (pagoTransportistaFiltro === 'pagado') return 'pagado';
   return null;
@@ -39,28 +35,28 @@ function activeFilterId(
 
 type Props = {
   resumen: ViajesResumenFiltrosData;
-  estadoFiltro: string;
+  facturacionFiltro: string;
   pagoTransportistaFiltro: ViajePagoTransportistaFiltro;
-  onFiltroEstado: (val: string) => void;
+  onFiltroFacturacion: (val: string) => void;
   onFiltroPago: (val: ViajePagoTransportistaFiltro) => void;
 };
 
 export function ViajesResumenFiltros({
   resumen,
-  estadoFiltro,
+  facturacionFiltro,
   pagoTransportistaFiltro,
-  onFiltroEstado,
+  onFiltroFacturacion,
   onFiltroPago,
 }: Props) {
-  const activeId = activeFilterId(estadoFiltro, pagoTransportistaFiltro);
+  const activeId = activeFilterId(facturacionFiltro, pagoTransportistaFiltro);
 
-  function toggleDesktop(id: FiltroId, tipo: 'estado' | 'pago') {
+  function toggleDesktop(id: FiltroId, tipo: 'facturacion' | 'pago') {
     if (activeId === id) {
-      if (tipo === 'estado') onFiltroEstado('');
+      if (tipo === 'facturacion') onFiltroFacturacion('');
       else onFiltroPago('');
       return;
     }
-    if (tipo === 'estado') onFiltroEstado(id);
+    if (tipo === 'facturacion') onFiltroFacturacion(id);
     else onFiltroPago(id as ViajePagoTransportistaFiltro);
   }
 
