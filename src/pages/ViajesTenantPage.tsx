@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import {
   ClienteSearchSelect,
+  ChoferSearchSelect,
   TransportistaSearchSelect,
 } from "@/components/forms/MaestroSearchSelects";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -31,21 +32,15 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   mergeMaestroPorId,
   nombreClienteListadoViaje,
+  nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
   textoMontoFacturarListado,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
-import {
-  ViajeGananciaBrutaCelda,
-  ViajeGananciaBrutaColumnHeader,
-} from "@/components/viajes/ViajeGananciaBruta";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
-import {
-  gananciaBrutaManualEnPatchParcial,
-  gananciaBrutaMetaDesdeViaje,
-} from "@/lib/viajesGananciaBruta";
+import { gananciaBrutaManualEnPatchParcial } from "@/lib/viajesGananciaBruta";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
@@ -220,6 +215,7 @@ export function ViajesTenantPage({
   const filtrosAplicadosRef = useRef({
     clienteId: "",
     transportistaId: "",
+    choferId: "",
     estado: initialEstadoFromUrl,
     pagoTransportista:
       initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro,
@@ -237,6 +233,7 @@ export function ViajesTenantPage({
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
+  const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
     useState<ViajePagoTransportistaFiltro>(initialPagoTransportistaFromUrl);
@@ -479,6 +476,7 @@ export function ViajesTenantPage({
         const {
           clienteId: cid,
           transportistaId: transpFiltro,
+          choferId: choferFiltro,
           estado: estF,
           pagoTransportista: pagoTranspF,
           tipoFecha: tf,
@@ -492,6 +490,7 @@ export function ViajesTenantPage({
         // Asignación manual de parámetros para armar la URL del request
         if (cid) filtros.set("clienteId", cid);
         if (transpFiltro) filtros.set("transportistaId", transpFiltro);
+        if (choferFiltro) filtros.set("choferId", choferFiltro);
         if (estF.trim()) filtros.set("etapa", estF.trim());
         if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
           filtros.set("pagoTransportista", pagoTranspF);
@@ -638,6 +637,18 @@ export function ViajesTenantPage({
     };
     setListadoRefetching(true);
     setTransportistaIdFiltroActivo(tid);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaChofer(choferId: string) {
+    const chid = choferId.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      choferId: chid,
+    };
+    setListadoRefetching(true);
+    setChoferIdFiltroActivo(chid);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -829,6 +840,7 @@ export function ViajesTenantPage({
     filtrosAplicadosRef.current = {
       clienteId: "",
       transportistaId: "",
+      choferId: "",
       estado: "",
       pagoTransportista: "",
       tipoFecha: "",
@@ -841,6 +853,7 @@ export function ViajesTenantPage({
     setListadoRefetching(true);
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
+    setChoferIdFiltroActivo("");
     setEstadoFiltro("");
     setPagoTransportistaFiltro("");
     setTipoFechaFiltro("");
@@ -857,6 +870,7 @@ export function ViajesTenantPage({
   const hayFiltrosColumnasActivos =
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
+    !!choferIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
     !!pagoTransportistaFiltro.trim() ||
     !!fechaDesdeFiltro.trim() ||
@@ -869,6 +883,7 @@ export function ViajesTenantPage({
     let n = 0;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
+    if (choferIdFiltroActivo.trim()) n += 1;
     if (estadoFiltro.trim()) n += 1;
     if (pagoTransportistaFiltro.trim()) n += 1;
     if (ubicacionFiltro.trim()) n += 1;
@@ -878,6 +893,7 @@ export function ViajesTenantPage({
   }, [
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
+    choferIdFiltroActivo,
     estadoFiltro,
     pagoTransportistaFiltro,
     ubicacionFiltro,
@@ -1157,7 +1173,7 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
-  /** Cliente + transp. externo + estado + recorrido + fechas + monto + ganancia bruta [+ acciones]. */
+  /** Cliente + transp. externo + chofer + estado + recorrido + fechas + monto [+ acciones]. */
   const tableColSpanBase = 8;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
@@ -1229,6 +1245,24 @@ export function ViajesTenantPage({
           aria-label="Filtrar listado por transporte"
           inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
             transportistaIdFiltroActivo.trim()
+              ? "text-vialto-fire"
+              : "text-vialto-charcoal"
+          }`}
+        />
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Chofer" active={!!choferIdFiltroActivo.trim()}>
+        <ChoferSearchSelect
+          id="viajes-filtro-chofer"
+          choferes={choferes}
+          value={choferIdFiltroActivo}
+          onChange={(id) => aplicarFiltroColumnaChofer(id)}
+          allowEmptyValue
+          emptyListChoiceLabel="Todos"
+          placeholderCerrado="Todos"
+          disabled={listadoRefetching}
+          aria-label="Filtrar listado por chofer"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            choferIdFiltroActivo.trim()
               ? "text-vialto-fire"
               : "text-vialto-charcoal"
           }`}
@@ -1557,6 +1591,30 @@ export function ViajesTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                title="Chofer"
+                filterActive={!!choferIdFiltroActivo.trim()}
+                filterSignature={choferIdFiltroActivo}
+              >
+                <ChoferSearchSelect
+                  id="viajes-col-filtro-chofer"
+                  choferes={choferes}
+                  value={choferIdFiltroActivo}
+                  onChange={(id) => aplicarFiltroColumnaChofer(id)}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  disabled={listadoRefetching}
+                  aria-label="Filtrar listado por chofer"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    choferIdFiltroActivo.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
                 title="Etapa"
                 filterActive={!!estadoFiltro.trim()}
                 filterSignature={estadoFiltro}
@@ -1713,7 +1771,6 @@ export function ViajesTenantPage({
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Monto a facturar
             </th>
-            <ViajeGananciaBrutaColumnHeader />
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
@@ -1729,6 +1786,7 @@ export function ViajesTenantPage({
             v,
             transportistas,
           );
+          const nombreChofer = nombreChoferListadoViaje(v, choferes);
           return (
             <tr key={v.id} className={listadoTablaBodyRowClass}>
               {mostrarColumnaFacturarLote && (
@@ -1764,6 +1822,11 @@ export function ViajesTenantPage({
                     Ejecuta: {nombreTranspEfectivo}
                   </span>
                 )}
+              </td>
+              <td className="px-4 py-3 max-w-[10rem] text-vialto-steel">
+                <span className="block truncate" title={nombreChofer}>
+                  {nombreChofer}
+                </span>
               </td>
               <td className="px-4 py-3">
                 <div className="flex flex-col gap-0.5 items-start">
@@ -1839,7 +1902,6 @@ export function ViajesTenantPage({
               <td className="px-4 py-3 text-right tabular-nums">
                 {textoMontoFacturarListado(v)}
               </td>
-              <ViajeGananciaBrutaCelda viaje={v} />
               <td className="px-4 py-3 text-right">
                 <ViajeAccionesMenu
                   viaje={v}
@@ -1883,7 +1945,7 @@ export function ViajesTenantPage({
             v,
             transportistas,
           );
-          const metaGanancia = gananciaBrutaMetaDesdeViaje(v);
+          const nombreChofer = nombreChoferListadoViaje(v, choferes);
           const transporteValue = (
             <>
               <span className="block truncate" title={nombreTransp}>
@@ -1943,27 +2005,6 @@ export function ViajesTenantPage({
               <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
             </div>
           );
-          const gananciaValue = (
-            <>
-              {metaGanancia.lineasBalance &&
-              metaGanancia.lineasBalance.length > 1 ? (
-                <span className="flex flex-col items-start gap-0.5 leading-tight">
-                  {metaGanancia.lineasBalance.map((l) => (
-                    <span key={l.moneda} className="tabular-nums">
-                      {l.formatted}
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                metaGanancia.display
-              )}
-              {metaGanancia.reason && (
-                <span className="block text-[10px] text-vialto-steel/70 tabular-nums">
-                  {metaGanancia.reason}
-                </span>
-              )}
-            </>
-          );
           return (
             <ListadoCard
               primary={
@@ -1987,6 +2028,7 @@ export function ViajesTenantPage({
               }
               fields={[
                 { label: "Transporte", value: transporteValue },
+                { label: "Chofer", value: nombreChofer },
                 { label: "Etapa", value: estadoValue },
                 {
                   label: "Origen — Destino",
@@ -2026,7 +2068,6 @@ export function ViajesTenantPage({
                   ),
                 },
                 { label: "Monto", value: textoMontoFacturarListado(v) },
-                { label: "Ganancia bruta", value: gananciaValue },
               ]}
               actions={
                 <ViajeAccionesMenu

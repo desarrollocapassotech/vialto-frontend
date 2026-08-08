@@ -19,6 +19,7 @@ import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajeGananciaBrutaDetalle } from "@/components/viajes/ViajeGananciaBruta";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -253,6 +254,7 @@ export function ViajeViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
+            <ViajeGananciaBrutaDetalle viaje={viaje} />
           </div>
           {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
             <div>

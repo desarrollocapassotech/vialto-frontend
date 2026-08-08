@@ -387,6 +387,20 @@ export function nombreClienteListadoViaje(
   return "—";
 }
 
+/**
+ * Nombre del chofer en tablas de viajes: relación del API o búsqueda por `choferId` en el maestro cargado.
+ */
+export function nombreChoferListadoViaje(v: Viaje, choferes?: Chofer[]): string {
+  const desdeApi = v.chofer?.nombre?.trim();
+  if (desdeApi) return desdeApi;
+  const chid = v.choferId?.trim();
+  if (chid && choferes?.length) {
+    const c = choferes.find((x) => x.id === chid);
+    if (c?.nombre?.trim()) return c.nombre.trim();
+  }
+  return "—";
+}
+
 const FLOTA_PROPIA_LISTADO = "Flota propia";
 
 /**
