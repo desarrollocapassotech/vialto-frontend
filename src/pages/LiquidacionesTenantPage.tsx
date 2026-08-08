@@ -1,5 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Ban,
   Download,
@@ -345,6 +346,44 @@ export function LiquidacionesTenantPage() {
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
+
+  /** Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje). */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !activeTenantId) return;
+    const id = searchParams.get("liquidacion")?.trim();
+    if (!id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const full = await apiJson<LiquidacionConTransportista>(
+          `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(activeTenantId)}`,
+          () => getToken(),
+        );
+        if (cancelled) return;
+        setDetail({
+          mode: "view",
+          liq: { ...full, conceptosLineas: full.conceptosLineas ?? [] },
+        });
+      } catch {
+        // Si no se pudo resolver (id inválido, sin permisos), no bloqueamos la pantalla.
+      } finally {
+        if (!cancelled) {
+          setSearchParams(
+            (p) => {
+              const next = new URLSearchParams(p);
+              next.delete("liquidacion");
+              return next;
+            },
+            { replace: true },
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, activeTenantId, searchParams, setSearchParams, getToken]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(

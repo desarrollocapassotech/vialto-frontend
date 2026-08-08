@@ -46,12 +46,11 @@ import {
 } from "@/lib/currencyMask";
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
-  estadoMuestraKmLitros,
-  estadoViajeLabel,
-  estadosDisponiblesParaViaje,
-  tooltipEstadoViaje,
-  viajeEstadoEsFacturadoOCobrado,
-} from "@/lib/viajesEstados";
+  etapaMuestraKmLitros,
+  etapaViajeLabel,
+  VIAJE_ETAPAS_TODAS,
+  tooltipEtapaViaje,
+} from "@/lib/viajesIndicadores";
 import { viajePermiteBotonFacturar } from "@/lib/viajesComprobantes";
 import { numeroFacturaVisibleViaje } from "@/lib/viajesFlota";
 import {
@@ -120,7 +119,6 @@ export type ViajeEditModalProps = {
   vehiculos: Vehiculo[];
   choferesPropios: Chofer[];
   vehiculosPropios: Vehiculo[];
-  viajesConFactura: Set<string>;
   onModoChange: (m: ViajeOperacionModo) => void;
   ayudaFlota: { chofer?: string; vehiculo?: string };
   viajeEditHint: string | null;
@@ -174,7 +172,6 @@ export function ViajeEditModal({
   vehiculos,
   choferesPropios,
   vehiculosPropios,
-  viajesConFactura,
   onModoChange,
   ayudaFlota,
   viajeEditHint,
@@ -264,7 +261,7 @@ export function ViajeEditModal({
     typeof onFacturar === "function" &&
     viajePermiteBotonFacturar({
       ...snapshotViaje,
-      estado: draft.estado,
+      etapa: draft.estado,
       transportistaId:
         draft.operacionModo === "externo"
           ? draft.transportistaId
@@ -351,7 +348,7 @@ export function ViajeEditModal({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Estado</span>
+                <span className={labelClass}>Etapa</span>
                 <select
                   value={draft.estado}
                   onChange={(e) =>
@@ -361,16 +358,14 @@ export function ViajeEditModal({
                   }
                   className={`${inputClass} max-w-md`}
                 >
-                  {estadosDisponiblesParaViaje(
-                    snapshotViaje,
-                    viajesConFactura,
-                  ).map((x) => (
-                    <option key={x} value={x} title={tooltipEstadoViaje(x)}>
-                      {estadoViajeLabel[x] ?? x}
+                  {VIAJE_ETAPAS_TODAS.map((x) => (
+                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                      {etapaViajeLabel[x] ?? x}
                     </option>
                   ))}
                 </select>
-                {viajeEstadoEsFacturadoOCobrado(draft.estado) && (
+                {(snapshotViaje.facturacionEstado === "facturado" ||
+                  snapshotViaje.facturacionEstado === "cobrado") && (
                   <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
                     Factura: {numeroFacturaVisibleViaje(snapshotViaje) || "—"}
                   </span>
@@ -760,7 +755,7 @@ export function ViajeEditModal({
                 errorFechaDescarga={fechaDescargaError}
               />
 
-              {estadoMuestraKmLitros(draft.estado) && (
+              {etapaMuestraKmLitros(draft.estado) && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                   {isVisible("edicion_viaje", "kmRecorridos") && (
                     <div className="flex flex-col gap-1">

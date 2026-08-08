@@ -126,9 +126,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     ? mensajesAyudaFlotaPropia(edicionMaestro.choferes, edicionMaestro.vehiculos)
     : mensajesAyudaFlotaPropia(choferes, vehiculos);
   const opcionesProducto = mergeOpcionesProducto(productosCatalogo, viajeSnapshot);
-  const viajesConFactura = new Set<string>(
-    viajeSnapshot?.facturaId ? [viajeSnapshot.id] : [],
-  );
 
   // Cuando cambiamos a modo "propio" con un chofer que ya no está en la lista de flota propia, lo limpiamos.
   useEffect(() => {
@@ -203,7 +200,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
 
     setDraft({
       numero: v.numero ?? "",
-      estado: v.estado ?? "pendiente",
+      estado: v.etapa ?? "pendiente",
       operacionModo: esExterno ? "externo" : esPropio ? "propio" : null,
       choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
       choferExternoId: esExterno
@@ -523,7 +520,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
           method: "PATCH",
           body: JSON.stringify({
             numero: draft.numero.trim(),
-            estado: draft.estado,
+            etapa: draft.estado,
             clienteId: draft.clienteId || undefined,
             ...(externo
               ? {
@@ -631,7 +628,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     vehiculosPropios,
     ayudaFlota,
     opcionesProducto,
-    viajesConFactura,
     beginEditViaje,
     cancelEdit,
     saveInline,

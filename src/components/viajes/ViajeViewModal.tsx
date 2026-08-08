@@ -16,7 +16,9 @@ import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { tooltipPanelClass } from "@/lib/tooltip";
+import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } from "@/lib/viajesIndicadores";
+import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
+import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -32,13 +34,6 @@ function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
   const prefix = moneda === "USD" ? "USD " : "$ ";
   return `${prefix}${monto.toLocaleString("es-AR")}`;
 }
-
-const ESTADO_LABEL: Record<string, string> = {
-  borrador: "Borrador",
-  en_curso: "En curso",
-  finalizado: "Finalizado",
-  cancelado: "Cancelado",
-};
 
 export function ViajeViewModal({
   viaje,
@@ -150,28 +145,17 @@ export function ViajeViewModal({
       isVisible("detalle_viaje", c.key),
   );
 
-  const bloqueadoPorFactura = Boolean(viaje.factura);
-  const bloqueadoPorLiquidacion =
-    viaje.liquidacionesViaje?.some(
-      (lv) => lv.liquidacion.estado !== "anulado"
-    ) ?? false;
-  const bloqueadoPorComprobante = bloqueadoPorFactura || bloqueadoPorLiquidacion;
-  const razonNoEditable =
-    bloqueadoPorFactura && bloqueadoPorLiquidacion
-      ? "No se puede editar: el viaje ya tiene una factura emitida y una liquidación activa."
-      : bloqueadoPorFactura
-        ? "No se puede editar: el viaje ya tiene una factura emitida."
-        : bloqueadoPorLiquidacion
-          ? "No se puede editar: el viaje está incluido en una liquidación activa."
-          : null;
-
   return (
     <ViewModalShell
       title={
         <span className="inline-flex items-center gap-3">
           <span>Viaje #{viaje.numero}</span>
           <span className="text-xs uppercase tracking-[0.1em] border rounded px-2 py-0.5 text-vialto-steel border-black/15">
-            {ESTADO_LABEL[viaje.estado] ?? viaje.estado}
+            {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
+            <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
           </span>
         </span>
       }
@@ -232,8 +216,8 @@ export function ViajeViewModal({
             <button
               type="button"
               onClick={onEditar}
-              disabled={bloqueado || bloqueadoPorComprobante}
-              className={`${viewModalBtnPrimary}${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : bloqueado ? " cursor-wait" : ""}`}
+              disabled={bloqueado}
+              className={`${viewModalBtnPrimary}${bloqueado ? " cursor-wait" : ""}`}
             >
               {editando ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -244,11 +228,6 @@ export function ViajeViewModal({
                 "Editar"
               )}
             </button>
-            {razonNoEditable && (
-              <div className={tooltipPanelClass} role="tooltip">
-                {razonNoEditable}
-              </div>
-            )}
           </span>
         </>
       }
@@ -256,6 +235,16 @@ export function ViajeViewModal({
       <div className="flex flex-col divide-y divide-black/5">
         <div className="flex flex-col gap-4 pb-5">
           <div className={viewModalGridClass}>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Facturación</p>
+              <p className="mt-1 text-sm">{tooltipFacturacionEstado(viaje)}</p>
+            </div>
+            {viaje.liquidacionEstado != null && (
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Liquidación</p>
+                <p className="mt-1 text-sm">{tooltipLiquidacionEstado(viaje)}</p>
+              </div>
+            )}
             {campos.map((c, i) => (
               <div key={i}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">

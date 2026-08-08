@@ -43,7 +43,7 @@ export type FinancieroDashboardResponse = {
     alertas: FinancieroMargenAlerta[];
   };
   viajesFunnel?: {
-    porEstado: Array<{ estado: string; cantidad: number }>;
+    porEtapa: Array<{ etapa: string; cantidad: number }>;
     liquidados: {
       cantidad: number;
       montoTotal: FinancieroMoney;

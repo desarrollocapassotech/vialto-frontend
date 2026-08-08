@@ -76,13 +76,13 @@ import {
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import {
-  estadoViajeLabel,
-  tooltipEstadoViaje,
-  estadoMuestraKmLitros,
+  etapaViajeLabel,
+  tooltipEtapaViaje,
+  etapaMuestraKmLitros,
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
-  VIAJE_ESTADOS_ALTA,
-} from "@/lib/viajesEstados";
+  VIAJE_ETAPAS_ALTA,
+} from "@/lib/viajesIndicadores";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
 import type {
@@ -99,7 +99,7 @@ import {
   type ViajeProductoItem,
 } from "@/lib/productosViaje";
 
-const ESTADOS = VIAJE_ESTADOS_ALTA;
+const ESTADOS = VIAJE_ETAPAS_ALTA;
 
 const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
@@ -608,7 +608,7 @@ export function ViajeCreatePage() {
     // 7. Chequeo para mostrar Modal de Km/Litros si corresponde al estado
     if (
       !opts?.kmLitrosFromModal &&
-      estadoMuestraKmLitros(estado) &&
+      etapaMuestraKmLitros(estado) &&
       draftKmLitrosVacios(kmRecorridos, litrosConsumidos)
     ) {
       setModalKm(kmRecorridos);
@@ -639,7 +639,7 @@ export function ViajeCreatePage() {
       await apiJson(path, () => getToken(), {
         method: "POST",
         body: JSON.stringify({
-          estado,
+          etapa: estado,
           clienteId,
           ...(externo
             ? {
@@ -755,8 +755,8 @@ export function ViajeCreatePage() {
                 className={inputClass}
               >
                 {ESTADOS.map((x) => (
-                  <option key={x} value={x} title={tooltipEstadoViaje(x)}>
-                    {estadoViajeLabel[x] ?? x}
+                  <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                    {etapaViajeLabel[x] ?? x}
                   </option>
                 ))}
               </select>
@@ -1108,7 +1108,7 @@ export function ViajeCreatePage() {
               errorFechaCarga={fechaCargaError}
               errorFechaDescarga={fechaDescargaError}
             />
-            {estadoMuestraKmLitros(estado) && (
+            {etapaMuestraKmLitros(estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               {isVisible("alta_viaje", "kmRecorridos") && (
                 <div className="flex flex-col gap-1">

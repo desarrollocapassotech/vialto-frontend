@@ -2,7 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import type { Viaje, Chofer } from "@/types/api";
-import { viajePermiteGenerarMicCrt } from "@/lib/viajesEstados";
+import { viajePermiteGenerarMicCrt } from "@/lib/viajesIndicadores";
 import { viajeUsaFlotaPropia } from "@/lib/viajesGananciaBruta";
 import { apiFetch, apiJson } from "@/lib/api";
 import { MicCrtExportModal } from "@/components/viajes/MicCrtExportModal";
@@ -93,7 +93,7 @@ export function ExportarViajeModal({
   // Nuevo estado para la vista de selección de transportista de Nómina
   const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
-  const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
+  const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.etapa);
   const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando || micCrtValidando;
 

@@ -1,4 +1,5 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
+import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
 
 import type {
   Chofer,
@@ -264,16 +265,14 @@ export function numeroFacturaVisibleViaje(
   return (v.factura?.numero ?? "").trim();
 }
 
-/** El viaje ya está vinculado a una factura (relación o número en fila). */
-export function viajeTieneFacturaAsignada(v: {
-  nroFactura?: string | null;
-  facturaId?: string | null;
-  factura?: { id?: string } | null;
-}): boolean {
-  if (v.nroFactura != null && String(v.nroFactura).trim() !== "") return true;
-  if (v.facturaId != null && String(v.facturaId).trim() !== "") return true;
-  if (v.factura?.id != null && String(v.factura.id).trim() !== "") return true;
-  return false;
+/**
+ * El viaje está actualmente facturado (no disponible para vincular a una factura nueva).
+ * Una factura anulada NO cuenta — el viaje vuelve a estar disponible para re-facturar
+ * (fix del bug histórico: antes se miraba solo la presencia de `facturaId`, sin
+ * importar si esa factura seguía vigente).
+ */
+export function viajeTieneFacturaAsignada(v: Pick<Viaje, "facturacionEstado">): boolean {
+  return !facturacionPermiteVincular(v.facturacionEstado);
 }
 
 export type ViajesFiltradosParaFacturaOpciones = {
@@ -331,8 +330,8 @@ export function viajesFiltradosParaFactura(
     );
 
     if (viajeTieneFacturaAsignada(v) && !enEstaFactura) return false;
-    if (v.estado === "cobrado" && !enEstaFactura) return false;
-    if (v.estado === "cancelado" && !enEstaFactura) return false;
+    if (v.facturacionEstado === "cobrado" && !enEstaFactura) return false;
+    if (v.etapa === "cancelado" && !enEstaFactura) return false;
     return true;
   });
 

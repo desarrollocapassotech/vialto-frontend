@@ -24,7 +24,14 @@ export interface Viaje {
   id: string;
   tenantId: string;
   numero: string;
+  /** @deprecated Reemplazado por `etapa` + `facturacionEstado` + `liquidacionEstado`. */
   estado: string;
+  /** Etapa operativa del viaje: pendiente | en_curso | finalizado | cancelado. */
+  etapa: string;
+  /** Estado de facturación al cliente (derivado, no editable a mano). */
+  facturacionEstado: string;
+  /** Estado de liquidación al transportista (derivado); null si no aplica (sin transportista externo o tenant sin integración ARCA). */
+  liquidacionEstado: string | null;
   clienteId: string;
   /** Presente en listados/detalle cuando el backend incluye la relación. */
   cliente?: { id: string; nombre: string; condicionIva?: number | null };
@@ -93,11 +100,38 @@ export interface Viaje {
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
-  factura?: { id: string; numero: string; estado: string } | null;
+  factura?: {
+    id: string;
+    numero: string;
+    importe?: number;
+    moneda?: string;
+    estado: string;
+    arcaEstado?: string | null;
+    arcaError?: string | null;
+    cae?: string | null;
+    caeFechaVto?: string | null;
+    cbteNro?: number | null;
+    ptoVenta?: number | null;
+    fechaEmision?: string;
+  } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
     monto?: number;
-    liquidacion: { id: string; estado: string; liquido: number };
+    liquidacion: {
+      id: string;
+      estado: string;
+      liquido: number;
+      arcaError?: string | null;
+      cae?: string | null;
+      caeFechaVto?: string | null;
+      cbteNro?: number | null;
+      ptoVenta?: number | null;
+      ambiente?: string | null;
+      periodoDesde?: string;
+      periodoHasta?: string;
+      motivoAnulacion?: string | null;
+      anuladoAt?: string | null;
+    };
   }[];
   createdAt: string;
   createdBy: string;

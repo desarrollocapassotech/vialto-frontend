@@ -56,6 +56,7 @@ type ViajeItem = Pick<
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "liquidacionesViaje"
+  | "liquidacionEstado"
   | "otrosGastos"
 >;
 
