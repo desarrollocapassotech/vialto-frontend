@@ -9,7 +9,7 @@ import { ViajeFacturacionDetalleModal } from '@/components/viajes/ViajeFacturaci
 import type { Viaje } from '@/types/api';
 
 type Props = {
-  viaje: Pick<Viaje, 'facturacionEstado' | 'factura'>;
+  viaje: Pick<Viaje, 'facturacionEstado' | 'factura' | 'cliente' | 'clienteId'>;
   /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
   tenantId?: string;
 };
