@@ -65,6 +65,7 @@ import {
 } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
   contarViajesPagoTransportistaDesdeApi,
   esFiltroPagoTransportistaValido,
@@ -1873,7 +1874,11 @@ export function ViajesTenantPage({
                     </button>
                   )}
                   <ViajeFacturacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
-                  <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
+                  {hasLiquidacionesArca ? (
+                    <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
+                  ) : (
+                    <ViajePagoTransportistaIndicador viaje={v} onClick={() => setRegistrarPagoViaje(v)} />
+                  )}
                 </div>
               </td>
               <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
@@ -2006,7 +2011,11 @@ export function ViajesTenantPage({
                 </button>
               )}
               <ViajeFacturacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
-              <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
+              {hasLiquidacionesArca ? (
+                    <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
+                  ) : (
+                    <ViajePagoTransportistaIndicador viaje={v} onClick={() => setRegistrarPagoViaje(v)} />
+                  )}
             </div>
           );
           return (
@@ -2130,6 +2139,7 @@ export function ViajesTenantPage({
         <ViajeViewModal
           viaje={viewingViaje}
           tenantId={platform ? tid : undefined}
+          hasArca={hasLiquidacionesArca}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {
@@ -2144,6 +2154,15 @@ export function ViajesTenantPage({
               }
             })();
           }}
+          onRegistrarPago={
+            !hasLiquidacionesArca && viewingViaje.transportistaId
+              ? () => {
+                  const v = viewingViaje;
+                  setViewingViaje(null);
+                  setRegistrarPagoViaje(v);
+                }
+              : undefined
+          }
         />
       )}
 

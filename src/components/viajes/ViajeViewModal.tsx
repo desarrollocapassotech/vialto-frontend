@@ -20,6 +20,7 @@ import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } f
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajeGananciaBrutaDetalle } from "@/components/viajes/ViajeGananciaBruta";
+import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -41,27 +42,37 @@ export function ViajeViewModal({
   onClose,
   onEditar,
   tenantId,
+  hasArca = false,
   editando = false,
   onFacturar,
   facturando = false,
   onLiquidar,
   liquidando = false,
+  onRegistrarPago,
 }: {
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
+  /** Tenant con módulo integracion-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
+  hasArca?: boolean;
   /** El editor se está preparando (fetch de listas maestras, etc.): bloquea el modal hasta que esté listo. */
   editando?: boolean;
   /** Si se pasa, muestra un botón "Facturar" junto a "Editar" (hoy solo desde el dashboard). */
   onFacturar?: () => void;
   /** El creador de factura se está preparando: bloquea el modal hasta que esté listo. */
   facturando?: boolean;
-  /** Si se pasa, muestra un botón "Liquidar" (registrar pago al transportista, hoy solo desde el dashboard). */
+  /** Si se pasa, muestra un botón "Liquidar" (abre la liquidación electrónica CVLP vía ARCA — hoy solo desde el dashboard). */
   onLiquidar?: () => void;
   /** El registro de pago se está preparando: bloquea el modal hasta que esté listo. */
   liquidando?: boolean;
+  /**
+   * Si se pasa, el badge de pago al transportista (tenants sin ARCA) se vuelve
+   * clickeable y abre "Registrar pago". Distinto de `onLiquidar`, que es la
+   * liquidación electrónica vía ARCA.
+   */
+  onRegistrarPago?: () => void;
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
@@ -156,7 +167,11 @@ export function ViajeViewModal({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
-            <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
+            {hasArca ? (
+              <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
+            ) : (
+              <ViajePagoTransportistaIndicador viaje={viaje} onClick={onRegistrarPago} />
+            )}
           </span>
         </span>
       }
@@ -254,7 +269,7 @@ export function ViajeViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
-            <ViajeGananciaBrutaDetalle viaje={viaje} />
+            <ViajeGananciaBrutaDetalle viaje={viaje} onPagoClick={onRegistrarPago} />
           </div>
           {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
             <div>

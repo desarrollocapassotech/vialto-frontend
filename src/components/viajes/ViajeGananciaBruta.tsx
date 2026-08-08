@@ -15,12 +15,13 @@ export function ViajeGananciaBrutaColumnHeader() {
   return <th className={`px-4 py-3 text-right ${listadoColHideUntilLg}`}>Ganancia bruta</th>;
 }
 
-type Props = { viaje: Viaje; extra?: ReactNode };
+type Props = { viaje: Viaje; extra?: ReactNode; onPagoClick?: () => void };
 
 /** Celda de ganancia bruta con tooltip al hover (sin subrayado). */
-export function ViajeGananciaBrutaCelda({ viaje, extra }: Props) {
+export function ViajeGananciaBrutaCelda({ viaje, extra, onPagoClick }: Props) {
   const meta = gananciaBrutaMetaDesdeViaje(viaje);
-  const indicadorPago = extra ?? <ViajePagoTransportistaIndicador viaje={viaje} />;
+  const indicadorPago =
+    extra ?? <ViajePagoTransportistaIndicador viaje={viaje} onClick={onPagoClick} />;
   return (
     <td className={`px-4 py-3 text-right tabular-nums ${listadoColHideUntilLg}`}>
       <div className="group relative flex flex-col items-end gap-0.5">
@@ -56,7 +57,13 @@ export function ViajeGananciaBrutaCelda({ viaje, extra }: Props) {
 }
 
 /** Bloque de detalle (modal "Ver"): monto + desglose en filas, sin depender del hover. */
-export function ViajeGananciaBrutaDetalle({ viaje }: { viaje: Viaje }) {
+export function ViajeGananciaBrutaDetalle({
+  viaje,
+  onPagoClick,
+}: {
+  viaje: Viaje;
+  onPagoClick?: () => void;
+}) {
   const meta = gananciaBrutaMetaDesdeViaje(viaje);
   const filas = gananciaBrutaDesgloseDetalle(viaje);
   return (
@@ -95,7 +102,7 @@ export function ViajeGananciaBrutaDetalle({ viaje }: { viaje: Viaje }) {
       )}
 
       <div className="mt-2">
-        <ViajePagoTransportistaIndicador viaje={viaje} />
+        <ViajePagoTransportistaIndicador viaje={viaje} onClick={onPagoClick} />
       </div>
     </div>
   );

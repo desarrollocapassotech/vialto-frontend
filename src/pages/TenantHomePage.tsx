@@ -213,6 +213,7 @@ export function TenantHomePage() {
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
+          hasArca={hasArca}
           editando={abriendoEditorViaje}
           facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
