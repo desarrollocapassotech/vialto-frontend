@@ -166,6 +166,12 @@ export function FacturacionTenantPage({
     return `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`;
   }, [platform, tid]);
 
+  function marcarCobradaUrl(id: string) {
+    return platform
+      ? `/api/platform/facturas/${encodeURIComponent(id)}/marcar-cobrada?tenantId=${encodeURIComponent(tid)}`
+      : `/api/facturacion/facturas/${encodeURIComponent(id)}/marcar-cobrada`;
+  }
+
   function facturaUrl(id: string) {
     if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
     return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
@@ -197,6 +203,11 @@ export function FacturacionTenantPage({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
+    useState<Factura | null>(null);
+  const [marcandoCobradaId, setMarcandoCobradaId] = useState<string | null>(
+    null,
+  );
+  const [marcarCobradaConfirm, setMarcarCobradaConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
@@ -728,6 +739,50 @@ export function FacturacionTenantPage({
     }
   }
 
+  function abrirMarcarCobrada(f: Factura) {
+    if (f.estado === "cobrada") {
+      showToast("Esta factura ya está cobrada.", "success");
+      return;
+    }
+    setMarcarCobradaConfirm(f);
+  }
+
+  async function confirmMarcarCobrada() {
+    const f = marcarCobradaConfirm;
+    if (!f || marcandoCobradaId) return;
+    setMarcandoCobradaId(f.id);
+    try {
+      const res = await apiJson<{ yaCobrada: boolean; factura: Factura }>(
+        marcarCobradaUrl(f.id),
+        () => getToken(),
+        { method: "POST" },
+      );
+      setMarcarCobradaConfirm(null);
+      if (res.yaCobrada) {
+        showToast("Esta factura ya está cobrada.", "success");
+        return;
+      }
+      const cantViajes = res.factura.viajeIds?.length ?? 0;
+      showToast(
+        cantViajes > 0
+          ? `Factura marcada como cobrada. ${cantViajes} viaje${cantViajes === 1 ? "" : "s"} vinculado${cantViajes === 1 ? "" : "s"} actualizado${cantViajes === 1 ? "" : "s"} a "Cobrado".`
+          : "Factura marcada como cobrada.",
+        "success",
+      );
+      if (platform) {
+        setFacturas((prev) =>
+          prev?.map((r) => (r.id === f.id ? res.factura : r)) ?? prev,
+        );
+      } else {
+        await refetchFacturas();
+      }
+    } catch (e) {
+      showToast(friendlyError(e, "facturacion"), "error");
+    } finally {
+      setMarcandoCobradaId(null);
+    }
+  }
+
   function nombreCliente(id: string | null | undefined) {
     if (!id) return "—";
     return clientes.find((c) => c.id === id)?.nombre ?? id;
@@ -1226,6 +1281,7 @@ export function FacturacionTenantPage({
                 hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onMarcarCobrada={() => abrirMarcarCobrada(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1274,6 +1330,7 @@ export function FacturacionTenantPage({
                 hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onMarcarCobrada={() => abrirMarcarCobrada(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1350,6 +1407,7 @@ export function FacturacionTenantPage({
               ? () => verNotaCredito(viewingFactura)
               : undefined
           }
+          onMarcarCobrada={() => abrirMarcarCobrada(viewingFactura)}
         />
       )}
 
@@ -1415,6 +1473,26 @@ export function FacturacionTenantPage({
           if (!deletingId) setFacturaDeleteConfirm(null);
         }}
         onConfirm={() => void confirmDeleteFactura()}
+      />
+
+      <ConfirmDialog
+        open={marcarCobradaConfirm != null}
+        title="Marcar como cobrada"
+        message={
+          marcarCobradaConfirm
+            ? `¿Marcás la factura ${marcarCobradaConfirm.numero} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
+            : ""
+        }
+        confirmLabel="Marcar como cobrada"
+        busy={
+          !!marcandoCobradaId &&
+          marcarCobradaConfirm != null &&
+          marcandoCobradaId === marcarCobradaConfirm.id
+        }
+        onCancel={() => {
+          if (!marcandoCobradaId) setMarcarCobradaConfirm(null);
+        }}
+        onConfirm={() => void confirmMarcarCobrada()}
       />
 
       {previewComprobanteUrl && (

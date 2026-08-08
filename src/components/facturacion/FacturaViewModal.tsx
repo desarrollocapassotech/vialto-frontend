@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Ban, Receipt } from 'lucide-react';
+import { Ban, Banknote, Receipt } from 'lucide-react';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -79,6 +79,7 @@ export function FacturaViewModal({
   onEmitirArca,
   onAnular,
   onVerNotaCredito,
+  onMarcarCobrada,
 }: {
   factura: Factura;
   clienteNombre?: string;
@@ -90,6 +91,8 @@ export function FacturaViewModal({
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
+  /** Solo facturas a cliente. Se muestra siempre (aunque ya esté cobrada) — ver `onClick` del caller. */
+  onMarcarCobrada?: () => void;
 }) {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -212,6 +215,16 @@ export function FacturaViewModal({
             >
               <Ban className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               Anular
+            </button>
+          )}
+          {factura.tipo === 'cliente' && !anulada && onMarcarCobrada && (
+            <button
+              type="button"
+              onClick={onMarcarCobrada}
+              className="inline-flex items-center gap-2 h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              <Banknote className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+              Marcar como cobrada
             </button>
           )}
           {!anulada && (

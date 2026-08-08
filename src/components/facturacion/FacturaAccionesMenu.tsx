@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Ban, Eye, FileText, Receipt, Trash2 } from 'lucide-react';
+import { Ban, Banknote, Eye, FileText, Receipt, Trash2 } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -14,6 +14,8 @@ interface Props {
   onEmitirArca?: () => void;
   onAnular?: () => void;
   onVerNotaCredito?: () => void;
+  /** Solo facturas a cliente. Se muestra siempre (aunque ya esté cobrada) — ver `onClick` del caller. */
+  onMarcarCobrada?: () => void;
 }
 
 export function FacturaAccionesMenu({
@@ -26,6 +28,7 @@ export function FacturaAccionesMenu({
   onEmitirArca,
   onAnular,
   onVerNotaCredito,
+  onMarcarCobrada,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -71,6 +74,14 @@ export function FacturaAccionesMenu({
         danger: true,
       });
     }
+    if (onMarcarCobrada && factura.tipo === 'cliente' && !anulada) {
+      opts.push({
+        id: 'marcar-cobrada',
+        label: 'Marcar como cobrada',
+        icon: Banknote,
+        onClick: onMarcarCobrada,
+      });
+    }
     if (onVerComprobante && factura.comprobanteUrl?.trim()) {
       opts.push({
         id: 'comprobante',
@@ -109,6 +120,7 @@ export function FacturaAccionesMenu({
     onVer,
     onEmitirArca,
     onAnular,
+    onMarcarCobrada,
     onVerComprobante,
     onVerNotaCredito,
     onEliminar,
