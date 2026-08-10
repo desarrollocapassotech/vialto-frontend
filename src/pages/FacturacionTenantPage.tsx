@@ -6,12 +6,12 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/lib/toast";
 import {
   emptyFacturaDraft,
-  FacturaCreateModal,
   FacturaEditModal,
   facturaPayloadFromDraft,
   facturaToEditDraft,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
+import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import { FacturaAccionesMenu } from "@/components/facturacion/FacturaAccionesMenu";
 import { AnularFacturaModal } from "@/components/facturacion/AnularFacturaModal";
 import { EmitirFacturaModal } from "@/components/facturacion/EmitirFacturaModal";
@@ -1283,12 +1283,28 @@ export function FacturacionTenantPage({
         viajesLoading={viajesLoading}
         onClose={() => {
           setCreating(false);
+          setDraft(emptyFacturaDraft());
           setDraftError(null);
         }}
-        onSave={() => void handleCreate()}
-        saving={saving}
-        error={draftError}
+        onSave={hasArca ? undefined : () => void handleCreate()}
+        saving={hasArca ? false : saving}
+        error={hasArca ? null : draftError}
         showComprobanteAdjunto={showComprobanteAdjunto}
+        hasArca={hasArca}
+        tenantId={platform ? tid : undefined}
+        getToken={getToken}
+        facturasCreateUrl={facturasCreateUrl()}
+        onFacturaGuardada={() => {
+          void refetchFacturas();
+        }}
+        onFacturaEmitida={(f) => {
+          setFacturas((prev) =>
+            prev
+              ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row))
+              : prev,
+          );
+          void refetchFacturas();
+        }}
       />
 
       {viewingFactura && (

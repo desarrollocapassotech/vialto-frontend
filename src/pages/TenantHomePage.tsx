@@ -10,7 +10,7 @@ import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
 import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
-import { FacturaCreateModal } from "@/components/facturacion/FacturaEditModal";
+import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import { useMaestroData } from "@/hooks/useMaestroData";
@@ -323,10 +323,15 @@ export function TenantHomePage() {
         viajesNueva={facturaCreator.viajesNueva}
         viajesLoading={facturaCreator.viajesLoading}
         onClose={facturaCreator.cancelar}
-        onSave={() => void facturaCreator.handleCreate()}
-        saving={facturaCreator.saving}
-        error={facturaCreator.error}
+        onSave={
+          hasArca ? undefined : () => void facturaCreator.handleCreate()
+        }
+        saving={hasArca ? false : facturaCreator.saving}
+        error={hasArca ? null : facturaCreator.error}
         showComprobanteAdjunto={!hasArca}
+        hasArca={hasArca}
+        getToken={getToken}
+        facturasCreateUrl="/api/facturacion/facturas"
       />
 
       {viajeEditor.editingId &&

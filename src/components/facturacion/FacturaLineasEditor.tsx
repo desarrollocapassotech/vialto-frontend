@@ -61,6 +61,48 @@ export function toFacturaLineasPayload(lineas: FacturaLineaDraft[]) {
     }));
 }
 
+export function defaultFacturaLineasFromDraft(
+  draft: { viajeIds: string[]; ivaPct: string; numero: string },
+  viajes: Viaje[],
+): FacturaLineaDraft[] {
+  const ivaPct = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 21;
+  const linked = viajes.filter((v) => draft.viajeIds.includes(v.id));
+  if (linked.length > 0) {
+    const lineas = linked.map((v) => {
+      const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
+      const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
+      return {
+        descripcion: `Viaje #${v.numero}${ruta}`,
+        importe: monto,
+        ivaPct,
+      };
+    });
+    const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
+    if (netoLineas > 0) return lineas;
+    const importe = linked.reduce((s, v) => s + (v.monto ?? 0), 0);
+    if (importe > 0) {
+      return [
+        {
+          descripcion:
+            lineas.length === 1
+              ? lineas[0].descripcion
+              : `Factura ${draft.numero.trim() || '—'}`,
+          importe,
+          ivaPct,
+        },
+      ];
+    }
+    return lineas;
+  }
+  return [
+    {
+      descripcion: 'Servicios de transporte',
+      importe: 0,
+      ivaPct,
+    },
+  ];
+}
+
 export function defaultFacturaLineas(
   factura: Factura,
   viajes: Viaje[],
