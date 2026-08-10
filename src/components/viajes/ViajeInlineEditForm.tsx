@@ -22,7 +22,7 @@ import {
   normalizarIdEnLista,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
-import { estadoMuestraKmLitros } from '@/lib/viajesEstados';
+import { etapaMuestraKmLitros } from '@/lib/viajesIndicadores';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
 import type { OpcionProducto } from '@/lib/productosViaje';
@@ -261,7 +261,7 @@ export function ViajeInlineEditForm({
           />
 
           {/* Km / Litros (solo en estados finales) */}
-          {estadoMuestraKmLitros(draft.estado) && (
+          {etapaMuestraKmLitros(draft.estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               <div className="flex flex-col gap-1">
                 <span className={LABEL}>Km recorridos</span>
@@ -296,6 +296,19 @@ export function ViajeInlineEditForm({
               triggerClassName={INPUT}
               inputClassName={INPUT}
               disabled={saving}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={LABEL}>ID propio</span>
+            <input
+              type="text"
+              value={draft.numeroIdentificacionPersonalizado}
+              onChange={(e) =>
+                set({ numeroIdentificacionPersonalizado: e.target.value })
+              }
+              placeholder="Ej: número de CTG"
+              className={INPUT}
             />
           </div>
 

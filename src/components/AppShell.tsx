@@ -20,6 +20,8 @@ import {
   Menu,
   PackageMinus,
   PackagePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   SlidersHorizontal,
   Truck,
@@ -63,8 +65,12 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const sidebarAsideClass =
-  "w-64 shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 px-4 gap-6 h-[100dvh] overflow-y-auto";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "vialto:sidebarCollapsed";
+
+const sidebarBaseClass =
+  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-200 ease-in-out";
+const sidebarExpandedWidthClass = "w-fit min-w-[12rem] max-w-[92vw] px-4";
+const sidebarCollapsedWidthClass = "w-[4.5rem] px-2";
 
 export function AppShell() {
   const { organization } = useOrganization();
@@ -74,6 +80,9 @@ export function AppShell() {
   const { tenant, tenantLoading } = useMaestroData();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1",
+  );
   useEnsureTenantOrganization();
 
   const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
@@ -87,6 +96,13 @@ export function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      SIDEBAR_COLLAPSED_STORAGE_KEY,
+      sidebarCollapsed ? "1" : "0",
+    );
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
     if (!sidebarOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -96,7 +112,10 @@ export function AppShell() {
   }, [sidebarOpen]);
 
   const navLoading = !userLoaded || tenantLoading;
-  const roleCtx = { orgRole, publicMetadata: user?.publicMetadata };
+  const roleCtx = useMemo(
+    () => ({ orgRole, publicMetadata: user?.publicMetadata }),
+    [orgRole, user?.publicMetadata],
+  );
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -274,7 +293,7 @@ export function AppShell() {
     });
 
     return groups;
-  }, [superadmin, tenant?.modules, orgRole, user?.publicMetadata]);
+  }, [superadmin, tenant?.modules, roleCtx]);
 
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === "string"
@@ -337,18 +356,31 @@ export function AppShell() {
         }
     : null;
 
-  function renderSidebar(showCloseButton: boolean) {
+  function renderSidebar(showCloseButton: boolean, collapsed: boolean) {
+    const headerWrapperClass = collapsed
+      ? "px-1 flex flex-col items-center gap-2"
+      : "px-1 flex items-start justify-between gap-2";
+
     return (
       <>
-        <div
-          className={`px-1 ${showCloseButton ? "flex items-start justify-between gap-2" : ""}`}
-        >
-          <div className="min-w-0">
-            <Logo heightClass="h-14 max-w-[11rem]" />
-            <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
-              TRANSPORTE Y LOGISTICA
-            </p>
-          </div>
+        <div className={headerWrapperClass}>
+          {collapsed ? (
+            <img
+              src="/favicon.ico"
+              alt="Vialto"
+              className="h-9 w-9 shrink-0 rounded-md"
+            />
+          ) : (
+            <div className="min-w-0">
+              <Logo
+                src="/vialto-software-white-removebg.png"
+                heightClass="h-20 max-w-[9rem]"
+              />
+              <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
+                TRANSPORTE Y LOGISTICA
+              </p>
+            </div>
+          )}
           {showCloseButton && (
             <button
               type="button"
@@ -359,16 +391,34 @@ export function AppShell() {
               <X className="h-5 w-5" strokeWidth={1.75} />
             </button>
           )}
+          {!showCloseButton && (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+              title={collapsed ? "Expandir menú" : "Colapsar menú"}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/15 text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
+              )}
+            </button>
+          )}
         </div>
 
-        <nav className="flex flex-col gap-3">
+        <nav className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}>
           {navLoading ? (
-            <div className="flex flex-col gap-2" aria-hidden>
+            <div
+              className={`flex flex-col gap-2 ${collapsed ? "items-center" : ""}`}
+              aria-hidden
+            >
               {[80, 65, 75, 55, 70].map((w, i) => (
                 <div
                   key={i}
                   className="h-10 rounded-md bg-white/10 animate-pulse"
-                  style={{ width: `${w}%` }}
+                  style={collapsed ? { width: "2.75rem" } : { width: `${w}%` }}
                 />
               ))}
             </div>
@@ -376,17 +426,23 @@ export function AppShell() {
             navGroups.map((group, gi) => (
               <div
                 key={group.title ?? `g-${gi}`}
-                className="flex flex-col gap-0.5"
+                className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
               >
                 {gi > 0 && (
-                  <div className="mb-2 border-t border-white/[0.12]" />
+                  <div
+                    className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
+                  />
                 )}
                 {group.items.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.end === true}
-                    onClick={() => setSidebarOpen(false)}
+                    title={collapsed ? item.label : undefined}
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      if (item.to === "/viajes") setSidebarCollapsed(true);
+                    }}
                     className={({ isActive }) => {
                       const active =
                         isActive ||
@@ -395,7 +451,8 @@ export function AppShell() {
                         ) ??
                           false);
                       return [
-                        "flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2.5 font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border",
+                        "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border",
+                        collapsed ? "w-11 justify-center px-0" : "gap-2.5 px-3 py-2.5",
                         active
                           ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
                           : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
@@ -406,7 +463,9 @@ export function AppShell() {
                       className="h-4 w-4 shrink-0"
                       strokeWidth={1.75}
                     />
-                    <span>{item.label}</span>
+                    {!collapsed && (
+                      <span className="whitespace-nowrap">{item.label}</span>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -414,39 +473,52 @@ export function AppShell() {
           )}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-5 pt-4 border-t border-white/10">
-          <div className="space-y-2">
-            <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
-              Empresa
-            </p>
-            <div className="w-full min-w-0">
-              {superadmin ? (
-                <OrganizationSwitcher
-                  hidePersonal
-                  afterCreateOrganizationUrl="/"
-                  afterSelectOrganizationUrl="/"
-                  appearance={orgSwitcherSidebarAppearance}
-                />
-              ) : (
-                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80">
-                  {organization?.name ?? "Empresa no disponible"}
-                </div>
+        <div
+          className={`mt-auto flex flex-col gap-5 pt-4 border-t border-white/10 ${collapsed ? "items-center" : ""}`}
+        >
+          {!collapsed && (
+            <div className="space-y-2">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
+                Empresa
+              </p>
+              <div className="w-full min-w-0">
+                {superadmin ? (
+                  <OrganizationSwitcher
+                    hidePersonal
+                    afterCreateOrganizationUrl="/"
+                    afterSelectOrganizationUrl="/"
+                    appearance={orgSwitcherSidebarAppearance}
+                  />
+                ) : (
+                  <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
+                    {organization?.name ?? "Empresa no disponible"}
+                  </div>
+                )}
+              </div>
+              {!organization && (
+                <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
+                  {superadmin
+                    ? "Elegí o creá una empresa para ver los datos de tu equipo."
+                    : "No podés cambiar la empresa con este rol."}
+                </p>
               )}
             </div>
-            {!organization && (
-              <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
-                {superadmin
-                  ? "Elegí o creá una empresa para ver los datos de tu equipo."
-                  : "No podés cambiar la empresa con este rol."}
+          )}
+
+          <div className={`space-y-2 ${collapsed ? "flex flex-col items-center" : ""}`}>
+            {!collapsed && (
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
+                Tu cuenta
               </p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
-              Tu cuenta
-            </p>
-            <div className="pl-0.5 pr-1 flex items-center gap-2 min-w-0">
+            <div
+              className={
+                collapsed
+                  ? "flex flex-col items-center gap-2"
+                  : "pl-0.5 pr-1 flex items-center gap-2 min-w-0"
+              }
+              title={collapsed ? accountName : undefined}
+            >
               <div className="relative h-8 w-8 shrink-0">
                 <div className="absolute inset-0 pointer-events-none">
                   {accountAvatarUrl ? (
@@ -468,28 +540,37 @@ export function AppShell() {
                   />
                 )}
               </div>
-              <p className="text-sm text-white/90 truncate flex-1">
-                {accountName}
-              </p>
+              {!collapsed && (
+                <p className="text-sm text-white/90 truncate flex-1">
+                  {accountName}
+                </p>
+              )}
             </div>
             {!superadmin && (
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                title={collapsed ? "Cerrar sesión" : undefined}
+                className={
+                  collapsed
+                    ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                    : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                }
               >
                 <LogOut className="h-4 w-4" />
-                <span>Cerrar sesión</span>
+                {!collapsed && <span>Cerrar sesión</span>}
               </button>
             )}
-            <div className="pl-0.5 pt-1 space-y-0.5">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
-                Rol
-              </p>
-              <p className="text-sm text-white/90 leading-snug pr-1">
-                {roleText}
-              </p>
-            </div>
+            {!collapsed && (
+              <div className="pl-0.5 pt-1 space-y-0.5">
+                <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
+                  Rol
+                </p>
+                <p className="text-sm text-white/90 leading-snug pr-1">
+                  {roleText}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </>
@@ -525,21 +606,28 @@ export function AppShell() {
         />
       )}
 
-      <aside className={`hidden lg:flex sticky top-0 ${sidebarAsideClass}`}>
-        {renderSidebar(false)}
+      <aside
+        className={[
+          "hidden lg:flex sticky top-0",
+          sidebarBaseClass,
+          sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
+        ].join(" ")}
+      >
+        {renderSidebar(false, sidebarCollapsed)}
       </aside>
 
       <aside
         aria-hidden={!sidebarOpen}
         className={[
-          sidebarAsideClass,
+          sidebarBaseClass,
+          sidebarExpandedWidthClass,
           "lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
           sidebarOpen
             ? "translate-x-0"
             : "-translate-x-full pointer-events-none",
         ].join(" ")}
       >
-        {renderSidebar(true)}
+        {renderSidebar(true, false)}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

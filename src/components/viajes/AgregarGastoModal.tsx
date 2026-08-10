@@ -10,7 +10,7 @@ import {
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import { modalOverlayClass } from '@/lib/modalLayers';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import { formatViajeImporteForListado, numeroVisibleViaje } from '@/lib/viajesFlota';
 import { OtroGastoAutorDisplay } from '@/components/viajes/OtrosGastosFieldset';
 import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import type { OtroGasto, Viaje } from '@/types/api';
@@ -116,7 +116,7 @@ export function AgregarGastoModal({ open, viaje, onSuccess, onClose, tenantId }:
           id="agregar-gasto-title"
           className="text-sm font-semibold text-vialto-charcoal"
         >
-          Agregar gasto — Viaje {viajeActual.numero}
+          Agregar gasto — Viaje {numeroVisibleViaje(viajeActual)}
         </h2>
         <p className="mt-1 text-xs text-vialto-steel">
           El gasto se suma al total del viaje.

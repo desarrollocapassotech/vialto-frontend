@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -22,7 +22,6 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
@@ -65,19 +64,34 @@ type FacturasPaginatedResponse = {
 };
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "PENDIENTE",
-  cobrada: "COBRADA",
-  vencida: "VENCIDA",
+  borrador: "BORRADOR",
+  esperando_afip: "ESPERANDO AFIP",
+  facturado: "FACTURADO",
+  error_afip: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
-  cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
-  vencida: "bg-red-100 text-red-950 border-red-400/80",
+  borrador: "bg-zinc-100 text-zinc-800 border-zinc-300/90",
+  esperando_afip: "bg-amber-50 text-amber-950 border-amber-200/95",
+  facturado: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
+  error_afip: "bg-red-100 text-red-950 border-red-400/80",
+  anulado: "bg-gray-100 text-gray-500 border-gray-300/80 line-through",
 };
+
+/** Badge adicional de cobro — se muestra junto al de ciclo de vida, nunca lo reemplaza. */
+const COBRADO_BADGE_CLASS =
+  "bg-emerald-200 text-emerald-950 border-emerald-600/90";
+const VENCIDA_BADGE_CLASS =
+  "bg-orange-100 text-orange-950 border-orange-400/80";
 
 function fmtFecha(iso: string | null) {
   if (!iso) return "—";
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [_, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
   return new Date(iso).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
@@ -114,7 +128,8 @@ export function FacturacionTenantPage({
   const platformTenant = useMemo(
     () =>
       platform
-        ? tenantsList?.find((t) => t.clerkOrgId === tid || t.id === tid) ?? null
+        ? (tenantsList?.find((t) => t.clerkOrgId === tid || t.id === tid) ??
+          null)
         : null,
     [platform, tenantsList, tid],
   );
@@ -135,7 +150,11 @@ export function FacturacionTenantPage({
 
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   useEffect(() => {
-    if (!hasArca || (platform && !tid) || (!platform && (!isLoaded || !isSignedIn))) {
+    if (
+      !hasArca ||
+      (platform && !tid) ||
+      (!platform && (!isLoaded || !isSignedIn))
+    ) {
       setArcaConfig(null);
       return;
     }
@@ -145,7 +164,9 @@ export function FacturacionTenantPage({
       : "/api/integracion-arca/config";
     void (async () => {
       try {
-        const cfg = await apiJson<ArcaConfig | null>(configUrl, () => getToken());
+        const cfg = await apiJson<ArcaConfig | null>(configUrl, () =>
+          getToken(),
+        );
         if (!cancelled) setArcaConfig(cfg);
       } catch {
         if (!cancelled) setArcaConfig(null);
@@ -166,10 +187,20 @@ export function FacturacionTenantPage({
     return `/api/platform/viajes?tenantId=${encodeURIComponent(tid)}`;
   }, [platform, tid]);
 
-  function facturaUrl(id: string) {
-    if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
-    return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+  function marcarCobradaUrl(id: string) {
+    return platform
+      ? `/api/platform/facturas/${encodeURIComponent(id)}/marcar-cobrada?tenantId=${encodeURIComponent(tid)}`
+      : `/api/facturacion/facturas/${encodeURIComponent(id)}/marcar-cobrada`;
   }
+
+  const facturaUrl = useCallback(
+    (id: string) => {
+      if (!platform)
+        return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
+      return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
+    },
+    [platform, tid],
+  );
 
   function facturasCreateUrl() {
     if (!platform) return "/api/facturacion/facturas";
@@ -198,12 +229,14 @@ export function FacturacionTenantPage({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [facturaDeleteConfirm, setFacturaDeleteConfirm] =
     useState<Factura | null>(null);
+  const [marcandoCobradaId, setMarcandoCobradaId] = useState<string | null>(
+    null,
+  );
+  const [marcarCobradaConfirm, setMarcarCobradaConfirm] =
+    useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
   const [anularFactura, setAnularFactura] = useState<Factura | null>(null);
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
 
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
@@ -331,7 +364,16 @@ export function FacturacionTenantPage({
         return false;
       if (vencimientoHastaFiltro && (!vence || vence > vencimientoHastaFiltro))
         return false;
-      if (estadoFiltro && f.estado !== estadoFiltro) return false;
+      if (estadoFiltro) {
+        if (estadoFiltro === "cobrado" && !f.cobrado) return false;
+        else if (estadoFiltro === "vencida" && !f.vencida) return false;
+        else if (
+          estadoFiltro !== "cobrado" &&
+          estadoFiltro !== "vencida" &&
+          f.estado !== estadoFiltro
+        )
+          return false;
+      }
       return true;
     });
   }, [
@@ -381,6 +423,10 @@ export function FacturacionTenantPage({
       if (next.length === ed.viajeIds.length) return ed;
       return { ...ed, viajeIds: next };
     });
+    // Deps parciales a propósito: solo estos campos invalidan la lista de viajes
+    // elegibles. Si se agregara `editDraft` completo, este efecto se re-ejecutaría
+    // en cada tecleo del formulario (numero, fechas, notas, etc.).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     editingId,
     editDraft?.clienteId,
@@ -390,21 +436,32 @@ export function FacturacionTenantPage({
     viajesEdicionFactura,
   ]);
 
-  function buildFacturasPaginatedQuery(pageApi: number, pageSizeApi: number) {
-    const params = new URLSearchParams();
-    params.set("page", String(pageApi));
-    params.set("pageSize", String(pageSizeApi));
-    if (numFiltro.trim()) params.set("numero", numFiltro.trim());
-    if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
-    if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
-    if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
-    if (vencimientoDesdeFiltro)
-      params.set("vencimientoDesde", vencimientoDesdeFiltro);
-    if (vencimientoHastaFiltro)
-      params.set("vencimientoHasta", vencimientoHastaFiltro);
-    if (estadoFiltro) params.set("estado", estadoFiltro);
-    return params.toString();
-  }
+  const buildFacturasPaginatedQuery = useCallback(
+    (pageApi: number, pageSizeApi: number) => {
+      const params = new URLSearchParams();
+      params.set("page", String(pageApi));
+      params.set("pageSize", String(pageSizeApi));
+      if (numFiltro.trim()) params.set("numero", numFiltro.trim());
+      if (clienteIdFiltro) params.set("clienteId", clienteIdFiltro);
+      if (emisionDesdeFiltro) params.set("emisionDesde", emisionDesdeFiltro);
+      if (emisionHastaFiltro) params.set("emisionHasta", emisionHastaFiltro);
+      if (vencimientoDesdeFiltro)
+        params.set("vencimientoDesde", vencimientoDesdeFiltro);
+      if (vencimientoHastaFiltro)
+        params.set("vencimientoHasta", vencimientoHastaFiltro);
+      if (estadoFiltro) params.set("estado", estadoFiltro);
+      return params.toString();
+    },
+    [
+      numFiltro,
+      clienteIdFiltro,
+      emisionDesdeFiltro,
+      emisionHastaFiltro,
+      vencimientoDesdeFiltro,
+      vencimientoHastaFiltro,
+      estadoFiltro,
+    ],
+  );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -458,13 +515,7 @@ export function FacturacionTenantPage({
     tid,
     page,
     pageSize,
-    numFiltro,
-    clienteIdFiltro,
-    emisionDesdeFiltro,
-    emisionHastaFiltro,
-    vencimientoDesdeFiltro,
-    vencimientoHastaFiltro,
-    estadoFiltro,
+    buildFacturasPaginatedQuery,
   ]);
 
   useEffect(() => {
@@ -500,7 +551,7 @@ export function FacturacionTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, facturaUrl, getToken]);
 
   async function ensureViajesLoaded() {
     if (viajes.length > 0 || viajesLoading) return;
@@ -509,6 +560,7 @@ export function FacturacionTenantPage({
       const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
       setViajes(data);
     } catch {
+      // best-effort: si falla, el selector de viajes de la factura queda vacío
     } finally {
       setViajesLoading(false);
     }
@@ -529,6 +581,9 @@ export function FacturacionTenantPage({
     setCreating(true);
     void ensureViajesLoaded();
     window.history.replaceState({}, "");
+    // Se consume una sola vez al montar: lee el state de navegación inicial y lo
+    // borra del history. No debe re-dispararse si `location.state` cambia después.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -542,9 +597,14 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(expand), () => getToken());
         startEdit(f);
-      } catch {}
+      } catch {
+        // si falla, simplemente no se abre el editor automático
+      }
     })();
-  }, [location.state, getToken]);
+    // `startEdit` no está memoizado, pero `expandFacturaHandledRef` ya evita que
+    // este efecto haga trabajo duplicado en renders posteriores.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, getToken, facturaUrl]);
 
   useEffect(() => {
     const viewId = (
@@ -557,9 +617,11 @@ export function FacturacionTenantPage({
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
         setViewingFactura(f);
-      } catch {}
+      } catch {
+        // si falla, simplemente no se abre el modal de vista automático
+      }
     })();
-  }, [location.state, getToken]);
+  }, [location.state, getToken, facturaUrl]);
 
   async function refetchFacturas() {
     const gen = ++fetchRef.current;
@@ -581,7 +643,9 @@ export function FacturacionTenantPage({
         setFacturas(data.items);
         setMeta(data.meta);
       }
-    } catch {}
+    } catch {
+      // best-effort: si falla el refetch, se conserva el listado ya cargado
+    }
   }
 
   async function resolveComprobanteUrl(
@@ -728,6 +792,91 @@ export function FacturacionTenantPage({
     }
   }
 
+  function puedeMarcarCobrada(f: Factura) {
+    return f.tipo === "cliente" && f.arcaEstado !== "anulado" && !f.cobrado;
+  }
+
+  function abrirMarcarCobrada(f: Factura) {
+    if (f.cobrado) {
+      showToast("Esta factura ya está cobrada.", "success");
+      return;
+    }
+    setMarcarCobradaConfirm(f);
+  }
+
+  /** Badge de ciclo de vida (estático) + badge de cobro, uno nunca reemplaza al otro. */
+  function renderEstadoBadges(f: Factura) {
+    const badgeBase =
+      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <span className={[badgeBase, ESTADO_BADGE[f.estado] ?? ""].join(" ")}>
+          {ESTADO_LABEL[f.estado] ?? f.estado}
+        </span>
+        {f.cobrado ? (
+          <span className={[badgeBase, COBRADO_BADGE_CLASS].join(" ")}>
+            COBRADO
+          </span>
+        ) : puedeMarcarCobrada(f) ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirMarcarCobrada(f);
+            }}
+            title="Marcar como cobrada"
+            className={[
+              badgeBase,
+              "cursor-pointer hover:brightness-95",
+              f.vencida
+                ? VENCIDA_BADGE_CLASS
+                : "border-black/15 text-vialto-steel",
+            ].join(" ")}
+          >
+            {f.vencida ? "VENCIDA" : "MARCAR COBRADA"}
+          </button>
+        ) : null}
+        <AmbienteTestBadge ambiente={f.ambiente} />
+      </span>
+    );
+  }
+
+  async function confirmMarcarCobrada() {
+    const f = marcarCobradaConfirm;
+    if (!f || marcandoCobradaId) return;
+    setMarcandoCobradaId(f.id);
+    try {
+      const res = await apiJson<{ yaCobrada: boolean; factura: Factura }>(
+        marcarCobradaUrl(f.id),
+        () => getToken(),
+        { method: "POST" },
+      );
+      setMarcarCobradaConfirm(null);
+      if (res.yaCobrada) {
+        showToast("Esta factura ya está cobrada.", "success");
+        return;
+      }
+      const cantViajes = res.factura.viajeIds?.length ?? 0;
+      showToast(
+        cantViajes > 0
+          ? `Factura marcada como cobrada. ${cantViajes} viaje${cantViajes === 1 ? "" : "s"} vinculado${cantViajes === 1 ? "" : "s"} actualizado${cantViajes === 1 ? "" : "s"} a "Cobrado".`
+          : "Factura marcada como cobrada.",
+        "success",
+      );
+      if (platform) {
+        setFacturas(
+          (prev) => prev?.map((r) => (r.id === f.id ? res.factura : r)) ?? prev,
+        );
+      } else {
+        await refetchFacturas();
+      }
+    } catch (e) {
+      showToast(friendlyError(e, "facturacion"), "error");
+    } finally {
+      setMarcandoCobradaId(null);
+    }
+  }
+
   function nombreCliente(id: string | null | undefined) {
     if (!id) return "—";
     return clientes.find((c) => c.id === id)?.nombre ?? id;
@@ -752,7 +901,9 @@ export function FacturacionTenantPage({
 
   function handleFacturaEmitida(f: Factura) {
     setFacturas((prev) =>
-      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+      prev
+        ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row))
+        : prev,
     );
     if (viewingFactura?.id === f.id) setViewingFactura(f);
     setEmittingFactura(f);
@@ -760,19 +911,23 @@ export function FacturacionTenantPage({
 
   function handleFacturaAnulada(f: Factura) {
     setFacturas((prev) =>
-      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+      prev
+        ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row))
+        : prev,
     );
     if (viewingFactura?.id === f.id) setViewingFactura(f);
     setAnularFactura(f);
   }
 
   function verComprobanteUrl(url: string | null | undefined) {
-    if (url?.trim()) setPreviewComprobanteUrl(url);
+    if (url?.trim()) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   }
 
   function verNotaCredito(f: Factura) {
     if (f.notaCreditoUrl?.trim()) {
-      setPreviewComprobanteUrl(f.notaCreditoUrl);
+      window.open(f.notaCreditoUrl, "_blank", "noopener,noreferrer");
       return;
     }
     // Sin URL en Cloudinary aún: abrir el modal de anulación en modo ya-anulada
@@ -946,8 +1101,12 @@ export function FacturacionTenantPage({
           aria-label="Filtrar por estado"
         >
           <option value="">Todos</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="cobrada">Cobrada</option>
+          {hasArca && <option value="borrador">Borrador</option>}
+          {hasArca && <option value="esperando_afip">Esperando AFIP</option>}
+          <option value="facturado">Facturado</option>
+          <option value="cobrado">Cobrado</option>
+          {hasArca && <option value="error_afip">Error de AFIP</option>}
+          {hasArca && <option value="anulado">Anulado</option>}
           <option value="vencida">Vencida</option>
         </select>
       </ListadoFiltroCampo>
@@ -970,7 +1129,10 @@ export function FacturacionTenantPage({
                 <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
                 Emisión electrónica vía ARCA
               </div>
-              <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
+              <AmbienteTestBadge
+                ambiente={arcaConfig?.ambiente}
+                to="/configuracion/arca?tab=ambiente"
+              />
             </div>
           )}
         </>
@@ -1180,8 +1342,14 @@ export function FacturacionTenantPage({
                   aria-label="Filtrar por estado"
                 >
                   <option value="">Todos</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="cobrada">Cobrada</option>
+                  {hasArca && <option value="borrador">Borrador</option>}
+                  {hasArca && (
+                    <option value="esperando_afip">Esperando AFIP</option>
+                  )}
+                  <option value="facturado">Facturado</option>
+                  <option value="cobrado">Cobrado</option>
+                  {hasArca && <option value="error_afip">Error de AFIP</option>}
+                  {hasArca && <option value="anulado">Anulado</option>}
                   <option value="vencida">Vencida</option>
                 </select>
               </ViajesListadoHeaderFiltro>
@@ -1195,7 +1363,11 @@ export function FacturacionTenantPage({
           </tr>
         }
         renderTableRow={(f) => (
-          <tr key={f.id} className={listadoTablaBodyRowClass}>
+          <tr
+            key={f.id}
+            className={`${listadoTablaBodyRowClass} cursor-pointer`}
+            onClick={() => setViewingFactura(f)}
+          >
             <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
               {nombreContraparte(f)}
@@ -1206,26 +1378,21 @@ export function FacturacionTenantPage({
             <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaVencimiento)}
             </td>
-            <td className="px-4 py-3">
-              <span
-                className={[
-                  "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                  ESTADO_BADGE[f.estado] ?? "",
-                ].join(" ")}
-              >
-                {ESTADO_LABEL[f.estado] ?? f.estado}
-              </span>
-            </td>
+            <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
               {textoImporteFacturaListado(f, viajes)}
             </td>
-            <td className="px-4 py-3 text-right">
+            <td
+              className="px-4 py-3 text-right"
+              onClick={(e) => e.stopPropagation()}
+            >
               <FacturaAccionesMenu
                 factura={f}
                 deleting={deletingId === f.id}
                 hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onMarcarCobrada={() => abrirMarcarCobrada(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1244,6 +1411,7 @@ export function FacturacionTenantPage({
         )}
         renderMobileCard={(f) => (
           <ListadoCard
+            onClick={() => setViewingFactura(f)}
             primary={f.numero}
             fields={[
               { label: "Cliente", value: nombreContraparte(f) },
@@ -1251,16 +1419,7 @@ export function FacturacionTenantPage({
               { label: "Vencimiento", value: fmtFecha(f.fechaVencimiento) },
               {
                 label: "Estado",
-                value: (
-                  <span
-                    className={[
-                      "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                      ESTADO_BADGE[f.estado] ?? "",
-                    ].join(" ")}
-                  >
-                    {ESTADO_LABEL[f.estado] ?? f.estado}
-                  </span>
-                ),
+                value: renderEstadoBadges(f),
               },
               {
                 label: "Importe",
@@ -1274,6 +1433,7 @@ export function FacturacionTenantPage({
                 hasArca={hasArca}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
+                onMarcarCobrada={() => abrirMarcarCobrada(f)}
                 onEmitirArca={hasArca ? () => abrirEmitirArca(f) : undefined}
                 onAnular={hasArca ? () => abrirAnularFactura(f) : undefined}
                 onVerComprobante={
@@ -1350,6 +1510,7 @@ export function FacturacionTenantPage({
               ? () => verNotaCredito(viewingFactura)
               : undefined
           }
+          onMarcarCobrada={() => abrirMarcarCobrada(viewingFactura)}
         />
       )}
 
@@ -1417,13 +1578,25 @@ export function FacturacionTenantPage({
         onConfirm={() => void confirmDeleteFactura()}
       />
 
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={marcarCobradaConfirm != null}
+        title="Marcar como cobrada"
+        message={
+          marcarCobradaConfirm
+            ? `¿Marcás la factura ${marcarCobradaConfirm.numero} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
+            : ""
+        }
+        confirmLabel="Marcar como cobrada"
+        busy={
+          !!marcandoCobradaId &&
+          marcarCobradaConfirm != null &&
+          marcandoCobradaId === marcarCobradaConfirm.id
+        }
+        onCancel={() => {
+          if (!marcandoCobradaId) setMarcarCobradaConfirm(null);
+        }}
+        onConfirm={() => void confirmMarcarCobrada()}
+      />
     </div>
   );
 }

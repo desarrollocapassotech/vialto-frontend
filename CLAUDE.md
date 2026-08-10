@@ -269,6 +269,28 @@ const [viewingEntidad, setViewingEntidad] = useState<Entidad | null>(null);
 
 ---
 
+## Badges de estado: ejes aditivos, nunca se reemplazan (Facturas, Liquidaciones, Viajes)
+
+**Regla global para toda pantalla que muestre el estado de un comprobante o de un viaje.**
+
+Facturas y Liquidaciones separan el **ciclo de vida** del comprobante (`estado`: borrador / esperando AFIP / facturado o liquidado / error de AFIP / anulado) de otros ejes independientes, que se muestran como **badges adicionales al lado, sin reemplazar nunca** al badge de ciclo de vida:
+
+- `cobrado` / `vencida` — solo Facturas (Liquidaciones no tiene noción de cobro separada del comprobante, por eso su `estado` sigue siendo un solo campo).
+- `AmbienteTestBadge` ("Ambiente de pruebas") — cuando el comprobante se emitió en homologación.
+
+El modelo de datos completo (por qué `estado` de Factura no incluye `cobrado`, cómo se calcula, y el sync de `Viaje.facturacionEstado`/`liquidacionEstado`) está documentado en `vialto-backend/CLAUDE.md`. Reglas prácticas de este lado:
+
+- Los labels van siempre en **MAYÚSCULA**: `BORRADOR`, `ESPERANDO AFIP`, `FACTURADO`, `COBRADO`, `ERROR DE AFIP`, `ANULADO`, `VENCIDA`.
+- El badge `ANULADO` lleva `line-through` y el mismo gris (`bg-gray-100 text-gray-500 border-gray-300/80`) en Facturas y Liquidaciones — no un color propio por pantalla.
+- Patrón de referencia a copiar (no reinventar un badge combinado): `renderEstadoBadges` en `FacturacionTenantPage.tsx` (grilla) y el header de `FacturaViewModal.tsx` / snapshot de `FacturaEditModal.tsx` — un `<span>` de ciclo de vida seguido de badges condicionales para `cobrado`/`vencida`/`AmbienteTestBadge`.
+- `AmbienteTestBadge` (`components/liquidaciones/AmbienteTestBadge.tsx`) es compartido por Facturas y Liquidaciones y acepta `to?: string`:
+  - **Sin `to`** → badge estático. Usar en snapshots por-comprobante (`factura.ambiente`, `liquidacion.ambiente`).
+  - **Con `to="/configuracion/arca?tab=ambiente"`** → se vuelve un `<Link>` clickeable. Usar solo en los banners de "ambiente actual del tenant" (ej. `arcaConfig?.ambiente` en los headers de página o antes de emitir), y solo en vistas de tenant — nunca en variantes `embeddedInSuperadmin`, que no tienen una ruta de configuración alcanzable para un tenant elegido.
+- En la grilla de Viajes, los badges de facturación/liquidación (`ViajeFacturacionIndicador`/`ViajeLiquidacionIndicador`) son **de lectura únicamente**: el click, si ya hay factura/liquidación vinculada, abre directo su vista completa (`FacturaViewModal`/`LiquidacionViewModal`, fetch on click, sin modal intermedio); si no hay nada vinculado, muestra un modal de detalle liviano (`ViajeFacturacionDetalleModal`/`ViajeLiquidacionDetalleModal`) que solo informa el estado. No agregar ahí acciones de mutación (marcar como cobrada, emitir, anular) — esas viven únicamente en las pantallas de Facturas/Liquidaciones.
+- Para "ver" el PDF de un comprobante generado on-demand (CVLP y su Nota de Crédito/Débito de anulación, que no tienen URL persistida como sí tiene `Factura.comprobanteUrl`/`notaCreditoUrl`), el patrón es abrir una pestaña en blanco de forma **síncrona** en el click (`window.open('', '_blank')`) y recién después, cuando llega el blob, setear `location.href` — evita que el bloqueador de pop-ups del navegador corte la apertura por venir de un `await`. Ver `verPdf`/`verPdfAnulacion` en `LiquidacionesTenantPage.tsx` y su equivalente en `ViajeLiquidacionIndicador.tsx`.
+
+---
+
 ## Campos de formulario: obligatorios y opcionales
 
 **Regla global para todos los formularios actuales y futuros.**
@@ -384,7 +406,8 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 - **Aplicar el patrón VER → modal read-only → EDITAR** en la columna de acciones de toda grilla nueva.
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
+- **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
 
 ---
 
-Última actualización: julio 2026 (resync de la estructura de carpetas contra el código real; agregado el patrón de pestañas por módulo del dashboard de tenant)
+Última actualización: agosto 2026 (agregado el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")

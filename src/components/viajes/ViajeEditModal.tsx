@@ -46,14 +46,18 @@ import {
 } from "@/lib/currencyMask";
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
-  estadoMuestraKmLitros,
-  estadoViajeLabel,
-  estadosDisponiblesParaViaje,
-  tooltipEstadoViaje,
-  viajeEstadoEsFacturadoOCobrado,
-} from "@/lib/viajesEstados";
+  etapaMuestraKmLitros,
+  etapaViajeLabel,
+  VIAJE_ETAPAS_TODAS,
+  tooltipEtapaViaje,
+} from "@/lib/viajesIndicadores";
 import { viajePermiteBotonFacturar } from "@/lib/viajesComprobantes";
-import { numeroFacturaVisibleViaje } from "@/lib/viajesFlota";
+import {
+  numeroFacturaVisibleViaje,
+  numeroVisibleViaje,
+  viajeUsaNumeroInterno,
+  labelIdentificacionPersonalizadaViajes,
+} from "@/lib/viajesFlota";
 import {
   viajeRequierePagosTransportista,
   validarPagosTransportistaDraftForm,
@@ -62,6 +66,7 @@ import type {
   Chofer,
   Cliente,
   Producto,
+  Tenant,
   Transportista,
   Vehiculo,
   Viaje,
@@ -71,11 +76,11 @@ import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
 import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
 import type { ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
-import { ViajeExportacionLeyenda } from "@/components/viajes/ViajeExportacionLeyenda";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export type ViajeInlineDraft = {
   numero: string;
+  numeroIdentificacionPersonalizado: string;
   estado: string;
   clienteId: string;
   operacionModo: ViajeOperacionModo | null;
@@ -120,7 +125,6 @@ export type ViajeEditModalProps = {
   vehiculos: Vehiculo[];
   choferesPropios: Chofer[];
   vehiculosPropios: Vehiculo[];
-  viajesConFactura: Set<string>;
   onModoChange: (m: ViajeOperacionModo) => void;
   ayudaFlota: { chofer?: string; vehiculo?: string };
   viajeEditHint: string | null;
@@ -151,6 +155,8 @@ export type ViajeEditModalProps = {
   crearVehiculoHref?: string;
   getToken?: () => Promise<string | null>;
   tenantId?: string;
+  /** Tenant activo, usado para el label personalizable del ID de viaje. */
+  tenant?: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null;
   onProductoCreado?: (p: Producto) => void;
   onClienteCreado?: (c: Cliente) => void;
   onTransportistaCreado?: (t: Transportista) => void;
@@ -174,7 +180,6 @@ export function ViajeEditModal({
   vehiculos,
   choferesPropios,
   vehiculosPropios,
-  viajesConFactura,
   onModoChange,
   ayudaFlota,
   viajeEditHint,
@@ -195,6 +200,7 @@ export function ViajeEditModal({
   crearVehiculoHref = "/vehiculos/nuevo",
   getToken,
   tenantId,
+  tenant,
   onProductoCreado,
   onClienteCreado,
   onTransportistaCreado,
@@ -264,7 +270,7 @@ export function ViajeEditModal({
     typeof onFacturar === "function" &&
     viajePermiteBotonFacturar({
       ...snapshotViaje,
-      estado: draft.estado,
+      etapa: draft.estado,
       transportistaId:
         draft.operacionModo === "externo"
           ? draft.transportistaId
@@ -331,9 +337,12 @@ export function ViajeEditModal({
                 id="viaje-edit-modal-title"
                 className="truncate text-base font-semibold text-vialto-charcoal"
               >
-                Editar viaje {draft.numero}
+                Editar viaje {numeroVisibleViaje(draft)}
               </h2>
               <p className="mt-1 text-xs text-vialto-steel">
+                {viajeUsaNumeroInterno(draft)
+                  ? "Número interno generado automáticamente por el sistema. "
+                  : ""}
                 Modificá los datos del viaje. Los cambios se aplican al guardar.
               </p>
             </div>
@@ -349,9 +358,35 @@ export function ViajeEditModal({
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div className="mb-4 flex flex-col gap-1.5 rounded border-2 border-vialto-fire/60 bg-vialto-mist/50 p-3">
+              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.08em] text-vialto-charcoal">
+                {labelIdentificacionPersonalizadaViajes(tenant)}
+              </span>
+              <input
+                type="text"
+                value={draft.numeroIdentificacionPersonalizado}
+                onChange={(e) =>
+                  setDraft((p) =>
+                    p
+                      ? {
+                          ...p,
+                          numeroIdentificacionPersonalizado: e.target.value,
+                        }
+                      : p,
+                  )
+                }
+                placeholder="Ej: número de CTG"
+                className="h-11 w-full border border-black/15 bg-white px-3 text-base font-medium text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/40"
+              />
+              <p className="text-xs text-vialto-steel">
+                Si lo cargás, este número se usa para identificar el viaje en toda
+                la app en vez del número interno del sistema.
+              </p>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Estado</span>
+                <span className={labelClass}>Etapa</span>
                 <select
                   value={draft.estado}
                   onChange={(e) =>
@@ -359,18 +394,16 @@ export function ViajeEditModal({
                       prev ? { ...prev, estado: e.target.value } : prev,
                     )
                   }
-                  className={`${inputClass} max-w-md`}
+                  className={inputClass}
                 >
-                  {estadosDisponiblesParaViaje(
-                    snapshotViaje,
-                    viajesConFactura,
-                  ).map((x) => (
-                    <option key={x} value={x} title={tooltipEstadoViaje(x)}>
-                      {estadoViajeLabel[x] ?? x}
+                  {VIAJE_ETAPAS_TODAS.map((x) => (
+                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                      {etapaViajeLabel[x] ?? x}
                     </option>
                   ))}
                 </select>
-                {viajeEstadoEsFacturadoOCobrado(draft.estado) && (
+                {(snapshotViaje.facturacionEstado === "facturado" ||
+                  snapshotViaje.facturacionEstado === "cobrado") && (
                   <span className="text-[10px] font-normal font-[family-name:var(--font-ui)] text-vialto-steel/75 tracking-wide">
                     Factura: {numeroFacturaVisibleViaje(snapshotViaje) || "—"}
                   </span>
@@ -760,7 +793,7 @@ export function ViajeEditModal({
                 errorFechaDescarga={fechaDescargaError}
               />
 
-              {estadoMuestraKmLitros(draft.estado) && (
+              {etapaMuestraKmLitros(draft.estado) && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                   {isVisible("edicion_viaje", "kmRecorridos") && (
                     <div className="flex flex-col gap-1">
@@ -906,9 +939,6 @@ export function ViajeEditModal({
                   </button>
                 </div>
               )}
-            </div>
-            <div className="md:col-span-2 lg:col-span-3 mt-4">
-              <ViajeExportacionLeyenda />
             </div>
             {error && (
               <p

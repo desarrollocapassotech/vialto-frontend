@@ -89,7 +89,7 @@ export function ImprimirRemitoButton({
         type="button"
         disabled={isDisabled}
         onClick={() => void handleVerRemito()}
-        className={`${BTN_BASE} ${variant === 'compact' ? 'h-8 px-2 py-1' : 'h-9 px-3 py-2'} ${className ?? ''}`}
+        className={`${BTN_BASE} ${variant === 'compact' ? 'h-8 px-2 py-1' : 'min-h-11 px-3 py-2'} ${className ?? ''}`}
         title="Ver remito en PDF"
       >
         {icon}

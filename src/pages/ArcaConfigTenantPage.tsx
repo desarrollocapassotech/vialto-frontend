@@ -1,5 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import { ArcaCertificadoModal } from "@/components/liquidaciones/ArcaCertificadoModal";
 import { ConceptosLiquidacionConfigSection } from "@/components/liquidaciones/ConceptosLiquidacionConfigSection";
@@ -188,8 +189,10 @@ export function ArcaConfigTenantPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState<"general" | "ambiente" | "conceptos">(
-    "general",
+    tabParam === "ambiente" || tabParam === "conceptos" ? tabParam : "general",
   );
 
   useEffect(() => {

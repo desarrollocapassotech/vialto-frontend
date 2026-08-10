@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel } from '@/components/crud/CrudFields';
 import type { Factura, Viaje } from '@/types/api';
+import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
 export type FacturaLineaDraft = {
   descripcion: string;
@@ -72,7 +73,7 @@ export function defaultFacturaLineas(
       const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
       const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
       return {
-        descripcion: `Viaje #${v.numero}${ruta}`,
+        descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
         ivaPct,
       };

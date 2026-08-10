@@ -1,12 +1,40 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
+import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
 
 import type {
   Chofer,
   Cliente,
+  Tenant,
   Transportista,
   Vehiculo,
   Viaje,
 } from "@/types/api";
+
+/** ID que se muestra en toda vista/documento humano de un viaje: el ID personalizado del
+ * cliente (ej. CTG) si está cargado, o el correlativo interno autogenerado si no. */
+export function numeroVisibleViaje(v: {
+  numero: string;
+  numeroIdentificacionPersonalizado?: string | null;
+}): string {
+  return v.numeroIdentificacionPersonalizado?.trim() || v.numero;
+}
+
+/** `true` si el viaje no tiene ID personalizado cargado y se está mostrando el número interno. */
+export function viajeUsaNumeroInterno(v: {
+  numeroIdentificacionPersonalizado?: string | null;
+}): boolean {
+  return !v.numeroIdentificacionPersonalizado?.trim();
+}
+
+/** Label del campo de ID personalizado de viaje, configurable por tenant (default: "ID propio"). */
+export function labelIdentificacionPersonalizadaViajes(
+  tenant: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null | undefined,
+): string {
+  return (
+    tenant?.labelIdentificacionPersonalizadaViajes?.trim() ||
+    "ID propio"
+  );
+}
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
@@ -264,16 +292,14 @@ export function numeroFacturaVisibleViaje(
   return (v.factura?.numero ?? "").trim();
 }
 
-/** El viaje ya está vinculado a una factura (relación o número en fila). */
-export function viajeTieneFacturaAsignada(v: {
-  nroFactura?: string | null;
-  facturaId?: string | null;
-  factura?: { id?: string } | null;
-}): boolean {
-  if (v.nroFactura != null && String(v.nroFactura).trim() !== "") return true;
-  if (v.facturaId != null && String(v.facturaId).trim() !== "") return true;
-  if (v.factura?.id != null && String(v.factura.id).trim() !== "") return true;
-  return false;
+/**
+ * El viaje está actualmente facturado (no disponible para vincular a una factura nueva).
+ * Una factura anulada NO cuenta — el viaje vuelve a estar disponible para re-facturar
+ * (fix del bug histórico: antes se miraba solo la presencia de `facturaId`, sin
+ * importar si esa factura seguía vigente).
+ */
+export function viajeTieneFacturaAsignada(v: Pick<Viaje, "facturacionEstado">): boolean {
+  return !facturacionPermiteVincular(v.facturacionEstado);
 }
 
 export type ViajesFiltradosParaFacturaOpciones = {
@@ -331,8 +357,8 @@ export function viajesFiltradosParaFactura(
     );
 
     if (viajeTieneFacturaAsignada(v) && !enEstaFactura) return false;
-    if (v.estado === "cobrado" && !enEstaFactura) return false;
-    if (v.estado === "cancelado" && !enEstaFactura) return false;
+    if (v.facturacionEstado === "cobrado" && !enEstaFactura) return false;
+    if (v.etapa === "cancelado" && !enEstaFactura) return false;
     return true;
   });
 
@@ -383,6 +409,20 @@ export function nombreClienteListadoViaje(
   const cid = v.clienteId?.trim();
   if (cid && clientes?.length) {
     const c = clientes.find((x) => x.id === cid);
+    if (c?.nombre?.trim()) return c.nombre.trim();
+  }
+  return "—";
+}
+
+/**
+ * Nombre del chofer en tablas de viajes: relación del API o búsqueda por `choferId` en el maestro cargado.
+ */
+export function nombreChoferListadoViaje(v: Viaje, choferes?: Chofer[]): string {
+  const desdeApi = v.chofer?.nombre?.trim();
+  if (desdeApi) return desdeApi;
+  const chid = v.choferId?.trim();
+  if (chid && choferes?.length) {
+    const c = choferes.find((x) => x.id === chid);
     if (c?.nombre?.trim()) return c.nombre.trim();
   }
   return "—";

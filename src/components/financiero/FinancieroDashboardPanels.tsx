@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { estadoViajeLabel } from "@/lib/viajesEstados";
+import { etapaViajeLabel } from "@/lib/viajesIndicadores";
 import type {
   FinancieroDashboardResponse,
   FinancieroMargenAlerta,
@@ -315,12 +315,12 @@ export function ViajesFunnelPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {funnel.porEstado.map((e) => (
+        {funnel.porEtapa.map((e) => (
           <StatTile
-            key={e.estado}
-            label={estadoViajeLabel[e.estado] ?? e.estado}
+            key={e.etapa}
+            label={etapaViajeLabel[e.etapa] ?? e.etapa}
             value={String(e.cantidad)}
-            linkTo={`/viajes?estado=${encodeURIComponent(e.estado)}`}
+            linkTo={`/viajes?etapa=${encodeURIComponent(e.etapa)}`}
           />
         ))}
         <StatTile
@@ -519,7 +519,7 @@ export function FacturacionPanel({
         <StatTile
           label="Pendientes de emitir"
           value={String(fac.pendientesEmitir.cantidad)}
-          linkTo="/viajes?estado=finalizado_sin_facturar"
+          linkTo="/viajes?etapa=finalizado"
         />
       </div>
 

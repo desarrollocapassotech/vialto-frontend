@@ -1,4 +1,3 @@
-import { gananciaBrutaValorOrdenable } from "@/lib/viajesGananciaBruta";
 import type { Viaje } from "@/types/api";
 
 const TZ_LISTADOS_AR = "America/Argentina/Buenos_Aires";
@@ -37,22 +36,6 @@ function compareNullableFechaAr(
   return keyA < keyB ? -mult : mult;
 }
 
-function compareNullableNumber(
-  a: number | null | undefined,
-  b: number | null | undefined,
-  dir: ViajeSortDir,
-  tieBreak: () => number,
-): number {
-  const na = a == null || Number.isNaN(Number(a)) ? null : Number(a);
-  const nb = b == null || Number.isNaN(Number(b)) ? null : Number(b);
-  if (na == null && nb == null) return tieBreak();
-  if (na == null) return 1;
-  if (nb == null) return -1;
-  if (na === nb) return tieBreak();
-  const mult = dir === "asc" ? 1 : -1;
-  return (na - nb) * mult;
-}
-
 /** Ordena en cliente con la misma lógica que el backend (filtro pago transportista). */
 export function sortViajesListado(
   items: Viaje[],
@@ -82,17 +65,6 @@ export function sortViajesListado(
           sortDir,
           () => tie(a, b),
         );
-      case "monto":
-        return compareNullableNumber(a.monto, b.monto, sortDir, () =>
-          tie(a, b),
-        );
-      case "ganancia_bruta":
-        return compareNullableNumber(
-          gananciaBrutaValorOrdenable(a),
-          gananciaBrutaValorOrdenable(b),
-          sortDir,
-          () => tie(a, b),
-        );
       default:
         return tie(a, b);
     }
@@ -103,8 +75,6 @@ export const VIAJE_SORT_FIELDS = [
   "fecha_creacion", // <-- NUEVO CAMPO
   "fecha_carga",
   "fecha_descarga",
-  "monto",
-  "ganancia_bruta",
 ] as const;
 
 export type ViajeSortField = (typeof VIAJE_SORT_FIELDS)[number];
@@ -123,8 +93,6 @@ export const VIAJE_SORT_LABELS: Record<ViajeSortField, string> = {
   fecha_creacion: "Fecha de creación", // <-- ETIQUETA NUEVA
   fecha_carga: "Fecha de carga",
   fecha_descarga: "Fecha de descarga",
-  monto: "Monto a facturar",
-  ganancia_bruta: "Ganancia bruta",
 };
 
 export function etiquetaViajeOrdenamiento(

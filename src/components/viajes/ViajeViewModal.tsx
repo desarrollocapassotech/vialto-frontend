@@ -16,7 +16,12 @@ import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { tooltipPanelClass } from "@/lib/tooltip";
+import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } from "@/lib/viajesIndicadores";
+import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
+import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
+import { ViajeGananciaBrutaDetalle } from "@/components/viajes/ViajeGananciaBruta";
+import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
+import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -33,39 +38,42 @@ function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
   return `${prefix}${monto.toLocaleString("es-AR")}`;
 }
 
-const ESTADO_LABEL: Record<string, string> = {
-  borrador: "Borrador",
-  en_curso: "En curso",
-  finalizado: "Finalizado",
-  cancelado: "Cancelado",
-};
-
 export function ViajeViewModal({
   viaje,
   onClose,
   onEditar,
   tenantId,
+  hasArca = false,
   editando = false,
   onFacturar,
   facturando = false,
   onLiquidar,
   liquidando = false,
+  onRegistrarPago,
 }: {
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
+  /** Tenant con módulo integracion-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
+  hasArca?: boolean;
   /** El editor se está preparando (fetch de listas maestras, etc.): bloquea el modal hasta que esté listo. */
   editando?: boolean;
   /** Si se pasa, muestra un botón "Facturar" junto a "Editar" (hoy solo desde el dashboard). */
   onFacturar?: () => void;
   /** El creador de factura se está preparando: bloquea el modal hasta que esté listo. */
   facturando?: boolean;
-  /** Si se pasa, muestra un botón "Liquidar" (registrar pago al transportista, hoy solo desde el dashboard). */
+  /** Si se pasa, muestra un botón "Liquidar" (abre la liquidación electrónica CVLP vía ARCA — hoy solo desde el dashboard). */
   onLiquidar?: () => void;
   /** El registro de pago se está preparando: bloquea el modal hasta que esté listo. */
   liquidando?: boolean;
+  /**
+   * Si se pasa, el badge de pago al transportista (tenants sin ARCA) se vuelve
+   * clickeable y abre "Registrar pago". Distinto de `onLiquidar`, que es la
+   * liquidación electrónica vía ARCA.
+   */
+  onRegistrarPago?: () => void;
 }) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const { isVisible } = useFieldConfig("viajes");
@@ -150,28 +158,26 @@ export function ViajeViewModal({
       isVisible("detalle_viaje", c.key),
   );
 
-  const bloqueadoPorFactura = Boolean(viaje.factura);
-  const bloqueadoPorLiquidacion =
-    viaje.liquidacionesViaje?.some(
-      (lv) => lv.liquidacion.estado !== "anulado"
-    ) ?? false;
-  const bloqueadoPorComprobante = bloqueadoPorFactura || bloqueadoPorLiquidacion;
-  const razonNoEditable =
-    bloqueadoPorFactura && bloqueadoPorLiquidacion
-      ? "No se puede editar: el viaje ya tiene una factura emitida y una liquidación activa."
-      : bloqueadoPorFactura
-        ? "No se puede editar: el viaje ya tiene una factura emitida."
-        : bloqueadoPorLiquidacion
-          ? "No se puede editar: el viaje está incluido en una liquidación activa."
-          : null;
-
   return (
     <ViewModalShell
       title={
         <span className="inline-flex items-center gap-3">
-          <span>Viaje #{viaje.numero}</span>
+          <span>Viaje #{numeroVisibleViaje(viaje)}</span>
+          {viajeUsaNumeroInterno(viaje) && (
+            <span className="text-xs font-normal normal-case tracking-normal text-vialto-steel">
+              (número interno generado automáticamente)
+            </span>
+          )}
           <span className="text-xs uppercase tracking-[0.1em] border rounded px-2 py-0.5 text-vialto-steel border-black/15">
-            {ESTADO_LABEL[viaje.estado] ?? viaje.estado}
+            {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
+            {hasArca ? (
+              <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
+            ) : (
+              <ViajePagoTransportistaIndicador viaje={viaje} onClick={onRegistrarPago} />
+            )}
           </span>
         </span>
       }
@@ -232,8 +238,8 @@ export function ViajeViewModal({
             <button
               type="button"
               onClick={onEditar}
-              disabled={bloqueado || bloqueadoPorComprobante}
-              className={`${viewModalBtnPrimary}${bloqueadoPorComprobante ? " opacity-50 cursor-not-allowed" : bloqueado ? " cursor-wait" : ""}`}
+              disabled={bloqueado}
+              className={`${viewModalBtnPrimary}${bloqueado ? " cursor-wait" : ""}`}
             >
               {editando ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -244,11 +250,6 @@ export function ViajeViewModal({
                 "Editar"
               )}
             </button>
-            {razonNoEditable && (
-              <div className={tooltipPanelClass} role="tooltip">
-                {razonNoEditable}
-              </div>
-            )}
           </span>
         </>
       }
@@ -256,6 +257,16 @@ export function ViajeViewModal({
       <div className="flex flex-col divide-y divide-black/5">
         <div className="flex flex-col gap-4 pb-5">
           <div className={viewModalGridClass}>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Facturación</p>
+              <p className="mt-1 text-sm">{tooltipFacturacionEstado(viaje)}</p>
+            </div>
+            {viaje.liquidacionEstado != null && (
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Liquidación</p>
+                <p className="mt-1 text-sm">{tooltipLiquidacionEstado(viaje)}</p>
+              </div>
+            )}
             {campos.map((c, i) => (
               <div key={i}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
@@ -264,6 +275,7 @@ export function ViajeViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
+            <ViajeGananciaBrutaDetalle viaje={viaje} onPagoClick={onRegistrarPago} />
           </div>
           {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
             <div>

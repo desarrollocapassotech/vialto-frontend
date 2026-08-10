@@ -10,7 +10,7 @@ import {
   maskCurrencyForMoneda
 } from '@/lib/currencyMask';
 import { modalOverlayClass } from '@/lib/modalLayers';
-import { formatViajeImporteForListado } from '@/lib/viajesFlota';
+import { formatViajeImporteForListado, numeroVisibleViaje } from '@/lib/viajesFlota';
 import {
   PAGO_TRANSPORTISTA_SALDO_ERROR,
   calcularSaldoTransportista,
@@ -117,7 +117,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
           id="registrar-pago-title"
           className="text-sm font-semibold text-vialto-charcoal"
         >
-          Registrar pago — Viaje {viajeActual.numero}
+          Registrar pago — Viaje {numeroVisibleViaje(viajeActual)}
         </h2>
 
         {saldo && saldo.totalAcordado > 0 && (
