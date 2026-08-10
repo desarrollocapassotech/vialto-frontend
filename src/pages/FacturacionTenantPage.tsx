@@ -22,7 +22,6 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
@@ -238,9 +237,6 @@ export function FacturacionTenantPage({
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
   const [anularFactura, setAnularFactura] = useState<Factura | null>(null);
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
 
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
@@ -924,12 +920,14 @@ export function FacturacionTenantPage({
   }
 
   function verComprobanteUrl(url: string | null | undefined) {
-    if (url?.trim()) setPreviewComprobanteUrl(url);
+    if (url?.trim()) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   }
 
   function verNotaCredito(f: Factura) {
     if (f.notaCreditoUrl?.trim()) {
-      setPreviewComprobanteUrl(f.notaCreditoUrl);
+      window.open(f.notaCreditoUrl, "_blank", "noopener,noreferrer");
       return;
     }
     // Sin URL en Cloudinary aún: abrir el modal de anulación en modo ya-anulada
@@ -1599,14 +1597,6 @@ export function FacturacionTenantPage({
         }}
         onConfirm={() => void confirmMarcarCobrada()}
       />
-
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
-      )}
     </div>
   );
 }
