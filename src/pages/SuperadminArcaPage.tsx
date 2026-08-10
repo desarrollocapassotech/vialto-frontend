@@ -31,11 +31,11 @@ import type { ArcaConfig, ArcaLog, Liquidacion } from "@/types/api";
 // ── Helpers visuales ──────────────────────────────────────────────────────────
 
 const ESTADO_LABEL: Record<string, string> = {
-  borrador: "Borrador",
-  pendiente_cae: "Pendiente CAE",
-  autorizado: "Autorizado",
-  error: "Error",
-  anulado: "Anulado",
+  borrador: "BORRADOR",
+  pendiente_cae: "ESPERANDO AFIP",
+  autorizado: "LIQUIDADO",
+  error: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
 const ESTADO_CLASS: Record<string, string> = {

@@ -7,6 +7,7 @@ import type { ViajeProductoItem } from '@/lib/productosViaje';
 
 export type ViajeInlineDraft = {
   numero: string;
+  numeroIdentificacionPersonalizado: string;
   estado: string;
   clienteId: string;
   operacionModo: ViajeOperacionModo;
@@ -29,9 +30,14 @@ export type ViajeInlineDraft = {
   observaciones: string;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
+  cantidadFactura: string;
+  precioUnitarioFactura: string;
   kmRecorridos: string;
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
+  cantidadTransportista: string;
+  precioUnitarioTransportista: string;
+  otrosGastos: import('./OtrosGastosFieldset').OtroGastoDraft[];
+  pagosTransportista: import('./PagosTransportistaFieldset').PagoTransportistaDraft[];
 };
-

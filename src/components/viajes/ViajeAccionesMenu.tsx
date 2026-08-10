@@ -4,11 +4,10 @@ import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
 import { motivoBloqueoAccionFacturarArcaUsd } from '@/lib/arcaUsdRestriction';
-import {
-  viajePermiteAgregarGasto,
-} from '@/lib/viajesEstados';
+import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
 import { viajePermiteBotonFacturar } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
+import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.slice(0, 10).split('-');
@@ -41,11 +40,11 @@ export function ViajeAccionesMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
 
-  const permitePago = viajeRequierePagosTransportista(viaje) && viaje.estado !== 'cancelado';
-  const permiteGasto = viajePermiteAgregarGasto(viaje.estado);
+  const permitePago = viajeRequierePagosTransportista(viaje) && viaje.etapa !== 'cancelado';
+  const permiteGasto = viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
   const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasArca, viaje);
-  const permiteExportar = viaje.estado !== 'cancelado';
+  const permiteExportar = viaje.etapa !== 'cancelado';
 
   const options = useMemo(() => {
     const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', icon: Eye, onClick: onVer }];
@@ -112,7 +111,7 @@ export function ViajeAccionesMenu({
             : viaje.fechaCarga
               ? fmtDate(viaje.fechaCarga)
               : null,
-        ].filter(Boolean).join(' · ') || `Viaje #${viaje.numero}`}
+        ].filter(Boolean).join(' · ') || `Viaje #${numeroVisibleViaje(viaje)}`}
         options={options}
       />
     </>

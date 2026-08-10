@@ -46,6 +46,10 @@ import {
   viajeConDestinosEnRespuesta,
 } from "@/lib/viajesDestinos";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
+import {
+  facturacionPermiteVincular,
+  liquidacionPermiteVincular,
+} from "@/lib/viajesIndicadores";
 import type {
   Chofer,
   Cliente,
@@ -126,9 +130,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     ? mensajesAyudaFlotaPropia(edicionMaestro.choferes, edicionMaestro.vehiculos)
     : mensajesAyudaFlotaPropia(choferes, vehiculos);
   const opcionesProducto = mergeOpcionesProducto(productosCatalogo, viajeSnapshot);
-  const viajesConFactura = new Set<string>(
-    viajeSnapshot?.facturaId ? [viajeSnapshot.id] : [],
-  );
 
   // Cuando cambiamos a modo "propio" con un chofer que ya no está en la lista de flota propia, lo limpiamos.
   useEffect(() => {
@@ -203,7 +204,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
 
     setDraft({
       numero: v.numero ?? "",
-      estado: v.estado ?? "pendiente",
+      numeroIdentificacionPersonalizado:
+        v.numeroIdentificacionPersonalizado ?? "",
+      estado: v.etapa ?? "pendiente",
       operacionModo: esExterno ? "externo" : esPropio ? "propio" : null,
       choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
       choferExternoId: esExterno
@@ -240,6 +243,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       observaciones: v.observaciones ?? "",
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
       monedaMonto: normalizeViajeMoneda(v.monedaMonto),
+      cantidadFactura: v.cantidadFactura != null ? String(v.cantidadFactura) : "",
+      precioUnitarioFactura: v.precioUnitarioFactura != null ? String(v.precioUnitarioFactura) : "",
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : "",
       litrosConsumidos:
         v.litrosConsumidos != null ? String(v.litrosConsumidos) : "",
@@ -250,6 +255,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(
         v.monedaPrecioTransportistaExterno,
       ),
+      cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
+      precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
         v.gananciaBrutaManual,
         normalizeViajeMoneda(v.monedaGananciaBrutaManual ?? v.monedaMonto),
@@ -476,6 +483,16 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       );
       return;
     }
+    
+    const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
+      ? (Number(draft.cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+      : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
+
+    if (calcMonto == null || calcMonto < 0.01) {
+      setError("Ingresá un monto a facturar mayor a 0.");
+      return;
+    }
+
     if (draftRequiereGananciaBrutaManual(draft)) {
       const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
       if (manualPayload.gananciaBrutaManual == null) {
@@ -485,17 +502,19 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         return;
       }
     }
-    const precioTransportistaNum = parseCurrencyForMoneda(
-      draft.precioTransportistaExterno,
-      draft.monedaPrecioTransportistaExterno,
-    );
+    const precioTransportistaNum = draft.cantidadTransportista.trim()
+      ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+      : parseCurrencyForMoneda(
+          draft.precioTransportistaExterno,
+          draft.monedaPrecioTransportistaExterno,
+        );
     const pagosTransportistaApi = pagosTransportistaDraftsToApi(
       draft.pagosTransportista,
     );
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: draft.transportistaId.trim(),
-          precioTransportistaExterno: draft.precioTransportistaExterno,
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
           monedaPrecioTransportistaExterno:
             draft.monedaPrecioTransportistaExterno,
           pagosTransportista: draft.pagosTransportista,
@@ -512,6 +531,14 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const litResolved = draft.litrosConsumidos.trim()
       ? Number(draft.litrosConsumidos.replace(",", "."))
       : undefined;
+    // Con viaje facturado/liquidado, el backend rechaza el PATCH si CUALQUIERA de los
+    // campos fiscales viene presente en el body (aunque su valor no haya cambiado). Por
+    // eso, con el viaje bloqueado, esos campos se omiten del payload (undefined → JSON.stringify
+    // los saca) para poder seguir guardando los campos operativos (fechas, km, observaciones, etc.).
+    const bloqueado = viajeSnapshot
+      ? !facturacionPermiteVincular(viajeSnapshot.facturacionEstado) ||
+        !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
+      : false;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -523,21 +550,29 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
           method: "PATCH",
           body: JSON.stringify({
             numero: draft.numero.trim(),
-            estado: draft.estado,
-            clienteId: draft.clienteId || undefined,
+            numeroIdentificacionPersonalizado:
+              draft.numeroIdentificacionPersonalizado.trim() || undefined,
+            etapa: draft.estado,
+            clienteId: bloqueado ? undefined : draft.clienteId || undefined,
             ...(externo
               ? {
-                  transportistaId: draft.transportistaId.trim(),
-                  contratanteRealizaFlete: draft.realizaFlete,
-                  transportistaEfectivoId: draft.realizaFlete
-                    ? null
-                    : draft.transportistaEfectivoId.trim() || null,
+                  transportistaId: bloqueado
+                    ? undefined
+                    : draft.transportistaId.trim(),
+                  contratanteRealizaFlete: bloqueado
+                    ? undefined
+                    : draft.realizaFlete,
+                  transportistaEfectivoId: bloqueado
+                    ? undefined
+                    : draft.realizaFlete
+                      ? null
+                      : draft.transportistaEfectivoId.trim() || null,
                   choferId: draft.choferExternoId.trim() || null,
                   vehiculoIds: vids,
                 }
               : {
-                  transportistaId: null,
-                  transportistaEfectivoId: null,
+                  transportistaId: bloqueado ? undefined : null,
+                  transportistaEfectivoId: bloqueado ? undefined : null,
                   choferId: draft.choferId.trim() || null,
                   vehiculoIds: vids,
                 }),
@@ -553,18 +588,19 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             ),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
-            monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
-            monedaMonto: draft.monedaMonto,
-            kmRecorridos: kmResolved,
-            litrosConsumidos: litResolved,
-            precioTransportistaExterno: precioTransportistaNum,
-            monedaPrecioTransportistaExterno:
-              draft.monedaPrecioTransportistaExterno,
-            ...gananciaBrutaManualPayloadFromDraft(draft),
-            otrosGastos: draft.otrosGastos
-              .map(otroGastoDraftToApi)
-              .filter(Boolean),
-            pagosTransportista: externo ? pagosTransportistaApi : [],
+            monto: bloqueado ? undefined : parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+            monedaMonto: bloqueado ? undefined : draft.monedaMonto,
+            cantidadFactura: bloqueado ? undefined : (draft.cantidadFactura.trim() ? Number(draft.cantidadFactura.replace(",", ".")) : null),
+            precioUnitarioFactura: bloqueado ? undefined : (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null),
+            cantidadTransportista: bloqueado ? undefined : (externo ? (draft.cantidadTransportista.trim() ? Number(draft.cantidadTransportista.replace(",", ".")) : null) : null),
+            precioUnitarioTransportista: bloqueado ? undefined : (externo ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null),
+            kmRecorridos: kmResolved ?? null,
+            litrosConsumidos: litResolved ?? null,
+            precioTransportistaExterno: bloqueado ? undefined : (externo ? (precioTransportistaNum ?? null) : null),
+            monedaPrecioTransportistaExterno: bloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
+            ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
+            otrosGastos: bloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+            pagosTransportista: bloqueado ? undefined : (externo ? pagosTransportistaApi : []),
           }),
         },
       );
@@ -631,7 +667,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     vehiculosPropios,
     ayudaFlota,
     opcionesProducto,
-    viajesConFactura,
     beginEditViaje,
     cancelEdit,
     saveInline,

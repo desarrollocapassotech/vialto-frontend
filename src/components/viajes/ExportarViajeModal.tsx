@@ -2,7 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import type { Viaje, Chofer } from "@/types/api";
-import { viajePermiteGenerarMicCrt } from "@/lib/viajesEstados";
+import { viajePermiteGenerarMicCrt } from "@/lib/viajesIndicadores";
 import { viajeUsaFlotaPropia } from "@/lib/viajesGananciaBruta";
 import { apiFetch, apiJson } from "@/lib/api";
 import { MicCrtExportModal } from "@/components/viajes/MicCrtExportModal";
@@ -12,6 +12,7 @@ import {
   missingGroupsMicCrtDesdeViaje,
   type ViajeExportMissingGroup,
 } from "@/lib/viajeExportMissingFields";
+import { numeroVisibleViaje } from "@/lib/viajesFlota";
 
 type Props = {
   viaje: Viaje;
@@ -93,7 +94,7 @@ export function ExportarViajeModal({
   // Nuevo estado para la vista de selección de transportista de Nómina
   const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
-  const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.estado);
+  const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.etapa);
   const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando || micCrtValidando;
 
@@ -211,7 +212,7 @@ export function ExportarViajeModal({
   function emitirNomina(emisorId?: string | null) {
     void ejecutarDescarga(
       viajePdfUrl("paut", emisorId),
-      `NOMINA-${viaje.numero}.pdf`,
+      `NOMINA-${numeroVisibleViaje(viaje)}.pdf`,
       setGenerandoPaut,
     );
   }
@@ -262,7 +263,7 @@ export function ExportarViajeModal({
                 Exportar
               </h2>
               <p className="mt-0.5 text-xs text-vialto-steel">
-                Viaje #{viaje.numero}
+                Viaje #{numeroVisibleViaje(viaje)}
               </p>
               {(viaje.origen || viaje.destino) && (
                 <p className="mt-1 text-xs text-vialto-steel">

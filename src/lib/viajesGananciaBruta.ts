@@ -396,3 +396,58 @@ export function gananciaBrutaMetaDesdeViaje(v: Viaje): GananciaBrutaMeta {
   }
   return gananciaBrutaMetaAutomatica(v, [], viajeUsaFlotaPropia(v));
 }
+
+export type GananciaBrutaDetalleFila = {
+  label: string;
+  monto: number;
+  moneda: MonedaBalance;
+  tag?: string;
+};
+
+/**
+ * Desglose en filas (label + monto con signo) para el modal de detalle: mismos números
+ * que `gananciaBrutaMetaDesdeViaje`, sin las oraciones armadas para el tooltip compacto.
+ * Omite ítems en cero (sin otros gastos, flota propia, etc.) para no sumar ruido visual.
+ */
+export function gananciaBrutaDesgloseDetalle(v: Viaje): GananciaBrutaDetalleFila[] {
+  if (viajeRequiereGananciaBrutaManual(v)) {
+    const resumen = resumenDesdeViaje(v);
+    return resumen.balance.map((l) => ({
+      label: l.tipo === 'gasto_extra' ? 'Gastos extra' : 'Ganancia manual',
+      monto: l.monto,
+      moneda: l.moneda,
+    }));
+  }
+
+  const monedas = monedasImplicadasEnViaje(v);
+  const desglose = desgloseBalancesPorMoneda(v);
+  const filas: GananciaBrutaDetalleFila[] = [];
+  for (const moneda of monedas) {
+    const d = desglose[moneda];
+    if (d.ingresos > 0) {
+      filas.push({
+        label: 'Ingresos',
+        monto: d.ingresos,
+        moneda,
+        tag: esIngresoReal(v) ? 'Real facturado' : 'Estimado',
+      });
+    }
+    if (d.costoTransportista > 0) {
+      filas.push({
+        label: 'Transportista externo',
+        monto: -d.costoTransportista,
+        moneda,
+        tag: esCostoReal(v) ? 'Real liquidado' : 'Estimado',
+      });
+    }
+    if (d.gastosExtra > 0) {
+      filas.push({
+        label: 'Gastos extra',
+        monto: -d.gastosExtra,
+        moneda,
+        tag: `${d.gastosCount} ítem/s`,
+      });
+    }
+  }
+  return filas;
+}

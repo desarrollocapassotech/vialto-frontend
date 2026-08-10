@@ -13,6 +13,7 @@ import {
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
@@ -21,15 +22,23 @@ import {
 import type { Cliente, Factura, Transportista, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "PENDIENTE",
-  cobrada: "COBRADA",
-  vencida: "VENCIDA",
+  borrador: "BORRADOR",
+  esperando_afip: "ESPERANDO AFIP",
+  facturado: "FACTURADO",
+  error_afip: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
+/** Badge adicional de cobro — se muestra junto al de ciclo de vida, nunca lo reemplaza. */
+const COBRADO_BADGE_CLASS = "bg-emerald-200 text-emerald-950 border-emerald-600/90";
+const VENCIDA_BADGE_CLASS = "bg-orange-100 text-orange-950 border-orange-400/80";
+
 const ESTADO_BADGE: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-950 border-amber-300/90",
-  cobrada: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
-  vencida: "bg-red-100 text-red-950 border-red-400/80",
+  borrador: "bg-zinc-100 text-zinc-800 border-zinc-300/90",
+  esperando_afip: "bg-amber-50 text-amber-950 border-amber-200/95",
+  facturado: "bg-emerald-100 text-emerald-950 border-emerald-500/80",
+  error_afip: "bg-red-100 text-red-950 border-red-400/80",
+  anulado: "bg-gray-100 text-gray-500 border-gray-300/80 line-through",
 };
 
 export type FacturaDraft = {
@@ -371,7 +380,7 @@ export function FacturaEditModal({
               Estado de cobro según los viajes vinculados. Los demás datos se
               guardan al confirmar.
             </p>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-1">
               <span
                 className={[
                   "inline-block rounded border px-2 py-0.5 text-xs font-medium",
@@ -380,6 +389,26 @@ export function FacturaEditModal({
               >
                 {ESTADO_LABEL[snapshotFactura.estado] ?? snapshotFactura.estado}
               </span>
+              {snapshotFactura.cobrado ? (
+                <span
+                  className={[
+                    "inline-block rounded border px-2 py-0.5 text-xs font-medium",
+                    COBRADO_BADGE_CLASS,
+                  ].join(" ")}
+                >
+                  COBRADO
+                </span>
+              ) : snapshotFactura.vencida ? (
+                <span
+                  className={[
+                    "inline-block rounded border px-2 py-0.5 text-xs font-medium",
+                    VENCIDA_BADGE_CLASS,
+                  ].join(" ")}
+                >
+                  VENCIDA
+                </span>
+              ) : null}
+              <AmbienteTestBadge ambiente={snapshotFactura.ambiente} />
             </div>
           </div>
           <button

@@ -67,7 +67,6 @@ import { vehiculosPorTipo } from "@/lib/vehiculoTipos";
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
 import { ChoferModal } from "@/components/viajes/ChoferModal";
-import { ViajeExportacionLeyenda } from "@/components/viajes/ViajeExportacionLeyenda";
 import { esEtiquetaCiudadValida, type PaisCodigo } from "@/lib/ciudades";
 import {
   destinosPayloadParaApi,
@@ -76,13 +75,13 @@ import {
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import {
-  estadoViajeLabel,
-  tooltipEstadoViaje,
-  estadoMuestraKmLitros,
+  etapaViajeLabel,
+  tooltipEtapaViaje,
+  etapaMuestraKmLitros,
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
-  VIAJE_ESTADOS_ALTA,
-} from "@/lib/viajesEstados";
+  VIAJE_ETAPAS_ALTA,
+} from "@/lib/viajesIndicadores";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
 import type {
@@ -94,12 +93,13 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
 import {
   type OpcionProducto,
   type ViajeProductoItem,
 } from "@/lib/productosViaje";
 
-const ESTADOS = VIAJE_ESTADOS_ALTA;
+const ESTADOS = VIAJE_ETAPAS_ALTA;
 
 const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
@@ -118,6 +118,7 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
+  const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
@@ -168,16 +169,22 @@ export function ViajeCreatePage() {
 
   const [detalleCarga, setDetalleCarga] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [numeroIdentificacionPersonalizado, setNumeroIdentificacionPersonalizado] =
+    useState("");
   const [kmRecorridos, setKmRecorridos] = useState("");
   const [litrosConsumidos, setLitrosConsumidos] = useState("");
 
   const [monto, setMonto] = useState("");
   const [monedaMonto, setMonedaMonto] = useState<ViajeMonedaCodigo>("ARS");
+  const [cantidadFactura, setCantidadFactura] = useState("");
+  const [precioUnitarioFactura, setPrecioUnitarioFactura] = useState("");
 
   const [precioTransportistaExterno, setPrecioTransportistaExterno] =
     useState("");
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>("ARS");
+  const [cantidadTransportista, setCantidadTransportista] = useState("");
+  const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -562,7 +569,9 @@ export function ViajeCreatePage() {
     }
 
     // 6. Validación de Montos y Pagos
-    const montoNum = parseCurrencyForMoneda(monto, monedaMonto);
+    const montoNum = desgloseActivo
+      ? (Number(cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
+      : parseCurrencyForMoneda(monto, monedaMonto);
     if (montoNum == null || montoNum < 0.01) {
       setError("Ingresá un monto a facturar mayor a 0.");
       return;
@@ -586,16 +595,15 @@ export function ViajeCreatePage() {
         return;
       }
     }
-    const precioTransportistaNum = parseCurrencyForMoneda(
-      precioTransportistaExterno,
-      monedaPrecioTransportista,
-    );
+    const precioTransportistaNum = desgloseActivo
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
     const pagosTransportistaApi =
       pagosTransportistaDraftsToApi(pagosTransportista);
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: transportistaId.trim(),
-          precioTransportistaExterno,
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           pagosTransportista,
         })
@@ -608,7 +616,7 @@ export function ViajeCreatePage() {
     // 7. Chequeo para mostrar Modal de Km/Litros si corresponde al estado
     if (
       !opts?.kmLitrosFromModal &&
-      estadoMuestraKmLitros(estado) &&
+      etapaMuestraKmLitros(estado) &&
       draftKmLitrosVacios(kmRecorridos, litrosConsumidos)
     ) {
       setModalKm(kmRecorridos);
@@ -639,7 +647,7 @@ export function ViajeCreatePage() {
       await apiJson(path, () => getToken(), {
         method: "POST",
         body: JSON.stringify({
-          estado,
+          etapa: estado,
           clienteId,
           ...(externo
             ? {
@@ -664,16 +672,22 @@ export function ViajeCreatePage() {
           productoItems: productoItems.filter((x) => x.productoId.trim()),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
+          numeroIdentificacionPersonalizado:
+            numeroIdentificacionPersonalizado.trim() || undefined,
           kmRecorridos:
             kmNum !== undefined && Number.isFinite(kmNum) ? kmNum : undefined,
           litrosConsumidos:
             litNum !== undefined && Number.isFinite(litNum)
               ? litNum
               : undefined,
-          monto: montoNum,
+          monto: desgloseActivo ? undefined : montoNum,
           monedaMonto,
-          precioTransportistaExterno: precioTransportistaNum,
+          precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
+          precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
+          cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
+          precioUnitarioTransportista: desgloseActivo && externo ? parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) : undefined,
           ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: externo ? pagosTransportistaApi : [],
@@ -745,21 +759,36 @@ export function ViajeCreatePage() {
               onSubmit();
             }}
           >
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Estado</span>
-              <select
-                value={estado}
-                onChange={(e) =>
-                  setEstado(e.target.value as (typeof ESTADOS)[number])
-                }
-                className={inputClass}
-              >
-                {ESTADOS.map((x) => (
-                  <option key={x} value={x} title={tooltipEstadoViaje(x)}>
-                    {estadoViajeLabel[x] ?? x}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
+                  {labelIdentificacionPersonalizadaViajes(maestro.tenant)}{" "}
+                  <span className="normal-case tracking-normal">(opcional)</span>
+                </span>
+                <input
+                  type="text"
+                  value={numeroIdentificacionPersonalizado}
+                  onChange={(e) => setNumeroIdentificacionPersonalizado(e.target.value)}
+                  placeholder="Ej: número de CTG"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClass}>Estado</span>
+                <select
+                  value={estado}
+                  onChange={(e) =>
+                    setEstado(e.target.value as (typeof ESTADOS)[number])
+                  }
+                  className={inputClass}
+                >
+                  {ESTADOS.map((x) => (
+                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                      {etapaViajeLabel[x] ?? x}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Origen</span>
@@ -823,34 +852,81 @@ export function ViajeCreatePage() {
                 />
                 <CrudFieldError message={fieldErrors.clienteId} />
               </div>
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Monto a facturar</span>
-                <div className="flex min-w-0 gap-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={monto}
-                    onChange={(e) =>
-                      setMonto(
-                        maskCurrencyForMoneda(e.target.value, monedaMonto),
-                      )
-                    }
-                    placeholder="0.00"
-                    className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
-                  />
-                  <MonedaSelect
-                    value={monedaMonto}
-                    onChange={(m) => {
-                      setMonto((prev) =>
-                        preserveAmountOnMonedaChange(prev, monedaMonto, m),
-                      );
-                      setMonedaMonto(m);
-                    }}
-                    aria-label="Moneda monto a facturar"
-                  />
+              {desgloseActivo ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Cantidad</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={cantidadFactura}
+                      onChange={(e) => setCantidadFactura(e.target.value)}
+                      placeholder="0.00"
+                      className={`${inputClass} text-right tabular-nums`}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Precio unitario</span>
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={precioUnitarioFactura}
+                        onChange={(e) => setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto))}
+                        placeholder="0.00"
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                      />
+                      <MonedaSelect
+                        value={monedaMonto}
+                        onChange={(m) => setMonedaMonto(m)}
+                        aria-label="Moneda precio unitario"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Total a facturar</span>
+                    <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                      <span className="w-full truncate">
+                        {(
+                          (Number(cantidadFactura.replace(",", ".")) || 0) * 
+                          (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
+                        ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Monto a facturar</span>
+                  <div className="flex min-w-0 gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={monto}
+                      onChange={(e) =>
+                        setMonto(
+                          maskCurrencyForMoneda(e.target.value, monedaMonto),
+                        )
+                      }
+                      placeholder="0.00"
+                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                    />
+                    <MonedaSelect
+                      value={monedaMonto}
+                      onChange={(m) => {
+                        setMonto((prev) =>
+                          preserveAmountOnMonedaChange(prev, monedaMonto, m),
+                        );
+                        setMonedaMonto(m);
+                      }}
+                      aria-label="Moneda monto a facturar"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <ViajeOperacionTipoFieldset
               modo={modoOperacion}
@@ -883,41 +959,88 @@ export function ViajeCreatePage() {
                       />
                       <CrudFieldError message={fieldErrors.transportistaId} />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Precio transporte</span>
-                      <div className="flex min-w-0 gap-2">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          value={precioTransportistaExterno}
-                          onChange={(e) =>
-                            setPrecioTransportistaExterno(
-                              maskCurrencyForMoneda(
-                                e.target.value,
-                                monedaPrecioTransportista,
-                              ),
-                            )
-                          }
-                          placeholder="0.00"
-                          className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
-                        />
-                        <MonedaSelect
-                          value={monedaPrecioTransportista}
-                          onChange={(m) => {
-                            setPrecioTransportistaExterno((prev) =>
-                              preserveAmountOnMonedaChange(
-                                prev,
-                                monedaPrecioTransportista,
-                                m,
-                              ),
-                            );
-                            setMonedaPrecioTransportista(m);
-                          }}
-                          aria-label="Moneda precio transportista externo"
-                        />
+                    {desgloseActivo ? (
+                      <>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Cantidad</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={cantidadTransportista}
+                            onChange={(e) => setCantidadTransportista(e.target.value)}
+                            placeholder="0.00"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Precio unitario</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioUnitarioTransportista}
+                              onChange={(e) => setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista))}
+                              placeholder="0.00"
+                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                            />
+                            <MonedaSelect
+                              value={monedaPrecioTransportista}
+                              onChange={(m) => setMonedaPrecioTransportista(m)}
+                              aria-label="Moneda precio unitario transportista"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Pago a transporte</span>
+                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <span className="w-full truncate">
+                              {(
+                                (Number(cantidadTransportista.replace(",", ".")) || 0) * 
+                                (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+                              ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={fieldLabelClass}>Precio transporte</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioTransportistaExterno}
+                            onChange={(e) =>
+                              setPrecioTransportistaExterno(
+                                maskCurrencyForMoneda(
+                                  e.target.value,
+                                  monedaPrecioTransportista,
+                                ),
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                          />
+                          <MonedaSelect
+                            value={monedaPrecioTransportista}
+                            onChange={(m) => {
+                              setPrecioTransportistaExterno((prev) =>
+                                preserveAmountOnMonedaChange(
+                                  prev,
+                                  monedaPrecioTransportista,
+                                  m,
+                                ),
+                              );
+                              setMonedaPrecioTransportista(m);
+                            }}
+                            aria-label="Moneda precio transportista externo"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   {transportistaId && (
                     <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
@@ -1108,7 +1231,7 @@ export function ViajeCreatePage() {
               errorFechaCarga={fechaCargaError}
               errorFechaDescarga={fechaDescargaError}
             />
-            {estadoMuestraKmLitros(estado) && (
+            {etapaMuestraKmLitros(estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               {isVisible("alta_viaje", "kmRecorridos") && (
                 <div className="flex flex-col gap-1">
@@ -1223,9 +1346,6 @@ export function ViajeCreatePage() {
               </button>
             </div>
           )}
-            <div className="md:col-span-2 lg:col-span-3">
-              <ViajeExportacionLeyenda />
-            </div>
             {error && (
               <div className="md:col-span-2 lg:col-span-3">
                 <p

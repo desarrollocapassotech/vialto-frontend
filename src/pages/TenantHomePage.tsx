@@ -213,6 +213,7 @@ export function TenantHomePage() {
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
+          hasArca={hasArca}
           editando={abriendoEditorViaje}
           facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
@@ -354,7 +355,6 @@ export function TenantHomePage() {
             }
             choferesPropios={viajeEditor.choferesPropios}
             vehiculosPropios={viajeEditor.vehiculosPropios}
-            viajesConFactura={viajeEditor.viajesConFactura}
             onModoChange={viajeEditor.applyDraftModo}
             ayudaFlota={viajeEditor.ayudaFlota}
             viajeEditHint={viajeEditor.viajeEditHint}

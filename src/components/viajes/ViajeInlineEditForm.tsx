@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+
 import { Spinner } from '@/components/ui/Spinner';
 import {
   ChoferSearchSelect,
@@ -14,6 +14,8 @@ import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
 import { ViajeVehiculosLista } from '@/components/viajes/ViajeVehiculosLista';
 import {
   preserveAmountOnMonedaChange,
+  parseCurrencyForMoneda,
+  maskCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from '@/lib/currencyMask';
 import {
@@ -22,7 +24,9 @@ import {
   normalizarIdEnLista,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
-import { estadoMuestraKmLitros } from '@/lib/viajesEstados';
+import { etapaMuestraKmLitros } from '@/lib/viajesIndicadores';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
 import type { ViajeInlineDraft } from './viajesSuperadminTypes';
 import type { OpcionProducto } from '@/lib/productosViaje';
@@ -73,12 +77,38 @@ export function ViajeInlineEditForm({
   onSave,
   onCancel,
 }: Props) {
+  const { isVisible } = useFieldConfig("viajes");
+  const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const choferesPropios = useMemo(() => choferesFlotaPropia(choferes), [choferes]);
   const vehiculosPropios = useMemo(() => vehiculosFlotaPropia(vehiculos), [vehiculos]);
   const ayudaFlota = useMemo(
     () => mensajesAyudaFlotaPropia(choferes, vehiculos),
     [choferes, vehiculos],
   );
+
+  const lastInitNum = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draft || !desgloseActivo) return;
+    if (lastInitNum.current === draft.numero) return;
+    lastInitNum.current = draft.numero;
+    
+    setDraft((p) => {
+      if (!p) return p;
+      let changed = false;
+      const next = { ...p };
+      if (next.cantidadFactura === "") {
+        next.cantidadFactura = "1";
+        next.precioUnitarioFactura = next.monto;
+        changed = true;
+      }
+      if (next.cantidadTransportista === "") {
+        next.cantidadTransportista = "1";
+        next.precioUnitarioTransportista = next.precioTransportistaExterno;
+        changed = true;
+      }
+      return changed ? next : p;
+    });
+  }, [draft, desgloseActivo, setDraft]);
 
   function set(patch: Partial<ViajeInlineDraft>) {
     setDraft((p) => (p ? { ...p, ...patch } : p));
@@ -121,30 +151,93 @@ export function ViajeInlineEditForm({
                 aria-label="Cliente"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <span className={LABEL}>Monto a facturar</span>
-              <div className="flex min-w-0 gap-2">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={draft.monto}
-                  onChange={(e) => set({ monto: e.target.value })}
-                  placeholder="0.00"
-                  className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
-                />
-                <MonedaSelect
-                  value={draft.monedaMonto}
-                  onChange={(m: ViajeMonedaCodigo) =>
-                    set({
-                      monedaMonto: m,
-                      monto: preserveAmountOnMonedaChange(draft.monto, draft.monedaMonto, m),
-                    })
-                  }
-                  aria-label="Moneda monto a facturar"
-                />
+            {desgloseActivo ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <span className={LABEL}>Cantidad</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.cantidadFactura}
+                    onChange={(e) => set({ cantidadFactura: e.target.value })}
+                    placeholder="0.00"
+                    className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={LABEL}>Precio unitario</span>
+                  <div className="flex min-w-0 gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={draft.precioUnitarioFactura}
+                      onChange={(e) =>
+                        set({
+                          precioUnitarioFactura: maskCurrencyForMoneda(
+                            e.target.value,
+                            draft.monedaMonto,
+                          ),
+                        })
+                      }
+                      placeholder="0.00"
+                      className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                    />
+                    <MonedaSelect
+                      value={draft.monedaMonto}
+                      onChange={(m: ViajeMonedaCodigo) =>
+                        set({
+                          monedaMonto: m,
+                          precioUnitarioFactura: preserveAmountOnMonedaChange(
+                            draft.precioUnitarioFactura,
+                            draft.monedaMonto,
+                            m,
+                          ),
+                        })
+                      }
+                      aria-label="Moneda precio unitario"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={LABEL}>Total a facturar</span>
+                  <div className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}>
+                    <span className="w-full truncate text-sm">
+                      {(
+                        (Number(draft.cantidadFactura.replace(",", ".")) || 0) * 
+                        (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+                      ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <span className={LABEL}>Monto a facturar</span>
+                <div className="flex min-w-0 gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.monto}
+                    onChange={(e) => set({ monto: e.target.value })}
+                    placeholder="0.00"
+                    className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                  />
+                  <MonedaSelect
+                    value={draft.monedaMonto}
+                    onChange={(m: ViajeMonedaCodigo) =>
+                      set({
+                        monedaMonto: m,
+                        monto: preserveAmountOnMonedaChange(draft.monto, draft.monedaMonto, m),
+                      })
+                    }
+                    aria-label="Moneda monto a facturar"
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Operación: externo o flota propia */}
@@ -165,34 +258,97 @@ export function ViajeInlineEditForm({
                       aria-label="Transportista externo"
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={LABEL}>Precio transporte</span>
-                    <div className="flex min-w-0 gap-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={draft.precioTransportistaExterno}
-                        onChange={(e) => set({ precioTransportistaExterno: e.target.value })}
-                        placeholder="0.00"
-                        className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
-                      />
-                      <MonedaSelect
-                        value={draft.monedaPrecioTransportistaExterno}
-                        onChange={(m: ViajeMonedaCodigo) =>
-                          set({
-                            monedaPrecioTransportistaExterno: m,
-                            precioTransportistaExterno: preserveAmountOnMonedaChange(
-                              draft.precioTransportistaExterno,
-                              draft.monedaPrecioTransportistaExterno,
-                              m,
-                            ),
-                          })
-                        }
-                        aria-label="Moneda precio transportista externo"
-                      />
+                  {desgloseActivo ? (
+                    <>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={LABEL}>Cantidad</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={draft.cantidadTransportista}
+                          onChange={(e) => set({ cantidadTransportista: e.target.value })}
+                          placeholder="0.00"
+                          className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={LABEL}>Precio unitario</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={draft.precioUnitarioTransportista}
+                            onChange={(e) =>
+                              set({
+                                precioUnitarioTransportista: maskCurrencyForMoneda(
+                                  e.target.value,
+                                  draft.monedaPrecioTransportistaExterno,
+                                ),
+                              })
+                            }
+                            placeholder="0.00"
+                            className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                          />
+                          <MonedaSelect
+                            value={draft.monedaPrecioTransportistaExterno}
+                            onChange={(m: ViajeMonedaCodigo) =>
+                              set({
+                                monedaPrecioTransportistaExterno: m,
+                                precioUnitarioTransportista: preserveAmountOnMonedaChange(
+                                  draft.precioUnitarioTransportista,
+                                  draft.monedaPrecioTransportistaExterno,
+                                  m,
+                                ),
+                              })
+                            }
+                            aria-label="Moneda precio unitario transportista"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={LABEL}>Pago a transporte</span>
+                        <div className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}>
+                          <span className="w-full truncate text-sm">
+                            {(
+                              (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * 
+                              (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+                            ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={LABEL}>Precio transporte</span>
+                      <div className="flex min-w-0 gap-2">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={draft.precioTransportistaExterno}
+                          onChange={(e) => set({ precioTransportistaExterno: e.target.value })}
+                          placeholder="0.00"
+                          className={`min-w-0 flex-1 ${INPUT} text-right tabular-nums`}
+                        />
+                        <MonedaSelect
+                          value={draft.monedaPrecioTransportistaExterno}
+                          onChange={(m: ViajeMonedaCodigo) =>
+                            set({
+                              monedaPrecioTransportistaExterno: m,
+                              precioTransportistaExterno: preserveAmountOnMonedaChange(
+                                draft.precioTransportistaExterno,
+                                draft.monedaPrecioTransportistaExterno,
+                                m,
+                              ),
+                            })
+                          }
+                          aria-label="Moneda precio transportista externo"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <div className="grid gap-3">
                   <div className="flex min-w-0 flex-col gap-1 max-w-md">
@@ -261,7 +417,7 @@ export function ViajeInlineEditForm({
           />
 
           {/* Km / Litros (solo en estados finales) */}
-          {estadoMuestraKmLitros(draft.estado) && (
+          {etapaMuestraKmLitros(draft.estado) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               <div className="flex flex-col gap-1">
                 <span className={LABEL}>Km recorridos</span>
@@ -296,6 +452,19 @@ export function ViajeInlineEditForm({
               triggerClassName={INPUT}
               inputClassName={INPUT}
               disabled={saving}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={LABEL}>ID propio</span>
+            <input
+              type="text"
+              value={draft.numeroIdentificacionPersonalizado}
+              onChange={(e) =>
+                set({ numeroIdentificacionPersonalizado: e.target.value })
+              }
+              placeholder="Ej: número de CTG"
+              className={INPUT}
             />
           </div>
 

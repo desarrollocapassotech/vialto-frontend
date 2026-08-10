@@ -21,6 +21,8 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
     maxUsers: String(t.maxUsers),
     billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
     whiteLabelDomain: t.whiteLabelDomain ?? "",
+    labelIdentificacionPersonalizadaViajes:
+      t.labelIdentificacionPersonalizadaViajes ?? "",
   };
 }
 
@@ -90,6 +92,8 @@ export function SuperadminTenantEditPage() {
             maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
             billingRenewsAt: values.billingRenewsAt || null,
             whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
+            labelIdentificacionPersonalizadaViajes:
+              values.labelIdentificacionPersonalizadaViajes?.trim() || null,
           }),
         },
       );

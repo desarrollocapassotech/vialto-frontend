@@ -54,6 +54,8 @@ export type ListadoDatosProps<T> = {
   renderMobileCard?: (row: T) => ReactNode;
   /** Fila de tabla desktop personalizada (anula celdas por columnas). */
   renderTableRow?: (row: T) => ReactNode;
+  /** Si se pasa (y no hay `renderTableRow`/`renderMobileCard`), la fila/tarjeta es clickable. */
+  onRowClick?: (row: T) => void;
   renderActions?: (row: T) => ReactNode;
   actionsHeader?: ReactNode;
   actionsThClassName?: string;
@@ -93,6 +95,7 @@ export function ListadoDatos<T>({
   filtersTitle,
   renderMobileCard,
   renderTableRow,
+  onRowClick,
   renderActions,
   actionsHeader = 'Acciones',
   actionsThClassName = `${listadoTablaThClass} text-right`,
@@ -109,7 +112,11 @@ export function ListadoDatos<T>({
 
   function renderDefaultMobileCard(row: T) {
     return (
-      <article key={rowKey(row)} className={listadoCardClass}>
+      <article
+        key={rowKey(row)}
+        className={`${listadoCardClass}${onRowClick ? ' cursor-pointer transition-colors hover:bg-vialto-mist/70' : ''}`}
+        onClick={onRowClick ? () => onRowClick(row) : undefined}
+      >
         {primaryCol && (
           <div className={listadoCardPrimaryClass}>{primaryCol.cell(row)}</div>
         )}
@@ -125,7 +132,12 @@ export function ListadoDatos<T>({
           </dl>
         )}
         {renderActions && (
-          <div className={listadoCardActionsClass}>{renderActions(row)}</div>
+          <div
+            className={listadoCardActionsClass}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {renderActions(row)}
+          </div>
         )}
       </article>
     );
@@ -205,14 +217,23 @@ export function ListadoDatos<T>({
                 renderTableRow ? (
                   renderTableRow(row)
                 ) : (
-                  <tr key={rowKey(row)} className={listadoTablaBodyRowClass}>
+                  <tr
+                    key={rowKey(row)}
+                    className={`${listadoTablaBodyRowClass}${onRowClick ? ' cursor-pointer' : ''}`}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  >
                     {columns.map((col) => (
                       <td key={col.id} className={col.tdClassName ?? listadoTablaTdClass}>
                         {col.cell(row)}
                       </td>
                     ))}
                     {renderActions && (
-                      <td className={actionsTdClassName}>{renderActions(row)}</td>
+                      <td
+                        className={actionsTdClassName}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {renderActions(row)}
+                      </td>
                     )}
                   </tr>
                 ),

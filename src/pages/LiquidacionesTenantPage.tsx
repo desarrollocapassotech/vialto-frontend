@@ -1,5 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Ban,
   Download,
@@ -51,11 +52,11 @@ import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
-  borrador: "Borrador",
-  pendiente_cae: "Pendiente CAE",
-  autorizado: "Autorizado",
-  error: "Error",
-  anulado: "Anulado",
+  borrador: "BORRADOR",
+  pendiente_cae: "ESPERANDO AFIP",
+  autorizado: "LIQUIDADO",
+  error: "ERROR DE AFIP",
+  anulado: "ANULADO",
 };
 
 const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
@@ -346,6 +347,44 @@ export function LiquidacionesTenantPage() {
     };
   }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
+  /** Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje). */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !activeTenantId) return;
+    const id = searchParams.get("liquidacion")?.trim();
+    if (!id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const full = await apiJson<LiquidacionConTransportista>(
+          `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(activeTenantId)}`,
+          () => getToken(),
+        );
+        if (cancelled) return;
+        setDetail({
+          mode: "view",
+          liq: { ...full, conceptosLineas: full.conceptosLineas ?? [] },
+        });
+      } catch {
+        // Si no se pudo resolver (id inválido, sin permisos), no bloqueamos la pantalla.
+      } finally {
+        if (!cancelled) {
+          setSearchParams(
+            (p) => {
+              const next = new URLSearchParams(p);
+              next.delete("liquidacion");
+              return next;
+            },
+            { replace: true },
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, activeTenantId, searchParams, setSearchParams, getToken]);
+
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
       (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
@@ -442,6 +481,47 @@ export function LiquidacionesTenantPage() {
     } finally {
       setDownloading(null);
     }
+  }
+
+  /** Abre el PDF en una pestaña nueva (a diferencia de descargarPdf/Nc, que fuerzan la descarga). */
+  async function verPdfEnPestania(url: string, errorMsg: string, liqId: string) {
+    const ventana = window.open("", "_blank");
+    try {
+      const res = await apiFetch(url, () => getToken());
+      if (!res.ok) throw new Error(errorMsg);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      if (ventana) {
+        ventana.location.href = blobUrl;
+      } else {
+        window.open(blobUrl, "_blank");
+      }
+    } catch (err) {
+      ventana?.close();
+      setActionError({
+        id: liqId,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
+    }
+  }
+
+  function verPdf(liq: LiquidacionConTransportista) {
+    const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+    return verPdfEnPestania(
+      `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf${qsTenant}`,
+      "Error al generar el PDF",
+      liq.id,
+    );
+  }
+
+  function verPdfAnulacion(liq: LiquidacionConTransportista) {
+    const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+    return verPdfEnPestania(
+      `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/pdf-anulacion${qsTenant}`,
+      "Error al generar el PDF de la anulación",
+      liq.id,
+    );
   }
 
   async function descargarPdfNc(liq: LiquidacionConTransportista) {
@@ -592,9 +672,12 @@ export function LiquidacionesTenantPage() {
       )}
 
       {hasArca && activeTenantId && (
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-          <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-          Emisión electrónica vía ARCA
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+            Emisión electrónica vía ARCA
+          </div>
+          <AmbienteTestBadge ambiente={config?.ambiente} />
         </div>
       )}
 
@@ -819,12 +902,14 @@ export function LiquidacionesTenantPage() {
               : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
+        onRowClick={(liq) => accionesProps(liq).onVer()}
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />
         )}
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
+            onClick={() => accionesProps(liq).onVer()}
             primary={transportistaNombre(liq)}
             fields={[
               {
@@ -1005,8 +1090,15 @@ export function LiquidacionesTenantPage() {
             setDetail(null);
           }}
           onVerComprobante={
-            !hasArca && detail.liq.comprobanteUrl?.trim()
-              ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)
+            hasArca && detail.liq.cbteNro != null
+              ? () => void verPdf(detail.liq)
+              : !hasArca && detail.liq.comprobanteUrl?.trim()
+                ? () => setPreviewComprobanteUrl(detail.liq.comprobanteUrl)
+                : undefined
+          }
+          onVerAnulacion={
+            detail.liq.estado === "anulado"
+              ? () => void verPdfAnulacion(detail.liq)
               : undefined
           }
         />

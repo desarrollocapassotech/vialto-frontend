@@ -11,13 +11,19 @@ export function ListadoCard({
   primary,
   fields,
   actions,
+  onClick,
 }: {
   primary?: ReactNode;
   fields?: Array<{ label: ReactNode; value: ReactNode }>;
   actions?: ReactNode;
+  /** Si se pasa, la tarjeta entera es clickable (p. ej. para abrir el modal de vista). */
+  onClick?: () => void;
 }) {
   return (
-    <article className={listadoCardClass}>
+    <article
+      className={`${listadoCardClass}${onClick ? ' cursor-pointer transition-colors hover:bg-vialto-mist/70' : ''}`}
+      onClick={onClick}
+    >
       {primary != null && primary !== false && (
         <div className={listadoCardPrimaryClass}>{primary}</div>
       )}
@@ -34,7 +40,14 @@ export function ListadoCard({
           ))}
         </dl>
       )}
-      {actions && <div className={listadoCardActionsClass}>{actions}</div>}
+      {actions && (
+        <div
+          className={listadoCardActionsClass}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {actions}
+        </div>
+      )}
     </article>
   );
 }

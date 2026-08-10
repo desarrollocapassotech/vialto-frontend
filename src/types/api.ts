@@ -24,7 +24,16 @@ export interface Viaje {
   id: string;
   tenantId: string;
   numero: string;
+  /** ID propio del cliente para identificar el viaje (ej. CTG). Si está cargado, reemplaza a `numero` en toda vista/documento humano. */
+  numeroIdentificacionPersonalizado: string | null;
+  /** @deprecated Reemplazado por `etapa` + `facturacionEstado` + `liquidacionEstado`. */
   estado: string;
+  /** Etapa operativa del viaje: pendiente | en_curso | finalizado | cancelado. */
+  etapa: string;
+  /** Estado de facturación al cliente (derivado, no editable a mano). */
+  facturacionEstado: string;
+  /** Estado de liquidación al transportista (derivado); null si no aplica (sin transportista externo o tenant sin integración ARCA). */
+  liquidacionEstado: string | null;
   clienteId: string;
   /** Presente en listados/detalle cuando el backend incluye la relación. */
   cliente?: { id: string; nombre: string; condicionIva?: number | null };
@@ -78,9 +87,13 @@ export interface Viaje {
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
+  cantidadFactura?: number | null;
+  precioUnitarioFactura?: number | null;
   /** ARS | USD (omitido en respuestas antiguas -> se trata como ARS). */
   monedaMonto?: string;
   precioTransportistaExterno: number | null;
+  cantidadTransportista?: number | null;
+  precioUnitarioTransportista?: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
@@ -93,11 +106,38 @@ export interface Viaje {
   facturaId?: string | null;
   /** Denormalizado en el viaje; si falta, usar `factura.numero` del include. */
   nroFactura: string | null;
-  factura?: { id: string; numero: string; estado: string } | null;
+  factura?: {
+    id: string;
+    numero: string;
+    importe?: number;
+    moneda?: string;
+    estado: string;
+    arcaEstado?: string | null;
+    arcaError?: string | null;
+    cae?: string | null;
+    caeFechaVto?: string | null;
+    cbteNro?: number | null;
+    ptoVenta?: number | null;
+    fechaEmision?: string;
+  } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
     monto?: number;
-    liquidacion: { id: string; estado: string; liquido: number };
+    liquidacion: {
+      id: string;
+      estado: string;
+      liquido: number;
+      arcaError?: string | null;
+      cae?: string | null;
+      caeFechaVto?: string | null;
+      cbteNro?: number | null;
+      ptoVenta?: number | null;
+      ambiente?: string | null;
+      periodoDesde?: string;
+      periodoHasta?: string;
+      motivoAnulacion?: string | null;
+      anuladoAt?: string | null;
+    };
   }[];
   createdAt: string;
   createdBy: string;
@@ -237,6 +277,8 @@ export interface Tenant {
   billingStatus: string;
   billingRenewsAt: string | null;
   whiteLabelDomain: string | null;
+  /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
+  labelIdentificacionPersonalizadaViajes: string | null;
   createdAt: string;
 }
 
@@ -303,7 +345,12 @@ export interface Factura {
   moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;
-  estado: "pendiente" | "cobrada" | "vencida";
+  /** Ciclo de vida del comprobante. Independiente de `cobrado`/`vencida` — no se reemplazan entre sí. */
+  estado: "borrador" | "esperando_afip" | "facturado" | "error_afip" | "anulado";
+  /** Se puede estar cobrado en cualquier `estado` (ej. cobrado antes de anular). */
+  cobrado: boolean;
+  /** Solo relevante mientras no está cobrado y ya se llegó a "facturado". */
+  vencida: boolean;
   diferencia: number | null;
   ivaPct: number | null;
   comprobanteUrl: string | null;
@@ -314,6 +361,8 @@ export interface Factura {
   caeFechaVto?: string | null;
   arcaEstado?: "pendiente_cae" | "autorizado" | "error" | "anulado" | null;
   arcaError?: string | null;
+  /** Ambiente ARCA con el que se autorizó (snapshot; homologacion | produccion). Null si no aplica. */
+  ambiente?: string | null;
   /** Datos del comprobante de anulación (Nota de Crédito A/B); la factura original se conserva arriba. */
   anulacionCbteTipo?: number | null;
   anulacionCbteNro?: number | null;
@@ -577,6 +626,7 @@ export interface LiquidacionViajeItem {
   viaje?: {
     id: string;
     numero: string | number | null;
+    numeroIdentificacionPersonalizado?: string | null;
     fechaCarga: string | null;
     origen: string | null;
     destino: string | null;

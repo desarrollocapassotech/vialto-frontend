@@ -12,7 +12,7 @@ import {
   fmtSignedLiquidacionMoney,
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
-import { AmbienteHomologacionWarning } from "@/components/liquidaciones/AmbienteHomologacionWarning";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
@@ -37,7 +37,10 @@ import {
   signedMontoConIvaConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
-import { formatViajeImporteForListado } from "@/lib/viajesFlota";
+import {
+  formatViajeImporteForListado,
+  numeroVisibleViaje,
+} from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import type {
   Liquidacion,
@@ -50,13 +53,18 @@ type ViajeItem = Pick<
   Viaje,
   | "id"
   | "numero"
+  | "numeroIdentificacionPersonalizado"
   | "fechaCarga"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
   | "liquidacionesViaje"
+  | "liquidacionEstado"
   | "otrosGastos"
+  | "choferId"
+  | "chofer"
+  | "productosViaje"
 >;
 
 function fmtDate(iso: string | null) {
@@ -324,7 +332,7 @@ export function CrearLiquidacionManualModal({
     }
     if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
       setError(
-        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${viajeInicial.numero}.`,
+        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${numeroVisibleViaje(viajeInicial)}.`,
       );
       return;
     }
@@ -516,9 +524,14 @@ export function CrearLiquidacionManualModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/10 px-6 py-4 shrink-0">
-          <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
-            Nueva liquidación
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+              Nueva liquidación
+            </h2>
+            {hasArca && (
+              <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
+            )}
+          </div>
           {!submitting && (
             <button
               type="button"
@@ -627,9 +640,15 @@ export function CrearLiquidacionManualModal({
               <p className={labelClass}>Detalle del viaje</p>
               <div className="rounded border border-black/10 bg-vialto-mist/50 px-3 py-2.5 space-y-1.5 text-xs">
                 <div className="flex justify-between gap-3">
-                  <span className="text-vialto-steel">Número</span>
+                  <span className="text-vialto-steel">ID sistema</span>
                   <span className="tabular-nums text-vialto-charcoal font-medium">
                     #{viajeInicial.numero}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-vialto-steel">ID personalizado</span>
+                  <span className="tabular-nums text-vialto-charcoal font-medium">
+                    {viajeInicial.numeroIdentificacionPersonalizado?.trim() || "—"}
                   </span>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -803,7 +822,7 @@ export function CrearLiquidacionManualModal({
             lineas={conceptosLineas}
             viajesDisponibles={selectedViajes.map((v) => ({
               id: v.id,
-              numero: v.numero,
+              numero: numeroVisibleViaje(v),
             }))}
             onChange={(next) => {
               setConceptosLineas(next);
@@ -912,10 +931,6 @@ export function CrearLiquidacionManualModal({
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
               {error}
             </div>
-          )}
-
-          {hasArca && (
-            <AmbienteHomologacionWarning ambiente={resolvedConfig?.ambiente} />
           )}
 
           {cvlpClaseBAlerta && (
