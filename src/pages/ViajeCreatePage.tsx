@@ -118,6 +118,7 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
+  const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
@@ -175,11 +176,15 @@ export function ViajeCreatePage() {
 
   const [monto, setMonto] = useState("");
   const [monedaMonto, setMonedaMonto] = useState<ViajeMonedaCodigo>("ARS");
+  const [cantidadFactura, setCantidadFactura] = useState("");
+  const [precioUnitarioFactura, setPrecioUnitarioFactura] = useState("");
 
   const [precioTransportistaExterno, setPrecioTransportistaExterno] =
     useState("");
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>("ARS");
+  const [cantidadTransportista, setCantidadTransportista] = useState("");
+  const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -564,7 +569,9 @@ export function ViajeCreatePage() {
     }
 
     // 6. Validación de Montos y Pagos
-    const montoNum = parseCurrencyForMoneda(monto, monedaMonto);
+    const montoNum = desgloseActivo
+      ? (Number(cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
+      : parseCurrencyForMoneda(monto, monedaMonto);
     if (montoNum == null || montoNum < 0.01) {
       setError("Ingresá un monto a facturar mayor a 0.");
       return;
@@ -588,16 +595,15 @@ export function ViajeCreatePage() {
         return;
       }
     }
-    const precioTransportistaNum = parseCurrencyForMoneda(
-      precioTransportistaExterno,
-      monedaPrecioTransportista,
-    );
+    const precioTransportistaNum = desgloseActivo
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
     const pagosTransportistaApi =
       pagosTransportistaDraftsToApi(pagosTransportista);
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: transportistaId.trim(),
-          precioTransportistaExterno,
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           pagosTransportista,
         })
@@ -674,10 +680,14 @@ export function ViajeCreatePage() {
             litNum !== undefined && Number.isFinite(litNum)
               ? litNum
               : undefined,
-          monto: montoNum,
+          monto: desgloseActivo ? undefined : montoNum,
           monedaMonto,
-          precioTransportistaExterno: precioTransportistaNum,
+          precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
+          precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
+          cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
+          precioUnitarioTransportista: desgloseActivo && externo ? parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) : undefined,
           ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: externo ? pagosTransportistaApi : [],
@@ -842,34 +852,81 @@ export function ViajeCreatePage() {
                 />
                 <CrudFieldError message={fieldErrors.clienteId} />
               </div>
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Monto a facturar</span>
-                <div className="flex min-w-0 gap-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={monto}
-                    onChange={(e) =>
-                      setMonto(
-                        maskCurrencyForMoneda(e.target.value, monedaMonto),
-                      )
-                    }
-                    placeholder="0.00"
-                    className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
-                  />
-                  <MonedaSelect
-                    value={monedaMonto}
-                    onChange={(m) => {
-                      setMonto((prev) =>
-                        preserveAmountOnMonedaChange(prev, monedaMonto, m),
-                      );
-                      setMonedaMonto(m);
-                    }}
-                    aria-label="Moneda monto a facturar"
-                  />
+              {desgloseActivo ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Cantidad</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={cantidadFactura}
+                      onChange={(e) => setCantidadFactura(e.target.value)}
+                      placeholder="0.00"
+                      className={`${inputClass} text-right tabular-nums`}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Precio unitario</span>
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={precioUnitarioFactura}
+                        onChange={(e) => setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto))}
+                        placeholder="0.00"
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                      />
+                      <MonedaSelect
+                        value={monedaMonto}
+                        onChange={(m) => setMonedaMonto(m)}
+                        aria-label="Moneda precio unitario"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Total a facturar</span>
+                    <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                      <span className="w-full truncate">
+                        {(
+                          (Number(cantidadFactura.replace(",", ".")) || 0) * 
+                          (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
+                        ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Monto a facturar</span>
+                  <div className="flex min-w-0 gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={monto}
+                      onChange={(e) =>
+                        setMonto(
+                          maskCurrencyForMoneda(e.target.value, monedaMonto),
+                        )
+                      }
+                      placeholder="0.00"
+                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                    />
+                    <MonedaSelect
+                      value={monedaMonto}
+                      onChange={(m) => {
+                        setMonto((prev) =>
+                          preserveAmountOnMonedaChange(prev, monedaMonto, m),
+                        );
+                        setMonedaMonto(m);
+                      }}
+                      aria-label="Moneda monto a facturar"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <ViajeOperacionTipoFieldset
               modo={modoOperacion}
@@ -902,41 +959,88 @@ export function ViajeCreatePage() {
                       />
                       <CrudFieldError message={fieldErrors.transportistaId} />
                     </div>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>Precio transporte</span>
-                      <div className="flex min-w-0 gap-2">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          value={precioTransportistaExterno}
-                          onChange={(e) =>
-                            setPrecioTransportistaExterno(
-                              maskCurrencyForMoneda(
-                                e.target.value,
-                                monedaPrecioTransportista,
-                              ),
-                            )
-                          }
-                          placeholder="0.00"
-                          className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
-                        />
-                        <MonedaSelect
-                          value={monedaPrecioTransportista}
-                          onChange={(m) => {
-                            setPrecioTransportistaExterno((prev) =>
-                              preserveAmountOnMonedaChange(
-                                prev,
-                                monedaPrecioTransportista,
-                                m,
-                              ),
-                            );
-                            setMonedaPrecioTransportista(m);
-                          }}
-                          aria-label="Moneda precio transportista externo"
-                        />
+                    {desgloseActivo ? (
+                      <>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Cantidad</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={cantidadTransportista}
+                            onChange={(e) => setCantidadTransportista(e.target.value)}
+                            placeholder="0.00"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Precio unitario</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioUnitarioTransportista}
+                              onChange={(e) => setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista))}
+                              placeholder="0.00"
+                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                            />
+                            <MonedaSelect
+                              value={monedaPrecioTransportista}
+                              onChange={(m) => setMonedaPrecioTransportista(m)}
+                              aria-label="Moneda precio unitario transportista"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Pago a transporte</span>
+                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <span className="w-full truncate">
+                              {(
+                                (Number(cantidadTransportista.replace(",", ".")) || 0) * 
+                                (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+                              ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={fieldLabelClass}>Precio transporte</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioTransportistaExterno}
+                            onChange={(e) =>
+                              setPrecioTransportistaExterno(
+                                maskCurrencyForMoneda(
+                                  e.target.value,
+                                  monedaPrecioTransportista,
+                                ),
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                          />
+                          <MonedaSelect
+                            value={monedaPrecioTransportista}
+                            onChange={(m) => {
+                              setPrecioTransportistaExterno((prev) =>
+                                preserveAmountOnMonedaChange(
+                                  prev,
+                                  monedaPrecioTransportista,
+                                  m,
+                                ),
+                              );
+                              setMonedaPrecioTransportista(m);
+                            }}
+                            aria-label="Moneda precio transportista externo"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   {transportistaId && (
                     <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
