@@ -7,6 +7,7 @@ import { motivoBloqueoAccionFacturarArcaUsd } from '@/lib/arcaUsdRestriction';
 import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
 import { viajePermiteBotonFacturar } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
+import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.slice(0, 10).split('-');
@@ -110,7 +111,7 @@ export function ViajeAccionesMenu({
             : viaje.fechaCarga
               ? fmtDate(viaje.fechaCarga)
               : null,
-        ].filter(Boolean).join(' · ') || `Viaje #${viaje.numero}`}
+        ].filter(Boolean).join(' · ') || `Viaje #${numeroVisibleViaje(viaje)}`}
         options={options}
       />
     </>

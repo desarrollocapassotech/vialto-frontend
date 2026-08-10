@@ -67,7 +67,6 @@ import { vehiculosPorTipo } from "@/lib/vehiculoTipos";
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
 import { ChoferModal } from "@/components/viajes/ChoferModal";
-import { ViajeExportacionLeyenda } from "@/components/viajes/ViajeExportacionLeyenda";
 import { esEtiquetaCiudadValida, type PaisCodigo } from "@/lib/ciudades";
 import {
   destinosPayloadParaApi,
@@ -94,6 +93,7 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
 import {
   type OpcionProducto,
   type ViajeProductoItem,
@@ -169,6 +169,8 @@ export function ViajeCreatePage() {
 
   const [detalleCarga, setDetalleCarga] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [numeroIdentificacionPersonalizado, setNumeroIdentificacionPersonalizado] =
+    useState("");
   const [kmRecorridos, setKmRecorridos] = useState("");
   const [litrosConsumidos, setLitrosConsumidos] = useState("");
 
@@ -670,6 +672,8 @@ export function ViajeCreatePage() {
           productoItems: productoItems.filter((x) => x.productoId.trim()),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
+          numeroIdentificacionPersonalizado:
+            numeroIdentificacionPersonalizado.trim() || undefined,
           kmRecorridos:
             kmNum !== undefined && Number.isFinite(kmNum) ? kmNum : undefined,
           litrosConsumidos:
@@ -755,21 +759,36 @@ export function ViajeCreatePage() {
               onSubmit();
             }}
           >
-            <div className="flex flex-col gap-1">
-              <span className={fieldLabelClass}>Estado</span>
-              <select
-                value={estado}
-                onChange={(e) =>
-                  setEstado(e.target.value as (typeof ESTADOS)[number])
-                }
-                className={inputClass}
-              >
-                {ESTADOS.map((x) => (
-                  <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                    {etapaViajeLabel[x] ?? x}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
+                  {labelIdentificacionPersonalizadaViajes(maestro.tenant)}{" "}
+                  <span className="normal-case tracking-normal">(opcional)</span>
+                </span>
+                <input
+                  type="text"
+                  value={numeroIdentificacionPersonalizado}
+                  onChange={(e) => setNumeroIdentificacionPersonalizado(e.target.value)}
+                  placeholder="Ej: número de CTG"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClass}>Estado</span>
+                <select
+                  value={estado}
+                  onChange={(e) =>
+                    setEstado(e.target.value as (typeof ESTADOS)[number])
+                  }
+                  className={inputClass}
+                >
+                  {ESTADOS.map((x) => (
+                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                      {etapaViajeLabel[x] ?? x}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Origen</span>
@@ -1327,9 +1346,6 @@ export function ViajeCreatePage() {
               </button>
             </div>
           )}
-            <div className="md:col-span-2 lg:col-span-3">
-              <ViajeExportacionLeyenda />
-            </div>
             {error && (
               <div className="md:col-span-2 lg:col-span-3">
                 <p

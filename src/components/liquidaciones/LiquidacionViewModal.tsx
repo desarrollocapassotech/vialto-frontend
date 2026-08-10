@@ -325,7 +325,10 @@ export function LiquidacionViewModal({
               {viajesIncluidos.map((row) => {
                 const v = row.viaje;
                 const viajeId = v?.id ?? row.viajeId;
-                const numero = v?.numero ?? "—";
+                const numero =
+                  v?.numeroIdentificacionPersonalizado?.trim() ||
+                  v?.numero ||
+                  "—";
                 return (
                   <Link
                     key={row.viajeId}
