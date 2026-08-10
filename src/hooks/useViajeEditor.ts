@@ -243,6 +243,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       observaciones: v.observaciones ?? "",
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
       monedaMonto: normalizeViajeMoneda(v.monedaMonto),
+      cantidadFactura: v.cantidadFactura != null ? String(v.cantidadFactura) : "",
+      precioUnitarioFactura: v.precioUnitarioFactura != null ? String(v.precioUnitarioFactura) : "",
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : "",
       litrosConsumidos:
         v.litrosConsumidos != null ? String(v.litrosConsumidos) : "",
@@ -253,6 +255,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(
         v.monedaPrecioTransportistaExterno,
       ),
+      cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
+      precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
         v.gananciaBrutaManual,
         normalizeViajeMoneda(v.monedaGananciaBrutaManual ?? v.monedaMonto),
@@ -479,6 +483,16 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       );
       return;
     }
+    
+    const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
+      ? (Number(draft.cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+      : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
+
+    if (calcMonto == null || calcMonto < 0.01) {
+      setError("Ingresá un monto a facturar mayor a 0.");
+      return;
+    }
+
     if (draftRequiereGananciaBrutaManual(draft)) {
       const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
       if (manualPayload.gananciaBrutaManual == null) {
@@ -488,17 +502,19 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         return;
       }
     }
-    const precioTransportistaNum = parseCurrencyForMoneda(
-      draft.precioTransportistaExterno,
-      draft.monedaPrecioTransportistaExterno,
-    );
+    const precioTransportistaNum = draft.cantidadTransportista.trim()
+      ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+      : parseCurrencyForMoneda(
+          draft.precioTransportistaExterno,
+          draft.monedaPrecioTransportistaExterno,
+        );
     const pagosTransportistaApi = pagosTransportistaDraftsToApi(
       draft.pagosTransportista,
     );
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: draft.transportistaId.trim(),
-          precioTransportistaExterno: draft.precioTransportistaExterno,
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
           monedaPrecioTransportistaExterno:
             draft.monedaPrecioTransportistaExterno,
           pagosTransportista: draft.pagosTransportista,
@@ -572,27 +588,19 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             ),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
-            monto: bloqueado
-              ? undefined
-              : parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+            monto: bloqueado ? undefined : parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
             monedaMonto: bloqueado ? undefined : draft.monedaMonto,
-            kmRecorridos: kmResolved,
-            litrosConsumidos: litResolved,
-            precioTransportistaExterno: bloqueado
-              ? undefined
-              : precioTransportistaNum,
-            monedaPrecioTransportistaExterno: bloqueado
-              ? undefined
-              : draft.monedaPrecioTransportistaExterno,
+            cantidadFactura: bloqueado ? undefined : (draft.cantidadFactura.trim() ? Number(draft.cantidadFactura.replace(",", ".")) : null),
+            precioUnitarioFactura: bloqueado ? undefined : (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null),
+            cantidadTransportista: bloqueado ? undefined : (externo ? (draft.cantidadTransportista.trim() ? Number(draft.cantidadTransportista.replace(",", ".")) : null) : null),
+            precioUnitarioTransportista: bloqueado ? undefined : (externo ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null),
+            kmRecorridos: kmResolved ?? null,
+            litrosConsumidos: litResolved ?? null,
+            precioTransportistaExterno: bloqueado ? undefined : (externo ? (precioTransportistaNum ?? null) : null),
+            monedaPrecioTransportistaExterno: bloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
             ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
-            otrosGastos: bloqueado
-              ? undefined
-              : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
-            pagosTransportista: bloqueado
-              ? undefined
-              : externo
-                ? pagosTransportistaApi
-                : [],
+            otrosGastos: bloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+            pagosTransportista: bloqueado ? undefined : (externo ? pagosTransportistaApi : []),
           }),
         },
       );
