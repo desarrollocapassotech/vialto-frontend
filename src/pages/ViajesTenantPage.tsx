@@ -58,6 +58,7 @@ import {
   viajePendienteComprobanteCliente,
   viajePendienteComprobanteTransportista,
   viajeRequiereComprobanteDual,
+  liquidacionElegidaDeViaje,
 } from "@/lib/viajesComprobantes";
 import {
   etapaViajeBadgeClass,
@@ -1988,6 +1989,19 @@ export function ViajesTenantPage({
                           )
                       : undefined
                   }
+                  onVerLiquidacion={
+                    liquidacionElegidaDeViaje(v)
+                      ? () => {
+                          const elegida = liquidacionElegidaDeViaje(v);
+                          if (elegida) {
+                            const params = new URLSearchParams();
+                            if (platform && tid) params.set('tenantId', tid);
+                            params.set('liquidacion', elegida.id);
+                            navigate(`/liquidaciones?${params.toString()}`);
+                          }
+                        }
+                      : undefined
+                  }
                   onEliminar={() => requestDeleteViaje(v)}
                 />
               </td>
@@ -2166,6 +2180,19 @@ export function ViajesTenantPage({
                                 }
                               : undefined,
                           )
+                      : undefined
+                  }
+                  onVerLiquidacion={
+                    liquidacionElegidaDeViaje(v)
+                      ? () => {
+                          const elegida = liquidacionElegidaDeViaje(v);
+                          if (elegida) {
+                            const params = new URLSearchParams();
+                            if (platform && tid) params.set('tenantId', tid);
+                            params.set('liquidacion', elegida.id);
+                            navigate(`/liquidaciones?${params.toString()}`);
+                          }
+                        }
                       : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}

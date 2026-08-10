@@ -42,3 +42,11 @@ export function viajePermiteBotonFacturar(v: Viaje): boolean {
 
   return viajePendienteComprobanteCliente(v);
 }
+
+/** Devuelve la liquidación más relevante del viaje (la activa, o la última si todas están anuladas). */
+export function liquidacionElegidaDeViaje(viaje: Pick<Viaje, 'liquidacionesViaje'>) {
+  const relevantes = viaje.liquidacionesViaje ?? [];
+  if (relevantes.length === 0) return undefined;
+  const activa = relevantes.find((lv) => lv.liquidacion.estado !== 'anulado');
+  return (activa ?? relevantes[relevantes.length - 1])?.liquidacion;
+}
