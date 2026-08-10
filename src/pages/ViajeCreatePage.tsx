@@ -39,7 +39,7 @@ import {
   pagosTransportistaDraftsToApi,
   type PagoTransportistaDraft,
 } from "@/components/viajes/PagosTransportistaFieldset";
-import { apiJson } from "@/lib/api";
+import { apiJson, ApiError } from "@/lib/api";
 import {
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
@@ -719,6 +719,16 @@ export function ViajeCreatePage() {
     } catch (e) {
       setError(friendlyError(e, "viajes"));
 
+      // Si el backend devolvió errores por campo (ValidationPipe), los nombres
+      // coinciden 1 a 1 con los estados de los montos de este formulario
+      // (monto, cantidadFactura, precioUnitarioFactura, precioTransportistaExterno,
+      // cantidadTransportista, precioUnitarioTransportista, gananciaBrutaManual):
+      // se resalta el input puntual en vez de dejar solo el mensaje genérico.
+      if (e instanceof ApiError && e.status === 400) {
+        const body = e.body as { fieldErrors?: Record<string, string> } | undefined;
+        if (body?.fieldErrors) setFieldErrors(body.fieldErrors);
+      }
+
       // --> TOAST INYECTADO: ERROR AL CREAR <--
       showToast("No se pudo crear el viaje", "error");
     } finally {
@@ -861,10 +871,14 @@ export function ViajeCreatePage() {
                       inputMode="decimal"
                       autoComplete="off"
                       value={cantidadFactura}
-                      onChange={(e) => setCantidadFactura(e.target.value)}
+                      onChange={(e) => {
+                        setCantidadFactura(e.target.value);
+                        setFieldErrors((p) => ({ ...p, cantidadFactura: "" }));
+                      }}
                       placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums`}
+                      className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadFactura ? "border-red-400" : ""}`}
                     />
+                    <CrudFieldError message={fieldErrors.cantidadFactura} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Precio unitario</span>
@@ -874,9 +888,12 @@ export function ViajeCreatePage() {
                         inputMode="decimal"
                         autoComplete="off"
                         value={precioUnitarioFactura}
-                        onChange={(e) => setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto))}
+                        onChange={(e) => {
+                          setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto));
+                          setFieldErrors((p) => ({ ...p, precioUnitarioFactura: "" }));
+                        }}
                         placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioFactura ? "border-red-400" : ""}`}
                       />
                       <MonedaSelect
                         value={monedaMonto}
@@ -884,6 +901,7 @@ export function ViajeCreatePage() {
                         aria-label="Moneda precio unitario"
                       />
                     </div>
+                    <CrudFieldError message={fieldErrors.precioUnitarioFactura} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Total a facturar</span>
@@ -906,13 +924,14 @@ export function ViajeCreatePage() {
                       inputMode="decimal"
                       autoComplete="off"
                       value={monto}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setMonto(
                           maskCurrencyForMoneda(e.target.value, monedaMonto),
-                        )
-                      }
+                        );
+                        setFieldErrors((p) => ({ ...p, monto: "" }));
+                      }}
                       placeholder="0.00"
-                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
                     />
                     <MonedaSelect
                       value={monedaMonto}
@@ -925,6 +944,7 @@ export function ViajeCreatePage() {
                       aria-label="Moneda monto a facturar"
                     />
                   </div>
+                  <CrudFieldError message={fieldErrors.monto} />
                 </div>
               )}
             </div>
@@ -968,10 +988,14 @@ export function ViajeCreatePage() {
                             inputMode="decimal"
                             autoComplete="off"
                             value={cantidadTransportista}
-                            onChange={(e) => setCantidadTransportista(e.target.value)}
+                            onChange={(e) => {
+                              setCantidadTransportista(e.target.value);
+                              setFieldErrors((p) => ({ ...p, cantidadTransportista: "" }));
+                            }}
                             placeholder="0.00"
-                            className={`${inputClass} text-right tabular-nums`}
+                            className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadTransportista ? "border-red-400" : ""}`}
                           />
+                          <CrudFieldError message={fieldErrors.cantidadTransportista} />
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Precio unitario</span>
@@ -981,9 +1005,12 @@ export function ViajeCreatePage() {
                               inputMode="decimal"
                               autoComplete="off"
                               value={precioUnitarioTransportista}
-                              onChange={(e) => setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista))}
+                              onChange={(e) => {
+                                setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista));
+                                setFieldErrors((p) => ({ ...p, precioUnitarioTransportista: "" }));
+                              }}
                               placeholder="0.00"
-                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioTransportista ? "border-red-400" : ""}`}
                             />
                             <MonedaSelect
                               value={monedaPrecioTransportista}
@@ -991,6 +1018,7 @@ export function ViajeCreatePage() {
                               aria-label="Moneda precio unitario transportista"
                             />
                           </div>
+                          <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Pago a transporte</span>
@@ -1013,16 +1041,17 @@ export function ViajeCreatePage() {
                             inputMode="decimal"
                             autoComplete="off"
                             value={precioTransportistaExterno}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setPrecioTransportistaExterno(
                                 maskCurrencyForMoneda(
                                   e.target.value,
                                   monedaPrecioTransportista,
                                 ),
-                              )
-                            }
+                              );
+                              setFieldErrors((p) => ({ ...p, precioTransportistaExterno: "" }));
+                            }}
                             placeholder="0.00"
-                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioTransportistaExterno ? "border-red-400" : ""}`}
                           />
                           <MonedaSelect
                             value={monedaPrecioTransportista}
@@ -1039,6 +1068,7 @@ export function ViajeCreatePage() {
                             aria-label="Moneda precio transportista externo"
                           />
                         </div>
+                        <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
                     )}
                   </div>

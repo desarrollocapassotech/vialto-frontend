@@ -2417,7 +2417,7 @@ export function ViajesTenantPage({
           }
           subtituloTransportista={
             hasLiquidacionesArca
-              ? "CVLP tipo 60/61 según IVA del transportista"
+              ? "CVLP tipo 60"
               : "Registro manual"
           }
           onFacturarCliente={() => {
