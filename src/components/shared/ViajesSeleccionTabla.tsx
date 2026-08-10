@@ -9,12 +9,26 @@ export type ViajeSeleccionable = {
   fechaCarga: string | null;
   origen: string | null;
   destino: string | null;
+  choferId?: string | null;
+  chofer?: { nombre: string } | null;
+  productosViaje?: Array<{ producto: { nombre: string } }>;
 };
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
+}
+
+function nombreChoferSeleccion(v: ViajeSeleccionable): string {
+  return v.chofer?.nombre?.trim() || "—";
+}
+
+function nombresProductosSeleccion(v: ViajeSeleccionable): string {
+  const nombres = (v.productosViaje ?? [])
+    .map((p) => p.producto?.nombre?.trim())
+    .filter((n): n is string => Boolean(n));
+  return nombres.length ? nombres.join(", ") : "—";
 }
 
 /**
@@ -52,7 +66,15 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
         const numero = numeroVisibleViaje(v).toLowerCase();
         const origen = (v.origen ?? "").toLowerCase();
         const destino = (v.destino ?? "").toLowerCase();
-        if (!numero.includes(q) && !origen.includes(q) && !destino.includes(q))
+        const chofer = nombreChoferSeleccion(v).toLowerCase();
+        const productos = nombresProductosSeleccion(v).toLowerCase();
+        if (
+          !numero.includes(q) &&
+          !origen.includes(q) &&
+          !destino.includes(q) &&
+          !chofer.includes(q) &&
+          !productos.includes(q)
+        )
           return false;
       }
       const fecha = v.fechaCarga ? v.fechaCarga.slice(0, 10) : "";
@@ -78,7 +100,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Número, origen o destino…"
+            placeholder="Número, origen, destino, chofer o producto…"
             className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
           />
         </label>
@@ -137,6 +159,8 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 <th className="px-2 py-2 text-left">ID personalizado</th>
                 <th className="px-2 py-2 text-left">Fecha</th>
                 <th className="px-2 py-2 text-left">Origen → Destino</th>
+                <th className="px-2 py-2 text-left">Producto</th>
+                <th className="px-2 py-2 text-left">Chofer</th>
                 <th className="px-2 py-2 text-right">Monto</th>
               </tr>
             </thead>
@@ -177,6 +201,12 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                     </td>
                     <td className="px-2 py-1.5 text-vialto-steel">
                       {v.origen ?? "—"} → {v.destino ?? "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-vialto-steel">
+                      {nombresProductosSeleccion(v)}
+                    </td>
+                    <td className="px-2 py-1.5 text-vialto-steel">
+                      {nombreChoferSeleccion(v)}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-vialto-steel">
                       {renderMonto(v)}

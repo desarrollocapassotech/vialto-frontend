@@ -53,6 +53,7 @@ type ViajeItem = Pick<
   Viaje,
   | "id"
   | "numero"
+  | "numeroIdentificacionPersonalizado"
   | "fechaCarga"
   | "origen"
   | "destino"
@@ -61,6 +62,9 @@ type ViajeItem = Pick<
   | "liquidacionesViaje"
   | "liquidacionEstado"
   | "otrosGastos"
+  | "choferId"
+  | "chofer"
+  | "productosViaje"
 >;
 
 function fmtDate(iso: string | null) {
