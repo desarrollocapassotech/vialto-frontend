@@ -22,7 +22,6 @@ import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ListadoFiltroCampo } from "@/components/listado/ListadoFiltroCampo";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
@@ -81,8 +80,10 @@ const ESTADO_BADGE: Record<string, string> = {
 };
 
 /** Badge adicional de cobro — se muestra junto al de ciclo de vida, nunca lo reemplaza. */
-const COBRADO_BADGE_CLASS = "bg-emerald-200 text-emerald-950 border-emerald-600/90";
-const VENCIDA_BADGE_CLASS = "bg-orange-100 text-orange-950 border-orange-400/80";
+const COBRADO_BADGE_CLASS =
+  "bg-emerald-200 text-emerald-950 border-emerald-600/90";
+const VENCIDA_BADGE_CLASS =
+  "bg-orange-100 text-orange-950 border-orange-400/80";
 
 function fmtFecha(iso: string | null) {
   if (!iso) return "—";
@@ -122,7 +123,8 @@ export function FacturacionTenantPage({
   const platformTenant = useMemo(
     () =>
       platform
-        ? tenantsList?.find((t) => t.clerkOrgId === tid || t.id === tid) ?? null
+        ? (tenantsList?.find((t) => t.clerkOrgId === tid || t.id === tid) ??
+          null)
         : null,
     [platform, tenantsList, tid],
   );
@@ -143,7 +145,11 @@ export function FacturacionTenantPage({
 
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   useEffect(() => {
-    if (!hasArca || (platform && !tid) || (!platform && (!isLoaded || !isSignedIn))) {
+    if (
+      !hasArca ||
+      (platform && !tid) ||
+      (!platform && (!isLoaded || !isSignedIn))
+    ) {
       setArcaConfig(null);
       return;
     }
@@ -153,7 +159,9 @@ export function FacturacionTenantPage({
       : "/api/integracion-arca/config";
     void (async () => {
       try {
-        const cfg = await apiJson<ArcaConfig | null>(configUrl, () => getToken());
+        const cfg = await apiJson<ArcaConfig | null>(configUrl, () =>
+          getToken(),
+        );
         if (!cancelled) setArcaConfig(cfg);
       } catch {
         if (!cancelled) setArcaConfig(null);
@@ -182,7 +190,8 @@ export function FacturacionTenantPage({
 
   const facturaUrl = useCallback(
     (id: string) => {
-      if (!platform) return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
+      if (!platform)
+        return `/api/facturacion/facturas/${encodeURIComponent(id)}`;
       return `/api/platform/facturas/${encodeURIComponent(id)}?tenantId=${encodeURIComponent(tid)}`;
     },
     [platform, tid],
@@ -223,9 +232,6 @@ export function FacturacionTenantPage({
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
   const [anularFactura, setAnularFactura] = useState<Factura | null>(null);
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
 
   const [numFiltro, setNumFiltro] = useState("");
   const [numFiltroInput, setNumFiltroInput] = useState("");
@@ -817,7 +823,9 @@ export function FacturacionTenantPage({
             className={[
               badgeBase,
               "cursor-pointer hover:brightness-95",
-              f.vencida ? VENCIDA_BADGE_CLASS : "border-black/15 text-vialto-steel",
+              f.vencida
+                ? VENCIDA_BADGE_CLASS
+                : "border-black/15 text-vialto-steel",
             ].join(" ")}
           >
             {f.vencida ? "VENCIDA" : "MARCAR COBRADA"}
@@ -851,8 +859,8 @@ export function FacturacionTenantPage({
         "success",
       );
       if (platform) {
-        setFacturas((prev) =>
-          prev?.map((r) => (r.id === f.id ? res.factura : r)) ?? prev,
+        setFacturas(
+          (prev) => prev?.map((r) => (r.id === f.id ? res.factura : r)) ?? prev,
         );
       } else {
         await refetchFacturas();
@@ -888,7 +896,9 @@ export function FacturacionTenantPage({
 
   function handleFacturaEmitida(f: Factura) {
     setFacturas((prev) =>
-      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+      prev
+        ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row))
+        : prev,
     );
     if (viewingFactura?.id === f.id) setViewingFactura(f);
     setEmittingFactura(f);
@@ -896,19 +906,23 @@ export function FacturacionTenantPage({
 
   function handleFacturaAnulada(f: Factura) {
     setFacturas((prev) =>
-      prev ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row)) : prev,
+      prev
+        ? prev.map((row) => (row.id === f.id ? { ...row, ...f } : row))
+        : prev,
     );
     if (viewingFactura?.id === f.id) setViewingFactura(f);
     setAnularFactura(f);
   }
 
   function verComprobanteUrl(url: string | null | undefined) {
-    if (url?.trim()) setPreviewComprobanteUrl(url);
+    if (url?.trim()) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   }
 
   function verNotaCredito(f: Factura) {
     if (f.notaCreditoUrl?.trim()) {
-      setPreviewComprobanteUrl(f.notaCreditoUrl);
+      window.open(f.notaCreditoUrl, "_blank", "noopener,noreferrer");
       return;
     }
     // Sin URL en Cloudinary aún: abrir el modal de anulación en modo ya-anulada
@@ -1578,14 +1592,6 @@ export function FacturacionTenantPage({
         }}
         onConfirm={() => void confirmMarcarCobrada()}
       />
-
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
-      )}
     </div>
   );
 }
