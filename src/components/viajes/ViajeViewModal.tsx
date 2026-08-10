@@ -21,6 +21,7 @@ import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionI
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajeGananciaBrutaDetalle } from "@/components/viajes/ViajeGananciaBruta";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
+import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -161,7 +162,12 @@ export function ViajeViewModal({
     <ViewModalShell
       title={
         <span className="inline-flex items-center gap-3">
-          <span>Viaje #{viaje.numero}</span>
+          <span>Viaje #{numeroVisibleViaje(viaje)}</span>
+          {viajeUsaNumeroInterno(viaje) && (
+            <span className="text-xs font-normal normal-case tracking-normal text-vialto-steel">
+              (número interno generado automáticamente)
+            </span>
+          )}
           <span className="text-xs uppercase tracking-[0.1em] border rounded px-2 py-0.5 text-vialto-steel border-black/15">
             {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
           </span>

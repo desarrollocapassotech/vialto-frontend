@@ -24,6 +24,8 @@ export interface Viaje {
   id: string;
   tenantId: string;
   numero: string;
+  /** ID propio del cliente para identificar el viaje (ej. CTG). Si está cargado, reemplaza a `numero` en toda vista/documento humano. */
+  numeroIdentificacionPersonalizado: string | null;
   /** @deprecated Reemplazado por `etapa` + `facturacionEstado` + `liquidacionEstado`. */
   estado: string;
   /** Etapa operativa del viaje: pendiente | en_curso | finalizado | cancelado. */
@@ -271,6 +273,8 @@ export interface Tenant {
   billingStatus: string;
   billingRenewsAt: string | null;
   whiteLabelDomain: string | null;
+  /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
+  labelIdentificacionPersonalizadaViajes: string | null;
   createdAt: string;
 }
 
@@ -618,6 +622,7 @@ export interface LiquidacionViajeItem {
   viaje?: {
     id: string;
     numero: string | number | null;
+    numeroIdentificacionPersonalizado?: string | null;
     fechaCarga: string | null;
     origen: string | null;
     destino: string | null;

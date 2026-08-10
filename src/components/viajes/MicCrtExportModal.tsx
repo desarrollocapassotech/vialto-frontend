@@ -24,6 +24,7 @@ import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMi
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
+import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
 type Props = {
   viaje: Viaje;
@@ -355,7 +356,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `MIC-CRT-${viaje.numero}.pdf`;
+      a.download = `MIC-CRT-${numeroVisibleViaje(viaje)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       clearMicCrtBorrador(viaje.id);
@@ -392,7 +393,7 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
             <h2 id="mic-crt-title" className="text-sm font-semibold text-vialto-charcoal">
               Documento aduanero MIC / CRT
             </h2>
-            <p className="mt-0.5 text-xs text-vialto-steel">Viaje #{viaje.numero}</p>
+            <p className="mt-0.5 text-xs text-vialto-steel">Viaje #{numeroVisibleViaje(viaje)}</p>
           </div>
           <button type="button" onClick={onClose} disabled={ocupado}
             className="text-vialto-steel hover:text-vialto-charcoal disabled:opacity-40" aria-label="Cerrar">✕</button>

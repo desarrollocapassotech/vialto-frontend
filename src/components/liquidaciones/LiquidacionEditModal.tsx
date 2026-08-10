@@ -59,8 +59,10 @@ function extraerViajesDeLiquidacion(data: any): ViajeOpcionDraft[] {
 
       // El ID real del viaje está en v.id o en item.viajeId
       const id = v.id ?? item.viajeId ?? item.id;
-      // El número real del viaje está en v.numero
-      const numero = v.numero ?? item.numero ?? "Sin Nº";
+      // El número real del viaje está en v.numero (o el ID personalizado, si está cargado)
+      const numero =
+        v.numeroIdentificacionPersonalizado?.trim?.() ||
+        (v.numero ?? item.numero ?? "Sin Nº");
 
       return id ? { id, numero } : null;
     })

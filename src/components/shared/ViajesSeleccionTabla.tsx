@@ -1,9 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
+import { numeroVisibleViaje } from "@/lib/viajesFlota";
 
 export type ViajeSeleccionable = {
   id: string;
   numero: string;
+  numeroIdentificacionPersonalizado?: string | null;
   fechaCarga: string | null;
   origen: string | null;
   destino: string | null;
@@ -47,7 +49,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
     const q = busqueda.trim().toLowerCase();
     return viajes.filter((v) => {
       if (q) {
-        const numero = String(v.numero ?? "").toLowerCase();
+        const numero = numeroVisibleViaje(v).toLowerCase();
         const origen = (v.origen ?? "").toLowerCase();
         const destino = (v.destino ?? "").toLowerCase();
         if (!numero.includes(q) && !origen.includes(q) && !destino.includes(q))
@@ -131,7 +133,8 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
             <thead className="sticky top-0 bg-vialto-mist text-[10px] uppercase tracking-wider text-vialto-steel">
               <tr>
                 <th className="w-8 px-2 py-2 text-left" />
-                <th className="px-2 py-2 text-left">Número</th>
+                <th className="px-2 py-2 text-left">ID sistema</th>
+                <th className="px-2 py-2 text-left">ID personalizado</th>
                 <th className="px-2 py-2 text-left">Fecha</th>
                 <th className="px-2 py-2 text-left">Origen → Destino</th>
                 <th className="px-2 py-2 text-right">Monto</th>
@@ -165,6 +168,9 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                     </td>
                     <td className="px-2 py-1.5 font-medium text-vialto-charcoal">
                       {v.numero}
+                    </td>
+                    <td className="px-2 py-1.5 text-vialto-charcoal">
+                      {v.numeroIdentificacionPersonalizado?.trim() || "—"}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-vialto-steel">
                       {fmtDate(v.fechaCarga)}

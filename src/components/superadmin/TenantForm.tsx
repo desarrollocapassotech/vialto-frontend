@@ -12,6 +12,7 @@ export interface TenantFormValues {
   maxUsers?: string;
   billingRenewsAt?: string;
   whiteLabelDomain?: string;
+  labelIdentificacionPersonalizadaViajes?: string;
 }
 
 interface TenantFormProps {
@@ -175,6 +176,22 @@ export function TenantForm({
               onChange={(e) =>
                 onChange({ ...values, whiteLabelDomain: e.target.value })
               }
+              className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
+            />
+          </label>
+          <label className="space-y-1 md:col-span-3">
+            <span className="text-xs uppercase tracking-wider text-vialto-steel">
+              Label del ID propio (módulo Viajes)
+            </span>
+            <input
+              value={values.labelIdentificacionPersonalizadaViajes ?? ''}
+              onChange={(e) =>
+                onChange({
+                  ...values,
+                  labelIdentificacionPersonalizadaViajes: e.target.value,
+                })
+              }
+              placeholder="ID propio"
               className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
             />
           </label>

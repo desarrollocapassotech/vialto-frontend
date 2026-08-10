@@ -46,6 +46,10 @@ import {
   viajeConDestinosEnRespuesta,
 } from "@/lib/viajesDestinos";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
+import {
+  facturacionPermiteVincular,
+  liquidacionPermiteVincular,
+} from "@/lib/viajesIndicadores";
 import type {
   Chofer,
   Cliente,
@@ -200,6 +204,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
 
     setDraft({
       numero: v.numero ?? "",
+      numeroIdentificacionPersonalizado:
+        v.numeroIdentificacionPersonalizado ?? "",
       estado: v.etapa ?? "pendiente",
       operacionModo: esExterno ? "externo" : esPropio ? "propio" : null,
       choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
@@ -509,6 +515,14 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const litResolved = draft.litrosConsumidos.trim()
       ? Number(draft.litrosConsumidos.replace(",", "."))
       : undefined;
+    // Con viaje facturado/liquidado, el backend rechaza el PATCH si CUALQUIERA de los
+    // campos fiscales viene presente en el body (aunque su valor no haya cambiado). Por
+    // eso, con el viaje bloqueado, esos campos se omiten del payload (undefined → JSON.stringify
+    // los saca) para poder seguir guardando los campos operativos (fechas, km, observaciones, etc.).
+    const bloqueado = viajeSnapshot
+      ? !facturacionPermiteVincular(viajeSnapshot.facturacionEstado) ||
+        !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
+      : false;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -520,21 +534,29 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
           method: "PATCH",
           body: JSON.stringify({
             numero: draft.numero.trim(),
+            numeroIdentificacionPersonalizado:
+              draft.numeroIdentificacionPersonalizado.trim() || undefined,
             etapa: draft.estado,
-            clienteId: draft.clienteId || undefined,
+            clienteId: bloqueado ? undefined : draft.clienteId || undefined,
             ...(externo
               ? {
-                  transportistaId: draft.transportistaId.trim(),
-                  contratanteRealizaFlete: draft.realizaFlete,
-                  transportistaEfectivoId: draft.realizaFlete
-                    ? null
-                    : draft.transportistaEfectivoId.trim() || null,
+                  transportistaId: bloqueado
+                    ? undefined
+                    : draft.transportistaId.trim(),
+                  contratanteRealizaFlete: bloqueado
+                    ? undefined
+                    : draft.realizaFlete,
+                  transportistaEfectivoId: bloqueado
+                    ? undefined
+                    : draft.realizaFlete
+                      ? null
+                      : draft.transportistaEfectivoId.trim() || null,
                   choferId: draft.choferExternoId.trim() || null,
                   vehiculoIds: vids,
                 }
               : {
-                  transportistaId: null,
-                  transportistaEfectivoId: null,
+                  transportistaId: bloqueado ? undefined : null,
+                  transportistaEfectivoId: bloqueado ? undefined : null,
                   choferId: draft.choferId.trim() || null,
                   vehiculoIds: vids,
                 }),
@@ -550,18 +572,27 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             ),
             detalleCarga: draft.detalleCarga.trim() || undefined,
             observaciones: draft.observaciones.trim() || undefined,
-            monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
-            monedaMonto: draft.monedaMonto,
+            monto: bloqueado
+              ? undefined
+              : parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
+            monedaMonto: bloqueado ? undefined : draft.monedaMonto,
             kmRecorridos: kmResolved,
             litrosConsumidos: litResolved,
-            precioTransportistaExterno: precioTransportistaNum,
-            monedaPrecioTransportistaExterno:
-              draft.monedaPrecioTransportistaExterno,
-            ...gananciaBrutaManualPayloadFromDraft(draft),
-            otrosGastos: draft.otrosGastos
-              .map(otroGastoDraftToApi)
-              .filter(Boolean),
-            pagosTransportista: externo ? pagosTransportistaApi : [],
+            precioTransportistaExterno: bloqueado
+              ? undefined
+              : precioTransportistaNum,
+            monedaPrecioTransportistaExterno: bloqueado
+              ? undefined
+              : draft.monedaPrecioTransportistaExterno,
+            ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
+            otrosGastos: bloqueado
+              ? undefined
+              : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
+            pagosTransportista: bloqueado
+              ? undefined
+              : externo
+                ? pagosTransportistaApi
+                : [],
           }),
         },
       );

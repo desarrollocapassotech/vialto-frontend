@@ -37,6 +37,8 @@ import {
   nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
+  numeroVisibleViaje,
+  labelIdentificacionPersonalizadaViajes,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -1573,6 +1575,19 @@ export function ViajesTenantPage({
               </span>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <span className="group relative inline-flex cursor-default items-center gap-1">
+                {labelIdentificacionPersonalizadaViajes(currentTenant)}
+                <Info
+                  className="h-3.5 w-3.5 text-vialto-steel/60"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <span className={tooltipPanelClassBelow} role="tooltip">
+                  ID propio del cliente para identificar el viaje.
+                </span>
+              </span>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Cliente"
                 filterActive={!!clienteIdFiltroActivo.trim()}
@@ -1831,13 +1846,16 @@ export function ViajesTenantPage({
                       checked={idsFacturarSeleccion.includes(v.id)}
                       onChange={() => toggleFacturarLote(v.id)}
                       className="accent-vialto-charcoal"
-                      aria-label={`Incluir viaje ${v.numero} en facturación conjunta`}
+                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
                     />
                   ) : null}
                 </td>
               )}
               <td className="px-4 py-3 text-vialto-steel tabular-nums">
                 #{v.numero}
+              </td>
+              <td className="px-4 py-3 text-vialto-steel tabular-nums">
+                {v.numeroIdentificacionPersonalizado?.trim() || "—"}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
                 <span
@@ -2065,7 +2083,7 @@ export function ViajesTenantPage({
                       onChange={() => toggleFacturarLote(v.id)}
                       onClick={(e) => e.stopPropagation()}
                       className="mt-1 accent-vialto-charcoal"
-                      aria-label={`Incluir viaje ${v.numero} en facturación conjunta`}
+                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
                     />
                   ) : null}
                   <span
@@ -2077,7 +2095,11 @@ export function ViajesTenantPage({
                 </div>
               }
               fields={[
-                { label: "ID", value: `#${v.numero}` },
+                { label: "ID sistema", value: `#${v.numero}` },
+                {
+                  label: labelIdentificacionPersonalizadaViajes(currentTenant),
+                  value: v.numeroIdentificacionPersonalizado?.trim() || "—",
+                },
                 { label: "Transporte", value: transporteValue },
                 { label: "Chofer", value: nombreChofer },
                 { label: "Etapa", value: estadoValue },
@@ -2277,6 +2299,7 @@ export function ViajesTenantPage({
             }
             getToken={getToken}
             tenantId={platform ? tid : undefined}
+            tenant={!platform ? currentTenant : undefined}
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)
@@ -2462,7 +2485,7 @@ export function ViajesTenantPage({
         title="Eliminar viaje"
         message={
           viajeDeleteConfirm
-            ? `¿Seguro que querés eliminar el viaje ${viajeDeleteConfirm.numero}? Esta acción no se puede deshacer.`
+            ? `¿Seguro que querés eliminar el viaje ${numeroVisibleViaje(viajeDeleteConfirm)}? Esta acción no se puede deshacer.`
             : ""
         }
         confirmLabel="Eliminar"
@@ -2483,7 +2506,7 @@ export function ViajesTenantPage({
         title="Este viaje tiene liquidaciones asociadas"
         message={
           viajeDeleteImpacto
-            ? `El viaje ${viajeDeleteImpacto.viaje.numero} está incluido en ${
+            ? `El viaje ${numeroVisibleViaje(viajeDeleteImpacto.viaje)} está incluido en ${
                 viajeDeleteImpacto.conflicto.liquidaciones.length === 1
                   ? "esta liquidación sin autorizar por AFIP"
                   : "estas liquidaciones sin autorizar por AFIP"

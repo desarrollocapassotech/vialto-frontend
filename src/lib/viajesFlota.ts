@@ -4,10 +4,37 @@ import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
 import type {
   Chofer,
   Cliente,
+  Tenant,
   Transportista,
   Vehiculo,
   Viaje,
 } from "@/types/api";
+
+/** ID que se muestra en toda vista/documento humano de un viaje: el ID personalizado del
+ * cliente (ej. CTG) si está cargado, o el correlativo interno autogenerado si no. */
+export function numeroVisibleViaje(v: {
+  numero: string;
+  numeroIdentificacionPersonalizado?: string | null;
+}): string {
+  return v.numeroIdentificacionPersonalizado?.trim() || v.numero;
+}
+
+/** `true` si el viaje no tiene ID personalizado cargado y se está mostrando el número interno. */
+export function viajeUsaNumeroInterno(v: {
+  numeroIdentificacionPersonalizado?: string | null;
+}): boolean {
+  return !v.numeroIdentificacionPersonalizado?.trim();
+}
+
+/** Label del campo de ID personalizado de viaje, configurable por tenant (default: "ID propio"). */
+export function labelIdentificacionPersonalizadaViajes(
+  tenant: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null | undefined,
+): string {
+  return (
+    tenant?.labelIdentificacionPersonalizadaViajes?.trim() ||
+    "ID propio"
+  );
+}
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {

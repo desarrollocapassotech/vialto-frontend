@@ -300,6 +300,19 @@ export function ViajeInlineEditForm({
           </div>
 
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+            <span className={LABEL}>ID propio</span>
+            <input
+              type="text"
+              value={draft.numeroIdentificacionPersonalizado}
+              onChange={(e) =>
+                set({ numeroIdentificacionPersonalizado: e.target.value })
+              }
+              placeholder="Ej: número de CTG"
+              className={INPUT}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={LABEL}>Detalle adicional</span>
             <textarea
               value={draft.detalleCarga}

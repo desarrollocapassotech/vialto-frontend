@@ -12,6 +12,7 @@ import {
   missingGroupsMicCrtDesdeViaje,
   type ViajeExportMissingGroup,
 } from "@/lib/viajeExportMissingFields";
+import { numeroVisibleViaje } from "@/lib/viajesFlota";
 
 type Props = {
   viaje: Viaje;
@@ -211,7 +212,7 @@ export function ExportarViajeModal({
   function emitirNomina(emisorId?: string | null) {
     void ejecutarDescarga(
       viajePdfUrl("paut", emisorId),
-      `NOMINA-${viaje.numero}.pdf`,
+      `NOMINA-${numeroVisibleViaje(viaje)}.pdf`,
       setGenerandoPaut,
     );
   }
@@ -262,7 +263,7 @@ export function ExportarViajeModal({
                 Exportar
               </h2>
               <p className="mt-0.5 text-xs text-vialto-steel">
-                Viaje #{viaje.numero}
+                Viaje #{numeroVisibleViaje(viaje)}
               </p>
               {(viaje.origen || viaje.destino) && (
                 <p className="mt-1 text-xs text-vialto-steel">
