@@ -85,9 +85,13 @@ export interface Viaje {
   kmRecorridos: number | null;
   litrosConsumidos: number | null;
   monto: number | null;
+  cantidadFactura?: number | null;
+  precioUnitarioFactura?: number | null;
   /** ARS | USD (omitido en respuestas antiguas -> se trata como ARS). */
   monedaMonto?: string;
   precioTransportistaExterno: number | null;
+  cantidadTransportista?: number | null;
+  precioUnitarioTransportista?: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */

@@ -237,6 +237,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       observaciones: v.observaciones ?? "",
       monto: formatNumberForMoneda(v.monto, normalizeViajeMoneda(v.monedaMonto)),
       monedaMonto: normalizeViajeMoneda(v.monedaMonto),
+      cantidadFactura: v.cantidadFactura != null ? String(v.cantidadFactura) : "",
+      precioUnitarioFactura: v.precioUnitarioFactura != null ? String(v.precioUnitarioFactura) : "",
       kmRecorridos: v.kmRecorridos != null ? String(v.kmRecorridos) : "",
       litrosConsumidos:
         v.litrosConsumidos != null ? String(v.litrosConsumidos) : "",
@@ -247,6 +249,8 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(
         v.monedaPrecioTransportistaExterno,
       ),
+      cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
+      precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
         v.gananciaBrutaManual,
         normalizeViajeMoneda(v.monedaGananciaBrutaManual ?? v.monedaMonto),
@@ -473,6 +477,16 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       );
       return;
     }
+    
+    const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
+      ? (Number(draft.cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+      : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
+
+    if (calcMonto == null || calcMonto < 0.01) {
+      setError("Ingresá un monto a facturar mayor a 0.");
+      return;
+    }
+
     if (draftRequiereGananciaBrutaManual(draft)) {
       const manualPayload = gananciaBrutaManualPayloadFromDraft(draft);
       if (manualPayload.gananciaBrutaManual == null) {
@@ -482,17 +496,19 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         return;
       }
     }
-    const precioTransportistaNum = parseCurrencyForMoneda(
-      draft.precioTransportistaExterno,
-      draft.monedaPrecioTransportistaExterno,
-    );
+    const precioTransportistaNum = draft.cantidadTransportista.trim()
+      ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+      : parseCurrencyForMoneda(
+          draft.precioTransportistaExterno,
+          draft.monedaPrecioTransportistaExterno,
+        );
     const pagosTransportistaApi = pagosTransportistaDraftsToApi(
       draft.pagosTransportista,
     );
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: draft.transportistaId.trim(),
-          precioTransportistaExterno: draft.precioTransportistaExterno,
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
           monedaPrecioTransportistaExterno:
             draft.monedaPrecioTransportistaExterno,
           pagosTransportista: draft.pagosTransportista,
@@ -552,9 +568,13 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             observaciones: draft.observaciones.trim() || undefined,
             monto: parseCurrencyForMoneda(draft.monto, draft.monedaMonto),
             monedaMonto: draft.monedaMonto,
-            kmRecorridos: kmResolved,
-            litrosConsumidos: litResolved,
-            precioTransportistaExterno: precioTransportistaNum,
+            cantidadFactura: draft.cantidadFactura.trim() ? Number(draft.cantidadFactura.replace(",", ".")) : null,
+            precioUnitarioFactura: parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) ?? null,
+            cantidadTransportista: externo ? (draft.cantidadTransportista.trim() ? Number(draft.cantidadTransportista.replace(",", ".")) : null) : null,
+            precioUnitarioTransportista: externo ? (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) ?? null) : null,
+            kmRecorridos: kmResolved ?? null,
+            litrosConsumidos: litResolved ?? null,
+            precioTransportistaExterno: externo ? (precioTransportistaNum ?? null) : null,
             monedaPrecioTransportistaExterno:
               draft.monedaPrecioTransportistaExterno,
             ...gananciaBrutaManualPayloadFromDraft(draft),

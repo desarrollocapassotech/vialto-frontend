@@ -29,9 +29,14 @@ export type ViajeInlineDraft = {
   observaciones: string;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
+  cantidadFactura: string;
+  precioUnitarioFactura: string;
   kmRecorridos: string;
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
+  cantidadTransportista: string;
+  precioUnitarioTransportista: string;
+  otrosGastos: import('./OtrosGastosFieldset').OtroGastoDraft[];
+  pagosTransportista: import('./PagosTransportistaFieldset').PagoTransportistaDraft[];
 };
-

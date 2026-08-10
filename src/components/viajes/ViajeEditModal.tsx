@@ -42,6 +42,7 @@ import {
 import {
   preserveAmountOnMonedaChange,
   maskCurrencyForMoneda,
+  parseCurrencyForMoneda,
   type ViajeMonedaCodigo,
 } from "@/lib/currencyMask";
 import type { PaisCodigo } from "@/lib/ciudades";
@@ -94,10 +95,14 @@ export type ViajeInlineDraft = {
   observaciones: string;
   monto: string;
   monedaMonto: ViajeMonedaCodigo;
+  cantidadFactura: string;
+  precioUnitarioFactura: string;
   kmRecorridos: string;
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
+  cantidadTransportista: string;
+  precioUnitarioTransportista: string;
   otrosGastos: OtroGastoDraft[];
   pagosTransportista: PagoTransportistaDraft[];
   gananciaBrutaManual: string;
@@ -201,6 +206,7 @@ export function ViajeEditModal({
   type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop";
   const { user } = useUser();
   const { isVisible } = useFieldConfig("viajes");
+  const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
@@ -242,6 +248,26 @@ export function ViajeEditModal({
     const ids = new Set(vehiculos.map((v) => v.id));
     return [...vehiculos, ...localVehiculos.filter((v) => !ids.has(v.id))];
   }, [vehiculos, localVehiculos]);
+
+  useEffect(() => {
+    if (!open || !draft || !desgloseActivo) return;
+    setDraft((p) => {
+      if (!p) return p;
+      let changed = false;
+      const next = { ...p };
+      if (snapshotViaje.cantidadFactura == null && next.cantidadFactura === "") {
+        next.cantidadFactura = "1";
+        next.precioUnitarioFactura = next.monto;
+        changed = true;
+      }
+      if (snapshotViaje.cantidadTransportista == null && next.cantidadTransportista === "") {
+        next.cantidadTransportista = "1";
+        next.precioUnitarioTransportista = next.precioTransportistaExterno;
+        changed = true;
+      }
+      return changed ? next : p;
+    });
+  }, [open, draft?.numero, desgloseActivo, snapshotViaje, setDraft]);
 
   useEffect(() => {
     if (!open) return;
@@ -430,51 +456,128 @@ export function ViajeEditModal({
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <span className={labelClass}>Monto a facturar</span>
-                <div className="flex min-w-0 gap-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={draft.monto}
-                    onChange={(e) =>
-                      setDraft((p) =>
-                        p
-                          ? {
-                              ...p,
-                              monto: maskCurrencyForMoneda(
-                                e.target.value,
-                                p.monedaMonto,
-                              ),
-                            }
-                          : p,
-                      )
-                    }
-                    placeholder="0.00"
-                    className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                  />
-                  <MonedaSelect
-                    value={draft.monedaMonto}
-                    onChange={(m: ViajeMonedaCodigo) =>
-                      setDraft((p) =>
-                        p
-                          ? {
-                              ...p,
-                              monedaMonto: m,
-                              monto: preserveAmountOnMonedaChange(
-                                p.monto,
-                                p.monedaMonto,
-                                m,
-                              ),
-                            }
-                          : p,
-                      )
-                    }
-                    aria-label="Moneda monto a facturar"
-                  />
+              {desgloseActivo ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <span className={labelClass}>Cantidad</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={draft.cantidadFactura}
+                      onChange={(e) =>
+                        setDraft((p) =>
+                          p ? { ...p, cantidadFactura: e.target.value } : p,
+                        )
+                      }
+                      placeholder="0.00"
+                      className={`${inputClass} text-right tabular-nums`}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={labelClass}>Precio unitario</span>
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={draft.precioUnitarioFactura}
+                        onChange={(e) =>
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  precioUnitarioFactura: maskCurrencyForMoneda(
+                                    e.target.value,
+                                    p.monedaMonto,
+                                  ),
+                                }
+                              : p,
+                          )
+                        }
+                        placeholder="0.00"
+                        className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                      />
+                      <MonedaSelect
+                        value={draft.monedaMonto}
+                        onChange={(m) =>
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  monedaMonto: m,
+                                  precioUnitarioFactura: preserveAmountOnMonedaChange(
+                                    p.precioUnitarioFactura,
+                                    p.monedaMonto,
+                                    m,
+                                  ),
+                                }
+                              : p,
+                          )
+                        }
+                        aria-label="Moneda precio unitario"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={labelClass}>Total a facturar</span>
+                    <div className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}>
+                      <span className="w-full truncate text-sm">
+                        {(
+                          (Number(draft.cantidadFactura.replace(",", ".")) || 0) * 
+                          (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+                        ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Monto a facturar</span>
+                  <div className="flex min-w-0 gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={draft.monto}
+                      onChange={(e) =>
+                        setDraft((p) =>
+                          p
+                            ? {
+                                ...p,
+                                monto: maskCurrencyForMoneda(
+                                  e.target.value,
+                                  p.monedaMonto,
+                                ),
+                              }
+                            : p,
+                        )
+                      }
+                      placeholder="0.00"
+                      className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                    />
+                    <MonedaSelect
+                      value={draft.monedaMonto}
+                      onChange={(m: ViajeMonedaCodigo) =>
+                        setDraft((p) =>
+                          p
+                            ? {
+                                ...p,
+                                monedaMonto: m,
+                                monto: preserveAmountOnMonedaChange(
+                                  p.monto,
+                                  p.monedaMonto,
+                                  m,
+                                ),
+                              }
+                            : p,
+                        )
+                      }
+                      aria-label="Moneda monto a facturar"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <ViajeOperacionTipoFieldset
                 modo={draft.operacionModo}
@@ -513,53 +616,130 @@ export function ViajeEditModal({
                           }
                         />
                       </div>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className={labelClass}>Precio transporte</span>
-                        <div className="flex min-w-0 gap-2">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={draft.precioTransportistaExterno}
-                            onChange={(e) =>
-                              setDraft((p) =>
-                                p
-                                  ? {
-                                      ...p,
-                                      precioTransportistaExterno:
-                                        maskCurrencyForMoneda(
-                                          e.target.value,
-                                          p.monedaPrecioTransportistaExterno,
-                                        ),
-                                    }
-                                  : p,
-                              )
-                            }
-                            placeholder="0.00"
-                            className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                          />
-                          <MonedaSelect
-                            value={draft.monedaPrecioTransportistaExterno}
-                            onChange={(m: ViajeMonedaCodigo) =>
-                              setDraft((p) =>
-                                p
-                                  ? {
-                                      ...p,
-                                      monedaPrecioTransportistaExterno: m,
-                                      precioTransportistaExterno:
-                                        preserveAmountOnMonedaChange(
-                                          p.precioTransportistaExterno,
-                                          p.monedaPrecioTransportistaExterno,
-                                          m,
-                                        ),
-                                    }
-                                  : p,
-                              )
-                            }
-                            aria-label="Moneda precio transportista externo"
-                          />
+                      {desgloseActivo ? (
+                        <>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Cantidad</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={draft.cantidadTransportista}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p ? { ...p, cantidadTransportista: e.target.value } : p,
+                                )
+                              }
+                              placeholder="0.00"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Precio unitario</span>
+                            <div className="flex min-w-0 gap-2">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={draft.precioUnitarioTransportista}
+                                onChange={(e) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          precioUnitarioTransportista: maskCurrencyForMoneda(
+                                            e.target.value,
+                                            p.monedaPrecioTransportistaExterno,
+                                          ),
+                                        }
+                                      : p,
+                                  )
+                                }
+                                placeholder="0.00"
+                                className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                              />
+                              <MonedaSelect
+                                value={draft.monedaPrecioTransportistaExterno}
+                                onChange={(m) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          monedaPrecioTransportistaExterno: m,
+                                          precioUnitarioTransportista: preserveAmountOnMonedaChange(
+                                            p.precioUnitarioTransportista,
+                                            p.monedaPrecioTransportistaExterno,
+                                            m,
+                                          ),
+                                        }
+                                      : p,
+                                  )
+                                }
+                                aria-label="Moneda precio unitario transportista"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago a transporte</span>
+                            <div className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate text-sm">
+                                {(
+                                  (Number(draft.cantidadTransportista.replace(",", ".")) || 0) * 
+                                  (parseCurrencyForMoneda(draft.precioUnitarioTransportista, draft.monedaPrecioTransportistaExterno) || 0)
+                                ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={labelClass}>Precio transporte</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={draft.precioTransportistaExterno}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        precioTransportistaExterno:
+                                          maskCurrencyForMoneda(
+                                            e.target.value,
+                                            p.monedaPrecioTransportistaExterno,
+                                          ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder="0.00"
+                              className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                            />
+                            <MonedaSelect
+                              value={draft.monedaPrecioTransportistaExterno}
+                              onChange={(m: ViajeMonedaCodigo) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        monedaPrecioTransportistaExterno: m,
+                                        precioTransportistaExterno:
+                                          preserveAmountOnMonedaChange(
+                                            p.precioTransportistaExterno,
+                                            p.monedaPrecioTransportistaExterno,
+                                            m,
+                                          ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              aria-label="Moneda precio transportista externo"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">

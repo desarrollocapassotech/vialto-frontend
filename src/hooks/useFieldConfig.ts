@@ -4,24 +4,49 @@ import { apiJson } from "@/lib/api";
 
 type FieldConfigModulo = Record<string, Record<string, boolean>>;
 
+const globalCache: Record<string, FieldConfigModulo> = {};
+const globalPromises: Record<string, Promise<FieldConfigModulo>> = {};
+
 export function useFieldConfig(modulo: string) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [config, setConfig] = useState<FieldConfigModulo | null>(null);
+  const [config, setConfig] = useState<FieldConfigModulo | null>(
+    globalCache[modulo] ?? null
+  );
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    
+    // Asignar el estado en caché inmediatamente (evita parpadeos en la UI)
+    if (globalCache[modulo]) {
+      setConfig(globalCache[modulo]);
+    }
+    
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiJson<FieldConfigModulo>(
-          `/api/field-config/${modulo}`,
-          () => getToken(),
-        );
+
+    // Buscar los datos más recientes en segundo plano si no hay ninguna petición en curso
+    if (!globalPromises[modulo]) {
+      globalPromises[modulo] = apiJson<FieldConfigModulo>(
+        `/api/field-config/${modulo}`,
+        () => getToken(),
+      ).then((data) => {
+        globalCache[modulo] = data;
+        delete globalPromises[modulo]; // Permite futuras recargas (refetch)
+        return data;
+      }).catch((err) => {
+        delete globalPromises[modulo];
+        throw err;
+      });
+    }
+
+    globalPromises[modulo]
+      .then((data) => {
         if (!cancelled) setConfig(data);
-      } catch {
-        if (!cancelled) setConfig(null);
-      }
-    })();
+      })
+      .catch(() => {
+        // Si hay un error y no tenemos datos en caché, asignamos null
+        if (!cancelled && !globalCache[modulo]) setConfig(null);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -32,5 +57,5 @@ export function useFieldConfig(modulo: string) {
     return config?.[formulario]?.[campo] ?? true;
   }
 
-  return { config, isVisible };
+  return { config, isVisible, isLoading: config === null };
 }
