@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel } from '@/components/crud/CrudFields';
+import {
+  isFacturaTramoCompleto,
+  type FacturaTramoDraft,
+} from '@/components/facturacion/FacturaTramosEditor';
 import type { Factura, Viaje } from '@/types/api';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
@@ -62,18 +66,80 @@ export function toFacturaLineasPayload(lineas: FacturaLineaDraft[]) {
     }));
 }
 
+function lineasFromTramos(
+  viajeIds: string[],
+  viajes: Viaje[],
+  tramos: FacturaTramoDraft[],
+  ivaPctHeader: number,
+  fallbackDescripcion: string,
+): FacturaLineaDraft[] | null {
+  const completos = tramos.filter(isFacturaTramoCompleto);
+  if (completos.length === 0) return null;
+
+  const viajeIdsConTramo = new Set(completos.map((t) => t.viajeId));
+  const lineas: FacturaLineaDraft[] = completos.map((t) => {
+    const v = viajes.find((x) => x.id === t.viajeId);
+    const nro = v ? numeroVisibleViaje(v) : '—';
+    return {
+      descripcion: `Viaje #${nro} · ${t.detalle.trim()}`,
+      importe: t.monto,
+      ivaPct: t.ivaPct,
+    };
+  });
+
+  for (const id of viajeIds) {
+    if (viajeIdsConTramo.has(id)) continue;
+    const v = viajes.find((x) => x.id === id);
+    if (!v) continue;
+    const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
+    const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
+    lineas.push({
+      descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
+      importe: monto,
+      ivaPct: ivaPctHeader,
+    });
+  }
+
+  const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
+  if (netoLineas > 0) return lineas;
+  return [
+    {
+      descripcion: fallbackDescripcion,
+      importe: 0,
+      ivaPct: ivaPctHeader,
+    },
+  ];
+}
+
 export function defaultFacturaLineasFromDraft(
-  draft: { viajeIds: string[]; ivaPct: string; numero: string },
+  draft: {
+    viajeIds: string[];
+    ivaPct: string;
+    numero: string;
+    facturarPorTramo?: boolean;
+    tramos?: FacturaTramoDraft[];
+  },
   viajes: Viaje[],
 ): FacturaLineaDraft[] {
   const ivaPct = draft.ivaPct.trim() !== '' ? Number(draft.ivaPct) : 21;
+  if (draft.facturarPorTramo && (draft.tramos?.length ?? 0) > 0) {
+    const fromTramos = lineasFromTramos(
+      draft.viajeIds,
+      viajes,
+      draft.tramos ?? [],
+      ivaPct,
+      `Factura ${draft.numero.trim() || '—'}`,
+    );
+    if (fromTramos) return fromTramos;
+  }
+
   const linked = viajes.filter((v) => draft.viajeIds.includes(v.id));
   if (linked.length > 0) {
     const lineas = linked.map((v) => {
       const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
       const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
       return {
-        descripcion: `Viaje #${v.numero}${ruta}`,
+        descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
         ivaPct,
       };
@@ -109,6 +175,36 @@ export function defaultFacturaLineas(
   viajes: Viaje[],
 ): FacturaLineaDraft[] {
   const ivaPct = factura.ivaPct ?? 21;
+  if (factura.facturarPorTramo && (factura.tramos?.length ?? 0) > 0) {
+    const tramosDraft: FacturaTramoDraft[] = (factura.tramos ?? []).map((t) => ({
+      viajeId: t.viajeId,
+      detalle: t.detalle,
+      monto: t.monto,
+      ivaPct: t.ivaPct,
+    }));
+    const fromTramos = lineasFromTramos(
+      factura.viajeIds,
+      viajes,
+      tramosDraft,
+      ivaPct,
+      `Factura ${factura.numero}`,
+    );
+    if (fromTramos) {
+      const neto = fromTramos.reduce((s, l) => s + l.importe, 0);
+      if (neto > 0) return fromTramos;
+      if (factura.importe > 0) {
+        return [
+          {
+            descripcion: `Factura ${factura.numero}`,
+            importe: factura.importe,
+            ivaPct,
+          },
+        ];
+      }
+      return fromTramos;
+    }
+  }
+
   const linked = viajes.filter((v) => factura.viajeIds.includes(v.id));
   if (linked.length > 0) {
     const lineas = linked.map((v) => {

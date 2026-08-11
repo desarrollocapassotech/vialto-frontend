@@ -6,6 +6,7 @@ import { monedaUnicaDeViajes, viajesFiltradosParaFactura } from "@/lib/viajesFlo
 import {
   emptyFacturaDraft,
   facturaPayloadFromDraft,
+  validateFacturaDraftTramos,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import type { Factura, Viaje } from "@/types/api";
@@ -107,6 +108,11 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
       })
     ) {
       setError(MSG_ARCA_NO_FACTURA_USD);
+      return;
+    }
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setError(tramosCheck.message);
       return;
     }
     setSaving(true);
