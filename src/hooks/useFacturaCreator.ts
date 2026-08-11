@@ -80,6 +80,7 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
   function cancelar() {
     setCreating(false);
     setError(null);
+    setDraft(emptyFacturaDraft());
   }
 
   async function handleCreate(onSuccess?: (factura: Factura) => void) {
