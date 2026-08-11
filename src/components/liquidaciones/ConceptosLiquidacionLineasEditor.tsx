@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
+import { tooltipPanelClass } from "@/lib/tooltip";
 import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
@@ -346,7 +347,30 @@ export function ConceptosLiquidacionLineasEditor({
               </select>
             </label>
             <label className="grid gap-1">
-              <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
+              <div className="flex items-center gap-1.5">
+                <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
+                <div className="group relative -mt-0.5 flex cursor-help items-center text-vialto-steel hover:text-vialto-charcoal">
+                  <span
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[9px] font-bold"
+                    aria-hidden="true"
+                  >
+                    ?
+                  </span>
+                  <div className={`${tooltipPanelClass} w-48 font-[family-name:var(--font-ui)]`}>
+                    <p className="mb-1.5 text-[10px] uppercase tracking-wider text-white/70">
+                      Alícuotas válidas AFIP:
+                    </p>
+                    <ul className="list-inside list-disc text-sm font-sans tracking-tight">
+                      <li>0%</li>
+                      <li>2,5%</li>
+                      <li>5%</li>
+                      <li>10,5%</li>
+                      <li>21%</li>
+                      <li>27%</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 min={0}
