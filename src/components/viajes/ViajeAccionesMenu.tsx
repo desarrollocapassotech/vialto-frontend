@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Banknote, Download, Eye, FileText, PlusCircle, Receipt, Trash2 } from 'lucide-react';
+import { Banknote, Download, Eye, FileText, Calculator, PlusCircle, Receipt, Trash2 } from 'lucide-react';
 import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
 import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
 import { motivoBloqueoAccionFacturarArcaUsd } from '@/lib/arcaUsdRestriction';
 import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
-import { viajePermiteBotonFacturar } from '@/lib/viajesComprobantes';
+import { viajePermiteBotonFacturar, liquidacionElegidaDeViaje } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
@@ -24,6 +24,7 @@ interface Props {
   onFacturar: () => void;
   onExportar: () => void;
   onVerFactura?: () => void;
+  onVerLiquidacion?: () => void;
   onEliminar?: () => void;
 }
 
@@ -36,6 +37,7 @@ export function ViajeAccionesMenu({
   onFacturar,
   onExportar,
   onVerFactura,
+  onVerLiquidacion,
   onEliminar,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -51,6 +53,9 @@ export function ViajeAccionesMenu({
 
     if (viaje.facturaId && onVerFactura) {
       items.push({ id: 'ver-factura', label: 'Ver factura', icon: FileText, onClick: onVerFactura });
+    }
+    if (liquidacionElegidaDeViaje(viaje) && onVerLiquidacion) {
+      items.push({ id: 'ver-liquidacion', label: 'Ver liquidación', icon: Calculator, onClick: onVerLiquidacion });
     }
     if (permiteFacturar) {
       items.push({
@@ -82,9 +87,10 @@ export function ViajeAccionesMenu({
 
     return items;
   }, [
-    viaje.facturaId,
+    viaje,
     onVer,
     onVerFactura,
+    onVerLiquidacion,
     permiteFacturar,
     facturarBloqueoArcaUsd,
     onFacturar,

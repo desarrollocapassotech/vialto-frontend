@@ -7,6 +7,7 @@ import {
   tooltipLiquidacionEstado,
   type LiquidacionEstado,
 } from '@/lib/viajesIndicadores';
+import { liquidacionElegidaDeViaje } from '@/lib/viajesComprobantes';
 import { ViajeLiquidacionDetalleModal } from '@/components/viajes/ViajeLiquidacionDetalleModal';
 import {
   LiquidacionViewModal,
@@ -56,9 +57,7 @@ export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
 
   if (viaje.liquidacionEstado == null) return null;
   const estado = viaje.liquidacionEstado as LiquidacionEstado;
-  const relevantes = viaje.liquidacionesViaje ?? [];
-  const activa = relevantes.find((lv) => lv.liquidacion.estado !== 'anulado');
-  const elegida = (activa ?? relevantes[relevantes.length - 1])?.liquidacion;
+  const elegida = liquidacionElegidaDeViaje(viaje);
 
   async function handleClick() {
     if (!elegida) {

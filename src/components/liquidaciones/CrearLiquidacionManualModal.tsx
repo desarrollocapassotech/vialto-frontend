@@ -13,6 +13,7 @@ import {
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
@@ -111,6 +112,7 @@ export function CrearLiquidacionManualModal({
   getToken,
   onSuccess,
   onClose,
+  tenantId,
 }: Props) {
   const showComprobante = !hasArca;
   const { showToast } = useToast();
@@ -160,6 +162,11 @@ export function CrearLiquidacionManualModal({
   >(null);
   const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
+  /** Liquidación creada como borrador cuando la emisión falló por datos faltantes; se
+   * muestra EmitirLiquidacionModal para completarlos y reintentar sin cerrar el circuito. */
+  const [emitirPendiente, setEmitirPendiente] = useState<Liquidacion | null>(
+    null,
+  );
 
   // Cargar config ARCA si no vino por props (p. ej. desde Viajes).
   useEffect(() => {
@@ -412,7 +419,7 @@ export function CrearLiquidacionManualModal({
               body: JSON.stringify({ ptoVenta: ptoVentaNum }),
             },
           );
-        } catch (emitErr) {
+        } catch {
           emitFailed = true;
           try {
             liq = await apiJson<Liquidacion>(
@@ -422,10 +429,10 @@ export function CrearLiquidacionManualModal({
           } catch {
             /* si falla el refresh, se usa el borrador ya creado */
           }
-          showToast(
-            `La liquidación se creó, pero no se pudo emitir: ${friendlyError(emitErr, "arca")}. Podés reintentar desde la grilla.`,
-            "error",
-          );
+          // La liquidación ya quedó creada en borrador. En vez de cerrar el modal con
+          // un error, mostramos EmitirLiquidacionModal para completar los datos
+          // faltantes (cliente/transportista) y reintentar sin romper el circuito.
+          setEmitirPendiente(liq);
         }
       }
       if (action === "emitir" && !emitFailed) {
@@ -441,7 +448,7 @@ export function CrearLiquidacionManualModal({
             : "Liquidación creada en borrador.",
         );
       }
-      onSuccess(liq);
+      if (!emitFailed) onSuccess(liq);
     } catch (err) {
       setError(friendlyError(err, "liquidaciones"));
     } finally {
@@ -508,6 +515,31 @@ export function CrearLiquidacionManualModal({
     !ptoVenta.trim() ||
     !Number.isInteger(ptoVentaNumPreview) ||
     ptoVentaNumPreview < 1;
+
+  if (emitirPendiente) {
+    return (
+      <EmitirLiquidacionModal
+        liq={emitirPendiente}
+        getToken={getToken}
+        tenantId={tenantId}
+        arcaConfig={resolvedConfig}
+        ivaPct={emitirPendiente.ivaPct ?? resolvedConfig?.ivaGastosAdmin}
+        onSuccess={(updated) => {
+          setEmitirPendiente(null);
+          showToast(
+            updated.cae
+              ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
+              : "Comprobante emitido correctamente.",
+          );
+          onSuccess(updated);
+        }}
+        onClose={() => {
+          setEmitirPendiente(null);
+          onSuccess(emitirPendiente);
+        }}
+      />
+    );
+  }
 
   return (
     <div
