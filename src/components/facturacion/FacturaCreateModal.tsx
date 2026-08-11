@@ -502,8 +502,8 @@ export function FacturaCreateModal({
     monedaUnicaDeViajes(draft.viajeIds, viajes) === null;
 
   const compactFields = (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label className={compactLabelClass}>
             Número <span className="text-red-500">*</span>
@@ -562,8 +562,8 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline justify-between gap-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+        <div className="flex shrink-0 items-baseline justify-between gap-2">
           <label className={compactLabelClass}>
             Viajes vinculados{" "}
             {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
@@ -574,19 +574,22 @@ export function FacturaCreateModal({
             </span>
           )}
         </div>
-        <ViajesVinculadosEditor
-          viajes={viajes}
-          disponibles={viajesNueva}
-          selected={draft.viajeIds}
-          onChange={(ids) => patch({ viajeIds: ids })}
-          loading={viajesLoading}
-          tipo={draft.tipo}
-          clienteId={draft.clienteId}
-          transportistaId={draft.transportistaId}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ViajesVinculadosEditor
+            viajes={viajes}
+            disponibles={viajesNueva}
+            selected={draft.viajeIds}
+            onChange={(ids) => patch({ viajeIds: ids })}
+            loading={viajesLoading}
+            tipo={draft.tipo}
+            clienteId={draft.clienteId}
+            transportistaId={draft.transportistaId}
+            viajesTablaFillHeight
+          />
+        </div>
       </div>
       {monedaInvalida && (
-        <p className="rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no puede
           contener viajes en distintas monedas. Generá una factura por moneda.
         </p>
@@ -753,7 +756,8 @@ export function FacturaCreateModal({
           aria-modal="true"
           aria-labelledby="factura-create-modal-title"
           className={[
-            "relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15",
+            "relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
+            unifiedArca ? "sm:h-[92vh]" : "sm:h-auto sm:max-h-[92vh]",
             unifiedArca
               ? "max-w-[min(90rem,calc(100vw-1rem))]"
               : "max-w-[min(72rem,calc(100vw-1rem))]",
@@ -796,16 +800,16 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
-              unifiedArca ? "flex flex-col lg:flex-row" : "overflow-y-auto",
+              unifiedArca ? "flex flex-col lg:min-h-0 lg:flex-row" : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="min-h-0 shrink-0 overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[min(26rem,38%)] lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[60%] lg:max-w-[60%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[40%] lg:max-w-[40%] lg:shrink-0 lg:min-w-0">
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
