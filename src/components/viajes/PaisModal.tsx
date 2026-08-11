@@ -26,7 +26,8 @@ export function PaisModal({
 
   async function submit() {
     const errs: Record<string, string> = {};
-    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del país.';
+    if (!codigo.trim()) errs.codigo = 'Ingresá el código de 2 letras (ej: BO).';
+    else if (!/^[A-Z]{2}$/.test(codigo.trim())) errs.codigo = 'El código debe tener 2 letras (ej: BO).';
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -39,7 +40,7 @@ export function PaisModal({
         method: 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
-          codigo: codigo.trim() || undefined,
+          codigo: codigo.trim(),
         }),
       });
       onSaved(result);
@@ -92,14 +93,17 @@ export function PaisModal({
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className={L}>Código (opcional)</span>
+              <span className={L}>
+                Código <span className="text-red-500">*</span>
+              </span>
               <input
                 value={codigo}
                 onChange={(e) => setCodigo(e.target.value.toUpperCase())}
                 placeholder="Ej: BO"
-                maxLength={3}
-                className={`${I} border-black/15`}
+                maxLength={2}
+                className={`${I} ${fieldErrors.codigo ? 'border-red-400' : 'border-black/15'}`}
               />
+              <CrudFieldError message={fieldErrors.codigo} />
             </label>
           </div>
         </div>

@@ -1469,7 +1469,7 @@ export function ViajeCreatePage() {
           }}
           onSaved={(p: Pais) => {
             setSessionPaises((prev) => [...prev, p]);
-            const codigo = (p.codigo || p.id) as PaisCodigo;
+            const codigo = (p.codigo || p.id);
             if (paisQuickCreateDestinoIndex === null) {
               setPaisOrigen(codigo);
               setOrigen("");
