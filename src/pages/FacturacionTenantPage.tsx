@@ -9,6 +9,7 @@ import {
   FacturaEditModal,
   facturaPayloadFromDraft,
   facturaToEditDraft,
+  validateFacturaDraftTramos,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
@@ -688,6 +689,11 @@ export function FacturacionTenantPage({
       setDraftError(MSG_ARCA_NO_FACTURA_USD);
       return;
     }
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setDraftError(tramosCheck.message);
+      return;
+    }
     setSaving(true);
     try {
       const comprobanteUrl = await resolveComprobanteUrl(draft);
@@ -738,6 +744,11 @@ export function FacturacionTenantPage({
       setEditError(
         "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.",
       );
+      return;
+    }
+    const tramosCheck = validateFacturaDraftTramos(editDraft);
+    if (!tramosCheck.ok) {
+      setEditError(tramosCheck.message);
       return;
     }
     setSavingEditId(editingId);

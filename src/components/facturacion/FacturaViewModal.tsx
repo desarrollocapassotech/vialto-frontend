@@ -99,8 +99,23 @@ export function FacturaViewModal({
 
   const importeFormato = fmtImporte(factura.moneda, factura.importe);
   const ivaN = factura.ivaPct ?? 0;
-  const muestraIva = ivaN > 0 && factura.importe > 0;
-  const totalConIva = factura.importe * (1 + ivaN / 100);
+  const tramos = factura.tramos ?? [];
+  const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
+
+  let muestraIva = false;
+  let totalConIva = factura.importe;
+  if (porTramo) {
+    const sumaTramos = tramos.reduce((s, t) => s + t.monto, 0);
+    const undivided = Math.max(0, factura.importe - sumaTramos);
+    const ivaTramos = tramos.reduce((s, t) => s + (t.monto * t.ivaPct) / 100, 0);
+    const ivaUndivided = (undivided * ivaN) / 100;
+    totalConIva = factura.importe + ivaTramos + ivaUndivided;
+    muestraIva = true;
+  } else {
+    muestraIva = ivaN > 0 && factura.importe > 0;
+    totalConIva = factura.importe * (1 + ivaN / 100);
+  }
+
   const letraFromCbte = facturaLetraFromCbteTipo(factura.cbteTipo);
   const letra =
     hasArca && (letraFromCbte || cliente?.condicionIva != null)
@@ -137,12 +152,20 @@ export function FacturaViewModal({
     ...(letra ? [{ label: 'Comprobante ARCA', value: letra }] : []),
     { label: 'Cliente', value: clienteNombre },
     { label: 'Importe', value: importeFormato },
-    ...(muestraIva
+    ...(porTramo
       ? [
-          { label: 'IVA', value: `${ivaN}%` },
+          { label: 'Facturación', value: 'Por tramo' },
+          ...(ivaN > 0
+            ? [{ label: 'IVA viajes sin tramo', value: `${ivaN}%` }]
+            : []),
           { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
         ]
-      : []),
+      : muestraIva
+        ? [
+            { label: 'IVA', value: `${ivaN}%` },
+            { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
+          ]
+        : []),
     { label: 'Fecha de emisión', value: factura.fechaEmision ? fmtDate(factura.fechaEmision) : null },
     { label: 'Fecha de vencimiento', value: factura.fechaVencimiento ? fmtDate(factura.fechaVencimiento) : null },
     {
@@ -253,6 +276,38 @@ export function FacturaViewModal({
           </div>
         ))}
       </div>
+
+      {porTramo && (
+        <div className="mt-6 border-t border-black/10 pt-4 space-y-3">
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            Tramos
+          </p>
+          <ul className="space-y-2">
+            {tramos
+              .slice()
+              .sort((a, b) => a.orden - b.orden)
+              .map((t) => {
+                const ivaMonto = (t.monto * t.ivaPct) / 100;
+                const totalTramo = t.monto + ivaMonto;
+                return (
+                  <li
+                    key={t.id}
+                    className="border border-black/10 bg-vialto-mist/30 px-3 py-2 text-sm"
+                  >
+                    <p className="font-medium text-vialto-charcoal">{t.detalle}</p>
+                    <p className="mt-1 text-xs text-vialto-steel">
+                      Monto {fmtImporte(factura.moneda, t.monto, 2)}
+                      {' · '}
+                      IVA {t.ivaPct}% ({fmtImporte(factura.moneda, ivaMonto, 2)})
+                      {' · '}
+                      Total {fmtImporte(factura.moneda, totalTramo, 2)}
+                    </p>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+      )}
 
       {anulada && (
         <div className="mt-6 border-t border-black/10 pt-4 space-y-3">
