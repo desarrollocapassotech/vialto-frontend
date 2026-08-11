@@ -338,7 +338,10 @@ export function ViajeCreatePage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiJson<Pais[]>("/api/paises", () => getToken());
+        const path = tenantId
+          ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
+          : "/api/paises";
+        const data = await apiJson<Pais[]>(path, () => getToken());
         if (!cancelled) setPaises(data);
       } catch {
         if (!cancelled) setPaises([]);
@@ -349,7 +352,7 @@ export function ViajeCreatePage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   // Carga del catálogo de productos de stock activos
   useEffect(() => {
@@ -1464,6 +1467,7 @@ export function ViajeCreatePage() {
       {quickCreate === "pais" && (
         <PaisModal
           getToken={getToken}
+          tenantId={tenantId || undefined}
           onClose={() => {
             setQuickCreate(null);
             setPaisQuickCreateDestinoIndex(null);

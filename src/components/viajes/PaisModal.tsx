@@ -10,11 +10,13 @@ export function PaisModal({
   getToken,
   onClose,
   onSaved,
+  tenantId,
   stacked,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (pais: Pais) => void;
+  tenantId?: string;
   /** true cuando se abre sobre otro modal z-[110] */
   stacked?: boolean;
 }) {
@@ -36,7 +38,10 @@ export function PaisModal({
     setSaving(true);
     setError(null);
     try {
-      const result = await apiJson<Pais>('/api/paises', () => getToken(), {
+      const path = tenantId
+        ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
+        : '/api/paises';
+      const result = await apiJson<Pais>(path, () => getToken(), {
         method: 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
@@ -86,7 +91,10 @@ export function PaisModal({
               <input
                 autoFocus
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNombre(v ? v.charAt(0).toUpperCase() + v.slice(1) : v);
+                }}
                 placeholder="Ej: Bolivia"
                 className={`${I} ${fieldErrors.nombre ? 'border-red-400' : 'border-black/15'}`}
               />
