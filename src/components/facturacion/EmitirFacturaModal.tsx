@@ -28,6 +28,7 @@ import { modalOverlayClass } from '@/lib/modalLayers';
 import { MSG_ARCA_NO_FACTURA_USD, arcaBloqueaFacturarUsd } from '@/lib/arcaUsdRestriction';
 import { useToast } from '@/lib/toast';
 import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
+import { CompletarDatosFiscalesInline } from '@/components/shared/CompletarDatosFiscalesInline';
 import type { ArcaConfig, Cliente, Factura, Viaje } from '@/types/api';
 
 interface Props {
@@ -140,6 +141,8 @@ export function EmitirFacturaModal({
   );
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
+  const missingEmisorFields = missingEmitFields.filter((f) => f.startsWith('Emisor:'));
+  const missingClienteFields = missingEmitFields.filter((f) => f.startsWith('Cliente:'));
   const sinConfigArca = datosReady && !arcaConfig;
   const tipoInvalido = factura.tipo !== 'cliente';
 
@@ -396,12 +399,6 @@ export function EmitirFacturaModal({
                 {clienteDetalle?.pais && (
                   <p className="text-xs text-vialto-steel">País: {clienteDetalle.pais}</p>
                 )}
-                {datosReady && condicionIva == null && (
-                  <p className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-2 py-1.5 mt-1" role="alert">
-                    Falta la condición de IVA AFIP. Editá el cliente, seleccioná{' '}
-                    <strong>Argentina</strong> como país y guardá la condición frente al IVA.
-                  </p>
-                )}
               </section>
 
               <section className="space-y-1">
@@ -447,15 +444,33 @@ export function EmitirFacturaModal({
                 </div>
               )}
 
-              {datosEmitIncompletos && !sinConfigArca && (
+              {missingEmisorFields.length > 0 && !sinConfigArca && (
                 <div className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
                   <p className="font-medium">Completá estos datos antes de emitir</p>
                   <ul className="mt-1 list-disc pl-4 space-y-0.5">
-                    {missingEmitFields.map((f) => (
+                    {missingEmisorFields.map((f) => (
                       <li key={f}>{f}</li>
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {missingClienteFields.length > 0 && !sinConfigArca && factura.clienteId && (
+                <CompletarDatosFiscalesInline
+                  entidad="cliente"
+                  id={factura.clienteId}
+                  tenantId={tenantId}
+                  getToken={getToken}
+                  initial={{
+                    nombre: clienteDetalle?.nombre ?? '',
+                    pais: clienteDetalle?.pais ?? null,
+                    idFiscal: clienteDetalle?.idFiscal ?? null,
+                    condicionIva: clienteDetalle?.condicionIva ?? null,
+                    condicionTributaria: clienteDetalle?.condicionTributaria ?? null,
+                    direccion: clienteDetalle?.direccion ?? null,
+                  }}
+                  onSaved={(updated) => setClienteDetalle(updated as Cliente)}
+                />
               )}
 
               <div ref={feedbackRef} className="space-y-2">
