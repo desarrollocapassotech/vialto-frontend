@@ -203,6 +203,16 @@ export interface Chofer {
   createdAt: string;
 }
 
+export type Pais = {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  codigo: string | null;
+  esPredefinido: boolean;
+  createdAt: string;
+  createdBy: string | null;
+};
+
 export interface Destinatario {
   id: string;
   tenantId: string;

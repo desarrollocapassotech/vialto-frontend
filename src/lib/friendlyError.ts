@@ -7,6 +7,7 @@ export type FriendlyErrorContext =
   | "viajes"
   | "cargas"
   | "clientes"
+  | "paises"
   | "transportistas"
   | "choferes"
   | "destinatarios"
@@ -27,6 +28,7 @@ const fallback: Record<FriendlyErrorContext, string> = {
   cargas:
     "No pudimos cargar el catálogo de cargas. Probá de nuevo en un momento.",
   clientes: "No pudimos cargar los clientes. Probá de nuevo en un momento.",
+  paises: "No pudimos cargar los países. Probá de nuevo en un momento.",
   transportistas:
     "No pudimos cargar los transportistas. Probá de nuevo en un momento.",
   choferes: "No pudimos cargar los choferes. Probá de nuevo en un momento.",
