@@ -219,7 +219,8 @@ export function ViajeCreatePage() {
 
   const paisesConSesion = useMemo(() => {
     const ids = new Set(paises.map((p) => p.id));
-    return [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
+    const combinados = [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
+    return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [paises, sessionPaises]);
 
   // ─── CÁLCULO DE MAESTROS COMBINADOS (BBDD + SESIÓN ACTUAL) ───────────────
