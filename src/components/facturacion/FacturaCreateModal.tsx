@@ -887,9 +887,11 @@ export function FacturaCreateModal({
           className={[
             "relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
             unifiedArca ? "sm:h-[92vh]" : "sm:h-auto sm:max-h-[92vh]",
-            unifiedArca
-              ? "max-w-[min(90rem,calc(100vw-1rem))]"
-              : "max-w-[min(72rem,calc(100vw-1rem))]",
+            step === "autorizada"
+              ? "max-w-[min(34rem,calc(100vw-1rem))]"
+              : unifiedArca
+                ? "max-w-[min(90rem,calc(100vw-1rem))]"
+                : "max-w-[min(72rem,calc(100vw-1rem))]",
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
@@ -899,20 +901,32 @@ export function FacturaCreateModal({
                 id="factura-create-modal-title"
                 className="text-base font-semibold text-vialto-charcoal"
               >
-                Nueva factura
-                {draft.letraComprobante === "a"
-                  ? " A"
-                  : draft.letraComprobante === "b"
-                    ? " B"
-                    : ""}
+                {step === "autorizada" ? (
+                  "Factura emitida"
+                ) : (
+                  <>
+                    Nueva factura
+                    {draft.letraComprobante === "a"
+                      ? " A"
+                      : draft.letraComprobante === "b"
+                        ? " B"
+                        : ""}
+                  </>
+                )}
               </h2>
               <p className="mt-1 text-xs text-vialto-steel">
-                {unifiedArca
-                  ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
-                  : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
-                {draft.letraComprobante
-                  ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
-                  : ""}
+                {step === "autorizada" ? (
+                  "El comprobante fue autorizado por ARCA."
+                ) : (
+                  <>
+                    {unifiedArca
+                      ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
+                      : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
+                    {draft.letraComprobante
+                      ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
+                      : ""}
+                  </>
+                )}
               </p>
             </div>
             <button
@@ -929,7 +943,13 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
+<<<<<<< HEAD
               unifiedArca ? "flex flex-col lg:min-h-0 lg:flex-row" : "overflow-y-auto",
+=======
+              step === "form" && unifiedArca
+                ? "flex flex-col lg:flex-row"
+                : "overflow-y-auto",
+>>>>>>> 3216511 ([FIX] VTO-266: Corregir título, descripción y tamaño del modal al emitir factura)
             ].join(" ")}
           >
             {step === "form" ? (
