@@ -639,6 +639,8 @@ export interface LiquidacionConceptoLinea {
   ivaPct: number | null;
   monto: number;
   orden: number;
+  modoAplicacion: string;
+  viajeId: string | null;
 }
 
 /** Viaje incluido en una liquidación (join liquidacion_viajes + viaje). */

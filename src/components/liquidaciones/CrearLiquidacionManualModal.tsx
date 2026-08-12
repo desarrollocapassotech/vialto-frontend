@@ -215,14 +215,14 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     if (viajeInicial || selectedViajeIds.size === 0) return;
 
-    setConceptosLineas((prev) =>
-      prev.map((linea) => {
-        if (linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-          return { ...linea, viajeId: null };
-        }
-        return linea;
-      }),
-    );
+      setConceptosLineas((prev) =>
+        prev.map((linea) => {
+          if (linea.modoAplicacion === 'VIAJE_PUNTUAL' && linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
+            return { ...linea, viajeId: null, modoAplicacion: 'GENERAL' };
+          }
+          return linea;
+        }),
+      );
   }, [selectedViajeIds, viajeInicial]);
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
@@ -479,9 +479,15 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
+  
+  const getMultiplicador = (modo?: string) =>
+    modo === "TODOS_LOS_VIAJES" ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0)) : 1;
+
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
-      sum + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) *
+        getMultiplicador(l.modoAplicacion),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -888,11 +894,12 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
               {conceptosCompletos.map((l, idx) => {
+                const mult = getMultiplicador(l.modoAplicacion);
                 const conIva = signedMontoConIvaConcepto(
                   l.signo,
                   Number(l.monto) || 0,
                   l.ivaPct,
-                );
+                ) * mult;
                 return (
                   <div
                     key={`${l.conceptoLiquidacionId}-${idx}`}
@@ -900,6 +907,7 @@ export function CrearLiquidacionManualModal({
                   >
                     <span>
                       {l.nombre || "Concepto"}
+                      {mult > 1 ? ` (×${mult} viajes)` : ""}
                       {l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}
                     </span>
                     <span className="tabular-nums">
