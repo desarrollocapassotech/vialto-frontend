@@ -1186,7 +1186,7 @@ export function ViajesTenantPage({
         () => getToken(),
       );
       const yaVinculada = facturasCliente.find((f) =>
-        f.viajeIds.includes(v.id),
+        f.viajeIds.includes(v.id) && f.estado !== "anulado",
       );
       if (yaVinculada) {
         navigate("/facturacion", {
