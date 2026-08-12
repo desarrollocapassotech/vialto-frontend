@@ -35,7 +35,6 @@ import {
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
 import { useToast } from "@/lib/toast";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
 
@@ -91,9 +90,6 @@ export function EmitirFacturaModal({
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [facturaEmitida, setFacturaEmitida] = useState<Factura>(factura);
   const [downloading, setDownloading] = useState(false);
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
   const [datosReady, setDatosReady] = useState(false);
@@ -331,15 +327,14 @@ export function EmitirFacturaModal({
               </p>
               <div className="flex justify-end gap-3">
                 {factura.comprobanteUrl && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreviewComprobanteUrl(factura.comprobanteUrl!)
-                    }
+                  <a
+                    href={factura.comprobanteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist inline-flex items-center"
                   >
                     Ver comprobante
-                  </button>
+                  </a>
                 )}
                 <button
                   type="button"
@@ -351,13 +346,6 @@ export function EmitirFacturaModal({
               </div>
             </div>
           </div>,
-        )}
-        {previewComprobanteUrl && (
-          <AdjuntoPreviewModal
-            url={previewComprobanteUrl}
-            title="Comprobante"
-            onClose={() => setPreviewComprobanteUrl(null)}
-          />
         )}
       </>
     );
@@ -659,17 +647,14 @@ export function EmitirFacturaModal({
                       {downloading ? "Generando…" : "Descargar PDF"}
                     </button>
                     {facturaEmitida.comprobanteUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewComprobanteUrl(
-                            facturaEmitida.comprobanteUrl!,
-                          )
-                        }
+                      <a
+                        href={facturaEmitida.comprobanteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist inline-flex items-center"
                       >
                         Ver comprobante
-                      </button>
+                      </a>
                     )}
                     <button
                       type="button"
@@ -716,13 +701,6 @@ export function EmitirFacturaModal({
             )}
           </div>
         </div>,
-      )}
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
       )}
     </>
   );
