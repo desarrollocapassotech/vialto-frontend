@@ -14,7 +14,8 @@ const PAIS_DEFAULT: PaisCodigo = 'AR';
 function normalizePaisCodigo(raw: string | null | undefined): PaisCodigo {
   const t = (raw ?? '').trim();
   if (esPaisSoportado(t)) return t;
-  const upper = t.toUpperCase();
+  // Cast: el branding `string & {}` de PaisCodigo hace que TS angoste `t` a `never` acá.
+  const upper = (t as string).toUpperCase();
   if (upper === 'ARGENTINA') return 'AR';
   if (upper === 'URUGUAY') return 'UY';
   if (upper === 'PARAGUAY') return 'PY';

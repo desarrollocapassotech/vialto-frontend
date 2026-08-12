@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { signedMontoConIvaConcepto } from "@/lib/liquidacionConceptosIva";
+import { tooltipPanelClass } from "@/lib/tooltip";
 import type {
   ConceptoLiquidacion,
   ConceptoLiquidacionSigno,
@@ -22,8 +23,11 @@ export type ConceptoLineaDraft = {
   signo?: ConceptoLiquidacionSigno;
   ivaPct?: number;
   /**
-   * ID del viaje al que corresponde este concepto.
-   * Si es undefined, null o vacío "", se interpreta como un concepto "General".
+   * Modo de aplicación del concepto: GENERAL, VIAJE_PUNTUAL, TODOS_LOS_VIAJES
+   */
+  modoAplicacion?: string;
+  /**
+   * ID del viaje al que corresponde este concepto (si modoAplicacion === 'VIAJE_PUNTUAL').
    */
   viajeId?: string | null;
 };
@@ -265,10 +269,13 @@ export function ConceptosLiquidacionLineasEditor({
     }
   }
 
+  const getMultiplicador = (modo?: string) =>
+    modo === "TODOS_LOS_VIAJES" ? Math.max(1, viajesDisponibles.length) : 1;
+
   const efectoNeto = lineas.reduce(
     (sum, l) =>
       sum +
-      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) * getMultiplicador(l.modoAplicacion),
     0,
   );
 
@@ -346,7 +353,30 @@ export function ConceptosLiquidacionLineasEditor({
               </select>
             </label>
             <label className="grid gap-1">
-              <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
+              <div className="flex items-center gap-1.5">
+                <CrudFieldLabel required>IVA (%)</CrudFieldLabel>
+                <div className="group relative -mt-0.5 flex cursor-help items-center text-vialto-steel hover:text-vialto-charcoal">
+                  <span
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[9px] font-bold"
+                    aria-hidden="true"
+                  >
+                    ?
+                  </span>
+                  <div className={`${tooltipPanelClass} w-48 font-[family-name:var(--font-ui)]`}>
+                    <p className="mb-1.5 text-[10px] uppercase tracking-wider text-white/70">
+                      Alícuotas válidas AFIP:
+                    </p>
+                    <ul className="list-inside list-disc text-sm font-sans tracking-tight">
+                      <li>0%</li>
+                      <li>2,5%</li>
+                      <li>5%</li>
+                      <li>10,5%</li>
+                      <li>21%</li>
+                      <li>27%</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 min={0}
@@ -390,11 +420,12 @@ export function ConceptosLiquidacionLineasEditor({
             // El signo viene del catálogo al elegir el concepto; no inferirlo del
             // monto (con monto 0, +0 y −0 se ven iguales y el UI no se actualiza).
             const aFavor = linea.signo !== "contra";
+            const mult = getMultiplicador(linea.modoAplicacion);
             const efecto = signedMontoConIvaConcepto(
               linea.signo,
               Number(linea.monto) || 0,
               linea.ivaPct,
-            );
+            ) * mult;
             const montoAbs = Math.abs(efecto);
             const rowIncomplete = incompleteSet.has(index);
             const conceptoMissing =
@@ -447,15 +478,23 @@ export function ConceptosLiquidacionLineasEditor({
                   <label className="min-w-0">
                     <span className={labelClass}>Aplicar a</span>
                     <select
-                      value={linea.viajeId ?? ""}
+                      value={linea.modoAplicacion === 'VIAJE_PUNTUAL' ? (linea.viajeId ?? "") : (linea.modoAplicacion ?? 'GENERAL')}
                       disabled={disabled}
-                      onChange={(e) =>
-                        updateRow(index, { viajeId: e.target.value || null })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'GENERAL') {
+                          updateRow(index, { modoAplicacion: 'GENERAL', viajeId: null });
+                        } else if (val === 'TODOS_LOS_VIAJES') {
+                          updateRow(index, { modoAplicacion: 'TODOS_LOS_VIAJES', viajeId: null });
+                        } else {
+                          updateRow(index, { modoAplicacion: 'VIAJE_PUNTUAL', viajeId: val || null });
+                        }
+                      }}
                       className={inputClass}
-                      title="Asignar concepto a un viaje o dejar como general"
+                      title="Asignar concepto a un viaje, a todos o dejar como general"
                     >
-                      <option value="">General (toda la liq.)</option>
+                      <option value="GENERAL">General (toda la liq.)</option>
+                      <option value="TODOS_LOS_VIAJES">Todos los viajes (individual)</option>
                       {viajesDisponibles.map((v) => (
                         <option key={v.id} value={v.id}>
                           Viaje #{v.numero}
@@ -544,6 +583,7 @@ export function toConceptosLineasPayload(lineas: ConceptoLineaDraft[]) {
   return lineas.filter(isConceptoLineaCompleta).map((l) => ({
     conceptoLiquidacionId: l.conceptoLiquidacionId,
     monto: Number(l.monto),
-    viajeId: l.viajeId || null,
+    modoAplicacion: l.modoAplicacion ?? 'GENERAL',
+    viajeId: l.modoAplicacion === 'VIAJE_PUNTUAL' ? (l.viajeId || null) : null,
   }));
 }

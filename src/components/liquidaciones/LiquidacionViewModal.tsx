@@ -107,6 +107,8 @@ function normalizeConceptosLineas(
       ivaPct: row.ivaPct != null ? Number(row.ivaPct) : null,
       orden: row.orden ?? i,
       conceptoLiquidacionId: row.conceptoLiquidacionId ?? null,
+      modoAplicacion: row.modoAplicacion ?? "GENERAL",
+      viajeId: row.viajeId ?? null,
     };
   });
 }

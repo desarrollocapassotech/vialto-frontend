@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useState,
   type Dispatch,
   type SetStateAction,
   useCallback,
@@ -10,6 +11,14 @@ import {
   ClienteSearchSelect,
   TransportistaSearchSelect,
 } from "@/components/forms/MaestroSearchSelects";
+import {
+  FacturaTramosEditor,
+  computeTotalesFacturaPorTramo,
+  emptyFacturaTramoDraft,
+  toFacturaTramosPayload,
+  validateFacturaTramosDraft,
+  type FacturaTramoDraft,
+} from "@/components/facturacion/FacturaTramosEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
@@ -50,6 +59,8 @@ export type FacturaDraft = {
   fechaEmision: string;
   fechaVencimiento: string;
   ivaPct: string;
+  facturarPorTramo: boolean;
+  tramos: FacturaTramoDraft[];
   /** Letra AFIP elegida al facturar desde un viaje (A o B). */
   letraComprobante?: "a" | "b" | null;
   /** URL ya guardada (edición) o vacía si se quitó. */
@@ -77,10 +88,28 @@ export function emptyFacturaDraft(): FacturaDraft {
     fechaEmision: todayIso(),
     fechaVencimiento: "",
     ivaPct: "21",
+    facturarPorTramo: false,
+    tramos: [],
     letraComprobante: null,
     comprobanteUrl: null,
     comprobanteFile: null,
   };
+}
+
+/** Filtra tramos huérfanos al cambiar los viajes vinculados. */
+export function filterFacturaTramosByViajeIds(
+  tramos: FacturaTramoDraft[],
+  viajeIds: string[],
+): FacturaTramoDraft[] {
+  const allowed = new Set(viajeIds);
+  return tramos.filter((t) => !t.viajeId || allowed.has(t.viajeId));
+}
+
+export function validateFacturaDraftTramos(
+  draft: FacturaDraft,
+): { ok: true } | { ok: false; message: string; indices: number[] } {
+  if (!draft.facturarPorTramo) return { ok: true };
+  return validateFacturaTramosDraft(draft.tramos, draft.viajeIds);
 }
 
 /** Payload para POST/PATCH de factura a partir del draft del formulario (crear y editar). */
@@ -89,6 +118,8 @@ export function facturaPayloadFromDraft(
   comprobanteUrl?: string | null,
 ) {
   const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : undefined;
+  const facturarPorTramo =
+    draft.facturarPorTramo && draft.viajeIds.length > 0;
   const base: Record<string, unknown> = {
     numero: draft.numero.trim(),
     tipo: "cliente",
@@ -96,6 +127,10 @@ export function facturaPayloadFromDraft(
     fechaEmision: draft.fechaEmision,
     fechaVencimiento: draft.fechaVencimiento || undefined,
     ivaPct: ivaN,
+    facturarPorTramo,
+    tramos: facturarPorTramo
+      ? toFacturaTramosPayload(draft.tramos)
+      : [],
   };
   if (comprobanteUrl !== undefined) {
     base.comprobanteUrl = comprobanteUrl ?? "";
@@ -108,6 +143,19 @@ export function facturaPayloadFromDraft(
 }
 
 export function facturaToEditDraft(f: Factura): FacturaDraft {
+  const ivaPct = f.ivaPct != null ? String(f.ivaPct) : "21";
+  const ivaDefault = f.ivaPct ?? 21;
+  const tramos: FacturaTramoDraft[] = (f.tramos ?? [])
+    .slice()
+    .sort((a, b) => a.orden - b.orden)
+    .map((t) => ({
+      viajeId: t.viajeId,
+      detalle: t.detalle,
+      monto: t.monto,
+      montoStr: t.monto > 0 ? String(t.monto) : "",
+      ivaPct: t.ivaPct,
+      ivaPctStr: String(t.ivaPct),
+    }));
   return {
     numero: f.numero,
     tipo: f.tipo,
@@ -116,10 +164,70 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
     viajeIds: f.viajeIds,
     fechaEmision: isoToDate(f.fechaEmision),
     fechaVencimiento: isoToDate(f.fechaVencimiento),
-    ivaPct: f.ivaPct != null ? String(f.ivaPct) : "21",
+    ivaPct,
+    facturarPorTramo: Boolean(f.facturarPorTramo),
+    tramos:
+      f.facturarPorTramo && tramos.length > 0
+        ? tramos
+        : f.facturarPorTramo
+          ? [emptyFacturaTramoDraft(ivaDefault)]
+          : [],
     comprobanteUrl: f.comprobanteUrl ?? null,
     comprobanteFile: null,
   };
+}
+
+function fmtTotalesMoney(n: number) {
+  return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Neto (sin IVA) + total con IVA para modo simple o por tramo. */
+export function FacturaTotalesPreview({
+  draft,
+  viajes,
+}: {
+  draft: FacturaDraft;
+  viajes: Viaje[];
+}) {
+  const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
+  const totales = (() => {
+    if (draft.facturarPorTramo && draft.viajeIds.length > 0) {
+      return computeTotalesFacturaPorTramo(
+        draft.viajeIds,
+        viajes,
+        draft.tramos,
+        Number.isFinite(ivaN) ? ivaN : 0,
+      );
+    }
+    const neto =
+      draft.viajeIds.length > 0
+        ? draft.viajeIds.reduce((sum, id) => {
+            const v = viajes.find((x) => x.id === id);
+            return sum + (v?.monto ?? 0);
+          }, 0)
+        : 0;
+    const iva = neto * ((Number.isFinite(ivaN) ? ivaN : 0) / 100);
+    return { neto, iva, total: neto + iva };
+  })();
+
+  if (totales.neto <= 0 && totales.total <= 0) return null;
+
+  return (
+    <div className="mt-3 space-y-1 text-xs text-right text-vialto-steel">
+      <p>
+        Neto (sin IVA):{" "}
+        <span className="font-medium tabular-nums text-vialto-charcoal">
+          {fmtTotalesMoney(totales.neto)}
+        </span>
+      </p>
+      <p>
+        Total con IVA:{" "}
+        <span className="font-medium tabular-nums text-vialto-charcoal">
+          {fmtTotalesMoney(totales.total)}
+        </span>
+      </p>
+    </div>
+  );
 }
 
 /** Al cambiar el tipo de factura, preserva el viaje actual y actualiza la contraparte según el tipo. Si no hay viaje previo, limpia todo. */
@@ -358,12 +466,66 @@ export function FacturaEditModal({
   showComprobanteAdjunto = false,
 }: FacturaEditModalProps) {
   useEscapeKey(open, saving, onClose);
+  const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
+  const [tramosLocalError, setTramosLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setTramosIncomplete([]);
+      setTramosLocalError(null);
+    }
+  }, [open]);
 
   if (!open) return null;
 
   function patch(p: Partial<FacturaDraft>) {
     setDraft((prev) => (prev ? { ...prev, ...p } : prev));
   }
+
+  function patchViajeIds(ids: string[]) {
+    const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
+    const facturarPorTramo =
+      ids.length === 0 ? false : draft.facturarPorTramo;
+    patch({
+      viajeIds: ids,
+      facturarPorTramo,
+      tramos: facturarPorTramo ? tramos : [],
+    });
+    setTramosIncomplete([]);
+    setTramosLocalError(null);
+  }
+
+  function handleToggleFacturarPorTramo(checked: boolean) {
+    const ivaDefault =
+      draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21;
+    patch({
+      facturarPorTramo: checked,
+      tramos: checked
+        ? draft.tramos.length > 0
+          ? draft.tramos
+          : [emptyFacturaTramoDraft(Number.isFinite(ivaDefault) ? ivaDefault : 21)]
+        : [],
+    });
+    setTramosIncomplete([]);
+    setTramosLocalError(null);
+  }
+
+  function handleSave() {
+    const check = validateFacturaDraftTramos(draft);
+    if (!check.ok) {
+      setTramosIncomplete(check.indices);
+      setTramosLocalError(check.message);
+      return;
+    }
+    setTramosIncomplete([]);
+    setTramosLocalError(null);
+    onSave();
+  }
+
+  const ivaLabel = draft.facturarPorTramo
+    ? "IVA (%) viajes sin tramo"
+    : "IVA (%)";
+  const displayError = tramosLocalError || error;
 
   return (
     <div
@@ -461,9 +623,21 @@ export function FacturaEditModal({
               transportistaId={draft.transportistaId}
               clientes={clientes}
               transportistas={transportistas}
-              onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
+              onClienteChange={(id) =>
+                patch({
+                  clienteId: id,
+                  viajeIds: [],
+                  facturarPorTramo: false,
+                  tramos: [],
+                })
+              }
               onTransportistaChange={(id) =>
-                patch({ transportistaId: id, viajeIds: [] })
+                patch({
+                  transportistaId: id,
+                  viajeIds: [],
+                  facturarPorTramo: false,
+                  tramos: [],
+                })
               }
             />
 
@@ -493,7 +667,7 @@ export function FacturaEditModal({
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                IVA (%)
+                {ivaLabel}
               </label>
               <input
                 type="number"
@@ -527,35 +701,53 @@ export function FacturaEditModal({
                 viajes={viajes}
                 disponibles={viajesEdicion}
                 selected={draft.viajeIds}
-                onChange={(ids) => patch({ viajeIds: ids })}
+                onChange={patchViajeIds}
                 loading={viajesLoading}
                 tipo={draft.tipo}
                 clienteId={draft.clienteId}
                 transportistaId={draft.transportistaId}
               />
             </div>
+
+            {draft.viajeIds.length > 0 && (
+              <div className="col-span-full">
+                <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
+                  <input
+                    type="checkbox"
+                    checked={draft.facturarPorTramo}
+                    disabled={saving}
+                    onChange={(e) =>
+                      handleToggleFacturarPorTramo(e.target.checked)
+                    }
+                    className="h-4 w-4 border-black/20"
+                  />
+                  Facturar por tramo
+                </label>
+              </div>
+            )}
+
+            {draft.facturarPorTramo && draft.viajeIds.length > 0 && (
+              <div className="col-span-full">
+                <FacturaTramosEditor
+                  tramos={draft.tramos}
+                  onChange={(tramos) => {
+                    patch({ tramos });
+                    setTramosIncomplete([]);
+                    setTramosLocalError(null);
+                  }}
+                  viajeIds={draft.viajeIds}
+                  viajes={viajes}
+                  ivaPctDefault={
+                    draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
+                  }
+                  disabled={saving}
+                  incompleteIndices={tramosIncomplete}
+                />
+              </div>
+            )}
           </div>
 
-          {(() => {
-            const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
-            const importe =
-              draft.viajeIds.length > 0
-                ? draft.viajeIds.reduce((sum, id) => {
-                    const v = viajes.find((x) => x.id === id);
-                    return sum + (v?.monto ?? 0);
-                  }, 0)
-                : 0;
-            if (ivaN <= 0 || importe === 0) return null;
-            const total = importe * (1 + ivaN / 100);
-            return (
-              <p className="mt-3 text-xs text-vialto-steel text-right">
-                Total con IVA {ivaN}%:{" "}
-                <span className="font-medium text-vialto-charcoal tabular-nums">
-                  ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </span>
-              </p>
-            );
-          })()}
+          <FacturaTotalesPreview draft={draft} viajes={viajes} />
 
           {draft.viajeIds.length > 0 &&
             monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
@@ -586,9 +778,9 @@ export function FacturaEditModal({
             </div>
           )}
 
-          {error && (
+          {displayError && (
             <div className="mt-4">
-              <CrudFormErrorAlert message={error} />
+              <CrudFormErrorAlert message={displayError} />
             </div>
           )}
         </div>
@@ -604,7 +796,7 @@ export function FacturaEditModal({
           </button>
           <button
             type="button"
-            onClick={onSave}
+            onClick={handleSave}
             disabled={
               saving ||
               (draft.viajeIds.length > 0 &&

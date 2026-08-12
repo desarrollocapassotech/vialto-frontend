@@ -13,10 +13,17 @@ import { Receipt } from "lucide-react";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import {
+  FacturaTotalesPreview,
   facturaPayloadFromDraft,
+  filterFacturaTramosByViajeIds,
+  validateFacturaDraftTramos,
   ViajesVinculadosEditor,
   type FacturaDraft,
 } from "@/components/facturacion/FacturaEditModal";
+import {
+  FacturaTramosEditor,
+  emptyFacturaTramoDraft,
+} from "@/components/facturacion/FacturaTramosEditor";
 import {
   computeFacturaTotales,
   defaultFacturaLineasFromDraft,
@@ -229,6 +236,7 @@ export function FacturaCreateModal({
     defaultFacturaLineasFromDraft(draft, viajes),
   );
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
+  const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
   const [datosReady, setDatosReady] = useState(false);
@@ -242,7 +250,7 @@ export function FacturaCreateModal({
   const lineasSyncKey = useRef("");
 
   const busy = saving || submitAction != null;
-  const displayError = unifiedArca ? localError : error;
+  const displayError = unifiedArca ? localError : localError || error;
 
   useEscapeKey(open, busy, onClose);
 
@@ -292,6 +300,7 @@ export function FacturaCreateModal({
       setSubmitAction(null);
       setLocalError(null);
       setLineasIncomplete([]);
+      setTramosIncomplete([]);
       setArcaConfigMissing(false);
       setFacturaEmitida(null);
       setPreviewComprobanteUrl(null);
@@ -348,17 +357,58 @@ export function FacturaCreateModal({
 
   useEffect(() => {
     if (!open || !unifiedArca) return;
-    const key = `${draft.viajeIds.join(",")}|${draft.ivaPct}|${draft.numero}`;
+    const key = `${draft.viajeIds.join(",")}|${draft.ivaPct}|${draft.numero}|${draft.facturarPorTramo}|${draft.tramos.map((t) => `${t.viajeId}:${t.detalle}:${t.monto}:${t.ivaPct}`).join(";")}`;
     if (key === lineasSyncKey.current) return;
     lineasSyncKey.current = key;
     setLineas(defaultFacturaLineasFromDraft(draft, viajes));
     setLineasIncomplete([]);
-  }, [open, unifiedArca, draft.viajeIds, draft.ivaPct, draft.numero, viajes]);
+  }, [
+    open,
+    unifiedArca,
+    draft.viajeIds,
+    draft.ivaPct,
+    draft.numero,
+    draft.facturarPorTramo,
+    draft.tramos,
+    viajes,
+  ]);
 
   if (!open) return null;
 
   function patch(p: Partial<FacturaDraft>) {
     setDraft((prev) => ({ ...prev, ...p }));
+  }
+
+  function patchViajeIds(ids: string[]) {
+    const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
+    const facturarPorTramo =
+      ids.length === 0 ? false : draft.facturarPorTramo;
+    patch({
+      viajeIds: ids,
+      facturarPorTramo,
+      tramos: facturarPorTramo ? tramos : [],
+    });
+    setTramosIncomplete([]);
+    setLocalError(null);
+  }
+
+  function handleToggleFacturarPorTramo(checked: boolean) {
+    const ivaDefault =
+      draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : ivaPctDefault;
+    patch({
+      facturarPorTramo: checked,
+      tramos: checked
+        ? draft.tramos.length > 0
+          ? draft.tramos
+          : [
+              emptyFacturaTramoDraft(
+                Number.isFinite(ivaDefault) ? ivaDefault : 21,
+              ),
+            ]
+        : [],
+    });
+    setTramosIncomplete([]);
+    setLocalError(null);
   }
 
   function notifyError(message: string) {
@@ -390,6 +440,12 @@ export function FacturaCreateModal({
     const validationError = validateFacturaDraft(draft, viajes, hasArca);
     if (validationError) {
       notifyError(validationError);
+      return;
+    }
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setTramosIncomplete(tramosCheck.indices);
+      notifyError(tramosCheck.message);
       return;
     }
 
@@ -424,6 +480,7 @@ export function FacturaCreateModal({
     }
 
     setLineasIncomplete([]);
+    setTramosIncomplete([]);
     setLocalError(null);
     setSubmitAction(action);
 
@@ -522,9 +579,21 @@ export function FacturaCreateModal({
           transportistaId={draft.transportistaId}
           clientes={clientes}
           transportistas={transportistas}
-          onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
+          onClienteChange={(id) =>
+            patch({
+              clienteId: id,
+              viajeIds: [],
+              facturarPorTramo: false,
+              tramos: [],
+            })
+          }
           onTransportistaChange={(id) =>
-            patch({ transportistaId: id, viajeIds: [] })
+            patch({
+              transportistaId: id,
+              viajeIds: [],
+              facturarPorTramo: false,
+              tramos: [],
+            })
           }
           compact
         />
@@ -549,7 +618,11 @@ export function FacturaCreateModal({
           />
         </div>
         <div className="flex flex-col gap-1 sm:col-span-2">
-          <label className={compactLabelClass}>IVA (%)</label>
+          <label className={compactLabelClass}>
+            {draft.facturarPorTramo
+              ? "IVA (%) viajes sin tramo"
+              : "IVA (%)"}
+          </label>
           <input
             type="number"
             min="0"
@@ -579,7 +652,7 @@ export function FacturaCreateModal({
             viajes={viajes}
             disponibles={viajesNueva}
             selected={draft.viajeIds}
-            onChange={(ids) => patch({ viajeIds: ids })}
+            onChange={patchViajeIds}
             loading={viajesLoading}
             tipo={draft.tipo}
             clienteId={draft.clienteId}
@@ -588,6 +661,34 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
+      {draft.viajeIds.length > 0 && (
+        <label className="inline-flex items-center gap-2 text-xs text-vialto-charcoal">
+          <input
+            type="checkbox"
+            checked={draft.facturarPorTramo}
+            disabled={busy}
+            onChange={(e) => handleToggleFacturarPorTramo(e.target.checked)}
+            className="h-4 w-4 border-black/20"
+          />
+          Facturar por tramo
+        </label>
+      )}
+      {draft.facturarPorTramo && draft.viajeIds.length > 0 && (
+        <FacturaTramosEditor
+          tramos={draft.tramos}
+          onChange={(tramos) => {
+            patch({ tramos });
+            setTramosIncomplete([]);
+            setLocalError(null);
+          }}
+          viajeIds={draft.viajeIds}
+          viajes={viajes}
+          ivaPctDefault={ivaPctDefault}
+          disabled={busy}
+          incompleteIndices={tramosIncomplete}
+        />
+      )}
+      <FacturaTotalesPreview draft={draft} viajes={viajes} />
       {monedaInvalida && (
         <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no puede
@@ -618,9 +719,21 @@ export function FacturaCreateModal({
           transportistaId={draft.transportistaId}
           clientes={clientes}
           transportistas={transportistas}
-          onClienteChange={(id) => patch({ clienteId: id, viajeIds: [] })}
+          onClienteChange={(id) =>
+            patch({
+              clienteId: id,
+              viajeIds: [],
+              facturarPorTramo: false,
+              tramos: [],
+            })
+          }
           onTransportistaChange={(id) =>
-            patch({ transportistaId: id, viajeIds: [] })
+            patch({
+              transportistaId: id,
+              viajeIds: [],
+              facturarPorTramo: false,
+              tramos: [],
+            })
           }
         />
         <div className="flex flex-col gap-1">
@@ -647,7 +760,9 @@ export function FacturaCreateModal({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            IVA (%)
+            {draft.facturarPorTramo
+              ? "IVA (%) viajes sin tramo"
+              : "IVA (%)"}
           </label>
           <input
             type="number"
@@ -680,34 +795,48 @@ export function FacturaCreateModal({
             viajes={viajes}
             disponibles={viajesNueva}
             selected={draft.viajeIds}
-            onChange={(ids) => patch({ viajeIds: ids })}
+            onChange={patchViajeIds}
             loading={viajesLoading}
             tipo={draft.tipo}
             clienteId={draft.clienteId}
             transportistaId={draft.transportistaId}
           />
         </div>
+        {draft.viajeIds.length > 0 && (
+          <div className="col-span-full">
+            <label className="inline-flex items-center gap-2 text-sm text-vialto-charcoal">
+              <input
+                type="checkbox"
+                checked={draft.facturarPorTramo}
+                disabled={busy}
+                onChange={(e) => handleToggleFacturarPorTramo(e.target.checked)}
+                className="h-4 w-4 border-black/20"
+              />
+              Facturar por tramo
+            </label>
+          </div>
+        )}
+        {draft.facturarPorTramo && draft.viajeIds.length > 0 && (
+          <div className="col-span-full">
+            <FacturaTramosEditor
+              tramos={draft.tramos}
+              onChange={(tramos) => {
+                patch({ tramos });
+                setTramosIncomplete([]);
+                setLocalError(null);
+              }}
+              viajeIds={draft.viajeIds}
+              viajes={viajes}
+              ivaPctDefault={
+                draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
+              }
+              disabled={busy}
+              incompleteIndices={tramosIncomplete}
+            />
+          </div>
+        )}
       </div>
-      {(() => {
-        const ivaN = draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 0;
-        const importe =
-          draft.viajeIds.length > 0
-            ? draft.viajeIds.reduce((sum, id) => {
-                const v = viajes.find((x) => x.id === id);
-                return sum + (v?.monto ?? 0);
-              }, 0)
-            : 0;
-        if (ivaN <= 0 || importe === 0) return null;
-        const total = importe * (1 + ivaN / 100);
-        return (
-          <p className="mt-3 text-xs text-vialto-steel text-right">
-            Total con IVA {ivaN}%:{" "}
-            <span className="font-medium text-vialto-charcoal tabular-nums">
-              ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-            </span>
-          </p>
-        );
-      })()}
+      <FacturaTotalesPreview draft={draft} viajes={viajes} />
       {monedaInvalida && (
         <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no puede
@@ -1003,7 +1132,16 @@ export function FacturaCreateModal({
               ) : (
                 <button
                   type="button"
-                  onClick={onSave}
+                  onClick={() => {
+                    const tramosCheck = validateFacturaDraftTramos(draft);
+                    if (!tramosCheck.ok) {
+                      setTramosIncomplete(tramosCheck.indices);
+                      setLocalError(tramosCheck.message);
+                      return;
+                    }
+                    setTramosIncomplete([]);
+                    onSave?.();
+                  }}
                   disabled={busy || monedaInvalida}
                   className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                 >

@@ -84,6 +84,7 @@ type Props = {
   ) => void;
   labelClassName: string;
   inputClassName: string;
+  disabled?: boolean;
 };
 
 export function ViajeGananciaBrutaManualFieldset({

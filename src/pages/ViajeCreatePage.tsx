@@ -12,7 +12,9 @@ import {
 } from "@/components/forms/MaestroSearchSelects";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { MonedaSelect } from "@/components/forms/MonedaSelect";
-import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
+import { PaisSearchSelect } from "@/components/forms/PaisSearchSelect";
+import { PaisModal } from "@/components/viajes/PaisModal";
+import type { Pais } from "@/types/api";
 import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
@@ -39,7 +41,7 @@ import {
   pagosTransportistaDraftsToApi,
   type PagoTransportistaDraft,
 } from "@/components/viajes/PagosTransportistaFieldset";
-import { apiJson } from "@/lib/api";
+import { apiJson, ApiError } from "@/lib/api";
 import {
   parseCurrencyForMoneda,
   preserveAmountOnMonedaChange,
@@ -195,7 +197,7 @@ export function ViajeCreatePage() {
   >([]);
 
   // ─── ESTADOS PARA CREACIÓN RÁPIDA (MODALES) ─────────────────────────────
-  type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop";
+  type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop" | "pais";
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const [sessionTransportistas, setSessionTransportistas] = useState<
@@ -207,6 +209,19 @@ export function ViajeCreatePage() {
   const [localChoferesRapidos, setLocalChoferesRapidos] = useState<Chofer[]>(
     [],
   );
+
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
+  const [paisesLoading, setPaisesLoading] = useState(true);
+  /** Índice del destino que disparó "+ Nuevo país" (null = fue el origen). */
+  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
+    useState<number | null>(null);
+
+  const paisesConSesion = useMemo(() => {
+    const ids = new Set(paises.map((p) => p.id));
+    const combinados = [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
+    return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [paises, sessionPaises]);
 
   // ─── CÁLCULO DE MAESTROS COMBINADOS (BBDD + SESIÓN ACTUAL) ───────────────
   const clientes = useMemo(() => {
@@ -316,6 +331,28 @@ export function ViajeCreatePage() {
       cancelled = true;
     };
   }, [getToken, tenantId]);
+
+  // Carga inicial de países
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = tenantId
+          ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
+          : "/api/paises";
+        const data = await apiJson<Pais[]>(path, () => getToken());
+        if (!cancelled) setPaises(data);
+      } catch {
+        if (!cancelled) setPaises([]);
+      } finally {
+        if (!cancelled) setPaisesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   // Carga del catálogo de productos de stock activos
   useEffect(() => {
@@ -719,6 +756,16 @@ export function ViajeCreatePage() {
     } catch (e) {
       setError(friendlyError(e, "viajes"));
 
+      // Si el backend devolvió errores por campo (ValidationPipe), los nombres
+      // coinciden 1 a 1 con los estados de los montos de este formulario
+      // (monto, cantidadFactura, precioUnitarioFactura, precioTransportistaExterno,
+      // cantidadTransportista, precioUnitarioTransportista, gananciaBrutaManual):
+      // se resalta el input puntual en vez de dejar solo el mensaje genérico.
+      if (e instanceof ApiError && e.status === 400) {
+        const body = e.body as { fieldErrors?: Record<string, string> } | undefined;
+        if (body?.fieldErrors) setFieldErrors(body.fieldErrors);
+      }
+
       // --> TOAST INYECTADO: ERROR AL CREAR <--
       showToast("No se pudo crear el viaje", "error");
     } finally {
@@ -793,19 +840,27 @@ export function ViajeCreatePage() {
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Origen</span>
               <div className="flex flex-wrap gap-2 items-start">
-                <PaisUbicacionSelect
+                <PaisSearchSelect
+                  paises={paisesConSesion}
+                  loading={paisesLoading}
                   value={paisOrigen}
                   onChange={(p) => {
-                    setPaisOrigen(p);
+                    setPaisOrigen(p as PaisCodigo);
                     setOrigen("");
                     setFieldErrors((prev) => ({ ...prev, origen: "" }));
                   }}
                   aria-label="País de origen"
-                  className={`${inputClass} w-full sm:w-40`}
+                  className="w-full sm:w-40"
+                  inputClassName={inputClass}
+                  onNuevo={() => {
+                    setPaisQuickCreateDestinoIndex(null);
+                    setQuickCreate("pais");
+                  }}
                 />
                 <div className="min-w-[200px] flex-1">
                   <CiudadCombobox
                     pais={paisOrigen}
+                    paisNombre={paisesConSesion.find((p) => (p.codigo || p.id) === paisOrigen)?.nombre}
                     value={origen}
                     onChange={(next) => {
                       setOrigen(next);
@@ -831,6 +886,12 @@ export function ViajeCreatePage() {
                 }}
                 inputClassName={inputClass}
                 disableBrowserAutocomplete
+                paises={paisesConSesion}
+                paisesLoading={paisesLoading}
+                onNuevoPais={(index) => {
+                  setPaisQuickCreateDestinoIndex(index);
+                  setQuickCreate("pais");
+                }}
               />
               <CrudFieldError message={fieldErrors.destinos} />
             </div>
@@ -861,10 +922,14 @@ export function ViajeCreatePage() {
                       inputMode="decimal"
                       autoComplete="off"
                       value={cantidadFactura}
-                      onChange={(e) => setCantidadFactura(e.target.value)}
+                      onChange={(e) => {
+                        setCantidadFactura(e.target.value);
+                        setFieldErrors((p) => ({ ...p, cantidadFactura: "" }));
+                      }}
                       placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums`}
+                      className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadFactura ? "border-red-400" : ""}`}
                     />
+                    <CrudFieldError message={fieldErrors.cantidadFactura} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Precio unitario</span>
@@ -874,9 +939,12 @@ export function ViajeCreatePage() {
                         inputMode="decimal"
                         autoComplete="off"
                         value={precioUnitarioFactura}
-                        onChange={(e) => setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto))}
+                        onChange={(e) => {
+                          setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto));
+                          setFieldErrors((p) => ({ ...p, precioUnitarioFactura: "" }));
+                        }}
                         placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioFactura ? "border-red-400" : ""}`}
                       />
                       <MonedaSelect
                         value={monedaMonto}
@@ -884,6 +952,7 @@ export function ViajeCreatePage() {
                         aria-label="Moneda precio unitario"
                       />
                     </div>
+                    <CrudFieldError message={fieldErrors.precioUnitarioFactura} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={fieldLabelClass}>Total a facturar</span>
@@ -906,13 +975,14 @@ export function ViajeCreatePage() {
                       inputMode="decimal"
                       autoComplete="off"
                       value={monto}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setMonto(
                           maskCurrencyForMoneda(e.target.value, monedaMonto),
-                        )
-                      }
+                        );
+                        setFieldErrors((p) => ({ ...p, monto: "" }));
+                      }}
                       placeholder="0.00"
-                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
                     />
                     <MonedaSelect
                       value={monedaMonto}
@@ -925,6 +995,7 @@ export function ViajeCreatePage() {
                       aria-label="Moneda monto a facturar"
                     />
                   </div>
+                  <CrudFieldError message={fieldErrors.monto} />
                 </div>
               )}
             </div>
@@ -968,10 +1039,14 @@ export function ViajeCreatePage() {
                             inputMode="decimal"
                             autoComplete="off"
                             value={cantidadTransportista}
-                            onChange={(e) => setCantidadTransportista(e.target.value)}
+                            onChange={(e) => {
+                              setCantidadTransportista(e.target.value);
+                              setFieldErrors((p) => ({ ...p, cantidadTransportista: "" }));
+                            }}
                             placeholder="0.00"
-                            className={`${inputClass} text-right tabular-nums`}
+                            className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadTransportista ? "border-red-400" : ""}`}
                           />
+                          <CrudFieldError message={fieldErrors.cantidadTransportista} />
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Precio unitario</span>
@@ -981,9 +1056,12 @@ export function ViajeCreatePage() {
                               inputMode="decimal"
                               autoComplete="off"
                               value={precioUnitarioTransportista}
-                              onChange={(e) => setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista))}
+                              onChange={(e) => {
+                                setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista));
+                                setFieldErrors((p) => ({ ...p, precioUnitarioTransportista: "" }));
+                              }}
                               placeholder="0.00"
-                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioTransportista ? "border-red-400" : ""}`}
                             />
                             <MonedaSelect
                               value={monedaPrecioTransportista}
@@ -991,6 +1069,7 @@ export function ViajeCreatePage() {
                               aria-label="Moneda precio unitario transportista"
                             />
                           </div>
+                          <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Pago a transporte</span>
@@ -1013,16 +1092,17 @@ export function ViajeCreatePage() {
                             inputMode="decimal"
                             autoComplete="off"
                             value={precioTransportistaExterno}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setPrecioTransportistaExterno(
                                 maskCurrencyForMoneda(
                                   e.target.value,
                                   monedaPrecioTransportista,
                                 ),
-                              )
-                            }
+                              );
+                              setFieldErrors((p) => ({ ...p, precioTransportistaExterno: "" }));
+                            }}
                             placeholder="0.00"
-                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums`}
+                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioTransportistaExterno ? "border-red-400" : ""}`}
                           />
                           <MonedaSelect
                             value={monedaPrecioTransportista}
@@ -1039,6 +1119,7 @@ export function ViajeCreatePage() {
                             aria-label="Moneda precio transportista externo"
                           />
                         </div>
+                        <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
                     )}
                   </div>
@@ -1383,6 +1464,33 @@ export function ViajeCreatePage() {
       </CrudPageLayout>
 
       {/* MODALES DE CREACIÓN RÁPIDA */}
+      {quickCreate === "pais" && (
+        <PaisModal
+          getToken={getToken}
+          tenantId={tenantId || undefined}
+          onClose={() => {
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+          onSaved={(p: Pais) => {
+            setSessionPaises((prev) => [...prev, p]);
+            const codigo = (p.codigo || p.id);
+            if (paisQuickCreateDestinoIndex === null) {
+              setPaisOrigen(codigo);
+              setOrigen("");
+            } else {
+              const idx = paisQuickCreateDestinoIndex;
+              setDestinosRows((rows) =>
+                rows.map((r, i) =>
+                  i === idx ? { ...r, pais: codigo, etiqueta: "" } : r,
+                ),
+              );
+            }
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+        />
+      )}
       {quickCreate === "cliente" && (
         <ClienteModal
           getToken={getToken}

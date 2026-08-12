@@ -13,6 +13,7 @@ import {
 } from "@/components/liquidaciones/LiquidacionMontosBreakdown";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
@@ -111,6 +112,7 @@ export function CrearLiquidacionManualModal({
   getToken,
   onSuccess,
   onClose,
+  tenantId,
 }: Props) {
   const showComprobante = !hasArca;
   const { showToast } = useToast();
@@ -160,6 +162,11 @@ export function CrearLiquidacionManualModal({
   >(null);
   const submitting = submitAction !== null;
   const [error, setError] = useState<string | null>(null);
+  /** Liquidación creada como borrador cuando la emisión falló por datos faltantes; se
+   * muestra EmitirLiquidacionModal para completarlos y reintentar sin cerrar el circuito. */
+  const [emitirPendiente, setEmitirPendiente] = useState<Liquidacion | null>(
+    null,
+  );
 
   // Cargar config ARCA si no vino por props (p. ej. desde Viajes).
   useEffect(() => {
@@ -208,14 +215,14 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     if (viajeInicial || selectedViajeIds.size === 0) return;
 
-    setConceptosLineas((prev) =>
-      prev.map((linea) => {
-        if (linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-          return { ...linea, viajeId: null };
-        }
-        return linea;
-      }),
-    );
+      setConceptosLineas((prev) =>
+        prev.map((linea) => {
+          if (linea.modoAplicacion === 'VIAJE_PUNTUAL' && linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
+            return { ...linea, viajeId: null, modoAplicacion: 'GENERAL' };
+          }
+          return linea;
+        }),
+      );
   }, [selectedViajeIds, viajeInicial]);
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
@@ -412,7 +419,7 @@ export function CrearLiquidacionManualModal({
               body: JSON.stringify({ ptoVenta: ptoVentaNum }),
             },
           );
-        } catch (emitErr) {
+        } catch {
           emitFailed = true;
           try {
             liq = await apiJson<Liquidacion>(
@@ -422,10 +429,10 @@ export function CrearLiquidacionManualModal({
           } catch {
             /* si falla el refresh, se usa el borrador ya creado */
           }
-          showToast(
-            `La liquidación se creó, pero no se pudo emitir: ${friendlyError(emitErr, "arca")}. Podés reintentar desde la grilla.`,
-            "error",
-          );
+          // La liquidación ya quedó creada en borrador. En vez de cerrar el modal con
+          // un error, mostramos EmitirLiquidacionModal para completar los datos
+          // faltantes (cliente/transportista) y reintentar sin romper el circuito.
+          setEmitirPendiente(liq);
         }
       }
       if (action === "emitir" && !emitFailed) {
@@ -441,7 +448,7 @@ export function CrearLiquidacionManualModal({
             : "Liquidación creada en borrador.",
         );
       }
-      onSuccess(liq);
+      if (!emitFailed) onSuccess(liq);
     } catch (err) {
       setError(friendlyError(err, "liquidaciones"));
     } finally {
@@ -472,9 +479,15 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
+  
+  const getMultiplicador = (modo?: string) =>
+    modo === "TODOS_LOS_VIAJES" ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0)) : 1;
+
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
-      sum + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) *
+        getMultiplicador(l.modoAplicacion),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -508,6 +521,31 @@ export function CrearLiquidacionManualModal({
     !ptoVenta.trim() ||
     !Number.isInteger(ptoVentaNumPreview) ||
     ptoVentaNumPreview < 1;
+
+  if (emitirPendiente) {
+    return (
+      <EmitirLiquidacionModal
+        liq={emitirPendiente}
+        getToken={getToken}
+        tenantId={tenantId}
+        arcaConfig={resolvedConfig}
+        ivaPct={emitirPendiente.ivaPct ?? resolvedConfig?.ivaGastosAdmin}
+        onSuccess={(updated) => {
+          setEmitirPendiente(null);
+          showToast(
+            updated.cae
+              ? `Comprobante emitido correctamente. CAE: ${updated.cae}`
+              : "Comprobante emitido correctamente.",
+          );
+          onSuccess(updated);
+        }}
+        onClose={() => {
+          setEmitirPendiente(null);
+          onSuccess(emitirPendiente);
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -856,11 +894,12 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
               {conceptosCompletos.map((l, idx) => {
+                const mult = getMultiplicador(l.modoAplicacion);
                 const conIva = signedMontoConIvaConcepto(
                   l.signo,
                   Number(l.monto) || 0,
                   l.ivaPct,
-                );
+                ) * mult;
                 return (
                   <div
                     key={`${l.conceptoLiquidacionId}-${idx}`}
@@ -868,6 +907,7 @@ export function CrearLiquidacionManualModal({
                   >
                     <span>
                       {l.nombre || "Concepto"}
+                      {mult > 1 ? ` (×${mult} viajes)` : ""}
                       {l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}
                     </span>
                     <span className="tabular-nums">

@@ -973,7 +973,7 @@ export function LiquidacionesTenantPage() {
           onClose={() => setPendingEmitir(null)}
           ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
-          tenantId={activeTenantId}
+          tenantId={isSuperAdmin ? activeTenantId : undefined}
         />
       )}
       {showCrear && activeTenantId && (
@@ -982,7 +982,7 @@ export function LiquidacionesTenantPage() {
           config={config}
           hasArca={hasArca}
           getToken={getToken}
-          tenantId={activeTenantId}
+          tenantId={isSuperAdmin ? activeTenantId : undefined}
           onSuccess={(liq) => {
             setRows((prev) =>
               prev

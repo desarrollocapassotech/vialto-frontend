@@ -6,6 +6,8 @@ import { buscarCiudades, normalizarEtiquetaCiudad, type PaisCodigo } from '@/lib
 type Props = {
   /** País cuyo buscador se usa (Argentina, Uruguay, …). */
   pais: PaisCodigo;
+  /** Nombre legible del país, para armar el placeholder dinámicamente. */
+  paisNombre?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -27,6 +29,7 @@ const MIN_CHARS = 2;
 
 export function CiudadCombobox({
   pais,
+  paisNombre,
   value,
   onChange,
   placeholder,
@@ -38,8 +41,9 @@ export function CiudadCombobox({
   disableBrowserAutocomplete = false,
   error = false,
 }: Props) {
-  const defaultPlaceholder =
-    pais === 'UY' ? 'Buscá ciudad o localidad en Uruguay…' : 'Buscá ciudad o localidad en Argentina…';
+  const defaultPlaceholder = paisNombre
+    ? `Buscá ciudad o localidad en ${paisNombre}…`
+    : 'Buscá ciudad o localidad…';
 
   const reactId = useId();
   const listboxId = `${reactId}-listbox`;

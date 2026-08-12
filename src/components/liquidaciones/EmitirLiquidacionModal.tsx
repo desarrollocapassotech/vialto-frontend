@@ -10,13 +10,14 @@ import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   CVLP_CLASE_B_WARNING,
   condicionIvaLabel,
   cvlpClaseBEsperada,
 } from "@/lib/arcaCbteTipo";
-import type { ArcaConfig, Liquidacion } from "@/types/api";
+import type { ArcaConfig, Cliente, Liquidacion, Transportista } from "@/types/api";
 
 type LiquidacionEmitDetail = Liquidacion & {
   transportista?: {
@@ -25,13 +26,18 @@ type LiquidacionEmitDetail = Liquidacion & {
     idFiscal: string | null;
     domicilio?: string | null;
     condicionIva?: number | null;
+    pais?: string | null;
+    condicionTributaria?: string | null;
   } | null;
   viajes?: Array<{
     viaje?: {
       cliente?: {
+        id?: string | null;
         nombre?: string | null;
         idFiscal?: string | null;
         direccion?: string | null;
+        pais?: string | null;
+        condicionTributaria?: string | null;
       } | null;
     } | null;
   }>;
@@ -91,6 +97,7 @@ export function EmitirLiquidacionModal({
   configUrl,
   arcaConfig: arcaConfigProp,
   ivaPct,
+  tenantId,
 }: {
   liq: LiquidacionEmitDetail;
   getToken: () => Promise<string | null>;
@@ -106,6 +113,7 @@ export function EmitirLiquidacionModal({
   arcaConfig?: ArcaConfig | null;
   /** Porcentaje de IVA configurado (ej: 21). Si no se pasa, se deduce de los valores guardados. */
   ivaPct?: number;
+  /** Override de superadmin: si está presente, las ediciones inline usan rutas /api/platform/... */
   tenantId?: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
@@ -198,6 +206,62 @@ export function EmitirLiquidacionModal({
   );
   const missingEmitMessage = formatCvlpEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
+  const missingEmisorFields = missingEmitFields.filter((f) => f.startsWith("Emisor:"));
+  const missingTransportistaFields = missingEmitFields.filter((f) =>
+    f.startsWith("Transportista:"),
+  );
+  const missingClienteFields = missingEmitFields.filter((f) => f.startsWith("Cliente:"));
+
+  const transportistaId = source.transportista?.id ?? liq.transportista?.id ?? null;
+  const clienteDelViaje = source.viajes?.[0]?.viaje?.cliente ?? null;
+  const clienteId = clienteDelViaje?.id ?? null;
+
+  function applyTransportistaUpdate(updated: Cliente | Transportista) {
+    const t = updated as Transportista;
+    setDetail((prev) => {
+      const base = prev ?? liq;
+      return {
+        ...base,
+        transportista: {
+          id: t.id,
+          nombre: t.nombre,
+          idFiscal: t.idFiscal,
+          domicilio: t.domicilio,
+          condicionIva: t.condicionIva,
+          pais: t.pais,
+          condicionTributaria: t.condicionTributaria,
+        },
+      };
+    });
+  }
+
+  function applyClienteUpdate(updated: Cliente | Transportista) {
+    const c = updated as Cliente;
+    setDetail((prev) => {
+      const base = prev ?? liq;
+      const viajes = base.viajes;
+      if (!viajes || viajes.length === 0) return base;
+      const nextViajes = viajes.map((v, i) =>
+        i === 0 && v.viaje
+          ? {
+              ...v,
+              viaje: {
+                ...v.viaje,
+                cliente: {
+                  id: c.id,
+                  nombre: c.nombre,
+                  idFiscal: c.idFiscal,
+                  direccion: c.direccion,
+                  pais: c.pais,
+                  condicionTributaria: c.condicionTributaria,
+                },
+              },
+            }
+          : v,
+      );
+      return { ...base, viajes: nextViajes };
+    });
+  }
 
   const ptoVentaNum = Number(ptoVenta);
   const ptoVentaInvalido =
@@ -352,7 +416,7 @@ export function EmitirLiquidacionModal({
             />
           </div>
 
-          {datosEmitIncompletos && (
+          {missingEmisorFields.length > 0 && (
             <div
               className="rounded border border-amber-400/40 bg-amber-50 px-4 py-3 text-xs text-amber-900"
               role="alert"
@@ -361,11 +425,47 @@ export function EmitirLiquidacionModal({
                 Completá estos datos antes de emitir
               </p>
               <ul className="mt-1 list-disc pl-4 space-y-0.5">
-                {missingEmitFields.map((f) => (
+                {missingEmisorFields.map((f) => (
                   <li key={f}>{f}</li>
                 ))}
               </ul>
             </div>
+          )}
+
+          {missingTransportistaFields.length > 0 && transportistaId && (
+            <CompletarDatosFiscalesInline
+              entidad="transportista"
+              id={transportistaId}
+              tenantId={tenantId}
+              getToken={getToken}
+              initial={{
+                nombre: source.transportista?.nombre ?? liq.transportista?.nombre ?? "",
+                pais: source.transportista?.pais ?? null,
+                idFiscal: source.transportista?.idFiscal ?? null,
+                condicionIva: source.transportista?.condicionIva ?? null,
+                condicionTributaria: source.transportista?.condicionTributaria ?? null,
+                direccion: source.transportista?.domicilio ?? null,
+              }}
+              onSaved={applyTransportistaUpdate}
+            />
+          )}
+
+          {missingClienteFields.length > 0 && clienteId && (
+            <CompletarDatosFiscalesInline
+              entidad="cliente"
+              id={clienteId}
+              tenantId={tenantId}
+              getToken={getToken}
+              initial={{
+                nombre: clienteDelViaje?.nombre ?? "",
+                pais: clienteDelViaje?.pais ?? null,
+                idFiscal: clienteDelViaje?.idFiscal ?? null,
+                condicionIva: null,
+                condicionTributaria: clienteDelViaje?.condicionTributaria ?? null,
+                direccion: clienteDelViaje?.direccion ?? null,
+              }}
+              onSaved={applyClienteUpdate}
+            />
           )}
 
           {!datosEmitIncompletos && (
