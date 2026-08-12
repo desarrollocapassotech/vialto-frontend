@@ -858,6 +858,7 @@ export function CrearLiquidacionManualModal({
           <ConceptosLiquidacionLineasEditor
             getToken={getToken}
             lineas={conceptosLineas}
+            autoFillBlockedConcepts={true}
             viajesDisponibles={selectedViajes.map((v) => ({
               id: v.id,
               numero: numeroVisibleViaje(v),

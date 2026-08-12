@@ -24,12 +24,16 @@ type FormState = {
   nombre: string;
   signo: ConceptoLiquidacionSigno;
   ivaPct: string;
+  monto: string;
+  bloqueado: boolean;
 };
 
 const EMPTY_FORM: FormState = {
   nombre: '',
   signo: 'favor',
   ivaPct: '21',
+  monto: '',
+  bloqueado: false,
 };
 
 export function ConceptosLiquidacionConfigSection({
@@ -81,6 +85,8 @@ export function ConceptosLiquidacionConfigSection({
       nombre: c.nombre,
       signo: c.signo,
       ivaPct: String(c.ivaPct),
+      monto: c.monto != null ? String(c.monto) : '',
+      bloqueado: c.bloqueado ?? false,
     });
     setFieldErrors({});
     setShowForm(true);
@@ -101,6 +107,12 @@ export function ConceptosLiquidacionConfigSection({
     if (form.ivaPct.trim() === '' || Number.isNaN(iva) || iva < 0 || iva > 100) {
       errs.ivaPct = 'Ingresá un IVA entre 0 y 100.';
     }
+    if (form.monto.trim() !== '') {
+      const m = Number(form.monto);
+      if (Number.isNaN(m) || m < 0) {
+        errs.monto = 'Ingresá un monto válido (0 o mayor).';
+      }
+    }
     return errs;
   }
 
@@ -119,6 +131,8 @@ export function ConceptosLiquidacionConfigSection({
         nombre: form.nombre.trim(),
         signo: form.signo,
         ivaPct: Number(form.ivaPct),
+        monto: form.monto.trim() !== '' ? Number(form.monto) : null,
+        bloqueado: form.bloqueado,
       };
       if (editingId) {
         await apiJson<ConceptoLiquidacion>(
@@ -254,6 +268,39 @@ export function ConceptosLiquidacionConfigSection({
               <CrudFieldError message={fieldErrors.ivaPct} />
             </label>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5">
+              <CrudFieldLabel>Monto base (Opcional)</CrudFieldLabel>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.monto}
+                onChange={(e) => setForm((f) => ({ ...f, monto: e.target.value }))}
+                disabled={saving}
+                className={`${inputClass} ${fieldErrors.monto ? 'border-red-400' : ''}`}
+                placeholder="Ej: 3500"
+              />
+              <CrudFieldError message={fieldErrors.monto} />
+            </label>
+            <label className="flex items-start gap-2.5 self-start mt-2 sm:mt-7">
+              <div className="flex h-5 items-center">
+                <input
+                  type="checkbox"
+                  checked={form.bloqueado}
+                  onChange={(e) => setForm((f) => ({ ...f, bloqueado: e.target.checked }))}
+                  disabled={saving}
+                  className="h-4 w-4 rounded border-black/20 text-vialto-fire focus:ring-vialto-fire/35"
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <CrudFieldLabel>Bloqueado (Autocarga)</CrudFieldLabel>
+                <span className="text-xs leading-snug text-vialto-steel">
+                  Si se marca, se añadirá automáticamente a las liquidaciones nuevas.
+                </span>
+              </div>
+            </label>
+          </div>
           <div className="flex justify-end gap-3">
             <button
               type="button"
@@ -294,6 +341,12 @@ export function ConceptosLiquidacionConfigSection({
                   IVA
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
+                  Monto Base
+                </th>
+                <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
+                  Auto
+                </th>
+                <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal">
                   Estado
                 </th>
                 <th className="px-3 py-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-vialto-steel font-normal text-right">
@@ -307,6 +360,12 @@ export function ConceptosLiquidacionConfigSection({
                   <td className="px-3 py-2.5 text-vialto-charcoal">{c.nombre}</td>
                   <td className="px-3 py-2.5 text-vialto-steel">{signoLabel(c.signo)}</td>
                   <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">{c.ivaPct}%</td>
+                  <td className="px-3 py-2.5 tabular-nums text-vialto-charcoal">
+                    {c.monto != null ? `$${c.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {c.bloqueado ? <span title="Se añade automáticamente">🔒</span> : '-'}
+                  </td>
                   <td className="px-3 py-2.5">
                     <span
                       className={
