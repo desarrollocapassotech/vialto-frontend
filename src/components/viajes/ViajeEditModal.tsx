@@ -16,6 +16,8 @@ import {
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
 import { ChoferModal } from "@/components/viajes/ChoferModal";
+import { PaisModal } from "@/components/viajes/PaisModal";
+import { apiJson } from "@/lib/api";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { MonedaSelect } from "@/components/forms/MonedaSelect";
 import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
@@ -66,6 +68,7 @@ import {
 import type {
   Chofer,
   Cliente,
+  Pais,
   Producto,
   Tenant,
   Transportista,
@@ -212,7 +215,12 @@ export function ViajeEditModal({
   onChoferCreado,
   onVehiculoCreado,
 }: ViajeEditModalProps) {
-  type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop";
+  type QuickCreate =
+    | "cliente"
+    | "transportista"
+    | "chofer-ext"
+    | "chofer-prop"
+    | "pais";
   const { user } = useUser();
   const { isVisible } = useFieldConfig("viajes");
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
@@ -224,6 +232,12 @@ export function ViajeEditModal({
   >([]);
   const [localChoferes, setLocalChoferes] = useState<Chofer[]>([]);
   const [localVehiculos] = useState<Vehiculo[]>([]);
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
+  const [paisesLoading, setPaisesLoading] = useState(true);
+  /** Índice del destino que disparó "+ Nuevo país". */
+  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
+    useState<number | null>(null);
 
   const todosClientes = useMemo(() => {
     const ids = new Set(clientes.map((c) => c.id));
@@ -257,6 +271,33 @@ export function ViajeEditModal({
     const ids = new Set(vehiculos.map((v) => v.id));
     return [...vehiculos, ...localVehiculos.filter((v) => !ids.has(v.id))];
   }, [vehiculos, localVehiculos]);
+
+  const todosPaises = useMemo(() => {
+    const ids = new Set(paises.map((p) => p.id));
+    const combinados = [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
+    return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [paises, sessionPaises]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = tenantId
+          ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
+          : "/api/paises";
+        const data = await apiJson<Pais[]>(path, () => getToken?.() ?? Promise.resolve(null));
+        if (!cancelled) setPaises(data);
+      } catch {
+        if (!cancelled) setPaises([]);
+      } finally {
+        if (!cancelled) setPaisesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tenantId, getToken]);
 
   useEffect(() => {
     if (!open || !draft || !desgloseActivo) return;
@@ -474,6 +515,12 @@ export function ViajeEditModal({
                       onClearDestinosError?.();
                   }}
                   inputClassName={inputClass}
+                  paises={todosPaises}
+                  paisesLoading={paisesLoading}
+                  onNuevoPais={(index) => {
+                    setPaisQuickCreateDestinoIndex(index);
+                    setQuickCreate("pais");
+                  }}
                 />
                 <CrudFieldError message={destinosError} />
               </div>
@@ -1184,6 +1231,36 @@ export function ViajeEditModal({
         </div>
       </div>
 
+      {quickCreate === "pais" && getToken && (
+        <PaisModal
+          stacked
+          getToken={getToken}
+          tenantId={tenantId}
+          onClose={() => {
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+          onSaved={(p) => {
+            setSessionPaises((prev) => [...prev, p]);
+            const codigo = p.codigo || p.id;
+            const idx = paisQuickCreateDestinoIndex;
+            if (idx !== null) {
+              setDraft((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      destinosRows: prev.destinosRows.map((r, i) =>
+                        i === idx ? { ...r, pais: codigo, etiqueta: "" } : r,
+                      ),
+                    }
+                  : prev,
+              );
+            }
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+        />
+      )}
       {quickCreate === "cliente" && getToken && (
         <ClienteModal
           stacked
