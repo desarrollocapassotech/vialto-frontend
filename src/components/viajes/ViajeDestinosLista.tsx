@@ -1,6 +1,7 @@
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
-import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import { PaisSearchSelect } from '@/components/forms/PaisSearchSelect';
 import type { PaisCodigo } from '@/lib/ciudades';
+import type { Pais } from '@/types/api';
 import { emptyDestinoRow, type ViajeDestinoRowDraft } from '@/lib/viajesDestinos';
 
 const LABEL =
@@ -13,6 +14,10 @@ type Props = {
   /** Para ids accesibles únicos entre formularios. */
   groupId: string;
   disableBrowserAutocomplete?: boolean;
+  paises: Pais[];
+  paisesLoading?: boolean;
+  /** Dispara la creación rápida de país para la fila `index`. */
+  onNuevoPais: (index: number) => void;
 };
 
 export function ViajeDestinosLista({
@@ -21,6 +26,9 @@ export function ViajeDestinosLista({
   inputClassName,
   groupId,
   disableBrowserAutocomplete,
+  paises,
+  paisesLoading = false,
+  onNuevoPais,
 }: Props) {
   function setRow(i: number, patch: Partial<ViajeDestinoRowDraft>) {
     onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -63,14 +71,19 @@ export function ViajeDestinosLista({
                   {esPrimero && <span className="text-red-500"> *</span>}
                 </span>
                 <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                  <PaisUbicacionSelect
+                  <PaisSearchSelect
+                    paises={paises}
+                    loading={paisesLoading}
                     value={row.pais}
-                    onChange={(p: PaisCodigo) => setRow(i, { pais: p, etiqueta: '' })}
+                    onChange={(p) => setRow(i, { pais: p as PaisCodigo, etiqueta: '' })}
                     aria-label={`País de ${labelDestino.toLowerCase()}`}
-                    className={`${inputClassName} w-full sm:w-40`}
+                    className="w-full sm:w-40"
+                    inputClassName={inputClassName}
+                    onNuevo={() => onNuevoPais(i)}
                   />
                   <CiudadCombobox
                     pais={row.pais}
+                    paisNombre={paises.find((p) => (p.codigo || p.id) === row.pais)?.nombre}
                     value={row.etiqueta}
                     onChange={(next) => setRow(i, { etiqueta: next })}
                     inputClassName={`${inputClassName} w-full`}

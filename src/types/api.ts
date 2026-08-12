@@ -203,6 +203,16 @@ export interface Chofer {
   createdAt: string;
 }
 
+export type Pais = {
+  id: string;
+  tenantId: string;
+  nombre: string;
+  codigo: string | null;
+  esPredefinido: boolean;
+  createdAt: string;
+  createdBy: string | null;
+};
+
 export interface Destinatario {
   id: string;
   tenantId: string;
@@ -333,6 +343,15 @@ export interface Pago {
   createdAt: string;
 }
 
+export interface FacturaTramo {
+  id: string;
+  viajeId: string;
+  detalle: string;
+  monto: number;
+  ivaPct: number;
+  orden: number;
+}
+
 export interface Factura {
   id: string;
   tenantId: string;
@@ -353,6 +372,9 @@ export interface Factura {
   vencida: boolean;
   diferencia: number | null;
   ivaPct: number | null;
+  /** Si true, el importe neto se arma con tramos + viajes sin dividir. */
+  facturarPorTramo?: boolean;
+  tramos?: FacturaTramo[];
   comprobanteUrl: string | null;
   cbteTipo?: number | null;
   cbteNro?: number | null;

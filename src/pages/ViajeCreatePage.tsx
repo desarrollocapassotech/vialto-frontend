@@ -12,7 +12,9 @@ import {
 } from "@/components/forms/MaestroSearchSelects";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import { MonedaSelect } from "@/components/forms/MonedaSelect";
-import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
+import { PaisSearchSelect } from "@/components/forms/PaisSearchSelect";
+import { PaisModal } from "@/components/viajes/PaisModal";
+import type { Pais } from "@/types/api";
 import {
   ViajeOperacionTipoFieldset,
   type ViajeOperacionModo,
@@ -195,7 +197,7 @@ export function ViajeCreatePage() {
   >([]);
 
   // ─── ESTADOS PARA CREACIÓN RÁPIDA (MODALES) ─────────────────────────────
-  type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop";
+  type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop" | "pais";
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const [sessionTransportistas, setSessionTransportistas] = useState<
@@ -207,6 +209,19 @@ export function ViajeCreatePage() {
   const [localChoferesRapidos, setLocalChoferesRapidos] = useState<Chofer[]>(
     [],
   );
+
+  const [paises, setPaises] = useState<Pais[]>([]);
+  const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
+  const [paisesLoading, setPaisesLoading] = useState(true);
+  /** Índice del destino que disparó "+ Nuevo país" (null = fue el origen). */
+  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
+    useState<number | null>(null);
+
+  const paisesConSesion = useMemo(() => {
+    const ids = new Set(paises.map((p) => p.id));
+    const combinados = [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
+    return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [paises, sessionPaises]);
 
   // ─── CÁLCULO DE MAESTROS COMBINADOS (BBDD + SESIÓN ACTUAL) ───────────────
   const clientes = useMemo(() => {
@@ -316,6 +331,28 @@ export function ViajeCreatePage() {
       cancelled = true;
     };
   }, [getToken, tenantId]);
+
+  // Carga inicial de países
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = tenantId
+          ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
+          : "/api/paises";
+        const data = await apiJson<Pais[]>(path, () => getToken());
+        if (!cancelled) setPaises(data);
+      } catch {
+        if (!cancelled) setPaises([]);
+      } finally {
+        if (!cancelled) setPaisesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, tenantId]);
 
   // Carga del catálogo de productos de stock activos
   useEffect(() => {
@@ -803,19 +840,27 @@ export function ViajeCreatePage() {
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Origen</span>
               <div className="flex flex-wrap gap-2 items-start">
-                <PaisUbicacionSelect
+                <PaisSearchSelect
+                  paises={paisesConSesion}
+                  loading={paisesLoading}
                   value={paisOrigen}
                   onChange={(p) => {
-                    setPaisOrigen(p);
+                    setPaisOrigen(p as PaisCodigo);
                     setOrigen("");
                     setFieldErrors((prev) => ({ ...prev, origen: "" }));
                   }}
                   aria-label="País de origen"
-                  className={`${inputClass} w-full sm:w-40`}
+                  className="w-full sm:w-40"
+                  inputClassName={inputClass}
+                  onNuevo={() => {
+                    setPaisQuickCreateDestinoIndex(null);
+                    setQuickCreate("pais");
+                  }}
                 />
                 <div className="min-w-[200px] flex-1">
                   <CiudadCombobox
                     pais={paisOrigen}
+                    paisNombre={paisesConSesion.find((p) => (p.codigo || p.id) === paisOrigen)?.nombre}
                     value={origen}
                     onChange={(next) => {
                       setOrigen(next);
@@ -841,6 +886,12 @@ export function ViajeCreatePage() {
                 }}
                 inputClassName={inputClass}
                 disableBrowserAutocomplete
+                paises={paisesConSesion}
+                paisesLoading={paisesLoading}
+                onNuevoPais={(index) => {
+                  setPaisQuickCreateDestinoIndex(index);
+                  setQuickCreate("pais");
+                }}
               />
               <CrudFieldError message={fieldErrors.destinos} />
             </div>
@@ -1413,6 +1464,33 @@ export function ViajeCreatePage() {
       </CrudPageLayout>
 
       {/* MODALES DE CREACIÓN RÁPIDA */}
+      {quickCreate === "pais" && (
+        <PaisModal
+          getToken={getToken}
+          tenantId={tenantId || undefined}
+          onClose={() => {
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+          onSaved={(p: Pais) => {
+            setSessionPaises((prev) => [...prev, p]);
+            const codigo = (p.codigo || p.id);
+            if (paisQuickCreateDestinoIndex === null) {
+              setPaisOrigen(codigo);
+              setOrigen("");
+            } else {
+              const idx = paisQuickCreateDestinoIndex;
+              setDestinosRows((rows) =>
+                rows.map((r, i) =>
+                  i === idx ? { ...r, pais: codigo, etiqueta: "" } : r,
+                ),
+              );
+            }
+            setQuickCreate(null);
+            setPaisQuickCreateDestinoIndex(null);
+          }}
+        />
+      )}
       {quickCreate === "cliente" && (
         <ClienteModal
           getToken={getToken}

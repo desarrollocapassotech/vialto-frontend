@@ -4,10 +4,7 @@ import {
   fmtSignedLiquidacionMoney,
   round2,
 } from "@/lib/liquidacionMoney";
-import {
-  ivaGeneralSobreBase,
-  signedMontoConIvaConcepto,
-} from "@/lib/liquidacionConceptosIva";
+
 
 // Re-export para no romper imports existentes.
 export { fmtLiquidacionMoney, fmtSignedLiquidacionMoney };
@@ -129,18 +126,20 @@ export function LiquidacionMontosBreakdown({
   brutoLabel = "Sub total",
   totalLabel = "Total neto a liquidar",
 }: Props) {
-  // Preferimos recalcular el IVA general sobre (bruto − comisión) para no mezclarlo
-  // con el IVA ya incluido en cada línea de concepto. Fallback: monto persistido.
-  const ivaGeneral =
-    ivaPct != null && Number.isFinite(ivaPct)
-      ? ivaGeneralSobreBase(bruto, comision, ivaPct)
-      : Number(gastosAdminIva) || 0;
-  const netoBase = round2(bruto - comision);
+  // El IVA general de la liquidación ahora representa el IVA total de AFIP
+  // (incluyendo el impacto de los conceptos).
+  const ivaGeneral = Number(gastosAdminIva) || 0;
+  const conceptosBaseSum = conceptosLineas.reduce((acc, l) => {
+    const row = l as ConceptoLineaDisplay & { nombre?: string };
+    const absBase = Math.abs(Number(row.monto) || 0);
+    return acc + (row.signo === "favor" ? absBase : -absBase);
+  }, 0);
+  const netoBase = round2(bruto - comision + conceptosBaseSum);
   const pctEfectivo = coerceIvaPct(ivaPct);
   const ivaLabel =
     pctEfectivo != null
-      ? `${formatIvaLabel(pctEfectivo)} (flete/comisión)`
-      : "IVA (flete/comisión)";
+      ? `${formatIvaLabel(pctEfectivo)}`
+      : "IVA";
   const comisionLabel = `Comisión (${comisionPct}%)`;
 
   const lineItems: {
@@ -164,14 +163,16 @@ export function LiquidacionMontosBreakdown({
     },
     ...conceptosLineas.map((l, idx) => {
       const row = l as ConceptoLineaDisplay & { nombre?: string };
-      const signed = signedMontoConIvaConcepto(row.signo, row.monto, row.ivaPct);
+      const absBase = Math.abs(Number(row.monto) || 0);
+      const isFavor = row.signo === "favor";
+      const signed = isFavor ? absBase : -absBase;
       const nombre = row.nombreSnapshot || row.nombre || "Concepto";
       const linePct = coerceIvaPct(row.ivaPct);
       return {
         key: row.id ?? `concepto-${idx}`,
         label: `${nombre}${linePct != null ? ` (IVA ${formatIvaLabel(linePct).replace(/^IVA /, "")})` : ""}`,
         value: fmtSignedLiquidacionMoney(
-          Math.abs(signed),
+          absBase,
           signed >= 0 ? "plus" : "minus",
         ),
         muted: true,
@@ -179,7 +180,7 @@ export function LiquidacionMontosBreakdown({
     }),
     {
       key: "neto",
-      label: "Neto gravado (flete/comisión)",
+      label: "Neto gravado",
       value: fmtLiquidacionMoney(netoBase),
       separator: true,
     },
