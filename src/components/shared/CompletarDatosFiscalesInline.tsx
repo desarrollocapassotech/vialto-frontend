@@ -76,6 +76,14 @@ export function CompletarDatosFiscalesInline({
     setCondicionTributaria('');
   }
 
+  const redInputClass = "!border-red-400 bg-red-50/50";
+  const isNombreMissing = !nombre.trim();
+  const isPaisMissing = !pais;
+  const isIdFiscalMissing = !idFiscal.trim();
+  const isDireccionMissing = !direccion.trim();
+  const isIvaMissing = pais === 'AR' && condicionIva === null;
+  const isTributariaMissing = pais !== 'AR' && !condicionTributaria.trim();
+
   async function onSave() {
     const validate = entidad === 'cliente' ? validateClienteForm : validateTransportistaForm;
     const msg = validate(nombre, pais, idFiscal);
@@ -104,12 +112,12 @@ export function CompletarDatosFiscalesInline({
         nombre: nombre.trim(),
         pais,
         idFiscal: idFiscal.trim(),
-        condicionIva: pais === 'AR' ? (condicionIva ?? undefined) : undefined,
+        condicionIva: pais === 'AR' ? condicionIva : null,
         condicionTributaria:
-          pais !== 'AR' ? condicionTributaria.trim() || undefined : undefined,
+          pais !== 'AR' ? condicionTributaria.trim() : null,
       };
-      if (entidad === 'cliente') body.direccion = direccion.trim() || undefined;
-      else body.domicilio = direccion.trim() || undefined;
+      if (entidad === 'cliente') body.direccion = direccion.trim();
+      else body.domicilio = direccion.trim();
       const updated = await apiJson<Cliente | Transportista>(path, () => getToken(), {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -131,6 +139,7 @@ export function CompletarDatosFiscalesInline({
         <CrudInput
           value={nombre}
           disabled={saving}
+          className={isNombreMissing ? redInputClass : undefined}
           error={fieldErrors.nombre}
           onChange={(e) => setNombre(e.target.value)}
         />
@@ -145,6 +154,7 @@ export function CompletarDatosFiscalesInline({
             onChange={handlePaisChange}
             placeholder="Seleccioná un país"
             disabled={saving}
+            className={isPaisMissing ? redInputClass : undefined}
           />
           <CrudFieldError message={fieldErrors.pais} />
         </label>
@@ -155,6 +165,7 @@ export function CompletarDatosFiscalesInline({
             value={idFiscal}
             placeholder={idFiscalPorPais(pais).placeholder}
             disabled={saving}
+            className={isIdFiscalMissing ? redInputClass : undefined}
             error={idFiscalError || undefined}
             onChange={(e) => setIdFiscal(e.target.value)}
           />
@@ -164,11 +175,12 @@ export function CompletarDatosFiscalesInline({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="grid gap-1">
-          <span className={labelClass}>{condInfo.label}</span>
+          <CrudFieldLabel required>{condInfo.label}</CrudFieldLabel>
           {condInfo.type === 'select' ? (
             <CrudSelect
               value={condicionIva ?? ''}
               disabled={saving}
+              className={isIvaMissing ? redInputClass : undefined}
               onChange={(e) =>
                 setCondicionIva(e.target.value ? Number(e.target.value) : null)
               }
@@ -185,16 +197,18 @@ export function CompletarDatosFiscalesInline({
               value={condicionTributaria}
               placeholder={condInfo.placeholder}
               disabled={saving}
+              className={isTributariaMissing ? redInputClass : undefined}
               onChange={(e) => setCondicionTributaria(e.target.value)}
             />
           )}
         </label>
 
         <label className="grid gap-1">
-          <span className={labelClass}>{direccionLabel}</span>
+          <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
           <CrudInput
             value={direccion}
             disabled={saving}
+            className={isDireccionMissing ? redInputClass : undefined}
             onChange={(e) => setDireccion(e.target.value)}
           />
         </label>
