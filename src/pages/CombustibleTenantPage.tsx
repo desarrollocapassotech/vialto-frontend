@@ -866,8 +866,11 @@ export function CombustibleTenantPage({
                   aria-label="Filtrar por forma de pago"
                 >
                   <option value="">Todas</option>
-                  <option value="tarjeta">Tarjeta</option>
-                  <option value="efectivo">Efectivo</option>
+                  <option value="tarjeta">{FORMA_PAGO_LABELS.tarjeta}</option>
+                  <option value="efectivo">{FORMA_PAGO_LABELS.efectivo}</option>
+                  <option value="cuenta_corriente">
+                    {FORMA_PAGO_LABELS.cuenta_corriente}
+                  </option>
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
