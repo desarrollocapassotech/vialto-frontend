@@ -148,15 +148,15 @@ export function TransportistaEditPage() {
           nombre: nombre.trim(),
           pais,
           idFiscal: idFiscal.trim(),
-          email: email.trim() || undefined,
-          telefono: telefono || undefined,
-          domicilio: domicilio.trim() || undefined,
-          condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
+          email: email.trim(),
+          telefono: telefono,
+          domicilio: domicilio.trim(),
+          condicionIva: pais === "AR" ? condicionIva : null,
           condicionTributaria:
-            pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
-          paut: paut.trim() || undefined,
-          permisoInternacional: permisoInternacional.trim() || undefined,
-          fechaVencimientoPermiso: fechaVencimientoPermiso || undefined,
+            pais !== "AR" ? condicionTributaria.trim() : null,
+          paut: paut.trim(),
+          permisoInternacional: permisoInternacional.trim(),
+          fechaVencimientoPermiso: fechaVencimientoPermiso || null,
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();

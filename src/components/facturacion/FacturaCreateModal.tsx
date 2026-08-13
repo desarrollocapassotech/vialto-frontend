@@ -958,6 +958,9 @@ export function FacturaCreateModal({
                       sinConfigArca={sinConfigArca}
                       datosEmitIncompletos={datosEmitIncompletos}
                       platform={platform}
+                      tenantId={tenantId}
+                      getToken={getToken}
+                      onClienteUpdated={setClienteDetalle}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError && (
@@ -1109,7 +1112,7 @@ export function FacturaCreateModal({
                   </button>
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    disabled={busy || monedaInvalida || bloqueadoUsd || datosEmitIncompletos}
                     onClick={() => void handleUnifiedSubmit("emitir")}
                     className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                   >
