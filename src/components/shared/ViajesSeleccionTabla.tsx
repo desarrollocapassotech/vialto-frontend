@@ -43,6 +43,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   disabledCheck,
   loading,
   maxHeightClass = "max-h-72",
+  fillHeight = false,
   emptyMessage = "No hay viajes disponibles.",
 }: {
   viajes: T[];
@@ -53,6 +54,8 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   disabledCheck?: (v: T) => { disabled: boolean; title?: string };
   loading?: boolean;
   maxHeightClass?: string;
+  /** Ocupa el alto disponible del contenedor padre (flex) en lugar de un max-height fijo. */
+  fillHeight?: boolean;
   emptyMessage?: string;
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -92,8 +95,14 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-end gap-2">
+    <div
+      className={
+        fillHeight
+          ? "flex h-full min-h-0 flex-col gap-2"
+          : "flex flex-col gap-2"
+      }
+    >
+      <div className="flex shrink-0 flex-wrap items-end gap-2">
         <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
           Buscar
           <input
@@ -149,7 +158,11 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
         </p>
       ) : (
         <div
-          className={`${maxHeightClass} overflow-auto rounded border border-black/15`}
+          className={
+            fillHeight
+              ? "h-0 min-h-0 flex-1 overflow-auto rounded border border-black/15"
+              : `${maxHeightClass} overflow-auto rounded border border-black/15`
+          }
         >
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-vialto-mist text-[10px] uppercase tracking-wider text-vialto-steel">
