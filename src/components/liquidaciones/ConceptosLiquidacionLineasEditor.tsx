@@ -101,6 +101,7 @@ export function ConceptosLiquidacionLineasEditor({
   disabled,
   incompleteIndices,
   viajesDisponibles = [],
+  autoFillBlockedConcepts = false,
 }: {
   getToken: () => Promise<string | null>;
   lineas: ConceptoLineaDraft[];
@@ -110,9 +111,12 @@ export function ConceptosLiquidacionLineasEditor({
   incompleteIndices?: number[];
   /** Viajes incluidos en la liquidación para permitir la asignación por línea. */
   viajesDisponibles?: ViajeOpcionDraft[];
+  /** Si es true, autoinyecta los conceptos bloqueados al cargar el catálogo (solo para creación). */
+  autoFillBlockedConcepts?: boolean;
 }) {
   const incompleteSet = new Set(incompleteIndices ?? []);
   const [catalogo, setCatalogo] = useState<ConceptoLiquidacion[]>([]);
+  const hasAutoFilled = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showQuick, setShowQuick] = useState(false);
@@ -147,6 +151,27 @@ export function ConceptosLiquidacionLineasEditor({
   useEffect(() => {
     void loadCatalogo();
   }, [loadCatalogo]);
+
+  useEffect(() => {
+    if (!autoFillBlockedConcepts || hasAutoFilled.current || catalogo.length === 0) return;
+    hasAutoFilled.current = true;
+
+    const bloqueados = catalogo.filter((c) => c.bloqueado);
+    if (bloqueados.length === 0) return;
+
+    if (lineas.length === 0) {
+      const nuevos = bloqueados.map((c) => ({
+        conceptoLiquidacionId: c.id,
+        monto: c.monto ?? 0,
+        montoStr: montoStrFromNumber(c.monto ?? 0),
+        nombre: c.nombre,
+        signo: c.signo,
+        ivaPct: c.ivaPct,
+        viajeId: null,
+      }));
+      onChange(nuevos);
+    }
+  }, [autoFillBlockedConcepts, catalogo, lineas.length, onChange]);
 
   function enrichFromCatalog(
     id: string,

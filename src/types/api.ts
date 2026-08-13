@@ -625,6 +625,8 @@ export interface ConceptoLiquidacion {
   nombre: string;
   signo: ConceptoLiquidacionSigno;
   ivaPct: number;
+  monto: number | null;
+  bloqueado: boolean;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
