@@ -868,7 +868,10 @@ export function FacturaCreateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
+        className={[
+          "fixed inset-0 z-[110] flex justify-center sm:items-center sm:p-4 md:p-6",
+          step === "autorizada" ? "items-center" : "items-stretch",
+        ].join(" ")}
         role="presentation"
       >
         <button
@@ -885,8 +888,13 @@ export function FacturaCreateModal({
           aria-modal="true"
           aria-labelledby="factura-create-modal-title"
           className={[
-            "relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
-            unifiedArca ? "sm:h-[92vh]" : "sm:h-auto sm:max-h-[92vh]",
+            "relative flex max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
+            step === "autorizada" ? "h-auto" : "h-full",
+            step === "autorizada"
+              ? "sm:h-auto"
+              : unifiedArca
+                ? "sm:h-[92vh]"
+                : "sm:h-auto sm:max-h-[92vh]",
             step === "autorizada"
               ? "max-w-[min(34rem,calc(100vw-1rem))]"
               : unifiedArca
@@ -943,13 +951,9 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
-<<<<<<< HEAD
-              unifiedArca ? "flex flex-col lg:min-h-0 lg:flex-row" : "overflow-y-auto",
-=======
               step === "form" && unifiedArca
-                ? "flex flex-col lg:flex-row"
+                ? "flex flex-col lg:min-h-0 lg:flex-row"
                 : "overflow-y-auto",
->>>>>>> 3216511 ([FIX] VTO-266: Corregir título, descripción y tamaño del modal al emitir factura)
             ].join(" ")}
           >
             {step === "form" ? (
