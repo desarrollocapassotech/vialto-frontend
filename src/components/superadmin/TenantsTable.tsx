@@ -90,7 +90,9 @@ export function TenantsTable({
     <>
       {importTenant && (
         <ImportacionModal
-          tenant={importTenant}
+          tenantId={importTenant.clerkOrgId}
+          tenantName={importTenant.name}
+          tenantModules={importTenant.modules}
           onClose={() => setImportTenant(null)}
         />
       )}

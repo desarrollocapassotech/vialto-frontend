@@ -16,34 +16,42 @@ import { modalOverlayClass } from "@/lib/modalLayers";
 import { labelModulo } from "@/lib/platformLabels";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import type {
-  Tenant,
   ImportPreviewViaje,
   ImportPreviewFactura,
   ImportPreviewEntidad,
 } from "@/types/api";
 
 interface ImportacionModalProps {
-  tenant: Tenant;
+  /** Desacoplado de `Tenant` (superadmin) a propósito: una pantalla de admin de
+   * tenant no tiene ese objeto completo, solo su propio tenant de sesión. */
+  tenantId: string;
+  tenantName: string;
+  tenantModules: string[];
   onClose: () => void;
 }
 
 type MainTab = "importar" | "templates";
 type ImportStep = "upload" | "preview" | "result";
 
-export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
+export function ImportacionModal({
+  tenantId,
+  tenantName,
+  tenantModules,
+  onClose,
+}: ImportacionModalProps) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
   const [mainTab, setMainTab] = useState<MainTab>("importar");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const importacion = useImportacion(tenant.clerkOrgId, () => getToken());
+  const importacion = useImportacion(tenantId, () => getToken());
   const {
     templates,
     loading: loadingTpls,
     saving,
     error: tplError,
     save: saveTemplate,
-  } = useImportTemplates(tenant.clerkOrgId);
+  } = useImportTemplates(tenantId);
 
   // Template form state
   const [tplModulo, setTplModulo] = useState("");
@@ -53,7 +61,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
 
   function handleModuloChange(m: string) {
     setTplModulo(m);
-    setTplNombre(m ? `Template ${labelModulo(m)} — ${tenant.name}` : "");
+    setTplNombre(m ? `Template ${labelModulo(m)} — ${tenantName}` : "");
     setTplConfig(m ? getTemplateExample(m) : "");
     setTplJsonError(null);
   }
@@ -87,8 +95,8 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
     onClose();
   }
 
-  const modulosDisponibles = tenant.modules.filter((m) =>
-    ["viajes", "clientes", "choferes", "vehiculos"].includes(m),
+  const modulosDisponibles = tenantModules.filter((m) =>
+    ["viajes", "clientes", "transportistas", "choferes", "vehiculos"].includes(m),
   );
 
   const {
@@ -121,7 +129,7 @@ export function ImportacionModal({ tenant, onClose }: ImportacionModalProps) {
             <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-vialto-charcoal">
               Importar datos
             </h2>
-            <p className="mt-0.5 text-sm text-vialto-steel">{tenant.name}</p>
+            <p className="mt-0.5 text-sm text-vialto-steel">{tenantName}</p>
           </div>
           <button
             type="button"
