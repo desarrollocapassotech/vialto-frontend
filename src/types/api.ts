@@ -355,7 +355,8 @@ export interface FacturaTramo {
 export interface Factura {
   id: string;
   tenantId: string;
-  numero: string;
+  /** Null para tenants con integracion-arca hasta que se emite (el número real lo asigna AFIP). */
+  numero: string | null;
   tipo: "cliente" | "transportista_externo";
   clienteId: string | null;
   transportistaId: string | null;
