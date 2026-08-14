@@ -355,7 +355,8 @@ export interface FacturaTramo {
 export interface Factura {
   id: string;
   tenantId: string;
-  numero: string;
+  /** Null para tenants con integracion-arca hasta que se emite (el número real lo asigna AFIP). */
+  numero: string | null;
   tipo: "cliente" | "transportista_externo";
   clienteId: string | null;
   transportistaId: string | null;
@@ -625,6 +626,8 @@ export interface ConceptoLiquidacion {
   nombre: string;
   signo: ConceptoLiquidacionSigno;
   ivaPct: number;
+  monto: number | null;
+  bloqueado: boolean;
   activo: boolean;
   createdAt: string;
   updatedAt: string;
@@ -639,6 +642,8 @@ export interface LiquidacionConceptoLinea {
   ivaPct: number | null;
   monto: number;
   orden: number;
+  modoAplicacion: string;
+  viajeId: string | null;
 }
 
 /** Viaje incluido en una liquidación (join liquidacion_viajes + viaje). */

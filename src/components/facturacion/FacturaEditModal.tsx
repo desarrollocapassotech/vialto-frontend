@@ -121,7 +121,7 @@ export function facturaPayloadFromDraft(
   const facturarPorTramo =
     draft.facturarPorTramo && draft.viajeIds.length > 0;
   const base: Record<string, unknown> = {
-    numero: draft.numero.trim(),
+    numero: draft.numero.trim() || undefined,
     tipo: "cliente",
     viajeIds: draft.viajeIds,
     fechaEmision: draft.fechaEmision,
@@ -157,7 +157,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
       ivaPctStr: String(t.ivaPct),
     }));
   return {
-    numero: f.numero,
+    numero: f.numero ?? "",
     tipo: f.tipo,
     clienteId: f.clienteId ?? "",
     transportistaId: f.transportistaId ?? "",
@@ -330,6 +330,7 @@ export function ViajesVinculadosEditor({
   tipo,
   clienteId,
   transportistaId,
+  viajesTablaFillHeight = false,
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -339,6 +340,7 @@ export function ViajesVinculadosEditor({
   tipo: FacturaDraft["tipo"];
   clienteId: string;
   transportistaId: string;
+  viajesTablaFillHeight?: boolean;
 }) {
   const showClienteHint = tipo === "cliente" && !clienteId.trim();
   const showTransportistaHint =
@@ -373,6 +375,22 @@ export function ViajesVinculadosEditor({
           ? "Elegí un transportista para poder vincular viajes."
           : "Elegí un cliente para poder vincular viajes."}
       </p>
+    );
+  }
+
+  if (viajesTablaFillHeight) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <ViajesSeleccionTabla
+          viajes={pool}
+          selectedIds={selected}
+          onToggle={toggle}
+          renderMonto={(v) => textoMontoFacturarListado(v)}
+          loading={loading}
+          fillHeight
+          emptyMessage="No hay viajes disponibles para vincular."
+        />
+      </div>
     );
   }
 

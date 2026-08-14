@@ -414,7 +414,7 @@ export function AnularFacturaModal({
                       label="Tipo"
                       value={facturaLetraLabel(letraFactura)}
                     />
-                    <Row label="Número local" value={factura.numero} />
+                    <Row label="Número local" value={factura.numero ?? "—"} />
                     <Row
                       label="Pto. venta / Nro."
                       value={`${factura.ptoVenta ?? "—"} / ${factura.cbteNro ?? "—"}`}

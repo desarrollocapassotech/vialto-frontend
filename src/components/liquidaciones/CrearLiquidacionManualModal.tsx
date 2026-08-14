@@ -14,9 +14,11 @@ import {
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
+import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
 import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
+import { collectCvlpEmitMissingFields } from "@/lib/cvlpEmitValidation";
 import {
   CVLP_CLASE_B_WARNING,
   condicionIvaLabel,
@@ -44,6 +46,7 @@ import {
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import type {
+  Cliente,
   Liquidacion,
   Transportista,
   Viaje,
@@ -126,6 +129,9 @@ export function CrearLiquidacionManualModal({
   const [transportistaId, setTransportistaId] = useState(
     viajeInicial?.transportistaId ?? "",
   );
+  
+  const [transportistaActualizado, setTransportistaActualizado] = useState<Transportista | null>(null);
+
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
   /** Precargada con la comisión propia del transportista o, a falta de ésta, la de config ARCA. */
@@ -215,14 +221,14 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     if (viajeInicial || selectedViajeIds.size === 0) return;
 
-    setConceptosLineas((prev) =>
-      prev.map((linea) => {
-        if (linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-          return { ...linea, viajeId: null };
-        }
-        return linea;
-      }),
-    );
+      setConceptosLineas((prev) =>
+        prev.map((linea) => {
+          if (linea.modoAplicacion === 'VIAJE_PUNTUAL' && linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
+            return { ...linea, viajeId: null, modoAplicacion: 'GENERAL' };
+          }
+          return linea;
+        }),
+      );
   }, [selectedViajeIds, viajeInicial]);
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
@@ -234,10 +240,15 @@ export function CrearLiquidacionManualModal({
     setComisionPct(porDefecto != null ? String(porDefecto) : "");
   }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
 
-  const condicionIva =
-    viajeInicial?.transportista?.condicionIva ??
-    transportistas.find((t) => t.id === transportistaId)?.condicionIva ??
-    null;
+  const transportistaSeleccionado = useMemo(() => {
+    if (transportistaActualizado && transportistaActualizado.id === transportistaId) {
+      return transportistaActualizado;
+    }
+    const fromList = transportistas.find((t) => t.id === transportistaId);
+    return (fromList as Partial<Transportista>) ?? (viajeInicial?.transportista as Partial<Transportista>) ?? null;
+  }, [viajeInicial, transportistas, transportistaId, transportistaActualizado]);
+
+  const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
   const cvlpClaseBAlerta = hasArca && cvlpClaseBEsperada(condicionIva);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
@@ -273,6 +284,34 @@ export function CrearLiquidacionManualModal({
     };
   }, [transportistaId, viajeInicial, getToken]);
 
+  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+
+  useEffect(() => {
+    let cid = viajeInicial?.clienteId;
+    if (!cid && selectedViajeIds.size > 0) {
+      const primerViaje = viajes.find(v => selectedViajeIds.has(v.id));
+      cid = (primerViaje as any)?.cliente?.id;
+    }
+    if (!cid) {
+      setClienteDetalle(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const url = tenantId
+          ? `/api/platform/clientes/${encodeURIComponent(cid)}?tenantId=${encodeURIComponent(tenantId)}`
+          : `/api/clientes/${encodeURIComponent(cid)}`;
+        const c = await apiJson<Cliente>(url, () => getToken());
+        if (!cancelled) setClienteDetalle(c);
+      } catch {
+        if (!cancelled) setClienteDetalle(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [viajeInicial, selectedViajeIds, viajes, tenantId, getToken]);
+
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !submitting) onClose();
@@ -291,6 +330,17 @@ export function CrearLiquidacionManualModal({
     if (selectedViajes.length === 0) return null;
     return monedaViaje(selectedViajes[0]);
   }, [selectedViajes]);
+
+  const clienteSeleccionado = clienteDetalle;
+
+  const missingEmitFields = useMemo(() => {
+    if (!hasArca || transportistaId === "" || selectedViajes.length === 0) return [];
+    return collectCvlpEmitMissingFields({
+      emisor: resolvedConfig,
+      transportista: transportistaSeleccionado ?? { idFiscal: null, domicilio: null, condicionIva: null },
+      cliente: clienteSeleccionado,
+    });
+  }, [hasArca, resolvedConfig, transportistaSeleccionado, clienteSeleccionado, transportistaId]);
 
   const bloqueadoUsd = selectedViajes.some((v) =>
     arcaBloqueaLiquidarUsd(hasArca, v.monedaPrecioTransportistaExterno),
@@ -377,6 +427,10 @@ export function CrearLiquidacionManualModal({
       setError(
         "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
       );
+      return;
+    }
+    if (action === "emitir" && missingEmitFields.length > 0) {
+      setError("No se puede emitir. Faltan datos obligatorios del transportista o cliente.");
       return;
     }
     setConceptosIncomplete([]);
@@ -479,9 +533,15 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
+  
+  const getMultiplicador = (modo?: string) =>
+    modo === "TODOS_LOS_VIAJES" ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0)) : 1;
+
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
-      sum + signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct),
+      sum +
+      signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) *
+        getMultiplicador(l.modoAplicacion),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -852,6 +912,7 @@ export function CrearLiquidacionManualModal({
           <ConceptosLiquidacionLineasEditor
             getToken={getToken}
             lineas={conceptosLineas}
+            autoFillBlockedConcepts={true}
             viajesDisponibles={selectedViajes.map((v) => ({
               id: v.id,
               numero: numeroVisibleViaje(v),
@@ -888,11 +949,12 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
               {conceptosCompletos.map((l, idx) => {
+                const mult = getMultiplicador(l.modoAplicacion);
                 const conIva = signedMontoConIvaConcepto(
                   l.signo,
                   Number(l.monto) || 0,
                   l.ivaPct,
-                );
+                ) * mult;
                 return (
                   <div
                     key={`${l.conceptoLiquidacionId}-${idx}`}
@@ -900,6 +962,7 @@ export function CrearLiquidacionManualModal({
                   >
                     <span>
                       {l.nombre || "Concepto"}
+                      {mult > 1 ? ` (×${mult} viajes)` : ""}
                       {l.ivaPct != null ? ` (IVA ${l.ivaPct}%)` : ""}
                     </span>
                     <span className="tabular-nums">
@@ -962,6 +1025,20 @@ export function CrearLiquidacionManualModal({
           {error && (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
               {error}
+            </div>
+          )}
+
+          {hasArca && missingEmitFields.length > 0 && (
+            <div className="mb-4">
+              <DatosFiscalesFaltantesAlerta
+                missingEmitFields={missingEmitFields}
+                clienteDetalle={clienteSeleccionado}
+                onClienteUpdated={(c) => setClienteDetalle(c)}
+                transportistaSeleccionado={transportistaSeleccionado}
+                onTransportistaUpdated={(t) => setTransportistaActualizado(t)}
+                tenantId={tenantId}
+                getToken={getToken}
+              />
             </div>
           )}
 

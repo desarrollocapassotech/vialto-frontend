@@ -118,12 +118,12 @@ export function ClienteEditPage() {
           nombre: nombre.trim(),
           pais,
           idFiscal: idFiscal.trim(),
-          condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
+          condicionIva: pais === "AR" ? condicionIva : null,
           condicionTributaria:
-            pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
-          email: email.trim() || undefined,
-          telefono: telefono.trim() || undefined,
-          direccion: direccion.trim() || undefined,
+            pais !== "AR" ? condicionTributaria.trim() : null,
+          email: email.trim(),
+          telefono: telefono.trim(),
+          direccion: direccion.trim(),
         }),
       });
       if (!tenantId) void maestro.refreshClientes();

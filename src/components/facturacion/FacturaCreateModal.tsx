@@ -91,7 +91,7 @@ function validateFacturaDraft(
   viajes: Viaje[],
   hasArca: boolean,
 ): string | null {
-  if (!draft.numero.trim()) return "Ingresá el número de factura.";
+  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de factura.";
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -559,20 +559,22 @@ export function FacturaCreateModal({
     monedaUnicaDeViajes(draft.viajeIds, viajes) === null;
 
   const compactFields = (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>
-            Número <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={draft.numero}
-            onChange={(e) => patch({ numero: e.target.value })}
-            placeholder="0001-00000001"
-            className={compactInputClass}
-          />
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        {!hasArca && (
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>
+              Número <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={draft.numero}
+              onChange={(e) => patch({ numero: e.target.value })}
+              placeholder="0001-00000001"
+              className={compactInputClass}
+            />
+          </div>
+        )}
         <FacturaContraparteField
           tipo={draft.tipo}
           clienteId={draft.clienteId}
@@ -597,25 +599,27 @@ export function FacturaCreateModal({
           }
           compact
         />
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>
-            Fecha de emisión <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={draft.fechaEmision}
-            onChange={(e) => patch({ fechaEmision: e.target.value })}
-            className={compactInputClass}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>Fecha de vencimiento</label>
-          <input
-            type="date"
-            value={draft.fechaVencimiento}
-            onChange={(e) => patch({ fechaVencimiento: e.target.value })}
-            className={compactInputClass}
-          />
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>
+              Fecha de emisión <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={draft.fechaEmision}
+              onChange={(e) => patch({ fechaEmision: e.target.value })}
+              className={compactInputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>Fecha de vencimiento</label>
+            <input
+              type="date"
+              value={draft.fechaVencimiento}
+              onChange={(e) => patch({ fechaVencimiento: e.target.value })}
+              className={compactInputClass}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className={compactLabelClass}>
@@ -635,8 +639,8 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline justify-between gap-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+        <div className="flex shrink-0 items-baseline justify-between gap-2">
           <label className={compactLabelClass}>
             Viajes vinculados{" "}
             {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
@@ -647,16 +651,19 @@ export function FacturaCreateModal({
             </span>
           )}
         </div>
-        <ViajesVinculadosEditor
-          viajes={viajes}
-          disponibles={viajesNueva}
-          selected={draft.viajeIds}
-          onChange={patchViajeIds}
-          loading={viajesLoading}
-          tipo={draft.tipo}
-          clienteId={draft.clienteId}
-          transportistaId={draft.transportistaId}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ViajesVinculadosEditor
+            viajes={viajes}
+            disponibles={viajesNueva}
+            selected={draft.viajeIds}
+            onChange={patchViajeIds}
+            loading={viajesLoading}
+            tipo={draft.tipo}
+            clienteId={draft.clienteId}
+            transportistaId={draft.transportistaId}
+            viajesTablaFillHeight
+          />
+        </div>
       </div>
       {draft.viajeIds.length > 0 && (
         <label className="inline-flex items-center gap-2 text-xs text-vialto-charcoal">
@@ -687,7 +694,7 @@ export function FacturaCreateModal({
       )}
       <FacturaTotalesPreview draft={draft} viajes={viajes} />
       {monedaInvalida && (
-        <p className="rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no puede
           contener viajes en distintas monedas. Generá una factura por moneda.
         </p>
@@ -865,7 +872,10 @@ export function FacturaCreateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
+        className={[
+          "fixed inset-0 z-[110] flex justify-center sm:items-center sm:p-4 md:p-6",
+          step === "autorizada" ? "items-center" : "items-stretch",
+        ].join(" ")}
         role="presentation"
       >
         <button
@@ -882,10 +892,18 @@ export function FacturaCreateModal({
           aria-modal="true"
           aria-labelledby="factura-create-modal-title"
           className={[
-            "relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-lg sm:border sm:border-black/15",
-            unifiedArca
-              ? "max-w-[min(90rem,calc(100vw-1rem))]"
-              : "max-w-[min(72rem,calc(100vw-1rem))]",
+            "relative flex max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-lg sm:border sm:border-black/15",
+            step === "autorizada" ? "h-auto" : "h-full",
+            step === "autorizada"
+              ? "sm:h-auto"
+              : unifiedArca
+                ? "sm:h-[92vh]"
+                : "sm:h-auto sm:max-h-[92vh]",
+            step === "autorizada"
+              ? "max-w-[min(34rem,calc(100vw-1rem))]"
+              : unifiedArca
+                ? "max-w-[min(90rem,calc(100vw-1rem))]"
+                : "max-w-[min(72rem,calc(100vw-1rem))]",
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
@@ -895,20 +913,32 @@ export function FacturaCreateModal({
                 id="factura-create-modal-title"
                 className="text-base font-semibold text-vialto-charcoal"
               >
-                Nueva factura
-                {draft.letraComprobante === "a"
-                  ? " A"
-                  : draft.letraComprobante === "b"
-                    ? " B"
-                    : ""}
+                {step === "autorizada" ? (
+                  "Factura emitida"
+                ) : (
+                  <>
+                    Nueva factura
+                    {draft.letraComprobante === "a"
+                      ? " A"
+                      : draft.letraComprobante === "b"
+                        ? " B"
+                        : ""}
+                  </>
+                )}
               </h2>
               <p className="mt-1 text-xs text-vialto-steel">
-                {unifiedArca
-                  ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
-                  : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
-                {draft.letraComprobante
-                  ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
-                  : ""}
+                {step === "autorizada" ? (
+                  "El comprobante fue autorizado por ARCA."
+                ) : (
+                  <>
+                    {unifiedArca
+                      ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
+                      : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
+                    {draft.letraComprobante
+                      ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
+                      : ""}
+                  </>
+                )}
               </p>
             </div>
             <button
@@ -925,16 +955,18 @@ export function FacturaCreateModal({
           <div
             className={[
               "min-h-0 flex-1 overflow-hidden",
-              unifiedArca ? "flex flex-col lg:flex-row" : "overflow-y-auto",
+              step === "form" && unifiedArca
+                ? "flex flex-col lg:min-h-0 lg:flex-row"
+                : "overflow-y-auto",
             ].join(" ")}
           >
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="min-h-0 shrink-0 overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[min(26rem,38%)] lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[60%] lg:max-w-[60%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[40%] lg:max-w-[40%] lg:shrink-0 lg:min-w-0">
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
@@ -954,6 +986,9 @@ export function FacturaCreateModal({
                       sinConfigArca={sinConfigArca}
                       datosEmitIncompletos={datosEmitIncompletos}
                       platform={platform}
+                      tenantId={tenantId}
+                      getToken={getToken}
+                      onClienteUpdated={setClienteDetalle}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError && (
@@ -1105,7 +1140,7 @@ export function FacturaCreateModal({
                   </button>
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    disabled={busy || monedaInvalida || bloqueadoUsd || datosEmitIncompletos}
                     onClick={() => void handleUnifiedSubmit("emitir")}
                     className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                   >

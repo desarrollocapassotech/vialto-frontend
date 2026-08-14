@@ -10,6 +10,7 @@ import {
   facturaLetraLabel,
 } from '@/lib/arcaCbteTipo';
 import { MSG_ARCA_NO_FACTURA_USD } from '@/lib/arcaUsdRestriction';
+import { DatosFiscalesFaltantesAlerta } from '@/components/shared/DatosFiscalesFaltantesAlerta';
 import type { ArcaConfig, Cliente } from '@/types/api';
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -50,6 +51,9 @@ export type FacturaArcaPreviewPanelProps = {
   sinConfigArca?: boolean;
   datosEmitIncompletos?: boolean;
   platform?: boolean;
+  tenantId?: string;
+  getToken?: () => Promise<string | null>;
+  onClienteUpdated?: (c: Cliente) => void;
   feedbackSlot?: ReactNode;
 };
 
@@ -69,6 +73,9 @@ export function FacturaArcaPreviewPanel({
   sinConfigArca = false,
   datosEmitIncompletos = false,
   platform = false,
+  tenantId,
+  getToken,
+  onClienteUpdated,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
   const condicionIva = clienteDetalle?.condicionIva ?? null;
@@ -190,17 +197,13 @@ export function FacturaArcaPreviewPanel({
       )}
 
       {datosEmitIncompletos && !sinConfigArca && (
-        <div
-          className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-          role="alert"
-        >
-          <p className="font-medium">Completá estos datos antes de emitir</p>
-          <ul className="mt-1 list-disc pl-4 space-y-0.5">
-            {missingEmitFields.map((f) => (
-              <li key={f}>{f}</li>
-            ))}
-          </ul>
-        </div>
+        <DatosFiscalesFaltantesAlerta
+          missingEmitFields={missingEmitFields}
+          clienteDetalle={clienteDetalle}
+          onClienteUpdated={onClienteUpdated}
+          tenantId={tenantId}
+          getToken={getToken}
+        />
       )}
 
       {feedbackSlot}
