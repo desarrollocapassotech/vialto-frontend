@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useToast } from "@/lib/toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -8,10 +8,8 @@ import {
   type ListadoColumn,
 } from "@/components/listado/ListadoDatos";
 import { useImportacion } from "@/hooks/useImportacion";
-import {
-  useImportTemplates,
-  getTemplateExample,
-} from "@/hooks/useImportTemplates";
+import { useImportTemplates } from "@/hooks/useImportTemplates";
+import { apiJson } from "@/lib/api";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { labelModulo } from "@/lib/platformLabels";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
@@ -20,6 +18,36 @@ import type {
   ImportPreviewFactura,
   ImportPreviewEntidad,
 } from "@/types/api";
+
+/** Campo fijo del catálogo del backend (`TEMPLATE_CATALOGO`) para un módulo. */
+type CatalogoColumn = {
+  field: string;
+  campoLabel: string;
+  type: "string" | "number" | "date" | "boolean" | "lookup" | "enum";
+  systemRequired: boolean;
+  defaultExcelHeader: string;
+  lookupModel?: string;
+  lookupFields?: string[];
+  createIfNotFoundSoportado?: boolean;
+  allowedValues?: string[];
+  format?: string;
+};
+
+/** Fila editable de la tabla de configuración: el catálogo fijo + lo que el superadmin ajusta. */
+type EditableColumn = CatalogoColumn & {
+  excelHeader: string;
+  required: boolean;
+  defaultValue: string;
+  createIfNotFound: boolean;
+};
+
+const SHEET_DEFAULT: Record<string, string> = {
+  clientes: "Clientes",
+  transportistas: "Transportes",
+  choferes: "Choferes",
+  vehiculos: "Vehiculos",
+  viajes: "Viajes",
+};
 
 interface ImportacionModalProps {
   /** Desacoplado de `Tenant` (superadmin) a propósito: una pantalla de admin de
@@ -31,7 +59,6 @@ interface ImportacionModalProps {
 }
 
 type MainTab = "importar" | "templates";
-type ImportStep = "upload" | "preview" | "result";
 
 export function ImportacionModal({
   tenantId,
@@ -56,35 +83,115 @@ export function ImportacionModal({
   // Template form state
   const [tplModulo, setTplModulo] = useState("");
   const [tplNombre, setTplNombre] = useState("");
-  const [tplConfig, setTplConfig] = useState("");
-  const [tplJsonError, setTplJsonError] = useState<string | null>(null);
+  const [tplSheet, setTplSheet] = useState("");
+  const [tplHeaderRow, setTplHeaderRow] = useState("1");
+  const [tplColumnas, setTplColumnas] = useState<EditableColumn[]>([]);
+  const [loadingCatalogo, setLoadingCatalogo] = useState(false);
+  const [tplValidationError, setTplValidationError] = useState<string | null>(
+    null,
+  );
 
-  function handleModuloChange(m: string) {
+  async function handleModuloChange(m: string) {
     setTplModulo(m);
     setTplNombre(m ? `Template ${labelModulo(m)} — ${tenantName}` : "");
-    setTplConfig(m ? getTemplateExample(m) : "");
-    setTplJsonError(null);
+    setTplSheet(SHEET_DEFAULT[m] ?? m);
+    setTplHeaderRow("1");
+    setTplColumnas([]);
+    setTplValidationError(null);
+    if (!m) return;
+    setLoadingCatalogo(true);
+    try {
+      const catalogo = await apiJson<CatalogoColumn[]>(
+        `/api/importaciones/templates/catalogo?modulo=${encodeURIComponent(m)}`,
+        () => getToken(),
+      );
+      setTplColumnas(
+        catalogo.map((c) => ({
+          ...c,
+          excelHeader: c.defaultExcelHeader,
+          required: c.systemRequired,
+          defaultValue: "",
+          createIfNotFound: false,
+        })),
+      );
+    } catch {
+      setTplValidationError(
+        "No se pudo cargar el catálogo de campos de este módulo.",
+      );
+    } finally {
+      setLoadingCatalogo(false);
+    }
   }
 
-  function handleConfigChange(val: string) {
-    setTplConfig(val);
-    setTplJsonError(null);
-    try {
-      JSON.parse(val);
-    } catch {
-      setTplJsonError("JSON inválido");
+  function updateColumna(field: string, patch: Partial<EditableColumn>) {
+    setTplColumnas((prev) =>
+      prev.map((c) => (c.field === field ? { ...c, ...patch } : c)),
+    );
+  }
+
+  function buildConfig() {
+    return {
+      sheet: tplSheet.trim() || undefined,
+      headerRow: Number(tplHeaderRow) || 1,
+      columns: tplColumnas
+        .filter((c) => c.excelHeader.trim() !== "")
+        .map((c) => {
+          const col: Record<string, unknown> = {
+            excelHeader: c.excelHeader.trim(),
+            field: c.field,
+            type: c.type,
+          };
+          if (c.required) col.required = true;
+          if (c.type === "lookup") {
+            col.lookupModel = c.lookupModel;
+            if (c.lookupFields) col.lookupFields = c.lookupFields;
+            if (c.createIfNotFound) col.createIfNotFound = true;
+          }
+          if (c.type === "enum" && c.allowedValues) {
+            col.allowedValues = c.allowedValues;
+          }
+          if (c.format) col.format = c.format;
+          if (!c.required && c.defaultValue.trim()) {
+            col.defaultValue = c.defaultValue.trim();
+          }
+          return col;
+        }),
+    };
+  }
+
+  function validarTemplate(): string | null {
+    if (!tplModulo) return "Elegí un módulo.";
+    if (!tplNombre.trim()) return "Ingresá un nombre para el template.";
+    const faltanObligatorios = tplColumnas.filter(
+      (c) => c.systemRequired && !c.excelHeader.trim(),
+    );
+    if (faltanObligatorios.length > 0) {
+      return `Estos campos los necesita el sistema sí o sí — completá su encabezado de Excel: ${faltanObligatorios
+        .map((c) => c.campoLabel)
+        .join(", ")}.`;
     }
+    const conExcelHeader = tplColumnas.filter((c) => c.excelHeader.trim());
+    const headersLower = conExcelHeader.map((c) =>
+      c.excelHeader.trim().toLowerCase(),
+    );
+    const duplicado = headersLower.find(
+      (h, i) => headersLower.indexOf(h) !== i,
+    );
+    if (duplicado) {
+      return `Hay más de una columna usando el mismo encabezado de Excel: "${duplicado}".`;
+    }
+    return null;
   }
 
   async function handleSaveTemplate() {
-    if (!tplModulo || !tplNombre || !tplConfig) return;
-    try {
-      JSON.parse(tplConfig);
-    } catch {
-      setTplJsonError("JSON inválido — corregilo antes de guardar");
+    const err = validarTemplate();
+    if (err) {
+      setTplValidationError(err);
       return;
     }
-    const ok = await saveTemplate(tplModulo, tplNombre, tplConfig);
+    setTplValidationError(null);
+    const config = buildConfig();
+    const ok = await saveTemplate(tplModulo, tplNombre.trim(), JSON.stringify(config));
     if (ok) {
       showToast("Template guardado correctamente.");
     }
@@ -95,9 +202,24 @@ export function ImportacionModal({
     onClose();
   }
 
-  const modulosDisponibles = tenantModules.filter((m) =>
-    ["viajes", "clientes", "transportistas", "choferes", "vehiculos"].includes(m),
+  // Clientes/Transportes/Choferes/Vehículos no son módulos vendibles en
+  // Tenant.modules — son entidades core del flujo de Viajes, así que se
+  // habilitan en bloque junto con él (mismo criterio que el wizard del tenant).
+  const modulosDisponibles = tenantModules.includes("viajes")
+    ? ["viajes", "clientes", "transportistas", "choferes", "vehiculos"]
+    : [];
+  const modulosFaltantes = modulosDisponibles.filter(
+    (m) => !templates.some((t) => t.modulo === m),
   );
+
+  // Precarga el primer módulo sin template configurado, una sola vez que
+  // termina de cargar la lista (si el superadmin ya eligió uno, no lo pisa).
+  useEffect(() => {
+    if (!loadingTpls && !tplModulo && modulosFaltantes.length > 0) {
+      void handleModuloChange(modulosFaltantes[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingTpls, templates, tplModulo]);
 
   const {
     step,
@@ -164,36 +286,6 @@ export function ImportacionModal({
         {/* ══════════════════════════════════════════════════════ */}
         {mainTab === "importar" && (
           <>
-            {/* Step indicator */}
-            <div className="flex border-b border-black/10 bg-vialto-mist">
-              {(["upload", "preview", "result"] as ImportStep[]).map((s, i) => {
-                const labels = [
-                  "1. Archivo",
-                  "2. Previsualización",
-                  "3. Resultado",
-                ];
-                const isActive = step === s;
-                const isDone =
-                  (s === "upload" && step !== "upload") ||
-                  (s === "preview" && step === "result");
-                return (
-                  <div
-                    key={s}
-                    className={[
-                      "flex-1 py-2 text-center text-[11px] uppercase tracking-widest font-[family-name:var(--font-ui)]",
-                      isActive
-                        ? "bg-vialto-charcoal text-white"
-                        : isDone
-                          ? "text-vialto-fire"
-                          : "text-vialto-steel",
-                    ].join(" ")}
-                  >
-                    {labels[i]}
-                  </div>
-                );
-              })}
-            </div>
-
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {error && (
                 <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -228,41 +320,6 @@ export function ImportacionModal({
                       </select>
                     )}
                   </div>
-
-                  {modulo === "viajes" && (
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
-                        <span className="mt-0.5 shrink-0 text-base leading-none">
-                          💡
-                        </span>
-                        <span>
-                          El módulo Viajes requiere las columnas{" "}
-                          <code className="font-mono bg-blue-100 px-0.5">
-                            MONEDA MONTO
-                          </code>{" "}
-                          y{" "}
-                          <code className="font-mono bg-blue-100 px-0.5">
-                            MONEDA FLETE
-                          </code>{" "}
-                          con valores <strong>ARS</strong> o{" "}
-                          <strong>USD</strong>. Si el campo está vacío o tiene
-                          un valor distinto, la fila será rechazada.
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-2 rounded border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-900">
-                        <span className="mt-0.5 shrink-0 text-base leading-none">
-                          📍
-                        </span>
-                        <span>
-                          Origen y destino se validan contra el catálogo de
-                          ciudades (mismo criterio que al crear un viaje
-                          manual). Las ciudades reconocidas se normalizan; las
-                          no reconocidas generan advertencia pero no bloquean la
-                          importación.
-                        </span>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="space-y-1">
                     <label className="block text-xs uppercase tracking-wider text-vialto-steel">
@@ -438,52 +495,14 @@ export function ImportacionModal({
         {mainTab === "templates" && (
           <>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-              {/* Templates existentes */}
-              {loadingTpls ? (
+              {loadingTpls && (
                 <p className="text-sm text-vialto-steel">Cargando templates…</p>
-              ) : templates.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
-                    Templates configurados
-                  </p>
-                  <div className="rounded border border-black/10 divide-y divide-black/5">
-                    {templates.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between px-4 py-3 text-sm"
-                      >
-                        <div>
-                          <span className="font-medium text-vialto-charcoal">
-                            {t.nombre}
-                          </span>
-                          <span className="ml-2 text-xs text-vialto-steel">
-                            ({labelModulo(t.modulo)})
-                          </span>
-                        </div>
-                        <span
-                          className={[
-                            "text-[11px] px-2 py-0.5 uppercase tracking-wider",
-                            t.activo
-                              ? "bg-green-100 text-green-700"
-                              : "bg-vialto-mist text-vialto-steel",
-                          ].join(" ")}
-                        >
-                          {t.activo ? "Activo" : "Inactivo"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-vialto-steel">
-                  No hay templates configurados para esta empresa.
-                </p>
               )}
 
               {/* Formulario crear/actualizar template */}
               <div>
                 <p className="mb-3 text-xs uppercase tracking-wider text-vialto-steel">
-                  Crear / actualizar template
+                  Actualizar template
                 </p>
                 {tplError && (
                   <div className="mb-3 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -510,59 +529,162 @@ export function ImportacionModal({
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs uppercase tracking-wider text-vialto-steel">
-                      Nombre del template{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      value={tplNombre}
-                      onChange={(e) => setTplNombre(e.target.value)}
-                      placeholder="ej. Template viajes Fernández v1"
-                      className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs uppercase tracking-wider text-vialto-steel">
-                        Configuración (JSON){" "}
-                        <span className="text-red-500">*</span>
-                      </label>
-                      {tplJsonError && (
-                        <span className="text-xs text-red-600">
-                          {tplJsonError}
+                  {tplModulo && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <label className="space-y-1">
+                        <span className="block text-xs uppercase tracking-wider text-vialto-steel">
+                          Hoja del Excel
                         </span>
-                      )}
+                        <input
+                          value={tplSheet}
+                          onChange={(e) => setTplSheet(e.target.value)}
+                          placeholder="ej. Clientes"
+                          className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-xs uppercase tracking-wider text-vialto-steel">
+                          Fila de encabezados
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={tplHeaderRow}
+                          onChange={(e) => setTplHeaderRow(e.target.value)}
+                          className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                        />
+                      </label>
                     </div>
-                    <textarea
-                      value={tplConfig}
-                      onChange={(e) => handleConfigChange(e.target.value)}
-                      rows={12}
-                      spellCheck={false}
-                      className={[
-                        "w-full border px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-vialto-charcoal resize-none",
-                        tplJsonError ? "border-red-400" : "border-black/20",
-                      ].join(" ")}
-                      placeholder='{"sheet": 0, "headerRow": 1, "columns": [...]}'
-                    />
-                    <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
-                      <span className="mt-0.5 shrink-0 text-base leading-none">
-                        💡
-                      </span>
-                      <span>
-                        El JSON viene precargado con los campos correctos para
-                        el módulo seleccionado. Solo tenés que cambiar cada{" "}
-                        <code className="font-mono bg-blue-100 px-0.5">
-                          excelHeader
-                        </code>{" "}
-                        para que coincida exactamente con el nombre de columna
-                        que usa el cliente en su Excel. El resto de la
-                        configuración (campos del sistema, tipos, lookups) no
-                        necesita modificarse.
-                      </span>
+                  )}
+
+                  {tplValidationError && (
+                    <div className="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                      {tplValidationError}
                     </div>
-                  </div>
+                  )}
+
+                  {loadingCatalogo && (
+                    <p className="text-sm text-vialto-steel">
+                      Cargando campos del módulo…
+                    </p>
+                  )}
+
+                  {!loadingCatalogo && tplColumnas.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs uppercase tracking-wider text-vialto-steel">
+                          Columnas del Excel
+                        </label>
+                        <span className="text-[11px] text-vialto-steel">
+                          Completá el encabezado tal como aparece en el Excel
+                          del cliente. Dejalo vacío para no importar esa
+                          columna.
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto rounded border border-black/10">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-vialto-mist text-left">
+                              <th className="px-3 py-2 font-medium text-vialto-steel">
+                                Campo del sistema
+                              </th>
+                              <th className="px-3 py-2 font-medium text-vialto-steel">
+                                Encabezado en el Excel
+                              </th>
+                              <th className="px-3 py-2 text-center font-medium text-vialto-steel">
+                                Obligatorio
+                              </th>
+                              <th className="px-3 py-2 font-medium text-vialto-steel">
+                                Valor por defecto
+                              </th>
+                              <th className="px-3 py-2 text-center font-medium text-vialto-steel">
+                                Crear si no existe
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-black/5">
+                            {tplColumnas.map((c) => (
+                              <tr key={c.field}>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  {c.campoLabel}
+                                  {c.type === "lookup" && (
+                                    <span className="ml-1 text-[10px] text-vialto-steel">
+                                      ({labelModulo(c.lookupModel ?? "")})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    value={c.excelHeader}
+                                    onChange={(e) =>
+                                      updateColumna(c.field, {
+                                        excelHeader: e.target.value,
+                                      })
+                                    }
+                                    className="h-8 w-full min-w-[10rem] border border-black/20 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={c.required}
+                                    disabled={c.systemRequired}
+                                    onChange={(e) =>
+                                      updateColumna(c.field, {
+                                        required: e.target.checked,
+                                      })
+                                    }
+                                    className="accent-vialto-charcoal disabled:opacity-50"
+                                    title={
+                                      c.systemRequired
+                                        ? "El sistema siempre necesita este campo"
+                                        : undefined
+                                    }
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  {!c.required && c.type !== "lookup" ? (
+                                    <input
+                                      value={c.defaultValue}
+                                      onChange={(e) =>
+                                        updateColumna(c.field, {
+                                          defaultValue: e.target.value,
+                                        })
+                                      }
+                                      placeholder="—"
+                                      className="h-8 w-full min-w-[6rem] border border-black/20 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                                    />
+                                  ) : (
+                                    <span className="text-vialto-steel/60">
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {c.createIfNotFoundSoportado ? (
+                                    <input
+                                      type="checkbox"
+                                      checked={c.createIfNotFound}
+                                      onChange={(e) =>
+                                        updateColumna(c.field, {
+                                          createIfNotFound: e.target.checked,
+                                        })
+                                      }
+                                      className="accent-vialto-charcoal"
+                                    />
+                                  ) : (
+                                    <span className="text-vialto-steel/60">
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -580,9 +702,9 @@ export function ImportacionModal({
                 type="button"
                 disabled={
                   !tplModulo ||
-                  !tplNombre ||
-                  !tplConfig ||
-                  !!tplJsonError ||
+                  !tplNombre.trim() ||
+                  loadingCatalogo ||
+                  tplColumnas.length === 0 ||
                   saving
                 }
                 onClick={handleSaveTemplate}
