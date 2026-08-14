@@ -12,22 +12,25 @@ export function PaisModal({
   onSaved,
   tenantId,
   stacked,
+  pais,
 }: {
   getToken: () => Promise<string | null>;
   onClose: () => void;
   onSaved: (pais: Pais) => void;
   tenantId?: string;
-  /** true cuando se abre sobre otro modal z-[110] */
   stacked?: boolean;
+  pais?: Pais;
 }) {
-  const [nombre, setNombre] = useState('');
-  const [codigo, setCodigo] = useState('');
+  const editando = !!pais;
+  const [nombre, setNombre] = useState(pais?.nombre ?? '');
+  const [codigo, setCodigo] = useState(pais?.codigo ?? '');
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del país.';
     if (!codigo.trim()) errs.codigo = 'Ingresá el código de 2 letras (ej: BO).';
     else if (!/^[A-Z]{2}$/.test(codigo.trim())) errs.codigo = 'El código debe tener 2 letras (ej: BO).';
     if (Object.keys(errs).length > 0) {
@@ -38,11 +41,16 @@ export function PaisModal({
     setSaving(true);
     setError(null);
     try {
-      const path = tenantId
+      const basePath = tenantId
         ? `/api/platform/paises?tenantId=${encodeURIComponent(tenantId)}`
         : '/api/paises';
+      const path = editando
+        ? tenantId
+          ? `/api/platform/paises/${encodeURIComponent(pais!.id)}?tenantId=${encodeURIComponent(tenantId)}`
+          : `/api/paises/${encodeURIComponent(pais!.id)}`
+        : basePath;
       const result = await apiJson<Pais>(path, () => getToken(), {
-        method: 'POST',
+        method: editando ? 'PATCH' : 'POST',
         body: JSON.stringify({
           nombre: nombre.trim(),
           codigo: codigo.trim(),
@@ -52,7 +60,9 @@ export function PaisModal({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 400
-          ? 'Ya existe un país con ese nombre.'
+          ? (e.message?.includes('ya existe')
+              ? 'Ya existe un país con ese nombre.'
+              : e.message) || friendlyError(e, 'paises')
           : friendlyError(e, 'paises'),
       );
     } finally {
@@ -72,7 +82,7 @@ export function PaisModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
-            Nuevo país
+            {editando ? 'Editar país' : 'Nuevo país'}
           </h2>
           <button
             type="button"
