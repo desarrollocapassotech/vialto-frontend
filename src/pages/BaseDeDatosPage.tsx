@@ -118,7 +118,12 @@ export function BaseDeDatosPage() {
       // Solo admin de tenant, no superadmin: éste ya tiene su propia entrada
       // de import (con selector de tenant) desde el panel superadmin.
       case "importar":
-        return !superadmin && isOrgAdmin && hasViajes;
+        return (
+          !superadmin &&
+          isOrgAdmin &&
+          hasViajes &&
+          !tenant?.importacionesOcultas
+        );
     }
   });
 
