@@ -351,7 +351,7 @@ export function FacturacionTenantPage({
     return facturas.filter((f) => {
       if (
         numFiltro.trim() &&
-        !f.numero.toLowerCase().includes(numFiltro.trim().toLowerCase())
+        !(f.numero ?? "").toLowerCase().includes(numFiltro.trim().toLowerCase())
       )
         return false;
       if (clienteIdFiltro && f.clienteId !== clienteIdFiltro) return false;
@@ -1589,7 +1589,7 @@ export function FacturacionTenantPage({
         title="Eliminar factura"
         message={
           facturaDeleteConfirm
-            ? `¿Eliminás la factura ${facturaDeleteConfirm.numero}? Esta acción no se puede deshacer.`
+            ? `¿Eliminás la factura ${facturaDeleteConfirm.numero ?? "s/n"}? Esta acción no se puede deshacer.`
             : ""
         }
         confirmLabel="Eliminar"
@@ -1610,7 +1610,7 @@ export function FacturacionTenantPage({
         title="Marcar como cobrada"
         message={
           marcarCobradaConfirm
-            ? `¿Marcás la factura ${marcarCobradaConfirm.numero} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
+            ? `¿Marcás la factura ${marcarCobradaConfirm.numero ?? "s/n"} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
             : ""
         }
         confirmLabel="Marcar como cobrada"

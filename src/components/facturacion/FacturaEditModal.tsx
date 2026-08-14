@@ -121,7 +121,7 @@ export function facturaPayloadFromDraft(
   const facturarPorTramo =
     draft.facturarPorTramo && draft.viajeIds.length > 0;
   const base: Record<string, unknown> = {
-    numero: draft.numero.trim(),
+    numero: draft.numero.trim() || undefined,
     tipo: "cliente",
     viajeIds: draft.viajeIds,
     fechaEmision: draft.fechaEmision,
@@ -157,7 +157,7 @@ export function facturaToEditDraft(f: Factura): FacturaDraft {
       ivaPctStr: String(t.ivaPct),
     }));
   return {
-    numero: f.numero,
+    numero: f.numero ?? "",
     tipo: f.tipo,
     clienteId: f.clienteId ?? "",
     transportistaId: f.transportistaId ?? "",

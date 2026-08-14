@@ -355,7 +355,8 @@ export interface FacturaTramo {
 export interface Factura {
   id: string;
   tenantId: string;
-  numero: string;
+  /** Null para tenants con integracion-arca hasta que se emite (el número real lo asigna AFIP). */
+  numero: string | null;
   tipo: "cliente" | "transportista_externo";
   clienteId: string | null;
   transportistaId: string | null;
@@ -492,6 +493,25 @@ export interface ImportLog {
   detalles: ImportLogDetalle[];
   createdAt: string;
   createdBy: string;
+}
+
+/** Preview de una liquidación borrador a generar (agrupada por transportista), etapa opcional posterior a Viajes. */
+export interface ImportLiquidacionPreviewGrupo {
+  transportistaId: string;
+  transportistaNombre: string;
+  cantidadViajes: number;
+  periodoDesde: string;
+  periodoHasta: string;
+  bruto: number;
+}
+
+/** Preview de una factura a cliente a generar (agrupada por cliente), etapa opcional posterior a Viajes. */
+export interface ImportFacturaClientePreviewGrupo {
+  clienteId: string;
+  clienteNombre: string;
+  cantidadViajes: number;
+  importe: number;
+  moneda: string;
 }
 
 export interface ImportTemplate {

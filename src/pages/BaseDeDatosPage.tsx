@@ -9,6 +9,7 @@ import {
   Package,
   ShieldCheck,
   Truck,
+  Upload,
   UserCheck,
   Users,
   Warehouse,
@@ -30,6 +31,7 @@ import { PresentacionesPage } from "./PresentacionesPage";
 import { SuperadminUsersPage } from "./SuperadminUsersPage";
 import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
+import { ImportarDatosTenantPage } from "./ImportarDatosTenantPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
   canAccessViajes,
@@ -53,7 +55,8 @@ type Tab =
   | "presentaciones"
   | "depositos"
   | "direcciones-entrega"
-  | "usuarios";
+  | "usuarios"
+  | "importar";
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
@@ -70,6 +73,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     icon: MapPin,
   },
   { id: "usuarios", label: "Usuarios", icon: ShieldCheck },
+  { id: "importar", label: "Importar datos", icon: Upload },
 ];
 
 export function BaseDeDatosPage() {
@@ -111,6 +115,10 @@ export function BaseDeDatosPage() {
         return hasStock;
       case "usuarios":
         return isOrgAdmin;
+      // Solo admin de tenant, no superadmin: éste ya tiene su propia entrada
+      // de import (con selector de tenant) desde el panel superadmin.
+      case "importar":
+        return !superadmin && isOrgAdmin && hasViajes;
     }
   });
 
@@ -236,6 +244,7 @@ export function BaseDeDatosPage() {
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
         {activeTab === "usuarios" &&
           (superadmin ? <SuperadminUsersPage /> : <UsuariosTenantPage />)}
+        {activeTab === "importar" && <ImportarDatosTenantPage />}
       </div>
     </div>
   );

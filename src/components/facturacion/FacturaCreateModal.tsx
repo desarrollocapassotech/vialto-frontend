@@ -91,7 +91,7 @@ function validateFacturaDraft(
   viajes: Viaje[],
   hasArca: boolean,
 ): string | null {
-  if (!draft.numero.trim()) return "Ingresá el número de factura.";
+  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de factura.";
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -561,18 +561,20 @@ export function FacturaCreateModal({
   const compactFields = (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>
-            Número <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={draft.numero}
-            onChange={(e) => patch({ numero: e.target.value })}
-            placeholder="0001-00000001"
-            className={compactInputClass}
-          />
-        </div>
+        {!hasArca && (
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>
+              Número <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={draft.numero}
+              onChange={(e) => patch({ numero: e.target.value })}
+              placeholder="0001-00000001"
+              className={compactInputClass}
+            />
+          </div>
+        )}
         <FacturaContraparteField
           tipo={draft.tipo}
           clienteId={draft.clienteId}
@@ -597,25 +599,27 @@ export function FacturaCreateModal({
           }
           compact
         />
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>
-            Fecha de emisión <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={draft.fechaEmision}
-            onChange={(e) => patch({ fechaEmision: e.target.value })}
-            className={compactInputClass}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={compactLabelClass}>Fecha de vencimiento</label>
-          <input
-            type="date"
-            value={draft.fechaVencimiento}
-            onChange={(e) => patch({ fechaVencimiento: e.target.value })}
-            className={compactInputClass}
-          />
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>
+              Fecha de emisión <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={draft.fechaEmision}
+              onChange={(e) => patch({ fechaEmision: e.target.value })}
+              className={compactInputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={compactLabelClass}>Fecha de vencimiento</label>
+            <input
+              type="date"
+              value={draft.fechaVencimiento}
+              onChange={(e) => patch({ fechaVencimiento: e.target.value })}
+              className={compactInputClass}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className={compactLabelClass}>

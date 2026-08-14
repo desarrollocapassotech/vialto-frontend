@@ -450,7 +450,7 @@ export function EmitirFacturaModal({
                     <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
                       Comprobante
                     </p>
-                    <Row label="Número local" value={factura.numero} />
+                    <Row label="Número local" value={factura.numero ?? "—"} />
                     <Row
                       label="Fecha de emisión"
                       value={fmtDate(factura.fechaEmision)}
