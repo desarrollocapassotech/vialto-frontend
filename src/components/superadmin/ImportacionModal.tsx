@@ -812,6 +812,33 @@ function PreviewPanel({
         )}
       </div>
 
+      {/* Columnas del Excel sin mapear en el template */}
+      {preview.headersNoMapeados.length > 0 && (
+        <div className="flex items-start gap-2 rounded border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-800">
+          <span className="mt-0.5 shrink-0 text-base leading-none">ℹ️</span>
+          <span>
+            El Excel tiene columnas que el template no reconoce — van a
+            quedar como texto libre en Observaciones, sin bloquear la
+            importación:{" "}
+            <strong>{preview.headersNoMapeados.join(", ")}</strong>.
+          </span>
+        </div>
+      )}
+
+      {/* Columnas opcionales del template no encontradas en el Excel */}
+      {preview.columnasOpcionalesFaltantes.length > 0 && (
+        <div className="flex items-start gap-2 rounded border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-900">
+          <span className="mt-0.5 shrink-0 text-base leading-none">⚠️</span>
+          <span>
+            El template espera estas columnas y no aparecen en el Excel —
+            quedan vacías en todas las filas:{" "}
+            <strong>{preview.columnasOpcionalesFaltantes.join(", ")}</strong>.
+            Si el Excel las llama distinto, ajustá el encabezado desde la
+            pestaña Templates.
+          </span>
+        </div>
+      )}
+
       {/* Errores */}
       {preview.detalleErrores.length > 0 && (
         <div>

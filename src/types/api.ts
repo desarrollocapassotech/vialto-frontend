@@ -467,6 +467,10 @@ export interface ImportPreviewResult {
   exitosas: number;
   errores: number;
   detalleErrores: ImportRowError[];
+  /** Columnas del Excel que no matchean ningún campo del template — van a texto libre en Observaciones. */
+  headersNoMapeados: string[];
+  /** Columnas del template (no obligatorias) que no se encontraron en el Excel. */
+  columnasOpcionalesFaltantes: string[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;
