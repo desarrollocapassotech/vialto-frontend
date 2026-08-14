@@ -29,6 +29,8 @@ type CatalogoColumn = {
   lookupModel?: string;
   lookupFields?: string[];
   createIfNotFoundSoportado?: boolean;
+  multiple?: boolean;
+  separador?: string;
   allowedValues?: string[];
   format?: string;
 };
@@ -94,25 +96,50 @@ export function ImportacionModal({
   async function handleModuloChange(m: string) {
     setTplModulo(m);
     setTplNombre(m ? `Template ${labelModulo(m)} — ${tenantName}` : "");
-    setTplSheet(SHEET_DEFAULT[m] ?? m);
-    setTplHeaderRow("1");
     setTplColumnas([]);
     setTplValidationError(null);
-    if (!m) return;
+    if (!m) {
+      setTplSheet("");
+      setTplHeaderRow("1");
+      return;
+    }
+    // Si ya existe un template guardado para este módulo, precarga sus
+    // valores reales en vez de resetear todo a los defaults del catálogo —
+    // antes cada vez que se tocaba el selector se perdía la configuración
+    // ya guardada (encabezados, obligatorios, "crear si no existe").
+    const existente = templates.find((t) => t.modulo === m);
+    setTplSheet(
+      existente?.config.sheet != null
+        ? String(existente.config.sheet)
+        : (SHEET_DEFAULT[m] ?? m),
+    );
+    setTplHeaderRow(
+      existente?.config.headerRow != null
+        ? String(existente.config.headerRow)
+        : "1",
+    );
     setLoadingCatalogo(true);
     try {
       const catalogo = await apiJson<CatalogoColumn[]>(
         `/api/importaciones/templates/catalogo?modulo=${encodeURIComponent(m)}`,
         () => getToken(),
       );
+      const guardadoPorCampo = new Map(
+        (existente?.config.columns ?? []).map((c) => [c.field, c]),
+      );
       setTplColumnas(
-        catalogo.map((c) => ({
-          ...c,
-          excelHeader: c.defaultExcelHeader,
-          required: c.systemRequired,
-          defaultValue: "",
-          createIfNotFound: false,
-        })),
+        catalogo.map((c) => {
+          const guardado = guardadoPorCampo.get(c.field);
+          return {
+            ...c,
+            excelHeader:
+              guardado?.excelHeader ??
+              (existente ? "" : c.defaultExcelHeader),
+            required: guardado?.required ?? c.systemRequired,
+            defaultValue: guardado?.defaultValue ?? "",
+            createIfNotFound: guardado?.createIfNotFound ?? false,
+          };
+        }),
       );
     } catch {
       setTplValidationError(
@@ -146,6 +173,10 @@ export function ImportacionModal({
             col.lookupModel = c.lookupModel;
             if (c.lookupFields) col.lookupFields = c.lookupFields;
             if (c.createIfNotFound) col.createIfNotFound = true;
+            if (c.multiple) {
+              col.multiple = true;
+              col.separador = c.separador ?? "/";
+            }
           }
           if (c.type === "enum" && c.allowedValues) {
             col.allowedValues = c.allowedValues;

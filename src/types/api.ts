@@ -525,6 +525,17 @@ export interface ImportTemplate {
   modulo: string;
   nombre: string;
   activo: boolean;
+  config: {
+    sheet?: string | number;
+    headerRow?: number;
+    columns: Array<{
+      field: string;
+      excelHeader: string;
+      required?: boolean;
+      defaultValue?: string;
+      createIfNotFound?: boolean;
+    }>;
+  };
   updatedAt: string;
 }
 
