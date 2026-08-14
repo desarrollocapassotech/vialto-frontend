@@ -29,7 +29,6 @@ import {
   defaultFacturaLineasFromDraft,
   toFacturaLineasPayload,
   validateFacturaLineasDraft,
-  type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
 import {
   ClienteSearchSelect,
@@ -58,7 +57,13 @@ import {
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
 } from "@/lib/viajesFlota";
-import type { ArcaConfig, Cliente, Factura, Transportista, Viaje } from "@/types/api";
+import type {
+  ArcaConfig,
+  Cliente,
+  Factura,
+  Transportista,
+  Viaje,
+} from "@/types/api";
 
 const compactInputClass =
   "h-8 w-full border border-black/15 bg-white px-2 text-sm";
@@ -225,16 +230,21 @@ export function FacturaCreateModal({
   const navigate = useNavigate();
   const { showToast } = useToast();
   const platform = Boolean(tenantId?.trim());
-  const unifiedArca = hasArca && Boolean(getToken) && Boolean(facturasCreateUrl);
+  const unifiedArca =
+    hasArca && Boolean(getToken) && Boolean(facturasCreateUrl);
 
-  const [submitAction, setSubmitAction] = useState<"borrador" | "emitir" | null>(
-    null,
-  );
+  const [submitAction, setSubmitAction] = useState<
+    "borrador" | "emitir" | null
+  >(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "autorizada">("form");
-  const [lineas, setLineas] = useState<FacturaLineaDraft[]>(() =>
-    defaultFacturaLineasFromDraft(draft, viajes),
+
+  // Las líneas ahora son derivadas y estrictamente de solo lectura
+  const lineas = useMemo(
+    () => defaultFacturaLineasFromDraft(draft, viajes),
+    [draft, viajes],
   );
+
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
@@ -247,7 +257,6 @@ export function FacturaCreateModal({
     string | null
   >(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
-  const lineasSyncKey = useRef("");
 
   const busy = saving || submitAction != null;
   const displayError = unifiedArca ? localError : localError || error;
@@ -318,7 +327,9 @@ export function FacturaCreateModal({
 
     void (async () => {
       try {
-        const cfg = await apiJson<ArcaConfig | null>(configUrl, () => getToken());
+        const cfg = await apiJson<ArcaConfig | null>(configUrl, () =>
+          getToken(),
+        );
         if (!cancelled) setArcaConfig(cfg);
       } catch {
         if (!cancelled) setArcaConfig(null);
@@ -355,23 +366,10 @@ export function FacturaCreateModal({
     tenantId,
   ]);
 
+  // Limpiar errores de línea cuando cambian las líneas derivadas
   useEffect(() => {
-    if (!open || !unifiedArca) return;
-    const key = `${draft.viajeIds.join(",")}|${draft.ivaPct}|${draft.numero}|${draft.facturarPorTramo}|${draft.tramos.map((t) => `${t.viajeId}:${t.detalle}:${t.monto}:${t.ivaPct}`).join(";")}`;
-    if (key === lineasSyncKey.current) return;
-    lineasSyncKey.current = key;
-    setLineas(defaultFacturaLineasFromDraft(draft, viajes));
     setLineasIncomplete([]);
-  }, [
-    open,
-    unifiedArca,
-    draft.viajeIds,
-    draft.ivaPct,
-    draft.numero,
-    draft.facturarPorTramo,
-    draft.tramos,
-    viajes,
-  ]);
+  }, [lineas]);
 
   if (!open) return null;
 
@@ -381,8 +379,7 @@ export function FacturaCreateModal({
 
   function patchViajeIds(ids: string[]) {
     const tramos = filterFacturaTramosByViajeIds(draft.tramos, ids);
-    const facturarPorTramo =
-      ids.length === 0 ? false : draft.facturarPorTramo;
+    const facturarPorTramo = ids.length === 0 ? false : draft.facturarPorTramo;
     patch({
       viajeIds: ids,
       facturarPorTramo,
@@ -415,14 +412,21 @@ export function FacturaCreateModal({
     setLocalError(message);
     showToast(message, "error");
     requestAnimationFrame(() => {
-      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      feedbackRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
     });
   }
 
   async function resolveComprobanteUrl(): Promise<string | null | undefined> {
     if (!showComprobanteAdjunto) return undefined;
     if (draft.comprobanteFile) {
-      return uploadComprobante(() => getToken(), draft.comprobanteFile, "facturacion");
+      return uploadComprobante(
+        () => getToken(),
+        draft.comprobanteFile,
+        "facturacion",
+      );
     }
     return draft.comprobanteUrl;
   }
@@ -455,7 +459,9 @@ export function FacturaCreateModal({
         return;
       }
       if (!datosReady) {
-        notifyError("Cargando datos de emisión. Intentá de nuevo en un momento.");
+        notifyError(
+          "Cargando datos de emisión. Intentá de nuevo en un momento.",
+        );
         return;
       }
       if (sinConfigArca) {
@@ -619,9 +625,7 @@ export function FacturaCreateModal({
         </div>
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className={compactLabelClass}>
-            {draft.facturarPorTramo
-              ? "IVA (%) viajes sin tramo"
-              : "IVA (%)"}
+            {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
           </label>
           <input
             type="number"
@@ -691,8 +695,9 @@ export function FacturaCreateModal({
       <FacturaTotalesPreview draft={draft} viajes={viajes} />
       {monedaInvalida && (
         <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
-          Los viajes seleccionados tienen distintas monedas. Una factura no puede
-          contener viajes en distintas monedas. Generá una factura por moneda.
+          Los viajes seleccionados tienen distintas monedas. Una factura no
+          puede contener viajes en distintas monedas. Generá una factura por
+          moneda.
         </p>
       )}
     </div>
@@ -760,9 +765,7 @@ export function FacturaCreateModal({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            {draft.facturarPorTramo
-              ? "IVA (%) viajes sin tramo"
-              : "IVA (%)"}
+            {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
           </label>
           <input
             type="number"
@@ -839,8 +842,9 @@ export function FacturaCreateModal({
       <FacturaTotalesPreview draft={draft} viajes={viajes} />
       {monedaInvalida && (
         <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
-          Los viajes seleccionados tienen distintas monedas. Una factura no puede
-          contener viajes en distintas monedas. Generá una factura por moneda.
+          Los viajes seleccionados tienen distintas monedas. Una factura no
+          puede contener viajes en distintas monedas. Generá una factura por
+          moneda.
         </p>
       )}
       {showComprobanteAdjunto && (
@@ -970,13 +974,12 @@ export function FacturaCreateModal({
                       numero={draft.numero}
                       fechaEmision={draft.fechaEmision}
                       lineas={lineas}
-                      onLineasChange={(next) => {
-                        setLineas(next);
-                        setLineasIncomplete([]);
-                      }}
+                      onLineasChange={() => {}} /* Bloqueado, las líneas son fijas */
                       ivaPctDefault={ivaPctDefault}
                       lineasIncomplete={lineasIncomplete}
-                      lineasDisabled={busy}
+                      lineasDisabled={
+                        true
+                      } /* Forzamos a deshabilitar edición interna */
                       bloqueadoUsd={bloqueadoUsd}
                       missingEmitFields={missingEmitFields}
                       sinConfigArca={sinConfigArca}
@@ -1089,7 +1092,9 @@ export function FacturaCreateModal({
                       <button
                         type="button"
                         onClick={() =>
-                          setPreviewComprobanteUrl(facturaEmitida.comprobanteUrl!)
+                          setPreviewComprobanteUrl(
+                            facturaEmitida.comprobanteUrl!,
+                          )
                         }
                         className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
                       >
@@ -1136,7 +1141,12 @@ export function FacturaCreateModal({
                   </button>
                   <button
                     type="button"
-                    disabled={busy || monedaInvalida || bloqueadoUsd || datosEmitIncompletos}
+                    disabled={
+                      busy ||
+                      monedaInvalida ||
+                      bloqueadoUsd ||
+                      datosEmitIncompletos
+                    }
                     onClick={() => void handleUnifiedSubmit("emitir")}
                     className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                   >
