@@ -459,6 +459,17 @@ export interface ImportPreviewEntidad {
   esNuevo: boolean;
 }
 
+export interface ImportEntidadFaltante {
+  valor: string;
+  /** Sugerencia por una regla simple (posición en el par tractor/semirremolque), no IA. */
+  tipoSugerido?: string | null;
+}
+
+export interface ImportEntidadesFaltantesModelo {
+  modelo: string;
+  valores: ImportEntidadFaltante[];
+}
+
 export interface ImportPreviewResult {
   sessionId: string;
   modulo: string;
@@ -471,6 +482,8 @@ export interface ImportPreviewResult {
   headersNoMapeados: string[];
   /** Columnas del template (no obligatorias) que no se encontraron en el Excel. */
   columnasOpcionalesFaltantes: string[];
+  /** Entidades referenciadas por lookup que no existen todavía, agrupadas por modelo. */
+  entidadesFaltantes: ImportEntidadesFaltantesModelo[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;

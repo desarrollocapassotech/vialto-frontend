@@ -43,6 +43,12 @@ type EditableColumn = CatalogoColumn & {
   createIfNotFound: boolean;
 };
 
+/** Respuesta de la sugerencia de mapeo con IA — nunca se guarda sola, solo precarga el formulario. */
+type SugerenciaTemplate = {
+  columnas: Array<{ field: string; excelHeader: string }>;
+  headersNoUsados: string[];
+};
+
 const SHEET_DEFAULT: Record<string, string> = {
   clientes: "Clientes",
   transportistas: "Transportes",
@@ -72,6 +78,8 @@ export function ImportacionModal({
   const { showToast } = useToast();
   const [mainTab, setMainTab] = useState<MainTab>("importar");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const iaFileInputRef = useRef<HTMLInputElement>(null);
+  const [sugiriendoIA, setSugiriendoIA] = useState(false);
 
   const importacion = useImportacion(tenantId, () => getToken());
   const {
@@ -147,6 +155,44 @@ export function ImportacionModal({
       );
     } finally {
       setLoadingCatalogo(false);
+    }
+  }
+
+  async function handleSugerirIA(file: File) {
+    if (!tplModulo) return;
+    setSugiriendoIA(true);
+    setTplValidationError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const sugerencia = await apiJson<SugerenciaTemplate>(
+        `/api/importaciones/templates/sugerir?modulo=${encodeURIComponent(tplModulo)}`,
+        () => getToken(),
+        { method: "POST", body: form },
+      );
+      const porCampo = new Map(
+        sugerencia.columnas.map((c) => [c.field, c.excelHeader]),
+      );
+      const completados = sugerencia.columnas.filter(
+        (c) => c.excelHeader,
+      ).length;
+      setTplColumnas((prev) =>
+        prev.map((c) => {
+          const sugerido = porCampo.get(c.field);
+          return sugerido ? { ...c, excelHeader: sugerido } : c;
+        }),
+      );
+      showToast(
+        `Sugerencia de IA aplicada: ${completados} de ${tplColumnas.length} campos completados. Revisá antes de guardar.`,
+      );
+    } catch (e) {
+      setTplValidationError(
+        e instanceof Error
+          ? e.message
+          : "No se pudo generar la sugerencia con IA.",
+      );
+    } finally {
+      setSugiriendoIA(false);
     }
   }
 
@@ -409,7 +455,12 @@ export function ImportacionModal({
 
               {/* Step 2 */}
               {step === "preview" && preview && (
-                <PreviewPanel preview={preview} />
+                <PreviewPanel
+                  preview={preview}
+                  tenantId={tenantId}
+                  getToken={getToken}
+                  onEntidadesCreadas={() => void submitPreview()}
+                />
               )}
 
               {/* Step 3 */}
@@ -585,6 +636,38 @@ export function ImportacionModal({
                           className="w-full border border-black/20 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
                         />
                       </label>
+                    </div>
+                  )}
+
+                  {tplModulo && (
+                    <div className="flex items-center gap-3 rounded border border-dashed border-black/20 px-4 py-3">
+                      <input
+                        ref={iaFileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handleSugerirIA(file);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => iaFileInputRef.current?.click()}
+                        disabled={sugiriendoIA || loadingCatalogo}
+                        className="inline-flex h-9 items-center gap-2 px-4 border border-vialto-charcoal text-vialto-charcoal text-xs uppercase tracking-wider hover:bg-vialto-charcoal hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {sugiriendoIA && <Spinner className="h-3.5 w-3.5" />}
+                        {sugiriendoIA
+                          ? "Analizando con IA…"
+                          : "Sugerir con IA"}
+                      </button>
+                      <span className="text-[11px] text-vialto-steel">
+                        Subí un Excel de ejemplo del tenant — la IA propone
+                        los encabezados de abajo, vos los revisás y guardás
+                        (no guarda nada sola).
+                      </span>
                     </div>
                   )}
 
@@ -797,12 +880,73 @@ function StatBox({
 
 type PreviewTab = "viajes" | "facturas" | "clientes" | "transportistas";
 
+const TIPOS_VEHICULO = [
+  "tractor",
+  "semirremolque",
+  "camion",
+  "utilitario",
+  "otro",
+];
+
 function PreviewPanel({
   preview,
+  tenantId,
+  getToken,
+  onEntidadesCreadas,
 }: {
   preview: import("@/types/api").ImportPreviewResult;
+  tenantId: string;
+  getToken: () => Promise<string | null>;
+  onEntidadesCreadas: () => void;
 }) {
   const [tab, setTab] = useState<PreviewTab>("viajes");
+
+  const vehiculosFaltantes = preview.entidadesFaltantes.find(
+    (e) => e.modelo === "vehiculos",
+  );
+  const [tiposVehiculo, setTiposVehiculo] = useState<Record<string, string>>(
+    {},
+  );
+  const [creandoVehiculos, setCreandoVehiculos] = useState(false);
+  const [errorVehiculos, setErrorVehiculos] = useState<string | null>(null);
+
+  async function handleCrearVehiculos() {
+    if (!vehiculosFaltantes) return;
+    const items = vehiculosFaltantes.valores.map((v) => ({
+      patente: v.valor,
+      tipo: tiposVehiculo[v.valor] ?? v.tipoSugerido ?? "",
+    }));
+    const sinTipo = items.filter((i) => !i.tipo);
+    if (sinTipo.length > 0) {
+      setErrorVehiculos(
+        `Falta elegir el tipo para: ${sinTipo.map((i) => i.patente).join(", ")}.`,
+      );
+      return;
+    }
+    setCreandoVehiculos(true);
+    setErrorVehiculos(null);
+    try {
+      const res = await apiJson<{
+        creados: number;
+        errores: { patente: string; error: string }[];
+      }>("/api/importaciones/entidades-faltantes/vehiculos", getToken, {
+        method: "POST",
+        body: JSON.stringify({ tenantId, items }),
+      });
+      if (res.errores.length > 0) {
+        setErrorVehiculos(
+          res.errores.map((e) => `${e.patente}: ${e.error}`).join(" · "),
+        );
+      }
+      if (res.creados > 0) onEntidadesCreadas();
+    } catch (e) {
+      setErrorVehiculos(
+        e instanceof Error ? e.message : "No se pudieron crear los vehículos.",
+      );
+    } finally {
+      setCreandoVehiculos(false);
+    }
+  }
 
   const hasViajes = (preview.viajes?.length ?? 0) > 0;
   const hasFacturas = (preview.facturas?.length ?? 0) > 0;
@@ -867,6 +1011,77 @@ function PreviewPanel({
             Si el Excel las llama distinto, ajustá el encabezado desde la
             pestaña Templates.
           </span>
+        </div>
+      )}
+
+      {/* Vehículos faltantes: crear y reintentar */}
+      {vehiculosFaltantes && vehiculosFaltantes.valores.length > 0 && (
+        <div className="space-y-2 rounded border border-vialto-charcoal/20 px-4 py-3">
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Faltan {vehiculosFaltantes.valores.length} vehículo
+            {vehiculosFaltantes.valores.length !== 1 ? "s" : ""}
+          </p>
+          <p className="text-[11px] text-vialto-steel">
+            No existen en el sistema todavía. Elegí el tipo de cada uno y
+            creálos — después se vuelve a previsualizar el archivo
+            automáticamente.
+          </p>
+          <div className="overflow-x-auto rounded border border-black/10">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-vialto-mist text-left">
+                  <th className="px-3 py-2 font-medium text-vialto-steel">
+                    Patente
+                  </th>
+                  <th className="px-3 py-2 font-medium text-vialto-steel">
+                    Tipo
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {vehiculosFaltantes.valores.map((v) => (
+                  <tr key={v.valor}>
+                    <td className="px-3 py-2 whitespace-nowrap font-mono">
+                      {v.valor}
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={tiposVehiculo[v.valor] ?? v.tipoSugerido ?? ""}
+                        onChange={(e) =>
+                          setTiposVehiculo((prev) => ({
+                            ...prev,
+                            [v.valor]: e.target.value,
+                          }))
+                        }
+                        className="h-8 w-full min-w-[9rem] border border-black/20 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-vialto-charcoal"
+                      >
+                        <option value="">Elegir…</option>
+                        {TIPOS_VEHICULO.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {errorVehiculos && (
+            <p className="text-xs text-red-700">{errorVehiculos}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleCrearVehiculos}
+            disabled={creandoVehiculos}
+            className="inline-flex h-9 items-center gap-2 px-4 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {creandoVehiculos && <Spinner className="h-3.5 w-3.5" />}
+            {creandoVehiculos
+              ? "Creando…"
+              : `Crear ${vehiculosFaltantes.valores.length} vehículo${vehiculosFaltantes.valores.length !== 1 ? "s" : ""} y reintentar`}
+          </button>
         </div>
       )}
 
