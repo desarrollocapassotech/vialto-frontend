@@ -1432,35 +1432,16 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
 }
 
 function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
-  const tipoBadge = (tipo: ImportPreviewFactura["tipo"]) => (
-    <span
-      className={[
-        "text-[10px] px-1.5 py-0.5 uppercase tracking-wider rounded",
-        tipo === "cliente"
-          ? "bg-blue-100 text-blue-700"
-          : "bg-amber-100 text-amber-700",
-      ].join(" ")}
-    >
-      {tipo === "cliente" ? "Cliente" : "Flete"}
-    </span>
-  );
-
   return (
     <ListadoDatos
       columns={[
-        {
-          id: "tipo",
-          header: "Tipo",
-          cell: (f) => tipoBadge(f.tipo),
-          tdClassName: listadoTablaTdClass,
-        },
         {
           id: "numero",
           header: "Número",
           primary: true,
           cell: (f) => f.numero,
         },
-        { id: "nombre", header: "Nombre", cell: (f) => f.nombre },
+        { id: "nombre", header: "Cliente", cell: (f) => f.nombre },
         {
           id: "importe",
           header: "Importe",
@@ -1481,8 +1462,7 @@ function FacturasTable({ facturas }: { facturas: ImportPreviewFactura[] }) {
         <ListadoCard
           primary={f.numero}
           fields={[
-            { label: "Tipo", value: tipoBadge(f.tipo) },
-            { label: "Nombre", value: f.nombre },
+            { label: "Cliente", value: f.nombre },
             {
               label: "Importe",
               value: `$${f.importe.toLocaleString("es-AR")}`,

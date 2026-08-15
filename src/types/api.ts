@@ -440,13 +440,13 @@ export interface ImportPreviewViaje {
   nroFactura: string | null;
   precioTransportistaExterno: number | null;
   monedaPrecioTransportistaExterno: string | null;
-  nroFacturaTransporte: string | null;
   /** Advertencias de validación de catálogo (no bloquean la importación). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
 }
 
 export interface ImportPreviewFactura {
-  tipo: "cliente" | "transportista_externo";
+  /** Siempre "cliente": el pago al transportista se liquida por afuera (Liquidaciones), no como Factura. */
+  tipo: "cliente";
   numero: string;
   nombre: string | null;
   importe: number;

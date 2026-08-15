@@ -84,7 +84,7 @@ export function CiudadAdvertenciasPanel({
                 className="h-8 shrink-0 border border-black/20 bg-white px-2 text-xs text-vialto-steel hover:bg-black/[0.04]"
                 title="No corresponde a una sola ciudad (ej. multidestino) — esta fila no se va a importar."
               >
-                No importar esta fila
+                No importar fila
               </button>
             </div>
           );
