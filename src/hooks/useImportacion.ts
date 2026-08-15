@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { apiFetch, apiJson } from "@/lib/api";
 import {
+  aplicarEleccionCiudad,
   enriquecerPreviewImportacionViajes,
   type CiudadNormalizadaConfirm,
 } from "@/lib/importacionViajesCiudades";
@@ -22,12 +23,15 @@ export function useImportacion(
   const [log, setLog] = useState<ImportLog | null>(null);
   const ciudadesNormalizadasRef = useRef<CiudadNormalizadaConfirm[]>([]);
   const ciudadesAbortRef = useRef<AbortController | null>(null);
+  const filasExcluidasRef = useRef<Set<number>>(new Set());
+  /** Elecciones manuales de ciudad (fila:campo → valor), sobreviven a un "reintentar" (ej. después de crear entidades faltantes). */
+  const eleccionesManualesRef = useRef<Map<string, string>>(new Map());
 
-  async function submitPreview() {
+  /** Núcleo del preview, sin tocar las correcciones/exclusiones ya hechas — lo usan tanto el preview inicial como "reintentar". */
+  async function ejecutarPreview() {
     if (!file || !modulo) return;
     setLoading(true);
     setError(null);
-    ciudadesNormalizadasRef.current = [];
     try {
       const form = new FormData();
       form.append("file", file);
@@ -68,6 +72,52 @@ export function useImportacion(
         }
       }
 
+      // Reaplica elecciones manuales de ciudad de antes de este preview (ej.
+      // si esto es un "reintentar" después de crear entidades faltantes) —
+      // el enriquecimiento recién hecho no las conoce, recalcula de cero.
+      for (const [key, valor] of eleccionesManualesRef.current) {
+        const [filaStr, campo] = key.split(":");
+        previewResult = aplicarEleccionCiudad(
+          previewResult,
+          Number(filaStr),
+          campo as "origen" | "destino",
+          valor,
+        );
+        const idx = ciudadesNormalizadasRef.current.findIndex(
+          (c) => c.fila === Number(filaStr),
+        );
+        if (idx >= 0) {
+          ciudadesNormalizadasRef.current[idx] = {
+            ...ciudadesNormalizadasRef.current[idx],
+            [campo]: valor,
+          };
+        } else {
+          ciudadesNormalizadasRef.current.push({
+            fila: Number(filaStr),
+            [campo]: valor,
+          });
+        }
+      }
+
+      // Reaplica filas excluidas de antes de este preview, por la misma razón.
+      if (filasExcluidasRef.current.size > 0) {
+        previewResult = {
+          ...previewResult,
+          viajes: previewResult.viajes?.filter(
+            (v) => !filasExcluidasRef.current.has(v.fila),
+          ),
+          advertenciasCiudad: previewResult.advertenciasCiudad?.filter(
+            (a) => !filasExcluidasRef.current.has(a.fila),
+          ),
+        };
+        previewResult.totalAdvertenciasCiudad =
+          previewResult.advertenciasCiudad?.length ?? 0;
+        previewResult.exitosas = Math.max(
+          0,
+          previewResult.exitosas - filasExcluidasRef.current.size,
+        );
+      }
+
       setPreview(previewResult);
       setStep("preview");
     } catch (e) {
@@ -76,6 +126,18 @@ export function useImportacion(
     } finally {
       setLoading(false);
     }
+  }
+
+  async function submitPreview() {
+    ciudadesNormalizadasRef.current = [];
+    filasExcluidasRef.current = new Set();
+    eleccionesManualesRef.current = new Map();
+    await ejecutarPreview();
+  }
+
+  /** Vuelve a previsualizar sin perder las correcciones ya hechas — se usa después de crear entidades faltantes. */
+  function reintentarPreview() {
+    void ejecutarPreview();
   }
 
   async function confirm() {
@@ -87,6 +149,7 @@ export function useImportacion(
         sessionId: string;
         tenantId: string;
         ciudadesNormalizadas?: CiudadNormalizadaConfirm[];
+        filasExcluidas?: number[];
       } = {
         sessionId: preview.sessionId,
         tenantId,
@@ -97,6 +160,10 @@ export function useImportacion(
         ciudadesNormalizadasRef.current.length > 0
       ) {
         body.ciudadesNormalizadas = ciudadesNormalizadasRef.current;
+      }
+
+      if (filasExcluidasRef.current.size > 0) {
+        body.filasExcluidas = [...filasExcluidasRef.current];
       }
 
       const result = await apiJson<ImportLog>(
@@ -118,9 +185,55 @@ export function useImportacion(
     }
   }
 
+  /** El usuario eligió la ciudad correcta para una fila con advertencia — se aplica en preview y en la confirmación. */
+  function elegirCiudad(
+    fila: number,
+    campo: "origen" | "destino",
+    valor: string,
+  ) {
+    eleccionesManualesRef.current.set(`${fila}:${campo}`, valor);
+
+    const idx = ciudadesNormalizadasRef.current.findIndex((c) => c.fila === fila);
+    if (idx >= 0) {
+      ciudadesNormalizadasRef.current[idx] = {
+        ...ciudadesNormalizadasRef.current[idx],
+        [campo]: valor,
+      };
+    } else {
+      ciudadesNormalizadasRef.current.push({ fila, [campo]: valor });
+    }
+
+    setPreview((prev) => (prev ? aplicarEleccionCiudad(prev, fila, campo, valor) : prev));
+  }
+
+  /** El usuario decidió no importar esta fila (ej. destino multidestino que no resuelve a una sola ciudad). */
+  function ignorarFila(fila: number) {
+    filasExcluidasRef.current.add(fila);
+    ciudadesNormalizadasRef.current = ciudadesNormalizadasRef.current.filter(
+      (c) => c.fila !== fila,
+    );
+
+    setPreview((prev) => {
+      if (!prev) return prev;
+      const viajes = prev.viajes?.filter((v) => v.fila !== fila);
+      const advertenciasCiudad = prev.advertenciasCiudad?.filter(
+        (a) => a.fila !== fila,
+      );
+      return {
+        ...prev,
+        viajes,
+        advertenciasCiudad,
+        totalAdvertenciasCiudad: advertenciasCiudad?.length ?? 0,
+        exitosas: Math.max(0, prev.exitosas - 1),
+      };
+    });
+  }
+
   function reset() {
     ciudadesAbortRef.current?.abort();
     ciudadesNormalizadasRef.current = [];
+    filasExcluidasRef.current = new Set();
+    eleccionesManualesRef.current = new Map();
     setStep("upload");
     setModulo("");
     setFile(null);
@@ -142,7 +255,10 @@ export function useImportacion(
     preview,
     log,
     submitPreview,
+    reintentarPreview,
     confirm,
+    elegirCiudad,
+    ignorarFila,
     reset,
   };
 }

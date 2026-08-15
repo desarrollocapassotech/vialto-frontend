@@ -7,6 +7,7 @@ import {
   MODULOS_SECUENCIA,
   useImportWizard,
 } from "@/hooks/useImportWizard";
+import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
 
 interface ImportWizardModalProps {
   tenantId: string;
@@ -266,12 +267,32 @@ export function ImportWizardModal({
   );
 }
 
+const TIPOS_VEHICULO = [
+  "tractor",
+  "semirremolque",
+  "camion",
+  "utilitario",
+  "otro",
+];
+
 function EtapaModulo({
   wizard,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
 }) {
   const p = wizard.preview;
+  const [tiposVehiculo, setTiposVehiculo] = useState<Record<string, string>>(
+    {},
+  );
+
+  const vehiculosFaltantes = p?.entidadesFaltantes.find(
+    (e) => e.modelo === "vehiculos",
+  );
+  const otrasEntidadesFaltantes =
+    p?.entidadesFaltantes.filter(
+      (e) => e.modelo !== "vehiculos" && e.valores.length > 0,
+    ) ?? [];
+
   return (
     <div className="flex flex-col gap-4">
       <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
@@ -284,6 +305,133 @@ function EtapaModulo({
             {p.exitosas} de {p.totalFilas} filas listas para crear.
             {p.errores > 0 && ` ${p.errores} con error.`}
           </p>
+
+          {p.headersNoMapeados.length > 0 && (
+            <div className="border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
+              El Excel tiene columnas que el template no reconoce — van a
+              quedar como texto libre en Observaciones, sin bloquear la
+              importación:{" "}
+              <strong>{p.headersNoMapeados.join(", ")}</strong>.
+            </div>
+          )}
+
+          {p.columnasOpcionalesFaltantes.length > 0 && (
+            <div className="border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              El template espera estas columnas y no aparecen en el Excel —
+              quedan vacías en todas las filas:{" "}
+              <strong>{p.columnasOpcionalesFaltantes.join(", ")}</strong>.
+            </div>
+          )}
+
+          <CiudadAdvertenciasPanel
+            advertencias={p.advertenciasCiudad ?? []}
+            onElegir={wizard.elegirCiudad}
+            onIgnorarFila={wizard.ignorarFila}
+          />
+
+          {vehiculosFaltantes && vehiculosFaltantes.valores.length > 0 && (
+            <div className="flex flex-col gap-2 border border-vialto-charcoal/20 px-4 py-3">
+              <p className="text-xs uppercase tracking-wider text-vialto-steel">
+                Faltan {vehiculosFaltantes.valores.length} vehículo
+                {vehiculosFaltantes.valores.length !== 1 ? "s" : ""}
+              </p>
+              <p className="text-xs text-vialto-steel">
+                No existen en el sistema todavía. Elegí el tipo de cada uno y
+                creálos — después se vuelve a previsualizar solo.
+              </p>
+              <div className="overflow-x-auto border border-black/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th className={th}>Patente</th>
+                      <th className={th}>Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vehiculosFaltantes.valores.map((v) => (
+                      <tr key={v.valor}>
+                        <td className={`${td} font-mono`}>{v.valor}</td>
+                        <td className={td}>
+                          <select
+                            value={tiposVehiculo[v.valor] ?? v.tipoSugerido ?? ""}
+                            onChange={(e) =>
+                              setTiposVehiculo((prev) => ({
+                                ...prev,
+                                [v.valor]: e.target.value,
+                              }))
+                            }
+                            className="h-8 w-full min-w-[9rem] border border-black/20 px-2 text-xs"
+                          >
+                            <option value="">Elegir…</option>
+                            {TIPOS_VEHICULO.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const items = vehiculosFaltantes.valores.map((v) => ({
+                    patente: v.valor,
+                    tipo: tiposVehiculo[v.valor] ?? v.tipoSugerido ?? "",
+                  }));
+                  if (items.some((i) => !i.tipo)) return;
+                  void wizard.crearVehiculosFaltantes(items);
+                }}
+                disabled={
+                  wizard.loading ||
+                  vehiculosFaltantes.valores.some(
+                    (v) => !(tiposVehiculo[v.valor] ?? v.tipoSugerido),
+                  )
+                }
+                className="self-start border border-black/15 bg-vialto-charcoal px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white hover:bg-black disabled:opacity-50"
+              >
+                {wizard.loading
+                  ? "Creando…"
+                  : `Crear ${vehiculosFaltantes.valores.length} vehículo${vehiculosFaltantes.valores.length !== 1 ? "s" : ""} y reintentar`}
+              </button>
+            </div>
+          )}
+
+          {otrasEntidadesFaltantes.map((grupo) => (
+            <div
+              key={grupo.modelo}
+              className="flex flex-col gap-2 border border-vialto-charcoal/20 px-4 py-3"
+            >
+              <p className="text-xs uppercase tracking-wider text-vialto-steel">
+                Faltan {grupo.valores.length} {labelModulo(grupo.modelo)}
+              </p>
+              <p className="text-xs text-vialto-steel">
+                No existen en el sistema todavía:{" "}
+                <strong>{grupo.valores.map((v) => v.valor).join(", ")}</strong>.
+                Se crean solo con el nombre — después se vuelve a
+                previsualizar solo.
+              </p>
+              <button
+                type="button"
+                disabled={wizard.loading}
+                onClick={() =>
+                  void wizard.crearEntidadesFaltantesSimple(
+                    grupo.modelo,
+                    grupo.valores.map((v) => v.valor),
+                  )
+                }
+                className="self-start border border-black/15 bg-vialto-charcoal px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white hover:bg-black disabled:opacity-50"
+              >
+                {wizard.loading
+                  ? "Creando…"
+                  : `Crear ${grupo.valores.length} ${labelModulo(grupo.modelo).toLowerCase()} y reintentar`}
+              </button>
+            </div>
+          ))}
+
           {p.detalleErrores.length > 0 && (
             <div className="max-h-40 overflow-y-auto border border-black/10">
               <table className="w-full text-xs">

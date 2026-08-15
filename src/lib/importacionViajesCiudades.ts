@@ -11,6 +11,35 @@ export type CiudadNormalizadaConfirm = {
   destino?: string | null;
 };
 
+/** Aplica la elección de ciudad de una fila al preview: pisa el valor y saca la advertencia de esa fila+campo. */
+export function aplicarEleccionCiudad(
+  preview: ImportPreviewResult,
+  fila: number,
+  campo: "origen" | "destino",
+  valor: string,
+): ImportPreviewResult {
+  const viajes = preview.viajes?.map((v) =>
+    v.fila === fila
+      ? {
+          ...v,
+          [campo]: valor,
+          advertenciasCiudad: v.advertenciasCiudad?.filter(
+            (a) => a.campo !== campo,
+          ),
+        }
+      : v,
+  );
+  const advertenciasCiudad = preview.advertenciasCiudad?.filter(
+    (a) => !(a.fila === fila && a.campo === campo),
+  );
+  return {
+    ...preview,
+    viajes,
+    advertenciasCiudad,
+    totalAdvertenciasCiudad: advertenciasCiudad?.length ?? 0,
+  };
+}
+
 const CONCURRENCY = 4;
 
 async function resolverCampoCached(

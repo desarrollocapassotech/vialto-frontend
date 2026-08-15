@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiJson } from "@/lib/api";
+import {
+  aplicarEleccionCiudad,
+  enriquecerPreviewImportacionViajes,
+  type CiudadNormalizadaConfirm,
+} from "@/lib/importacionViajesCiudades";
 import type {
   ImportPreviewResult,
   ImportLog,
@@ -50,8 +55,14 @@ export function useImportWizard(
   const [file, setFile] = useState<File | null>(null);
   const [moduloIndex, setModuloIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [validandoCiudades, setValidandoCiudades] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
+  const ciudadesNormalizadasRef = useRef<CiudadNormalizadaConfirm[]>([]);
+  const ciudadesAbortRef = useRef<AbortController | null>(null);
+  const filasExcluidasRef = useRef<Set<number>>(new Set());
+  /** Elecciones manuales de ciudad (fila:campo → valor), sobreviven a un "reintentar" (ej. después de crear entidades faltantes). */
+  const eleccionesManualesRef = useRef<Map<string, string>>(new Map());
   const [etapasCompletadas, setEtapasCompletadas] = useState<
     EtapaCompletada[]
   >([]);
@@ -79,7 +90,8 @@ export function useImportWizard(
     void previewModuloActual(f, 0);
   }
 
-  async function previewModuloActual(f: File, idx: number) {
+  /** Núcleo del preview de un módulo, sin tocar correcciones/exclusiones ya hechas — lo usa tanto el cambio de módulo como "reintentar". */
+  async function ejecutarPreviewModulo(f: File, idx: number) {
     const modulo = secuencia[idx];
     if (!modulo) return;
     setLoading(true);
@@ -93,7 +105,72 @@ export function useImportWizard(
         getToken,
         { method: "POST", body: form },
       );
-      setPreview(data);
+
+      let previewResult = data;
+      if (modulo === "viajes" && (previewResult.viajes?.length ?? 0) > 0) {
+        setValidandoCiudades(true);
+        ciudadesAbortRef.current?.abort();
+        const ac = new AbortController();
+        ciudadesAbortRef.current = ac;
+        try {
+          const enriched = await enriquecerPreviewImportacionViajes(
+            previewResult,
+            ac.signal,
+          );
+          previewResult = enriched.preview;
+          ciudadesNormalizadasRef.current = enriched.ciudadesNormalizadas;
+        } finally {
+          setValidandoCiudades(false);
+        }
+
+        // Reaplica elecciones manuales de antes de este preview (ej. si esto
+        // es un "reintentar" después de crear entidades faltantes) — el
+        // enriquecimiento recién hecho no las conoce, recalcula de cero.
+        for (const [key, valor] of eleccionesManualesRef.current) {
+          const [filaStr, campo] = key.split(":");
+          previewResult = aplicarEleccionCiudad(
+            previewResult,
+            Number(filaStr),
+            campo as "origen" | "destino",
+            valor,
+          );
+          const idxCiudad = ciudadesNormalizadasRef.current.findIndex(
+            (c) => c.fila === Number(filaStr),
+          );
+          if (idxCiudad >= 0) {
+            ciudadesNormalizadasRef.current[idxCiudad] = {
+              ...ciudadesNormalizadasRef.current[idxCiudad],
+              [campo]: valor,
+            };
+          } else {
+            ciudadesNormalizadasRef.current.push({
+              fila: Number(filaStr),
+              [campo]: valor,
+            });
+          }
+        }
+
+        // Reaplica filas excluidas de antes de este preview, por la misma razón.
+        if (filasExcluidasRef.current.size > 0) {
+          previewResult = {
+            ...previewResult,
+            viajes: previewResult.viajes?.filter(
+              (v) => !filasExcluidasRef.current.has(v.fila),
+            ),
+            advertenciasCiudad: previewResult.advertenciasCiudad?.filter(
+              (a) => !filasExcluidasRef.current.has(a.fila),
+            ),
+          };
+          previewResult.totalAdvertenciasCiudad =
+            previewResult.advertenciasCiudad?.length ?? 0;
+          previewResult.exitosas = Math.max(
+            0,
+            previewResult.exitosas - filasExcluidasRef.current.size,
+          );
+        }
+      }
+
+      setPreview(previewResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al procesar el archivo");
     } finally {
@@ -101,9 +178,126 @@ export function useImportWizard(
     }
   }
 
+  /** Transición a un módulo (nuevo o siguiente): arranca sin correcciones/exclusiones previas. */
+  async function previewModuloActual(f: File, idx: number) {
+    ciudadesNormalizadasRef.current = [];
+    filasExcluidasRef.current = new Set();
+    eleccionesManualesRef.current = new Map();
+    await ejecutarPreviewModulo(f, idx);
+  }
+
+  /** El usuario eligió la ciudad correcta para una fila con advertencia — se aplica en preview y en la confirmación. */
+  function elegirCiudad(
+    fila: number,
+    campo: "origen" | "destino",
+    valor: string,
+  ) {
+    eleccionesManualesRef.current.set(`${fila}:${campo}`, valor);
+
+    const idx = ciudadesNormalizadasRef.current.findIndex((c) => c.fila === fila);
+    if (idx >= 0) {
+      ciudadesNormalizadasRef.current[idx] = {
+        ...ciudadesNormalizadasRef.current[idx],
+        [campo]: valor,
+      };
+    } else {
+      ciudadesNormalizadasRef.current.push({ fila, [campo]: valor });
+    }
+
+    setPreview((prev) => (prev ? aplicarEleccionCiudad(prev, fila, campo, valor) : prev));
+  }
+
+  /** El usuario decidió no importar esta fila (ej. destino multidestino que no resuelve a una sola ciudad). */
+  function ignorarFila(fila: number) {
+    filasExcluidasRef.current.add(fila);
+    ciudadesNormalizadasRef.current = ciudadesNormalizadasRef.current.filter(
+      (c) => c.fila !== fila,
+    );
+
+    setPreview((prev) => {
+      if (!prev) return prev;
+      const viajes = prev.viajes?.filter((v) => v.fila !== fila);
+      const advertenciasCiudad = prev.advertenciasCiudad?.filter(
+        (a) => a.fila !== fila,
+      );
+      return {
+        ...prev,
+        viajes,
+        advertenciasCiudad,
+        totalAdvertenciasCiudad: advertenciasCiudad?.length ?? 0,
+        exitosas: Math.max(0, prev.exitosas - 1),
+      };
+    });
+  }
+
   /** Saltea el módulo actual sin confirmarlo (ej. sin template configurado, o a propósito sin esa hoja). */
   function saltearModuloActual() {
     avanzarModulo();
+  }
+
+  /** Vuelve a previsualizar el módulo actual sin perder correcciones ya hechas — se usa después de crear entidades faltantes. */
+  function reintentarPreview() {
+    if (file) void ejecutarPreviewModulo(file, moduloIndex);
+  }
+
+  /** Crea vehículos faltantes confirmados desde el panel de previsualización y reintenta. */
+  async function crearVehiculosFaltantes(
+    items: { patente: string; tipo: string }[],
+  ) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiJson<{
+        creados: number;
+        errores: { patente: string; error: string }[];
+      }>("/api/importaciones/entidades-faltantes/vehiculos", getToken, {
+        method: "POST",
+        body: JSON.stringify({ tenantId, items }),
+      });
+      if (res.errores.length > 0) {
+        setError(res.errores.map((e) => `${e.patente}: ${e.error}`).join(" · "));
+      }
+      if (res.creados > 0) reintentarPreview();
+      return res;
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudieron crear los vehículos.",
+      );
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /** Crea entidades faltantes que solo necesitan nombre (clientes/transportistas/choferes/productos) y reintenta. */
+  async function crearEntidadesFaltantesSimple(
+    modelo: string,
+    valores: string[],
+  ) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiJson<{
+        creados: number;
+        errores: { valor: string; error: string }[];
+      }>(
+        `/api/importaciones/entidades-faltantes/${encodeURIComponent(modelo)}`,
+        getToken,
+        { method: "POST", body: JSON.stringify({ tenantId, valores }) },
+      );
+      if (res.errores.length > 0) {
+        setError(res.errores.map((e) => `${e.valor}: ${e.error}`).join(" · "));
+      }
+      if (res.creados > 0) reintentarPreview();
+      return res;
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudieron crear los registros.",
+      );
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   }
 
   function avanzarModulo() {
@@ -123,9 +317,24 @@ export function useImportWizard(
     setLoading(true);
     setError(null);
     try {
+      const body: {
+        sessionId: string;
+        tenantId: string;
+        ciudadesNormalizadas?: CiudadNormalizadaConfirm[];
+        filasExcluidas?: number[];
+      } = {
+        sessionId: preview.sessionId,
+        tenantId,
+      };
+      if (moduloActual === "viajes" && ciudadesNormalizadasRef.current.length > 0) {
+        body.ciudadesNormalizadas = ciudadesNormalizadasRef.current;
+      }
+      if (moduloActual === "viajes" && filasExcluidasRef.current.size > 0) {
+        body.filasExcluidas = [...filasExcluidasRef.current];
+      }
       const log = await apiJson<ImportLog>("/api/importaciones/confirm", getToken, {
         method: "POST",
-        body: JSON.stringify({ sessionId: preview.sessionId, tenantId }),
+        body: JSON.stringify(body),
       });
       setEtapasCompletadas((prev) => [...prev, { modulo: moduloActual, log }]);
       if (moduloActual === "viajes") {
@@ -241,11 +450,16 @@ export function useImportWizard(
   }
 
   function reset() {
+    ciudadesAbortRef.current?.abort();
+    ciudadesNormalizadasRef.current = [];
+    filasExcluidasRef.current = new Set();
+    eleccionesManualesRef.current = new Map();
     setFase("upload");
     setFile(null);
     setModuloIndex(0);
     setError(null);
     setPreview(null);
+    setValidandoCiudades(false);
     setEtapasCompletadas([]);
     setViajeIdsCreados([]);
     setLiquidacionesPreview(null);
@@ -260,6 +474,7 @@ export function useImportWizard(
     moduloActual,
     moduloIndex,
     loading,
+    validandoCiudades,
     error,
     preview,
     etapasCompletadas,
@@ -271,6 +486,11 @@ export function useImportWizard(
     startFile,
     confirmarModuloActual,
     saltearModuloActual,
+    reintentarPreview,
+    crearVehiculosFaltantes,
+    crearEntidadesFaltantesSimple,
+    elegirCiudad,
+    ignorarFila,
     pedirPreviewLiquidaciones,
     confirmarLiquidaciones,
     saltearLiquidaciones,

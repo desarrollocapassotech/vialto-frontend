@@ -495,7 +495,7 @@ export interface ImportPreviewResult {
 
 export interface ImportLogDetalle {
   fila: number;
-  estado: "ok" | "error";
+  estado: "ok" | "error" | "omitida";
   id?: string;
   mensaje?: string;
 }

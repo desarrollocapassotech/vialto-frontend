@@ -9,6 +9,7 @@ import {
 } from "@/components/listado/ListadoDatos";
 import { useImportacion } from "@/hooks/useImportacion";
 import { useImportTemplates } from "@/hooks/useImportTemplates";
+import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
 import { apiJson } from "@/lib/api";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { labelModulo } from "@/lib/platformLabels";
@@ -310,7 +311,10 @@ export function ImportacionModal({
     preview,
     log,
     submitPreview,
+    reintentarPreview,
     confirm,
+    elegirCiudad,
+    ignorarFila,
     reset,
   } = importacion;
 
@@ -459,7 +463,9 @@ export function ImportacionModal({
                   preview={preview}
                   tenantId={tenantId}
                   getToken={getToken}
-                  onEntidadesCreadas={() => void submitPreview()}
+                  onEntidadesCreadas={reintentarPreview}
+                  onElegirCiudad={elegirCiudad}
+                  onIgnorarFila={ignorarFila}
                 />
               )}
 
@@ -893,11 +899,19 @@ function PreviewPanel({
   tenantId,
   getToken,
   onEntidadesCreadas,
+  onElegirCiudad,
+  onIgnorarFila,
 }: {
   preview: import("@/types/api").ImportPreviewResult;
   tenantId: string;
   getToken: () => Promise<string | null>;
   onEntidadesCreadas: () => void;
+  onElegirCiudad: (
+    fila: number,
+    campo: "origen" | "destino",
+    valor: string,
+  ) => void;
+  onIgnorarFila: (fila: number) => void;
 }) {
   const [tab, setTab] = useState<PreviewTab>("viajes");
 
@@ -945,6 +959,49 @@ function PreviewPanel({
       );
     } finally {
       setCreandoVehiculos(false);
+    }
+  }
+
+  const otrasEntidadesFaltantes = preview.entidadesFaltantes.filter(
+    (e) => e.modelo !== "vehiculos" && e.valores.length > 0,
+  );
+  const [creandoModelo, setCreandoModelo] = useState<string | null>(null);
+  const [errorEntidades, setErrorEntidades] = useState<
+    Record<string, string>
+  >({});
+
+  async function handleCrearEntidadesSimple(
+    modelo: string,
+    valores: string[],
+  ) {
+    setCreandoModelo(modelo);
+    setErrorEntidades((prev) => ({ ...prev, [modelo]: "" }));
+    try {
+      const res = await apiJson<{
+        creados: number;
+        errores: { valor: string; error: string }[];
+      }>(
+        `/api/importaciones/entidades-faltantes/${encodeURIComponent(modelo)}`,
+        getToken,
+        { method: "POST", body: JSON.stringify({ tenantId, valores }) },
+      );
+      if (res.errores.length > 0) {
+        setErrorEntidades((prev) => ({
+          ...prev,
+          [modelo]: res.errores.map((e) => `${e.valor}: ${e.error}`).join(" · "),
+        }));
+      }
+      if (res.creados > 0) onEntidadesCreadas();
+    } catch (e) {
+      setErrorEntidades((prev) => ({
+        ...prev,
+        [modelo]:
+          e instanceof Error
+            ? e.message
+            : `No se pudieron crear los ${labelModulo(modelo).toLowerCase()}.`,
+      }));
+    } finally {
+      setCreandoModelo(null);
     }
   }
 
@@ -1085,6 +1142,47 @@ function PreviewPanel({
         </div>
       )}
 
+      {/* Otras entidades faltantes (clientes/transportistas/choferes/productos): crear y reintentar */}
+      {otrasEntidadesFaltantes.map((grupo) => (
+        <div
+          key={grupo.modelo}
+          className="space-y-2 rounded border border-vialto-charcoal/20 px-4 py-3"
+        >
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Faltan {grupo.valores.length} {labelModulo(grupo.modelo)}
+          </p>
+          <p className="text-[11px] text-vialto-steel">
+            No existen en el sistema todavía:{" "}
+            <strong>{grupo.valores.map((v) => v.valor).join(", ")}</strong>.
+            Se crean solo con el nombre — después se vuelve a previsualizar
+            el archivo automáticamente.
+          </p>
+          {errorEntidades[grupo.modelo] && (
+            <p className="text-xs text-red-700">
+              {errorEntidades[grupo.modelo]}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              handleCrearEntidadesSimple(
+                grupo.modelo,
+                grupo.valores.map((v) => v.valor),
+              )
+            }
+            disabled={creandoModelo === grupo.modelo}
+            className="inline-flex h-9 items-center gap-2 px-4 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-graphite disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {creandoModelo === grupo.modelo && (
+              <Spinner className="h-3.5 w-3.5" />
+            )}
+            {creandoModelo === grupo.modelo
+              ? "Creando…"
+              : `Crear ${grupo.valores.length} ${labelModulo(grupo.modelo).toLowerCase()} y reintentar`}
+          </button>
+        </div>
+      ))}
+
       {/* Errores */}
       {preview.detalleErrores.length > 0 && (
         <div>
@@ -1102,24 +1200,12 @@ function PreviewPanel({
         </div>
       )}
 
-      {/* Advertencias de ciudades */}
-      {advertenciasCiudad.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs uppercase tracking-wider text-vialto-steel">
-            Advertencias de ciudades (no bloquean la importación)
-          </p>
-          <div className="max-h-28 overflow-y-auto rounded border border-amber-200 bg-amber-50 text-xs divide-y divide-amber-100">
-            {advertenciasCiudad.map((a, i) => (
-              <div key={i} className="px-3 py-1.5 text-amber-900">
-                <span className="font-medium">Fila {a.fila}</span>
-                <span> · {a.campo === "origen" ? "Origen" : "Destino"}</span>
-                {" — "}
-                {a.mensaje}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Advertencias de ciudades: dejan elegir la ciudad correcta */}
+      <CiudadAdvertenciasPanel
+        advertencias={advertenciasCiudad}
+        onElegir={onElegirCiudad}
+        onIgnorarFila={onIgnorarFila}
+      />
 
       {preview.exitosas === 0 && (
         <p className="text-sm text-vialto-steel">
