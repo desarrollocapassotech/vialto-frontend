@@ -312,7 +312,10 @@ export function useImportWizard(
     if (file) await previewModuloActual(file, nextIdx);
   }
 
-  async function confirmarModuloActual(confirmarCamposFaltantes?: boolean) {
+  async function confirmarModuloActual(
+    confirmarCamposFaltantes?: boolean,
+    confirmarFacturasDuplicadas?: boolean,
+  ) {
     if (!preview || !moduloActual) return;
     setLoading(true);
     setError(null);
@@ -323,6 +326,7 @@ export function useImportWizard(
         ciudadesNormalizadas?: CiudadNormalizadaConfirm[];
         filasExcluidas?: number[];
         confirmarCamposFaltantes?: boolean;
+        confirmarFacturasDuplicadas?: boolean;
       } = {
         sessionId: preview.sessionId,
         tenantId,
@@ -335,6 +339,9 @@ export function useImportWizard(
       }
       if (confirmarCamposFaltantes) {
         body.confirmarCamposFaltantes = true;
+      }
+      if (confirmarFacturasDuplicadas) {
+        body.confirmarFacturasDuplicadas = true;
       }
       const log = await apiJson<ImportLog>("/api/importaciones/confirm", getToken, {
         method: "POST",

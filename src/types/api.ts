@@ -442,6 +442,10 @@ export interface ImportPreviewViaje {
   monedaPrecioTransportistaExterno: string | null;
   /** Advertencias de validación de catálogo (no bloquean la importación). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
+  /** true = este viaje no existe todavía (alta nueva). false = actualiza uno existente. */
+  nuevo: boolean;
+  /** Solo si `nuevo` es false: campos que cambian respecto al valor actual, con su antes/después. */
+  cambios?: { campo: string; antes: string | number | null; despues: string | number | null }[];
 }
 
 export interface ImportPreviewFactura {
@@ -489,6 +493,8 @@ export interface ImportPreviewResult {
   /** Desglose de `exitosas` entre altas y actualizaciones (upsert por nombre/patente) — no viene para todos los módulos. */
   entidadesNuevas?: number;
   entidadesActualizadas?: number;
+  /** Solo viajes: números de factura compartidos por más de un viaje nuevo (o ya existentes) — se unifican en una sola factura, requiere confirmación explícita. */
+  advertenciasFacturasDuplicadas?: { numero: string; filas: number[] }[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;
@@ -502,6 +508,10 @@ export interface ImportLogDetalle {
   fila: number;
   estado: "ok" | "error" | "omitida";
   id?: string;
+  /** Solo cuando estado="ok": true = alta nueva, false = actualizó un registro existente. */
+  creado?: boolean;
+  /** Solo viajes: true = esta fila quedó con una factura individual adjunta (por nroFactura). */
+  facturado?: boolean;
   mensaje?: string;
 }
 

@@ -4,13 +4,15 @@ import { Link } from "react-router-dom";
 import { Check, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ListadoCard } from "@/components/listado/ListadoCard";
-import {
-  ListadoDatos,
-  type ListadoColumn,
-} from "@/components/listado/ListadoDatos";
+import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { labelModulo } from "@/lib/platformLabels";
 import { modalEditOverlayClass, modalEditPanelClass } from "@/lib/modalLayers";
+import {
+  metaPaginacionCliente,
+  paginasVisibles,
+  slicePaginaCliente,
+} from "@/lib/listadoPaginacion";
 import {
   MODULOS_SECUENCIA,
   useImportWizard,
@@ -81,6 +83,17 @@ export function ImportWizard({
     Record<string, string>
   >({});
 
+  // Si el Excel ya trae número de factura por viaje, esos viajes quedan
+  // facturados individualmente al confirmar Viajes — generar facturas
+  // consolidadas acá por encima los facturaría de nuevo. Se avisa antes de
+  // que el usuario pida el preview, no después.
+  const etapaViajes = wizard.etapasCompletadas.find((e) => e.modulo === "viajes");
+  const viajesOk =
+    etapaViajes?.log.detalles.filter((d) => d.estado === "ok") ?? [];
+  const viajesYaFacturados = viajesOk.filter((d) => d.facturado).length;
+  const mayoriaYaFacturada =
+    viajesOk.length > 0 && viajesYaFacturados / viajesOk.length >= 0.5;
+
   const columnasFaltantes = wizard.error?.startsWith(
     PREFIJO_COLUMNAS_FALTANTES,
   )
@@ -134,11 +147,6 @@ export function ImportWizard({
       <div className="border border-black/10 bg-white p-6">
         {wizard.fase === "upload" && (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-vialto-steel">
-              Subí un único Excel con las hojas de Clientes, Transportes,
-              Choferes, Vehículos y Viajes. Se van a procesar en ese orden,
-              una hoja a la vez.
-            </p>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => {
@@ -233,7 +241,20 @@ export function ImportWizard({
       )}
 
       {wizard.fase === "post-facturas" && (hasArca || hasFacturacion) && (
-        <EtapaOpcional
+        <div className="flex flex-col gap-4">
+          {mayoriaYaFacturada && (
+            <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <strong>
+                {viajesYaFacturados} de {viajesOk.length}
+              </strong>{" "}
+              viajes recién creados ya tienen una factura individual (traían
+              número de factura en el Excel). Si generás facturas
+              consolidadas acá también, esos viajes quedarían facturados dos
+              veces. Si tu Excel ya factura por viaje, probablemente
+              convenga apretar "No, gracias" abajo.
+            </div>
+          )}
+          <EtapaOpcional
           titulo="Facturar a clientes"
           descripcion="Se van a agrupar los viajes recién creados por cliente."
           loading={wizard.loading}
@@ -300,31 +321,118 @@ export function ImportWizard({
               </p>
             )
           }
-        />
+          />
+        </div>
       )}
       {wizard.fase === "post-facturas" && !hasArca && !hasFacturacion && (
         <AvanceSilencioso onNext={wizard.saltearFacturas} />
       )}
 
       {wizard.fase === "terminado" && (
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-vialto-charcoal">Import terminado.</p>
-          <ul className="flex flex-col gap-1 text-sm text-vialto-steel">
-            {wizard.etapasCompletadas.map((e) => (
-              <li key={e.modulo}>
-                {labelModulo(e.modulo)}: {e.log.exitosas} creados/actualizados
-                {e.log.errores > 0 ? `, ${e.log.errores} con error` : ""}
-              </li>
-            ))}
+        <div className="flex flex-col gap-5">
+          <div>
+            <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
+              Resumen de la importación
+            </h3>
+            <p className="mt-1 text-sm text-vialto-steel">
+              Cada módulo ya quedó guardado al confirmarlo — esto es solo un
+              repaso de lo que se hizo.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {wizard.etapasCompletadas.map((e) => {
+              const creados = e.log.detalles.filter(
+                (d) => d.estado === "ok" && d.creado,
+              ).length;
+              const actualizados = e.log.detalles.filter(
+                (d) => d.estado === "ok" && d.creado === false,
+              ).length;
+              const erroresDetalle = e.log.detalles.filter(
+                (d) => d.estado === "error",
+              );
+              return (
+                <div
+                  key={e.modulo}
+                  className={[
+                    "border-l-4 bg-vialto-mist/40 px-4 py-3",
+                    e.log.errores > 0 ? "border-l-amber-400" : "border-l-green-500",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+                      {labelModulo(e.modulo)}
+                    </p>
+                    <p className="text-xs text-vialto-steel">
+                      <span className="text-green-700 font-medium">
+                        {creados} creados
+                      </span>
+                      {" · "}
+                      <span className="text-vialto-charcoal font-medium">
+                        {actualizados} actualizados
+                      </span>
+                      {e.log.errores > 0 && (
+                        <>
+                          {" · "}
+                          <span className="text-amber-700 font-medium">
+                            {e.log.errores} con error
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+
+                  {erroresDetalle.length > 0 && (
+                    <details className="group mt-2">
+                      <summary className="cursor-pointer list-none text-[11px] text-amber-800 marker:hidden">
+                        Ver detalle de errores
+                        <span className="ml-1 inline-block transition-transform group-open:rotate-180">
+                          ▾
+                        </span>
+                      </summary>
+                      <div className="mt-2 max-h-40 overflow-y-auto border border-amber-100 bg-white text-xs">
+                        {erroresDetalle.map((d, i) => (
+                          <div
+                            key={i}
+                            className="border-b border-amber-50 px-3 py-1.5 last:border-b-0"
+                          >
+                            <span className="font-medium text-vialto-charcoal">
+                              Fila {d.fila}
+                            </span>{" "}
+                            <span className="text-vialto-steel">
+                              — {d.mensaje}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+
             {wizard.liquidacionesCreadas && (
-              <li>
-                Liquidaciones borrador: {wizard.liquidacionesCreadas.length}
-              </li>
+              <div className="border-l-4 border-l-green-500 bg-vialto-mist/40 px-4 py-3">
+                <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+                  Liquidaciones borrador
+                </p>
+                <p className="text-xs text-vialto-steel">
+                  {wizard.liquidacionesCreadas.length} generadas
+                </p>
+              </div>
             )}
             {wizard.facturasCreadas && (
-              <li>Facturas: {wizard.facturasCreadas.length}</li>
+              <div className="border-l-4 border-l-green-500 bg-vialto-mist/40 px-4 py-3">
+                <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+                  Facturas
+                </p>
+                <p className="text-xs text-vialto-steel">
+                  {wizard.facturasCreadas.length} generadas
+                </p>
+              </div>
             )}
-          </ul>
+          </div>
+
           <Link
             to={backTo}
             className="self-start border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
@@ -351,7 +459,7 @@ function WizardStepper({
     ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
     ...(hasArca ? [{ key: "post-liquidaciones", label: "Liquidaciones" }] : []),
     ...(hasArca || hasFacturacion
-      ? [{ key: "post-facturas", label: "Facturas" }]
+      ? [{ key: "post-facturas", label: "Resumen" }]
       : []),
   ];
 
@@ -466,7 +574,11 @@ function EtapaModulo({
     {},
   );
   const [tab, setTab] = useState<PreviewTab>("viajes");
+  const [tablaPage, setTablaPage] = useState(1);
+  const TABLA_PAGE_SIZE = tab === "viajes" ? 5 : 10;
   const [confirmarCamposFaltantes, setConfirmarCamposFaltantes] =
+    useState(false);
+  const [confirmarFacturasDuplicadas, setConfirmarFacturasDuplicadas] =
     useState(false);
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
   const [detalleModalOpen, setDetalleModalOpen] = useState(false);
@@ -474,6 +586,7 @@ function EtapaModulo({
   // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
+    setConfirmarFacturasDuplicadas(false);
   }, [p?.sessionId]);
 
   const vehiculosFaltantes = p?.entidadesFaltantes.find(
@@ -501,6 +614,10 @@ function EtapaModulo({
   const requiereConfirmarCamposFaltantes =
     advertenciasCamposFaltantes.length > 0 && !confirmarCamposFaltantes;
   const requiereResolverCiudades = advertenciasCiudad.length > 0;
+  const advertenciasFacturasDuplicadas =
+    p?.advertenciasFacturasDuplicadas ?? [];
+  const requiereConfirmarFacturasDuplicadas =
+    advertenciasFacturasDuplicadas.length > 0 && !confirmarFacturasDuplicadas;
   const tieneDesgloseActualizacion =
     p != null &&
     p.entidadesNuevas != null &&
@@ -740,6 +857,37 @@ function EtapaModulo({
             </div>
           )}
 
+          {advertenciasFacturasDuplicadas.length > 0 && (
+            <div className="space-y-2.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <p>
+                <strong>{advertenciasFacturasDuplicadas.length}</strong>{" "}
+                número{advertenciasFacturasDuplicadas.length !== 1 ? "s" : ""}{" "}
+                de factura repetido
+                {advertenciasFacturasDuplicadas.length !== 1 ? "s" : ""} entre
+                varios viajes nuevos:{" "}
+                <strong>
+                  {advertenciasFacturasDuplicadas
+                    .map((d) => d.numero)
+                    .join(", ")}
+                </strong>
+                . Se van a unificar en una sola factura por número (sumando
+                el importe), en vez de crear una factura duplicada por cada
+                viaje.
+              </p>
+              <label className="flex items-center justify-end gap-2.5 border-t border-amber-200 pt-2.5 text-sm font-semibold text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={confirmarFacturasDuplicadas}
+                  onChange={(e) =>
+                    setConfirmarFacturasDuplicadas(e.target.checked)
+                  }
+                  className="h-5 w-5 accent-vialto-charcoal"
+                />
+                Entiendo, unificar estas facturas
+              </label>
+            </div>
+          )}
+
           {p.detalleErrores.length > 0 && (
             <div className="max-h-40 overflow-y-auto border border-red-100">
               <table className="w-full text-xs">
@@ -768,9 +916,9 @@ function EtapaModulo({
               <button
                 type="button"
                 onClick={() => setDetalleModalOpen(true)}
-                className="self-start border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal hover:bg-vialto-mist"
+                className="self-end border border-vialto-charcoal bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm hover:bg-black"
               >
-                Ver detalle de filas →
+                Ver cambios →
               </button>
             )}
         </fieldset>
@@ -791,22 +939,27 @@ function EtapaModulo({
                 wizard.loading ||
                 p.exitosas === 0 ||
                 requiereConfirmarCamposFaltantes ||
-                requiereResolverCiudades
+                requiereResolverCiudades ||
+                requiereConfirmarFacturasDuplicadas
               }
               onClick={() =>
-                void wizard.confirmarModuloActual(confirmarCamposFaltantes)
+                void wizard.confirmarModuloActual(
+                  confirmarCamposFaltantes,
+                  confirmarFacturasDuplicadas,
+                )
               }
               title={
                 requiereResolverCiudades
                   ? "Resolvé las ciudades pendientes para continuar"
-                  : requiereConfirmarCamposFaltantes
+                  : requiereConfirmarCamposFaltantes ||
+                      requiereConfirmarFacturasDuplicadas
                     ? "Marcá la casilla de arriba para confirmar"
                     : undefined
               }
               className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
             >
               {wizard.loading && <Spinner className="h-3.5 w-3.5" />}
-              {wizard.loading ? "Confirmando…" : "Confirmar y continuar"}
+              {wizard.loading ? "Guardando…" : "Guardar y continuar"}
             </button>
         </div>
       )}
@@ -859,8 +1012,8 @@ function EtapaModulo({
           }}
         >
           <div className={modalEditPanelClass}>
-            <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
-              <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+            <div className="flex items-center justify-between border-b border-black/10 px-6 py-3">
+              <h2 className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal">
                 Detalle de filas
               </h2>
               <button
@@ -871,7 +1024,7 @@ function EtapaModulo({
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-5 py-3">
               <div className="flex border-b border-black/10">
                 {(
                   [
@@ -902,7 +1055,10 @@ function EtapaModulo({
                     <button
                       key={key}
                       type="button"
-                      onClick={() => setTab(key)}
+                      onClick={() => {
+                        setTab(key);
+                        setTablaPage(1);
+                      }}
                       className={[
                         "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
                         tab === key
@@ -915,20 +1071,111 @@ function EtapaModulo({
                   ))}
               </div>
 
-              <div className="mt-3 overflow-x-auto">
-                {tab === "viajes" && hasViajes && (
-                  <ViajesTable viajes={p.viajes!} />
-                )}
-                {tab === "facturas" && hasFacturas && (
-                  <FacturasTable facturas={p.facturas!} />
-                )}
-                {tab === "clientes" && hasClientes && (
-                  <EntidadTable entidades={p.clientes!} />
-                )}
-                {tab === "transportistas" && hasTransportistas && (
-                  <EntidadTable entidades={p.transportistas!} />
-                )}
-              </div>
+              {(() => {
+                const items: unknown[] =
+                  (tab === "viajes" && hasViajes && p.viajes) ||
+                  (tab === "facturas" && hasFacturas && p.facturas) ||
+                  (tab === "clientes" && hasClientes && p.clientes) ||
+                  (tab === "transportistas" &&
+                    hasTransportistas &&
+                    p.transportistas) ||
+                  [];
+                const meta = metaPaginacionCliente(
+                  items.length,
+                  tablaPage,
+                  TABLA_PAGE_SIZE,
+                );
+                return (
+                  <>
+                    <div className="mt-2 overflow-x-auto">
+                      {tab === "viajes" && hasViajes && (
+                        <ViajesCambiosList
+                          viajes={slicePaginaCliente(
+                            p.viajes!,
+                            tablaPage,
+                            TABLA_PAGE_SIZE,
+                          )}
+                        />
+                      )}
+                      {tab === "facturas" && hasFacturas && (
+                        <FacturasTable
+                          facturas={slicePaginaCliente(
+                            p.facturas!,
+                            tablaPage,
+                            TABLA_PAGE_SIZE,
+                          )}
+                        />
+                      )}
+                      {tab === "clientes" && hasClientes && (
+                        <EntidadTable
+                          entidades={slicePaginaCliente(
+                            p.clientes!,
+                            tablaPage,
+                            TABLA_PAGE_SIZE,
+                          )}
+                        />
+                      )}
+                      {tab === "transportistas" && hasTransportistas && (
+                        <EntidadTable
+                          entidades={slicePaginaCliente(
+                            p.transportistas!,
+                            tablaPage,
+                            TABLA_PAGE_SIZE,
+                          )}
+                        />
+                      )}
+                    </div>
+                    {meta.totalPages > 1 && (
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                        <span className="text-vialto-steel">
+                          Página {meta.page} de {meta.totalPages} ·{" "}
+                          {meta.total} filas
+                        </span>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={!meta.hasPrev}
+                            onClick={() =>
+                              setTablaPage((p) => Math.max(1, p - 1))
+                            }
+                            className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Anterior
+                          </button>
+                          {paginasVisibles(meta.page, meta.totalPages).map(
+                            (n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => setTablaPage(n)}
+                                aria-current={n === meta.page ? "page" : undefined}
+                                className={[
+                                  "h-8 min-w-8 px-2 border text-xs tabular-nums",
+                                  n === meta.page
+                                    ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                                    : "border-black/20 text-vialto-charcoal hover:bg-vialto-mist/80",
+                                ].join(" ")}
+                              >
+                                {n}
+                              </button>
+                            ),
+                          )}
+                          <button
+                            type="button"
+                            disabled={!meta.hasNext}
+                            onClick={() =>
+                              setTablaPage((p) => Math.min(meta.totalPages, p + 1))
+                            }
+                            className="h-8 min-w-8 border border-black/20 px-2 text-xs uppercase tracking-wider hover:bg-vialto-mist/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -937,151 +1184,96 @@ function EtapaModulo({
   );
 }
 
-function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
-  const fmt = (v: unknown) => (v != null ? String(v) : "—");
-  const money = (v: number | null) =>
-    v != null ? `$${v.toLocaleString("es-AR")}` : "—";
-  const hasChofer = viajes.some((v) => v.chofer);
-  const hasVehiculo = viajes.some((v) => v.vehiculo);
+/** Campos que se muestran para una fila nueva, o que se comparan antes/después para una que actualiza. */
+const CAMPOS_VIAJE_MOSTRAR: { key: keyof ImportPreviewViaje; label: string }[] = [
+  { key: "cliente", label: "Cliente" },
+  { key: "transporte", label: "Transporte" },
+  { key: "chofer", label: "Chofer" },
+  { key: "vehiculo", label: "Vehículo" },
+  { key: "origen", label: "Origen" },
+  { key: "destino", label: "Destino" },
+  { key: "fechaCarga", label: "F. Carga" },
+  { key: "fechaDescarga", label: "F. Descarga" },
+  { key: "detalleCarga", label: "Carga" },
+  { key: "monto", label: "Monto" },
+  { key: "monedaMonto", label: "Moneda" },
+  { key: "nroFactura", label: "Nro FC" },
+  { key: "precioTransportistaExterno", label: "Flete" },
+  { key: "monedaPrecioTransportistaExterno", label: "Moneda Flete" },
+];
 
-  function advertenciaCampo(
-    v: ImportPreviewViaje,
-    campo: "origen" | "destino",
-  ) {
-    return v.advertenciasCiudad?.find((a) => a.campo === campo);
-  }
+function ViajesCambiosList({ viajes }: { viajes: ImportPreviewViaje[] }) {
+  const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "—");
 
-  function celdaUbicacion(v: ImportPreviewViaje, campo: "origen" | "destino") {
-    const valor = fmt(v[campo]);
-    const adv = advertenciaCampo(v, campo);
-    if (!adv) return valor;
+  if (viajes.length === 0) {
     return (
-      <span className="inline-flex flex-col gap-0.5">
-        <span>{valor}</span>
-        <span
-          className="text-[10px] font-medium text-amber-700"
-          title={adv.mensaje}
-        >
-          ⚠ {adv.mensaje}
-        </span>
-      </span>
+      <p className="px-1 py-6 text-center text-sm text-vialto-steel">
+        No hay viajes en esta página.
+      </p>
     );
   }
 
-  const columns: ListadoColumn<ImportPreviewViaje>[] = [
-    {
-      id: "fila",
-      header: "Fila",
-      primary: true,
-      cell: (v) => v.fila,
-      tdClassName: `${listadoTablaTdClass} text-vialto-steel text-xs`,
-    },
-    { id: "cliente", header: "Cliente", cell: (v) => fmt(v.cliente) },
-    { id: "transporte", header: "Transporte", cell: (v) => fmt(v.transporte) },
-    {
-      id: "origen",
-      header: "Origen",
-      cell: (v) => celdaUbicacion(v, "origen"),
-    },
-    {
-      id: "destino",
-      header: "Destino",
-      cell: (v) => celdaUbicacion(v, "destino"),
-    },
-    ...(hasChofer
-      ? [
-          {
-            id: "chofer",
-            header: "Chofer",
-            cell: (v: ImportPreviewViaje) => fmt(v.chofer),
-          },
-        ]
-      : []),
-    ...(hasVehiculo
-      ? [
-          {
-            id: "vehiculo",
-            header: "Vehículo",
-            cell: (v: ImportPreviewViaje) => fmt(v.vehiculo),
-          },
-        ]
-      : []),
-    { id: "fechaCarga", header: "F. Carga", cell: (v) => fmt(v.fechaCarga) },
-    {
-      id: "fechaDescarga",
-      header: "F. Descarga",
-      cell: (v) => fmt(v.fechaDescarga),
-    },
-    { id: "carga", header: "Carga", cell: (v) => fmt(v.detalleCarga) },
-    { id: "monto", header: "Monto", cell: (v) => money(v.monto) },
-    { id: "moneda", header: "Moneda", cell: (v) => fmt(v.monedaMonto) },
-    { id: "nroFc", header: "Nro FC", cell: (v) => fmt(v.nroFactura) },
-    {
-      id: "flete",
-      header: "Flete",
-      cell: (v) => money(v.precioTransportistaExterno),
-    },
-    {
-      id: "monedaFlete",
-      header: "Moneda Flete",
-      cell: (v) => fmt(v.monedaPrecioTransportistaExterno),
-    },
-  ];
-
   return (
-    <ListadoDatos
-      columns={columns}
-      rows={viajes}
-      rowKey={(v) => String(v.fila)}
-      emptyMessage="No hay viajes en la vista previa."
-      renderMobileCard={(v) => {
-        const advOrigen = advertenciaCampo(v, "origen");
-        const advDestino = advertenciaCampo(v, "destino");
-        return (
-          <ListadoCard
-            primary={`Fila ${v.fila} · ${fmt(v.cliente)}`}
-            fields={[
-              { label: "Transporte", value: fmt(v.transporte) },
-              {
-                label: "Origen",
-                value: advOrigen ? (
-                  <span className="text-amber-700">
-                    {fmt(v.origen)} — {advOrigen.mensaje}
+    <div className="divide-y divide-black/10 border border-black/10">
+      {viajes.map((v) => (
+        <div key={v.fila} className="px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-vialto-charcoal">
+              Fila {v.fila} · {fmt(v.cliente)}
+            </p>
+            {v.nuevo ? (
+              <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
+                Nuevo
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                Actualiza
+              </span>
+            )}
+          </div>
+
+          {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              ⚠ Tiene ciudad sin confirmar — revisala en "Revisar ciudades".
+            </p>
+          )}
+
+          {v.nuevo ? (
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
+              {CAMPOS_VIAJE_MOSTRAR.filter(
+                (c) => v[c.key] != null && v[c.key] !== "",
+              ).map((c) => (
+                <div key={c.key}>
+                  <dt className="text-[10px] uppercase tracking-wider text-vialto-steel">
+                    {c.label}
+                  </dt>
+                  <dd className="text-vialto-charcoal">{fmt(v[c.key])}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : v.cambios && v.cambios.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {v.cambios.map((c, i) => (
+                <div key={i} className="text-xs">
+                  <span className="font-medium text-vialto-charcoal">
+                    {c.campo}:
+                  </span>{" "}
+                  <span className="text-vialto-steel line-through decoration-red-400">
+                    {fmt(c.antes)}
                   </span>
-                ) : (
-                  fmt(v.origen)
-                ),
-              },
-              {
-                label: "Destino",
-                value: advDestino ? (
-                  <span className="text-amber-700">
-                    {fmt(v.destino)} — {advDestino.mensaje}
+                  <span className="mx-1 text-vialto-steel">→</span>
+                  <span className="font-medium text-vialto-charcoal">
+                    {fmt(c.despues)}
                   </span>
-                ) : (
-                  fmt(v.destino)
-                ),
-              },
-              ...(hasChofer ? [{ label: "Chofer", value: fmt(v.chofer) }] : []),
-              ...(hasVehiculo
-                ? [{ label: "Vehículo", value: fmt(v.vehiculo) }]
-                : []),
-              { label: "F. Carga", value: fmt(v.fechaCarga) },
-              { label: "F. Descarga", value: fmt(v.fechaDescarga) },
-              { label: "Carga", value: fmt(v.detalleCarga) },
-              { label: "Monto", value: money(v.monto) },
-              { label: "Moneda", value: fmt(v.monedaMonto) },
-              { label: "Nro FC", value: fmt(v.nroFactura) },
-              { label: "Flete", value: money(v.precioTransportistaExterno) },
-              {
-                label: "Moneda Flete",
-                value: fmt(v.monedaPrecioTransportistaExterno),
-              },
-            ]}
-          />
-        );
-      }}
-    />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-vialto-steel">Sin cambios.</p>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

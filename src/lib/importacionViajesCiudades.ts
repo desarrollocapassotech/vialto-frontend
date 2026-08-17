@@ -11,6 +11,32 @@ export type CiudadNormalizadaConfirm = {
   destino?: string | null;
 };
 
+type CambioCampo = NonNullable<ImportPreviewViaje["cambios"]>[number];
+
+/**
+ * Sincroniza el diff de "Ver cambios" con el valor final de ciudad ya
+ * resuelto (canónico o elegido a mano) — el diff se computó en el backend
+ * con el texto crudo del Excel, así que sin este ajuste seguiría mostrando
+ * la ortografía original en vez de la corregida. Si el valor final termina
+ * siendo igual al actual en base, el campo deja de ser un cambio real.
+ */
+function sincronizarCambioCiudad(
+  cambios: CambioCampo[] | undefined,
+  campoLabel: "Origen" | "Destino",
+  valorFinal: string,
+): CambioCampo[] | undefined {
+  if (!cambios) return cambios;
+  const idx = cambios.findIndex((c) => c.campo === campoLabel);
+  if (idx === -1) return cambios;
+  if (cambios[idx].antes === valorFinal) {
+    return cambios.filter((_, i) => i !== idx);
+  }
+  if (cambios[idx].despues === valorFinal) return cambios;
+  const next = [...cambios];
+  next[idx] = { ...next[idx], despues: valorFinal };
+  return next;
+}
+
 /** Aplica la elección de ciudad de una fila al preview: pisa el valor y saca la advertencia de esa fila+campo. */
 export function aplicarEleccionCiudad(
   preview: ImportPreviewResult,
@@ -18,6 +44,7 @@ export function aplicarEleccionCiudad(
   campo: "origen" | "destino",
   valor: string,
 ): ImportPreviewResult {
+  const campoLabel = campo === "origen" ? "Origen" : "Destino";
   const viajes = preview.viajes?.map((v) =>
     v.fila === fila
       ? {
@@ -26,6 +53,7 @@ export function aplicarEleccionCiudad(
           advertenciasCiudad: v.advertenciasCiudad?.filter(
             (a) => a.campo !== campo,
           ),
+          cambios: sincronizarCambioCiudad(v.cambios, campoLabel, valor),
         }
       : v,
   );
@@ -141,10 +169,19 @@ export async function enriquecerPreviewImportacionViajes(
         ciudadesNormalizadas.push(patch);
       }
 
+      let cambios = viaje.cambios;
+      if (patch.origen !== undefined) {
+        cambios = sincronizarCambioCiudad(cambios, "Origen", origen ?? "");
+      }
+      if (patch.destino !== undefined) {
+        cambios = sincronizarCambioCiudad(cambios, "Destino", destino ?? "");
+      }
+
       const row: ImportPreviewViaje = {
         ...viaje,
         origen,
         destino,
+        cambios,
         ...(advertenciasCiudad.length > 0 ? { advertenciasCiudad } : {}),
       };
       return row;
