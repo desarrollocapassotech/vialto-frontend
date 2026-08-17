@@ -486,6 +486,9 @@ export interface ImportPreviewResult {
   entidadesFaltantes: ImportEntidadesFaltantesModelo[];
   /** Filas que se importarían igual pero con algún campo recomendado (ej. CUIT/país) vacío — requieren confirmación explícita. */
   advertenciasCamposFaltantes: { fila: number; campos: string[] }[];
+  /** Desglose de `exitosas` entre altas y actualizaciones (upsert por nombre/patente) — no viene para todos los módulos. */
+  entidadesNuevas?: number;
+  entidadesActualizadas?: number;
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;

@@ -10,6 +10,7 @@ import {
 } from "@/components/listado/ListadoDatos";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { labelModulo } from "@/lib/platformLabels";
+import { modalEditOverlayClass, modalEditPanelClass } from "@/lib/modalLayers";
 import {
   MODULOS_SECUENCIA,
   useImportWizard,
@@ -408,10 +409,13 @@ function StatBox({
   label,
   value,
   highlight,
+  caption,
 }: {
   label: string;
   value: number;
   highlight?: "ok" | "error" | "warn";
+  /** Línea chica opcional debajo del label, ej. desglose "N nuevas · N a actualizar". */
+  caption?: string;
 }) {
   return (
     <div
@@ -443,6 +447,9 @@ function StatBox({
       <p className="mt-0.5 text-[11px] uppercase tracking-wider text-vialto-steel">
         {label}
       </p>
+      {caption && (
+        <p className="mt-0.5 text-[10px] text-vialto-steel/80">{caption}</p>
+      )}
     </div>
   );
 }
@@ -461,6 +468,8 @@ function EtapaModulo({
   const [tab, setTab] = useState<PreviewTab>("viajes");
   const [confirmarCamposFaltantes, setConfirmarCamposFaltantes] =
     useState(false);
+  const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
+  const [detalleModalOpen, setDetalleModalOpen] = useState(false);
   // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
   // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
   useEffect(() => {
@@ -491,6 +500,18 @@ function EtapaModulo({
   );
   const requiereConfirmarCamposFaltantes =
     advertenciasCamposFaltantes.length > 0 && !confirmarCamposFaltantes;
+  const requiereResolverCiudades = advertenciasCiudad.length > 0;
+  const tieneDesgloseActualizacion =
+    p != null &&
+    p.entidadesNuevas != null &&
+    p.entidadesActualizadas != null &&
+    p.entidadesActualizadas > 0;
+
+  // Si el usuario resolvió (o excluyó) la última ciudad pendiente estando
+  // dentro del modal, se cierra solo.
+  useEffect(() => {
+    if (advertenciasCiudad.length === 0) setCiudadesModalOpen(false);
+  }, [advertenciasCiudad.length]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -508,9 +529,18 @@ function EtapaModulo({
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
             <StatBox
-              label={`${labelModulo(wizard.moduloActual ?? "")} a crear`}
+              label={
+                tieneDesgloseActualizacion
+                  ? `${labelModulo(wizard.moduloActual ?? "")} a importar`
+                  : `${labelModulo(wizard.moduloActual ?? "")} a crear`
+              }
               value={p.exitosas}
               highlight="ok"
+              caption={
+                tieneDesgloseActualizacion
+                  ? `${p.entidadesNuevas} nuevas · ${p.entidadesActualizadas} a actualizar`
+                  : undefined
+              }
             />
             <StatBox
               label="Filas con error"
@@ -568,11 +598,22 @@ function EtapaModulo({
             </details>
           )}
 
-          <CiudadAdvertenciasPanel
-            advertencias={advertenciasCiudad}
-            onElegir={wizard.elegirCiudad}
-            onIgnorarFila={wizard.ignorarFila}
-          />
+          {advertenciasCiudad.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <span>
+                <strong>{advertenciasCiudad.length}</strong> ciudad
+                {advertenciasCiudad.length !== 1 ? "es" : ""} sin confirmar —
+                hay que resolverlas para poder continuar.
+              </span>
+              <button
+                type="button"
+                onClick={() => setCiudadesModalOpen(true)}
+                className="shrink-0 border border-amber-300 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-amber-900 hover:bg-amber-100"
+              >
+                Revisar ciudades
+              </button>
+            </div>
+          )}
 
           {vehiculosFaltantes && vehiculosFaltantes.valores.length > 0 && (
             <div className="flex flex-col gap-2 border border-vialto-charcoal/20 px-4 py-3">
@@ -724,63 +765,13 @@ function EtapaModulo({
 
           {p.exitosas > 0 &&
             (hasViajes || hasFacturas || hasClientes || hasTransportistas) && (
-              <>
-                <div className="flex border-b border-black/10">
-                  {(
-                    [
-                      {
-                        key: "viajes",
-                        label: `Viajes (${p.viajes?.length ?? 0})`,
-                        show: hasViajes,
-                      },
-                      {
-                        key: "facturas",
-                        label: `Facturas (${p.facturas?.length ?? 0})`,
-                        show: hasFacturas,
-                      },
-                      {
-                        key: "clientes",
-                        label: `Clientes (${p.clientes?.length ?? 0})${nuevosClientes > 0 ? ` · ${nuevosClientes} nuevos` : ""}`,
-                        show: hasClientes,
-                      },
-                      {
-                        key: "transportistas",
-                        label: `Transportistas (${p.transportistas?.length ?? 0})${nuevosTransp > 0 ? ` · ${nuevosTransp} nuevos` : ""}`,
-                        show: hasTransportistas,
-                      },
-                    ] as { key: PreviewTab; label: string; show: boolean }[]
-                  )
-                    .filter((t) => t.show)
-                    .map(({ key, label }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setTab(key)}
-                        className={[
-                          "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
-                          tab === key
-                            ? "border-vialto-fire text-vialto-fire"
-                            : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
-                        ].join(" ")}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                </div>
-
-                {tab === "viajes" && hasViajes && (
-                  <ViajesTable viajes={p.viajes!} />
-                )}
-                {tab === "facturas" && hasFacturas && (
-                  <FacturasTable facturas={p.facturas!} />
-                )}
-                {tab === "clientes" && hasClientes && (
-                  <EntidadTable entidades={p.clientes!} />
-                )}
-                {tab === "transportistas" && hasTransportistas && (
-                  <EntidadTable entidades={p.transportistas!} />
-                )}
-              </>
+              <button
+                type="button"
+                onClick={() => setDetalleModalOpen(true)}
+                className="self-start border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                Ver detalle de filas →
+              </button>
             )}
         </fieldset>
       )}
@@ -799,21 +790,147 @@ function EtapaModulo({
               disabled={
                 wizard.loading ||
                 p.exitosas === 0 ||
-                requiereConfirmarCamposFaltantes
+                requiereConfirmarCamposFaltantes ||
+                requiereResolverCiudades
               }
               onClick={() =>
                 void wizard.confirmarModuloActual(confirmarCamposFaltantes)
               }
               title={
-                requiereConfirmarCamposFaltantes
-                  ? "Marcá la casilla de arriba para confirmar"
-                  : undefined
+                requiereResolverCiudades
+                  ? "Resolvé las ciudades pendientes para continuar"
+                  : requiereConfirmarCamposFaltantes
+                    ? "Marcá la casilla de arriba para confirmar"
+                    : undefined
               }
               className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
             >
               {wizard.loading && <Spinner className="h-3.5 w-3.5" />}
               {wizard.loading ? "Confirmando…" : "Confirmar y continuar"}
             </button>
+        </div>
+      )}
+
+      {p && ciudadesModalOpen && (
+        <div
+          className={modalEditOverlayClass}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCiudadesModalOpen(false);
+          }}
+        >
+          <div className={modalEditPanelClass}>
+            <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
+              <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+                Ciudades a confirmar
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCiudadesModalOpen(false)}
+                className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none px-2"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <CiudadAdvertenciasPanel
+                advertencias={advertenciasCiudad}
+                onElegir={wizard.elegirCiudad}
+                onIgnorarFila={wizard.ignorarFila}
+              />
+            </div>
+            <div className="flex justify-end border-t border-black/10 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setCiudadesModalOpen(false)}
+                className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {p && detalleModalOpen && (
+        <div
+          className={modalEditOverlayClass}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDetalleModalOpen(false);
+          }}
+        >
+          <div className={modalEditPanelClass}>
+            <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
+              <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
+                Detalle de filas
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDetalleModalOpen(false)}
+                className="text-vialto-steel hover:text-vialto-charcoal text-xl leading-none px-2"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="flex border-b border-black/10">
+                {(
+                  [
+                    {
+                      key: "viajes",
+                      label: `Viajes (${p.viajes?.length ?? 0})`,
+                      show: hasViajes,
+                    },
+                    {
+                      key: "facturas",
+                      label: `Facturas (${p.facturas?.length ?? 0})`,
+                      show: hasFacturas,
+                    },
+                    {
+                      key: "clientes",
+                      label: `Clientes (${p.clientes?.length ?? 0})${nuevosClientes > 0 ? ` · ${nuevosClientes} nuevos` : ""}`,
+                      show: hasClientes,
+                    },
+                    {
+                      key: "transportistas",
+                      label: `Transportistas (${p.transportistas?.length ?? 0})${nuevosTransp > 0 ? ` · ${nuevosTransp} nuevos` : ""}`,
+                      show: hasTransportistas,
+                    },
+                  ] as { key: PreviewTab; label: string; show: boolean }[]
+                )
+                  .filter((t) => t.show)
+                  .map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setTab(key)}
+                      className={[
+                        "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
+                        tab === key
+                          ? "border-vialto-fire text-vialto-fire"
+                          : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
+                      ].join(" ")}
+                    >
+                      {label}
+                    </button>
+                  ))}
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                {tab === "viajes" && hasViajes && (
+                  <ViajesTable viajes={p.viajes!} />
+                )}
+                {tab === "facturas" && hasFacturas && (
+                  <FacturasTable facturas={p.facturas!} />
+                )}
+                {tab === "clientes" && hasClientes && (
+                  <EntidadTable entidades={p.clientes!} />
+                )}
+                {tab === "transportistas" && hasTransportistas && (
+                  <EntidadTable entidades={p.transportistas!} />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
