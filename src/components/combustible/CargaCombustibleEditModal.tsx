@@ -18,9 +18,10 @@ import type { CargaCombustible } from "@/types/api";
 
 function toUtcDateString(isoDate: string | null | undefined) {
   if (!isoDate) return "";
-  const d = new Date(isoDate);
-  if (isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+  if (typeof isoDate === "string" && isoDate.length >= 10) {
+    return isoDate.slice(0, 10);
+  }
+  return "";
 }
 
 function normalizeFormaPago(val: string | null | undefined): string {
@@ -152,7 +153,7 @@ export function CargaCombustibleEditModal({
     const fechaStr = fd.get("fecha") as string;
 
     const [year, month, day] = fechaStr.split("-").map(Number);
-    const payloadDate = new Date(year, month - 1, day, 12, 0, 0);
+    const payloadDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 
     const payload = {
       fecha: payloadDate.toISOString(),

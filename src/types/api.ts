@@ -289,6 +289,8 @@ export interface Tenant {
   whiteLabelDomain: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
+  /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
+  importacionesOcultas: boolean;
   createdAt: string;
 }
 
@@ -438,13 +440,17 @@ export interface ImportPreviewViaje {
   nroFactura: string | null;
   precioTransportistaExterno: number | null;
   monedaPrecioTransportistaExterno: string | null;
-  nroFacturaTransporte: string | null;
   /** Advertencias de validación de catálogo (no bloquean la importación). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
+  /** true = este viaje no existe todavía (alta nueva). false = actualiza uno existente. */
+  nuevo: boolean;
+  /** Solo si `nuevo` es false: campos que cambian respecto al valor actual, con su antes/después. */
+  cambios?: { campo: string; antes: string | number | null; despues: string | number | null }[];
 }
 
 export interface ImportPreviewFactura {
-  tipo: "cliente" | "transportista_externo";
+  /** Siempre "cliente": el pago al transportista se liquida por afuera (Liquidaciones), no como Factura. */
+  tipo: "cliente";
   numero: string;
   nombre: string | null;
   importe: number;
@@ -457,6 +463,17 @@ export interface ImportPreviewEntidad {
   esNuevo: boolean;
 }
 
+export interface ImportEntidadFaltante {
+  valor: string;
+  /** Sugerencia por una regla simple (posición en el par tractor/semirremolque), no IA. */
+  tipoSugerido?: string | null;
+}
+
+export interface ImportEntidadesFaltantesModelo {
+  modelo: string;
+  valores: ImportEntidadFaltante[];
+}
+
 export interface ImportPreviewResult {
   sessionId: string;
   modulo: string;
@@ -465,6 +482,19 @@ export interface ImportPreviewResult {
   exitosas: number;
   errores: number;
   detalleErrores: ImportRowError[];
+  /** Columnas del Excel que no matchean ningún campo del template — van a texto libre en Observaciones. */
+  headersNoMapeados: string[];
+  /** Columnas del template (no obligatorias) que no se encontraron en el Excel. */
+  columnasOpcionalesFaltantes: string[];
+  /** Entidades referenciadas por lookup que no existen todavía, agrupadas por modelo. */
+  entidadesFaltantes: ImportEntidadesFaltantesModelo[];
+  /** Filas que se importarían igual pero con algún campo recomendado (ej. CUIT/país) vacío — requieren confirmación explícita. */
+  advertenciasCamposFaltantes: { fila: number; campos: string[] }[];
+  /** Desglose de `exitosas` entre altas y actualizaciones (upsert por nombre/patente) — no viene para todos los módulos. */
+  entidadesNuevas?: number;
+  entidadesActualizadas?: number;
+  /** Solo viajes: números de factura compartidos por más de un viaje nuevo (o ya existentes) — se unifican en una sola factura, requiere confirmación explícita. */
+  advertenciasFacturasDuplicadas?: { numero: string; filas: number[] }[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;
@@ -476,8 +506,12 @@ export interface ImportPreviewResult {
 
 export interface ImportLogDetalle {
   fila: number;
-  estado: "ok" | "error";
+  estado: "ok" | "error" | "omitida";
   id?: string;
+  /** Solo cuando estado="ok": true = alta nueva, false = actualizó un registro existente. */
+  creado?: boolean;
+  /** Solo viajes: true = esta fila quedó con una factura individual adjunta (por nroFactura). */
+  facturado?: boolean;
   mensaje?: string;
 }
 
@@ -495,11 +529,41 @@ export interface ImportLog {
   createdBy: string;
 }
 
+/** Preview de una liquidación borrador a generar (agrupada por transportista), etapa opcional posterior a Viajes. */
+export interface ImportLiquidacionPreviewGrupo {
+  transportistaId: string;
+  transportistaNombre: string;
+  cantidadViajes: number;
+  periodoDesde: string;
+  periodoHasta: string;
+  bruto: number;
+}
+
+/** Preview de una factura a cliente a generar (agrupada por cliente), etapa opcional posterior a Viajes. */
+export interface ImportFacturaClientePreviewGrupo {
+  clienteId: string;
+  clienteNombre: string;
+  cantidadViajes: number;
+  importe: number;
+  moneda: string;
+}
+
 export interface ImportTemplate {
   id: string;
   modulo: string;
   nombre: string;
   activo: boolean;
+  config: {
+    sheet?: string | number;
+    headerRow?: number;
+    columns: Array<{
+      field: string;
+      excelHeader: string;
+      required?: boolean;
+      defaultValue?: string;
+      createIfNotFound?: boolean;
+    }>;
+  };
   updatedAt: string;
 }
 

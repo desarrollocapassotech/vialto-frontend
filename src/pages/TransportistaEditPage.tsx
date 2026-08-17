@@ -49,11 +49,15 @@ export function TransportistaEditPage() {
   const [permisoInternacional, setPermisoInternacional] = useState("");
   const [fechaVencimientoPermiso, setFechaVencimientoPermiso] = useState("");
   const [confirmDelete, setConfirmDelete] = useState("");
+  const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
+    useState(false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const faltanDatosFiscales = !pais || !idFiscal.trim();
 
   useEffect(() => {
     if (!id) return;
@@ -118,11 +122,6 @@ export function TransportistaEditPage() {
     if (!id) return;
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "Ingresá el nombre del transportista.";
-    if (!pais) errs.pais = "Seleccioná el país del transportista.";
-    if (!idFiscal.trim()) {
-      const label = pais ? idFiscalPorPais(pais).label : "ID fiscal";
-      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
-    }
     if (telefono.trim() && !isValidPhoneNumber(telefono)) {
       errs.telefono = "Ingresá un teléfono válido para el país seleccionado.";
     }
@@ -130,7 +129,9 @@ export function TransportistaEditPage() {
       setFieldErrors(errs);
       return;
     }
-    const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
+    const errorFiscal = idFiscal.trim()
+      ? validarIdFiscal(pais, idFiscal.trim())
+      : null;
     if (errorFiscal) {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
@@ -146,7 +147,7 @@ export function TransportistaEditPage() {
         method: "PATCH",
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais,
+          pais: pais || "",
           idFiscal: idFiscal.trim(),
           email: email.trim(),
           telefono: telefono,
@@ -157,6 +158,9 @@ export function TransportistaEditPage() {
           paut: paut.trim(),
           permisoInternacional: permisoInternacional.trim(),
           fechaVencimientoPermiso: fechaVencimientoPermiso || null,
+          confirmarSinDatosFiscales: faltanDatosFiscales
+            ? confirmarSinDatosFiscales
+            : undefined,
         }),
       });
       if (!tenantId) void maestro.refreshTransportistas();
@@ -233,7 +237,7 @@ export function TransportistaEditPage() {
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="grid gap-1.5">
-              <CrudFieldLabel required>País</CrudFieldLabel>
+              <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
               <PaisUbicacionSelect
                 value={pais}
                 onChange={handlePaisChange}
@@ -243,8 +247,8 @@ export function TransportistaEditPage() {
             </label>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5">
-                <CrudFieldLabel required>
-                  {idFiscalPorPais(pais).label}
+                <CrudFieldLabel>
+                  {idFiscalPorPais(pais).label} (recomendado)
                 </CrudFieldLabel>
                 <CrudInput
                   value={idFiscal}
@@ -281,6 +285,27 @@ export function TransportistaEditPage() {
                 )}
               </label>
             </div>
+            {faltanDatosFiscales && (
+              <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p>
+                  Estás guardando el transportista sin país y/o{" "}
+                  {idFiscalPorPais(pais).label.toLowerCase()} — esto puede
+                  afectar la facturación/liquidaciones más adelante si no se
+                  completa.
+                </p>
+                <label className="flex items-center gap-2 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={confirmarSinDatosFiscales}
+                    onChange={(e) =>
+                      setConfirmarSinDatosFiscales(e.target.checked)
+                    }
+                    className="h-4 w-4 accent-vialto-charcoal"
+                  />
+                  Entiendo, guardar igual
+                </label>
+              </div>
+            )}
             <label className="grid gap-1.5">
               <span className={labelClass}>Domicilio</span>
               <CrudInput
@@ -344,7 +369,10 @@ export function TransportistaEditPage() {
             <CrudSubmitButton
               loading={loading}
               label="Guardar cambios"
-              disabled={!!errorFiscal}
+              disabled={
+                !!errorFiscal ||
+                (faltanDatosFiscales && !confirmarSinDatosFiscales)
+              }
             />
           </form>
 

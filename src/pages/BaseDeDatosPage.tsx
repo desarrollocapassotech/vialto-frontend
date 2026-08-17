@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import {
   Car,
@@ -9,6 +9,7 @@ import {
   Package,
   ShieldCheck,
   Truck,
+  Upload,
   UserCheck,
   Users,
   Warehouse,
@@ -53,7 +54,8 @@ type Tab =
   | "presentaciones"
   | "depositos"
   | "direcciones-entrega"
-  | "usuarios";
+  | "usuarios"
+  | "importar";
 
 const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "clientes", label: "Clientes", icon: Users },
@@ -70,6 +72,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     icon: MapPin,
   },
   { id: "usuarios", label: "Usuarios", icon: ShieldCheck },
+  { id: "importar", label: "Importar datos", icon: Upload },
 ];
 
 export function BaseDeDatosPage() {
@@ -77,6 +80,7 @@ export function BaseDeDatosPage() {
   const { orgRole } = useAuth();
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
   const tabsLoading = !isLoaded || tenantLoading;
@@ -111,6 +115,15 @@ export function BaseDeDatosPage() {
         return hasStock;
       case "usuarios":
         return isOrgAdmin;
+      // Solo admin de tenant, no superadmin: éste ya tiene su propia entrada
+      // de import (con selector de tenant) desde el panel superadmin.
+      case "importar":
+        return (
+          !superadmin &&
+          isOrgAdmin &&
+          hasViajes &&
+          !tenant?.importacionesOcultas
+        );
     }
   });
 
@@ -125,12 +138,24 @@ export function BaseDeDatosPage() {
   const activeTabDef = visibleTabs.find((t) => t.id === activeTab);
   const ActiveIcon = activeTabDef?.icon;
 
+  // "Importar datos" ya no se renderiza como contenido de esta pestaña —
+  // es una página propia. Si alguien llega con ?tab=importar en la URL
+  // (link viejo, back del navegador), lo mandamos a la página real.
+  if (activeTab === "importar") {
+    return <Navigate to="/importar" replace />;
+  }
+
   const sectionOptions: SelectorOpcion[] = visibleTabs.map((tab) => ({
     id: tab.id,
     label: tab.label,
   }));
 
   function setTab(tab: Tab) {
+    if (tab === "importar") {
+      navigate("/importar");
+      setSectionSheetOpen(false);
+      return;
+    }
     setSearchParams({ tab }, { replace: true });
     setSectionSheetOpen(false);
   }

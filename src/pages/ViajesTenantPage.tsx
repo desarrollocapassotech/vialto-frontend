@@ -939,6 +939,7 @@ export function ViajesTenantPage({
   }, [clienteIdFiltroActivo]);
 
   function esElegibleFacturarLote(v: Viaje): boolean {
+    if (v.etapa?.toLowerCase() === "cancelado") return false;
     if (!viajePermiteBotonFacturar(v)) return false;
     if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto))
       return false;
@@ -1030,7 +1031,10 @@ export function ViajesTenantPage({
         const body = e.body as Partial<ViajeEliminacionConflicto> | undefined;
         if (body?.code === "VIAJE_TIENE_LIQUIDACIONES") {
           setViajeDeleteConfirm(null);
-          setViajeDeleteImpacto({ viaje: v, conflicto: body as ViajeEliminacionConflicto });
+          setViajeDeleteImpacto({
+            viaje: v,
+            conflicto: body as ViajeEliminacionConflicto,
+          });
           setDeletingViajeId(null);
           return;
         }
@@ -1185,8 +1189,8 @@ export function ViajesTenantPage({
         facturasPorClienteUrl(v.clienteId ?? ""),
         () => getToken(),
       );
-      const yaVinculada = facturasCliente.find((f) =>
-        f.viajeIds.includes(v.id) && f.estado !== "anulado",
+      const yaVinculada = facturasCliente.find(
+        (f) => f.viajeIds.includes(v.id) && f.estado !== "anulado",
       );
       if (yaVinculada) {
         navigate("/facturacion", {
@@ -1924,11 +1928,24 @@ export function ViajesTenantPage({
                         : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
                     </button>
                   )}
-                  <ViajeFacturacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
-                  {hasLiquidacionesArca ? (
-                    <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
-                  ) : (
-                    <ViajePagoTransportistaIndicador viaje={v} onClick={() => setRegistrarPagoViaje(v)} />
+                  {v.etapa?.toLowerCase() !== "cancelado" && (
+                    <>
+                      <ViajeFacturacionIndicador
+                        viaje={v}
+                        tenantId={platform ? tid : undefined}
+                      />
+                      {hasLiquidacionesArca ? (
+                        <ViajeLiquidacionIndicador
+                          viaje={v}
+                          tenantId={platform ? tid : undefined}
+                        />
+                      ) : (
+                        <ViajePagoTransportistaIndicador
+                          viaje={v}
+                          onClick={() => setRegistrarPagoViaje(v)}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
               </td>
@@ -1995,8 +2012,8 @@ export function ViajesTenantPage({
                           const elegida = liquidacionElegidaDeViaje(v);
                           if (elegida) {
                             const params = new URLSearchParams();
-                            if (platform && tid) params.set('tenantId', tid);
-                            params.set('liquidacion', elegida.id);
+                            if (platform && tid) params.set("tenantId", tid);
+                            params.set("liquidacion", elegida.id);
                             navigate(`/liquidaciones?${params.toString()}`);
                           }
                         }
@@ -2068,8 +2085,7 @@ export function ViajesTenantPage({
                     setEstadoQuickId(v.id);
                   }}
                   className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-                    etapaViajeBadgeClass[v.etapa] ??
-                    etapaViajeBadgeClassDefault
+                    etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
                   }`}
                 >
                   {savingEstadoId === v.id
@@ -2077,12 +2093,25 @@ export function ViajesTenantPage({
                     : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
                 </button>
               )}
-              <ViajeFacturacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
-              {hasLiquidacionesArca ? (
-                    <ViajeLiquidacionIndicador viaje={v} tenantId={platform ? tid : undefined} />
+              {v.etapa?.toLowerCase() !== "cancelado" && (
+                <>
+                  <ViajeFacturacionIndicador
+                    viaje={v}
+                    tenantId={platform ? tid : undefined}
+                  />
+                  {hasLiquidacionesArca ? (
+                    <ViajeLiquidacionIndicador
+                      viaje={v}
+                      tenantId={platform ? tid : undefined}
+                    />
                   ) : (
-                    <ViajePagoTransportistaIndicador viaje={v} onClick={() => setRegistrarPagoViaje(v)} />
+                    <ViajePagoTransportistaIndicador
+                      viaje={v}
+                      onClick={() => setRegistrarPagoViaje(v)}
+                    />
                   )}
+                </>
+              )}
             </div>
           );
           return (
@@ -2188,8 +2217,8 @@ export function ViajesTenantPage({
                           const elegida = liquidacionElegidaDeViaje(v);
                           if (elegida) {
                             const params = new URLSearchParams();
-                            if (platform && tid) params.set('tenantId', tid);
-                            params.set('liquidacion', elegida.id);
+                            if (platform && tid) params.set("tenantId", tid);
+                            params.set("liquidacion", elegida.id);
                             navigate(`/liquidaciones?${params.toString()}`);
                           }
                         }
@@ -2443,9 +2472,7 @@ export function ViajesTenantPage({
               : "Registro manual"
           }
           subtituloTransportista={
-            hasLiquidacionesArca
-              ? "CVLP tipo 60"
-              : "Registro manual"
+            hasLiquidacionesArca ? "CVLP tipo 60" : "Registro manual"
           }
           onFacturarCliente={() => {
             if (
@@ -2559,9 +2586,9 @@ export function ViajesTenantPage({
                 Liquidación a {l.transportistaNombre}
               </span>
               <span className="text-vialto-steel">
-                Período {new Date(l.periodoDesde).toLocaleDateString("es-AR")}{" "}
-                – {new Date(l.periodoHasta).toLocaleDateString("es-AR")} ·
-                estado: {l.estado}
+                Período {new Date(l.periodoDesde).toLocaleDateString("es-AR")} –{" "}
+                {new Date(l.periodoHasta).toLocaleDateString("es-AR")} · estado:{" "}
+                {l.estado}
               </span>
             </li>
           ))}

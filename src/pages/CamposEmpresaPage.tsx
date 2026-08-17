@@ -5,6 +5,8 @@ import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
+import type { Tenant } from "@/types/api";
 
 type CampoCatalogo = {
   campo: string;
@@ -30,6 +32,40 @@ type CampoConfig = {
   obligatorioSistema: boolean;
   visible: boolean;
 };
+
+/** Mismo look & feel en toda la pantalla: charcoal = activo, rojo = apagado. */
+function ToggleSwitch({
+  checked,
+  disabled,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onChange}
+      aria-pressed={checked}
+      aria-label={label}
+      className={[
+        "inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50",
+        checked ? "bg-vialto-charcoal" : "bg-red-500",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "h-5 w-5 rounded-full bg-white shadow transition-transform",
+          checked ? "translate-x-5" : "translate-x-0.5",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
 
 // NUEVO TIPO para el historial
 type AuditLog = {
@@ -67,6 +103,86 @@ export function CamposEmpresaPage() {
   const [auditFilter, setAuditFilter] = useState<"todo" | "formulario">(
     "formulario",
   );
+
+  // --- CONFIGURACIÓN GENERAL DE LA EMPRESA (independiente de módulo/formulario) ---
+  // Mismo criterio que el resto de la pantalla: cada campo guarda apenas se
+  // edita, sin un botón "Guardar" aparte.
+  const { showToast } = useToast();
+  const [empresaLabel, setEmpresaLabel] = useState("");
+  const [empresaLabelGuardado, setEmpresaLabelGuardado] = useState("");
+  const [empresaImportOculto, setEmpresaImportOculto] = useState(false);
+  const [loadingEmpresaConfig, setLoadingEmpresaConfig] = useState(false);
+  const [savingLabel, setSavingLabel] = useState(false);
+  const [savingImportToggle, setSavingImportToggle] = useState(false);
+  const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
+    let cancelled = false;
+    setLoadingEmpresaConfig(true);
+    setEmpresaConfigError(null);
+    (async () => {
+      try {
+        const tenant = await apiJson<Tenant>(
+          `/api/tenants/${encodeURIComponent(filtroEmpresa)}`,
+          () => getToken(),
+        );
+        if (!cancelled) {
+          const label = tenant.labelIdentificacionPersonalizadaViajes ?? "";
+          setEmpresaLabel(label);
+          setEmpresaLabelGuardado(label);
+          setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
+        }
+      } catch (e) {
+        if (!cancelled) setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+      } finally {
+        if (!cancelled) setLoadingEmpresaConfig(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
+
+  async function guardarEmpresaLabel() {
+    if (!filtroEmpresa || empresaLabel === empresaLabelGuardado) return;
+    setSavingLabel(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({
+          labelIdentificacionPersonalizadaViajes: empresaLabel.trim() || null,
+        }),
+      });
+      setEmpresaLabelGuardado(empresaLabel);
+      showToast("Label actualizado", "success");
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingLabel(false);
+    }
+  }
+
+  async function toggleImportOculto() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaImportOculto;
+    setSavingImportToggle(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ importacionesOcultas: nuevoValor }),
+      });
+      setEmpresaImportOculto(nuevoValor);
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingImportToggle(false);
+    }
+  }
 
   // Carga del catálogo completo (módulos/formularios disponibles) al montar
   useEffect(() => {
@@ -195,6 +311,9 @@ export function CamposEmpresaPage() {
   const modulosDisponibles = catalogo ? Object.keys(catalogo) : [];
   const formulariosDelModulo =
     catalogo && modulo ? Object.keys(catalogo[modulo].formularios) : [];
+  // Los campos obligatorios del sistema no se pueden ocultar — no tiene
+  // sentido mostrarlos en esta pantalla, solo agregan ruido.
+  const camposConfigurables = campos?.filter((c) => !c.obligatorioSistema) ?? null;
 
   return (
     <div className="w-full">
@@ -224,6 +343,77 @@ export function CamposEmpresaPage() {
           onChange={onChangeTenant}
         />
       </div>
+
+      {filtroEmpresa && (
+        <div className="mt-6">
+          <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+            Configuración general
+          </h2>
+          {empresaConfigError && (
+            <p className="mt-2 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {empresaConfigError}
+            </p>
+          )}
+          <div className="mt-2 overflow-hidden border border-black/15">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-vialto-mist text-left">
+                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
+                    Campo
+                  </th>
+                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
+                    Valor
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingEmpresaConfig ? (
+                  <tr>
+                    <td colSpan={2} className="px-4 py-6 text-center text-vialto-steel">
+                      Cargando…
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Label del ID propio (módulo Viajes)
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <input
+                          value={empresaLabel}
+                          onChange={(e) => setEmpresaLabel(e.target.value)}
+                          onBlur={() => void guardarEmpresaLabel()}
+                          disabled={savingLabel}
+                          placeholder="ID propio"
+                          className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                        />
+                      </td>
+                    </tr>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Ocultar importación masiva de Excel para el admin
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <ToggleSwitch
+                          checked={empresaImportOculto}
+                          disabled={savingImportToggle}
+                          onChange={() => void toggleImportOculto()}
+                          label={
+                            empresaImportOculto
+                              ? "Mostrar importación masiva"
+                              : "Ocultar importación masiva"
+                          }
+                        />
+                      </td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {filtroEmpresa && catalogo && modulo && formulario && (
         <>
@@ -255,33 +445,36 @@ export function CamposEmpresaPage() {
             </nav>
           </div>
 
-          <div className="mt-4 flex flex-col gap-1 max-w-xs">
-            <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-              Formulario
-            </span>
-            <select
-              value={formulario}
-              onChange={(e) => setFormulario(e.target.value)}
-              className="h-9 border border-black/15 bg-white px-2 text-sm"
-            >
-              {formulariosDelModulo.map((f) => (
-                <option key={f} value={f}>
-                  {catalogo[modulo].formularios[f].label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                Formulario
+              </span>
+              <select
+                value={formulario}
+                onChange={(e) => setFormulario(e.target.value)}
+                className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
+              >
+                {formulariosDelModulo.map((f) => (
+                  <option key={f} value={f}>
+                    {catalogo[modulo].formularios[f].label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="mt-4 flex items-center gap-2 text-sm text-vialto-steel">
-            <input
-              type="checkbox"
-              checked={aplicarATodos}
-              onChange={(e) => setAplicarATodos(e.target.checked)}
-              className="accent-vialto-charcoal"
-            />
-            Aplicar cambios a todos los formularios del módulo (alta, edición y
-            detalle)
-          </label>
+            <div className="flex items-center gap-3">
+              <ToggleSwitch
+                checked={aplicarATodos}
+                onChange={() => setAplicarATodos((v) => !v)}
+                label="Aplicar cambios a todos los formularios del módulo"
+              />
+              <span className="max-w-xs text-sm text-vialto-steel">
+                Aplicar cambios a todos los formularios del módulo (alta,
+                edición y detalle)
+              </span>
+            </div>
+          </div>
 
           {filtroEmpresa && (
             <div className="mt-8">
@@ -335,7 +528,7 @@ export function CamposEmpresaPage() {
                     </td>
                   </tr>
                 )}
-                {!loading && campos && campos.length === 0 && (
+                {!loading && camposConfigurables && camposConfigurables.length === 0 && (
                   <tr>
                     <td
                       colSpan={2}
@@ -346,40 +539,16 @@ export function CamposEmpresaPage() {
                   </tr>
                 )}
                 {!loading &&
-                  campos?.map((c) => (
+                  camposConfigurables?.map((c) => (
                     <tr key={c.campo} className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        {c.label}
-                        {c.obligatorioSistema && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wider text-vialto-steel/70">
-                            (obligatorio)
-                          </span>
-                        )}
-                      </td>
+                      <td className="px-4 py-2.5">{c.label}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <button
-                          type="button"
-                          disabled={
-                            c.obligatorioSistema || savingCampo === c.campo
-                          }
-                          onClick={() => toggleCampo(c.campo, c.visible)}
-                          className={[
-                            "inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                            c.visible ? "bg-vialto-charcoal" : "bg-black/20",
-                            c.obligatorioSistema
-                              ? "opacity-50 cursor-not-allowed"
-                              : "",
-                          ].join(" ")}
-                          aria-pressed={c.visible}
-                          aria-label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
-                        >
-                          <span
-                            className={[
-                              "h-5 w-5 rounded-full bg-white shadow transition-transform",
-                              c.visible ? "translate-x-5" : "translate-x-0.5",
-                            ].join(" ")}
-                          />
-                        </button>
+                        <ToggleSwitch
+                          checked={c.visible}
+                          disabled={savingCampo === c.campo}
+                          onChange={() => toggleCampo(c.campo, c.visible)}
+                          label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
+                        />
                       </td>
                     </tr>
                   ))}

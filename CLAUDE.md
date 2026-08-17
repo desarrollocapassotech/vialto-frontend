@@ -89,7 +89,7 @@ src/
     MissingClerkConfig.tsx
     Logo.tsx
   hooks/                     # useTenantsList.ts, useCurrentTenant.ts, useEntityList.ts,
-                             # useTenantOwnerDashboard.ts, useImportacion.ts, y uno por listado/módulo paginado
+                             # useTenantOwnerDashboard.ts, useImportWizard.ts, y uno por listado/módulo paginado
   lib/
     api.ts, friendlyError.ts, roleLabels.ts, sentry.ts, tenantModules.ts
     # + utilidades específicas por módulo (stock*, viajes*, combustible*, micCrt*, arca*, etc.)
@@ -395,6 +395,39 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 
 ---
 
+## Importación masiva desde Excel (`components/importacion/ImportWizard.tsx`)
+
+**Un solo componente para tenant-admin y superadmin.** `ImportWizard` no es un modal — es una página de ancho completo, hosteada por dos páginas finas que solo resuelven "qué tenant": `pages/ImportarDatosTenantPage.tsx` (tenant-admin, usa la org activa de Clerk) y `pages/SuperadminImportarPage.tsx` (superadmin, resuelve `:orgId` de la URL). La configuración de templates (mapeo de columnas + sugerencia IA) es exclusiva de superadmin y vive aparte, en `pages/SuperadminImportTemplatesPage.tsx` — no se mezcla con el wizard de import en sí. Si se necesita tocar el flujo de import, **no crear un modal nuevo ni duplicar lógica por rol** — extender `ImportWizard.tsx`/`useImportWizard.ts`, que ya son agnósticos de rol (reciben `tenantId`/`tenantModules` por props).
+
+### Orquestación (`hooks/useImportWizard.ts`)
+
+El wizard recorre los módulos en orden fijo de dependencia (`MODULOS_SECUENCIA`: `clientes → transportistas → choferes → vehiculos → viajes`), llamando preview/confirm **una vez por módulo** contra `/api/importaciones/preview` y `/confirm` (ver `vialto-backend/CLAUDE.md`, sección `importaciones`). Después de Viajes hay dos etapas opcionales (`post-liquidaciones`/`post-facturas`) si el tenant tiene `integracion-arca`/`facturacion`.
+
+- **Regla de correctitud async (no fire-and-forget entre pasos)**: `avanzarModulo()`, `saltearModuloActual()`, `reintentarPreview()` y `confirmarModuloActual()` encadenan con `await` de punta a punta. Bug real corregido ago 2026: `confirmarModuloActual()` liberaba `loading` (`finally { setLoading(false) }`) **antes** de que el `setLoading(true)` del preview del módulo siguiente llegara a "pegar", mostrando un flash de pantalla en blanco entre pasos. Si se agrega un paso nuevo al wizard, seguir el mismo patrón (todo el camino de transición entre pasos es una sola cadena `await`, nunca una llamada suelta sin awaitear).
+- **Exclusión de filas y normalización de ciudad son 100% client-side** (`lib/importacionViajesCiudades.ts`): el backend no valida `origen`/`destino` contra ningún catálogo — el wizard lo hace contra un catálogo externo antes de mostrar el preview de Viajes, y solo manda `ciudadesNormalizadas`/`filasExcluidas` al confirmar. Si se corrige o elige una ciudad después de que el preview ya trajo el diff "antes/después" (`PreviewViaje.cambios`, ver abajo), hay que **resincronizar** las entradas "Origen"/"Destino" de `cambios` con el valor final (`sincronizarCambioCiudad` en el mismo archivo) — si no, el modal de cambios muestra el texto crudo del Excel en vez de la ciudad corregida. Bug real corregido ago 2026.
+
+### Selector de módulos previo al upload (cuando el tenant ya tiene datos)
+
+Antes de mostrar el dropzone, `ImportWizard` consulta `GET /api/importaciones/tenant-tiene-datos?tenantId=...`. Si el tenant **no tiene nada** cargado (clientes/transportistas/choferes/vehículos en cero), arranca directo con la secuencia completa — es el caso de uso principal (alta de un tenant nuevo). Si **ya tiene algo**, se muestra `SelectorModulos` — una pantalla dedicada, no un dropdown ni checkboxes al costado — con un checkbox por módulo. Por defecto solo quedan tildados **Viajes** (siempre) y los módulos que todavía no tienen datos; dejarlos todos tildados equivale al recorrido completo de siempre. La selección alimenta directo el `modulosDisponibles` de `useImportWizard` — no hay un modo "elegir un módulo suelto" separado del wizard secuencial, solo se acorta la secuencia.
+
+### Preview de Viajes: "Ver cambios" con diff antes/después
+
+El modal "Detalle de filas" (trigger: botón "Ver cambios →", alineado a la derecha y con fondo `vialto-charcoal` para destacarse del resto de acciones) muestra, para la pestaña Viajes, la lista `ViajesCambiosList` en vez de una tabla plana:
+
+- Badge verde **"Nuevo"** vs. ámbar **"Actualiza"** por fila (`PreviewViaje.nuevo`).
+- Fila nueva → grilla compacta con los campos no vacíos.
+- Fila que actualiza → una línea por campo que cambió: `Campo: valor anterior (tachado) → valor nuevo` (`PreviewViaje.cambios`, calculado server-side en `compararCamposViaje` — ver backend). Sin cambios reales → "Sin cambios."
+
+Las pestañas Clientes/Transportistas de este mismo modal solo se muestran si esos módulos están en `wizard.secuencia` de la corrida actual — el preview de Viajes siempre trae los nombres que referencia (para marcar cuáles son nuevos), pero si el usuario no eligió importar esos módulos en el selector, no tiene sentido mostrarlos como si fueran parte de lo que se está por guardar.
+
+Paginación de estas tablas/listas: **no** usar el componente `ListadoPagination` completo (su selector de page-size está limitado a `[10, 25, 50]`, no sirve para "5 en Viajes, 10 en el resto"). Usar el pager liviano de `lib/listadoPaginacion.ts` (`metaPaginacionCliente`/`slicePaginaCliente`/`paginasVisibles`), construido inline.
+
+### Bloqueo de UI durante carga
+
+Todo el contenido de un paso (excepto la fila de botones de acción) va envuelto en `<fieldset disabled={wizard.loading}>` — deshabilita nativamente todos los inputs/botones descendientes durante el preview/confirm, con `disabled:opacity-60` para feedback visual. No armar un overlay de loading aparte para esto.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -407,7 +440,8 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 - **Campos obligatorios con asterisco rojo; campos opcionales sin ningún indicador.**
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
+- **Si se toca el flujo de importación masiva**, extender `ImportWizard.tsx`/`useImportWizard.ts` (compartidos entre tenant-admin y superadmin) en vez de crear un modal o una copia por rol — ver "Importación masiva desde Excel".
 
 ---
 
-Última actualización: agosto 2026 (agregado el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")
+Última actualización: agosto 2026 (wizard de importación masiva unificado en `ImportWizard.tsx` — páginas en vez de modal, selector de módulos, diff "Ver cambios" y demás patrones — ver "Importación masiva desde Excel"; y, de una pasada anterior, el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import {
   listadoTablaAccionClass,
@@ -9,7 +10,6 @@ import {
 import { labelBillingStatus, labelModulo } from "@/lib/platformLabels";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import type { Tenant } from "@/types/api";
-import { ImportacionModal } from "./ImportacionModal";
 import { TenantViewModal } from "./TenantViewModal";
 
 interface TenantsTableProps {
@@ -37,7 +37,7 @@ export function TenantsTable({
   statusUpdatingByOrgId,
   onToggleEnabled,
 }: TenantsTableProps) {
-  const [importTenant, setImportTenant] = useState<Tenant | null>(null);
+  const navigate = useNavigate();
   const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
 
   // Estados de los filtros de columna
@@ -88,14 +88,6 @@ export function TenantsTable({
 
   return (
     <>
-      {importTenant && (
-        <ImportacionModal
-          tenantId={importTenant.clerkOrgId}
-          tenantName={importTenant.name}
-          tenantModules={importTenant.modules}
-          onClose={() => setImportTenant(null)}
-        />
-      )}
       {viewingTenant && (
         <TenantViewModal
           tenant={viewingTenant}
@@ -285,7 +277,9 @@ export function TenantsTable({
             </button>
             <button
               type="button"
-              onClick={() => setImportTenant(tenant)}
+              onClick={() =>
+                navigate(`/superadmin/empresas/${tenant.clerkOrgId}/importar`)
+              }
               className={listadoTablaAccionClass}
             >
               Importar

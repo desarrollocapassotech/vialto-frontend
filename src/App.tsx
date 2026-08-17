@@ -41,6 +41,9 @@ import { StockMovimientosPage } from "@/pages/StockMovimientosPage";
 import { StockPanelPage } from "@/pages/StockPanelPage";
 import { FacturacionPage } from "@/pages/FacturacionPage";
 import { SuperadminEmpresasPage } from "@/pages/SuperadminEmpresasPage";
+import { SuperadminImportarPage } from "@/pages/SuperadminImportarPage";
+import { SuperadminImportTemplatesPage } from "@/pages/SuperadminImportTemplatesPage";
+import { ImportarDatosTenantPage } from "@/pages/ImportarDatosTenantPage";
 import { SuperadminUsersPage } from "@/pages/SuperadminUsersPage";
 import { SuperadminUserCreatePage } from "@/pages/SuperadminUserCreatePage";
 import { SuperadminUserEditPage } from "@/pages/SuperadminUserEditPage";
@@ -337,6 +340,7 @@ export default function App() {
               element={<ConceptosConfigTenantPage />}
             />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
+            <Route path="importar" element={<ImportarDatosTenantPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
             <Route path="clientes/:id/editar" element={<ClienteEditPage />} />
             <Route
@@ -443,6 +447,14 @@ export default function App() {
           <Route
             path="superadmin/empresas/:orgId/editar"
             element={<SuperadminTenantEditPage />}
+          />
+          <Route
+            path="superadmin/empresas/:orgId/importar"
+            element={<SuperadminImportarPage />}
+          />
+          <Route
+            path="superadmin/empresas/:orgId/importar/templates"
+            element={<SuperadminImportTemplatesPage />}
           />
         </Route>
       </Route>

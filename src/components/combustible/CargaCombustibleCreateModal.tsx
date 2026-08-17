@@ -174,7 +174,10 @@ export function CargaCombustibleCreateModal({
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: (() => {
+      const d = new Date();
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+    })(),
     vehiculoId: "",
     choferId: "",
     estacion: "",
