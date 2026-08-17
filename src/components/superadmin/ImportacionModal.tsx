@@ -1366,11 +1366,6 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
       header: "Moneda Flete",
       cell: (v) => fmt(v.monedaPrecioTransportistaExterno),
     },
-    {
-      id: "fcFlete",
-      header: "FC Flete",
-      cell: (v) => fmt(v.nroFacturaTransporte),
-    },
   ];
 
   return (
@@ -1422,7 +1417,6 @@ function ViajesTable({ viajes }: { viajes: ImportPreviewViaje[] }) {
                 label: "Moneda Flete",
                 value: fmt(v.monedaPrecioTransportistaExterno),
               },
-              { label: "FC Flete", value: fmt(v.nroFacturaTransporte) },
             ]}
           />
         );
