@@ -7,6 +7,7 @@ import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
 import { labelModulo } from "@/lib/platformLabels";
+import { apiJson } from "@/lib/api";
 import { modalEditOverlayClass, modalEditPanelClass } from "@/lib/modalLayers";
 import {
   metaPaginacionCliente,
@@ -16,6 +17,7 @@ import {
 import {
   MODULOS_SECUENCIA,
   useImportWizard,
+  type ModuloWizard,
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
 import type {
@@ -63,6 +65,13 @@ const TIPOS_VEHICULO = [
  * ambos es qué `tenantId`/`tenantModules` se le pasa desde la página que lo
  * hostea.
  */
+interface TenantTieneDatos {
+  clientes: boolean;
+  transportistas: boolean;
+  choferes: boolean;
+  vehiculos: boolean;
+}
+
 export function ImportWizard({
   tenantId,
   tenantModules,
@@ -72,8 +81,54 @@ export function ImportWizard({
   const { getToken } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arrastrando, setArrastrando] = useState(false);
-  const wizard = useImportWizard(tenantId, [...MODULOS_SECUENCIA], () =>
-    getToken(),
+
+  // Un tenant nuevo (sin nada cargado todavía) arranca directo con la
+  // secuencia completa — es el caso de uso principal. Si ya tiene datos, se
+  // le pregunta primero qué módulos quiere tocar en esta importación, para
+  // no forzarlo a pasar por hojas que no le interesan.
+  const [tieneDatos, setTieneDatos] = useState<TenantTieneDatos | null>(null);
+  const [modulosElegidos, setModulosElegidos] = useState<ModuloWizard[] | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let cancelado = false;
+    setTieneDatos(null);
+    setModulosElegidos(null);
+    (async () => {
+      try {
+        const data = await apiJson<TenantTieneDatos>(
+          `/api/importaciones/tenant-tiene-datos?tenantId=${encodeURIComponent(tenantId)}`,
+          getToken,
+        );
+        if (cancelado) return;
+        setTieneDatos(data);
+        if (!data.clientes && !data.transportistas && !data.choferes && !data.vehiculos) {
+          setModulosElegidos([...MODULOS_SECUENCIA]);
+        }
+      } catch {
+        // Si falla la consulta, no bloqueamos el import: se arranca con la secuencia completa.
+        if (!cancelado) {
+          setTieneDatos({
+            clientes: false,
+            transportistas: false,
+            choferes: false,
+            vehiculos: false,
+          });
+          setModulosElegidos([...MODULOS_SECUENCIA]);
+        }
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  const wizard = useImportWizard(
+    tenantId,
+    modulosElegidos ?? [...MODULOS_SECUENCIA],
+    () => getToken(),
   );
 
   const hasArca = tenantModules.includes("integracion-arca");
@@ -100,6 +155,23 @@ export function ImportWizard({
     ? wizard.error.slice(PREFIJO_COLUMNAS_FALTANTES.length).trim()
     : null;
   const moduloLabel = labelModulo(wizard.moduloActual ?? "");
+
+  if (!tieneDatos) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!modulosElegidos) {
+    return (
+      <SelectorModulos
+        tieneDatos={tieneDatos}
+        onElegir={(modulos) => setModulosElegidos(modulos)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -446,6 +518,99 @@ export function ImportWizard({
   );
 }
 
+/** Etiqueta + hint de "ya tenés N cargados" para cada módulo del selector inicial — Viajes no tiene chequeo propio. */
+const MODULOS_SELECTOR: { key: ModuloWizard; tieneDatosKey?: keyof TenantTieneDatos }[] =
+  [
+    { key: "clientes", tieneDatosKey: "clientes" },
+    { key: "transportistas", tieneDatosKey: "transportistas" },
+    { key: "choferes", tieneDatosKey: "choferes" },
+    { key: "vehiculos", tieneDatosKey: "vehiculos" },
+    { key: "viajes" },
+  ];
+
+/**
+ * Pantalla previa al upload cuando el tenant ya tiene datos cargados: en vez
+ * de forzar la secuencia completa (pensada para un tenant nuevo), deja
+ * elegir qué hojas importar. Dejar todo tildado equivale al recorrido
+ * completo de siempre.
+ */
+function SelectorModulos({
+  tieneDatos,
+  onElegir,
+}: {
+  tieneDatos: TenantTieneDatos;
+  onElegir: (modulos: ModuloWizard[]) => void;
+}) {
+  // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
+  // todavía no tienen datos cargados — los que ya tienen algo se destildan
+  // para no forzar un re-import de lo que ya está, aunque se puedan sumar a mano.
+  const [seleccionados, setSeleccionados] = useState<Set<ModuloWizard>>(
+    () =>
+      new Set(
+        MODULOS_SELECTOR.filter(
+          ({ key, tieneDatosKey }) =>
+            key === "viajes" || !tieneDatosKey || !tieneDatos[tieneDatosKey],
+        ).map(({ key }) => key),
+      ),
+  );
+
+  function toggle(modulo: ModuloWizard) {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(modulo)) next.delete(modulo);
+      else next.add(modulo);
+      return next;
+    });
+  }
+
+  const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
+
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-12 text-center">
+      <div className="max-w-xl">
+        <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-vialto-charcoal">
+          ¿Qué querés importar?
+        </h2>
+      </div>
+
+      <div className="flex w-full max-w-md flex-col divide-y divide-black/10 border border-black/10 bg-white text-left">
+        {MODULOS_SELECTOR.map(({ key, tieneDatosKey }) => (
+          <label
+            key={key}
+            className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
+          >
+            <span className="flex flex-col">
+              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                {labelModulo(key)}
+              </span>
+              {tieneDatosKey && tieneDatos[tieneDatosKey] && (
+                <span className="text-xs text-vialto-steel">
+                  Ya tenés datos cargados
+                </span>
+              )}
+            </span>
+            <input
+              type="checkbox"
+              checked={seleccionados.has(key)}
+              onChange={() => toggle(key)}
+              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+            />
+          </label>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        disabled={ordenados.length === 0}
+        onClick={() => onElegir(ordenados)}
+        className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+      >
+        Continuar →
+      </button>
+    </div>
+  );
+}
+
 function WizardStepper({
   wizard,
   hasArca,
@@ -599,8 +764,15 @@ function EtapaModulo({
 
   const hasViajes = (p?.viajes?.length ?? 0) > 0;
   const hasFacturas = (p?.facturas?.length ?? 0) > 0;
-  const hasClientes = (p?.clientes?.length ?? 0) > 0;
-  const hasTransportistas = (p?.transportistas?.length ?? 0) > 0;
+  // El preview de Viajes siempre trae los clientes/transportistas que
+  // referencia (para marcar cuáles son nuevos), pero si el usuario no eligió
+  // importar esos módulos en esta corrida no tiene sentido mostrarlos como
+  // si fueran parte de lo que se está por guardar.
+  const hasClientes =
+    wizard.secuencia.includes("clientes") && (p?.clientes?.length ?? 0) > 0;
+  const hasTransportistas =
+    wizard.secuencia.includes("transportistas") &&
+    (p?.transportistas?.length ?? 0) > 0;
   const advertenciasCiudad = p?.advertenciasCiudad ?? [];
   const totalAdvertenciasCiudad =
     p?.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
