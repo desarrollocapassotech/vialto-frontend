@@ -1,17 +1,9 @@
-import { useState } from "react";
-import { Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
-import { ImportWizardModal } from "@/components/importacion/ImportWizardModal";
+import { ImportWizard } from "@/components/importacion/ImportWizard";
 
-/**
- * Entrada de import para el admin del tenant — sin selector de tenant (a
- * diferencia de TenantsTable.tsx en superadmin, que sí elige uno). Reusa el
- * mismo ImportacionModal como núcleo compartido; el tenant sale siempre de
- * la sesión, nunca de un prop explícito elegible por el usuario.
- */
 export function ImportarDatosTenantPage() {
   const { tenant, loading, error } = useCurrentTenant();
-  const [open, setOpen] = useState(false);
 
   if (loading) {
     return (
@@ -28,28 +20,32 @@ export function ImportarDatosTenantPage() {
   }
 
   return (
-    <div className="flex flex-col items-start gap-4">
-      <p className="max-w-2xl text-sm text-vialto-steel">
+    <div>
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+        Importar datos
+      </h1>
+      <p className="mt-2 max-w-2xl text-sm text-vialto-steel">
         Subí un Excel para cargar clientes, transportes, choferes, vehículos
         y viajes de forma masiva. El proceso se hace por etapas: cada hoja se
         previsualiza y confirma por separado antes de pasar a la siguiente.
       </p>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
-      >
-        <Upload className="h-3.5 w-3.5" strokeWidth={1.75} />
-        Importar datos
-      </button>
 
-      {open && (
-        <ImportWizardModal
+      <div className="mt-4">
+        <Link
+          className="text-sm text-vialto-fire hover:text-vialto-bright"
+          to="/base-de-datos"
+        >
+          ← Volver
+        </Link>
+      </div>
+
+      <div className="mt-6">
+        <ImportWizard
           tenantId={tenant.clerkOrgId}
           tenantModules={tenant.modules}
-          onClose={() => setOpen(false)}
+          backTo="/base-de-datos"
         />
-      )}
+      </div>
     </div>
   );
 }
