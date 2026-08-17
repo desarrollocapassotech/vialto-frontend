@@ -24,11 +24,6 @@ export function ImportarDatosTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Importar datos
       </h1>
-      <p className="mt-2 max-w-2xl text-sm text-vialto-steel">
-        Subí un Excel para cargar clientes, transportes, choferes, vehículos
-        y viajes de forma masiva. El proceso se hace por etapas: cada hoja se
-        previsualiza y confirma por separado antes de pasar a la siguiente.
-      </p>
 
       <div className="mt-4">
         <Link
