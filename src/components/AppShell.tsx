@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   OrganizationSwitcher,
   UserButton,
@@ -20,8 +21,8 @@ import {
   Menu,
   PackageMinus,
   PackagePlus,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
   Receipt,
   SlidersHorizontal,
   Truck,
@@ -83,6 +84,11 @@ export function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1",
   );
+  const [navTooltip, setNavTooltip] = useState<{
+    label: string;
+    top: number;
+    left: number;
+  } | null>(null);
   useEnsureTenantOrganization();
 
   const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
@@ -100,6 +106,7 @@ export function AppShell() {
       SIDEBAR_COLLAPSED_STORAGE_KEY,
       sidebarCollapsed ? "1" : "0",
     );
+    setNavTooltip(null);
   }, [sidebarCollapsed]);
 
   useEffect(() => {
@@ -391,21 +398,6 @@ export function AppShell() {
               <X className="h-5 w-5" strokeWidth={1.75} />
             </button>
           )}
-          {!showCloseButton && (
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed((c) => !c)}
-              aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
-              title={collapsed ? "Expandir menú" : "Colapsar menú"}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/15 text-white/70 hover:bg-white/10 hover:text-white"
-            >
-              {collapsed ? (
-                <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
-              )}
-            </button>
-          )}
         </div>
 
         <nav className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}>
@@ -438,9 +430,20 @@ export function AppShell() {
                     key={item.to}
                     to={item.to}
                     end={item.end === true}
-                    title={collapsed ? item.label : undefined}
+                    aria-label={collapsed ? item.label : undefined}
+                    onMouseEnter={(e) => {
+                      if (!collapsed) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setNavTooltip({
+                        label: item.label,
+                        top: rect.top + rect.height / 2,
+                        left: rect.right + 10,
+                      });
+                    }}
+                    onMouseLeave={() => setNavTooltip(null)}
                     onClick={() => {
                       setSidebarOpen(false);
+                      setNavTooltip(null);
                       if (item.to === "/viajes") setSidebarCollapsed(true);
                     }}
                     className={({ isActive }) => {
@@ -517,7 +520,17 @@ export function AppShell() {
                   ? "flex flex-col items-center gap-2"
                   : "pl-0.5 pr-1 flex items-center gap-2 min-w-0"
               }
-              title={collapsed ? accountName : undefined}
+              aria-label={collapsed ? accountName : undefined}
+              onMouseEnter={(e) => {
+                if (!collapsed) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                setNavTooltip({
+                  label: accountName,
+                  top: rect.top + rect.height / 2,
+                  left: rect.right + 10,
+                });
+              }}
+              onMouseLeave={() => setNavTooltip(null)}
             >
               <div className="relative h-8 w-8 shrink-0">
                 <div className="absolute inset-0 pointer-events-none">
@@ -549,8 +562,21 @@ export function AppShell() {
             {!superadmin && (
               <button
                 type="button"
-                onClick={() => void handleSignOut()}
-                title={collapsed ? "Cerrar sesión" : undefined}
+                onClick={() => {
+                  setNavTooltip(null);
+                  void handleSignOut();
+                }}
+                aria-label={collapsed ? "Cerrar sesión" : undefined}
+                onMouseEnter={(e) => {
+                  if (!collapsed) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setNavTooltip({
+                    label: "Cerrar sesión",
+                    top: rect.top + rect.height / 2,
+                    left: rect.right + 10,
+                  });
+                }}
+                onMouseLeave={() => setNavTooltip(null)}
                 className={
                   collapsed
                     ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
@@ -606,15 +632,38 @@ export function AppShell() {
         />
       )}
 
-      <aside
-        className={[
-          "hidden lg:flex sticky top-0",
-          sidebarBaseClass,
-          sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
-        ].join(" ")}
-      >
-        {renderSidebar(false, sidebarCollapsed)}
-      </aside>
+      <div className="hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
+        <aside
+          className={[
+            "flex",
+            sidebarBaseClass,
+            sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
+          ].join(" ")}
+        >
+          {renderSidebar(false, sidebarCollapsed)}
+        </aside>
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed((c) => !c)}
+          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setNavTooltip({
+              label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
+              top: rect.top + rect.height / 2,
+              left: rect.right + 10,
+            });
+          }}
+          onMouseLeave={() => setNavTooltip(null)}
+          className="absolute top-9 -right-3 z-10 inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-vialto-charcoal text-white shadow-md transition-colors hover:bg-vialto-charcoal/80"
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          )}
+        </button>
+      </div>
 
       <aside
         aria-hidden={!sidebarOpen}
@@ -648,6 +697,17 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {navTooltip &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md bg-vialto-charcoal px-3.5 py-2 font-[family-name:var(--font-ui)] text-sm font-medium tracking-wide text-white shadow-lg"
+            style={{ top: navTooltip.top, left: navTooltip.left }}
+          >
+            {navTooltip.label}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
