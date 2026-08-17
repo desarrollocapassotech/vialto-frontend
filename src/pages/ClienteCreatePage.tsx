@@ -37,9 +37,13 @@ export function ClienteCreatePage() {
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
+    useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const faltanDatosFiscales = !pais || !idFiscal.trim();
 
   function handlePaisChange(newPais: PaisCodigo | "") {
     setPais(newPais);
@@ -50,16 +54,13 @@ export function ClienteCreatePage() {
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "Ingresá el nombre del cliente.";
-    if (!pais) errs.pais = "Seleccioná el país del cliente.";
-    if (!idFiscal.trim()) {
-      const label = pais ? idFiscalPorPais(pais).label : "ID fiscal";
-      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
-    }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
     }
-    const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
+    const errorFiscal = idFiscal.trim()
+      ? validarIdFiscal(pais, idFiscal.trim())
+      : null;
     if (errorFiscal) {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
@@ -75,14 +76,17 @@ export function ClienteCreatePage() {
         method: "POST",
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais,
-          idFiscal: idFiscal.trim(),
+          pais: pais || undefined,
+          idFiscal: idFiscal.trim() || undefined,
           condicionIva: pais === "AR" ? (condicionIva ?? undefined) : undefined,
           condicionTributaria:
             pais !== "AR" ? condicionTributaria.trim() || undefined : undefined,
           email: email.trim() || undefined,
           telefono: telefono.trim() || undefined,
           direccion: direccion.trim() || undefined,
+          confirmarSinDatosFiscales: faltanDatosFiscales
+            ? confirmarSinDatosFiscales
+            : undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -131,7 +135,7 @@ export function ClienteCreatePage() {
           <CrudFieldError message={fieldErrors.nombre} />
         </label>
         <label className="grid gap-1.5">
-          <CrudFieldLabel required>País</CrudFieldLabel>
+          <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
           <PaisUbicacionSelect
             value={pais}
             onChange={handlePaisChange}
@@ -141,8 +145,8 @@ export function ClienteCreatePage() {
         </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="grid gap-1.5">
-            <CrudFieldLabel required>
-              {idFiscalPorPais(pais).label}
+            <CrudFieldLabel>
+              {idFiscalPorPais(pais).label} (recomendado)
             </CrudFieldLabel>
             <CrudInput
               placeholder={idFiscalPorPais(pais).placeholder}
@@ -179,6 +183,26 @@ export function ClienteCreatePage() {
             )}
           </label>
         </div>
+        {faltanDatosFiscales && (
+          <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p>
+              Estás guardando el cliente sin país y/o{" "}
+              {idFiscalPorPais(pais).label.toLowerCase()} — esto puede
+              afectar la facturación más adelante si no se completa.
+            </p>
+            <label className="flex items-center gap-2 font-medium">
+              <input
+                type="checkbox"
+                checked={confirmarSinDatosFiscales}
+                onChange={(e) =>
+                  setConfirmarSinDatosFiscales(e.target.checked)
+                }
+                className="h-4 w-4 accent-vialto-charcoal"
+              />
+              Entiendo, guardar igual
+            </label>
+          </div>
+        )}
         <label className="grid gap-1.5">
           <span className={labelClass}>Dirección</span>
           <CrudInput
@@ -207,7 +231,10 @@ export function ClienteCreatePage() {
         <CrudSubmitButton
           loading={loading}
           label="Crear cliente"
-          disabled={!!errorFiscal}
+          disabled={
+            !!errorFiscal ||
+            (faltanDatosFiscales && !confirmarSinDatosFiscales)
+          }
         />
       </form>
     </CrudPageLayout>

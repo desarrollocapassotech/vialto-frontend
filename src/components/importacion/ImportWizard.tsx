@@ -459,6 +459,13 @@ function EtapaModulo({
     {},
   );
   const [tab, setTab] = useState<PreviewTab>("viajes");
+  const [confirmarCamposFaltantes, setConfirmarCamposFaltantes] =
+    useState(false);
+  // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
+  // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
+  useEffect(() => {
+    setConfirmarCamposFaltantes(false);
+  }, [p?.sessionId]);
 
   const vehiculosFaltantes = p?.entidadesFaltantes.find(
     (e) => e.modelo === "vehiculos",
@@ -478,6 +485,12 @@ function EtapaModulo({
   const nuevosClientes = p?.clientes?.filter((c) => c.esNuevo).length ?? 0;
   const nuevosTransp =
     p?.transportistas?.filter((t) => t.esNuevo).length ?? 0;
+  const advertenciasCamposFaltantes = p?.advertenciasCamposFaltantes ?? [];
+  const camposFaltantesUnicos = Array.from(
+    new Set(advertenciasCamposFaltantes.flatMap((a) => a.campos)),
+  );
+  const requiereConfirmarCamposFaltantes =
+    advertenciasCamposFaltantes.length > 0 && !confirmarCamposFaltantes;
 
   return (
     <div className="flex flex-col gap-4">
@@ -486,14 +499,21 @@ function EtapaModulo({
       </h3>
       {wizard.loading && !p && <Spinner />}
       {p && (
-        <>
+        <fieldset
+          disabled={wizard.loading}
+          className="flex flex-col gap-4 border-0 p-0 m-0 disabled:opacity-60 transition-opacity"
+        >
           <div
             className={`grid gap-2 ${hasViajes ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-3"}`}
           >
-            <StatBox label="Filas totales" value={p.totalFilas} />
-            <StatBox label="Listas para crear" value={p.exitosas} highlight="ok" />
+            <StatBox label="Filas en el Excel" value={p.totalFilas} />
             <StatBox
-              label="Errores"
+              label={`${labelModulo(wizard.moduloActual ?? "")} a crear`}
+              value={p.exitosas}
+              highlight="ok"
+            />
+            <StatBox
+              label="Filas con error"
               value={p.errores}
               highlight={p.errores > 0 ? "error" : undefined}
             />
@@ -510,19 +530,42 @@ function EtapaModulo({
           </div>
 
           {p.headersNoMapeados.length > 0 && (
-            <div className="border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
-              El Excel tiene columnas que el template no reconoce — van a
-              quedar como texto libre en Observaciones, sin bloquear la
-              importación: <strong>{p.headersNoMapeados.join(", ")}</strong>.
-            </div>
+            <details className="group border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              <summary className="cursor-pointer list-none marker:hidden">
+                <span className="font-medium">
+                  {p.headersNoMapeados.length} columna
+                  {p.headersNoMapeados.length !== 1 ? "s" : ""} del Excel sin
+                  usar
+                </span>{" "}
+                <span className="text-blue-700/70">
+                  — no bloquean la importación
+                </span>
+                <span className="ml-1 inline-block transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <p className="mt-1.5">{p.headersNoMapeados.join(", ")}</p>
+            </details>
           )}
 
           {p.columnasOpcionalesFaltantes.length > 0 && (
-            <div className="border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-              El template espera estas columnas y no aparecen en el Excel —
-              quedan vacías en todas las filas:{" "}
-              <strong>{p.columnasOpcionalesFaltantes.join(", ")}</strong>.
-            </div>
+            <details className="group border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <summary className="cursor-pointer list-none marker:hidden">
+                <span className="font-medium">
+                  {p.columnasOpcionalesFaltantes.length} columna
+                  {p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} del
+                  template no encontrada
+                  {p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} en
+                  el Excel
+                </span>
+                <span className="ml-1 inline-block transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <p className="mt-1.5">
+                {p.columnasOpcionalesFaltantes.join(", ")}
+              </p>
+            </details>
           )}
 
           <CiudadAdvertenciasPanel
@@ -634,19 +677,41 @@ function EtapaModulo({
             </div>
           ))}
 
+          {advertenciasCamposFaltantes.length > 0 && (
+            <div className="space-y-2.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <p>
+                <strong>{advertenciasCamposFaltantes.length}</strong> fila
+                {advertenciasCamposFaltantes.length !== 1 ? "s" : ""} sin{" "}
+                <strong>{camposFaltantesUnicos.join(", ")}</strong> — se
+                puede completar después a mano.
+              </p>
+              <label className="flex items-center justify-end gap-2.5 border-t border-amber-200 pt-2.5 text-sm font-semibold text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={confirmarCamposFaltantes}
+                  onChange={(e) =>
+                    setConfirmarCamposFaltantes(e.target.checked)
+                  }
+                  className="h-5 w-5 accent-vialto-charcoal"
+                />
+                Entiendo, importar estas filas igual
+              </label>
+            </div>
+          )}
+
           {p.detalleErrores.length > 0 && (
-            <div className="max-h-40 overflow-y-auto border border-black/10">
+            <div className="max-h-40 overflow-y-auto border border-red-100">
               <table className="w-full text-xs">
-                <thead>
+                <thead className="sticky top-0 bg-red-50">
                   <tr>
-                    <th className={th}>Fila</th>
-                    <th className={th}>Campo</th>
-                    <th className={th}>Error</th>
+                    <th className={`${th} text-red-900`}>Fila</th>
+                    <th className={`${th} text-red-900`}>Campo</th>
+                    <th className={`${th} text-red-900`}>Error</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-red-50">
                   {p.detalleErrores.map((e, i) => (
-                    <tr key={i}>
+                    <tr key={i} className="odd:bg-white even:bg-red-50/40">
                       <td className={td}>{e.fila}</td>
                       <td className={td}>{e.campo ?? "—"}</td>
                       <td className={td}>{e.error}</td>
@@ -717,26 +782,39 @@ function EtapaModulo({
                 )}
               </>
             )}
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              disabled={wizard.loading || p.exitosas === 0}
-              onClick={() => void wizard.confirmarModuloActual()}
-              className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
-            >
-              Confirmar y continuar
-            </button>
+        </fieldset>
+      )}
+      {p && (
+        <div className="flex justify-end gap-3">
             <button
               type="button"
               disabled={wizard.loading}
               onClick={wizard.saltearModuloActual}
-              className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04]"
+              className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Saltear esta hoja
             </button>
-          </div>
-        </>
+            <button
+              type="button"
+              disabled={
+                wizard.loading ||
+                p.exitosas === 0 ||
+                requiereConfirmarCamposFaltantes
+              }
+              onClick={() =>
+                void wizard.confirmarModuloActual(confirmarCamposFaltantes)
+              }
+              title={
+                requiereConfirmarCamposFaltantes
+                  ? "Marcá la casilla de arriba para confirmar"
+                  : undefined
+              }
+              className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+            >
+              {wizard.loading && <Spinner className="h-3.5 w-3.5" />}
+              {wizard.loading ? "Confirmando…" : "Confirmar y continuar"}
+            </button>
+        </div>
       )}
     </div>
   );

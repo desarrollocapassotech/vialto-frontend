@@ -232,12 +232,12 @@ export function useImportWizard(
 
   /** Saltea el módulo actual sin confirmarlo (ej. sin template configurado, o a propósito sin esa hoja). */
   function saltearModuloActual() {
-    avanzarModulo();
+    void avanzarModulo();
   }
 
   /** Vuelve a previsualizar el módulo actual sin perder correcciones ya hechas — se usa después de crear entidades faltantes. */
-  function reintentarPreview() {
-    if (file) void ejecutarPreviewModulo(file, moduloIndex);
+  async function reintentarPreview() {
+    if (file) await ejecutarPreviewModulo(file, moduloIndex);
   }
 
   /** Crea vehículos faltantes confirmados desde el panel de previsualización y reintenta. */
@@ -257,7 +257,7 @@ export function useImportWizard(
       if (res.errores.length > 0) {
         setError(res.errores.map((e) => `${e.patente}: ${e.error}`).join(" · "));
       }
-      if (res.creados > 0) reintentarPreview();
+      if (res.creados > 0) await reintentarPreview();
       return res;
     } catch (e) {
       setError(
@@ -288,7 +288,7 @@ export function useImportWizard(
       if (res.errores.length > 0) {
         setError(res.errores.map((e) => `${e.valor}: ${e.error}`).join(" · "));
       }
-      if (res.creados > 0) reintentarPreview();
+      if (res.creados > 0) await reintentarPreview();
       return res;
     } catch (e) {
       setError(
@@ -300,7 +300,7 @@ export function useImportWizard(
     }
   }
 
-  function avanzarModulo() {
+  async function avanzarModulo() {
     setPreview(null);
     setError(null);
     const nextIdx = moduloIndex + 1;
@@ -309,10 +309,10 @@ export function useImportWizard(
       return;
     }
     setModuloIndex(nextIdx);
-    if (file) void previewModuloActual(file, nextIdx);
+    if (file) await previewModuloActual(file, nextIdx);
   }
 
-  async function confirmarModuloActual() {
+  async function confirmarModuloActual(confirmarCamposFaltantes?: boolean) {
     if (!preview || !moduloActual) return;
     setLoading(true);
     setError(null);
@@ -322,6 +322,7 @@ export function useImportWizard(
         tenantId: string;
         ciudadesNormalizadas?: CiudadNormalizadaConfirm[];
         filasExcluidas?: number[];
+        confirmarCamposFaltantes?: boolean;
       } = {
         sessionId: preview.sessionId,
         tenantId,
@@ -331,6 +332,9 @@ export function useImportWizard(
       }
       if (moduloActual === "viajes" && filasExcluidasRef.current.size > 0) {
         body.filasExcluidas = [...filasExcluidasRef.current];
+      }
+      if (confirmarCamposFaltantes) {
+        body.confirmarCamposFaltantes = true;
       }
       const log = await apiJson<ImportLog>("/api/importaciones/confirm", getToken, {
         method: "POST",
@@ -343,7 +347,7 @@ export function useImportWizard(
           .map((d) => d.id as string);
         setViajeIdsCreados(ids);
       }
-      avanzarModulo();
+      await avanzarModulo();
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Error al confirmar la importación",

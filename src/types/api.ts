@@ -484,6 +484,8 @@ export interface ImportPreviewResult {
   columnasOpcionalesFaltantes: string[];
   /** Entidades referenciadas por lookup que no existen todavía, agrupadas por modelo. */
   entidadesFaltantes: ImportEntidadesFaltantesModelo[];
+  /** Filas que se importarían igual pero con algún campo recomendado (ej. CUIT/país) vacío — requieren confirmación explícita. */
+  advertenciasCamposFaltantes: { fila: number; campos: string[] }[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;

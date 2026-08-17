@@ -25,6 +25,8 @@ type CatalogoColumn = {
   separador?: string;
   allowedValues?: string[];
   format?: string;
+  /** true = recomendado pero no bloqueante — se importa igual con confirmación del usuario. */
+  warnIfEmpty?: boolean;
 };
 
 /** Fila editable de la tabla de configuración: el catálogo fijo + lo que el superadmin ajusta. */
@@ -286,6 +288,7 @@ export function SuperadminImportTemplatesPage() {
           if (!c.required && c.defaultValue.trim()) {
             col.defaultValue = c.defaultValue.trim();
           }
+          if (!c.required && c.warnIfEmpty) col.warnIfEmpty = true;
           return col;
         }),
     };

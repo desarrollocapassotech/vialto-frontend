@@ -42,11 +42,15 @@ export function ClienteEditPage() {
   const [direccion, setDireccion] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [confirmDelete, setConfirmDelete] = useState("");
+  const [confirmarSinDatosFiscales, setConfirmarSinDatosFiscales] =
+    useState(false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const faltanDatosFiscales = !pais || !idFiscal.trim();
 
   useEffect(() => {
     if (!id) return;
@@ -91,16 +95,13 @@ export function ClienteEditPage() {
     if (!id) return;
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "Ingresá el nombre del cliente.";
-    if (!pais) errs.pais = "Seleccioná el país del cliente.";
-    if (!idFiscal.trim()) {
-      const label = pais ? idFiscalPorPais(pais).label : "ID fiscal";
-      errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
-    }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
     }
-    const errorFiscal = validarIdFiscal(pais, idFiscal.trim());
+    const errorFiscal = idFiscal.trim()
+      ? validarIdFiscal(pais, idFiscal.trim())
+      : null;
     if (errorFiscal) {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
@@ -116,7 +117,7 @@ export function ClienteEditPage() {
         method: "PATCH",
         body: JSON.stringify({
           nombre: nombre.trim(),
-          pais,
+          pais: pais || "",
           idFiscal: idFiscal.trim(),
           condicionIva: pais === "AR" ? condicionIva : null,
           condicionTributaria:
@@ -124,6 +125,9 @@ export function ClienteEditPage() {
           email: email.trim(),
           telefono: telefono.trim(),
           direccion: direccion.trim(),
+          confirmarSinDatosFiscales: faltanDatosFiscales
+            ? confirmarSinDatosFiscales
+            : undefined,
         }),
       });
       if (!tenantId) void maestro.refreshClientes();
@@ -199,7 +203,7 @@ export function ClienteEditPage() {
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
             <label className="grid gap-1.5">
-              <CrudFieldLabel required>País</CrudFieldLabel>
+              <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
               <PaisUbicacionSelect
                 value={pais}
                 onChange={handlePaisChange}
@@ -209,8 +213,8 @@ export function ClienteEditPage() {
             </label>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5">
-                <CrudFieldLabel required>
-                  {idFiscalPorPais(pais).label}
+                <CrudFieldLabel>
+                  {idFiscalPorPais(pais).label} (recomendado)
                 </CrudFieldLabel>
                 <CrudInput
                   value={idFiscal}
@@ -247,6 +251,26 @@ export function ClienteEditPage() {
                 )}
               </label>
             </div>
+            {faltanDatosFiscales && (
+              <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p>
+                  Estás guardando el cliente sin país y/o{" "}
+                  {idFiscalPorPais(pais).label.toLowerCase()} — esto puede
+                  afectar la facturación más adelante si no se completa.
+                </p>
+                <label className="flex items-center gap-2 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={confirmarSinDatosFiscales}
+                    onChange={(e) =>
+                      setConfirmarSinDatosFiscales(e.target.checked)
+                    }
+                    className="h-4 w-4 accent-vialto-charcoal"
+                  />
+                  Entiendo, guardar igual
+                </label>
+              </div>
+            )}
             <label className="grid gap-1.5">
               <span className={labelClass}>Dirección</span>
               <CrudInput
@@ -275,7 +299,10 @@ export function ClienteEditPage() {
             <CrudSubmitButton
               loading={loading}
               label="Guardar cambios"
-              disabled={!!errorFiscal}
+              disabled={
+                !!errorFiscal ||
+                (faltanDatosFiscales && !confirmarSinDatosFiscales)
+              }
             />
           </form>
           <CrudDangerZone
