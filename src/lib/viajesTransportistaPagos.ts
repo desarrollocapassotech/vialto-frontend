@@ -48,6 +48,7 @@ export type ViajeSaldoTransportistaInput = Pick<
   | "transportistaId"
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
+  | "precioTransportistaIncluyeIva"
 > & {
   liquidacionesViaje?: Array<{
     monto?: number | null;
@@ -138,6 +139,12 @@ function totalPagadoTransportistaEnMonedaAcordada(
 
   // 1. Partimos del estimado original como base
   let totalAcordado = Number(v.precioTransportistaExterno) || 0;
+
+  // El precio ya incluye IVA: se usa tal cual, sin sumarle el IVA de ninguna
+  // Liquidación vinculada (evita el doble conteo de IVA).
+  if (v.precioTransportistaIncluyeIva) {
+    return { moneda, totalAcordado, totalPagado };
+  }
 
   // 2. Si el viaje tiene liquidaciones emitidas, sobreescribimos con el monto real
   if (v.liquidacionesViaje && v.liquidacionesViaje.length > 0) {

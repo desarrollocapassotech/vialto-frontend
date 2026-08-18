@@ -95,6 +95,8 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
 import {
   type OpcionProducto,
@@ -120,6 +122,13 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
+  // Con integracion-arca, advertimos (no ocultamos) que "Incluir IVA" es
+  // incompatible con liquidar el viaje por CVLP — el backend es quien bloquea
+  // de verdad (ver liquidaciones.service.ts); acá solo evitamos la sorpresa.
+  const { tenant: currentTenantParaIva } = useCurrentTenant();
+  const hasArcaParaPrecioIva = canAccessIntegracionArca(
+    currentTenantParaIva?.modules ?? [],
+  );
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
@@ -187,6 +196,8 @@ export function ViajeCreatePage() {
     useState<ViajeMonedaCodigo>("ARS");
   const [cantidadTransportista, setCantidadTransportista] = useState("");
   const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
+  const [precioTransportistaIncluyeIva, setPrecioTransportistaIncluyeIva] =
+    useState(false);
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -721,6 +732,9 @@ export function ViajeCreatePage() {
           monedaMonto,
           precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          precioTransportistaIncluyeIva: externo
+            ? precioTransportistaIncluyeIva
+            : undefined,
           cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
           precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
           cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
@@ -1119,6 +1133,25 @@ export function ViajeCreatePage() {
                         </div>
                         <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={precioTransportistaIncluyeIva}
+                        onChange={(e) =>
+                          setPrecioTransportistaIncluyeIva(e.target.checked)
+                        }
+                      />
+                      Incluir IVA (el precio del transporte ya incluye IVA)
+                    </label>
+                    {hasArcaParaPrecioIva && (
+                      <p className="text-xs text-amber-800/90">
+                        Un viaje con esta opción activada no se puede incluir
+                        en una Liquidación ARCA/CVLP (el comprobante ya
+                        calcula el IVA por separado).
+                      </p>
                     )}
                   </div>
                   {transportistaId && (

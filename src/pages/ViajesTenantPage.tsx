@@ -2356,6 +2356,7 @@ export function ViajesTenantPage({
             getToken={getToken}
             tenantId={platform ? tid : undefined}
             tenant={!platform ? currentTenant : undefined}
+            hasIntegracionArca={hasLiquidacionesArca}
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)

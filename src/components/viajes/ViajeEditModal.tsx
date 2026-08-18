@@ -51,6 +51,7 @@ import type { PaisCodigo } from "@/lib/ciudades";
 import {
   etapaMuestraKmLitros,
   etapaViajeLabel,
+  liquidacionPermiteVincular,
   VIAJE_ETAPAS_TODAS,
   tooltipEtapaViaje,
 } from "@/lib/viajesIndicadores";
@@ -110,6 +111,7 @@ export type ViajeInlineDraft = {
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
+  precioTransportistaIncluyeIva: boolean;
   cantidadTransportista: string;
   precioUnitarioTransportista: string;
   otrosGastos: OtroGastoDraft[];
@@ -165,6 +167,13 @@ export type ViajeEditModalProps = {
   tenantId?: string;
   /** Tenant activo, usado para el label personalizable del ID de viaje. */
   tenant?: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null;
+  /**
+   * true si el tenant tiene integracion-arca: muestra una advertencia junto a
+   * "Incluir IVA" en el precio transportista (el CVLP ya calcula y discrimina
+   * el IVA por su cuenta — el backend es quien bloquea de verdad la combinación,
+   * ver liquidaciones.service.ts).
+   */
+  hasIntegracionArca?: boolean;
   onProductoCreado?: (p: Producto) => void;
   onClienteCreado?: (c: Cliente) => void;
   onTransportistaCreado?: (t: Transportista) => void;
@@ -210,6 +219,7 @@ export function ViajeEditModal({
   getToken,
   tenantId,
   tenant,
+  hasIntegracionArca = false,
   onProductoCreado,
   onClienteCreado,
   onTransportistaCreado,
@@ -294,6 +304,17 @@ export function ViajeEditModal({
       (snapshotViaje as any).liquidacionEstado === "pagado";
 
     return facturado || liquidado;
+  }, [snapshotViaje]);
+
+  // "Incluir IVA" solo se bloquea por liquidación vigente (no por facturación al
+  // cliente, que es un eje independiente) — mismo criterio que el backend en
+  // viajes.service.ts, para que un viaje ya facturado pero todavía sin liquidar
+  // no quede con el flag atascado en cuanto se emite la factura al cliente.
+  const precioIvaBloqueado = useMemo(() => {
+    if (!snapshotViaje) return false;
+    return !liquidacionPermiteVincular(
+      (snapshotViaje as any).liquidacionEstado ?? null,
+    );
   }, [snapshotViaje]);
 
   useEffect(() => {
@@ -911,6 +932,34 @@ export function ViajeEditModal({
                             />
                           </div>
                         </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          disabled={precioIvaBloqueado}
+                          checked={draft.precioTransportistaIncluyeIva}
+                          onChange={(e) =>
+                            setDraft((p) =>
+                              p
+                                ? {
+                                    ...p,
+                                    precioTransportistaIncluyeIva:
+                                      e.target.checked,
+                                  }
+                                : p,
+                            )
+                          }
+                        />
+                        Incluir IVA (el precio del transporte ya incluye IVA)
+                      </label>
+                      {hasIntegracionArca && (
+                        <p className="text-xs text-amber-800/90">
+                          Un viaje con esta opción activada no se puede
+                          incluir en una Liquidación ARCA/CVLP (el comprobante
+                          ya calcula el IVA por separado).
+                        </p>
                       )}
                     </div>
                     {draft.transportistaId && (

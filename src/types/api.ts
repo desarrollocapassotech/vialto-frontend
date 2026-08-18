@@ -96,6 +96,8 @@ export interface Viaje {
   precioUnitarioTransportista?: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
+  /** Si es true, precioTransportistaExterno ya incluye IVA (no se le suma el IVA de una liquidación vinculada). */
+  precioTransportistaIncluyeIva?: boolean;
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;
   monedaGananciaBrutaManual?: string | null;

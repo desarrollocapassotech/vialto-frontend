@@ -255,6 +255,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(
         v.monedaPrecioTransportistaExterno,
       ),
+      precioTransportistaIncluyeIva: v.precioTransportistaIncluyeIva ?? false,
       cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
       precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
@@ -539,6 +540,13 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       ? !facturacionPermiteVincular(viajeSnapshot.facturacionEstado) ||
         !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
       : false;
+    // precioTransportistaIncluyeIva se bloquea solo por liquidación vigente (no por
+    // facturación al cliente, eje independiente) — mismo criterio que el backend, para
+    // que un viaje ya facturado pero todavía sin liquidar no quede con el flag
+    // atascado apenas se emite la factura al cliente.
+    const precioIvaBloqueado = viajeSnapshot
+      ? !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
+      : false;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -598,6 +606,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             litrosConsumidos: litResolved ?? null,
             precioTransportistaExterno: bloqueado ? undefined : (externo ? (precioTransportistaNum ?? null) : null),
             monedaPrecioTransportistaExterno: bloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
+            precioTransportistaIncluyeIva: precioIvaBloqueado ? undefined : (externo ? draft.precioTransportistaIncluyeIva : false),
             ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
             otrosGastos: bloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
             pagosTransportista: bloqueado ? undefined : (externo ? pagosTransportistaApi : []),
