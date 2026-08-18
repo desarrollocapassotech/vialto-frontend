@@ -2357,6 +2357,9 @@ export function ViajesTenantPage({
             tenantId={platform ? tid : undefined}
             tenant={!platform ? currentTenant : undefined}
             hasIntegracionArca={hasLiquidacionesArca}
+            onRegistrarPago={() =>
+              setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
+            }
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)
@@ -2430,6 +2433,7 @@ export function ViajesTenantPage({
                   }
                 : d,
             );
+            viajeEditor.patchViajeSnapshot(updated);
           }
           setRegistrarPagoViaje(null);
         }}

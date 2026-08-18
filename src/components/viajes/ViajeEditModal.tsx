@@ -41,6 +41,8 @@ import {
   emptyPagoTransportista,
   type PagoTransportistaDraft,
 } from "@/components/viajes/PagosTransportistaFieldset";
+import { PagosTransportistaSummary } from "@/components/viajes/PagosTransportistaSummary";
+import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import {
   preserveAmountOnMonedaChange,
   maskCurrencyForMoneda,
@@ -174,6 +176,12 @@ export type ViajeEditModalProps = {
    * ver liquidaciones.service.ts).
    */
   hasIntegracionArca?: boolean;
+  /**
+   * Abre el modal de registrar pago (`RegistrarPagoTransportistaModal`, mantenido
+   * por la página que hostea este modal). Si no se pasa, el resumen de solo lectura
+   * de pagos (viaje con liquidación vigente) no muestra el botón "+ Registrar pago".
+   */
+  onRegistrarPago?: () => void;
   onProductoCreado?: (p: Producto) => void;
   onClienteCreado?: (c: Cliente) => void;
   onTransportistaCreado?: (t: Transportista) => void;
@@ -220,6 +228,7 @@ export function ViajeEditModal({
   tenantId,
   tenant,
   hasIntegracionArca = false,
+  onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
   onTransportistaCreado,
@@ -306,11 +315,18 @@ export function ViajeEditModal({
     return facturado || liquidado;
   }, [snapshotViaje]);
 
-  // "Incluir IVA" solo se bloquea por liquidación vigente (no por facturación al
-  // cliente, que es un eje independiente) — mismo criterio que el backend en
-  // viajes.service.ts, para que un viaje ya facturado pero todavía sin liquidar
-  // no quede con el flag atascado en cuanto se emite la factura al cliente.
-  const precioIvaBloqueado = useMemo(() => {
+  // true si el viaje tiene una liquidación vigente (no disponible para vincular
+  // una nueva). Se usa para: (1) bloquear "Incluir IVA" — mismo criterio que el
+  // backend en viajes.service.ts, para que un viaje ya facturado al cliente pero
+  // todavía sin liquidar no quede con el flag atascado en cuanto se emite esa
+  // factura (eje independiente de la liquidación); y (2) reemplazar el fieldset
+  // editable de pagos por un resumen de solo lectura con los montos reales de la
+  // Liquidación — editarlos ahí fallaría igual al guardar (pagosTransportista está
+  // en CAMPOS_FISCALES_VIAJE), y antes de este cambio el fieldset mostraba un
+  // "Acordado" calculado sobre el precio plano, sin la comisión/IVA de la
+  // Liquidación real (ver "precioTransportistaExterno con IVA incluido" en
+  // vialto-backend/CLAUDE.md).
+  const liquidacionVigente = useMemo(() => {
     if (!snapshotViaje) return false;
     return !liquidacionPermiteVincular(
       (snapshotViaje as any).liquidacionEstado ?? null,
@@ -938,7 +954,7 @@ export function ViajeEditModal({
                       <label className="flex cursor-pointer items-center gap-2 text-sm">
                         <input
                           type="checkbox"
-                          disabled={precioIvaBloqueado}
+                          disabled={liquidacionVigente}
                           checked={draft.precioTransportistaIncluyeIva}
                           onChange={(e) =>
                             setDraft((p) =>
@@ -1284,7 +1300,28 @@ export function ViajeEditModal({
               )}
 
               {muestraPagosTransportista &&
-                isVisible("edicion_viaje", "pagosTransportista") && (
+                isVisible("edicion_viaje", "pagosTransportista") &&
+                (liquidacionVigente && snapshotViaje ? (
+                  // Viaje con liquidación vigente: el fieldset editable de abajo no
+                  // sirve acá — pagosTransportista está en CAMPOS_FISCALES_VIAJE, así
+                  // que guardar filas nuevas fallaría igual, y su "Acordado" ignora la
+                  // comisión/IVA reales de la Liquidación (ver comentario de
+                  // `liquidacionVigente` más arriba). Mostramos el resumen real +
+                  // acceso directo a la Liquidación en vez del fieldset.
+                  <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={labelClass}>Liquidación vinculada</span>
+                      <ViajeLiquidacionIndicador
+                        viaje={snapshotViaje}
+                        tenantId={tenantId}
+                      />
+                    </div>
+                    <PagosTransportistaSummary
+                      viaje={snapshotViaje}
+                      onRegistrarPago={onRegistrarPago}
+                    />
+                  </div>
+                ) : (
                   <div className="md:col-span-2 lg:col-span-3">
                     <PagosTransportistaFieldset
                       rows={draft.pagosTransportista}
@@ -1317,7 +1354,7 @@ export function ViajeEditModal({
                       + Agregar pago al transportista
                     </button>
                   </div>
-                )}
+                ))}
             </div>
             {error && (
               <p

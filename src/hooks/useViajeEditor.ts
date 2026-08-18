@@ -350,6 +350,17 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     }));
   }
 
+  /**
+   * Actualiza `viajeSnapshot` con un viaje fresco traído fuera de este hook (ej. la
+   * respuesta de `RegistrarPagoTransportistaModal`, montado por la página que hostea
+   * el editor). Sin esto, registrar un pago mientras el editor sigue abierto para
+   * el mismo viaje deja el snapshot viejo — y con él, desactualizados el resumen de
+   * pagos y el badge de liquidación que se muestran cuando hay una liquidación vigente.
+   */
+  function patchViajeSnapshot(updated: Viaje) {
+    if (editingId === updated.id) setViajeSnapshot(updated);
+  }
+
   function cancelEdit() {
     setEditingId(null);
     setDraft(null);
@@ -677,6 +688,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     ayudaFlota,
     opcionesProducto,
     beginEditViaje,
+    patchViajeSnapshot,
     cancelEdit,
     saveInline,
     applyDraftModo,
