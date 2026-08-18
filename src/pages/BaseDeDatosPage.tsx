@@ -32,7 +32,6 @@ import { PresentacionesPage } from "./PresentacionesPage";
 import { SuperadminUsersPage } from "./SuperadminUsersPage";
 import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
-import { ImportarDatosTenantPage } from "./ImportarDatosTenantPage";
 import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {

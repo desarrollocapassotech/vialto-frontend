@@ -792,8 +792,6 @@ export function ViajeCreatePage() {
     <>
       <CrudPageLayout
         title="Crear viaje"
-        backTo={`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-        backLabel="← Volver a viajes"
       >
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>

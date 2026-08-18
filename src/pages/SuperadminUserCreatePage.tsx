@@ -78,8 +78,6 @@ export function SuperadminUserCreatePage() {
     <SuperadminOnly>
       <CrudPageLayout
         title="Crear usuario"
-        backTo={`/superadmin/usuarios${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`}
-        backLabel="← Volver a usuarios"
       >
         <form
           className="mt-6 grid gap-4"

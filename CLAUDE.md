@@ -428,6 +428,18 @@ Todo el contenido de un paso (excepto la fila de botones de acción) va envuelto
 
 ---
 
+## Navegación: breadcrumb global, no botones "Volver" por pantalla
+
+**Regla global — ninguna pantalla interna arma su propio link/botón "← Volver".** La navegación hacia atrás la resuelve un breadcrumb único, montado una sola vez en `AppShell.tsx` (arriba del `<Outlet/>`, dentro de `<main>`), que muestra el trail completo de pantallas previas + la actual. Que una pantalla necesite "volver" no es motivo para agregar un link ahí — es motivo para agregarla al config central.
+
+- **`src/lib/breadcrumbs.ts`**: tabla de rutas → trail. Cada entrada matchea un `pattern` (sintaxis de `react-router-dom`) contra `location.pathname` y arma el array de crumbs (`{ label, to? }`, el último sin `to` = pantalla actual). Lee `tenantId` de `location.search` para que los links intermedios preserven el contexto de superadmin sobre una empresa puntual (mismo criterio que ya usaban los `backTo` viejos: `?tab=<tab>&tenantId=<id>` hacia `/base-de-datos`, etc.). El "Inicio" del trail es "Panorama" para superadmin, "Inicio" para el resto — excepto stock-viewer, que no tiene acceso a `/` y usa `/stock/inventario` como su inicio real.
+- **`src/components/shared/Breadcrumbs.tsx`**: presentacional, no se toca para agregar rutas nuevas — solo renderiza lo que devuelve `resolveBreadcrumbs`. No se muestra si el trail resuelto tiene 1 o menos crumbs (p. ej. el home).
+- **Al agregar una ruta nueva en `App.tsx` que sea una pantalla real** (no un redirect legacy), sumar su entrada en `ENTRIES` de `breadcrumbs.ts` seleccionando como label el propio `<h1>`/título de esa pantalla, para que el crumb final coincida con lo que el usuario ve arriba.
+- **Escape hatch — `useBreadcrumbOverride` (`src/hooks/useBreadcrumbOverride.tsx`)**: para las pocas pantallas cuyo trail depende de datos que no están en la URL (un fetch recién resuelto, o selección de tenant en estado local no sincronizado con `searchParams`) en vez de la ruta. Ejemplos reales: `MovimientoStockDetallePage.tsx` (el link/label del padre depende de `row.tipo`, que solo se conoce tras el fetch) y `DivisionesStockHistorialTenantPage.tsx` (el tenant elegido por el superadmin es estado local, no query param). Pasar `null` cuando no aplica override, para que se use el trail automático.
+- **`CrudPageLayout.tsx`** (usado por las pantallas de alta/edición con patrón VER→modal→EDITAR) ya no acepta `backTo`/`backLabel` — el breadcrumb central los reemplazó. No reintroducir esas props.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.

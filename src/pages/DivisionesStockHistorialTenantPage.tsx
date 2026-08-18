@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -11,6 +10,7 @@ import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useHistorialStockFiltros } from "@/hooks/useHistorialStockFiltros";
+import { useBreadcrumbOverride } from "@/hooks/useBreadcrumbOverride";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { buildQs } from "@/lib/queryString";
@@ -132,18 +132,20 @@ export function DivisionesStockHistorialTenantPage({
       ? `/stock/divisiones?tenantId=${encodeURIComponent(activeTenantId)}`
       : "/stock/divisiones";
 
+  // El tenant seleccionado por el superadmin es estado local (no está en la URL),
+  // así que el breadcrumb automático (calculado por ruta) no lo puede reflejar.
+  useBreadcrumbOverride([
+    { label: platform ? "Panorama" : "Inicio", to: "/" },
+    { label: "División de bultos", to: volverHref },
+    { label: "Historial de divisiones" },
+  ]);
+
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-vialto-charcoal">
           Historial de divisiones
         </h1>
-        <Link
-          to={volverHref}
-          className="text-sm font-medium text-vialto-fire hover:underline"
-        >
-          ← Volver a divisiones
-        </Link>
       </div>
 
       {/* Buscador de empresas para plataforma */}

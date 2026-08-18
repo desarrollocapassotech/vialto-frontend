@@ -23,7 +23,6 @@ export function PaisesSuperadminPage() {
   const tenants = useTenantsList();
 
   const [rows, setRows] = useState<Pais[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingPais, setViewingPais] = useState<Pais | null>(null);
   const [editingPais, setEditingPais] = useState<Pais | null>(null);
@@ -53,7 +52,6 @@ export function PaisesSuperadminPage() {
     }
     let cancelled = false;
     setRows(null);
-    setLoading(true);
     (async () => {
       try {
         await load();
@@ -63,8 +61,6 @@ export function PaisesSuperadminPage() {
           setRows(null);
           setError(friendlyError(e, "paises"));
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     })();
     return () => {

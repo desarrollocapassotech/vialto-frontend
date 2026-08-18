@@ -178,8 +178,6 @@ export function ClienteEditPage() {
   return (
     <CrudPageLayout
       title="Editar cliente"
-      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a clientes"
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>

@@ -156,8 +156,6 @@ export function VehiculoEditPage() {
   return (
     <CrudPageLayout
       title="Editar vehículo"
-      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a vehículos"
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>

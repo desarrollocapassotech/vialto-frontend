@@ -1,7 +1,6 @@
 ﻿import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 // Asegúrate de que esta ruta coincida con dónde guardaste el ListadoPagination
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -128,10 +127,6 @@ export function IngresosStockHistorialTenantPage({
     }
   }, [platform, params, tenantId, getToken]);
 
-  const volverHref = platform
-    ? `/stock/ingresos?tenantId=${encodeURIComponent(tenantId!)}`
-    : "/stock/ingresos";
-
   const excelCols = stockOperacionColumnas("ingreso");
   const excelRows = flattenStockOperaciones(exportRows);
 
@@ -154,26 +149,12 @@ export function IngresosStockHistorialTenantPage({
           <h1 className="text-2xl font-semibold text-vialto-charcoal">
             Historial de ingresos
           </h1>
-          <div className="flex items-center gap-4">
-            <Link
-              to={volverHref}
-              className="text-sm font-medium text-vialto-fire hover:underline"
-            >
-              ← Volver a ingresos
-            </Link>
-          </div>
         </div>
       )}
 
       {embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-end gap-4">
           {exportButton}
-          <Link
-            to={volverHref}
-            className="text-sm font-medium text-vialto-fire hover:underline"
-          >
-            ← Volver a ingresos
-          </Link>
         </div>
       )}
 

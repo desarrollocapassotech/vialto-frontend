@@ -113,8 +113,6 @@ export function SuperadminUserEditPage() {
     <SuperadminOnly>
       <CrudPageLayout
         title="Editar usuario"
-        backTo={`/superadmin/usuarios${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`}
-        backLabel="← Volver a usuarios"
       >
         {initialLoading ? (
           <p className="mt-6 text-vialto-steel">Cargando…</p>

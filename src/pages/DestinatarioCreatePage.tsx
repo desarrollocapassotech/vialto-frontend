@@ -70,8 +70,6 @@ export function DestinatarioCreatePage() {
   return (
     <CrudPageLayout
       title="Crear destinatario"
-      backTo={`/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a destinatarios"
     >
       <form
         className="max-w-lg grid gap-4"

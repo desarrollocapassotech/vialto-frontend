@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { ImportWizard } from "@/components/importacion/ImportWizard";
 
@@ -24,15 +23,6 @@ export function ImportarDatosTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Importar datos
       </h1>
-
-      <div className="mt-4">
-        <Link
-          className="text-sm text-vialto-fire hover:text-vialto-bright"
-          to="/base-de-datos"
-        >
-          ← Volver
-        </Link>
-      </div>
 
       <div className="mt-6">
         <ImportWizard

@@ -32,7 +32,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "./Logo";
+import { Breadcrumbs } from "./shared/Breadcrumbs";
 import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization";
+import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   canAccessCombustible,
@@ -123,6 +125,7 @@ export function AppShell() {
     () => ({ orgRole, publicMetadata: user?.publicMetadata }),
     [orgRole, user?.publicMetadata],
   );
+  const stockViewer = isStockViewer(roleCtx);
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -694,7 +697,18 @@ export function AppShell() {
         </header>
 
         <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
-          <Outlet />
+          <BreadcrumbOverrideProvider>
+            {(override) => (
+              <>
+                <Breadcrumbs
+                  override={override}
+                  superadmin={superadmin}
+                  stockViewer={stockViewer}
+                />
+                <Outlet />
+              </>
+            )}
+          </BreadcrumbOverrideProvider>
         </main>
       </div>
 
