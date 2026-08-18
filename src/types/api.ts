@@ -361,7 +361,8 @@ export interface Factura {
   tenantId: string;
   /** Null para tenants con integracion-arca hasta que se emite (el número real lo asigna AFIP). */
   numero: string | null;
-  tipo: "cliente" | "transportista_externo";
+  /** Siempre "cliente" — el pago a transportistas externos se gestiona en Liquidaciones, no como Factura. */
+  tipo: "cliente";
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];

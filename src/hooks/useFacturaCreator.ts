@@ -31,15 +31,10 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
   const [viajesLoading, setViajesLoading] = useState(false);
 
   const viajesNueva = useMemo(() => {
-    const list = viajesFiltradosParaFactura(
-      viajes,
-      draft.tipo,
-      draft.clienteId,
-      draft.transportistaId,
-    );
+    const list = viajesFiltradosParaFactura(viajes, draft.clienteId);
     if (!config.hasArca) return list;
     return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
-  }, [viajes, draft.tipo, draft.clienteId, draft.transportistaId, config.hasArca]);
+  }, [viajes, draft.clienteId, config.hasArca]);
 
   async function ensureViajesLoaded() {
     if (viajes.length > 0 || viajesLoading) return;

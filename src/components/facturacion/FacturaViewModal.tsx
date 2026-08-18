@@ -40,7 +40,6 @@ function fmtImporte(moneda: string, importe: number, minDecimals?: number) {
 
 const TIPO_LABEL: Record<string, string> = {
   cliente: 'Cliente',
-  transportista_externo: 'Transportista externo',
 };
 
 const ESTADO_LABEL: Record<string, string> = {

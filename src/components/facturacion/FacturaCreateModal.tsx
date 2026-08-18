@@ -30,10 +30,7 @@ import {
   toFacturaLineasPayload,
   validateFacturaLineasDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
-import {
-  ClienteSearchSelect,
-  TransportistaSearchSelect,
-} from "@/components/forms/MaestroSearchSelects";
+import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
@@ -57,13 +54,7 @@ import {
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
 } from "@/lib/viajesFlota";
-import type {
-  ArcaConfig,
-  Cliente,
-  Factura,
-  Transportista,
-  Viaje,
-} from "@/types/api";
+import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
 
 const compactInputClass =
   "h-8 w-full border border-black/15 bg-white px-2 text-sm";
@@ -127,25 +118,16 @@ function fmtPreviewMoney(n: number) {
 }
 
 function FacturaContraparteField({
-  tipo,
   clienteId,
-  transportistaId,
   clientes,
-  transportistas,
   onClienteChange,
-  onTransportistaChange,
   compact = false,
 }: {
-  tipo: FacturaDraft["tipo"];
   clienteId: string;
-  transportistaId: string;
   clientes: Cliente[];
-  transportistas: Transportista[];
   onClienteChange: (id: string) => void;
-  onTransportistaChange: (id: string) => void;
   compact?: boolean;
 }) {
-  const esTransportista = tipo === "transportista_externo";
   const labelClass = compact
     ? compactLabelClass
     : "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
@@ -153,31 +135,17 @@ function FacturaContraparteField({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className={labelClass}>
-        {esTransportista ? "Transportista" : "Cliente"}
-      </label>
-      {esTransportista ? (
-        <TransportistaSearchSelect
-          transportistas={transportistas}
-          value={transportistaId}
-          onChange={onTransportistaChange}
-          inputClassName={inputClass}
-          emptyListChoiceLabel="— Sin transportista —"
-          placeholderCerrado="— Sin transportista —"
-          aria-label="Transportista"
-        />
-      ) : (
-        <ClienteSearchSelect
-          clientes={clientes}
-          value={clienteId}
-          onChange={onClienteChange}
-          inputClassName={inputClass}
-          allowEmptyValue
-          emptyListChoiceLabel="— Sin cliente —"
-          placeholderCerrado="— Sin cliente —"
-          aria-label="Cliente"
-        />
-      )}
+      <label className={labelClass}>Cliente</label>
+      <ClienteSearchSelect
+        clientes={clientes}
+        value={clienteId}
+        onChange={onClienteChange}
+        inputClassName={inputClass}
+        allowEmptyValue
+        emptyListChoiceLabel="— Sin cliente —"
+        placeholderCerrado="— Sin cliente —"
+        aria-label="Cliente"
+      />
     </div>
   );
 }
@@ -187,7 +155,6 @@ export type FacturaCreateModalProps = {
   draft: FacturaDraft;
   setDraft: Dispatch<SetStateAction<FacturaDraft>>;
   clientes: Cliente[];
-  transportistas: Transportista[];
   viajes: Viaje[];
   viajesNueva: Viaje[];
   viajesLoading: boolean;
@@ -209,7 +176,6 @@ export function FacturaCreateModal({
   draft,
   setDraft,
   clientes,
-  transportistas,
   viajes,
   viajesNueva,
   viajesLoading,
@@ -582,22 +548,11 @@ export function FacturaCreateModal({
           </div>
         )}
         <FacturaContraparteField
-          tipo={draft.tipo}
           clienteId={draft.clienteId}
-          transportistaId={draft.transportistaId}
           clientes={clientes}
-          transportistas={transportistas}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
-              viajeIds: [],
-              facturarPorTramo: false,
-              tramos: [],
-            })
-          }
-          onTransportistaChange={(id) =>
-            patch({
-              transportistaId: id,
               viajeIds: [],
               facturarPorTramo: false,
               tramos: [],
@@ -651,7 +606,7 @@ export function FacturaCreateModal({
           </label>
           {draft.viajeIds.length > 0 && (
             <span className="text-xs font-medium tabular-nums text-vialto-charcoal">
-              {textoImporteFacturaSeleccion(draft.viajeIds, viajes, draft.tipo)}
+              {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
             </span>
           )}
         </div>
@@ -662,9 +617,7 @@ export function FacturaCreateModal({
             selected={draft.viajeIds}
             onChange={patchViajeIds}
             loading={viajesLoading}
-            tipo={draft.tipo}
             clienteId={draft.clienteId}
-            transportistaId={draft.transportistaId}
             viajesTablaFillHeight
           />
         </div>
@@ -723,22 +676,11 @@ export function FacturaCreateModal({
           />
         </div>
         <FacturaContraparteField
-          tipo={draft.tipo}
           clienteId={draft.clienteId}
-          transportistaId={draft.transportistaId}
           clientes={clientes}
-          transportistas={transportistas}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
-              viajeIds: [],
-              facturarPorTramo: false,
-              tramos: [],
-            })
-          }
-          onTransportistaChange={(id) =>
-            patch({
-              transportistaId: id,
               viajeIds: [],
               facturarPorTramo: false,
               tramos: [],
@@ -790,11 +732,7 @@ export function FacturaCreateModal({
             </label>
             {draft.viajeIds.length > 0 && (
               <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                {textoImporteFacturaSeleccion(
-                  draft.viajeIds,
-                  viajes,
-                  draft.tipo,
-                )}
+                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
               </span>
             )}
           </div>
@@ -804,9 +742,7 @@ export function FacturaCreateModal({
             selected={draft.viajeIds}
             onChange={patchViajeIds}
             loading={viajesLoading}
-            tipo={draft.tipo}
             clienteId={draft.clienteId}
-            transportistaId={draft.transportistaId}
           />
         </div>
         {draft.viajeIds.length > 0 && (

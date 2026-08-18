@@ -7,10 +7,7 @@ import {
   useCallback,
 } from "react";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
-import {
-  ClienteSearchSelect,
-  TransportistaSearchSelect,
-} from "@/components/forms/MaestroSearchSelects";
+import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import {
   FacturaTramosEditor,
   computeTotalesFacturaPorTramo,
@@ -28,7 +25,7 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
-import type { Cliente, Factura, Transportista, Viaje } from "@/types/api";
+import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
   borrador: "BORRADOR",
@@ -52,7 +49,8 @@ const ESTADO_BADGE: Record<string, string> = {
 
 export type FacturaDraft = {
   numero: string;
-  tipo: "cliente" | "transportista_externo";
+  /** Siempre "cliente" — el pago a transportistas externos se gestiona en Liquidaciones, no como Factura. */
+  tipo: "cliente";
   clienteId: string;
   transportistaId: string;
   viajeIds: string[];
@@ -230,30 +228,6 @@ export function FacturaTotalesPreview({
   );
 }
 
-/** Al cambiar el tipo de factura, preserva el viaje actual y actualiza la contraparte según el tipo. Si no hay viaje previo, limpia todo. */
-export function patchFacturaTipo(
-  tipo: FacturaDraft["tipo"],
-  viajeActual?: Viaje | null,
-): Pick<FacturaDraft, "tipo" | "clienteId" | "transportistaId" | "viajeIds"> {
-  if (tipo === "transportista_externo" && viajeActual) {
-    return {
-      tipo,
-      clienteId: "",
-      transportistaId: viajeActual.transportistaId ?? "",
-      viajeIds: [viajeActual.id],
-    };
-  }
-  if (tipo === "cliente" && viajeActual) {
-    return {
-      tipo,
-      clienteId: viajeActual.clienteId ?? "",
-      transportistaId: "",
-      viajeIds: [viajeActual.id],
-    };
-  }
-  return { tipo, clienteId: "", transportistaId: "", viajeIds: [] };
-}
-
 const clienteInputClass =
   "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 
@@ -264,25 +238,16 @@ const compactLabelClass =
   "text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel";
 
 function FacturaContraparteField({
-  tipo,
   clienteId,
-  transportistaId,
   clientes,
-  transportistas,
   onClienteChange,
-  onTransportistaChange,
   compact = false,
 }: {
-  tipo: FacturaDraft["tipo"];
   clienteId: string;
-  transportistaId: string;
   clientes: Cliente[];
-  transportistas: Transportista[];
   onClienteChange: (id: string) => void;
-  onTransportistaChange: (id: string) => void;
   compact?: boolean;
 }) {
-  const esTransportista = tipo === "transportista_externo";
   const labelClass = compact
     ? compactLabelClass
     : "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
@@ -290,31 +255,17 @@ function FacturaContraparteField({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className={labelClass}>
-        {esTransportista ? "Transportista" : "Cliente"}
-      </label>
-      {esTransportista ? (
-        <TransportistaSearchSelect
-          transportistas={transportistas}
-          value={transportistaId}
-          onChange={onTransportistaChange}
-          inputClassName={inputClass}
-          emptyListChoiceLabel="— Sin transportista —"
-          placeholderCerrado="— Sin transportista —"
-          aria-label="Transportista"
-        />
-      ) : (
-        <ClienteSearchSelect
-          clientes={clientes}
-          value={clienteId}
-          onChange={onClienteChange}
-          inputClassName={inputClass}
-          allowEmptyValue
-          emptyListChoiceLabel="— Sin cliente —"
-          placeholderCerrado="— Sin cliente —"
-          aria-label="Cliente"
-        />
-      )}
+      <label className={labelClass}>Cliente</label>
+      <ClienteSearchSelect
+        clientes={clientes}
+        value={clienteId}
+        onChange={onClienteChange}
+        inputClassName={inputClass}
+        allowEmptyValue
+        emptyListChoiceLabel="— Sin cliente —"
+        placeholderCerrado="— Sin cliente —"
+        aria-label="Cliente"
+      />
     </div>
   );
 }
@@ -327,9 +278,7 @@ export function ViajesVinculadosEditor({
   selected,
   onChange,
   loading,
-  tipo,
   clienteId,
-  transportistaId,
   viajesTablaFillHeight = false,
 }: {
   viajes: Viaje[];
@@ -337,15 +286,10 @@ export function ViajesVinculadosEditor({
   selected: string[];
   onChange: (ids: string[]) => void;
   loading?: boolean;
-  tipo: FacturaDraft["tipo"];
   clienteId: string;
-  transportistaId: string;
   viajesTablaFillHeight?: boolean;
 }) {
-  const showClienteHint = tipo === "cliente" && !clienteId.trim();
-  const showTransportistaHint =
-    tipo === "transportista_externo" && !transportistaId.trim();
-  const showContraparteHint = showClienteHint || showTransportistaHint;
+  const showContraparteHint = !clienteId.trim();
 
   // Candidatos filtrados + los ya seleccionados que hayan quedado fuera del filtro actual.
   const pool = useMemo(() => {
@@ -371,9 +315,7 @@ export function ViajesVinculadosEditor({
   if (showContraparteHint) {
     return (
       <p className="text-[11px] text-vialto-steel">
-        {showTransportistaHint
-          ? "Elegí un transportista para poder vincular viajes."
-          : "Elegí un cliente para poder vincular viajes."}
+        Elegí un cliente para poder vincular viajes.
       </p>
     );
   }
@@ -436,7 +378,6 @@ export type FacturaEditModalProps = {
   setDraft: Dispatch<SetStateAction<FacturaDraft | null>>;
   snapshotFactura: Factura;
   clientes: Cliente[];
-  transportistas: Transportista[];
   /** Listado completo de viajes (para sumar importes de los seleccionados). */
   viajes: Viaje[];
   /** Viajes mostrados en los checkboxes (filtrados por cliente/tipo/edición). */
@@ -455,7 +396,6 @@ export function FacturaEditModal({
   setDraft,
   snapshotFactura,
   clientes,
-  transportistas,
   viajes,
   viajesEdicion,
   viajesLoading,
@@ -618,22 +558,11 @@ export function FacturaEditModal({
             </div>
 
             <FacturaContraparteField
-              tipo={draft.tipo}
               clienteId={draft.clienteId}
-              transportistaId={draft.transportistaId}
               clientes={clientes}
-              transportistas={transportistas}
               onClienteChange={(id) =>
                 patch({
                   clienteId: id,
-                  viajeIds: [],
-                  facturarPorTramo: false,
-                  tramos: [],
-                })
-              }
-              onTransportistaChange={(id) =>
-                patch({
-                  transportistaId: id,
                   viajeIds: [],
                   facturarPorTramo: false,
                   tramos: [],
@@ -689,11 +618,7 @@ export function FacturaEditModal({
                 </label>
                 {draft.viajeIds.length > 0 && (
                   <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                    {textoImporteFacturaSeleccion(
-                      draft.viajeIds,
-                      viajes,
-                      draft.tipo,
-                    )}
+                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
                   </span>
                 )}
               </div>
@@ -703,9 +628,7 @@ export function FacturaEditModal({
                 selected={draft.viajeIds}
                 onChange={patchViajeIds}
                 loading={viajesLoading}
-                tipo={draft.tipo}
                 clienteId={draft.clienteId}
-                transportistaId={draft.transportistaId}
               />
             </div>
 

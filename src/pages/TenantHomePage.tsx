@@ -319,7 +319,6 @@ export function TenantHomePage() {
         draft={facturaCreator.draft}
         setDraft={facturaCreator.setDraft}
         clientes={maestro.clientes}
-        transportistas={maestro.transportistas}
         viajes={facturaCreator.viajes}
         viajesNueva={facturaCreator.viajesNueva}
         viajesLoading={facturaCreator.viajesLoading}
