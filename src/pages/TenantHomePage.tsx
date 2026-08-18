@@ -287,6 +287,10 @@ export function TenantHomePage() {
           transportistas={maestro.transportistas}
           hasArca={hasArca}
           getToken={getToken}
+          onDataSaved={() => {
+            void maestro.refreshTransportistas();
+            void maestro.refreshClientes();
+          }}
           onSuccess={() => setCrearLiqViaje(null)}
           onClose={() => setCrearLiqViaje(null)}
         />

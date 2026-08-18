@@ -1455,6 +1455,10 @@ export function FacturacionTenantPage({
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
+        onDataSaved={() => {
+          void maestro.refreshTransportistas();
+          void maestro.refreshClientes();
+        }}
         onClose={() => {
           setCreating(false);
           setDraft(emptyFacturaDraft());
@@ -1519,6 +1523,10 @@ export function FacturacionTenantPage({
           viajes={viajes}
           tenantId={platform ? tid : undefined}
           clienteInicial={clienteById(emittingFactura.clienteId)}
+          onDataSaved={() => {
+            void maestro.refreshTransportistas();
+            void maestro.refreshClientes();
+          }}
           onClose={() => setEmittingFactura(null)}
           onEmitido={(f) => {
             handleFacturaEmitida(f);

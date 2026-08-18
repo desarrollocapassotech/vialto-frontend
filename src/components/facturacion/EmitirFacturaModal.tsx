@@ -46,6 +46,7 @@ interface Props {
   clienteInicial?: Cliente | null;
   onClose: () => void;
   onEmitido: (factura: Factura) => void;
+  onDataSaved?: () => void;
 }
 
 type Step = "revision" | "autorizada";
@@ -66,6 +67,7 @@ export function EmitirFacturaModal({
   clienteInicial = null,
   onClose,
   onEmitido,
+  onDataSaved,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -444,6 +446,15 @@ export function EmitirFacturaModal({
                         País: {clienteDetalle.pais}
                       </p>
                     )}
+                    {missingClienteFields.length > 0 && (
+                      <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                        <p className="font-medium">
+                          Faltan datos del cliente: {missingClienteFields.map((f) => f.replace("Cliente: ", "")).join(", ")}.
+                          <br />
+                          <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                        </p>
+                      </div>
+                    )}
                   </section>
 
                   <section className="space-y-1">
@@ -548,9 +559,10 @@ export function EmitirFacturaModal({
                             clienteDetalle?.condicionTributaria ?? null,
                           direccion: clienteDetalle?.direccion ?? null,
                         }}
-                        onSaved={(updated) =>
-                          setClienteDetalle(updated as Cliente)
-                        }
+                        onSaved={(updated) => {
+                          setClienteDetalle(updated as Cliente);
+                          onDataSaved?.();
+                        }}
                       />
                     )}
 
