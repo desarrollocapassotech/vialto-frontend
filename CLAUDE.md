@@ -291,6 +291,16 @@ El modelo de datos completo (por qué `estado` de Factura no incluye `cobrado`, 
 
 ---
 
+## Controles incompatibles con el estado del tenant/registro: advertir, no ocultar
+
+**Regla global para cualquier control cuyo valor puede volverse inválido según un módulo del tenant o un estado del registro que cambia con el tiempo.**
+
+Cuando un control (checkbox, campo) es incompatible con cierto estado (ej. un módulo que el tenant no tenía al crear el registro y adquirió después), **no lo ocultes condicionalmente** — el registro puede haber quedado con ese control en un valor "inválido" antes del cambio de estado, y ocultarlo le quita al usuario la única forma de corregirlo desde la UI. En su lugar: dejalo siempre visible y editable, y mostrá una advertencia corta (`<p className="text-xs text-amber-800/90">`) explicando la incompatibilidad. El backend es siempre la fuente de verdad del bloqueo real (rechaza la operación inválida con un mensaje claro); el frontend solo informa, nunca decide ocultando.
+
+Ejemplo real: el checkbox "Incluir IVA" del precio transportista (`ViajeCreatePage.tsx`/`ViajeEditModal.tsx`) — la primera versión lo ocultaba para tenants con `integracion-arca`, lo que dejaba sin forma de destildar el flag a un viaje viejo cuyo tenant adoptó ARCA después de crearlo. Se corrigió mostrando el checkbox siempre + una advertencia condicional. Ver `vialto-backend/CLAUDE.md`, sección "`precioTransportistaExterno` con IVA incluido", para el detalle completo (incluye además un lock parcial: el campo no se bloquea por todos los ejes fiscales del registro, solo por el que realmente lo vuelve inconsistente — no asumir que todo campo relacionado a un módulo opcional debe seguir el mismo lock que el resto de los campos fiscales del formulario).
+
+---
+
 ## Campos de formulario: obligatorios y opcionales
 
 **Regla global para todos los formularios actuales y futuros.**
@@ -453,7 +463,8 @@ Todo el contenido de un paso (excepto la fila de botones de acción) va envuelto
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
 - **Si se toca el flujo de importación masiva**, extender `ImportWizard.tsx`/`useImportWizard.ts` (compartidos entre tenant-admin y superadmin) en vez de crear un modal o una copia por rol — ver "Importación masiva desde Excel".
+- **Si un control puede volverse inválido según un módulo del tenant o el estado de un registro** (no según lo que el usuario está tipeando ahora), advertí en vez de ocultar — ver "Controles incompatibles con el estado del tenant/registro: advertir, no ocultar".
 
 ---
 
-Última actualización: agosto 2026 (wizard de importación masiva unificado en `ImportWizard.tsx` — páginas en vez de modal, selector de módulos, diff "Ver cambios" y demás patrones — ver "Importación masiva desde Excel"; y, de una pasada anterior, el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")
+Última actualización: agosto 2026 (`Viaje.precioTransportistaIncluyeIva` — patrón "advertir, no ocultar" para controles incompatibles con el estado del tenant/registro, ver "Controles incompatibles..."; y, de una pasada anterior, wizard de importación masiva unificado en `ImportWizard.tsx` — páginas en vez de modal, selector de módulos, diff "Ver cambios" y demás patrones — ver "Importación masiva desde Excel"; y, de una pasada anterior a esa, el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")
