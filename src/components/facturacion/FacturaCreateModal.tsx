@@ -202,6 +202,7 @@ export type FacturaCreateModalProps = {
   facturasCreateUrl?: string;
   onFacturaGuardada?: (factura: Factura) => void;
   onFacturaEmitida?: (factura: Factura) => void;
+  onDataSaved?: () => void;
 };
 
 export function FacturaCreateModal({
@@ -224,6 +225,7 @@ export function FacturaCreateModal({
   facturasCreateUrl,
   onFacturaGuardada,
   onFacturaEmitida,
+  onDataSaved,
 }: FacturaCreateModalProps) {
   const auth = useAuth();
   const getToken = getTokenProp ?? auth.getToken;
@@ -974,7 +976,6 @@ export function FacturaCreateModal({
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
-                      datosReady={datosReady}
                       numero={draft.numero}
                       fechaEmision={draft.fechaEmision}
                       lineas={lineas}
@@ -991,7 +992,10 @@ export function FacturaCreateModal({
                       platform={platform}
                       tenantId={tenantId}
                       getToken={getToken}
-                      onClienteUpdated={setClienteDetalle}
+                      onClienteUpdated={(c) => {
+                        setClienteDetalle(c);
+                        onDataSaved?.();
+                      }}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError && (

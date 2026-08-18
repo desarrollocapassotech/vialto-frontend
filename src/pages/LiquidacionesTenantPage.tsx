@@ -215,7 +215,7 @@ export function LiquidacionesTenantPage() {
   const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
-  const { tenant, transportistas } = useMaestroData();
+  const { tenant, transportistas, refreshTransportistas, refreshClientes } = useMaestroData();
 
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
@@ -974,6 +974,10 @@ export function LiquidacionesTenantPage() {
           ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          onDataSaved={() => {
+            void refreshTransportistas();
+            void refreshClientes();
+          }}
         />
       )}
       {showCrear && activeTenantId && (
@@ -983,6 +987,10 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          onDataSaved={() => {
+            void refreshTransportistas();
+            void refreshClientes();
+          }}
           onSuccess={(liq) => {
             setRows((prev) =>
               prev

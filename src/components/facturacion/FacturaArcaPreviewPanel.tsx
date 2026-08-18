@@ -38,7 +38,6 @@ function fmtDate(iso: string) {
 export type FacturaArcaPreviewPanelProps = {
   arcaConfig: ArcaConfig | null;
   clienteDetalle: Cliente | null;
-  datosReady: boolean;
   numero: string;
   fechaEmision: string;
   lineas: FacturaLineaDraft[];
@@ -60,7 +59,6 @@ export type FacturaArcaPreviewPanelProps = {
 export function FacturaArcaPreviewPanel({
   arcaConfig,
   clienteDetalle,
-  datosReady,
   numero,
   fechaEmision,
   lineas,
@@ -81,6 +79,9 @@ export function FacturaArcaPreviewPanel({
   const condicionIva = clienteDetalle?.condicionIva ?? null;
   const letra = facturaLetraFromCondicionIva(condicionIva);
   const totales = computeFacturaTotales(lineas, ivaPctDefault);
+  const missingClienteFields = missingEmitFields.filter((f) =>
+    f.startsWith("Cliente:")
+  );
 
   return (
     <div className="space-y-4">
@@ -143,15 +144,14 @@ export function FacturaArcaPreviewPanel({
             País: {clienteDetalle.pais}
           </p>
         )}
-        {datosReady && condicionIva == null && clienteDetalle && (
-          <p
-            className="text-xs text-amber-900 border border-amber-400/40 bg-amber-50 px-2 py-1.5 mt-1"
-            role="alert"
-          >
-            Falta la condición de IVA AFIP. Editá el cliente, seleccioná{" "}
-            <strong>Argentina</strong> como país y guardá la condición frente al
-            IVA.
-          </p>
+        {missingClienteFields.length > 0 && clienteDetalle && (
+          <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+            <p className="font-medium">
+              Faltan datos del cliente: {missingClienteFields.map((f) => f.replace("Cliente: ", "")).join(", ")}.
+              <br />
+              <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+            </p>
+          </div>
         )}
       </section>
 
@@ -236,7 +236,11 @@ export function FacturaArcaPreviewPanel({
 
       {datosEmitIncompletos && !sinConfigArca && (
         <DatosFiscalesFaltantesAlerta
-          missingEmitFields={missingEmitFields}
+          missingEmitFields={
+            clienteDetalle
+              ? missingEmitFields
+              : missingEmitFields.filter((f) => !f.startsWith("Cliente:"))
+          }
           clienteDetalle={clienteDetalle}
           onClienteUpdated={onClienteUpdated}
           tenantId={tenantId}
