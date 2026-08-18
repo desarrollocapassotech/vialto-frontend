@@ -2531,6 +2531,10 @@ export function ViajesTenantPage({
           transportistas={maestro.transportistas}
           hasArca={hasLiquidacionesArca}
           getToken={getToken}
+          onDataSaved={() => {
+            void maestro.refreshTransportistas();
+            void maestro.refreshClientes();
+          }}
           onSuccess={() => {
             setCrearLiqViaje(null);
             setListadoQueryVersion((v) => v + 1);

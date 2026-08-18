@@ -105,6 +105,7 @@ interface Props {
   onSuccess: (liq: Liquidacion) => void;
   onClose: () => void;
   tenantId?: string;
+  onDataSaved?: () => void;
 }
 
 export function CrearLiquidacionManualModal({
@@ -116,6 +117,7 @@ export function CrearLiquidacionManualModal({
   onSuccess,
   onClose,
   tenantId,
+  onDataSaved,
 }: Props) {
   const showComprobante = !hasArca;
   const { showToast } = useToast();
@@ -334,13 +336,17 @@ export function CrearLiquidacionManualModal({
   const clienteSeleccionado = clienteDetalle;
 
   const missingEmitFields = useMemo(() => {
-    if (!hasArca || transportistaId === "" || selectedViajes.length === 0) return [];
+    if (!hasArca || transportistaId === "") return [];
     return collectCvlpEmitMissingFields({
       emisor: resolvedConfig,
       transportista: transportistaSeleccionado ?? { idFiscal: null, domicilio: null, condicionIva: null },
       cliente: clienteSeleccionado,
     });
   }, [hasArca, resolvedConfig, transportistaSeleccionado, clienteSeleccionado, transportistaId]);
+
+  const isLoadingCliente = selectedViajes.length > 0 && clienteSeleccionado === null;
+  const missingTransportistaFields = missingEmitFields.filter(f => f.startsWith("Transportista:"));
+  const missingClienteFields = selectedViajes.length > 0 && !isLoadingCliente ? missingEmitFields.filter(f => f.startsWith("Cliente:")) : [];
 
   const bloqueadoUsd = selectedViajes.some((v) =>
     arcaBloqueaLiquidarUsd(hasArca, v.monedaPrecioTransportistaExterno),
@@ -686,6 +692,16 @@ export function CrearLiquidacionManualModal({
                 </div>
               </div>
 
+              {missingTransportistaFields.length > 0 && (
+                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">
+                    Faltan datos del transportista: {missingTransportistaFields.map(f => f.replace("Transportista: ", "")).join(", ")}.
+                    <br />
+                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                  </p>
+                </div>
+              )}
+
               {/* Período */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -827,6 +843,16 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
 
+              {missingClienteFields.length > 0 && (
+                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                  <p className="font-medium">
+                    Faltan datos del cliente: {missingClienteFields.map(f => f.replace("Cliente: ", "")).join(", ")}.
+                    <br />
+                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                  </p>
+                </div>
+              )}
+
               {bloqueadoUsd && (
                 <p
                   className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
@@ -945,11 +971,21 @@ export function CrearLiquidacionManualModal({
 
               {hasArca && missingEmitFields.length > 0 && (
                 <DatosFiscalesFaltantesAlerta
-                  missingEmitFields={missingEmitFields}
+                  missingEmitFields={
+                    selectedViajes.length > 0 && !isLoadingCliente
+                      ? missingEmitFields
+                      : missingEmitFields.filter((f) => !f.startsWith("Cliente:"))
+                  }
                   clienteDetalle={clienteSeleccionado}
-                  onClienteUpdated={(c) => setClienteDetalle(c)}
+                  onClienteUpdated={(c) => {
+                    setClienteDetalle(c);
+                    onDataSaved?.();
+                  }}
                   transportistaSeleccionado={transportistaSeleccionado}
-                  onTransportistaUpdated={(t) => setTransportistaActualizado(t)}
+                  onTransportistaUpdated={(t) => {
+                    setTransportistaActualizado(t);
+                    onDataSaved?.();
+                  }}
                   tenantId={tenantId}
                   getToken={getToken}
                 />

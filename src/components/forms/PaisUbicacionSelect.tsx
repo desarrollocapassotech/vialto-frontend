@@ -40,7 +40,7 @@ export function PaisUbicacionSelect({
       value={value}
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value as PaisCodigo)}
-      className={className ?? defaultClass}
+      className={className ? `${defaultClass} ${className}` : defaultClass}
     >
       {placeholder !== undefined && (
         <option value="">{placeholder}</option>
