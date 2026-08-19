@@ -122,7 +122,7 @@ export function ClienteEditPage() {
           condicionIva: pais === "AR" ? condicionIva : null,
           condicionTributaria:
             pais !== "AR" ? condicionTributaria.trim() : null,
-          email: email.trim(),
+          email: email.trim() || null,
           telefono: telefono.trim(),
           direccion: direccion.trim(),
           confirmarSinDatosFiscales: faltanDatosFiscales
