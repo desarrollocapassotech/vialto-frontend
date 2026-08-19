@@ -343,7 +343,6 @@ export function TenantHomePage() {
         viajeEditor.viajeSnapshot && (
           <ViajeEditModal
             open
-            hasIntegracionArca={hasArca}
             draft={viajeEditor.draft}
             setDraft={viajeEditor.setDraft}
             snapshotViaje={viajeEditor.viajeSnapshot}

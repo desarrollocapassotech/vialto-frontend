@@ -2640,7 +2640,6 @@ export function ViajesTenantPage({
             getToken={getToken}
             tenantId={platform ? tid : undefined}
             tenant={!platform ? currentTenant : undefined}
-            hasIntegracionArca={hasLiquidacionesArca}
             onRegistrarPago={() =>
               setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
             }

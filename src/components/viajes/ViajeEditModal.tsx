@@ -67,6 +67,7 @@ import {
 import {
   viajeRequierePagosTransportista,
   validarPagosTransportistaDraftForm,
+  netearIvaIncluido,
 } from "@/lib/viajesTransportistaPagos";
 import type {
   Chofer,
@@ -113,7 +114,7 @@ export type ViajeInlineDraft = {
   litrosConsumidos: string;
   precioTransportistaExterno: string;
   monedaPrecioTransportistaExterno: ViajeMonedaCodigo;
-  precioTransportistaIncluyeIva: boolean;
+  precioTransportistaIvaIncluidoPct: string;
   cantidadTransportista: string;
   precioUnitarioTransportista: string;
   otrosGastos: OtroGastoDraft[];
@@ -170,13 +171,6 @@ export type ViajeEditModalProps = {
   /** Tenant activo, usado para el label personalizable del ID de viaje. */
   tenant?: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null;
   /**
-   * true si el tenant tiene integracion-arca: muestra una advertencia junto a
-   * "Incluir IVA" en el precio transportista (el CVLP ya calcula y discrimina
-   * el IVA por su cuenta — el backend es quien bloquea de verdad la combinación,
-   * ver liquidaciones.service.ts).
-   */
-  hasIntegracionArca?: boolean;
-  /**
    * Abre el modal de registrar pago (`RegistrarPagoTransportistaModal`, mantenido
    * por la página que hostea este modal). Si no se pasa, el resumen de solo lectura
    * de pagos (viaje con liquidación vigente) no muestra el botón "+ Registrar pago".
@@ -227,7 +221,6 @@ export function ViajeEditModal({
   getToken,
   tenantId,
   tenant,
-  hasIntegracionArca = false,
   onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
@@ -316,15 +309,14 @@ export function ViajeEditModal({
   }, [snapshotViaje]);
 
   // true si el viaje tiene una liquidación vigente (no disponible para vincular
-  // una nueva). Se usa para: (1) bloquear "Incluir IVA" — mismo criterio que el
-  // backend en viajes.service.ts, para que un viaje ya facturado al cliente pero
-  // todavía sin liquidar no quede con el flag atascado en cuanto se emite esa
-  // factura (eje independiente de la liquidación); y (2) reemplazar el fieldset
-  // editable de pagos por un resumen de solo lectura con los montos reales de la
-  // Liquidación — editarlos ahí fallaría igual al guardar (pagosTransportista está
-  // en CAMPOS_FISCALES_VIAJE), y antes de este cambio el fieldset mostraba un
-  // "Acordado" calculado sobre el precio plano, sin la comisión/IVA de la
-  // Liquidación real (ver "precioTransportistaExterno con IVA incluido" en
+  // una nueva). Se usa para: (1) bloquear "% de IVA ya incluido" — mismo criterio que
+  // el backend en viajes.service.ts, para que un viaje ya facturado al cliente pero
+  // todavía sin liquidar no quede con el % atascado en cuanto se emite esa
+  // factura (eje independiente de la liquidación) — una vez liquidado, el % queda fijo
+  // porque `Liquidacion.bruto` ya se calculó neteando con ese valor; y (2) reemplazar el
+  // fieldset editable de pagos por un resumen de solo lectura con los montos reales de
+  // la Liquidación — editarlos ahí fallaría igual al guardar (pagosTransportista está
+  // en CAMPOS_FISCALES_VIAJE) (ver "precioTransportistaExterno con IVA incluido" en
   // vialto-backend/CLAUDE.md).
   const liquidacionVigente = useMemo(() => {
     if (!snapshotViaje) return false;
@@ -332,6 +324,20 @@ export function ViajeEditModal({
       (snapshotViaje as any).liquidacionEstado ?? null,
     );
   }, [snapshotViaje]);
+
+  // Desglose transportista: pago neto (cantidad × precio unitario, tal cual se carga),
+  // pago bruto (neto "destapado" de IVA) y el monto de IVA — usados en el resumen de
+  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
+  const desglosePagoNeto =
+    (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
+    (parseCurrencyForMoneda(
+      draft.precioUnitarioTransportista,
+      draft.monedaPrecioTransportistaExterno,
+    ) || 0);
+  const desglosePctIva =
+    Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
+  const desglosePagoBruto = netearIvaIncluido(desglosePagoNeto, desglosePctIva);
+  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
 
   useEffect(() => {
     if (!open) return;
@@ -766,40 +772,40 @@ export function ViajeEditModal({
                 groupName={`viaje-edit-${draft.numero || "e"}`}
                 externoContent={
                   <div className="grid gap-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className={labelClass}>
-                          Transportista externo
-                        </span>
-                        <TransportistaSearchSelect
-                          transportistas={todosTransportistas}
-                          value={draft.transportistaId}
-                          onChange={(id) =>
-                            setDraft((p) =>
-                              p
-                                ? {
-                                    ...p,
-                                    transportistaId: id,
-                                    transportistaEfectivoId:
-                                      p.transportistaEfectivoId === id
-                                        ? ""
-                                        : p.transportistaEfectivoId,
-                                  }
-                                : p,
-                            )
-                          }
-                          inputClassName={inputClass}
-                          disabled={datosComercialesBloqueados || saving}
-                          aria-label="Transportista externo"
-                          onNuevo={
-                            getToken && !datosComercialesBloqueados
-                              ? () => setQuickCreate("transportista")
-                              : undefined
-                          }
-                        />
-                      </div>
-                      {desgloseActivo ? (
-                        <>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={labelClass}>
+                        Transportista externo
+                      </span>
+                      <TransportistaSearchSelect
+                        transportistas={todosTransportistas}
+                        value={draft.transportistaId}
+                        onChange={(id) =>
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  transportistaId: id,
+                                  transportistaEfectivoId:
+                                    p.transportistaEfectivoId === id
+                                      ? ""
+                                      : p.transportistaEfectivoId,
+                                }
+                              : p,
+                          )
+                        }
+                        inputClassName={inputClass}
+                        disabled={datosComercialesBloqueados || saving}
+                        aria-label="Transportista externo"
+                        onNuevo={
+                          getToken && !datosComercialesBloqueados
+                            ? () => setQuickCreate("transportista")
+                            : undefined
+                        }
+                      />
+                    </div>
+                    {desgloseActivo ? (
+                      <>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr_1fr]">
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={labelClass}>Cantidad</span>
                             <input
@@ -873,32 +879,79 @@ export function ViajeEditModal({
                           </div>
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={labelClass}>
-                              Pago a transporte
+                              % de IVA ya incluido en el precio
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              disabled={liquidacionVigente}
+                              value={draft.precioTransportistaIvaIncluidoPct}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        precioTransportistaIvaIncluidoPct:
+                                          e.target.value,
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder="0"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                            <p className="text-xs text-vialto-steel">
+                              Dejalo en 0 si el precio no incluye IVA.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>
+                              Pago bruto
                             </span>
                             <div
                               className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
                             >
                               <span className="w-full truncate text-sm">
-                                {(
-                                  (Number(
-                                    draft.cantidadTransportista.replace(
-                                      ",",
-                                      ".",
-                                    ),
-                                  ) || 0) *
-                                  (parseCurrencyForMoneda(
-                                    draft.precioUnitarioTransportista,
-                                    draft.monedaPrecioTransportistaExterno,
-                                  ) || 0)
-                                ).toLocaleString("es-AR", {
+                                {desglosePagoBruto.toLocaleString("es-AR", {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 })}
                               </span>
                             </div>
                           </div>
-                        </>
-                      ) : (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago neto</span>
+                            <div
+                              className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                            >
+                              <span className="w-full truncate text-sm">
+                                {desglosePagoNeto.toLocaleString("es-AR", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Monto IVA</span>
+                            <div
+                              className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                            >
+                              <span className="w-full truncate text-sm">
+                                {desgloseMontoIva.toLocaleString("es-AR", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={labelClass}>Precio transporte</span>
                           <div className="flex min-w-0 gap-2">
@@ -948,36 +1001,36 @@ export function ViajeEditModal({
                             />
                           </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          disabled={liquidacionVigente}
-                          checked={draft.precioTransportistaIncluyeIva}
-                          onChange={(e) =>
-                            setDraft((p) =>
-                              p
-                                ? {
-                                    ...p,
-                                    precioTransportistaIncluyeIva:
-                                      e.target.checked,
-                                  }
-                                : p,
-                            )
-                          }
-                        />
-                        Incluir IVA (el precio del transporte ya incluye IVA)
-                      </label>
-                      {hasIntegracionArca && (
-                        <p className="text-xs text-amber-800/90">
-                          Un viaje con esta opción activada no se puede
-                          incluir en una Liquidación ARCA/CVLP (el comprobante
-                          ya calcula el IVA por separado).
-                        </p>
-                      )}
-                    </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={labelClass}>
+                            % de IVA ya incluido en el precio
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={liquidacionVigente}
+                            value={draft.precioTransportistaIvaIncluidoPct}
+                            onChange={(e) =>
+                              setDraft((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      precioTransportistaIvaIncluidoPct:
+                                        e.target.value,
+                                    }
+                                  : p,
+                              )
+                            }
+                            placeholder="0"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                          <p className="text-xs text-vialto-steel">
+                            Dejalo en 0 si el precio no incluye IVA.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                         <span className={labelClass}>

@@ -84,7 +84,10 @@ import {
   parseKmLitrosOpcionales,
   VIAJE_ETAPAS_ALTA,
 } from "@/lib/viajesIndicadores";
-import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
+import {
+  validarPagosTransportistaDraftForm,
+  netearIvaIncluido,
+} from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
 import type {
   Chofer,
@@ -95,8 +98,6 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { useCurrentTenant } from "@/hooks/useCurrentTenant";
-import { canAccessIntegracionArca } from "@/lib/tenantModules";
 import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
 import {
   type OpcionProducto,
@@ -122,13 +123,6 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
-  // Con integracion-arca, advertimos (no ocultamos) que "Incluir IVA" es
-  // incompatible con liquidar el viaje por CVLP — el backend es quien bloquea
-  // de verdad (ver liquidaciones.service.ts); acá solo evitamos la sorpresa.
-  const { tenant: currentTenantParaIva } = useCurrentTenant();
-  const hasArcaParaPrecioIva = canAccessIntegracionArca(
-    currentTenantParaIva?.modules ?? [],
-  );
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
@@ -194,10 +188,10 @@ export function ViajeCreatePage() {
     useState("");
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>("ARS");
-  const [cantidadTransportista, setCantidadTransportista] = useState("");
+  const [cantidadTransportista, setCantidadTransportista] = useState("1");
   const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
-  const [precioTransportistaIncluyeIva, setPrecioTransportistaIncluyeIva] =
-    useState(false);
+  const [precioTransportistaIvaIncluidoPct, setPrecioTransportistaIvaIncluidoPct] =
+    useState("");
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -732,9 +726,10 @@ export function ViajeCreatePage() {
           monedaMonto,
           precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-          precioTransportistaIncluyeIva: externo
-            ? precioTransportistaIncluyeIva
-            : undefined,
+          precioTransportistaIvaIncluidoPct:
+            externo && precioTransportistaIvaIncluidoPct.trim()
+              ? Number(precioTransportistaIvaIncluidoPct.replace(",", "."))
+              : undefined,
           cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
           precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
           cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
@@ -800,6 +795,17 @@ export function ViajeCreatePage() {
     if (p.litros !== undefined) setLitrosConsumidos(String(p.litros));
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
+
+  // Desglose transportista: pago neto (cantidad × precio unitario, tal cual se carga),
+  // pago bruto (neto "destapado" de IVA) y el monto de IVA — usados en el resumen de
+  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
+  const desglosePagoNeto =
+    (Number(cantidadTransportista.replace(",", ".")) || 0) *
+    (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
+  const desglosePctIva =
+    Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
+  const desglosePagoBruto = netearIvaIncluido(desglosePagoNeto, desglosePctIva);
+  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
 
   // ─── RENDERIZADO DEL FORMULARIO ──────────────────────────────────────────
   return (
@@ -1016,34 +1022,34 @@ export function ViajeCreatePage() {
               onModoChange={applyModoOperacion}
               externoContent={
                 <div className="grid gap-3">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>
-                        Transportista externo{" "}
-                        <span className="text-red-500">*</span>
-                      </span>
-                      <TransportistaSearchSelect
-                        transportistas={transportistas}
-                        value={transportistaId}
-                        onChange={(id) => {
-                          setTransportistaId(id);
-                          setRealizaFlete(true);
-                          setTransportistaEfectivoId("");
-                          setChoferExternoIdDraft("");
-                          if (id)
-                            setFieldErrors((p) => ({
-                              ...p,
-                              transportistaId: "",
-                            }));
-                        }}
-                        inputClassName={inputClass}
-                        aria-label="Transportista externo"
-                        onNuevo={() => setQuickCreate("transportista")}
-                      />
-                      <CrudFieldError message={fieldErrors.transportistaId} />
-                    </div>
-                    {desgloseActivo ? (
-                      <>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>
+                      Transportista externo{" "}
+                      <span className="text-red-500">*</span>
+                    </span>
+                    <TransportistaSearchSelect
+                      transportistas={transportistas}
+                      value={transportistaId}
+                      onChange={(id) => {
+                        setTransportistaId(id);
+                        setRealizaFlete(true);
+                        setTransportistaEfectivoId("");
+                        setChoferExternoIdDraft("");
+                        if (id)
+                          setFieldErrors((p) => ({
+                            ...p,
+                            transportistaId: "",
+                          }));
+                      }}
+                      inputClassName={inputClass}
+                      aria-label="Transportista externo"
+                      onNuevo={() => setQuickCreate("transportista")}
+                    />
+                    <CrudFieldError message={fieldErrors.transportistaId} />
+                  </div>
+                  {desgloseActivo ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr_1fr]">
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Cantidad</span>
                           <input
@@ -1084,18 +1090,54 @@ export function ViajeCreatePage() {
                           <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Pago a transporte</span>
+                          <span className={fieldLabelClass}>
+                            % de IVA ya incluido en el precio
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioTransportistaIvaIncluidoPct}
+                            onChange={(e) =>
+                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                            }
+                            placeholder="0"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                          <p className="text-xs text-vialto-steel">
+                            Dejalo en 0 si el precio no incluye IVA.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Pago bruto a transporte</span>
                           <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
                             <span className="w-full truncate">
-                              {(
-                                (Number(cantidadTransportista.replace(",", ".")) || 0) * 
-                                (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
-                              ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
-                      </>
-                    ) : (
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Pago neto</span>
+                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <span className="w-full truncate">
+                              {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Monto IVA</span>
+                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <span className="w-full truncate">
+                              {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="flex min-w-0 flex-col gap-1">
                         <span className={fieldLabelClass}>Precio transporte</span>
                         <div className="flex min-w-0 gap-2">
@@ -1133,27 +1175,27 @@ export function ViajeCreatePage() {
                         </div>
                         <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={precioTransportistaIncluyeIva}
-                        onChange={(e) =>
-                          setPrecioTransportistaIncluyeIva(e.target.checked)
-                        }
-                      />
-                      Incluir IVA (el precio del transporte ya incluye IVA)
-                    </label>
-                    {hasArcaParaPrecioIva && (
-                      <p className="text-xs text-amber-800/90">
-                        Un viaje con esta opción activada no se puede incluir
-                        en una Liquidación ARCA/CVLP (el comprobante ya
-                        calcula el IVA por separado).
-                      </p>
-                    )}
-                  </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className={fieldLabelClass}>
+                          % de IVA ya incluido en el precio
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={precioTransportistaIvaIncluidoPct}
+                          onChange={(e) =>
+                            setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                          }
+                          placeholder="0"
+                          className={`${inputClass} text-right tabular-nums`}
+                        />
+                        <p className="text-xs text-vialto-steel">
+                          Dejalo en 0 si el precio no incluye IVA.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {transportistaId && (
                     <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                       <span className={fieldLabelClass}>

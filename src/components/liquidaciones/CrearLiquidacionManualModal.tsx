@@ -45,6 +45,7 @@ import {
   numeroVisibleViaje,
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import { netearIvaIncluido } from "@/lib/viajesTransportistaPagos";
 import type {
   Cliente,
   Liquidacion,
@@ -63,6 +64,7 @@ type ViajeItem = Pick<
   | "destino"
   | "precioTransportistaExterno"
   | "monedaPrecioTransportistaExterno"
+  | "precioTransportistaIvaIncluidoPct"
   | "liquidacionesViaje"
   | "liquidacionEstado"
   | "otrosGastos"
@@ -527,8 +529,16 @@ export function CrearLiquidacionManualModal({
   const anyHasPrice = selectedViajes.some(
     (v) => v.precioTransportistaExterno != null,
   );
+  // Cada viaje "neteado" por su propio % de IVA ya incluido antes de sumarlo al bruto
+  // agregado — mismo cálculo que el backend en createLiquidacion, para que este resumen
+  // coincida con lo que realmente se va a persistir (y no muestre el IVA duplicado).
   const bruto = selectedViajes.reduce(
-    (sum, v) => sum + (v.precioTransportistaExterno ?? 0),
+    (sum, v) =>
+      sum +
+      netearIvaIncluido(
+        v.precioTransportistaExterno ?? 0,
+        v.precioTransportistaIvaIncluidoPct ?? 0,
+      ),
     0,
   );
   const comisionNum =
@@ -783,12 +793,15 @@ export function CrearLiquidacionManualModal({
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">Bruto</span>
+                      <span className="text-vialto-steel">Precio del viaje</span>
                       <span className="font-medium tabular-nums text-vialto-charcoal">
                         {fmtMoney(
                           viajeInicial.precioTransportistaExterno,
                           viajeInicial.monedaPrecioTransportistaExterno,
                         )}
+                        {viajeInicial.precioTransportistaIvaIncluidoPct
+                          ? ` (IVA ${viajeInicial.precioTransportistaIvaIncluidoPct}% incluido)`
+                          : ""}
                       </span>
                     </div>
                   </div>
@@ -822,7 +835,10 @@ export function CrearLiquidacionManualModal({
                       fmtMoney(
                         v.precioTransportistaExterno,
                         v.monedaPrecioTransportistaExterno,
-                      )
+                      ) +
+                      (v.precioTransportistaIvaIncluidoPct
+                        ? ` (IVA ${v.precioTransportistaIvaIncluidoPct}% incl.)`
+                        : "")
                     }
                     disabledCheck={(v) => {
                       const moneda = monedaViaje(v);
