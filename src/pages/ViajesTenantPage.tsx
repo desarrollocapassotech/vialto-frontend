@@ -1,6 +1,4 @@
 import { useAuth } from "@clerk/clerk-react";
-import { Info } from "lucide-react";
-import { tooltipPanelClassBelow } from "@/lib/tooltip";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
