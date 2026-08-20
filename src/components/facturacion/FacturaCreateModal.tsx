@@ -45,6 +45,8 @@ import {
 } from "@/lib/facturaEmitValidation";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
+import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
+import { isAfipInfrastructureError } from "@/lib/arcaFriendlyError";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
@@ -934,9 +936,12 @@ export function FacturaCreateModal({
                       }}
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
-                          {displayError && (
-                            <CrudFormErrorAlert message={displayError} />
-                          )}
+                          {displayError &&
+                            (isAfipInfrastructureError(displayError) ? (
+                              <ArcaEmitErrorAlert error={displayError} />
+                            ) : (
+                              <CrudFormErrorAlert message={displayError} />
+                            ))}
                           {arcaConfigMissing && (
                             <button
                               type="button"
@@ -965,7 +970,11 @@ export function FacturaCreateModal({
                   {standardFields}
                   {displayError && (
                     <div className="mt-4">
-                      <CrudFormErrorAlert message={displayError} />
+                      {isAfipInfrastructureError(displayError) ? (
+                        <ArcaEmitErrorAlert error={displayError} />
+                      ) : (
+                        <CrudFormErrorAlert message={displayError} />
+                      )}
                     </div>
                   )}
                 </div>

@@ -8,6 +8,14 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
 import {
+  AfipInfraErrorBanner,
+  ArcaErrorMessage,
+} from '@/components/ui/ArcaErrorMessage';
+import {
+  formatStoredArcaError,
+  isAfipInfrastructureError,
+} from '@/lib/arcaFriendlyError';
+import {
   facturaLetraFromCbteTipo,
   facturaLetraFromCondicionIva,
   facturaLetraLabel,
@@ -175,10 +183,15 @@ export function FacturaViewModal({
     ...(factura.caeFechaVto
       ? [{ label: 'Vto. CAE', value: fmtDate(factura.caeFechaVto) }]
       : []),
-    ...(factura.arcaError && factura.arcaEstado === 'error'
-      ? [{ label: 'Error ARCA', value: factura.arcaError }]
-      : []),
   ];
+
+  const arcaErrorTexto = formatStoredArcaError(factura.arcaError);
+  const mostrarArcaError =
+    Boolean(arcaErrorTexto) &&
+    (factura.arcaEstado === 'error' ||
+      factura.arcaEstado === 'pendiente_cae' ||
+      factura.estado === 'esperando_afip' ||
+      factura.estado === 'error_afip');
 
   const ncTipo = facturaNcCbteTipoFromFactura(
     factura.anulacionCbteTipo ?? factura.cbteTipo,
@@ -275,6 +288,17 @@ export function FacturaViewModal({
           </div>
         ))}
       </div>
+
+      {mostrarArcaError && arcaErrorTexto && (
+        <div className="mt-4">
+          {isAfipInfrastructureError(factura.arcaError) ||
+          isAfipInfrastructureError(arcaErrorTexto) ? (
+            <AfipInfraErrorBanner message={arcaErrorTexto} />
+          ) : (
+            <ArcaErrorMessage message={arcaErrorTexto} />
+          )}
+        </div>
+      )}
 
       {porTramo && (
         <div className="mt-6 border-t border-black/10 pt-4 space-y-3">

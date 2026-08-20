@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { apiJson } from "@/lib/api";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
@@ -462,9 +463,11 @@ export function LiquidacionViewModal({
         )}
 
         {source.arcaError && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">
+          <div className="rounded px-0 py-0 text-sm">
             <ArcaErrorMessage
-              message={source.arcaError}
+              message={
+                formatStoredArcaError(source.arcaError) ?? source.arcaError
+              }
               detalle={source.arcaErrorDetalle ?? undefined}
             />
           </div>
