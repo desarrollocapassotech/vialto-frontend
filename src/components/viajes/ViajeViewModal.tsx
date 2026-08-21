@@ -139,7 +139,7 @@ export function ViajeViewModal({
               viaje.monedaPrecioTransportistaExterno,
             ) +
             (viaje.precioTransportistaIvaIncluidoPct
-              ? ` (IVA ${viaje.precioTransportistaIvaIncluidoPct}% incluido)`
+              ? ` (+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
               : "")
           : null,
     },

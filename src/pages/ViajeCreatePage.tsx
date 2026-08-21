@@ -86,7 +86,7 @@ import {
 } from "@/lib/viajesIndicadores";
 import {
   validarPagosTransportistaDraftForm,
-  netearIvaIncluido,
+  engrosarConIva,
 } from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
 import type {
@@ -796,15 +796,16 @@ export function ViajeCreatePage() {
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
-  // Desglose transportista: pago neto (cantidad × precio unitario, tal cual se carga),
-  // pago bruto (neto "destapado" de IVA) y el monto de IVA — usados en el resumen de
+  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
+  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
+  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
   // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
-  const desglosePagoNeto =
+  const desglosePagoBruto =
     (Number(cantidadTransportista.replace(",", ".")) || 0) *
     (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
   const desglosePctIva =
     Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoBruto = netearIvaIncluido(desglosePagoNeto, desglosePctIva);
+  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
   const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
 
   // ─── RENDERIZADO DEL FORMULARIO ──────────────────────────────────────────
@@ -1091,7 +1092,7 @@ export function ViajeCreatePage() {
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>
-                            % de IVA ya incluido en el precio
+                            % de IVA
                           </span>
                           <input
                             type="text"
@@ -1105,7 +1106,7 @@ export function ViajeCreatePage() {
                             className={`${inputClass} text-right tabular-nums`}
                           />
                           <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el precio no incluye IVA.
+                            Dejalo en 0 si el transportista no suma IVA al cobrar.
                           </p>
                         </div>
                       </div>
@@ -1177,7 +1178,7 @@ export function ViajeCreatePage() {
                       </div>
                       <div className="flex min-w-0 flex-col gap-1">
                         <span className={fieldLabelClass}>
-                          % de IVA ya incluido en el precio
+                          % de IVA
                         </span>
                         <input
                           type="text"
@@ -1191,7 +1192,7 @@ export function ViajeCreatePage() {
                           className={`${inputClass} text-right tabular-nums`}
                         />
                         <p className="text-xs text-vialto-steel">
-                          Dejalo en 0 si el precio no incluye IVA.
+                          Dejalo en 0 si el transportista no suma IVA al cobrar.
                         </p>
                       </div>
                     </div>

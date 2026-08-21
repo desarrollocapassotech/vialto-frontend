@@ -67,7 +67,7 @@ import {
 import {
   viajeRequierePagosTransportista,
   validarPagosTransportistaDraftForm,
-  netearIvaIncluido,
+  engrosarConIva,
 } from "@/lib/viajesTransportistaPagos";
 import type {
   Chofer,
@@ -309,15 +309,18 @@ export function ViajeEditModal({
   }, [snapshotViaje]);
 
   // true si el viaje tiene una liquidación vigente (no disponible para vincular
-  // una nueva). Se usa para: (1) bloquear "% de IVA ya incluido" — mismo criterio que
-  // el backend en viajes.service.ts, para que un viaje ya facturado al cliente pero
-  // todavía sin liquidar no quede con el % atascado en cuanto se emite esa
+  // una nueva). Se usa para: (1) bloquear "% de IVA que suma el transportista" — mismo
+  // criterio que el backend en viajes.service.ts, para que un viaje ya facturado al
+  // cliente pero todavía sin liquidar no quede con el % atascado en cuanto se emite esa
   // factura (eje independiente de la liquidación) — una vez liquidado, el % queda fijo
-  // porque `Liquidacion.bruto` ya se calculó neteando con ese valor; y (2) reemplazar el
-  // fieldset editable de pagos por un resumen de solo lectura con los montos reales de
-  // la Liquidación — editarlos ahí fallaría igual al guardar (pagosTransportista está
-  // en CAMPOS_FISCALES_VIAJE) (ver "precioTransportistaExterno con IVA incluido" en
-  // vialto-backend/CLAUDE.md).
+  // porque el "pago en efectivo" ya acordado con el transportista se calculó con ese
+  // valor; y (2) reemplazar el fieldset editable de pagos por un resumen de solo lectura
+  // con los montos reales de la Liquidación — editarlos ahí fallaría igual al guardar
+  // (pagosTransportista está en CAMPOS_FISCALES_VIAJE) (ver "precioTransportistaExterno
+  // con % de IVA a sumar en efectivo" en vialto-backend/CLAUDE.md). El % no afecta el
+  // cálculo de la Liquidación en sí (que siempre usa el precio neto tal cual), pero se
+  // bloquea igual una vez liquidado para
+  // no desincronizar el "pago en efectivo" ya acordado con el transportista.
   const liquidacionVigente = useMemo(() => {
     if (!snapshotViaje) return false;
     return !liquidacionPermiteVincular(
@@ -325,10 +328,11 @@ export function ViajeEditModal({
     );
   }, [snapshotViaje]);
 
-  // Desglose transportista: pago neto (cantidad × precio unitario, tal cual se carga),
-  // pago bruto (neto "destapado" de IVA) y el monto de IVA — usados en el resumen de
+  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
+  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
+  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
   // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
-  const desglosePagoNeto =
+  const desglosePagoBruto =
     (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
     (parseCurrencyForMoneda(
       draft.precioUnitarioTransportista,
@@ -336,7 +340,7 @@ export function ViajeEditModal({
     ) || 0);
   const desglosePctIva =
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoBruto = netearIvaIncluido(desglosePagoNeto, desglosePctIva);
+  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
   const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
 
   useEffect(() => {
@@ -879,7 +883,7 @@ export function ViajeEditModal({
                           </div>
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={labelClass}>
-                              % de IVA ya incluido en el precio
+                              % de IVA
                             </span>
                             <input
                               type="text"
@@ -902,7 +906,7 @@ export function ViajeEditModal({
                               className={`${inputClass} text-right tabular-nums`}
                             />
                             <p className="text-xs text-vialto-steel">
-                              Dejalo en 0 si el precio no incluye IVA.
+                              Dejalo en 0 si el transportista no suma IVA al cobrar.
                             </p>
                           </div>
                         </div>
@@ -1003,7 +1007,7 @@ export function ViajeEditModal({
                         </div>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={labelClass}>
-                            % de IVA ya incluido en el precio
+                            % de IVA
                           </span>
                           <input
                             type="text"
@@ -1026,7 +1030,7 @@ export function ViajeEditModal({
                             className={`${inputClass} text-right tabular-nums`}
                           />
                           <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el precio no incluye IVA.
+                            Dejalo en 0 si el transportista no suma IVA al cobrar.
                           </p>
                         </div>
                       </div>

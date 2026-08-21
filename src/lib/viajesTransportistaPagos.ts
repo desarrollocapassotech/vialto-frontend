@@ -84,14 +84,15 @@ export type EstadoPagoTransportistaExterno =
   | "pagado";
 
 /**
- * "Destapa" el IVA ya incluido en un precio: si `pctIncluido` es 0, devuelve el mismo
- * valor. Si es > 0, divide por (1 + pct/100) para obtener el neto — espejo exacto de
- * `netearIvaIncluido` en `viajes.service.ts` (backend), para que el saldo mostrado acá
- * coincida con lo que el backend calculó al liquidar.
+ * Suma el IVA a un precio cargado sin IVA. `precioTransportistaExterno` siempre es
+ * neto — `precioTransportistaIvaIncluidoPct` es el % que hay que sumarle para saber
+ * cuánto se le paga en efectivo al transportista. Espejo exacto de `engrosarConIva`
+ * en `viaje-ganancia-bruta.util.ts` (backend). No toca el cálculo de Liquidación/CVLP,
+ * que usa el precio neto tal cual (con su propio IVA, configurado aparte).
  */
-export function netearIvaIncluido(precioRaw: number, pctIncluido: number): number {
-  if (!pctIncluido || pctIncluido <= 0) return precioRaw;
-  return Math.round((precioRaw / (1 + pctIncluido / 100)) * 100) / 100;
+export function engrosarConIva(precioNeto: number, pct: number): number {
+  if (!pct || pct <= 0) return precioNeto;
+  return Math.round(precioNeto * (1 + pct / 100) * 100) / 100;
 }
 
 /**
@@ -148,8 +149,13 @@ function totalPagadoTransportistaEnMonedaAcordada(
     .filter((p) => (p.moneda === "USD" ? "USD" : "ARS") === moneda)
     .reduce((acc, p) => acc + Number(p.monto || 0), 0);
 
-  // 1. Partimos del estimado original como base
-  let totalAcordado = Number(v.precioTransportistaExterno) || 0;
+  // 1. Partimos del estimado original como base — cuánto se le debe pagar en
+  // efectivo al transportista (el precio cargado, siempre neto, más el % de IVA
+  // que se le suma encima, si tiene).
+  let totalAcordado = engrosarConIva(
+    Number(v.precioTransportistaExterno) || 0,
+    Number(v.precioTransportistaIvaIncluidoPct) || 0,
+  );
 
   // 2. Si el viaje tiene liquidaciones emitidas, sobreescribimos con el monto real
   if (v.liquidacionesViaje && v.liquidacionesViaje.length > 0) {
@@ -164,14 +170,13 @@ function totalPagadoTransportistaEnMonedaAcordada(
 
       // Cálculo detallado contemplando conceptos asignados al viaje o generales divididos
       if (liq && Array.isArray(liq.conceptosLineas) && v.id) {
-        const rawBrutoViaje =
+        // El precio del viaje ya es neto — la Liquidación lo usa tal cual, sin
+        // ajustar por el % de IVA del viaje (independiente del IVA que declara la
+        // Liquidación, configurado aparte).
+        const brutoViaje =
           typeof lv.subtotal === "number"
             ? lv.subtotal
             : Number(v.precioTransportistaExterno) || 0;
-        const brutoViaje = netearIvaIncluido(
-          rawBrutoViaje,
-          Number(v.precioTransportistaIvaIncluidoPct) || 0,
-        );
         const comisionPct = Number(liq.comisionPct) || 0;
         const comisionMonto = (brutoViaje * comisionPct) / 100;
 

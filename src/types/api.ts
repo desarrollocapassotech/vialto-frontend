@@ -96,7 +96,7 @@ export interface Viaje {
   precioUnitarioTransportista?: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
-  /** % de IVA ya incluido en precioTransportistaExterno (0 = no incluye). Se "netea" al liquidar por CVLP para no duplicar el IVA. */
+  /** % de IVA que el transportista suma en efectivo por encima de precioTransportistaExterno (que siempre es neto). 0 = no suma IVA. No afecta el cálculo de la Liquidación/CVLP, solo el pago en efectivo y la ganancia bruta. */
   precioTransportistaIvaIncluidoPct?: number;
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;

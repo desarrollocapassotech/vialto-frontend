@@ -45,7 +45,6 @@ import {
   numeroVisibleViaje,
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
-import { netearIvaIncluido } from "@/lib/viajesTransportistaPagos";
 import type {
   Cliente,
   Liquidacion,
@@ -529,16 +528,11 @@ export function CrearLiquidacionManualModal({
   const anyHasPrice = selectedViajes.some(
     (v) => v.precioTransportistaExterno != null,
   );
-  // Cada viaje "neteado" por su propio % de IVA ya incluido antes de sumarlo al bruto
-  // agregado — mismo cálculo que el backend en createLiquidacion, para que este resumen
-  // coincida con lo que realmente se va a persistir (y no muestre el IVA duplicado).
+  // precioTransportistaExterno es siempre neto (sin IVA) — el % de IVA del viaje
+  // (precioTransportistaIvaIncluidoPct) es independiente del IVA que declara esta
+  // Liquidación (config aparte, más abajo) y no se usa acá.
   const bruto = selectedViajes.reduce(
-    (sum, v) =>
-      sum +
-      netearIvaIncluido(
-        v.precioTransportistaExterno ?? 0,
-        v.precioTransportistaIvaIncluidoPct ?? 0,
-      ),
+    (sum, v) => sum + (v.precioTransportistaExterno ?? 0),
     0,
   );
   const comisionNum =
@@ -800,7 +794,7 @@ export function CrearLiquidacionManualModal({
                           viajeInicial.monedaPrecioTransportistaExterno,
                         )}
                         {viajeInicial.precioTransportistaIvaIncluidoPct
-                          ? ` (IVA ${viajeInicial.precioTransportistaIvaIncluidoPct}% incluido)`
+                          ? ` (+${viajeInicial.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                           : ""}
                       </span>
                     </div>
@@ -837,7 +831,7 @@ export function CrearLiquidacionManualModal({
                         v.monedaPrecioTransportistaExterno,
                       ) +
                       (v.precioTransportistaIvaIncluidoPct
-                        ? ` (IVA ${v.precioTransportistaIvaIncluidoPct}% incl.)`
+                        ? ` (+${v.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                         : "")
                     }
                     disabledCheck={(v) => {
