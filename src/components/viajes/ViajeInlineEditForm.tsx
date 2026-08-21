@@ -417,43 +417,51 @@ export function ViajeInlineEditForm({
           />
 
           {/* Km / Litros (solo en estados finales) */}
-          {etapaMuestraKmLitros(draft.estado) && (
+          {etapaMuestraKmLitros(draft.estado) &&
+            (isVisible("edicion_viaje", "kmRecorridos") ||
+              isVisible("edicion_viaje", "litrosConsumidos")) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-              <div className="flex flex-col gap-1">
-                <span className={LABEL}>Km recorridos</span>
-                <input
-                  type="number"
-                  value={draft.kmRecorridos}
-                  onChange={(e) => set({ kmRecorridos: e.target.value })}
-                  placeholder="0"
-                  className={INPUT}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className={LABEL}>Litros consumidos</span>
-                <input
-                  type="number"
-                  value={draft.litrosConsumidos}
-                  onChange={(e) => set({ litrosConsumidos: e.target.value })}
-                  placeholder="0"
-                  className={INPUT}
-                />
-              </div>
+                {isVisible("edicion_viaje", "kmRecorridos") && (
+                  <div className="flex flex-col gap-1">
+                    <span className={LABEL}>Km recorridos</span>
+                    <input
+                      type="number"
+                      value={draft.kmRecorridos}
+                      onChange={(e) => set({ kmRecorridos: e.target.value })}
+                      placeholder="0"
+                      className={INPUT}
+                    />
+                  </div>
+                )}
+                {isVisible("edicion_viaje", "litrosConsumidos") && (
+                  <div className="flex flex-col gap-1">
+                    <span className={LABEL}>Litros consumidos</span>
+                    <input
+                      type="number"
+                      value={draft.litrosConsumidos}
+                      onChange={(e) => set({ litrosConsumidos: e.target.value })}
+                      placeholder="0"
+                      className={INPUT}
+                    />
+                  </div>
+                )}
             </div>
           )}
 
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Productos</span>
-            <ViajeProductosLista
-              groupId={`viaje-inline-${draft.numero || 'e'}`}
-              value={draft.productoItems}
-              onChange={(items) => set({ productoItems: items })}
-              opciones={opcionesProducto}
-              triggerClassName={INPUT}
-              inputClassName={INPUT}
-              disabled={saving}
-            />
-          </div>
+          {isVisible("edicion_viaje", "productoItems") && (
+            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <span className={LABEL}>Productos</span>
+              <ViajeProductosLista
+                groupId={`viaje-inline-${draft.numero || 'e'}`}
+                value={draft.productoItems}
+                onChange={(items) => set({ productoItems: items })}
+                opciones={opcionesProducto}
+                triggerClassName={INPUT}
+                inputClassName={INPUT}
+                disabled={saving}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
             <span className={LABEL}>ID propio</span>
@@ -468,26 +476,30 @@ export function ViajeInlineEditForm({
             />
           </div>
 
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Detalle adicional</span>
-            <textarea
-              value={draft.detalleCarga}
-              onChange={(e) => set({ detalleCarga: e.target.value })}
-              placeholder="Notas extra: bultos, temperatura, precinto, etc."
-              className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
-            />
-          </div>
+          {isVisible("edicion_viaje", "detalleCarga") && (
+            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <span className={LABEL}>Detalle adicional</span>
+              <textarea
+                value={draft.detalleCarga}
+                onChange={(e) => set({ detalleCarga: e.target.value })}
+                placeholder="Notas extra: bultos, temperatura, precinto, etc."
+                className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
+              />
+            </div>
+          )}
 
           {/* Observaciones */}
-          <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-            <span className={LABEL}>Observaciones</span>
-            <textarea
-              value={draft.observaciones}
-              onChange={(e) => set({ observaciones: e.target.value })}
-              placeholder="Notas adicionales"
-              className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
-            />
-          </div>
+          {isVisible("edicion_viaje", "observaciones") && (
+            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+              <span className={LABEL}>Observaciones</span>
+              <textarea
+                value={draft.observaciones}
+                onChange={(e) => set({ observaciones: e.target.value })}
+                placeholder="Notas adicionales"
+                className="min-h-20 border border-black/15 bg-white px-2 py-2 text-sm"
+              />
+            </div>
+          )}
         </div>
 
         {formError && (
