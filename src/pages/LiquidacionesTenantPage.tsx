@@ -215,7 +215,7 @@ export function LiquidacionesTenantPage() {
   const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
-  const { tenant, transportistas } = useMaestroData();
+  const { tenant, transportistas, refreshTransportistas, refreshClientes } = useMaestroData();
 
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
@@ -411,6 +411,10 @@ export function LiquidacionesTenantPage() {
       );
       setRows((prev) => prev?.filter((r) => r.id !== liq.id) ?? prev);
       setEliminarConfirm(null);
+      setDetail((prev) =>
+        prev?.mode === "view" && prev.liq.id === liq.id ? null : prev,
+      );
+      showToast("Liquidación eliminada.");
     } catch (err) {
       setActionError({
         id: liq.id,
@@ -441,6 +445,12 @@ export function LiquidacionesTenantPage() {
         (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
       );
       setAnularConfirm(null);
+      setDetail((prev) =>
+        prev?.liq.id === updated.id
+          ? { mode: "view", liq: { ...prev.liq, ...updated } }
+          : prev,
+      );
+      showToast("Liquidación anulada.");
     } catch (err) {
       setActionError({
         id: liq.id,
@@ -974,6 +984,10 @@ export function LiquidacionesTenantPage() {
           ivaPct={pendingEmitir.ivaPct ?? config?.ivaGastosAdmin}
           arcaConfig={config}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          onDataSaved={() => {
+            void refreshTransportistas();
+            void refreshClientes();
+          }}
         />
       )}
       {showCrear && activeTenantId && (
@@ -983,6 +997,10 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          onDataSaved={() => {
+            void refreshTransportistas();
+            void refreshClientes();
+          }}
           onSuccess={(liq) => {
             setRows((prev) =>
               prev
@@ -1099,6 +1117,18 @@ export function LiquidacionesTenantPage() {
           onVerAnulacion={
             detail.liq.estado === "anulado"
               ? () => void verPdfAnulacion(detail.liq)
+              : undefined
+          }
+          onEliminar={
+            detail.liq.estado === "borrador" ||
+            detail.liq.estado === "error" ||
+            detail.liq.estado === "pendiente_cae"
+              ? () => setEliminarConfirm(detail.liq)
+              : undefined
+          }
+          onAnular={
+            hasArca && detail.liq.estado === "autorizado"
+              ? () => setAnularConfirm(detail.liq)
               : undefined
           }
         />

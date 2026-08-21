@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   TenantForm,
   type TenantFormValues,
@@ -139,15 +139,6 @@ export function SuperadminTenantEditPage() {
         <p className="mt-2 text-vialto-steel">
           Actualizá módulos y configuración comercial de la empresa.
         </p>
-
-        <div className="mt-4">
-          <Link
-            className="text-sm text-vialto-fire hover:text-vialto-bright"
-            to="/superadmin/empresas"
-          >
-            ← Volver a empresas
-          </Link>
-        </div>
 
         {initialLoading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>

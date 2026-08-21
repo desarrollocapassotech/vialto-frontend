@@ -55,7 +55,6 @@ import type {
   Cliente,
   Factura,
   PaginatedMeta,
-  Transportista,
   Viaje,
 } from "@/types/api";
 
@@ -141,13 +140,7 @@ export function FacturacionTenantPage({
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
-  const [transportistasPlatform, setTransportistasPlatform] = useState<
-    Transportista[]
-  >([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
-  const transportistas = platform
-    ? transportistasPlatform
-    : maestro.transportistas;
 
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   useEffect(() => {
@@ -253,28 +246,17 @@ export function FacturacionTenantPage({
   const viewFacturaHandledRef = useRef(false);
 
   const viajesNuevaFactura = useMemo(() => {
-    const list = viajesFiltradosParaFactura(
-      viajes,
-      draft.tipo,
-      draft.clienteId,
-      draft.transportistaId,
-    );
+    const list = viajesFiltradosParaFactura(viajes, draft.clienteId);
     if (!hasArca) return list;
     return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
-  }, [viajes, draft.tipo, draft.clienteId, draft.transportistaId, hasArca]);
+  }, [viajes, draft.clienteId, hasArca]);
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];
-    const list = viajesFiltradosParaFactura(
-      viajes,
-      editDraft.tipo,
-      editDraft.clienteId,
-      editDraft.transportistaId,
-      {
-        facturaEdicionId: editingId,
-        viajeIdsFacturaEdicion: editDraft.viajeIds,
-      },
-    );
+    const list = viajesFiltradosParaFactura(viajes, editDraft.clienteId, {
+      facturaEdicionId: editingId,
+      viajeIdsFacturaEdicion: editDraft.viajeIds,
+    });
     if (!hasArca) return list;
     return list.filter(
       (v) =>
@@ -294,30 +276,21 @@ export function FacturacionTenantPage({
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
       setClientesPlatform([]);
-      setTransportistasPlatform([]);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const [c, t] = await Promise.all([
-          apiJson<Cliente[]>(
-            `/api/platform/clientes?tenantId=${encodeURIComponent(tid)}`,
-            () => getToken(),
-          ),
-          apiJson<Transportista[]>(
-            `/api/platform/transportistas?tenantId=${encodeURIComponent(tid)}`,
-            () => getToken(),
-          ),
-        ]);
+        const c = await apiJson<Cliente[]>(
+          `/api/platform/clientes?tenantId=${encodeURIComponent(tid)}`,
+          () => getToken(),
+        );
         if (!cancelled) {
           setClientesPlatform(c);
-          setTransportistasPlatform(t);
         }
       } catch {
         if (!cancelled) {
           setClientesPlatform([]);
-          setTransportistasPlatform([]);
         }
       }
     })();
@@ -1479,10 +1452,13 @@ export function FacturacionTenantPage({
         draft={draft}
         setDraft={setDraft}
         clientes={clientes}
-        transportistas={transportistas}
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
+        onDataSaved={() => {
+          void maestro.refreshTransportistas();
+          void maestro.refreshClientes();
+        }}
         onClose={() => {
           setCreating(false);
           setDraft(emptyFacturaDraft());
@@ -1547,6 +1523,10 @@ export function FacturacionTenantPage({
           viajes={viajes}
           tenantId={platform ? tid : undefined}
           clienteInicial={clienteById(emittingFactura.clienteId)}
+          onDataSaved={() => {
+            void maestro.refreshTransportistas();
+            void maestro.refreshClientes();
+          }}
           onClose={() => setEmittingFactura(null)}
           onEmitido={(f) => {
             handleFacturaEmitida(f);
@@ -1572,7 +1552,6 @@ export function FacturacionTenantPage({
           setDraft={setEditDraft}
           snapshotFactura={facturaEdicionSnapshot}
           clientes={clientes}
-          transportistas={transportistas}
           viajes={viajes}
           viajesEdicion={viajesEdicionFactura}
           viajesLoading={viajesLoading}

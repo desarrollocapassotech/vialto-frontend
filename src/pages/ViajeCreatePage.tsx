@@ -84,7 +84,10 @@ import {
   parseKmLitrosOpcionales,
   VIAJE_ETAPAS_ALTA,
 } from "@/lib/viajesIndicadores";
-import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
+import {
+  validarPagosTransportistaDraftForm,
+  engrosarConIva,
+} from "@/lib/viajesTransportistaPagos";
 import { fechaHoraToIso } from "@/lib/viajeFechaHora";
 import type {
   Chofer,
@@ -121,6 +124,10 @@ export function ViajeCreatePage() {
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
+  const ivaTransportistaVisible = isVisible(
+    "alta_viaje",
+    "precioTransportistaIvaIncluidoPct",
+  );
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
@@ -185,8 +192,10 @@ export function ViajeCreatePage() {
     useState("");
   const [monedaPrecioTransportista, setMonedaPrecioTransportista] =
     useState<ViajeMonedaCodigo>("ARS");
-  const [cantidadTransportista, setCantidadTransportista] = useState("");
+  const [cantidadTransportista, setCantidadTransportista] = useState("1");
   const [precioUnitarioTransportista, setPrecioUnitarioTransportista] = useState("");
+  const [precioTransportistaIvaIncluidoPct, setPrecioTransportistaIvaIncluidoPct] =
+    useState("");
   const [gananciaBrutaManual, setGananciaBrutaManual] = useState("");
   const [monedaGananciaBrutaManual, setMonedaGananciaBrutaManual] =
     useState<ViajeMonedaCodigo>("ARS");
@@ -721,6 +730,10 @@ export function ViajeCreatePage() {
           monedaMonto,
           precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          precioTransportistaIvaIncluidoPct:
+            externo && precioTransportistaIvaIncluidoPct.trim()
+              ? Number(precioTransportistaIvaIncluidoPct.replace(",", "."))
+              : undefined,
           cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
           precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
           cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
@@ -787,13 +800,23 @@ export function ViajeCreatePage() {
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
+  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
+  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
+  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
+  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
+  const desglosePagoBruto =
+    (Number(cantidadTransportista.replace(",", ".")) || 0) *
+    (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
+  const desglosePctIva =
+    Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
+  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
+  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
+
   // ─── RENDERIZADO DEL FORMULARIO ──────────────────────────────────────────
   return (
     <>
       <CrudPageLayout
         title="Crear viaje"
-        backTo={`/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-        backLabel="← Volver a viajes"
       >
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
@@ -1004,34 +1027,36 @@ export function ViajeCreatePage() {
               onModoChange={applyModoOperacion}
               externoContent={
                 <div className="grid gap-3">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className={fieldLabelClass}>
-                        Transportista externo{" "}
-                        <span className="text-red-500">*</span>
-                      </span>
-                      <TransportistaSearchSelect
-                        transportistas={transportistas}
-                        value={transportistaId}
-                        onChange={(id) => {
-                          setTransportistaId(id);
-                          setRealizaFlete(true);
-                          setTransportistaEfectivoId("");
-                          setChoferExternoIdDraft("");
-                          if (id)
-                            setFieldErrors((p) => ({
-                              ...p,
-                              transportistaId: "",
-                            }));
-                        }}
-                        inputClassName={inputClass}
-                        aria-label="Transportista externo"
-                        onNuevo={() => setQuickCreate("transportista")}
-                      />
-                      <CrudFieldError message={fieldErrors.transportistaId} />
-                    </div>
-                    {desgloseActivo ? (
-                      <>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>
+                      Transportista externo{" "}
+                      <span className="text-red-500">*</span>
+                    </span>
+                    <TransportistaSearchSelect
+                      transportistas={transportistas}
+                      value={transportistaId}
+                      onChange={(id) => {
+                        setTransportistaId(id);
+                        setRealizaFlete(true);
+                        setTransportistaEfectivoId("");
+                        setChoferExternoIdDraft("");
+                        if (id)
+                          setFieldErrors((p) => ({
+                            ...p,
+                            transportistaId: "",
+                          }));
+                      }}
+                      inputClassName={inputClass}
+                      aria-label="Transportista externo"
+                      onNuevo={() => setQuickCreate("transportista")}
+                    />
+                    <CrudFieldError message={fieldErrors.transportistaId} />
+                  </div>
+                  {desgloseActivo ? (
+                    <>
+                      <div
+                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr]"}`}
+                      >
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Cantidad</span>
                           <input
@@ -1071,19 +1096,59 @@ export function ViajeCreatePage() {
                           </div>
                           <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
                         </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Pago a transporte</span>
-                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                            <span className="w-full truncate">
-                              {(
-                                (Number(cantidadTransportista.replace(",", ".")) || 0) * 
-                                (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
-                              ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                        {ivaTransportistaVisible && (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>% de IVA</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioTransportistaIvaIncluidoPct}
+                              onChange={(e) =>
+                                setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                              }
+                              placeholder="0"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                            <p className="text-xs text-vialto-steel">
+                              Dejalo en 0 si el transportista no suma IVA al cobrar.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {ivaTransportistaVisible && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago neto</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Monto IVA</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </>
-                    ) : (
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                    >
                       <div className="flex min-w-0 flex-col gap-1">
                         <span className={fieldLabelClass}>Precio transporte</span>
                         <div className="flex min-w-0 gap-2">
@@ -1121,8 +1186,27 @@ export function ViajeCreatePage() {
                         </div>
                         <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
-                    )}
-                  </div>
+                      {ivaTransportistaVisible && (
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>% de IVA</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioTransportistaIvaIncluidoPct}
+                            onChange={(e) =>
+                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                            }
+                            placeholder="0"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                          <p className="text-xs text-vialto-steel">
+                            Dejalo en 0 si el transportista no suma IVA al cobrar.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {transportistaId && (
                     <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
                       <span className={fieldLabelClass}>

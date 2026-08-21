@@ -98,6 +98,7 @@ export function EmitirLiquidacionModal({
   arcaConfig: arcaConfigProp,
   ivaPct,
   tenantId,
+  onDataSaved,
 }: {
   liq: LiquidacionEmitDetail;
   getToken: () => Promise<string | null>;
@@ -115,6 +116,7 @@ export function EmitirLiquidacionModal({
   ivaPct?: number;
   /** Override de superadmin: si está presente, las ediciones inline usan rutas /api/platform/... */
   tenantId?: string;
+  onDataSaved?: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +235,7 @@ export function EmitirLiquidacionModal({
         },
       };
     });
+    onDataSaved?.();
   }
 
   function applyClienteUpdate(updated: Cliente | Transportista) {
@@ -261,6 +264,7 @@ export function EmitirLiquidacionModal({
       );
       return { ...base, viajes: nextViajes };
     });
+    onDataSaved?.();
   }
 
   const ptoVentaNum = Number(ptoVenta);
@@ -361,6 +365,15 @@ export function EmitirLiquidacionModal({
                 </p>
               )}
             </div>
+            {missingTransportistaFields.length > 0 && (
+              <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                <p className="font-medium">
+                  Faltan datos del transportista: {missingTransportistaFields.map(f => f.replace("Transportista: ", "")).join(", ")}.
+                  <br />
+                  <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
@@ -387,6 +400,15 @@ export function EmitirLiquidacionModal({
                 />
               </div>
             </div>
+            {missingClienteFields.length > 0 && (
+              <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                <p className="font-medium">
+                  Faltan datos del cliente: {missingClienteFields.map(f => f.replace("Cliente: ", "")).join(", ")}.
+                  <br />
+                  <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">

@@ -103,8 +103,6 @@ export function VehiculoCreatePage() {
   return (
     <CrudPageLayout
       title="Crear vehículo"
-      backTo={`/base-de-datos?tab=vehiculos${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a vehículos"
     >
       <form
         className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2"

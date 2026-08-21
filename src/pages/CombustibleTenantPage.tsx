@@ -9,6 +9,13 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { CombustiblesOrdenamientoMenu } from "@/components/combustible/CombustibleOrdenamientoMenu";
+import {
+  COMBUSTIBLE_SORT_DEFAULT,
+  type CombustibleSortDir,
+  type CombustibleSortField,
+  appendCombustibleSortQuery,
+} from "@/lib/combustibleOrdenamiento";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -150,6 +157,12 @@ export function CombustibleTenantPage({
   const initialTo = searchParams.get("to");
   const initialEstacion = searchParams.get("estacion") ?? "";
   const initialFormaPago = searchParams.get("formaPago") ?? "";
+  const initialSortBy =
+    (searchParams.get("sortBy") as CombustibleSortField) ||
+    COMBUSTIBLE_SORT_DEFAULT.sortBy;
+  const initialSortDir =
+    (searchParams.get("sortDir") as CombustibleSortDir) ||
+    COMBUSTIBLE_SORT_DEFAULT.sortDir;
 
   const [vehiculos, setVehiculos] = useState<ConEmpresa<Vehiculo>[]>([]);
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
@@ -163,6 +176,8 @@ export function CombustibleTenantPage({
   const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState(initialEstacion);
   const [formaPago, setFormaPago] = useState(initialFormaPago);
+  const [sortBy, setSortBy] = useState<CombustibleSortField>(initialSortBy);
+  const [sortDir, setSortDir] = useState<CombustibleSortDir>(initialSortDir);
 
   const [opcionesValidas, setOpcionesValidas] = useState<{
     choferIds: Set<string>;
@@ -225,6 +240,7 @@ export function CombustibleTenantPage({
         else qs.delete("estacion");
         if (formaPago) qs.set("formaPago", formaPago);
         else qs.delete("formaPago");
+        appendCombustibleSortQuery(qs, sortBy, sortDir);
         return qs;
       },
       { replace: true },
@@ -236,6 +252,8 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    sortBy,
+    sortDir,
     setSearchParams,
   ]);
 
@@ -275,6 +293,7 @@ export function CombustibleTenantPage({
     if (choferId) qs.set("choferId", choferId);
     if (estacion) qs.set("estacion", estacion);
     if (formaPago) qs.set("formaPago", formaPago);
+    appendCombustibleSortQuery(qs, sortBy, sortDir);
     return qs;
   }
 
@@ -367,6 +386,8 @@ export function CombustibleTenantPage({
     choferId,
     estacion,
     formaPago,
+    sortBy,
+    sortDir,
     reloadKey,
     getToken,
   ]);
@@ -715,23 +736,41 @@ export function CombustibleTenantPage({
               </button>
             </div>
           )}
+
         </div>
 
-        {!isReadOnly && (
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            disabled={!activeTenantId}
-            className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
-              activeTenantId
-                ? "bg-vialto-charcoal hover:bg-vialto-graphite"
-                : "bg-vialto-charcoal/50 pointer-events-none"
-            }`}
-            aria-disabled={!activeTenantId}
-          >
-            Nueva carga
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {activeTenantId && (
+            <div className="hidden lg:block">
+              <CombustiblesOrdenamientoMenu
+                sortBy={sortBy}
+                sortDir={sortDir}
+                disabled={rows === null || total === 0}
+                onChange={(b, d) => {
+                  setSortBy(b);
+                  setSortDir(d);
+                  resetPage();
+                }}
+              />
+            </div>
+          )}
+
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              disabled={!activeTenantId}
+              className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
+                activeTenantId
+                  ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+                  : "bg-vialto-charcoal/50 pointer-events-none"
+              }`}
+              aria-disabled={!activeTenantId}
+            >
+              Nueva carga
+            </button>
+          )}
+        </div>
       </div>
 
       {embeddedInSuperadmin && error && (

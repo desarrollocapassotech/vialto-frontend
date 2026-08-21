@@ -1,8 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
-  OrganizationSwitcher,
-  UserButton,
   useAuth,
   useClerk,
   useOrganization,
@@ -21,8 +19,6 @@ import {
   Menu,
   PackageMinus,
   PackagePlus,
-  ChevronLeft,
-  ChevronRight,
   Receipt,
   SlidersHorizontal,
   Truck,
@@ -32,7 +28,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "./Logo";
+import { Breadcrumbs } from "./shared/Breadcrumbs";
 import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization";
+import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   canAccessCombustible,
@@ -47,10 +45,6 @@ import {
   isStockViewer,
   userRoleDisplay,
 } from "@/lib/roleLabels";
-import {
-  orgSwitcherSidebarAppearance,
-  userButtonSidebarAppearance,
-} from "./clerkSidebarAppearance";
 
 type NavItem = {
   to: string;
@@ -66,11 +60,9 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "vialto:sidebarCollapsed";
-
 const sidebarBaseClass =
-  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-200 ease-in-out";
-const sidebarExpandedWidthClass = "w-fit min-w-[12rem] max-w-[92vw] px-4";
+  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+const sidebarExpandedWidthClass = "w-[16rem] max-w-[92vw] px-4";
 const sidebarCollapsedWidthClass = "w-[4.5rem] px-2";
 
 export function AppShell() {
@@ -81,9 +73,7 @@ export function AppShell() {
   const { tenant, tenantLoading } = useMaestroData();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1",
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [navTooltip, setNavTooltip] = useState<{
     label: string;
     top: number;
@@ -102,14 +92,6 @@ export function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      SIDEBAR_COLLAPSED_STORAGE_KEY,
-      sidebarCollapsed ? "1" : "0",
-    );
-    setNavTooltip(null);
-  }, [sidebarCollapsed]);
-
-  useEffect(() => {
     if (!sidebarOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -123,6 +105,7 @@ export function AppShell() {
     () => ({ orgRole, publicMetadata: user?.publicMetadata }),
     [orgRole, user?.publicMetadata],
   );
+  const stockViewer = isStockViewer(roleCtx);
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -331,17 +314,6 @@ export function AppShell() {
 
   const accountInitial = accountName.trim().charAt(0).toUpperCase() || "U";
 
-  const clickableAvatarUserButtonAppearance = {
-    ...userButtonSidebarAppearance,
-    elements: {
-      ...userButtonSidebarAppearance.elements,
-      rootBox: "h-8 w-8 shrink-0",
-      userButtonTrigger:
-        "h-8 w-8 rounded-full border border-white/15 bg-transparent hover:bg-white/10 transition-colors",
-      userButtonAvatarBox: "opacity-0",
-    },
-  } as const;
-
   const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith(
     "pk_test_",
   );
@@ -444,7 +416,6 @@ export function AppShell() {
                     onClick={() => {
                       setSidebarOpen(false);
                       setNavTooltip(null);
-                      if (item.to === "/viajes") setSidebarCollapsed(true);
                     }}
                     className={({ isActive }) => {
                       const active =
@@ -485,18 +456,9 @@ export function AppShell() {
                 Empresa
               </p>
               <div className="w-full min-w-0">
-                {superadmin ? (
-                  <OrganizationSwitcher
-                    hidePersonal
-                    afterCreateOrganizationUrl="/"
-                    afterSelectOrganizationUrl="/"
-                    appearance={orgSwitcherSidebarAppearance}
-                  />
-                ) : (
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
-                    {organization?.name ?? "Empresa no disponible"}
-                  </div>
-                )}
+                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
+                  {organization?.name ?? "Empresa no disponible"}
+                </div>
               </div>
               {!organization && (
                 <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
@@ -546,12 +508,6 @@ export function AppShell() {
                     </div>
                   )}
                 </div>
-                {superadmin && (
-                  <UserButton
-                    afterSignOutUrl="/sign-in"
-                    appearance={clickableAvatarUserButtonAppearance}
-                  />
-                )}
               </div>
               {!collapsed && (
                 <p className="text-sm text-white/90 truncate flex-1">
@@ -559,34 +515,32 @@ export function AppShell() {
                 </p>
               )}
             </div>
-            {!superadmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setNavTooltip(null);
-                  void handleSignOut();
-                }}
-                aria-label={collapsed ? "Cerrar sesión" : undefined}
-                onMouseEnter={(e) => {
-                  if (!collapsed) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setNavTooltip({
-                    label: "Cerrar sesión",
-                    top: rect.top + rect.height / 2,
-                    left: rect.right + 10,
-                  });
-                }}
-                onMouseLeave={() => setNavTooltip(null)}
-                className={
-                  collapsed
-                    ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-                    : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-                }
-              >
-                <LogOut className="h-4 w-4" />
-                {!collapsed && <span>Cerrar sesión</span>}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setNavTooltip(null);
+                void handleSignOut();
+              }}
+              aria-label={collapsed ? "Cerrar sesión" : undefined}
+              onMouseEnter={(e) => {
+                if (!collapsed) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                setNavTooltip({
+                  label: "Cerrar sesión",
+                  top: rect.top + rect.height / 2,
+                  left: rect.right + 10,
+                });
+              }}
+              onMouseLeave={() => setNavTooltip(null)}
+              className={
+                collapsed
+                  ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                  : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+              }
+            >
+              <LogOut className="h-4 w-4" />
+              {!collapsed && <span>Cerrar sesión</span>}
+            </button>
             {!collapsed && (
               <div className="pl-0.5 pt-1 space-y-0.5">
                 <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
@@ -634,6 +588,8 @@ export function AppShell() {
 
       <div className="hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
         <aside
+          onMouseEnter={() => setSidebarCollapsed(false)}
+          onMouseLeave={() => setSidebarCollapsed(true)}
           className={[
             "flex",
             sidebarBaseClass,
@@ -642,27 +598,6 @@ export function AppShell() {
         >
           {renderSidebar(false, sidebarCollapsed)}
         </aside>
-        <button
-          type="button"
-          onClick={() => setSidebarCollapsed((c) => !c)}
-          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setNavTooltip({
-              label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
-              top: rect.top + rect.height / 2,
-              left: rect.right + 10,
-            });
-          }}
-          onMouseLeave={() => setNavTooltip(null)}
-          className="absolute top-9 -right-3 z-10 inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-vialto-charcoal text-white shadow-md transition-colors hover:bg-vialto-charcoal/80"
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
-          ) : (
-            <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          )}
-        </button>
       </div>
 
       <aside
@@ -694,7 +629,18 @@ export function AppShell() {
         </header>
 
         <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
-          <Outlet />
+          <BreadcrumbOverrideProvider>
+            {(override) => (
+              <>
+                <Breadcrumbs
+                  override={override}
+                  superadmin={superadmin}
+                  stockViewer={stockViewer}
+                />
+                <Outlet />
+              </>
+            )}
+          </BreadcrumbOverrideProvider>
         </main>
       </div>
 

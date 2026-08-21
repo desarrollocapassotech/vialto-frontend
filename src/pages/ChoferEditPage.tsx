@@ -144,8 +144,6 @@ export function ChoferEditPage() {
   return (
     <CrudPageLayout
       title="Editar chofer"
-      backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a choferes"
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>

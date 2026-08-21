@@ -129,8 +129,6 @@ export function TransportistaCreatePage() {
   return (
     <CrudPageLayout
       title="Crear transportista"
-      backTo={`/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a transportistas"
     >
       <form
         className="mt-6 grid gap-4"

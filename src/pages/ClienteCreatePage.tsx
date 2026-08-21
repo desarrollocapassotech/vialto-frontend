@@ -114,8 +114,6 @@ export function ClienteCreatePage() {
   return (
     <CrudPageLayout
       title="Crear cliente"
-      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a clientes"
     >
       <form
         className="mt-6 grid gap-4"

@@ -2,6 +2,7 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { MovimientoStockDetalleBody } from '@/components/stock/MovimientoStockDetalleBody';
+import { useBreadcrumbOverride } from '@/hooks/useBreadcrumbOverride';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
 import { isPlatformSuperadmin, isStockViewer } from '@/lib/roleLabels';
@@ -46,6 +47,34 @@ export function MovimientoStockDetallePage() {
     })();
   }, [id, url, getToken, needsTenant]);
 
+  const volverMovimientosHref = (() => {
+    const q = new URLSearchParams();
+    if (tenantIdParam?.trim()) q.set('tenantId', tenantIdParam.trim());
+    const s = q.toString();
+    return `/stock/movimientos${s ? `?${s}` : ''}`;
+  })();
+
+  const homeCrumb = stockViewer
+    ? { label: 'Inicio', to: '/stock/inventario' }
+    : { label: superadmin ? 'Panorama' : 'Inicio', to: '/' };
+
+  // El origen de navegación (lista de movimientos vs. ingresos/egresos) y el
+  // tipo del movimiento sólo se conocen en runtime, así que el breadcrumb
+  // automático (calculado por ruta) no lo puede reflejar.
+  useBreadcrumbOverride(
+    row
+      ? [
+          homeCrumb,
+          stockViewer || fromMovimientosList
+            ? { label: 'Movimientos', to: volverMovimientosHref }
+            : row.tipo === 'egreso'
+              ? { label: 'Egresos / despacho', to: '/stock/egresos' }
+              : { label: 'Ingresos al depósito', to: '/stock/ingresos' },
+          { label: 'Movimiento de stock' },
+        ]
+      : null,
+  );
+
   if (!id) {
     return <p className="text-sm text-vialto-steel">Movimiento no especificado.</p>;
   }
@@ -69,38 +98,15 @@ export function MovimientoStockDetallePage() {
     return <p className="text-vialto-steel py-8 text-center">Cargando…</p>;
   }
 
-  const volverMovimientosHref = (() => {
-    const q = new URLSearchParams();
-    if (tenantIdParam?.trim()) q.set('tenantId', tenantIdParam.trim());
-    const s = q.toString();
-    return `/stock/movimientos${s ? `?${s}` : ''}`;
-  })();
-
-  const volverHref = stockViewer || fromMovimientosList
-    ? volverMovimientosHref
-    : row.tipo === 'egreso'
-      ? '/stock/egresos'
-      : '/stock/ingresos';
-  const volverLabel = stockViewer || fromMovimientosList
-    ? 'Volver a movimientos'
-    : row.tipo === 'egreso'
-      ? 'Volver a egresos'
-      : 'Volver a ingresos';
-
   return (
     <div className="max-w-xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimiento de stock</h1>
-          <p className="mt-1">
-            <span className={movimientoStockTipoBadgeClass(row.tipo)}>
-              {movimientoStockTipoLabel(row.tipo)}
-            </span>
-          </p>
-        </div>
-        <Link to={volverHref} className="text-sm text-vialto-fire hover:underline shrink-0">
-          {volverLabel}
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold text-vialto-charcoal">Movimiento de stock</h1>
+        <p className="mt-1">
+          <span className={movimientoStockTipoBadgeClass(row.tipo)}>
+            {movimientoStockTipoLabel(row.tipo)}
+          </span>
+        </p>
       </div>
 
       <div className="rounded-lg border border-black/10 bg-white">

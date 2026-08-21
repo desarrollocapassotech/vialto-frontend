@@ -96,6 +96,8 @@ export interface Viaje {
   precioUnitarioTransportista?: number | null;
   /** ARS | USD */
   monedaPrecioTransportistaExterno?: string;
+  /** % de IVA que el transportista suma en efectivo por encima de precioTransportistaExterno (que siempre es neto). 0 = no suma IVA. No afecta el cálculo de la Liquidación/CVLP, solo el pago en efectivo y la ganancia bruta. */
+  precioTransportistaIvaIncluidoPct?: number;
   /** Solo cuando monedaMonto != monedaPrecioTransportistaExterno (transporte externo). */
   gananciaBrutaManual?: number | null;
   monedaGananciaBrutaManual?: string | null;
@@ -359,7 +361,8 @@ export interface Factura {
   tenantId: string;
   /** Null para tenants con integracion-arca hasta que se emite (el número real lo asigna AFIP). */
   numero: string | null;
-  tipo: "cliente" | "transportista_externo";
+  /** Siempre "cliente" — el pago a transportistas externos se gestiona en Liquidaciones, no como Factura. */
+  tipo: "cliente";
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];

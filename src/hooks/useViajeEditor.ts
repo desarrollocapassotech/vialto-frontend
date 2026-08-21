@@ -255,6 +255,10 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       monedaPrecioTransportistaExterno: normalizeViajeMoneda(
         v.monedaPrecioTransportistaExterno,
       ),
+      precioTransportistaIvaIncluidoPct:
+        v.precioTransportistaIvaIncluidoPct != null
+          ? String(v.precioTransportistaIvaIncluidoPct)
+          : "",
       cantidadTransportista: v.cantidadTransportista != null ? String(v.cantidadTransportista) : "",
       precioUnitarioTransportista: v.precioUnitarioTransportista != null ? String(v.precioUnitarioTransportista) : "",
       gananciaBrutaManual: formatNumberForMoneda(
@@ -347,6 +351,17 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       ),
       vehiculos: mergeMaestroPorId(prev.vehiculos, incoming.vehiculos),
     }));
+  }
+
+  /**
+   * Actualiza `viajeSnapshot` con un viaje fresco traído fuera de este hook (ej. la
+   * respuesta de `RegistrarPagoTransportistaModal`, montado por la página que hostea
+   * el editor). Sin esto, registrar un pago mientras el editor sigue abierto para
+   * el mismo viaje deja el snapshot viejo — y con él, desactualizados el resumen de
+   * pagos y el badge de liquidación que se muestran cuando hay una liquidación vigente.
+   */
+  function patchViajeSnapshot(updated: Viaje) {
+    if (editingId === updated.id) setViajeSnapshot(updated);
   }
 
   function cancelEdit() {
@@ -539,6 +554,13 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       ? !facturacionPermiteVincular(viajeSnapshot.facturacionEstado) ||
         !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
       : false;
+    // precioTransportistaIvaIncluidoPct se bloquea solo por liquidación vigente (no por
+    // facturación al cliente, eje independiente) — mismo criterio que el backend, para
+    // que un viaje ya facturado pero todavía sin liquidar no quede con el % atascado
+    // apenas se emite la factura al cliente.
+    const precioIvaBloqueado = viajeSnapshot
+      ? !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
+      : false;
     setSavingId(viajeId);
     setError(null);
     try {
@@ -598,6 +620,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             litrosConsumidos: litResolved ?? null,
             precioTransportistaExterno: bloqueado ? undefined : (externo ? (precioTransportistaNum ?? null) : null),
             monedaPrecioTransportistaExterno: bloqueado ? undefined : draft.monedaPrecioTransportistaExterno,
+            precioTransportistaIvaIncluidoPct: precioIvaBloqueado ? undefined : (externo ? (draft.precioTransportistaIvaIncluidoPct.trim() ? Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) : 0) : 0),
             ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
             otrosGastos: bloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
             pagosTransportista: bloqueado ? undefined : (externo ? pagosTransportistaApi : []),
@@ -668,6 +691,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     ayudaFlota,
     opcionesProducto,
     beginEditViaje,
+    patchViajeSnapshot,
     cancelEdit,
     saveInline,
     applyDraftModo,

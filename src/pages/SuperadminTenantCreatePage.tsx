@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   TenantForm,
   type TenantFormValues,
@@ -72,15 +72,6 @@ export function SuperadminTenantCreatePage() {
           Crear empresa
         </h1>
         <p className="mt-2 text-vialto-steel">Alta de una nueva empresa.</p>
-
-        <div className="mt-4">
-          <Link
-            className="text-sm text-vialto-fire hover:text-vialto-bright"
-            to="/superadmin/empresas"
-          >
-            ← Volver a empresas
-          </Link>
-        </div>
 
         <TenantForm
           values={values}

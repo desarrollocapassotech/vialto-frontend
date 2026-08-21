@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { RotateCw } from "lucide-react";
+import { Ban, RotateCw, Trash2 } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { apiJson } from "@/lib/api";
+import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
@@ -123,6 +124,8 @@ export function LiquidacionViewModal({
   onClose,
   onEditar,
   onEmitir,
+  onEliminar,
+  onAnular,
   onVerComprobante,
   onVerAnulacion,
 }: {
@@ -138,6 +141,10 @@ export function LiquidacionViewModal({
   onEditar: () => void;
   /** Si se pasa, muestra "Emitir"/"Reintentar emisión" cuando el estado es borrador o error. */
   onEmitir?: () => void;
+  /** Baja de borrador (o error / esperando AFIP). El caller pide confirmación. */
+  onEliminar?: () => void;
+  /** Anulación de liquidación autorizada (ARCA). El caller pide confirmación + motivo. */
+  onAnular?: () => void;
   /** Ver el comprobante: PDF del CVLP autorizado (ARCA) o adjunto manual (sin ARCA), según lo resuelva el caller. */
   onVerComprobante?: () => void;
   /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'`. */
@@ -212,6 +219,13 @@ export function LiquidacionViewModal({
   })();
   const conceptosLineas = normalizeConceptosLineas(source.conceptosLineas);
   const viajesIncluidos: LiquidacionViajeItem[] = source.viajes ?? [];
+  const puedeEliminar =
+    Boolean(onEliminar) &&
+    (source.estado === "borrador" ||
+      source.estado === "error" ||
+      source.estado === "pendiente_cae");
+  const puedeAnular =
+    Boolean(onAnular) && hasArca && source.estado === "autorizado";
 
   return (
     <ViewModalShell
@@ -255,6 +269,34 @@ export function LiquidacionViewModal({
                 {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
               </button>
             )}
+          {puedeEliminar && (
+            <button
+              type="button"
+              onClick={onEliminar}
+              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+            >
+              <Trash2
+                className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              Eliminar
+            </button>
+          )}
+          {puedeAnular && (
+            <button
+              type="button"
+              onClick={onAnular}
+              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+            >
+              <Ban
+                className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              Anular
+            </button>
+          )}
           {canEdit && (
             <button
               type="button"
@@ -421,9 +463,11 @@ export function LiquidacionViewModal({
         )}
 
         {source.arcaError && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm">
+          <div className="rounded px-0 py-0 text-sm">
             <ArcaErrorMessage
-              message={source.arcaError}
+              message={
+                formatStoredArcaError(source.arcaError) ?? source.arcaError
+              }
               detalle={source.arcaErrorDetalle ?? undefined}
             />
           </div>

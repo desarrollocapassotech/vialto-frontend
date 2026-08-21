@@ -324,29 +324,19 @@ function viajePerteneceAFacturaEnEdicion(
 }
 
 /**
- * Viajes que se pueden vincular a una factura según tipo y contraparte.
- * Tipo «cliente»: viajes del `clienteId` elegido.
- * «transportista_externo»: viajes del `transportistaId` elegido (operación externa).
- * Excluye viajes que ya tienen factura asignada, cobrados y cancelados.
- * Con `opciones` de edición, mantiene visibles los viajes ya vinculados a esa factura.
+ * Viajes que se pueden vincular a una factura de cliente: viajes del
+ * `clienteId` elegido. Excluye viajes que ya tienen factura asignada,
+ * cobrados y cancelados. Con `opciones` de edición, mantiene visibles los
+ * viajes ya vinculados a esa factura.
  */
 export function viajesFiltradosParaFactura(
   todos: Viaje[],
-  tipo: "cliente" | "transportista_externo",
   clienteId: string,
-  transportistaId: string,
   opciones?: ViajesFiltradosParaFacturaOpciones,
 ): Viaje[] {
-  let list: Viaje[];
-  if (tipo === "cliente") {
-    const cid = clienteId.trim();
-    if (!cid) return [];
-    list = todos.filter((v) => v.clienteId === cid);
-  } else {
-    const tid = transportistaId.trim();
-    if (!tid) return [];
-    list = todos.filter((v) => v.transportistaId === tid);
-  }
+  const cid = clienteId.trim();
+  if (!cid) return [];
+  const list = todos.filter((v) => v.clienteId === cid);
 
   const fid = opciones?.facturaEdicionId?.trim() || null;
   const idsFactura = opciones?.viajeIdsFacturaEdicion;
@@ -370,9 +360,7 @@ export function viajesFiltradosParaFactura(
     if (seen.has(id)) continue;
     const v = todos.find((x) => x.id === id);
     if (!v) continue;
-    if (tipo === "cliente" && v.clienteId !== clienteId.trim()) continue;
-    if (tipo !== "cliente" && v.transportistaId !== transportistaId.trim())
-      continue;
+    if (v.clienteId !== cid) continue;
     seen.add(id);
     extra.push(v);
   }
@@ -527,7 +515,6 @@ export function monedaUnicaDeViajes(
 export function textoImporteFacturaSeleccion(
   viajeIds: string[],
   viajes: Viaje[],
-  tipo: "cliente" | "transportista_externo" = "cliente",
 ): string {
   let ars = 0;
   let usd = 0;
@@ -535,11 +522,8 @@ export function textoImporteFacturaSeleccion(
     const v = viajes.find((x) => x.id === id);
     if (!v) continue;
 
-    const esTransportista = tipo === "transportista_externo";
-    const monto = esTransportista ? v.precioTransportistaExterno : v.monto;
-    const moneda = esTransportista
-      ? v.monedaPrecioTransportistaExterno
-      : v.monedaMonto;
+    const monto = v.monto;
+    const moneda = v.monedaMonto;
 
     if (monto == null) continue;
     if (normalizeViajeMoneda(moneda) === "USD") usd += monto;

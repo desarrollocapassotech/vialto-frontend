@@ -54,6 +54,14 @@ export function useFieldConfig(modulo: string) {
 
   /** true = visible (default si todavía no cargó o el campo no está en la config) */
   function isVisible(formulario: string, campo: string): boolean {
+    if (modulo === "viajes") {
+      return (
+        config?.alta_viaje?.[campo] ??
+        config?.edicion_viaje?.[campo] ??
+        config?.detalle_viaje?.[campo] ??
+        true
+      );
+    }
     return config?.[formulario]?.[campo] ?? true;
   }
 

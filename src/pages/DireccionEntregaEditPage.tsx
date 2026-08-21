@@ -134,13 +134,9 @@ export function DireccionEntregaEditPage() {
     }
   }
 
-  const backTo = `/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`;
-
   return (
     <CrudPageLayout
       title="Editar dirección / ruta"
-      backTo={backTo}
-      backLabel="← Volver a direcciones"
     >
       {initialLoading ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>

@@ -88,8 +88,6 @@ export function ChoferCreatePage() {
   return (
     <CrudPageLayout
       title="Crear chofer"
-      backTo={`/base-de-datos?tab=choferes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a choferes"
     >
       <form
         className="mt-6 grid gap-4"

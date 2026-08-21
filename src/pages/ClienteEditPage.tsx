@@ -122,7 +122,7 @@ export function ClienteEditPage() {
           condicionIva: pais === "AR" ? condicionIva : null,
           condicionTributaria:
             pais !== "AR" ? condicionTributaria.trim() : null,
-          email: email.trim(),
+          email: email.trim() || null,
           telefono: telefono.trim(),
           direccion: direccion.trim(),
           confirmarSinDatosFiscales: faltanDatosFiscales
@@ -178,8 +178,6 @@ export function ClienteEditPage() {
   return (
     <CrudPageLayout
       title="Editar cliente"
-      backTo={`/base-de-datos?tab=clientes${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a clientes"
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>

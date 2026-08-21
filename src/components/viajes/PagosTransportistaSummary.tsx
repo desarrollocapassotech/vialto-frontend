@@ -4,7 +4,8 @@ import type { Viaje } from '@/types/api';
 
 interface Props {
   viaje: Viaje;
-  onRegistrarPago: () => void;
+  /** Si no se pasa, no se muestra el botón "+ Registrar pago" (ej. contextos sin el modal wireado). */
+  onRegistrarPago?: () => void;
 }
 
 const labelClass =
@@ -20,13 +21,15 @@ export function PagosTransportistaSummary({ viaje, onRegistrarPago }: Props) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className={labelClass}>Pagos al transportista</span>
-        <button
-          type="button"
-          onClick={onRegistrarPago}
-          className="text-xs border border-black/20 bg-white px-2 py-1 hover:bg-gray-50 active:bg-gray-100"
-        >
-          + Registrar pago
-        </button>
+        {onRegistrarPago && (
+          <button
+            type="button"
+            onClick={onRegistrarPago}
+            className="text-xs border border-black/20 bg-white px-2 py-1 hover:bg-gray-50 active:bg-gray-100"
+          >
+            + Registrar pago
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 rounded border border-black/10 bg-white px-3 py-2.5 text-sm">

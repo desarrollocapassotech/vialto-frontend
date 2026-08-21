@@ -1,6 +1,4 @@
 import { useAuth } from "@clerk/clerk-react";
-import { Info } from "lucide-react";
-import { tooltipPanelClassBelow } from "@/lib/tooltip";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -29,7 +27,7 @@ import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteM
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import type { FacturaLetra } from "@/lib/arcaCbteTipo";
 import { apiJson, ApiError } from "@/lib/api";
-import { useToast } from "@/lib/toast"; // <-- IMPORTACIÓN DEL TOAST
+import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   mergeMaestroPorId,
@@ -117,7 +115,159 @@ import {
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
 
-//comentario para nuevo PR
+// ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
+function AutocompleteInput({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+  disabled,
+  prefix = "",
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onSearch: (query: string) => Promise<string[]>;
+  placeholder?: string;
+  disabled?: boolean;
+  prefix?: string;
+}) {
+  const [query, setQuery] = useState(value);
+  const [options, setOptions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        wrapperRef.current &&
+        document.contains(target) &&
+        !wrapperRef.current.contains(target)
+      ) {
+        setOpen(false);
+        setQuery(value);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [value]);
+
+  useEffect(() => {
+    let active = true;
+    const queryClean = query.trim();
+
+    if (queryClean === value.trim() && !open) return;
+
+    if (!queryClean) {
+      setOptions([]);
+      setOpen(false);
+      if (value) onChange("");
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLoading(true);
+      onSearch(queryClean).then((res) => {
+        if (!active) return;
+        setOptions(res);
+        setOpen(true);
+        setLoading(false);
+      });
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, value, onChange, onSearch, open]);
+
+  const handleApply = (valToApply: string) => {
+    setQuery(valToApply);
+    setOpen(false);
+    onChange(valToApply);
+  };
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <div
+        className={`flex items-center h-9 w-full border border-black/15 bg-white px-2 text-sm focus-within:ring-1 focus-within:ring-vialto-fire ${
+          value ? "text-vialto-fire" : "text-vialto-charcoal"
+        } ${disabled ? "opacity-60 bg-gray-50" : ""}`}
+      >
+        {prefix && (
+          <span className="text-vialto-steel mr-0.5 pointer-events-none select-none">
+            {prefix}
+          </span>
+        )}
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            let val = e.target.value;
+            if (prefix === "#") {
+              val = val.replace(/#/g, "");
+            }
+            setQuery(val);
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleApply(query.trim());
+            }
+          }}
+          disabled={disabled}
+          placeholder={placeholder}
+          onFocus={() => {
+            if (query.trim() && options.length > 0) setOpen(true);
+          }}
+          className="flex-1 min-w-0 outline-none bg-transparent"
+          autoComplete="off"
+        />
+      </div>
+      {open && query.trim() !== "" && (
+        <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded border border-black/15 bg-white py-1 shadow-lg text-sm text-vialto-charcoal">
+          {loading ? (
+            <li className="px-3 py-2 text-vialto-steel">Buscando...</li>
+          ) : options.length === 0 ? (
+            <li
+              className="cursor-pointer px-3 py-2 hover:bg-vialto-mist/80 text-vialto-steel"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleApply(query.trim());
+              }}
+            >
+              Presiona <kbd className="font-sans font-medium px-1 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para buscar "{query}"
+            </li>
+          ) : (
+            options.map((opt, idx) => {
+              return (
+                <li
+                  key={idx}
+                  className="cursor-pointer px-3 py-2 hover:bg-vialto-mist/80"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleApply(opt);
+                  }}
+                >
+                  {prefix}
+                  {opt}
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 type ViajesPaginatedResponse = {
   items: Viaje[];
@@ -131,16 +281,14 @@ export function ViajesTenantPage({
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
 } = {}) {
-  // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
-  const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
+  const { showToast } = useToast();
 
-  // Variables de configuración de entorno (superadmin vs usuario normal)
   const platform = Boolean(tenantId?.trim());
   const hasLiquidacionesArca =
     !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
@@ -150,7 +298,6 @@ export function ViajesTenantPage({
     canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? "";
 
-  // Maestros de datos (dependiendo de si es vista superadmin o normal)
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
   const [transportistasP, setTransportistasP] = useState<Transportista[]>([]);
@@ -160,7 +307,6 @@ export function ViajesTenantPage({
   const transportistas = platform ? transportistasP : maestro.transportistas;
   const vehiculos = platform ? vehiculosP : maestro.vehiculos;
 
-  // ─── CONSTRUCCIÓN DE RUTAS DE API ────────────────────────────────────────
   const viajeApiUrl = useCallback(
     (id: string, opts?: { force?: boolean }) => {
       const base = !platform
@@ -181,12 +327,10 @@ export function ViajesTenantPage({
 
   const facturacionNavExtras = () => (platform ? { tenantId: tid } : {});
 
-  // ─── ESTADOS GLOBALES DE LA VISTA ─────────────────────────────────────────
   const [rows, setRows] = useState<Viaje[] | null>(null);
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** Fila donde el usuario abrió el selector de estado con un clic en el badge. */
   const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
@@ -195,7 +339,6 @@ export function ViajesTenantPage({
   const [viajeDeleteConfirm, setViajeDeleteConfirm] = useState<Viaje | null>(
     null,
   );
-  /** Viaje + liquidaciones asociadas que también se borrarían; se llena cuando el backend responde 409. */
   const [viajeDeleteImpacto, setViajeDeleteImpacto] = useState<{
     viaje: Viaje;
     conflicto: ViajeEliminacionConflicto;
@@ -206,7 +349,6 @@ export function ViajesTenantPage({
   const [sortBy, setSortBy] = useState<ViajeSortField>("fecha_creacion");
   const [sortDir, setSortDir] = useState<ViajeSortDir>("desc");
 
-  /** Orden aplicado al fetch (evita carrera entre setState y listadoQueryVersion). */
   const ordenamientoAplicadoRef = useRef({
     sortBy: "fecha_creacion" as ViajeSortField,
     sortDir: "desc" as ViajeSortDir,
@@ -218,8 +360,9 @@ export function ViajesTenantPage({
     return esFiltroPagoTransportistaValido(p) ? p : "";
   })();
 
-  /** Filtros de listado (ref para el fetch; la versión fuerza refetch). */
   const filtrosAplicadosRef = useRef({
+    numero: "",
+    ctg: "",
     clienteId: "",
     transportistaId: "",
     choferId: "",
@@ -231,13 +374,12 @@ export function ViajesTenantPage({
     fechaDesde: "",
     fechaHasta: "",
     tipoUbicacion: "" as "" | "origen" | "destino",
-    /** Etiqueta completa de ciudad (misma que guarda el viaje al elegir del combobox). */
     ubicacion: "",
     periodo: "todos" as "todos" | "desde_hoy" | "anteriores",
   });
 
-  // ─── ESTADOS DE LOS FILTROS DE COLUMNAS ────────────────────────────────────
-  /** Cliente seleccionado en filtro de columna (checks y facturación masiva). */
+  const [numeroFiltroActivo, setNumeroFiltroActivo] = useState("");
+  const [ctgFiltroActivo, setCtgFiltroActivo] = useState("");
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
@@ -262,10 +404,7 @@ export function ViajesTenantPage({
   >("todos");
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
 
-  /** Mientras se vuelve a pedir el listado (filtros, página, etc.). */
   const [listadoRefetching, setListadoRefetching] = useState(false);
-
-  /** Selección para facturar varios viajes juntos (solo con filtro por cliente). */
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>(
     [],
   );
@@ -273,7 +412,6 @@ export function ViajesTenantPage({
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
 
-  // Modales de acciones secundarias
   const [agregarGastoViaje, setAgregarGastoViaje] = useState<Viaje | null>(
     null,
   );
@@ -287,13 +425,79 @@ export function ViajesTenantPage({
     null,
   );
 
-  /** Conteos globales para los chips de acceso rápido en la UI. */
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
     sinCobrar: number;
     sinPagar: number;
     pagados: number;
   } | null>(null);
+
+  // Funciones asincrónicas de búsqueda de Autocompletado 
+  const searchNumero = useCallback(
+    async (q: string) => {
+      const qClean = q.replace(/#/g, "").trim().toLowerCase();
+      if (!qClean) return [];
+
+      const params = new URLSearchParams();
+      if (platform && tid) params.set("tenantId", tid);
+      // NO le pasamos qClean a la API para que no nos devuelva 0 resultados por el filtro estricto.
+      // Descargamos un lote general y lo filtramos aquí mismo.
+      params.set("page", "1");
+      params.set("pageSize", "1000");
+
+      const url = platform
+        ? `/api/platform/viajes/paginated?${params.toString()}`
+        : `/api/viajes/paginated?${params.toString()}`;
+
+      try {
+        const res = await apiJson<ViajesPaginatedResponse>(url, () =>
+          getTokenRef.current(),
+        );
+
+        // Filtramos de forma estricta localmente asegurando coincidencia parcial
+        const matches = res.items.filter((v) =>
+          String(v.numero).toLowerCase().includes(qClean),
+        );
+
+        return Array.from(new Set(matches.map((v) => String(v.numero))));
+      } catch {
+        return [];
+      }
+    },
+    [platform, tid],
+  );
+
+  const searchCtg = useCallback(
+    async (q: string) => {
+      const qClean = q.trim().toLowerCase();
+      if (!qClean) return [];
+
+      const params = new URLSearchParams();
+      if (platform && tid) params.set("tenantId", tid);
+      params.set("page", "1");
+      params.set("pageSize", "1000");
+
+      const url = platform
+        ? `/api/platform/viajes/paginated?${params.toString()}`
+        : `/api/viajes/paginated?${params.toString()}`;
+
+      try {
+        const res = await apiJson<ViajesPaginatedResponse>(url, () =>
+          getTokenRef.current(),
+        );
+
+        // Filtro local estricto
+        const matches = res.items
+          .map((v) => v.numeroIdentificacionPersonalizado?.trim() || "")
+          .filter((x) => x.toLowerCase().includes(qClean));
+
+        return Array.from(new Set(matches));
+      } catch {
+        return [];
+      }
+    },
+    [platform, tid],
+  );
 
   async function fetchProductosCatalogoParaEditor(): Promise<Producto[]> {
     const url = platform
@@ -360,7 +564,6 @@ export function ViajesTenantPage({
     fetchProductosCatalogo: fetchProductosCatalogoParaEditor,
   });
 
-  /** Entidades creadas en «Crear viaje» que deben seguir disponibles al volver al listado. */
   useEffect(() => {
     const incoming = (
       location.state as { sessionMaestro?: MaestroListasViaje } | null
@@ -374,7 +577,6 @@ export function ViajesTenantPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search, location.state, navigate]);
 
-  /** Envoltorio: además de delegar al hook, resetea el selector rápido de estado de la fila. */
   function beginEditViaje(v: Viaje, origen: "listado" | "remoto" = "listado") {
     setEstadoQuickId(null);
     return viajeEditor.beginEditViaje(v, origen);
@@ -385,11 +587,9 @@ export function ViajesTenantPage({
     viajeEditor.cancelEdit();
   }
 
-  // Variables booleanas para facilitar la legibilidad de la grilla
   const ordenResaltaFechaCarga = sortBy === "fecha_carga";
   const ordenResaltaFechaDescarga = sortBy === "fecha_descarga";
 
-  // Efecto que trae los datos de los maestros si operamos bajo modo superadmin
   useEffect(() => {
     if (!platform || !tid || !isLoaded || !isSignedIn) {
       setClientesP([]);
@@ -430,7 +630,6 @@ export function ViajesTenantPage({
     };
   }, [platform, tid, isLoaded, isSignedIn, getToken]);
 
-  // Actualiza los badges contadores del inicio ("Sin facturar", "Sin cobrar", etc.)
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (platform && !tid) return;
@@ -474,7 +673,6 @@ export function ViajesTenantPage({
     };
   }, [getToken, isLoaded, isSignedIn, platform, tid]);
 
-  // Carga del listado principal y aplicación de los queries de búsqueda / filtrado / orden
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (platform && !tid) return;
@@ -483,6 +681,8 @@ export function ViajesTenantPage({
       try {
         const filtros = new URLSearchParams();
         const {
+          numero: numF,
+          ctg: ctgF,
           clienteId: cid,
           transportistaId: transpFiltro,
           choferId: choferFiltro,
@@ -497,7 +697,20 @@ export function ViajesTenantPage({
           periodo: per,
         } = filtrosAplicadosRef.current;
 
-        // Asignación manual de parámetros para armar la URL del request
+        // Por seguridad, enviamos los datos en la consulta, pero no confiamos ciegamente en el backend si el texto es parcial.
+        if (numF.trim()) {
+          const cleanNum = numF.replace(/#/g, "").trim();
+          filtros.set("numero", cleanNum);
+          filtros.set("q", cleanNum);
+          filtros.set("busqueda", cleanNum);
+        }
+        if (ctgF.trim()) {
+          filtros.set("ctg", ctgF.trim());
+          filtros.set("numeroIdentificacionPersonalizado", ctgF.trim());
+          filtros.set("q", ctgF.trim());
+          filtros.set("busqueda", ctgF.trim());
+        }
+
         if (cid) filtros.set("clienteId", cid);
         if (transpFiltro) filtros.set("transportistaId", transpFiltro);
         if (choferFiltro) filtros.set("choferId", choferFiltro);
@@ -530,8 +743,10 @@ export function ViajesTenantPage({
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
 
-        const pageApi = Math.max(1, Math.floor(page));
-        const pageSizeApi = pageSizeApiValido(pageSize);
+        const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+        const pageApi = isLocalSearch ? 1 : Math.max(1, Math.floor(page));
+        // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
+        const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
 
         const pagoFiltroActivo =
           pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
@@ -543,7 +758,6 @@ export function ViajesTenantPage({
 
         const sortFetch = ordenamientoAplicadoRef.current;
 
-        // Existen diferentes estrategias de fetch según si ordenamos por pago, cliente o campos genéricos
         if (pagoFiltroActivo) {
           const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
             listBase,
@@ -582,6 +796,36 @@ export function ViajesTenantPage({
           meta = data.meta;
         }
 
+        // --- FILTRADO LOCAL (FALLBACK INFALIBLE DE LA GRILLA) ---
+        if (isLocalSearch) {
+          const qNum = numF.replace(/#/g, "").trim().toLowerCase();
+          const qCtg = ctgF.trim().toLowerCase();
+
+          let filteredItems = items;
+          if (qNum) {
+            filteredItems = filteredItems.filter((v) =>
+              String(v.numero).toLowerCase().includes(qNum),
+            );
+          }
+          if (qCtg) {
+            filteredItems = filteredItems.filter((v) =>
+              (v.numeroIdentificacionPersonalizado || "")
+                .toLowerCase()
+                .includes(qCtg),
+            );
+          }
+
+          // Sobrescribimos paginación con el resultado local exacto
+          meta = {
+            ...meta,
+            total: filteredItems.length,
+            page: page,
+            pageSize: pageSize,
+            totalPages: Math.ceil(filteredItems.length / pageSize) || 1,
+          };
+          items = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+        }
+
         if (!cancelled) {
           setRows(items);
           setMeta(meta);
@@ -612,7 +856,6 @@ export function ViajesTenantPage({
     tid,
   ]);
 
-  // ─── HANDLERS DE APLICACIÓN DE FILTROS ─────────────────────────────────────
   function aplicarOrdenamiento(
     nuevoSortBy: ViajeSortField,
     nuevoSortDir: ViajeSortDir,
@@ -624,6 +867,30 @@ export function ViajesTenantPage({
     setListadoRefetching(true);
     setSortBy(nuevoSortBy);
     setSortDir(nuevoSortDir);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaNumero(val: string) {
+    const num = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      numero: num,
+    };
+    setListadoRefetching(true);
+    setNumeroFiltroActivo(num);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaCTG(val: string) {
+    const ctg = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      ctg: ctg,
+    };
+    setListadoRefetching(true);
+    setCtgFiltroActivo(ctg);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -692,7 +959,6 @@ export function ViajesTenantPage({
     setListadoQueryVersion((v) => v + 1);
   }
 
-  /** Chips rápidos "Sin facturar" / "Sin cobrar" — filtran por `facturacionEstado`, independiente de la etapa. */
   function aplicarFiltroFacturacion(val: string) {
     const f = val.trim();
     filtrosAplicadosRef.current = {
@@ -729,7 +995,6 @@ export function ViajesTenantPage({
     }
   }
 
-  //Comentario para hacer pr desde rama develop
   function aplicarTipoFechaFiltro(val: "" | "carga" | "descarga") {
     if (!val) {
       filtrosAplicadosRef.current = {
@@ -815,7 +1080,6 @@ export function ViajesTenantPage({
       setUbicacionFiltro("");
     }
 
-    /** Solo se pide de nuevo el listado si había ciudad aplicada (se quitó o se cambió origen/destino). */
     if (habiaCiudadEnFiltro) {
       setListadoRefetching(true);
       setPage(1);
@@ -864,6 +1128,8 @@ export function ViajesTenantPage({
 
   function limpiarFiltrosColumnas() {
     filtrosAplicadosRef.current = {
+      numero: "",
+      ctg: "",
       clienteId: "",
       transportistaId: "",
       choferId: "",
@@ -878,6 +1144,8 @@ export function ViajesTenantPage({
       periodo: "todos",
     };
     setListadoRefetching(true);
+    setNumeroFiltroActivo("");
+    setCtgFiltroActivo("");
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
     setChoferIdFiltroActivo("");
@@ -896,6 +1164,8 @@ export function ViajesTenantPage({
   }
 
   const hayFiltrosColumnasActivos =
+    !!numeroFiltroActivo.trim() ||
+    !!ctgFiltroActivo.trim() ||
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!choferIdFiltroActivo.trim() ||
@@ -907,9 +1177,10 @@ export function ViajesTenantPage({
     !!ubicacionFiltro.trim() ||
     periodoFiltro !== "todos";
 
-  /** Una unidad por columna de filtro con criterio aplicado (máx. 5). */
   const cantidadFiltrosColumnasActivos = useMemo(() => {
     let n = 0;
+    if (numeroFiltroActivo.trim()) n += 1;
+    if (ctgFiltroActivo.trim()) n += 1;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (choferIdFiltroActivo.trim()) n += 1;
@@ -921,6 +1192,8 @@ export function ViajesTenantPage({
     if (periodoFiltro !== "todos") n += 1;
     return n;
   }, [
+    numeroFiltroActivo,
+    ctgFiltroActivo,
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
     choferIdFiltroActivo,
@@ -933,7 +1206,6 @@ export function ViajesTenantPage({
     periodoFiltro,
   ]);
 
-  // Si cambia el cliente en el filtro, limpiamos la selección para facturar
   useEffect(() => {
     setIdsFacturarSeleccion([]);
   }, [clienteIdFiltroActivo]);
@@ -968,7 +1240,6 @@ export function ViajesTenantPage({
     }
   }
 
-  // ─── RUTEO Y REDIRECCIÓN AL FACTURAR ───────────────────────────────────────
   function facturarSeleccionMultiple() {
     const ids = idsFacturarSeleccion;
     const cid = clienteIdFiltroActivo.trim();
@@ -999,7 +1270,6 @@ export function ViajesTenantPage({
     setViajeDeleteConfirm(v);
   }
 
-  /** Limpieza de estado local compartida por el borrado directo y el borrado forzado. */
   function onViajeEliminadoOk(v: Viaje) {
     showToast("Viaje eliminado correctamente", "success");
     setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
@@ -1017,7 +1287,6 @@ export function ViajesTenantPage({
     setViajeDeleteImpacto(null);
   }
 
-  // ─── ELIMINACIÓN DEFINITIVA ────────────────────────────────────────────────
   async function confirmDeleteViaje() {
     const v = viajeDeleteConfirm;
     if (!v || deletingViajeId) return;
@@ -1026,7 +1295,6 @@ export function ViajesTenantPage({
       await apiJson(viajeApiUrl(v.id), () => getToken(), { method: "DELETE" });
       onViajeEliminadoOk(v);
     } catch (e) {
-      // El backend devuelve 409 + code cuando el viaje tiene liquidaciones asociadas.
       if (e instanceof ApiError && e.status === 409) {
         const body = e.body as Partial<ViajeEliminacionConflicto> | undefined;
         if (body?.code === "VIAJE_TIENE_LIQUIDACIONES") {
@@ -1046,7 +1314,6 @@ export function ViajesTenantPage({
     }
   }
 
-  /** Confirmación del segundo paso: borra el viaje junto con sus liquidaciones sin autorizar. */
   async function confirmDeleteViajeForzado() {
     const impacto = viajeDeleteImpacto;
     if (!impacto || deletingViajeId) return;
@@ -1066,7 +1333,6 @@ export function ViajesTenantPage({
     }
   }
 
-  /** Limpiar ?etapa= de la URL una vez aplicado al filtro inicial. */
   useEffect(() => {
     if (
       !searchParams.has("etapa") &&
@@ -1084,7 +1350,6 @@ export function ViajesTenantPage({
     );
   }, [searchParams, setSearchParams]);
 
-  /** Abrir detalle (Ver) desde enlace: `?viaje=id` */
   useEffect(() => {
     const id = searchParams.get("viaje")?.trim();
     if (!id || !isLoaded || !isSignedIn) return;
@@ -1098,7 +1363,7 @@ export function ViajesTenantPage({
         if (cancelled || !v) return;
         setViewingViaje(v);
       } catch {
-        /* viaje inexistente o sin permiso */
+        /* error ignorable */
       } finally {
         if (!cancelled) {
           setSearchParams(
@@ -1125,7 +1390,6 @@ export function ViajesTenantPage({
     viajeApiUrl,
   ]);
 
-  // ─── CAMBIO RÁPIDO DE ESTADO (SELECT DESDE LA GRILLA) ─────────────────────
   async function patchEstadoDesdeListado(v: Viaje, nuevaEtapa: string) {
     if (nuevaEtapa === v.etapa) {
       setEstadoQuickId(null);
@@ -1149,13 +1413,9 @@ export function ViajesTenantPage({
         prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev,
       );
       setEstadoQuickId(null);
-
-      // --> TOAST INYECTADO: ÉXITO AL ACTUALIZAR EL ESTADO <--
       showToast("Estado actualizado correctamente", "success");
     } catch (e) {
       setError(friendlyError(e, "viajes"));
-
-      // --> TOAST INYECTADO: ERROR AL ACTUALIZAR EL ESTADO <--
       showToast("No se pudo actualizar el estado", "error");
     } finally {
       setSavingEstadoId(null);
@@ -1164,7 +1424,6 @@ export function ViajesTenantPage({
 
   function openFacturarFlow(v: Viaje) {
     if (viajeRequiereComprobanteDual(v)) {
-      // Dual: primero elegir contraparte; luego el tipo de comprobante (A/B o CVLP 60/61).
       if (hasLiquidacionesArca || hasFacturacionSinArca) {
         setSelectorViaje(v);
         return;
@@ -1174,7 +1433,6 @@ export function ViajesTenantPage({
       showToast(MSG_ARCA_NO_FACTURA_USD, "error");
       return;
     }
-    // Tipo A/B solo aplica con integración ARCA; sin ARCA va directo al registro manual.
     if (hasLiquidacionesArca) {
       setTipoFacturaViaje(v);
     } else {
@@ -1199,7 +1457,7 @@ export function ViajesTenantPage({
         return;
       }
     } catch {
-      // si falla la consulta, igualmente navegamos
+      // Ignorar fallback
     } finally {
       setFacturandoLoadingId(null);
     }
@@ -1216,7 +1474,6 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
-  /** ID + cliente + transp. externo + chofer + estado + recorrido + fechas + acciones. */
   const tableColSpanBase = 8;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
@@ -1230,6 +1487,28 @@ export function ViajesTenantPage({
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
+      <ListadoFiltroCampo label="ID" active={!!numeroFiltroActivo.trim()}>
+        <AutocompleteInput
+          value={numeroFiltroActivo}
+          onChange={(val) => aplicarFiltroColumnaNumero(val)}
+          onSearch={searchNumero}
+          disabled={listadoRefetching}
+          placeholder="Buscar ID..."
+          prefix="#"
+        />
+      </ListadoFiltroCampo>
+      <ListadoFiltroCampo
+        label={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
+        active={!!ctgFiltroActivo.trim()}
+      >
+        <AutocompleteInput
+          value={ctgFiltroActivo}
+          onChange={(val) => aplicarFiltroColumnaCTG(val)}
+          onSearch={searchCtg}
+          disabled={listadoRefetching}
+          placeholder="Buscar valor..."
+        />
+      </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Período" active={periodoFiltro !== "todos"}>
         <select
           value={periodoFiltro}
@@ -1567,30 +1846,35 @@ export function ViajesTenantPage({
               </th>
             )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <span className="group relative inline-flex cursor-default items-center gap-1">
-                ID
-                <Info
-                  className="h-3.5 w-3.5 text-vialto-steel/60"
-                  strokeWidth={1.75}
-                  aria-hidden
+              <ViajesListadoHeaderFiltro
+                title="ID"
+                filterActive={!!numeroFiltroActivo.trim()}
+                filterSignature={numeroFiltroActivo}
+              >
+                <AutocompleteInput
+                  value={numeroFiltroActivo}
+                  onChange={(val) => aplicarFiltroColumnaNumero(val)}
+                  onSearch={searchNumero}
+                  disabled={listadoRefetching}
+                  placeholder="Buscar ID..."
+                  prefix="#"
                 />
-                <span className={tooltipPanelClassBelow} role="tooltip">
-                  ID generado automáticamente por el sistema.
-                </span>
-              </span>
+              </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <span className="group relative inline-flex cursor-default items-center gap-1">
-                {labelIdentificacionPersonalizadaViajes(currentTenant)}
-                <Info
-                  className="h-3.5 w-3.5 text-vialto-steel/60"
-                  strokeWidth={1.75}
-                  aria-hidden
+              <ViajesListadoHeaderFiltro
+                title={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
+                filterActive={!!ctgFiltroActivo.trim()}
+                filterSignature={ctgFiltroActivo}
+              >
+                <AutocompleteInput
+                  value={ctgFiltroActivo}
+                  onChange={(val) => aplicarFiltroColumnaCTG(val)}
+                  onSearch={searchCtg}
+                  disabled={listadoRefetching}
+                  placeholder="Buscar valor..."
                 />
-                <span className={tooltipPanelClassBelow} role="tooltip">
-                  ID propio del cliente para identificar el viaje.
-                </span>
-              </span>
+              </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
@@ -2356,6 +2640,9 @@ export function ViajesTenantPage({
             getToken={getToken}
             tenantId={platform ? tid : undefined}
             tenant={!platform ? currentTenant : undefined}
+            onRegistrarPago={() =>
+              setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
+            }
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)
@@ -2429,6 +2716,7 @@ export function ViajesTenantPage({
                   }
                 : d,
             );
+            viajeEditor.patchViajeSnapshot(updated);
           }
           setRegistrarPagoViaje(null);
         }}
@@ -2526,6 +2814,10 @@ export function ViajesTenantPage({
           transportistas={maestro.transportistas}
           hasArca={hasLiquidacionesArca}
           getToken={getToken}
+          onDataSaved={() => {
+            void maestro.refreshTransportistas();
+            void maestro.refreshClientes();
+          }}
           onSuccess={() => {
             setCrearLiqViaje(null);
             setListadoQueryVersion((v) => v + 1);

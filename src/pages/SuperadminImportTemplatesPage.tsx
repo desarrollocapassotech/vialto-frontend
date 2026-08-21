@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
@@ -366,15 +366,6 @@ export function SuperadminImportTemplatesPage() {
           Configurar templates de importación
         </h1>
         {tenant && <p className="mt-2 text-vialto-steel">{tenant.name}</p>}
-
-        <div className="mt-4">
-          <Link
-            className="text-sm text-vialto-fire hover:text-vialto-bright"
-            to={`/superadmin/empresas/${orgId}/importar`}
-          >
-            ← Volver a importar
-          </Link>
-        </div>
 
         {tenantLoading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>

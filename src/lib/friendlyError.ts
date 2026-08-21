@@ -1,5 +1,9 @@
 import { ApiError } from "./api";
-import { sanitizeArcaApiError } from "./arcaFriendlyError";
+import {
+  isAfipInfrastructureError,
+  MSG_AFIP_INFRA,
+  sanitizeArcaApiError,
+} from "./arcaFriendlyError";
 import { fmtMensajeErrorSincronizacion } from "./combustibleLabels";
 
 export type FriendlyErrorContext =
@@ -60,6 +64,10 @@ export function friendlyError(
   context: FriendlyErrorContext,
 ): string {
   if (err instanceof ApiError) {
+    // AFIP 5xx (501 CabInsert, etc.): no confundir con un fallo nuestro.
+    if (context === "arca" && err.message && isAfipInfrastructureError(err.message)) {
+      return MSG_AFIP_INFRA;
+    }
     if (err.status === 401) {
       return "Tu sesión venció. Volvé a iniciar sesión para seguir.";
     }
@@ -129,10 +137,19 @@ export function friendlyError(
         err.message !== "Bad Gateway" &&
         err.message !== "Service Unavailable"
       ) {
+        if (context === "arca") {
+          return sanitizeArcaApiError(err.message) ?? err.message;
+        }
         return err.message;
       }
     }
     if (err.status >= 500) {
+      if (context === "arca" && err.message) {
+        const sanitized = sanitizeArcaApiError(err.message);
+        if (sanitized && isAfipInfrastructureError(err.message)) {
+          return MSG_AFIP_INFRA;
+        }
+      }
       return "Tuvimos un problema del nuestro. Intentá de nuevo más tarde.";
     }
     if (

@@ -72,8 +72,6 @@ export function DireccionEntregaCreatePage() {
   return (
     <CrudPageLayout
       title="Crear dirección / ruta"
-      backTo={`/base-de-datos?tab=direcciones-entrega${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a direcciones"
     >
       <form
         className="max-w-lg grid gap-4"

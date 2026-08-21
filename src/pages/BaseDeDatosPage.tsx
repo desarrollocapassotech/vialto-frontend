@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import {
   Car,
   ChevronDown,
+  Globe,
   Layers,
   MapPin,
   Package,
@@ -31,6 +32,7 @@ import { PresentacionesPage } from "./PresentacionesPage";
 import { SuperadminUsersPage } from "./SuperadminUsersPage";
 import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
+import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import {
   canAccessViajes,
@@ -54,6 +56,7 @@ type Tab =
   | "presentaciones"
   | "depositos"
   | "direcciones-entrega"
+  | "paises"
   | "usuarios"
   | "importar";
 
@@ -71,6 +74,7 @@ const ALL_TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     label: "Direcciones / Ruta de entrega",
     icon: MapPin,
   },
+  { id: "paises", label: "Países", icon: Globe },
   { id: "usuarios", label: "Usuarios", icon: ShieldCheck },
   { id: "importar", label: "Importar datos", icon: Upload },
 ];
@@ -113,6 +117,8 @@ export function BaseDeDatosPage() {
         return hasStock;
       case "direcciones-entrega":
         return hasStock;
+      case "paises":
+        return hasViajes;
       case "usuarios":
         return isOrgAdmin;
       // Solo admin de tenant, no superadmin: éste ya tiene su propia entrada
@@ -259,6 +265,7 @@ export function BaseDeDatosPage() {
           <DepositosPage isPlatform={superadmin} />
         )}
         {activeTab === "direcciones-entrega" && <DireccionesEntregaPage />}
+        {activeTab === "paises" && <PaisesPage />}
         {activeTab === "usuarios" &&
           (superadmin ? <SuperadminUsersPage /> : <UsuariosTenantPage />)}
       </div>

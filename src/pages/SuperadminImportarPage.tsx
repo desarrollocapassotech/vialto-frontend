@@ -57,15 +57,6 @@ export function SuperadminImportarPage() {
           )}
         </div>
 
-        <div className="mt-4">
-          <Link
-            className="text-sm text-vialto-fire hover:text-vialto-bright"
-            to="/superadmin/empresas"
-          >
-            ← Volver a empresas
-          </Link>
-        </div>
-
         {loading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
         )}

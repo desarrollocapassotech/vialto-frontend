@@ -1,7 +1,6 @@
 ﻿import { useAuth } from "@clerk/clerk-react";
 import { FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import { ImprimirRemitoButton } from "@/components/stock/ImprimirRemitoButton";
@@ -129,10 +128,6 @@ export function EgresosStockHistorialTenantPage({
     }
   }, [platform, params, tenantId, getToken]);
 
-  const volverHref = platform
-    ? `/stock/egresos?tenantId=${encodeURIComponent(tenantId!)}`
-    : "/stock/egresos";
-
   const excelCols = stockOperacionColumnas("egreso");
   const excelRows = flattenStockOperaciones(exportRows);
 
@@ -155,27 +150,13 @@ export function EgresosStockHistorialTenantPage({
           <h1 className="text-2xl font-semibold text-vialto-charcoal">
             Historial de egresos
           </h1>
-          <div className="flex items-center gap-4">
-            {exportButton}
-            <Link
-              to={volverHref}
-              className="text-sm font-medium text-vialto-fire hover:underline"
-            >
-              ← Volver a egresos
-            </Link>
-          </div>
+          <div className="flex items-center gap-4">{exportButton}</div>
         </div>
       )}
 
       {embeddedInSuperadmin && (
         <div className="flex flex-wrap items-center justify-end gap-4">
           {exportButton}
-          <Link
-            to={volverHref}
-            className="text-sm font-medium text-vialto-fire hover:underline"
-          >
-            ← Volver a egresos
-          </Link>
         </div>
       )}
 

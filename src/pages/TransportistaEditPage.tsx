@@ -212,8 +212,6 @@ export function TransportistaEditPage() {
   return (
     <CrudPageLayout
       title="Editar transportista"
-      backTo={`/base-de-datos?tab=transportistas${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`}
-      backLabel="← Volver a transportistas"
     >
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>

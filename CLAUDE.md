@@ -291,6 +291,16 @@ El modelo de datos completo (por qué `estado` de Factura no incluye `cobrado`, 
 
 ---
 
+## Controles incompatibles con el estado del tenant/registro: advertir, no ocultar
+
+**Regla global para cualquier control cuyo valor puede volverse inválido según un módulo del tenant o un estado del registro que cambia con el tiempo.**
+
+Cuando un control (checkbox, campo) es incompatible con cierto estado (ej. un módulo que el tenant no tenía al crear el registro y adquirió después), **no lo ocultes condicionalmente** — el registro puede haber quedado con ese control en un valor "inválido" antes del cambio de estado, y ocultarlo le quita al usuario la única forma de corregirlo desde la UI. En su lugar: dejalo siempre visible y editable, y mostrá una advertencia corta (`<p className="text-xs text-amber-800/90">`) explicando la incompatibilidad. El backend es siempre la fuente de verdad del bloqueo real (rechaza la operación inválida con un mensaje claro); el frontend solo informa, nunca decide ocultando.
+
+Ejemplo real (histórico, la situación concreta ya no aplica pero el patrón sigue vigente): el campo "IVA incluido" del precio transportista (`ViajeCreatePage.tsx`/`ViajeEditModal.tsx`) tuvo una v1 tipo checkbox que la UI ocultaba para tenants con `integracion-arca`, lo que dejaba sin forma de destildarlo a un viaje viejo cuyo tenant adoptó ARCA después de crearlo — se corrigió mostrándolo siempre + una advertencia condicional. Esa v1 (exclusión mutua con Liquidación ARCA) después se rediseñó a un % que se suma en efectivo por encima del precio neto (ver `vialto-backend/CLAUDE.md`, sección "`precioTransportistaExterno` con % de IVA a sumar en efectivo"), así que hoy el campo ya no tiene ninguna incompatibilidad que advertir — pero el principio general ("advertir, no ocultar", nunca dejar un control sin forma de corregirse a sí mismo) sigue siendo la regla a aplicar la próxima vez que aparezca un caso así. Ese mismo caso también ilustra otro patrón reusable: **lock parcial** — el campo no se bloquea por todos los ejes fiscales del registro, solo por el que realmente lo vuelve inconsistente (no asumir que todo campo relacionado a un módulo opcional debe seguir el mismo lock que el resto de los campos fiscales del formulario).
+
+---
+
 ## Campos de formulario: obligatorios y opcionales
 
 **Regla global para todos los formularios actuales y futuros.**
@@ -428,6 +438,18 @@ Todo el contenido de un paso (excepto la fila de botones de acción) va envuelto
 
 ---
 
+## Navegación: breadcrumb global, no botones "Volver" por pantalla
+
+**Regla global — ninguna pantalla interna arma su propio link/botón "← Volver".** La navegación hacia atrás la resuelve un breadcrumb único, montado una sola vez en `AppShell.tsx` (arriba del `<Outlet/>`, dentro de `<main>`), que muestra el trail completo de pantallas previas + la actual. Que una pantalla necesite "volver" no es motivo para agregar un link ahí — es motivo para agregarla al config central.
+
+- **`src/lib/breadcrumbs.ts`**: tabla de rutas → trail. Cada entrada matchea un `pattern` (sintaxis de `react-router-dom`) contra `location.pathname` y arma el array de crumbs (`{ label, to? }`, el último sin `to` = pantalla actual). Lee `tenantId` de `location.search` para que los links intermedios preserven el contexto de superadmin sobre una empresa puntual (mismo criterio que ya usaban los `backTo` viejos: `?tab=<tab>&tenantId=<id>` hacia `/base-de-datos`, etc.). El "Inicio" del trail es "Panorama" para superadmin, "Inicio" para el resto — excepto stock-viewer, que no tiene acceso a `/` y usa `/stock/inventario` como su inicio real.
+- **`src/components/shared/Breadcrumbs.tsx`**: presentacional, no se toca para agregar rutas nuevas — solo renderiza lo que devuelve `resolveBreadcrumbs`. No se muestra si el trail resuelto tiene 1 o menos crumbs (p. ej. el home).
+- **Al agregar una ruta nueva en `App.tsx` que sea una pantalla real** (no un redirect legacy), sumar su entrada en `ENTRIES` de `breadcrumbs.ts` seleccionando como label el propio `<h1>`/título de esa pantalla, para que el crumb final coincida con lo que el usuario ve arriba.
+- **Escape hatch — `useBreadcrumbOverride` (`src/hooks/useBreadcrumbOverride.tsx`)**: para las pocas pantallas cuyo trail depende de datos que no están en la URL (un fetch recién resuelto, o selección de tenant en estado local no sincronizado con `searchParams`) en vez de la ruta. Ejemplos reales: `MovimientoStockDetallePage.tsx` (el link/label del padre depende de `row.tipo`, que solo se conoce tras el fetch) y `DivisionesStockHistorialTenantPage.tsx` (el tenant elegido por el superadmin es estado local, no query param). Pasar `null` cuando no aplica override, para que se use el trail automático.
+- **`CrudPageLayout.tsx`** (usado por las pantallas de alta/edición con patrón VER→modal→EDITAR) ya no acepta `backTo`/`backLabel` — el breadcrumb central los reemplazó. No reintroducir esas props.
+
+---
+
 ## Checklist para nuevas funcionalidades frontend
 
 - Definir si la vista es `tenant`, `superadmin` o ambas.
@@ -441,7 +463,8 @@ Todo el contenido de un paso (excepto la fila de botones de acción) va envuelto
 - **Si el módulo agrega una sección al dashboard del tenant**, sumarla a `moduloTabs` en `TenantOwnerDashboard.tsx` en vez de apilarla — ver "Panel del tenant: pestañas por módulo en el dashboard".
 - **Si la pantalla muestra estado de un comprobante o viaje (Facturas/Liquidaciones/Viajes)**, los ejes independientes (cobro, ambiente de prueba) van en badges aditivos, nunca reemplazando al badge de ciclo de vida — ver "Badges de estado: ejes aditivos, nunca se reemplazan".
 - **Si se toca el flujo de importación masiva**, extender `ImportWizard.tsx`/`useImportWizard.ts` (compartidos entre tenant-admin y superadmin) en vez de crear un modal o una copia por rol — ver "Importación masiva desde Excel".
+- **Si un control puede volverse inválido según un módulo del tenant o el estado de un registro** (no según lo que el usuario está tipeando ahora), advertí en vez de ocultar — ver "Controles incompatibles con el estado del tenant/registro: advertir, no ocultar".
 
 ---
 
-Última actualización: agosto 2026 (wizard de importación masiva unificado en `ImportWizard.tsx` — páginas en vez de modal, selector de módulos, diff "Ver cambios" y demás patrones — ver "Importación masiva desde Excel"; y, de una pasada anterior, el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")
+Última actualización: agosto 2026 (`Viaje.precioTransportistaIvaIncluidoPct` — reemplaza al boolean v1, ya no hace falta el patrón "advertir, no ocultar" para este campo puntual pero la regla general sigue documentada, ver "Controles incompatibles..."; y, de una pasada anterior, wizard de importación masiva unificado en `ImportWizard.tsx` — páginas en vez de modal, selector de módulos, diff "Ver cambios" y demás patrones — ver "Importación masiva desde Excel"; y, de una pasada anterior a esa, el patrón de badges de estado aditivos para Facturas/Liquidaciones/Viajes — ver "Badges de estado: ejes aditivos, nunca se reemplazan")

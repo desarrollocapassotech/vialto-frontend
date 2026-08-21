@@ -137,7 +137,11 @@ export function ViajeViewModal({
           ? fmtMonto(
               viaje.precioTransportistaExterno,
               viaje.monedaPrecioTransportistaExterno,
-            )
+            ) +
+            (isVisible("detalle_viaje", "precioTransportistaIvaIncluidoPct") &&
+            viaje.precioTransportistaIvaIncluidoPct
+              ? ` (+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
+              : "")
           : null,
     },
     { key: "kmRecorridos", label: "KM recorridos", value: viaje.kmRecorridos },

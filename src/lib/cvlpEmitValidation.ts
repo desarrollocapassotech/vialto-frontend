@@ -16,6 +16,7 @@ export type CvlpEmitCliente = {
   nombre?: string | null;
   direccion?: string | null;
   idFiscal?: string | null;
+  condicionIva?: number | null;
 };
 
 function blank(v: string | null | undefined): boolean {
@@ -39,13 +40,16 @@ export function collectCvlpEmitMissingFields(args: {
   if (!t || blank(t.domicilio)) missing.push("Transportista: domicilio");
   if (!t || blank(t.idFiscal)) missing.push("Transportista: CUIT");
   if (t?.condicionIva == null || !Number.isFinite(t.condicionIva)) {
-    missing.push("Transportista: condición de IVA");
+    missing.push("Transportista: condición de IVA (país Argentina + campo AFIP)");
   }
 
   const c = args.cliente;
   if (!c || blank(c.nombre)) missing.push("Cliente: nombre");
   if (!c || blank(c.direccion)) missing.push("Cliente: domicilio");
   if (!c || blank(c.idFiscal)) missing.push("Cliente: CUIT");
+  if (c?.condicionIva == null || !Number.isFinite(c.condicionIva)) {
+    missing.push("Cliente: condición de IVA (país Argentina + campo AFIP)");
+  }
 
   return missing;
 }

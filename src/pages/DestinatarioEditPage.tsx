@@ -129,13 +129,9 @@ export function DestinatarioEditPage() {
     }
   }
 
-  const backTo = `/base-de-datos?tab=destinatarios${tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : ""}`;
-
   return (
     <CrudPageLayout
       title="Editar destinatario"
-      backTo={backTo}
-      backLabel="← Volver a destinatarios"
     >
       {initialLoading ? (
         <p className="text-sm text-vialto-steel">Cargando…</p>
