@@ -21,8 +21,6 @@ import {
   Menu,
   PackageMinus,
   PackagePlus,
-  ChevronLeft,
-  ChevronRight,
   Receipt,
   SlidersHorizontal,
   Truck,
@@ -68,11 +66,9 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "vialto:sidebarCollapsed";
-
 const sidebarBaseClass =
-  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-200 ease-in-out";
-const sidebarExpandedWidthClass = "w-fit min-w-[12rem] max-w-[92vw] px-4";
+  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+const sidebarExpandedWidthClass = "w-[16rem] max-w-[92vw] px-4";
 const sidebarCollapsedWidthClass = "w-[4.5rem] px-2";
 
 export function AppShell() {
@@ -83,9 +79,7 @@ export function AppShell() {
   const { tenant, tenantLoading } = useMaestroData();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1",
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [navTooltip, setNavTooltip] = useState<{
     label: string;
     top: number;
@@ -102,14 +96,6 @@ export function AppShell() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      SIDEBAR_COLLAPSED_STORAGE_KEY,
-      sidebarCollapsed ? "1" : "0",
-    );
-    setNavTooltip(null);
-  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -447,7 +433,6 @@ export function AppShell() {
                     onClick={() => {
                       setSidebarOpen(false);
                       setNavTooltip(null);
-                      if (item.to === "/viajes") setSidebarCollapsed(true);
                     }}
                     className={({ isActive }) => {
                       const active =
@@ -637,6 +622,8 @@ export function AppShell() {
 
       <div className="hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
         <aside
+          onMouseEnter={() => setSidebarCollapsed(false)}
+          onMouseLeave={() => setSidebarCollapsed(true)}
           className={[
             "flex",
             sidebarBaseClass,
@@ -645,27 +632,6 @@ export function AppShell() {
         >
           {renderSidebar(false, sidebarCollapsed)}
         </aside>
-        <button
-          type="button"
-          onClick={() => setSidebarCollapsed((c) => !c)}
-          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setNavTooltip({
-              label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
-              top: rect.top + rect.height / 2,
-              left: rect.right + 10,
-            });
-          }}
-          onMouseLeave={() => setNavTooltip(null)}
-          className="absolute top-9 -right-3 z-10 inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-vialto-charcoal text-white shadow-md transition-colors hover:bg-vialto-charcoal/80"
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
-          ) : (
-            <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          )}
-        </button>
       </div>
 
       <aside
