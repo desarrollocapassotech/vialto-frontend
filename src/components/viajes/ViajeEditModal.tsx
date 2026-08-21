@@ -237,6 +237,10 @@ export function ViajeEditModal({
   const { user } = useUser();
   const { isVisible } = useFieldConfig("viajes");
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
+  const ivaTransportistaVisible = isVisible(
+    "edicion_viaje",
+    "precioTransportistaIvaIncluidoPct",
+  );
   const gastoAutor = useMemo(() => otroGastoAutorFromClerk(user), [user]);
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
@@ -809,7 +813,9 @@ export function ViajeEditModal({
                     </div>
                     {desgloseActivo ? (
                       <>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr_1fr]">
+                        <div
+                          className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr]"}`}
+                        >
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={labelClass}>Cantidad</span>
                             <input
@@ -881,78 +887,78 @@ export function ViajeEditModal({
                               />
                             </div>
                           </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>
-                              % de IVA
-                            </span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              disabled={liquidacionVigente}
-                              value={draft.precioTransportistaIvaIncluidoPct}
-                              onChange={(e) =>
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        precioTransportistaIvaIncluidoPct:
-                                          e.target.value,
-                                      }
-                                    : p,
-                                )
-                              }
-                              placeholder="0"
-                              className={`${inputClass} text-right tabular-nums`}
-                            />
-                            <p className="text-xs text-vialto-steel">
-                              Dejalo en 0 si el transportista no suma IVA al cobrar.
-                            </p>
-                          </div>
+                          {ivaTransportistaVisible && (
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>% de IVA</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                disabled={liquidacionVigente}
+                                value={draft.precioTransportistaIvaIncluidoPct}
+                                onChange={(e) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          precioTransportistaIvaIncluidoPct:
+                                            e.target.value,
+                                        }
+                                      : p,
+                                  )
+                                }
+                                placeholder="0"
+                                className={`${inputClass} text-right tabular-nums`}
+                              />
+                              <p className="text-xs text-vialto-steel">
+                                Dejalo en 0 si el transportista no suma IVA al cobrar.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>
-                              Pago bruto
-                            </span>
-                            <div
-                              className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                            >
-                              <span className="w-full truncate text-sm">
-                                {desglosePagoBruto.toLocaleString("es-AR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
+                        {ivaTransportistaVisible && (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Pago bruto</span>
+                              <div
+                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                              >
+                                <span className="w-full truncate text-sm">
+                                  {desglosePagoBruto.toLocaleString("es-AR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Pago neto</span>
+                              <div
+                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                              >
+                                <span className="w-full truncate text-sm">
+                                  {desglosePagoNeto.toLocaleString("es-AR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Monto IVA</span>
+                              <div
+                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                              >
+                                <span className="w-full truncate text-sm">
+                                  {desgloseMontoIva.toLocaleString("es-AR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>Pago neto</span>
-                            <div
-                              className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                            >
-                              <span className="w-full truncate text-sm">
-                                {desglosePagoNeto.toLocaleString("es-AR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>Monto IVA</span>
-                            <div
-                              className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                            >
-                              <span className="w-full truncate text-sm">
-                                {desgloseMontoIva.toLocaleString("es-AR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </>
                     ) : (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

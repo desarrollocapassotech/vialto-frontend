@@ -45,6 +45,7 @@ import {
   numeroVisibleViaje,
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   Cliente,
   Liquidacion,
@@ -122,6 +123,11 @@ export function CrearLiquidacionManualModal({
 }: Props) {
   const showComprobante = !hasArca;
   const { showToast } = useToast();
+  const { isVisible } = useFieldConfig("viajes");
+  const ivaTransportistaVisible = isVisible(
+    "detalle_viaje",
+    "precioTransportistaIvaIncluidoPct",
+  );
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
@@ -793,7 +799,8 @@ export function CrearLiquidacionManualModal({
                           viajeInicial.precioTransportistaExterno,
                           viajeInicial.monedaPrecioTransportistaExterno,
                         )}
-                        {viajeInicial.precioTransportistaIvaIncluidoPct
+                        {ivaTransportistaVisible &&
+                        viajeInicial.precioTransportistaIvaIncluidoPct
                           ? ` (+${viajeInicial.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                           : ""}
                       </span>
@@ -830,7 +837,8 @@ export function CrearLiquidacionManualModal({
                         v.precioTransportistaExterno,
                         v.monedaPrecioTransportistaExterno,
                       ) +
-                      (v.precioTransportistaIvaIncluidoPct
+                      (ivaTransportistaVisible &&
+                      v.precioTransportistaIvaIncluidoPct
                         ? ` (+${v.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                         : "")
                     }

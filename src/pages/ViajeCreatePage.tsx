@@ -124,6 +124,10 @@ export function ViajeCreatePage() {
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
+  const ivaTransportistaVisible = isVisible(
+    "alta_viaje",
+    "precioTransportistaIvaIncluidoPct",
+  );
   const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
@@ -1050,7 +1054,9 @@ export function ViajeCreatePage() {
                   </div>
                   {desgloseActivo ? (
                     <>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr_1fr]">
+                      <div
+                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr]"}`}
+                      >
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={fieldLabelClass}>Cantidad</span>
                           <input
@@ -1090,55 +1096,59 @@ export function ViajeCreatePage() {
                           </div>
                           <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
                         </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>
-                            % de IVA
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={precioTransportistaIvaIncluidoPct}
-                            onChange={(e) =>
-                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
-                            }
-                            placeholder="0"
-                            className={`${inputClass} text-right tabular-nums`}
-                          />
-                          <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el transportista no suma IVA al cobrar.
-                          </p>
-                        </div>
+                        {ivaTransportistaVisible && (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>% de IVA</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioTransportistaIvaIncluidoPct}
+                              onChange={(e) =>
+                                setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                              }
+                              placeholder="0"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                            <p className="text-xs text-vialto-steel">
+                              Dejalo en 0 si el transportista no suma IVA al cobrar.
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Pago bruto a transporte</span>
-                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                            <span className="w-full truncate">
-                              {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                      {ivaTransportistaVisible && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago neto</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Monto IVA</span>
+                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                              <span className="w-full truncate">
+                                {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Pago neto</span>
-                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                            <span className="w-full truncate">
-                              {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Monto IVA</span>
-                          <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                            <span className="w-full truncate">
-                              {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </>
                   ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div
+                      className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                    >
                       <div className="flex min-w-0 flex-col gap-1">
                         <span className={fieldLabelClass}>Precio transporte</span>
                         <div className="flex min-w-0 gap-2">
@@ -1176,25 +1186,25 @@ export function ViajeCreatePage() {
                         </div>
                         <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
                       </div>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className={fieldLabelClass}>
-                          % de IVA
-                        </span>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          value={precioTransportistaIvaIncluidoPct}
-                          onChange={(e) =>
-                            setPrecioTransportistaIvaIncluidoPct(e.target.value)
-                          }
-                          placeholder="0"
-                          className={`${inputClass} text-right tabular-nums`}
-                        />
-                        <p className="text-xs text-vialto-steel">
-                          Dejalo en 0 si el transportista no suma IVA al cobrar.
-                        </p>
-                      </div>
+                      {ivaTransportistaVisible && (
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>% de IVA</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioTransportistaIvaIncluidoPct}
+                            onChange={(e) =>
+                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                            }
+                            placeholder="0"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                          <p className="text-xs text-vialto-steel">
+                            Dejalo en 0 si el transportista no suma IVA al cobrar.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   {transportistaId && (
