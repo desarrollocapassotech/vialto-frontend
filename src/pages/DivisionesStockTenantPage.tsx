@@ -153,6 +153,16 @@ export function DivisionesStockTenantPage({
     return depositos.filter((d) => ids.has(d.id));
   }, [depositos, allStockItems, allStockLoading, clienteId]);
 
+  const productosFiltrados = useMemo(() => {
+  if (allStockLoading || !clienteId) return productosConPresentaciones;
+  const ids = new Set(
+    allStockItems
+      .filter((s) => s.clienteId === clienteId)
+      .map((s) => s.productoId),
+  );
+    return productosConPresentaciones.filter((p) => ids.has(p.id));
+  }, [productosConPresentaciones, allStockItems, allStockLoading, clienteId]);
+
   const loadProductos = useCallback(async () => {
     setProductosLoading(true);
     setLoadError(null);
@@ -187,7 +197,7 @@ export function DivisionesStockTenantPage({
     void apiJson<StockItem[]>(`${disponibleBase}${buildQs({}, tenantId)}`, () =>
       getToken(),
     )
-      .then((items) => setAllStockItems(items.filter((s) => s.cantidad1 > 0)))
+      .then((items) => setAllStockItems(items.filter((s) => s.cantidad1 > 0 || s.cantidad2 > 0)))
       .catch(() => setAllStockItems([]))
       .finally(() => setAllStockLoading(false));
   }, [disponibleBase, tenantId, getToken]);
@@ -410,7 +420,7 @@ export function DivisionesStockTenantPage({
                 Producto <span className="text-red-500">*</span>
               </label>
               <SearchableEntitySelect<Producto>
-                items={productosConPresentaciones}
+                items={productosFiltrados}
                 value={productoId}
                 onChange={(id) => {
                   setProductoId(id);
