@@ -91,6 +91,50 @@
   }
 }
 
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.28) transparent;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.28);
+  background-clip: padding-box;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.44);
+  background-clip: padding-box;
+}
+
+@keyframes sidebar-expand-hint {
+  0%,
+  100% {
+    transform: translateY(-50%) translateX(0);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
+  }
+  50% {
+    transform: translateY(-50%) translateX(5px);
+    box-shadow:
+      0 0 0 5px rgb(232 71 10 / 0.2),
+      4px 4px 26px rgb(232 71 10 / 0.9);
+  }
+}
+
+.sidebar-control-zone:hover .sidebar-expand-button {
+  animation: sidebar-expand-hint 1.2s ease-in-out infinite;
+}
+
 @media screen and (max-width: 768px) {
   input,
   textarea,

@@ -12,6 +12,8 @@ import {
   Building2,
   Split,
   Calculator,
+  ChevronLeft,
+  ChevronRight,
   Database,
   Fuel,
   House,
@@ -61,7 +63,7 @@ type NavGroup = {
 };
 
 const sidebarBaseClass =
-  "shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "sidebar-scrollbar shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
 const sidebarExpandedWidthClass = "w-[16rem] max-w-[92vw] px-4";
 const sidebarCollapsedWidthClass = "w-[4.5rem] px-2";
 
@@ -586,10 +588,8 @@ export function AppShell() {
         />
       )}
 
-      <div className="hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
+      <div className="sidebar-control-zone hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
         <aside
-          onMouseEnter={() => setSidebarCollapsed(false)}
-          onMouseLeave={() => setSidebarCollapsed(true)}
           className={[
             "flex",
             sidebarBaseClass,
@@ -598,6 +598,36 @@ export function AppShell() {
         >
           {renderSidebar(false, sidebarCollapsed)}
         </aside>
+        <button
+          type="button"
+          onClick={() => {
+            setSidebarCollapsed((collapsed) => !collapsed);
+            setNavTooltip(null);
+          }}
+          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setNavTooltip({
+              label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
+              top: rect.top + rect.height / 2,
+              left: rect.right + 10,
+            });
+          }}
+          onMouseLeave={() => setNavTooltip(null)}
+          className="sidebar-expand-button group absolute top-1/2 -right-3 z-10 inline-flex h-12 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-r-lg border border-l-0 border-white/20 bg-vialto-fire text-white shadow-lg transition-[background-color,transform,box-shadow] duration-300 ease-out hover:bg-vialto-fire/90 hover:shadow-xl hover:brightness-110 active:scale-95"
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight
+              className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5"
+              strokeWidth={2.25}
+            />
+          ) : (
+            <ChevronLeft
+              className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-translate-x-0.5"
+              strokeWidth={2.25}
+            />
+          )}
+        </button>
       </div>
 
       <aside
