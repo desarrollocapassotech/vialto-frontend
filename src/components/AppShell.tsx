@@ -1,8 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
-  OrganizationSwitcher,
-  UserButton,
   useAuth,
   useClerk,
   useOrganization,
@@ -47,10 +45,6 @@ import {
   isStockViewer,
   userRoleDisplay,
 } from "@/lib/roleLabels";
-import {
-  orgSwitcherSidebarAppearance,
-  userButtonSidebarAppearance,
-} from "./clerkSidebarAppearance";
 
 type NavItem = {
   to: string;
@@ -320,17 +314,6 @@ export function AppShell() {
 
   const accountInitial = accountName.trim().charAt(0).toUpperCase() || "U";
 
-  const clickableAvatarUserButtonAppearance = {
-    ...userButtonSidebarAppearance,
-    elements: {
-      ...userButtonSidebarAppearance.elements,
-      rootBox: "h-8 w-8 shrink-0",
-      userButtonTrigger:
-        "h-8 w-8 rounded-full border border-white/15 bg-transparent hover:bg-white/10 transition-colors",
-      userButtonAvatarBox: "opacity-0",
-    },
-  } as const;
-
   const isTestKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.startsWith(
     "pk_test_",
   );
@@ -473,18 +456,9 @@ export function AppShell() {
                 Empresa
               </p>
               <div className="w-full min-w-0">
-                {superadmin ? (
-                  <OrganizationSwitcher
-                    hidePersonal
-                    afterCreateOrganizationUrl="/"
-                    afterSelectOrganizationUrl="/"
-                    appearance={orgSwitcherSidebarAppearance}
-                  />
-                ) : (
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
-                    {organization?.name ?? "Empresa no disponible"}
-                  </div>
-                )}
+                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
+                  {organization?.name ?? "Empresa no disponible"}
+                </div>
               </div>
               {!organization && (
                 <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
@@ -534,12 +508,6 @@ export function AppShell() {
                     </div>
                   )}
                 </div>
-                {superadmin && (
-                  <UserButton
-                    afterSignOutUrl="/sign-in"
-                    appearance={clickableAvatarUserButtonAppearance}
-                  />
-                )}
               </div>
               {!collapsed && (
                 <p className="text-sm text-white/90 truncate flex-1">
@@ -547,34 +515,32 @@ export function AppShell() {
                 </p>
               )}
             </div>
-            {!superadmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setNavTooltip(null);
-                  void handleSignOut();
-                }}
-                aria-label={collapsed ? "Cerrar sesión" : undefined}
-                onMouseEnter={(e) => {
-                  if (!collapsed) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setNavTooltip({
-                    label: "Cerrar sesión",
-                    top: rect.top + rect.height / 2,
-                    left: rect.right + 10,
-                  });
-                }}
-                onMouseLeave={() => setNavTooltip(null)}
-                className={
-                  collapsed
-                    ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-                    : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-                }
-              >
-                <LogOut className="h-4 w-4" />
-                {!collapsed && <span>Cerrar sesión</span>}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setNavTooltip(null);
+                void handleSignOut();
+              }}
+              aria-label={collapsed ? "Cerrar sesión" : undefined}
+              onMouseEnter={(e) => {
+                if (!collapsed) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                setNavTooltip({
+                  label: "Cerrar sesión",
+                  top: rect.top + rect.height / 2,
+                  left: rect.right + 10,
+                });
+              }}
+              onMouseLeave={() => setNavTooltip(null)}
+              className={
+                collapsed
+                  ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                  : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+              }
+            >
+              <LogOut className="h-4 w-4" />
+              {!collapsed && <span>Cerrar sesión</span>}
+            </button>
             {!collapsed && (
               <div className="pl-0.5 pt-1 space-y-0.5">
                 <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
