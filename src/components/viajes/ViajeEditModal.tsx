@@ -1011,34 +1011,34 @@ export function ViajeEditModal({
                             />
                           </div>
                         </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={labelClass}>
-                            % de IVA
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            disabled={liquidacionVigente}
-                            value={draft.precioTransportistaIvaIncluidoPct}
-                            onChange={(e) =>
-                              setDraft((p) =>
-                                p
-                                  ? {
-                                      ...p,
-                                      precioTransportistaIvaIncluidoPct:
-                                        e.target.value,
-                                    }
-                                  : p,
-                              )
-                            }
-                            placeholder="0"
-                            className={`${inputClass} text-right tabular-nums`}
-                          />
-                          <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el transportista no suma IVA al cobrar.
-                          </p>
-                        </div>
+                        {ivaTransportistaVisible && (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>% de IVA</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              disabled={liquidacionVigente}
+                              value={draft.precioTransportistaIvaIncluidoPct}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        precioTransportistaIvaIncluidoPct:
+                                          e.target.value,
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder="0"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                            <p className="text-xs text-vialto-steel">
+                              Dejalo en 0 si el transportista no suma IVA al cobrar.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                     {draft.transportistaId && (

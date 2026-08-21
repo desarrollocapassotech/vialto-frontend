@@ -446,34 +446,37 @@ export function CamposEmpresaPage() {
           </div>
 
           <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                Formulario
-              </span>
-              <select
-                value={formulario}
-                onChange={(e) => setFormulario(e.target.value)}
-                className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
-              >
-                {formulariosDelModulo.map((f) => (
-                  <option key={f} value={f}>
-                    {catalogo[modulo].formularios[f].label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {modulo !== "viajes" && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                  Formulario
+                </span>
+                <select
+                  value={formulario}
+                  onChange={(e) => setFormulario(e.target.value)}
+                  className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
+                >
+                  {formulariosDelModulo.map((f) => (
+                    <option key={f} value={f}>
+                      {catalogo[modulo].formularios[f].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-            <div className="flex items-center gap-3">
-              <ToggleSwitch
-                checked={aplicarATodos}
-                onChange={() => setAplicarATodos((v) => !v)}
-                label="Aplicar cambios a todos los formularios del módulo"
-              />
-              <span className="max-w-xs text-sm text-vialto-steel">
-                Aplicar cambios a todos los formularios del módulo (alta,
-                edición y detalle)
-              </span>
-            </div>
+            {modulo !== "viajes" && (
+              <div className="flex items-center gap-3">
+                <ToggleSwitch
+                  checked={aplicarATodos}
+                  onChange={() => setAplicarATodos((v) => !v)}
+                  label="Aplicar cambios a todos los formularios del módulo"
+                />
+                <span className="max-w-xs text-sm text-vialto-steel">
+                  Aplicar cambios a todos los formularios del módulo
+                </span>
+              </div>
+            )}
           </div>
 
           {filtroEmpresa && (
