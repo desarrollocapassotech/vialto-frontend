@@ -154,12 +154,12 @@ export function DivisionesStockTenantPage({
   }, [depositos, allStockItems, allStockLoading, clienteId]);
 
   const productosFiltrados = useMemo(() => {
-  if (allStockLoading || !clienteId) return productosConPresentaciones;
-  const ids = new Set(
+    if (allStockLoading || !clienteId) return [];
+    const ids = new Set(
     allStockItems
       .filter((s) => s.clienteId === clienteId)
       .map((s) => s.productoId),
-  );
+    );
     return productosConPresentaciones.filter((p) => ids.has(p.id));
   }, [productosConPresentaciones, allStockItems, allStockLoading, clienteId]);
 
@@ -430,6 +430,14 @@ export function DivisionesStockTenantPage({
                   setLoteDisponible(null);
                 }}
                 loading={productosLoading}
+                disabled={!clienteId}
+                noItemsSlot={
+                  <div className={`${INPUT} flex items-center text-vialto-steel`}>
+                    {!clienteId
+                      ? "Primero elegí una empresa…"
+                      : "Sin productos con stock para este cliente"}
+                  </div>
+                }
                 filterItems={(items, q) => {
                   const lq = q.toLowerCase();
                   return items.filter(
