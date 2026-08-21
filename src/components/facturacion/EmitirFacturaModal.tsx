@@ -29,6 +29,7 @@ import {
   formatFacturaEmitMissingMessage,
 } from "@/lib/facturaEmitValidation";
 import { friendlyError } from "@/lib/friendlyError";
+import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import {
   MSG_ARCA_NO_FACTURA_USD,
@@ -567,14 +568,7 @@ export function EmitirFacturaModal({
                     )}
 
                   <div ref={feedbackRef} className="space-y-2">
-                    {error && (
-                      <p
-                        className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2"
-                        role="alert"
-                      >
-                        {error}
-                      </p>
-                    )}
+                    {error && <ArcaEmitErrorAlert error={error} />}
                     {arcaConfigMissing && (
                       <button
                         type="button"
@@ -643,11 +637,7 @@ export function EmitirFacturaModal({
                     </div>
                   </section>
 
-                  {error && (
-                    <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
-                      {error}
-                    </p>
-                  )}
+                  {error && <ArcaEmitErrorAlert error={error} />}
 
                   <div className="flex justify-end gap-3">
                     <button

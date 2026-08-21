@@ -29,6 +29,11 @@ import {
   facturaNcLabel,
 } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
+import {
+  isAfipInfrastructureError,
+  MSG_AFIP_INFRA,
+} from "@/lib/arcaFriendlyError";
+import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { useToast } from "@/lib/toast";
 import type { ArcaConfig, Cliente, Factura, Viaje } from "@/types/api";
@@ -485,14 +490,7 @@ export function AnularFacturaModal({
                     <CrudFieldError message={motivoError ?? undefined} />
                   </label>
 
-                  {error && (
-                    <p
-                      className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2"
-                      role="alert"
-                    >
-                      {error}
-                    </p>
-                  )}
+                  {error && <ArcaEmitErrorAlert error={error} />}
 
                   <AmbienteHomologacionWarning
                     ambiente={arcaConfig?.ambiente}
@@ -524,8 +522,9 @@ export function AnularFacturaModal({
                         Anulación pendiente de CAE
                       </p>
                       <p className="text-xs text-amber-800 mt-0.5">
-                        No hubo respuesta completa de ARCA. Podés reintentar
-                        más tarde.
+                        {isAfipInfrastructureError(facturaResultado.arcaError)
+                          ? MSG_AFIP_INFRA
+                          : "No hubo respuesta completa de ARCA. Podés reintentar más tarde."}
                       </p>
                     </div>
                   ) : (
@@ -561,11 +560,7 @@ export function AnularFacturaModal({
                     )}
                   </section>
 
-                  {error && (
-                    <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2">
-                      {error}
-                    </p>
-                  )}
+                  {error && <ArcaEmitErrorAlert error={error} />}
 
                   <div className="flex flex-wrap justify-end gap-3">
                     {facturaResultado.anulacionCae && (
