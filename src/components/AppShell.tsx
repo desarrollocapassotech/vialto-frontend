@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
+  Bell,
   Building2,
   Split,
   Calculator,
@@ -300,6 +301,19 @@ export function AppShell() {
         },
       ],
     });
+
+    if (!superadmin) {
+      groups.push({
+        title: "Configuración",
+        items: [
+          {
+            to: "/configuracion/notificaciones",
+            label: "Notificaciones",
+            icon: Bell,
+          },
+        ],
+      });
+    }
 
     return groups;
   }, [superadmin, tenant?.modules, roleCtx]);
