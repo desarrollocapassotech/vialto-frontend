@@ -7,11 +7,12 @@ import {
   loteEgresoSeleccionValida,
 } from '@/lib/stockLote';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const INPUT_READONLY =
-  'h-9 w-full border border-black/10 bg-vialto-mist/30 px-2 text-sm text-vialto-charcoal';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
+import {
+  STOCK_FORM_INPUT as INPUT,
+  STOCK_FORM_INPUT_READONLY as INPUT_READONLY,
+  STOCK_FORM_LABEL as LABEL,
+  STOCK_FORM_REMOVE_BTN,
+} from '@/lib/stockFormLayout';
 
 export type LoteStockDisponible = {
   bultos: number;
@@ -128,11 +129,7 @@ export function EgresoProductoLoteBloque({
           {title}
         </p>
         {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-xs text-red-600 hover:underline shrink-0"
-          >
+          <button type="button" onClick={onRemove} className={`${STOCK_FORM_REMOVE_BTN} shrink-0`}>
             Quitar lote
           </button>
         )}
@@ -199,6 +196,7 @@ export function EgresoProductoLoteBloque({
           <label className={LABEL}>{labels.bultos} a extraer</label>
           <input
             type="number"
+            inputMode="decimal"
             min="0"
             step="any"
             value={bultos}
@@ -214,15 +212,16 @@ export function EgresoProductoLoteBloque({
 
         <div className="space-y-1">
           <label className={LABEL}>{labels.sueltas} a extraer</label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="number"
+              inputMode="decimal"
               min="0"
               step="any"
               value={sueltas}
               disabled={!cantidadesHabilitadas}
               onChange={(e) => onSueltasChange(e.target.value)}
-              className={`${INPUT} flex-1 disabled:opacity-50 ${
+              className={`${INPUT} sm:flex-1 disabled:opacity-50 ${
                 sueltasFieldError ? 'border-red-400' : ''
               }`}
               placeholder="0"
@@ -231,7 +230,7 @@ export function EgresoProductoLoteBloque({
               <button
                 type="button"
                 onClick={onFraccionar}
-                className="shrink-0 px-2.5 text-xs font-medium uppercase tracking-wider border border-vialto-fire text-vialto-fire rounded hover:bg-vialto-fire/5 whitespace-nowrap"
+                className="h-11 shrink-0 rounded border border-vialto-fire px-2.5 text-xs font-medium uppercase tracking-wider text-vialto-fire hover:bg-vialto-fire/5 whitespace-nowrap sm:h-auto"
                 title={`Desarmar ${labels.bultos} para obtener ${labels.sueltas}`}
               >
                 {fraccionarLabel}

@@ -15,10 +15,13 @@ import { Spinner } from '@/components/ui/Spinner';
 import { fetchSaldoLote, loteEgresoParaApi, loteEgresoSeleccionValida } from '@/lib/stockLote';
 import { useToast } from '@/lib/toast';
 import { fechaHoraToIso, isoToFechaHora } from '@/lib/viajeFechaHora';
+import {
+  STOCK_FORM_INPUT as INPUT,
+  STOCK_FORM_LABEL as LABEL,
+  STOCK_FORM_REMOVE_BTN,
+  STOCK_FORM_ACTIONS_STICKY,
+} from '@/lib/stockFormLayout';
 import type { Producto, ProductoPresentacion } from '@/types/api';
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 export type EgresoLoteLinea = {
   _key: string;
@@ -290,7 +293,7 @@ export function EgresoWizardStep3({
                   type="button"
                   onClick={() => onRemoveRow(row._key)}
                   disabled={rows.length <= 1}
-                  className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
+                  className={STOCK_FORM_REMOVE_BTN}
                 >
                   Eliminar
                 </button>
@@ -350,10 +353,8 @@ export function EgresoWizardStep3({
                       })
                     }
                     disabled={!row.productoId || pps.length === 0}
-                    className={`h-9 w-full border bg-white px-2 text-sm disabled:opacity-50 ${
-                      fieldErrors[`row_${idx}_presentacionId`]
-                        ? 'border-red-400'
-                        : 'border-black/15'
+                    className={`${INPUT} disabled:opacity-50 ${
+                      fieldErrors[`row_${idx}_presentacionId`] ? 'border-red-400' : ''
                     }`}
                   >
                     <option value="">
@@ -509,7 +510,7 @@ export function EgresoWizardStep3({
 
       <CrudFormErrorAlert message={formError} />
 
-      <div className="flex items-center justify-between">
+      <div className={`flex items-center justify-between ${STOCK_FORM_ACTIONS_STICKY}`}>
         <button
           type="button"
           onClick={onVolver}
