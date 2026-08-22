@@ -620,9 +620,17 @@ function WizardStepper({
   hasArca: boolean;
   hasFacturacion: boolean;
 }) {
+  // Liquidaciones (y el resto de las etapas opcionales post-viajes) solo son
+  // alcanzables si "viajes" está en la secuencia de este import — sin viajes,
+  // useImportWizard salta directo a "terminado" (ver avanzarModulo). Mostrar
+  // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
+  const tieneViajes = wizard.secuencia.includes("viajes");
+
   const pasos = [
     ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
-    ...(hasArca ? [{ key: "post-liquidaciones", label: "Liquidaciones" }] : []),
+    ...(tieneViajes && hasArca
+      ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
+      : []),
     ...(hasArca || hasFacturacion
       ? [{ key: "post-facturas", label: "Resumen" }]
       : []),
@@ -636,7 +644,7 @@ function WizardStepper({
         : wizard.fase === "post-liquidaciones"
           ? wizard.secuencia.length
           : wizard.fase === "post-facturas"
-            ? wizard.secuencia.length + (hasArca ? 1 : 0)
+            ? wizard.secuencia.length + (tieneViajes && hasArca ? 1 : 0)
             : pasos.length;
 
   return (
