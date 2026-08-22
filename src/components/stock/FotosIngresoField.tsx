@@ -1,11 +1,13 @@
 import { useRef } from 'react';
 import { isIngresoFotoFile } from '@/lib/stockRemitoUpload';
+import { STOCK_FORM_LABEL as LABEL } from '@/lib/stockFormLayout';
 
 const MAX_FOTOS = 2;
 const ACCEPT_FOTOS = 'image/jpeg,image/png,.jpg,.jpeg,.png';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const BTN_SM =
-  'h-8 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50';
+  'h-10 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50 sm:h-8';
+const BTN_SM_DANGER =
+  'h-10 px-3 text-xs uppercase tracking-wider border border-red-200 bg-white text-red-700 hover:bg-red-50 disabled:opacity-50 sm:h-8';
 
 export function FotosIngresoField({
   files,
@@ -58,7 +60,7 @@ export function FotosIngresoField({
               type="button"
               disabled={disabled}
               onClick={() => removeFile(idx)}
-              className="text-xs uppercase tracking-wider text-vialto-fire hover:underline disabled:opacity-50"
+              className={BTN_SM_DANGER}
             >
               Quitar
             </button>
@@ -71,7 +73,7 @@ export function FotosIngresoField({
               type="button"
               disabled={disabled}
               onClick={() => inputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 h-9 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-11 px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50 sm:h-9"
             >
               + Agregar foto
             </button>
