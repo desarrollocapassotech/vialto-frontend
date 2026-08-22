@@ -25,7 +25,7 @@ export function IngresoWizardStep1({
   depositoId: string;
   onDepositoChange: (id: string) => void;
   fieldErrors: Record<string, string>;
-  onNuevoCliente: () => void;
+  onNuevoCliente?: () => void;
   onContinuar: () => void;
 }) {
   return (
