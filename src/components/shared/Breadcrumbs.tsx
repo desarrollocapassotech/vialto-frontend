@@ -6,10 +6,12 @@ export function Breadcrumbs({
   override,
   superadmin,
   stockViewer,
+  stockOperator,
 }: {
   override: Crumb[] | null;
   superadmin: boolean;
   stockViewer: boolean;
+  stockOperator: boolean;
 }) {
   const location = useLocation();
   const crumbs =
@@ -17,6 +19,7 @@ export function Breadcrumbs({
     resolveBreadcrumbs(location.pathname, new URLSearchParams(location.search), {
       superadmin,
       stockViewer,
+      stockOperator,
     });
 
   if (crumbs.length <= 1) return null;

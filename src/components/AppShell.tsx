@@ -45,6 +45,7 @@ import {
   isPlatformSuperadmin,
   isOrgMember,
   isStockViewer,
+  isStockOperator,
   userRoleDisplay,
 } from "@/lib/roleLabels";
 
@@ -108,6 +109,7 @@ export function AppShell() {
     [orgRole, user?.publicMetadata],
   );
   const stockViewer = isStockViewer(roleCtx);
+  const stockOperator = isStockOperator(roleCtx);
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -156,6 +158,21 @@ export function AppShell() {
                 icon: ArrowLeftRight,
                 end: true,
               },
+            ],
+          },
+        ];
+      }
+      return [];
+    }
+
+    if (isStockOperator(roleCtx)) {
+      if (canAccessStock(tenant?.modules ?? [])) {
+        return [
+          {
+            title: "Stock",
+            items: [
+              { to: "/stock/ingresos", label: "Ingresos", icon: PackagePlus },
+              { to: "/stock/egresos", label: "Egresos", icon: PackageMinus },
             ],
           },
         ];
@@ -666,6 +683,7 @@ export function AppShell() {
                   override={override}
                   superadmin={superadmin}
                   stockViewer={stockViewer}
+                  stockOperator={stockOperator}
                 />
                 <Outlet />
               </>
