@@ -24,7 +24,8 @@ export type FriendlyErrorContext =
   | "plataforma"
   | "arca"
   | "usuarios"
-  | "camposEmpresa";
+  | "camposEmpresa"
+  | "notificaciones";
 
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: "No pudimos cargar el tablero. Probá de nuevo en un momento.",
@@ -54,6 +55,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
   usuarios: "No pudimos cargar los usuarios. Probá de nuevo en un momento.",
   camposEmpresa:
     "No pudimos cargar la configuración de campos. Probá de nuevo en un momento.",
+  notificaciones:
+    "No pudimos cargar la configuración de notificaciones. Probá de nuevo en un momento.",
 };
 
 /**

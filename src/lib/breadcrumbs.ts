@@ -74,6 +74,10 @@ const ENTRIES: Entry[] = [
     pattern: "/configuracion/conceptos",
     build: (_p, ctx) => [homeCrumb(ctx), { label: "Configuración de conceptos" }],
   },
+  {
+    pattern: "/configuracion/notificaciones",
+    build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones por email" }],
+  },
 
   // Base de datos
   { pattern: "/base-de-datos", build: (_p, ctx) => [homeCrumb(ctx), { label: "Base de datos" }] },
