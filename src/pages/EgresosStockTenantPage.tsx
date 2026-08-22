@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast';
 import { Link } from 'react-router-dom';
@@ -37,6 +37,7 @@ import { EgresoWizardStep1 } from '@/components/stock/EgresoWizardStep1';
 import { EgresoWizardStep2 } from '@/components/stock/EgresoWizardStep2';
 import { EgresoWizardStep3, emptyEgresoRow, egresoFieldKey, egresoRowsToApiLineas, type EgresoRow } from '@/components/stock/EgresoWizardStep3';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { isStockOperator } from '@/lib/roleLabels';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
 type EgresoResult = { id: string; numeroRemito: string | null; movimientosCount: number };
@@ -118,11 +119,16 @@ export function EgresosStockTenantPage({
   direccionesEntregaExternos?: DireccionEntrega[];
   direccionesEntregaExternosLoading?: boolean;
 }) {
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { user } = useUser();
   const { showToast } = useToast();
   const maestro = useMaestroData();
   const platform = Boolean(tenantId);
   const { isVisible } = useFieldConfig('stock');
+  const puedeCrearEntidadesRelacionadas = !isStockOperator({
+    orgRole,
+    publicMetadata: user?.publicMetadata,
+  });
 
   const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
   const clientes = useMemo(() => {
@@ -560,7 +566,7 @@ export function EgresosStockTenantPage({
             setRows([emptyEgresoRow()]);
           }}
           fieldErrors={fieldErrors}
-          onNuevoCliente={() => setModalCliente(true)}
+          onNuevoCliente={puedeCrearEntidadesRelacionadas ? () => setModalCliente(true) : undefined}
           onContinuar={handleContinuar1}
         />
       )}
@@ -607,17 +613,17 @@ export function EgresosStockTenantPage({
           choferesLoading={choferesLoading}
           choferId={choferId}
           onChoferIdChange={setChoferId}
-          onNuevoChofer={() => setModalChofer(true)}
+          onNuevoChofer={puedeCrearEntidadesRelacionadas ? () => setModalChofer(true) : undefined}
           destinatarios={destinatarios}
           destinatariosLoading={destinatariosLoading}
           destinatarioId={destinatarioId}
           onDestinatarioIdChange={setDestinatarioId}
-          onNuevoDestinatario={() => setModalDestinatario(true)}
+          onNuevoDestinatario={puedeCrearEntidadesRelacionadas ? () => setModalDestinatario(true) : undefined}
           direccionesEntrega={direccionesEntrega}
           direccionesEntregaLoading={direccionesEntregaLoading}
           direccionEntregaId={direccionEntregaId}
           onDireccionEntregaChange={setDireccionEntregaId}
-          onNuevaDireccionEntrega={() => setModalDireccionEntrega(true)}
+          onNuevaDireccionEntrega={puedeCrearEntidadesRelacionadas ? () => setModalDireccionEntrega(true) : undefined}
           documentoExternoModo={documentoExternoModo}
           onDocumentoExternoModoChange={(modo) => {
             setDocumentoExternoModo(modo);

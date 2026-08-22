@@ -5,6 +5,7 @@ export type Crumb = { label: string; to?: string };
 export type BreadcrumbRoleCtx = {
   superadmin: boolean;
   stockViewer: boolean;
+  stockOperator: boolean;
 };
 
 type BuildCtx = BreadcrumbRoleCtx & { search: URLSearchParams };
@@ -25,9 +26,10 @@ function withTenantId(search: URLSearchParams, path: string, extra?: Record<stri
 }
 
 function homeCrumb(ctx: BreadcrumbRoleCtx): Crumb {
-  // Un stock-viewer no tiene acceso a "/" (RequireNotStockViewer lo redirige),
-  // así que su "inicio" real es el inventario.
+  // Un stock-viewer / stock-operator no tiene acceso a "/" (RequireNotStockOnlyRole
+  // lo redirige), así que su "inicio" real es inventario / ingresos respectivamente.
   if (ctx.stockViewer) return { label: "Inicio", to: "/stock/inventario" };
+  if (ctx.stockOperator) return { label: "Inicio", to: "/stock/ingresos" };
   return { label: ctx.superadmin ? "Panorama" : "Inicio", to: "/" };
 }
 

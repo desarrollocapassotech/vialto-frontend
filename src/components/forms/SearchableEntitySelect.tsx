@@ -1,6 +1,8 @@
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useIsMobileViewport } from '@/hooks/useIsMobileViewport';
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
 
 export type SearchableEntitySelectProps<T extends { id: string }> = {
   items: T[];
@@ -72,6 +74,8 @@ export function SearchableEntitySelect<T extends { id: string }>({
       : selected
         ? getPrimaryLabel(selected)
         : '';
+
+  const isMobile = useIsMobileViewport();
 
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -201,7 +205,9 @@ export function SearchableEntitySelect<T extends { id: string }>({
   }
 
   const canOpenPanel = items.length > 0 || allowEmptyValue || !!onNuevo;
-  const showPanel = open && menuStyle && canOpenPanel;
+  const showPanel = open && canOpenPanel && (isMobile || !!menuStyle);
+
+  useLockBodyScroll(showPanel && isMobile);
 
   function focusOptionIndex(i: number) {
     const root = listRef.current;
@@ -210,107 +216,142 @@ export function SearchableEntitySelect<T extends { id: string }>({
     buttons[i]?.focus();
   }
 
-  const panelEl =
-    showPanel && menuStyle ? (
-      <div
-        ref={panelRef}
-        style={menuStyle}
-        className="flex max-h-72 flex-col overflow-hidden border border-black/15 bg-white text-sm shadow-md"
+  const panelListEl = showPanel ? (
+    <>
+      <div className="shrink-0 border-b border-black/10 p-2">
+        <input
+          ref={searchInputRef}
+          id={searchId}
+          type="text"
+          autoComplete="off"
+          placeholder={placeholderBuscar}
+          aria-label={searchAriaLabel}
+          className="h-10 w-full border border-black/15 bg-white px-3 text-base outline-none focus:border-black/25"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setOpen(false);
+              triggerRef.current?.focus();
+              return;
+            }
+            if (e.key === 'ArrowDown' && rows.length > 0) {
+              e.preventDefault();
+              setHighlight(0);
+              window.setTimeout(() => focusOptionIndex(0), 0);
+            }
+          }}
+        />
+      </div>
+      <ul
+        ref={listRef}
+        id={listboxId}
+        role="listbox"
+        aria-labelledby={triggerId}
+        className="min-h-0 flex-1 overflow-y-auto py-1"
       >
-        <div className="shrink-0 border-b border-black/10 p-2">
-          <input
-            ref={searchInputRef}
-            id={searchId}
-            type="text"
-            autoComplete="off"
-            placeholder={placeholderBuscar}
-            aria-label={searchAriaLabel}
-            className="h-8 w-full border border-black/15 bg-white px-2 text-sm outline-none focus:border-black/25"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setOpen(false);
-                triggerRef.current?.focus();
-                return;
-              }
-              if (e.key === 'ArrowDown' && rows.length > 0) {
-                e.preventDefault();
-                setHighlight(0);
-                window.setTimeout(() => focusOptionIndex(0), 0);
-              }
-            }}
-          />
-        </div>
-        <ul
-          ref={listRef}
-          id={listboxId}
-          role="listbox"
-          aria-labelledby={triggerId}
-          className="min-h-0 flex-1 overflow-y-auto py-1"
-        >
-          {rows.length === 0 ? (
-            <li className="px-3 py-2 text-vialto-steel">Sin coincidencias.</li>
-          ) : (
-            rows.map((row, i) => {
-              if (row.kind === 'empty') {
-                return (
-                  <li key="__empty__" role="option" aria-selected={i === highlight}>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      className={`w-full px-3 py-2 text-left text-vialto-steel hover:bg-vialto-mist focus:bg-vialto-mist focus:outline-none ${
-                        i === highlight ? 'bg-vialto-mist' : ''
-                      }`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pickRow(i)}
-                      onKeyDown={(e) => handleOptionKeyDown(e, i)}
-                    >
-                      {emptyListChoiceLabel}
-                    </button>
-                  </li>
-                );
-              }
-              const c = row.item;
-              const id = getItemId(c);
-              const sec = getSecondaryLabel?.(c);
+        {rows.length === 0 ? (
+          <li className="px-3 py-2 text-vialto-steel">Sin coincidencias.</li>
+        ) : (
+          rows.map((row, i) => {
+            if (row.kind === 'empty') {
               return (
-                <li key={id} role="option" aria-selected={i === highlight}>
+                <li key="__empty__" role="option" aria-selected={i === highlight}>
                   <button
                     type="button"
                     tabIndex={-1}
-                    className={`w-full px-3 py-2 text-left hover:bg-vialto-mist focus:bg-vialto-mist focus:outline-none ${
+                    className={`min-h-11 w-full px-3 py-2 text-left text-vialto-steel hover:bg-vialto-mist focus:bg-vialto-mist focus:outline-none ${
                       i === highlight ? 'bg-vialto-mist' : ''
-                    } ${id === value ? 'font-medium' : ''}`}
+                    }`}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pickRow(i)}
                     onKeyDown={(e) => handleOptionKeyDown(e, i)}
                   >
-                    <span className="block truncate">{getPrimaryLabel(c)}</span>
-                    {sec ? (
-                      <span className="block truncate text-xs text-vialto-steel">{sec}</span>
-                    ) : null}
+                    {emptyListChoiceLabel}
                   </button>
                 </li>
               );
-            })
-          )}
-        </ul>
-        {onNuevo && (
-          <div className="shrink-0 border-t border-black/10 px-2 py-2">
+            }
+            const c = row.item;
+            const id = getItemId(c);
+            const sec = getSecondaryLabel?.(c);
+            return (
+              <li key={id} role="option" aria-selected={i === highlight}>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className={`flex min-h-11 w-full flex-col justify-center px-3 py-2 text-left hover:bg-vialto-mist focus:bg-vialto-mist focus:outline-none ${
+                    i === highlight ? 'bg-vialto-mist' : ''
+                  } ${id === value ? 'font-medium' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pickRow(i)}
+                  onKeyDown={(e) => handleOptionKeyDown(e, i)}
+                >
+                  <span className="block truncate">{getPrimaryLabel(c)}</span>
+                  {sec ? (
+                    <span className="block truncate text-xs text-vialto-steel">{sec}</span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
+      {onNuevo && (
+        <div className="shrink-0 border-t border-black/10 px-2 py-2">
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center justify-center gap-1 border border-black/20 bg-vialto-mist/60 px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setOpen(false); onNuevo(); }}
+          >
+            {onNuevoLabel}
+          </button>
+        </div>
+      )}
+    </>
+  ) : null;
+
+  const mobileTitle = placeholderCerrado.replace(/…+$/, '');
+
+  const panelEl = !showPanel
+    ? null
+    : isMobile ? (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel || mobileTitle}
+          className="fixed inset-0 z-[9999] flex flex-col bg-white text-sm"
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/10 px-4 py-3">
+            <span className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-wider text-vialto-charcoal">
+              {mobileTitle}
+            </span>
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-1 border border-black/20 bg-vialto-mist/60 px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setOpen(false); onNuevo(); }}
+              onClick={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+              aria-label="Cerrar"
+              className="inline-flex h-11 w-11 items-center justify-center text-vialto-steel hover:bg-vialto-mist"
             >
-              {onNuevoLabel}
+              ×
             </button>
           </div>
-        )}
-      </div>
-    ) : null;
+          {panelListEl}
+        </div>
+      ) : menuStyle ? (
+        <div
+          ref={panelRef}
+          style={menuStyle}
+          className="flex max-h-72 flex-col overflow-hidden border border-black/15 bg-white text-sm shadow-md"
+        >
+          {panelListEl}
+        </div>
+      ) : null;
 
   if (loading) {
     return (

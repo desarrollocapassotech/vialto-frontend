@@ -14,6 +14,7 @@ const ROLES = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Miembro' },
   { value: 'stock_viewer', label: 'Consulta de stock' },
+  { value: 'stock_operator', label: 'Operador de stock' },
 ] as const;
 
 const labelClass =

@@ -25,7 +25,7 @@ export function EgresoWizardStep1({
   depositoId: string;
   onDepositoChange: (id: string) => void;
   fieldErrors: Record<string, string>;
-  onNuevoCliente: () => void;
+  onNuevoCliente?: () => void;
   onContinuar: () => void;
 }) {
   const sinDepositosConStock = !clientesLoading && clienteId && depositos.length === 0;

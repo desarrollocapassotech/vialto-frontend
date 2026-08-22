@@ -5,7 +5,7 @@ export function isPlatformSuperadmin(
   return publicMetadata?.vialtoRole === 'superadmin';
 }
 
-export type VialtoTenantRole = 'admin' | 'member' | 'stock_viewer';
+export type VialtoTenantRole = 'admin' | 'member' | 'stock_viewer' | 'stock_operator';
 
 export type RoleContext = {
   orgRole?: string | null;
@@ -14,7 +14,7 @@ export type RoleContext = {
 
 /**
  * Rol efectivo del usuario en la empresa.
- * Fuente de verdad: `publicMetadata.vialtoRole` (admin | member | stock_viewer).
+ * Fuente de verdad: `publicMetadata.vialtoRole` (admin | member | stock_viewer | stock_operator).
  * Fallback: rol de organización Clerk (`org:admin`, `org:member`).
  */
 export function getVialtoTenantRole({
@@ -22,15 +22,20 @@ export function getVialtoTenantRole({
   publicMetadata,
 }: RoleContext): VialtoTenantRole | null {
   const vr = publicMetadata?.vialtoRole;
-  if (vr === 'admin' || vr === 'member' || vr === 'stock_viewer') return vr;
+  if (vr === 'admin' || vr === 'member' || vr === 'stock_viewer' || vr === 'stock_operator') return vr;
   if (orgRole === 'org:admin') return 'admin';
   if (orgRole === 'org:stock_viewer') return 'stock_viewer';
+  if (orgRole === 'org:stock_operator') return 'stock_operator';
   if (orgRole === 'org:member') return 'member';
   return null;
 }
 
 export function isStockViewer(ctx: RoleContext): boolean {
   return getVialtoTenantRole(ctx) === 'stock_viewer';
+}
+
+export function isStockOperator(ctx: RoleContext): boolean {
+  return getVialtoTenantRole(ctx) === 'stock_operator';
 }
 
 export function isOrgMember(ctx: RoleContext): boolean {
@@ -89,6 +94,8 @@ export function userRoleDisplay({
       return 'Miembro';
     case 'stock_viewer':
       return 'Consulta de stock';
+    case 'stock_operator':
+      return 'Operador de stock';
     default:
       return orgRole ? 'Rol pendiente de asignar' : 'Rol pendiente de asignar';
   }
