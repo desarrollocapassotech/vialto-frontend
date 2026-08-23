@@ -4,6 +4,8 @@ export type NotificacionConfigEfectiva = {
   label: string;
   descripcion: string;
   activo: boolean;
+  /** userIds de Clerk elegidos a mano para este tipo. Vacío = default (todos los administradores). */
+  destinatarios: string[];
 };
 
 export type NotificacionFeedItem = {
