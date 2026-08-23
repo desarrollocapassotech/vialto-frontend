@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Truck,
   Warehouse,
+  Wrench,
   LogOut,
   X,
   type LucideIcon,
@@ -38,6 +39,7 @@ import {
   canAccessCombustible,
   canAccessFacturacion,
   canAccessIntegracionArca,
+  canAccessMantenimiento,
   canAccessStock,
   canAccessViajes,
 } from "@/lib/tenantModules";
@@ -140,6 +142,13 @@ export function AppShell() {
         memberGroups.push({
           title: "Combustible",
           items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
+        });
+      }
+
+      if (canAccessMantenimiento(tenant?.modules ?? [])) {
+        memberGroups.push({
+          title: "Mantenimiento",
+          items: [{ to: "/mantenimiento", label: "Mantenimiento", icon: Wrench }],
         });
       }
 
@@ -284,6 +293,13 @@ export function AppShell() {
       groups.push({
         title: "Combustible",
         items: [{ to: "/combustible", label: "Cargas", icon: Fuel }],
+      });
+    }
+
+    if (canAccessMantenimiento(tenant?.modules ?? [])) {
+      groups.push({
+        title: "Mantenimiento",
+        items: [{ to: "/mantenimiento", label: "Mantenimiento", icon: Wrench }],
       });
     }
 

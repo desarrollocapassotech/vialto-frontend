@@ -100,6 +100,9 @@ const ENTRIES: Entry[] = [
   // Combustible
   { pattern: "/combustible", build: (_p, ctx) => [homeCrumb(ctx), { label: "Combustible" }] },
 
+  // Mantenimiento
+  { pattern: "/mantenimiento", build: (_p, ctx) => [homeCrumb(ctx), { label: "Mantenimiento" }] },
+
   // Stock
   { pattern: "/stock/inventario", build: (_p, ctx) => [homeCrumb(ctx), { label: "Inventario" }] },
   { pattern: "/stock/movimientos", build: (_p, ctx) => [homeCrumb(ctx), { label: "Movimientos" }] },
