@@ -9,7 +9,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
-  Bell,
   Building2,
   Split,
   Calculator,
@@ -30,8 +29,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Logo } from "./Logo";
 import { Breadcrumbs } from "./shared/Breadcrumbs";
+import { NotificationBell } from "./NotificationBell";
 import { useEnsureTenantOrganization } from "@/hooks/useEnsureTenantOrganization";
 import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
@@ -47,6 +46,7 @@ import {
   isOrgMember,
   isStockViewer,
   isStockOperator,
+  puedeGestionarComoAdminEmpresa,
   userRoleDisplay,
 } from "@/lib/roleLabels";
 
@@ -64,8 +64,10 @@ type NavGroup = {
   items: NavItem[];
 };
 
+const HEADER_HEIGHT_CLASS = "h-16";
+
 const sidebarBaseClass =
-  "sidebar-scrollbar shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 h-[100dvh] overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "sidebar-scrollbar shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
 const sidebarExpandedWidthClass = "w-[16rem] max-w-[92vw] px-4";
 const sidebarCollapsedWidthClass = "w-[4.5rem] px-2";
 
@@ -111,6 +113,8 @@ export function AppShell() {
   );
   const stockViewer = isStockViewer(roleCtx);
   const stockOperator = isStockOperator(roleCtx);
+  const canSeeNotificaciones =
+    Boolean(organization) && puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -302,19 +306,6 @@ export function AppShell() {
       ],
     });
 
-    if (!superadmin) {
-      groups.push({
-        title: "Configuración",
-        items: [
-          {
-            to: "/configuracion/notificaciones",
-            label: "Notificaciones",
-            icon: Bell,
-          },
-        ],
-      });
-    }
-
     return groups;
   }, [superadmin, tenant?.modules, roleCtx]);
 
@@ -369,31 +360,10 @@ export function AppShell() {
     : null;
 
   function renderSidebar(showCloseButton: boolean, collapsed: boolean) {
-    const headerWrapperClass = collapsed
-      ? "px-1 flex flex-col items-center gap-2"
-      : "px-1 flex items-start justify-between gap-2";
-
     return (
       <>
-        <div className={headerWrapperClass}>
-          {collapsed ? (
-            <img
-              src="/favicon.ico"
-              alt="Vialto"
-              className="h-9 w-9 shrink-0 rounded-md"
-            />
-          ) : (
-            <div className="min-w-0">
-              <Logo
-                src="/vialto-software-white-removebg.png"
-                heightClass="h-20 max-w-[9rem]"
-              />
-              <p className="mt-2 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.25em] text-white/40">
-                TRANSPORTE Y LOGISTICA
-              </p>
-            </div>
-          )}
-          {showCloseButton && (
+        {showCloseButton && (
+          <div className="px-1 flex justify-end">
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
@@ -402,8 +372,8 @@ export function AppShell() {
             >
               <X className="h-5 w-5" strokeWidth={1.75} />
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <nav className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}>
           {navLoading ? (
@@ -479,231 +449,196 @@ export function AppShell() {
             ))
           )}
         </nav>
-
-        <div
-          className={`mt-auto flex flex-col gap-5 pt-4 border-t border-white/10 ${collapsed ? "items-center" : ""}`}
-        >
-          {!collapsed && (
-            <div className="space-y-2">
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
-                Empresa
-              </p>
-              <div className="w-full min-w-0">
-                <div className="rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-white/80 truncate">
-                  {organization?.name ?? "Empresa no disponible"}
-                </div>
-              </div>
-              {!organization && (
-                <p className="text-xs leading-snug text-amber-300/95 pl-0.5 pr-1">
-                  {superadmin
-                    ? "Elegí o creá una empresa para ver los datos de tu equipo."
-                    : "No podés cambiar la empresa con este rol."}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className={`space-y-2 ${collapsed ? "flex flex-col items-center" : ""}`}>
-            {!collapsed && (
-              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45 pl-0.5">
-                Tu cuenta
-              </p>
-            )}
-            <div
-              className={
-                collapsed
-                  ? "flex flex-col items-center gap-2"
-                  : "pl-0.5 pr-1 flex items-center gap-2 min-w-0"
-              }
-              aria-label={collapsed ? accountName : undefined}
-              onMouseEnter={(e) => {
-                if (!collapsed) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                setNavTooltip({
-                  label: accountName,
-                  top: rect.top + rect.height / 2,
-                  left: rect.right + 10,
-                });
-              }}
-              onMouseLeave={() => setNavTooltip(null)}
-            >
-              <div className="relative h-8 w-8 shrink-0">
-                <div className="absolute inset-0 pointer-events-none">
-                  {accountAvatarUrl ? (
-                    <img
-                      src={accountAvatarUrl}
-                      alt="Foto de perfil"
-                      className="h-8 w-8 rounded-full object-cover ring-2 ring-white/20"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-white/10 text-white/80 text-xs font-semibold flex items-center justify-center ring-2 ring-white/20">
-                      {accountInitial}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {!collapsed && (
-                <p className="text-sm text-white/90 truncate flex-1">
-                  {accountName}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setNavTooltip(null);
-                void handleSignOut();
-              }}
-              aria-label={collapsed ? "Cerrar sesión" : undefined}
-              onMouseEnter={(e) => {
-                if (!collapsed) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                setNavTooltip({
-                  label: "Cerrar sesión",
-                  top: rect.top + rect.height / 2,
-                  left: rect.right + 10,
-                });
-              }}
-              onMouseLeave={() => setNavTooltip(null)}
-              className={
-                collapsed
-                  ? "mt-2 flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-                  : "mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-left text-sm font-medium text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
-              }
-            >
-              <LogOut className="h-4 w-4" />
-              {!collapsed && <span>Cerrar sesión</span>}
-            </button>
-            {!collapsed && (
-              <div className="pl-0.5 pt-1 space-y-0.5">
-                <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-white/45">
-                  Rol
-                </p>
-                <p className="text-sm text-white/90 leading-snug pr-1">
-                  {roleText}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
       </>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-vialto-mist overflow-x-clip">
-      {envBadge && (
-        <div className="fixed top-2 right-3 z-[60] pointer-events-none hidden sm:flex items-center gap-1.5 max-w-[calc(100vw-1rem)]">
-          {neonBranch && (
-            <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
-              Neon: {neonBranch}
-            </span>
-          )}
-          <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
-            {clerkEnv}
-          </span>
-          <span
-            className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}
-          >
-            {envBadge.label}
-          </span>
-        </div>
-      )}
-
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Cerrar menú"
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <div className="sidebar-control-zone hidden lg:block relative shrink-0 sticky top-0 h-[100dvh]">
-        <aside
-          className={[
-            "flex",
-            sidebarBaseClass,
-            sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
-          ].join(" ")}
-        >
-          {renderSidebar(false, sidebarCollapsed)}
-        </aside>
-        <button
-          type="button"
-          onClick={() => {
-            setSidebarCollapsed((collapsed) => !collapsed);
-            setNavTooltip(null);
-          }}
-          aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setNavTooltip({
-              label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
-              top: rect.top + rect.height / 2,
-              left: rect.right + 10,
-            });
-          }}
-          onMouseLeave={() => setNavTooltip(null)}
-          className="sidebar-expand-button group absolute top-1/2 -right-3 z-10 inline-flex h-12 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-r-lg border border-l-0 border-white/20 bg-vialto-fire text-white shadow-lg transition-[background-color,transform,box-shadow] duration-300 ease-out hover:bg-vialto-fire/90 hover:shadow-xl hover:brightness-110 active:scale-95"
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight
-              className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5"
-              strokeWidth={2.25}
-            />
-          ) : (
-            <ChevronLeft
-              className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-translate-x-0.5"
-              strokeWidth={2.25}
-            />
-          )}
-        </button>
-      </div>
-
-      <aside
-        aria-hidden={!sidebarOpen}
-        className={[
-          sidebarBaseClass,
-          sidebarExpandedWidthClass,
-          "lg:hidden fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
-          sidebarOpen
-            ? "translate-x-0"
-            : "-translate-x-full pointer-events-none",
-        ].join(" ")}
+    <div className="min-h-screen flex flex-col bg-vialto-mist overflow-x-clip">
+      <header
+        className={`sticky top-0 z-50 flex ${HEADER_HEIGHT_CLASS} shrink-0 items-center gap-3 bg-vialto-charcoal px-4`}
       >
-        {renderSidebar(true, false)}
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-vialto-charcoal px-4 py-3 lg:hidden">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             aria-label="Abrir menú"
             aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen(true)}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white hover:bg-white/10"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white hover:bg-white/10 lg:hidden"
           >
             <Menu className="h-5 w-5" strokeWidth={1.75} />
           </button>
-          <Logo heightClass="h-8 max-w-[8rem]" />
-        </header>
+          <img
+            src="/favicon.ico"
+            alt="Vialto"
+            className="h-9 w-9 shrink-0 rounded-md"
+          />
+          <div className="inline-flex flex-col justify-center leading-none">
+            <span className="block [text-align-last:justify] [text-justify:inter-character] font-[family-name:var(--font-display)] text-lg text-vialto-fire">
+              VIALTO
+            </span>
+            <span className="-mt-1 block [text-align-last:justify] [text-justify:inter-character] font-[family-name:var(--font-ui)] text-[10px] uppercase text-white">
+              Software
+            </span>
+          </div>
 
-        <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
-          <BreadcrumbOverrideProvider>
-            {(override) => (
-              <>
-                <Breadcrumbs
-                  override={override}
-                  superadmin={superadmin}
-                  stockViewer={stockViewer}
-                  stockOperator={stockOperator}
-                />
-                <Outlet />
-              </>
+          {organization && (
+            <div className="hidden min-w-0 items-center gap-3 border-l border-white/10 pl-3 sm:flex">
+              <span className="max-w-[9rem] truncate font-[family-name:var(--font-ui)] text-xs tracking-wide text-white/45 md:max-w-[14rem]">
+                {organization.name}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex shrink-0 items-center gap-2">
+          {envBadge && (
+            <div className="hidden sm:flex items-center gap-1.5">
+              {neonBranch && (
+                <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-emerald-900 bg-emerald-400 border-emerald-500">
+                  Neon: {neonBranch}
+                </span>
+              )}
+              <span className="font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm text-violet-900 bg-violet-400 border-violet-500">
+                {clerkEnv}
+              </span>
+              <span
+                className={`font-[family-name:var(--font-ui)] text-[9px] uppercase tracking-[0.15em] border px-2 py-0.5 rounded-sm ${envBadge.cls}`}
+              >
+                {envBadge.label}
+              </span>
+            </div>
+          )}
+
+          {/* usuario */}
+          <div className="hidden sm:flex min-w-0 items-center gap-2 pl-1">
+            {accountAvatarUrl ? (
+              <img
+                src={accountAvatarUrl}
+                alt="Foto de perfil"
+                className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-white/20"
+              />
+            ) : (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/80 ring-2 ring-white/20">
+                {accountInitial}
+              </div>
             )}
-          </BreadcrumbOverrideProvider>
-        </main>
+            <div className="flex min-w-0 flex-col justify-center leading-none">
+              <span className="max-w-[9rem] truncate text-sm text-white/90">
+                {accountName}
+              </span>
+              <span className="-mt-0.5 max-w-[9rem] truncate font-[family-name:var(--font-ui)] text-[10px] tracking-wide text-white/45">
+                {roleText}
+              </span>
+            </div>
+          </div>
+
+          {/* notificaciones */}
+          {canSeeNotificaciones && <NotificationBell />}
+
+          {/* cerrar sesión */}
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white/85 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={1.75} />
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 min-h-0">
+        {sidebarOpen && (
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            className="fixed inset-x-0 top-16 bottom-0 z-40 bg-black/50 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        <div className="sidebar-control-zone hidden lg:block fixed left-0 top-16 z-30 h-[calc(100dvh-4rem)]">
+          <aside
+            className={[
+              "flex h-full",
+              sidebarBaseClass,
+              sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
+            ].join(" ")}
+          >
+            {renderSidebar(false, sidebarCollapsed)}
+          </aside>
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarCollapsed((collapsed) => !collapsed);
+              setNavTooltip(null);
+            }}
+            aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setNavTooltip({
+                label: sidebarCollapsed ? "Expandir menú" : "Colapsar menú",
+                top: rect.top + rect.height / 2,
+                left: rect.right + 10,
+              });
+            }}
+            onMouseLeave={() => setNavTooltip(null)}
+            className="sidebar-expand-button group absolute top-1/2 -right-3 z-10 -mt-6 inline-flex h-12 w-7 cursor-pointer items-center justify-center rounded-r-lg border border-l-0 border-white/20 bg-vialto-fire text-white shadow-lg transition-[background-color,box-shadow,transform] duration-300 ease-out hover:bg-vialto-fire/90 hover:shadow-xl hover:brightness-110 active:scale-95"
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight
+                className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5"
+                strokeWidth={2.25}
+              />
+            ) : (
+              <ChevronLeft
+                className="h-4 w-4 transition-transform duration-300 ease-out group-hover:-translate-x-0.5"
+                strokeWidth={2.25}
+              />
+            )}
+          </button>
+        </div>
+
+        <aside
+          aria-hidden={!sidebarOpen}
+          className={[
+            sidebarBaseClass,
+            sidebarExpandedWidthClass,
+            "lg:hidden fixed top-16 bottom-0 left-0 z-50 transition-transform duration-200 ease-in-out",
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full pointer-events-none",
+          ].join(" ")}
+        >
+          {renderSidebar(true, false)}
+        </aside>
+
+        <div
+          className={[
+            "flex min-w-0 flex-1 flex-col transition-[margin-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            sidebarCollapsed ? "lg:ml-[4.5rem]" : "lg:ml-[16rem]",
+          ].join(" ")}
+        >
+          <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
+            <BreadcrumbOverrideProvider>
+              {(override) => (
+                <>
+                  <Breadcrumbs
+                    override={override}
+                    superadmin={superadmin}
+                    stockViewer={stockViewer}
+                    stockOperator={stockOperator}
+                  />
+                  <Outlet />
+                </>
+              )}
+            </BreadcrumbOverrideProvider>
+          </main>
+        </div>
       </div>
 
       {navTooltip &&

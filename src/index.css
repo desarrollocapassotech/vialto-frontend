@@ -120,11 +120,11 @@
 @keyframes sidebar-expand-hint {
   0%,
   100% {
-    transform: translateY(-50%) translateX(0);
+    transform: translateX(0);
     box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
   }
   50% {
-    transform: translateY(-50%) translateX(5px);
+    transform: translateX(5px);
     box-shadow:
       0 0 0 5px rgb(232 71 10 / 0.2),
       4px 4px 26px rgb(232 71 10 / 0.9);

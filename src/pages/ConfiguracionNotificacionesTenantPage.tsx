@@ -115,10 +115,6 @@ export function ConfiguracionNotificacionesTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Notificaciones por email
       </h1>
-      <p className="mt-2 max-w-2xl text-vialto-steel">
-        Elegí qué avisos querés recibir por email. Los mandamos a los
-        administradores de la cuenta cuando hay algo nuevo para revisar.
-      </p>
 
       {error && (
         <p className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

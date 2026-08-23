@@ -60,6 +60,7 @@ import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
+import { NotificacionesPage } from "@/pages/NotificacionesPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -373,6 +374,7 @@ export default function App() {
               path="configuracion/notificaciones"
               element={<ConfiguracionNotificacionesTenantPage />}
             />
+            <Route path="notificaciones" element={<NotificacionesPage />} />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="importar" element={<ImportarDatosTenantPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
