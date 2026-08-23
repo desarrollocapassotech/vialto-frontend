@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@clerk/clerk-react';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -7,6 +8,9 @@ import {
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
 import { labelBillingStatus, labelModulo } from '@/lib/platformLabels';
+import { apiJson } from '@/lib/api';
+import { friendlyError } from '@/lib/friendlyError';
+import { useToast } from '@/lib/toast';
 import type { Tenant } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -25,6 +29,10 @@ export function TenantViewModal({
   tenant: Tenant;
   onClose: () => void;
 }) {
+  const { getToken } = useAuth();
+  const { showToast } = useToast();
+  const [probandoNotificaciones, setProbandoNotificaciones] = useState(false);
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -32,6 +40,22 @@ export function TenantViewModal({
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  async function probarNotificaciones() {
+    setProbandoNotificaciones(true);
+    try {
+      await apiJson(
+        `/api/notificaciones/ejecutar?tenantId=${encodeURIComponent(tenant.clerkOrgId)}`,
+        () => getToken(),
+        { method: 'POST' },
+      );
+      showToast('Notificaciones evaluadas — se enviaron los emails que correspondían.');
+    } catch (e) {
+      showToast(friendlyError(e, 'notificaciones'), 'error');
+    } finally {
+      setProbandoNotificaciones(false);
+    }
+  }
 
   return (
     <ViewModalShell
@@ -41,6 +65,14 @@ export function TenantViewModal({
         <>
           <button type="button" onClick={onClose} className={viewModalBtnGhost}>
             Cerrar
+          </button>
+          <button
+            type="button"
+            onClick={probarNotificaciones}
+            disabled={probandoNotificaciones}
+            className={viewModalBtnGhost}
+          >
+            {probandoNotificaciones ? 'Probando…' : 'Probar notificaciones'}
           </button>
           <Link
             to={`/superadmin/empresas/${encodeURIComponent(tenant.clerkOrgId)}/editar`}
