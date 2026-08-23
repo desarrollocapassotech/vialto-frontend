@@ -52,6 +52,7 @@ import { SuperadminArcaPage } from "@/pages/SuperadminArcaPage";
 import { LiquidacionesTenantPage } from "@/pages/LiquidacionesTenantPage";
 import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
 import { CombustiblePage } from "@/pages/CombustiblePage";
+import { MantenimientoTenantPage } from "@/pages/MantenimientoTenantPage";
 import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
 import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
@@ -413,6 +414,16 @@ export default function App() {
           <Route element={<RequireModule module="combustible" />}>
             <Route element={<RequireNotStockOnlyRole />}>
               <Route path="combustible" element={<CombustiblePage />} />
+            </Route>
+          </Route>
+
+          {/* rutas de mantenimiento — requieren módulo "mantenimiento" contratado */}
+          <Route element={<RequireModule module="mantenimiento" />}>
+            <Route element={<RequireNotStockOnlyRole />}>
+              <Route
+                path="mantenimiento"
+                element={<MantenimientoTenantPage />}
+              />
             </Route>
           </Route>
 

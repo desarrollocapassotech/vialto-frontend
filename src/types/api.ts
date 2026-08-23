@@ -249,6 +249,26 @@ export interface Vehiculo {
   createdAt: string;
 }
 
+export type TipoIntervencionMantenimiento =
+  | 'service'
+  | 'aceite'
+  | 'filtro'
+  | 'cubiertas'
+  | 'otro';
+
+export interface Intervencion {
+  id: string;
+  tenantId: string;
+  vehiculoId: string;
+  tipo: TipoIntervencionMantenimiento;
+  descripcion: string | null;
+  km: number | null;
+  proximoKm: number | null;
+  fecha: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface Transportista {
   id: string;
   tenantId: string;
