@@ -736,7 +736,7 @@ export function AlertsPanel({
             id={panelId}
             role="region"
             aria-labelledby={headingId}
-            className="fixed right-6 top-6 z-40 max-h-[calc(100dvh-3rem)] w-80 overflow-y-auto rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-2xl ring-1 ring-vialto-fire/20"
+            className="fixed right-6 top-[5.5rem] z-40 max-h-[calc(100dvh-7rem)] w-80 overflow-y-auto rounded-lg border-2 border-vialto-fire/50 bg-gradient-to-br from-vialto-charcoal to-vialto-graphite p-4 shadow-2xl ring-1 ring-vialto-fire/20"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
