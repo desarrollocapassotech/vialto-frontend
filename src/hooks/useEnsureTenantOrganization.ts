@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { isPlatformSuperadmin } from '@/lib/roleLabels';
 
 /**
- * Asegura que usuarios de tenant (admin / member / stock_viewer) tengan
+ * Asegura que usuarios de tenant (admin / member / stock_viewer / stock_operator) tengan
  * activa la organización de su cuenta. Sin esto, el JWT no trae `org_id`
  * y el inventario / stock queda vacío (sin datos de la empresa).
  */

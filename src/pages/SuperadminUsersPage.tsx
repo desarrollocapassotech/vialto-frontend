@@ -25,6 +25,7 @@ function formatRole(role: string, platformRole?: string | null) {
   if (role === "org:admin") return "Admin";
   if (role === "org:member") return "Miembro";
   if (role === "org:stock_viewer") return "Consulta de stock";
+  if (role === "org:stock_operator") return "Operador de stock";
   return role;
 }
 

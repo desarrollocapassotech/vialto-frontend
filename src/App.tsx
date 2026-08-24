@@ -11,6 +11,7 @@ import {
   isPlatformSuperadmin,
   isOrgMember,
   isStockViewer,
+  isStockOperator,
 } from "@/lib/roleLabels";
 import { HomePage } from "@/pages/HomePage";
 import { ViajesPage } from "@/pages/ViajesPage";
@@ -51,6 +52,7 @@ import { SuperadminArcaPage } from "@/pages/SuperadminArcaPage";
 import { LiquidacionesTenantPage } from "@/pages/LiquidacionesTenantPage";
 import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
 import { CombustiblePage } from "@/pages/CombustiblePage";
+import { MantenimientoTenantPage } from "@/pages/MantenimientoTenantPage";
 import { PasswordSignInPage } from "@/pages/PasswordSignInPage";
 import { PasswordSignUpPage } from "@/pages/PasswordSignUpPage";
 import { TaskSetupMFAPage } from "@/pages/TaskSetupMFAPage";
@@ -58,6 +60,8 @@ import { TaskChooseOrganizationPage } from "@/pages/TaskChooseOrganizationPage";
 import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
+import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
+import { NotificacionesPage } from "@/pages/NotificacionesPage";
 
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -136,6 +140,16 @@ function RequireOrgAdmin() {
     );
   }
 
+  if (isStockOperator(ctx)) {
+    return (
+      <RestrictedAccess
+        message="Tu rol solo permite gestionar ingresos y egresos de stock."
+        linkTo="/stock/ingresos"
+        linkLabel="Ir a Ingresos"
+      />
+    );
+  }
+
   return <Outlet />;
 }
 
@@ -155,10 +169,20 @@ function RequireStockReadAccess() {
     );
   }
 
+  if (isStockOperator(ctx)) {
+    return (
+      <RestrictedAccess
+        message="Tu rol solo permite gestionar ingresos y egresos de stock."
+        linkTo="/stock/ingresos"
+        linkLabel="Ir a Ingresos"
+      />
+    );
+  }
+
   return <Outlet />;
 }
 
-/** Ingresos y egresos: operadores y admins (no consulta de stock). */
+/** Ingresos y egresos: operadores (de stock o generales) y admins (no consulta de stock). */
 function RequireStockOperator() {
   const { isLoaded, ctx } = useRoleContext();
 
@@ -177,14 +201,22 @@ function RequireStockOperator() {
   return <Outlet />;
 }
 
-/** Bloquea consulta de stock en el resto de la app (viajes, facturación, inicio, etc.). */
-function RequireNotStockViewer() {
+/**
+ * Bloquea el resto de la app (viajes, facturación, inicio, etc.) para roles
+ * confinados a una sección puntual de stock: consulta (stock_viewer, solo
+ * inventario/movimientos) y operador (stock_operator, solo ingresos/egresos).
+ */
+function RequireNotStockOnlyRole() {
   const { isLoaded, ctx } = useRoleContext();
 
   if (!isLoaded) return null;
 
   if (isStockViewer(ctx)) {
     return <Navigate to="/stock/inventario" replace />;
+  }
+
+  if (isStockOperator(ctx)) {
+    return <Navigate to="/stock/ingresos" replace />;
   }
 
   return <Outlet />;
@@ -276,7 +308,7 @@ export default function App() {
             </MaestroDataProvider>
           }
         >
-          <Route element={<RequireNotStockViewer />}>
+          <Route element={<RequireNotStockOnlyRole />}>
             <Route index element={<HomePage />} />
             <Route path="viajes" element={<ViajesPage />} />
             <Route path="viajes/nuevo" element={<ViajeCreatePage />} />
@@ -339,6 +371,11 @@ export default function App() {
               path="configuracion/conceptos"
               element={<ConceptosConfigTenantPage />}
             />
+            <Route
+              path="configuracion/notificaciones"
+              element={<ConfiguracionNotificacionesTenantPage />}
+            />
+            <Route path="notificaciones" element={<NotificacionesPage />} />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />
             <Route path="importar" element={<ImportarDatosTenantPage />} />
             <Route path="clientes/nuevo" element={<ClienteCreatePage />} />
@@ -375,8 +412,18 @@ export default function App() {
 
           {/* rutas de combustible — requieren módulo "combustible" contratado y rol admin */}
           <Route element={<RequireModule module="combustible" />}>
-            <Route element={<RequireNotStockViewer />}>
+            <Route element={<RequireNotStockOnlyRole />}>
               <Route path="combustible" element={<CombustiblePage />} />
+            </Route>
+          </Route>
+
+          {/* rutas de mantenimiento — requieren módulo "mantenimiento" contratado */}
+          <Route element={<RequireModule module="mantenimiento" />}>
+            <Route element={<RequireNotStockOnlyRole />}>
+              <Route
+                path="mantenimiento"
+                element={<MantenimientoTenantPage />}
+              />
             </Route>
           </Route>
 

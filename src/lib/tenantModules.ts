@@ -54,3 +54,7 @@ export function canAccessIntegracionArca(modules: string[]): boolean {
 export function canAccessCombustible(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'combustible');
 }
+
+export function canAccessMantenimiento(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'mantenimiento');
+}

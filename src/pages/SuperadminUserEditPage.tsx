@@ -15,11 +15,13 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'member', label: 'Miembro' },
   { value: 'stock_viewer', label: 'Consulta de stock' },
+  { value: 'stock_operator', label: 'Operador de stock' },
 ] as const;
 
 function fromOrgRole(role: string): (typeof ROLE_OPTIONS)[number]['value'] {
   if (role === 'org:admin') return 'admin';
   if (role === 'org:stock_viewer') return 'stock_viewer';
+  if (role === 'org:stock_operator') return 'stock_operator';
   return 'member';
 }
 

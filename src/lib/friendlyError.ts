@@ -24,7 +24,9 @@ export type FriendlyErrorContext =
   | "plataforma"
   | "arca"
   | "usuarios"
-  | "camposEmpresa";
+  | "camposEmpresa"
+  | "notificaciones"
+  | "mantenimiento";
 
 const fallback: Record<FriendlyErrorContext, string> = {
   tablero: "No pudimos cargar el tablero. Probá de nuevo en un momento.",
@@ -54,6 +56,10 @@ const fallback: Record<FriendlyErrorContext, string> = {
   usuarios: "No pudimos cargar los usuarios. Probá de nuevo en un momento.",
   camposEmpresa:
     "No pudimos cargar la configuración de campos. Probá de nuevo en un momento.",
+  notificaciones:
+    "No pudimos cargar la configuración de notificaciones. Probá de nuevo en un momento.",
+  mantenimiento:
+    "No pudimos cargar el mantenimiento de flota. Probá de nuevo en un momento.",
 };
 
 /**
@@ -81,6 +87,9 @@ export function friendlyError(
       }
       if (context === "facturacion" || context === "liquidaciones") {
         return "Tu empresa no tiene habilitado el módulo de facturación. Consultá con el administrador de tu cuenta.";
+      }
+      if (context === "mantenimiento") {
+        return "Tu empresa no tiene habilitado el módulo de mantenimiento. Consultá con el administrador de tu cuenta.";
       }
       return "No tenés permiso para ver esto. Si necesitás acceso, pedilo a un administrador.";
     }

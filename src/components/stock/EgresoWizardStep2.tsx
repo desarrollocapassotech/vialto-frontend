@@ -8,10 +8,12 @@ import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { Spinner } from '@/components/ui/Spinner';
 import type { StockDocumentoExternoModo } from '@/lib/stockDocumentoExterno';
+import {
+  STOCK_FORM_INPUT as INPUT,
+  STOCK_FORM_LABEL as LABEL,
+  STOCK_FORM_TEXTAREA,
+} from '@/lib/stockFormLayout';
 import type { Chofer, Destinatario, DireccionEntrega } from '@/types/api';
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 type FechaHoraPatch = {
   fechaCarga?: string;
@@ -224,7 +226,7 @@ export function EgresoWizardStep2({
                 value={observaciones}
                 onChange={(e) => onObservacionesChange(e.target.value)}
                 rows={2}
-                className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
+                className={STOCK_FORM_TEXTAREA}
                 placeholder="Notas internas…"
               />
             </div>

@@ -1,9 +1,11 @@
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ViajeFechaHoraFields } from '@/components/viajes/ViajeFechaHoraFields';
+import {
+  STOCK_FORM_INPUT as INPUT,
+  STOCK_FORM_LABEL as LABEL,
+  STOCK_FORM_TEXTAREA,
+} from '@/lib/stockFormLayout';
 import { FotosIngresoField } from './FotosIngresoField';
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 type FechaHoraPatch = {
   fechaCarga?: string;
@@ -108,7 +110,7 @@ export function IngresoWizardStep2({
               value={observaciones}
               onChange={(e) => onObservacionesChange(e.target.value)}
               rows={3}
-              className="w-full border border-black/15 bg-white px-2 py-1.5 text-sm resize-none"
+              className={STOCK_FORM_TEXTAREA}
               placeholder="Notas internas sobre este ingreso…"
             />
           </div>

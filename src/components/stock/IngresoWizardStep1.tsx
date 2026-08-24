@@ -1,9 +1,7 @@
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { STOCK_FORM_INPUT as INPUT, STOCK_FORM_LABEL as LABEL } from '@/lib/stockFormLayout';
 import type { Cliente, Deposito } from '@/types/api';
-
-const INPUT = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const LABEL = 'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 
 export function IngresoWizardStep1({
   clientes,
@@ -25,7 +23,7 @@ export function IngresoWizardStep1({
   depositoId: string;
   onDepositoChange: (id: string) => void;
   fieldErrors: Record<string, string>;
-  onNuevoCliente: () => void;
+  onNuevoCliente?: () => void;
   onContinuar: () => void;
 }) {
   return (
@@ -59,9 +57,7 @@ export function IngresoWizardStep1({
           <select
             value={depositoId}
             onChange={(e) => onDepositoChange(e.target.value)}
-            className={`h-9 w-full border bg-white px-2 text-sm ${
-              fieldErrors.depositoId ? 'border-red-400' : 'border-black/15'
-            }`}
+            className={`${INPUT} ${fieldErrors.depositoId ? 'border-red-400' : ''}`}
           >
             <option value="">Elegí un depósito…</option>
             {depositos.map((d) => (

@@ -32,13 +32,14 @@ type ModalState =
   | {
       mode: "edit-role";
       user: TenantUser;
-      selectedRole: "admin" | "member" | "stock_viewer";
+      selectedRole: "admin" | "member" | "stock_viewer" | "stock_operator";
     }
   | { mode: "invite" };
 
 function formatRole(role: string) {
   if (role === "org:admin") return "Administrador";
   if (role === "org:stock_viewer") return "Consulta de stock";
+  if (role === "org:stock_operator") return "Operador de stock";
   return "Miembro";
 }
 
@@ -54,9 +55,10 @@ function formatDate(value: number | string) {
   }
 }
 
-function toApiRole(role: string): "admin" | "member" | "stock_viewer" {
+function toApiRole(role: string): "admin" | "member" | "stock_viewer" | "stock_operator" {
   if (role === "org:admin") return "admin";
   if (role === "org:stock_viewer") return "stock_viewer";
+  if (role === "org:stock_operator") return "stock_operator";
   return "member";
 }
 
@@ -84,7 +86,9 @@ function UsuarioModal({
   onClose: () => void;
   onStartEditRole: () => void;
   onSaveRole: () => void;
-  onSetSelectedRole: (role: "admin" | "member" | "stock_viewer") => void;
+  onSetSelectedRole: (
+    role: "admin" | "member" | "stock_viewer" | "stock_operator",
+  ) => void;
   onDelete: () => void;
 }) {
   const user = modal.user;
@@ -124,8 +128,8 @@ function UsuarioModal({
             <strong className="text-vialto-charcoal">{nombre}</strong>.
           </p>
           <div className="flex flex-col gap-2">
-            {(["admin", "member", "stock_viewer"] as const)
-              .filter((r) => r !== "stock_viewer" || tieneModuloStock)
+            {(["admin", "member", "stock_viewer", "stock_operator"] as const)
+              .filter((r) => (r !== "stock_viewer" && r !== "stock_operator") || tieneModuloStock)
               .map((r) => (
                 <label
                   key={r}
@@ -144,7 +148,9 @@ function UsuarioModal({
                       ? "Administrador"
                       : r === "stock_viewer"
                         ? "Consulta de stock"
-                        : "Miembro"}
+                        : r === "stock_operator"
+                          ? "Operador de stock"
+                          : "Miembro"}
                   </span>
                 </label>
               ))}
@@ -226,15 +232,15 @@ function CreateUserModal({
     name: string,
     email: string,
     password: string,
-    role: "admin" | "member" | "stock_viewer",
+    role: "admin" | "member" | "stock_viewer" | "stock_operator",
   ) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "member" | "stock_viewer">(
-    "member",
-  );
+  const [role, setRole] = useState<
+    "admin" | "member" | "stock_viewer" | "stock_operator"
+  >("member");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function handleSubmit() {
@@ -340,8 +346,8 @@ function CreateUserModal({
             Rol
           </p>
           <div className="flex flex-col gap-2">
-            {(["member", "admin", "stock_viewer"] as const)
-              .filter((r) => r !== "stock_viewer" || tieneModuloStock)
+            {(["member", "admin", "stock_viewer", "stock_operator"] as const)
+              .filter((r) => (r !== "stock_viewer" && r !== "stock_operator") || tieneModuloStock)
               .map((r) => (
                 <label
                   key={r}
@@ -360,7 +366,9 @@ function CreateUserModal({
                       ? "Administrador"
                       : r === "stock_viewer"
                         ? "Consulta de stock"
-                        : "Miembro"}
+                        : r === "stock_operator"
+                          ? "Operador de stock"
+                          : "Miembro"}
                   </span>
                 </label>
               ))}
@@ -520,7 +528,7 @@ export function UsuariosTenantPage() {
     name: string,
     email: string,
     password: string,
-    role: "admin" | "member" | "stock_viewer",
+    role: "admin" | "member" | "stock_viewer" | "stock_operator",
   ) {
     setBusy(true);
     setActionError(null);

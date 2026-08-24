@@ -8,10 +8,12 @@ import { ProductoModal } from "@/components/stock/ProductoModal";
 import { Spinner } from "@/components/ui/Spinner";
 import type { Producto, ProductoPresentacion } from "@/types/api";
 import { StockActual } from "@/components/stock/StockActual";
-
-const INPUT = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
-const LABEL =
-  "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
+import {
+  STOCK_FORM_INPUT as INPUT,
+  STOCK_FORM_LABEL as LABEL,
+  STOCK_FORM_REMOVE_BTN,
+  STOCK_FORM_ACTIONS_STICKY,
+} from "@/lib/stockFormLayout";
 
 export type IngresoRow = {
   _key: string;
@@ -188,7 +190,7 @@ export function IngresoWizardStep3({
                     type="button"
                     onClick={() => onRemoveRow(row._key)}
                     disabled={rows.length <= 1}
-                    className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
+                    className={STOCK_FORM_REMOVE_BTN}
                   >
                     Eliminar
                   </button>
@@ -318,6 +320,7 @@ export function IngresoWizardStep3({
                     </label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="any"
                       value={row.bultos}
@@ -338,6 +341,7 @@ export function IngresoWizardStep3({
                     <label className={LABEL}>Sueltas</label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="any"
                       value={row.sueltas}
@@ -459,7 +463,7 @@ export function IngresoWizardStep3({
 
         <CrudFormErrorAlert message={formError} />
 
-        <div className="flex items-center justify-between">
+        <div className={`flex items-center justify-between ${STOCK_FORM_ACTIONS_STICKY}`}>
           <button
             type="button"
             onClick={onVolver}

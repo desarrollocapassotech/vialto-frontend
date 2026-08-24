@@ -14,7 +14,7 @@ import type { Cliente, Deposito, PaginatedResponse, Producto } from '@/types/api
 import { IngresoWizardStep1 } from '@/components/stock/IngresoWizardStep1';
 import { IngresoWizardStep2 } from '@/components/stock/IngresoWizardStep2';
 import { IngresoWizardStep3, emptyRow, type IngresoRow } from '@/components/stock/IngresoWizardStep3';
-import { isOrgAdmin } from '@/lib/roleLabels';
+import { isOrgAdmin, isStockOperator } from '@/lib/roleLabels';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 type PaginatedProductos = { items: Producto[]; meta: unknown };
@@ -106,6 +106,10 @@ export function IngresosStockTenantPage({
   const platform = Boolean(tenantId);
   const canCreateProducto =
     platform || isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata });
+  const puedeCrearCliente = !isStockOperator({
+    orgRole,
+    publicMetadata: user?.publicMetadata,
+  });
 
   const { isVisible } = useFieldConfig('stock');
 
@@ -344,7 +348,7 @@ export function IngresosStockTenantPage({
           depositoId={depositoId}
           onDepositoChange={setDepositoId}
           fieldErrors={fieldErrors}
-          onNuevoCliente={() => setModalCliente(true)}
+          onNuevoCliente={puedeCrearCliente ? () => setModalCliente(true) : undefined}
           onContinuar={handleContinuar1}
         />
       )}
