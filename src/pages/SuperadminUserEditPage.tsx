@@ -18,10 +18,10 @@ const ROLE_OPTIONS = [
   { value: 'stock_operator', label: 'Operador de stock' },
 ] as const;
 
-function fromOrgRole(role: string): (typeof ROLE_OPTIONS)[number]['value'] {
+function fromOrgRole(role: string, platformRole?: string | null): (typeof ROLE_OPTIONS)[number]['value'] {
+  if (platformRole === 'stock_viewer') return 'stock_viewer';
+  if (platformRole === 'stock_operator') return 'stock_operator';
   if (role === 'org:admin') return 'admin';
-  if (role === 'org:stock_viewer') return 'stock_viewer';
-  if (role === 'org:stock_operator') return 'stock_operator';
   return 'member';
 }
 
@@ -54,7 +54,7 @@ export function SuperadminUserEditPage() {
           () => getToken(),
         );
         if (!cancelled) {
-          setRole(fromOrgRole(data.role));
+          setRole(fromOrgRole(data.role, data.platformRole));
           setEmail(data.email ?? '');
           setDisplayName([data.firstName, data.lastName].filter(Boolean).join(' ') || 'Sin nombre');
         }

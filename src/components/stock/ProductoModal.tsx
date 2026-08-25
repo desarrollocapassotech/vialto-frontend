@@ -153,10 +153,12 @@ export function ProductoModal({
           }
         }
         if (!errs.presentaciones) {
-          const presSet = new Set(rows.map((r) => r.presentacionId));
-          if (presSet.size !== rows.length) {
+          const claves = rows.map(
+            (r) => `${r.presentacionId}::${r.unidadesPorBulto}`,
+          );
+          if (new Set(claves).size !== claves.length) {
             errs.presentaciones =
-              "No se pueden repetir presentaciones en el mismo producto.";
+              "No se puede repetir la misma presentación con la misma cantidad de unidades por bulto.";
           }
         }
       }

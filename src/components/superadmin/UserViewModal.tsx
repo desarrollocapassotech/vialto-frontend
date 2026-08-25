@@ -10,11 +10,10 @@ import type { PlatformUser } from '@/types/api';
 
 function formatRole(role: string, platformRole?: string | null) {
   if (platformRole === 'superadmin') return 'Superadmin';
+  if (platformRole === 'stock_viewer') return 'Consulta de stock';
+  if (platformRole === 'stock_operator') return 'Operador de stock';
   if (role === 'org:admin') return 'Admin';
-  if (role === 'org:member') return 'Miembro';
-  if (role === 'org:stock_viewer') return 'Consulta de stock';
-  if (role === 'org:stock_operator') return 'Operador de stock';
-  return role;
+  return 'Miembro';
 }
 
 function formatDate(value: number | string) {
