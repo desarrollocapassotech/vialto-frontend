@@ -37,6 +37,7 @@ type LiquidacionEmitDetail = Liquidacion & {
         idFiscal?: string | null;
         direccion?: string | null;
         pais?: string | null;
+        condicionIva?: number | null;
         condicionTributaria?: string | null;
       } | null;
     } | null;
@@ -256,6 +257,7 @@ export function EmitirLiquidacionModal({
                   idFiscal: c.idFiscal,
                   direccion: c.direccion,
                   pais: c.pais,
+                  condicionIva: c.condicionIva,
                   condicionTributaria: c.condicionTributaria,
                 },
               },
@@ -482,7 +484,7 @@ export function EmitirLiquidacionModal({
                 nombre: clienteDelViaje?.nombre ?? "",
                 pais: clienteDelViaje?.pais ?? null,
                 idFiscal: clienteDelViaje?.idFiscal ?? null,
-                condicionIva: null,
+                condicionIva: clienteDelViaje?.condicionIva ?? null,
                 condicionTributaria: clienteDelViaje?.condicionTributaria ?? null,
                 direccion: clienteDelViaje?.direccion ?? null,
               }}
