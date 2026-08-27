@@ -67,6 +67,18 @@ function getPresentaciones(productos: Producto[], productoId: string): ProductoP
   return productos.find((p) => p.id === productoId)?.productoPresentaciones ?? [];
 }
 
+function calcularKgRow(row: EgresoRow, productos: Producto[]): number {
+  const producto = productos.find((p) => p.id === row.productoId);
+  const pp = producto?.productoPresentaciones.find((p) => p.id === row.presentacionId);
+  const pesoUnitarioKg = producto?.pesoUnitarioKg ?? 0;
+  const unidadesPorBulto = pp?.unidadesPorBulto ?? 0;
+  return row.loteLineas.reduce((sum, linea) => {
+    const bultos = parseFloat(linea.bultos) || 0;
+    const sueltas = parseFloat(linea.sueltas) || 0;
+    return sum + (bultos * unidadesPorBulto + sueltas) * pesoUnitarioKg;
+  }, 0);
+}
+
 export function isEgresoLoteLineaComplete(linea: EgresoLoteLinea): boolean {
   const b = parseFloat(linea.bultos) || 0;
   const s = parseFloat(linea.sueltas) || 0;
@@ -475,6 +487,13 @@ export function EgresoWizardStep3({
                 >
                   + Añadir otro lote
                 </button>
+
+                {selectedPP && calcularKgRow(row, productos) > 0 && (
+                  <p className="text-sm text-vialto-charcoal">
+                    <span className="text-vialto-steel">Peso de este producto: </span>
+                    <span className="font-semibold">{calcularKgRow(row, productos)} kg</span>
+                  </p>
+                )}
               </div>
             </div>
           );
@@ -506,6 +525,17 @@ export function EgresoWizardStep3({
             </button>
           );
         })()}
+
+        {rows.some((r) => calcularKgRow(r, productos) > 0) && (
+          <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-vialto-charcoal">
+              Total del egreso
+            </span>
+            <span className="text-lg font-semibold text-vialto-charcoal">
+              {rows.reduce((sum, r) => sum + calcularKgRow(r, productos), 0)} kg
+            </span>
+          </div>
+        )}
       </div>
 
       <CrudFormErrorAlert message={formError} />

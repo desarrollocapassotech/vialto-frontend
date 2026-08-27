@@ -60,6 +60,18 @@ function isRowComplete(row: IngresoRow): boolean {
   );
 }
 
+function calcularKgFila(row: IngresoRow, productos: Producto[]): number {
+  const producto = productos.find((p) => p.id === row.productoId);
+  const pp = producto?.productoPresentaciones.find(
+    (p) => p.id === row.presentacionId,
+  );
+  const pesoUnitarioKg = producto?.pesoUnitarioKg ?? 0;
+  const unidadesPorBulto = pp?.unidadesPorBulto ?? 0;
+  const bultos = parseFloat(row.bultos) || 0;
+  const sueltas = parseFloat(row.sueltas) || 0;
+  return (bultos * unidadesPorBulto + sueltas) * pesoUnitarioKg;
+}
+
 export function IngresoWizardStep3({
   rows,
   onAddRow,
@@ -354,6 +366,15 @@ export function IngresoWizardStep3({
                   </div>
                 </div>
 
+                {(row.bultos || row.sueltas) && row.presentacionId && (
+                  <p className="text-sm text-vialto-charcoal">
+                    <span className="text-vialto-steel">Peso: </span>
+                    <span className="font-semibold">
+                      {calcularKgFila(row, productos)} kg
+                    </span>
+                  </p>
+                )}
+
                 {/* Lote y vencimiento */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -460,6 +481,17 @@ export function IngresoWizardStep3({
             );
           })()}
         </div>
+
+        {rows.some((r) => r.bultos || r.sueltas) && (
+          <div className="bg-vialto-mist/40 border border-black/10 rounded-lg px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-vialto-charcoal">
+              Total del ingreso
+            </span>
+            <span className="text-lg font-semibold text-vialto-charcoal">
+              {rows.reduce((sum, r) => sum + calcularKgFila(r, productos), 0)} kg
+            </span>
+          </div>
+        )}
 
         <CrudFormErrorAlert message={formError} />
 

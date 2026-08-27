@@ -458,6 +458,20 @@ export function StockMovimientosTenantPage({
             tdClassName: listadoTablaTdClass,
           },
           {
+            id: "kg",
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: "Kg",
+            cell: (op) => {
+              if (op.tipo === "division") {
+                const kg = op.movimientos[0]?.kg ?? 0;
+                return `${kg} kg`;
+              }
+              const totalKg = op.movimientos.reduce((s, m) => s + m.kg, 0);
+              return `${totalKg} kg`;
+            },
+            tdClassName: listadoTablaTdClass,
+          },
+          {
             id: "remito",
             thClassName: `${listadoTablaThClass} align-top`,
             header: "Remito",

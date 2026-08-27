@@ -864,6 +864,7 @@ export interface StockItem {
   cantidad1: number;
   cantidad2: number;
   updatedAt: string;
+  kg: number;
 }
 
 export interface StockOperacionLinea {
@@ -882,6 +883,7 @@ export interface StockOperacionLinea {
   unidades: number;
   lote?: string | null;
   fechaVencimiento?: string | null;
+  kg: number;
 }
 
 export interface StockOperacion {

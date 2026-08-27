@@ -134,6 +134,7 @@ export function DivisionesStockTenantPage({
 
   const unidadesPorBulto = presentacionSeleccionada?.unidadesPorBulto ?? 0;
   const sueltasResultantes = bultos * unidadesPorBulto;
+  const pesoUnitarioKg = productoSeleccionado?.pesoUnitarioKg ?? 0;
 
   // Saldo del lote elegido (obligatorio para dividir con trazabilidad).
   const bultosDisponibles = loteDisponible?.bultos ?? 0;
@@ -619,6 +620,11 @@ export function DivisionesStockTenantPage({
                   <p className="text-sm text-red-500 mt-1">
                     bulto{bultos !== 1 ? "s" : ""}
                   </p>
+                  {pesoUnitarioKg > 0 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      {bultos * unidadesPorBulto * pesoUnitarioKg} kg
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center self-center text-2xl text-vialto-steel/50 px-1 shrink-0">
@@ -633,6 +639,11 @@ export function DivisionesStockTenantPage({
                     +{sueltasResultantes}
                   </p>
                   <p className="text-sm text-emerald-600 mt-1">sueltas</p>
+                  {pesoUnitarioKg > 0 && (
+                    <p className="text-xs text-emerald-500 mt-1">
+                      {sueltasResultantes * pesoUnitarioKg} kg
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
