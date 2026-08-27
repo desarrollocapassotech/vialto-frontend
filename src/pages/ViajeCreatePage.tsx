@@ -828,17 +828,35 @@ export function ViajeCreatePage() {
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
-  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
-  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
-  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
-  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
-  const desglosePagoBruto =
-    (Number(cantidadTransportista.replace(",", ".")) || 0) *
-    (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
-  const desglosePctIva =
+  // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
+  // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
+  const pagoBrutoTransportista = desgloseActivo
+    ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+      (parseCurrencyForMoneda(
+        precioUnitarioTransportista,
+        monedaPrecioTransportista,
+      ) || 0)
+    : parseCurrencyForMoneda(
+        precioTransportistaExterno,
+        monedaPrecioTransportista,
+      ) || 0;
+  const pctIvaTransportista =
     Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
-  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
+  const pagoNetoTransportista = engrosarConIva(
+    pagoBrutoTransportista,
+    pctIvaTransportista,
+  );
+  const montoIvaTransportista =
+    pagoNetoTransportista - pagoBrutoTransportista;
+
+  const readonlyMoneyClass =
+    "flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0";
+  function fmtReadonlyMoney(n: number) {
+    return n.toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
   // ─── RENDERIZADO DEL FORMULARIO ──────────────────────────────────────────
   return (
@@ -1212,96 +1230,135 @@ export function ViajeCreatePage() {
                           </div>
                         )}
                       </div>
-                      {ivaTransportistaVisible && (
+                      {ivaTransportistaVisible ? (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={fieldLabelClass}>Pago bruto a transporte</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <div className={readonlyMoneyClass}>
                               <span className="w-full truncate">
-                                {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
                               </span>
                             </div>
                           </div>
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={fieldLabelClass}>Pago neto</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <div className={readonlyMoneyClass}>
                               <span className="w-full truncate">
-                                {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {fmtReadonlyMoney(pagoNetoTransportista)}
                               </span>
                             </div>
                           </div>
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className={fieldLabelClass}>Monto IVA</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                            <div className={readonlyMoneyClass}>
                               <span className="w-full truncate">
-                                {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {fmtReadonlyMoney(montoIvaTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
+                          <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                          <div className={readonlyMoneyClass}>
+                            <span className="w-full truncate">
+                              {fmtReadonlyMoney(pagoBrutoTransportista)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                      >
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className={fieldLabelClass}>Precio transporte</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioTransportistaExterno}
+                              onChange={(e) => {
+                                setPrecioTransportistaExterno(
+                                  maskCurrencyForMoneda(
+                                    e.target.value,
+                                    monedaPrecioTransportista,
+                                  ),
+                                );
+                                setFieldErrors((p) => ({ ...p, precioTransportistaExterno: "" }));
+                              }}
+                              placeholder="0.00"
+                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioTransportistaExterno ? "border-red-400" : ""}`}
+                            />
+                            <MonedaSelect
+                              value={monedaPrecioTransportista}
+                              onChange={(m) => {
+                                setPrecioTransportistaExterno((prev) =>
+                                  preserveAmountOnMonedaChange(
+                                    prev,
+                                    monedaPrecioTransportista,
+                                    m,
+                                  ),
+                                );
+                                setMonedaPrecioTransportista(m);
+                              }}
+                              aria-label="Moneda precio transportista externo"
+                            />
+                          </div>
+                          <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
+                        </div>
+                        {ivaTransportistaVisible && (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>% de IVA</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={precioTransportistaIvaIncluidoPct}
+                              onChange={(e) =>
+                                setPrecioTransportistaIvaIncluidoPct(e.target.value)
+                              }
+                              placeholder="0"
+                              className={`${inputClass} text-right tabular-nums`}
+                            />
+                            <p className="text-xs text-vialto-steel">
+                              Dejalo en 0 si el transportista no suma IVA al cobrar.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {ivaTransportistaVisible && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Pago neto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate">
+                                {fmtReadonlyMoney(pagoNetoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={fieldLabelClass}>Monto IVA</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate">
+                                {fmtReadonlyMoney(montoIvaTransportista)}
                               </span>
                             </div>
                           </div>
                         </div>
                       )}
                     </>
-                  ) : (
-                    <div
-                      className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
-                    >
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className={fieldLabelClass}>Precio transporte</span>
-                        <div className="flex min-w-0 gap-2">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={precioTransportistaExterno}
-                            onChange={(e) => {
-                              setPrecioTransportistaExterno(
-                                maskCurrencyForMoneda(
-                                  e.target.value,
-                                  monedaPrecioTransportista,
-                                ),
-                              );
-                              setFieldErrors((p) => ({ ...p, precioTransportistaExterno: "" }));
-                            }}
-                            placeholder="0.00"
-                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioTransportistaExterno ? "border-red-400" : ""}`}
-                          />
-                          <MonedaSelect
-                            value={monedaPrecioTransportista}
-                            onChange={(m) => {
-                              setPrecioTransportistaExterno((prev) =>
-                                preserveAmountOnMonedaChange(
-                                  prev,
-                                  monedaPrecioTransportista,
-                                  m,
-                                ),
-                              );
-                              setMonedaPrecioTransportista(m);
-                            }}
-                            aria-label="Moneda precio transportista externo"
-                          />
-                        </div>
-                        <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
-                      </div>
-                      {ivaTransportistaVisible && (
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>% de IVA</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={precioTransportistaIvaIncluidoPct}
-                            onChange={(e) =>
-                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
-                            }
-                            placeholder="0"
-                            className={`${inputClass} text-right tabular-nums`}
-                          />
-                          <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el transportista no suma IVA al cobrar.
-                          </p>
-                        </div>
-                      )}
-                    </div>
                   )}
                   {transportistaId && (
                     <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
