@@ -17,7 +17,13 @@ import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } from "@/lib/viajesIndicadores";
+import {
+  etapaViajeBadgeClass,
+  etapaViajeBadgeClassDefault,
+  etapaViajeLabel,
+  tooltipFacturacionEstado,
+  tooltipLiquidacionEstado,
+} from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
@@ -233,7 +239,11 @@ export function ViajeViewModal({
               (número interno generado automáticamente)
             </span>
           )}
-          <span className="text-xs uppercase tracking-[0.1em] border rounded px-2 py-0.5 text-vialto-steel border-black/15">
+          <span
+            className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${
+              etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
+            }`}
+          >
             {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
           </span>
           <span className="inline-flex items-center gap-1.5">

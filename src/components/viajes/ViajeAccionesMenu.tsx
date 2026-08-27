@@ -9,11 +9,6 @@ import { viajePermiteBotonFacturar, liquidacionElegidaDeViaje } from '@/lib/viaj
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
-function fmtDate(iso: string) {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
-
 interface Props {
   viaje: Viaje;
   /** Tenant con módulo integracion-arca activo. */
@@ -110,14 +105,7 @@ export function ViajeAccionesMenu({
       <AccionesOpcionesSheet
         open={open}
         onClose={() => setOpen(false)}
-        subtitle={[
-          viaje.origen && viaje.destino ? `${viaje.origen} → ${viaje.destino}` : null,
-          viaje.fechaCarga && viaje.fechaDescarga
-            ? `${fmtDate(viaje.fechaCarga)} — ${fmtDate(viaje.fechaDescarga)}`
-            : viaje.fechaCarga
-              ? fmtDate(viaje.fechaCarga)
-              : null,
-        ].filter(Boolean).join(' · ') || `Viaje #${numeroVisibleViaje(viaje)}`}
+        subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
         options={options}
       />
     </>
