@@ -24,7 +24,6 @@ import {
   normalizarIdEnLista,
   vehiculosFlotaPropia,
 } from '@/lib/viajesFlota';
-import { etapaMuestraKmLitros } from '@/lib/viajesIndicadores';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Chofer, Cliente, Transportista, Vehiculo } from '@/types/api';
@@ -416,10 +415,9 @@ export function ViajeInlineEditForm({
             errorFechaDescarga={errorFechaDescarga}
           />
 
-          {/* Km / Litros (solo en estados finales) */}
-          {etapaMuestraKmLitros(draft.estado) &&
-            (isVisible("edicion_viaje", "kmRecorridos") ||
-              isVisible("edicion_viaje", "litrosConsumidos")) && (
+          {/* Km / Litros */}
+          {(isVisible("edicion_viaje", "kmRecorridos") ||
+            isVisible("edicion_viaje", "litrosConsumidos")) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                 {isVisible("edicion_viaje", "kmRecorridos") && (
                   <div className="flex flex-col gap-1">

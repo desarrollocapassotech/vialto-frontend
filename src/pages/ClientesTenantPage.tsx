@@ -5,6 +5,7 @@ import { ClienteViewModal } from "@/components/clientes/ClienteViewModal";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { apiJson } from "@/lib/api";
+import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
@@ -254,6 +255,17 @@ export function ClientesTenantPage() {
             id: "pais",
             header: "País",
             cell: (c) => c.pais ?? "—",
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: "condicionTributaria",
+            header: "Condición tributaria",
+            cell: (c) =>
+              c.pais === "AR"
+                ? c.condicionIva != null
+                  ? condicionIvaLabel(c.condicionIva)
+                  : "—"
+                : (c.condicionTributaria ?? "—"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {

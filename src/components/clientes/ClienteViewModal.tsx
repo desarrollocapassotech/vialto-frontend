@@ -6,11 +6,19 @@ import {
   viewModalBtnPrimary,
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
+import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
 import type { Cliente } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function labelCondicionCliente(c: Cliente): string | null {
+  if (c.pais === 'AR') {
+    return c.condicionIva != null ? condicionIvaLabel(c.condicionIva) : null;
+  }
+  return c.condicionTributaria?.trim() || null;
 }
 
 export function ClienteViewModal({
@@ -50,6 +58,10 @@ export function ClienteViewModal({
           { label: 'Nombre', value: cliente.nombre },
           { label: 'ID Fiscal', value: cliente.idFiscal },
           { label: 'País', value: cliente.pais },
+          {
+            label: cliente.pais === 'AR' ? 'Condición IVA' : 'Condición tributaria',
+            value: labelCondicionCliente(cliente),
+          },
           { label: 'Email', value: cliente.email },
           { label: 'Teléfono', value: cliente.telefono },
           { label: 'Dirección', value: cliente.direccion },

@@ -20,6 +20,7 @@ const emptyForm = (): VehiculoFormState => ({
   vencimientoPoliza: '',
   tara: '',
   precinto: '',
+  transportistaId: '',
 });
 
 export function VehiculoModal({

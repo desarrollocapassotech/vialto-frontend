@@ -8,6 +8,7 @@ import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
+import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
@@ -310,6 +311,17 @@ export function ClientesSuperadminPage() {
             id: "pais",
             header: "País",
             cell: (c) => c.pais ?? "—",
+            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+          },
+          {
+            id: "condicionTributaria",
+            header: "Condición tributaria",
+            cell: (c) =>
+              c.pais === "AR"
+                ? c.condicionIva != null
+                  ? condicionIvaLabel(c.condicionIva)
+                  : "—"
+                : (c.condicionTributaria ?? "—"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           },
           {

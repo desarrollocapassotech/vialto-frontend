@@ -1396,7 +1396,8 @@ export function ViajeCreatePage() {
               errorFechaCarga={fechaCargaError}
               errorFechaDescarga={fechaDescargaError}
             />
-            {etapaMuestraKmLitros(estado) && (
+            {(isVisible("alta_viaje", "kmRecorridos") ||
+              isVisible("alta_viaje", "litrosConsumidos")) && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
               {isVisible("alta_viaje", "kmRecorridos") && (
                 <div className="flex flex-col gap-1">

@@ -51,7 +51,6 @@ import {
 } from "@/lib/currencyMask";
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
-  etapaMuestraKmLitros,
   etapaViajeLabel,
   liquidacionPermiteVincular,
   VIAJE_ETAPAS_TODAS,
@@ -1243,7 +1242,8 @@ export function ViajeEditModal({
                 errorFechaDescarga={fechaDescargaError}
               />
 
-              {etapaMuestraKmLitros(draft.estado) && (
+              {(isVisible("edicion_viaje", "kmRecorridos") ||
+                isVisible("edicion_viaje", "litrosConsumidos")) && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                   {isVisible("edicion_viaje", "kmRecorridos") && (
                     <div className="flex flex-col gap-1">

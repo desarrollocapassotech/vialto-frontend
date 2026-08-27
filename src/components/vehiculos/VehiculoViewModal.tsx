@@ -10,6 +10,7 @@ import {
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { labelVehiculoTipo } from "@/lib/labels";
+import { useTransportistasList } from "@/hooks/useTransportistasList";
 import type { Vehiculo } from "@/types/api";
 
 function fmtDate(iso: string | null | undefined) {
@@ -52,6 +53,11 @@ export function VehiculoViewModal({
   const [ultimoKmCombustible, setUltimoKmCombustible] = useState<number | null>(
     null,
   );
+  const transportistas = useTransportistasList(tenantId, false);
+  const transportistaNombre =
+    vehiculo?.transportistaId && transportistas
+      ? transportistas.find((t) => t.id === vehiculo.transportistaId)?.nombre
+      : undefined;
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -194,6 +200,12 @@ export function VehiculoViewModal({
               value: vehiculo.tara != null ? fmtNum(vehiculo.tara) : null,
             },
             { label: "Precinto", value: vehiculo.precinto },
+            {
+              label: "Pertenencia",
+              value: vehiculo.transportistaId
+                ? (transportistaNombre ?? "Transportista externo")
+                : "Flota propia",
+            },
             { label: "Alta", value: fmtDate(vehiculo.createdAt) },
           ]
             .filter((c) => c.value != null && c.value !== "")

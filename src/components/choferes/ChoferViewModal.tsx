@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { apiJson } from '@/lib/api';
 import { friendlyError } from '@/lib/friendlyError';
+import { useTransportistasList } from '@/hooks/useTransportistasList';
 import type { Chofer } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
@@ -47,6 +48,11 @@ export function ChoferViewModal({
   const [chofer, setChofer] = useState<Chofer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const transportistas = useTransportistasList(tenantId, false);
+  const transportistaNombre =
+    chofer?.transportistaId && transportistas
+      ? transportistas.find((t) => t.id === chofer.transportistaId)?.nombre
+      : undefined;
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -118,6 +124,12 @@ export function ChoferViewModal({
               value: chofer.licenciaVence ? fmtDate(chofer.licenciaVence) : null,
             },
             { label: 'Teléfono', value: chofer.telefono },
+            {
+              label: 'Pertenencia',
+              value: chofer.transportistaId
+                ? (transportistaNombre ?? 'Transportista externo')
+                : 'Flota propia',
+            },
             { label: 'Alta', value: fmtDate(chofer.createdAt) },
           ]
             .filter((c) => c.value != null && c.value !== '')
