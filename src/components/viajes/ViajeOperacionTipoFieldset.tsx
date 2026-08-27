@@ -24,7 +24,6 @@ export function ViajeOperacionTipoFieldset({
   groupName = "viaje-operacion-tipo",
   className,
 }: Props) {
-  console.log(modo);
   return (
     <fieldset
       className={

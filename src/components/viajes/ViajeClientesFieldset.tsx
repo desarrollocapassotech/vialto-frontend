@@ -83,17 +83,24 @@ interface Props {
   paisesLoading: boolean;
   onNuevoPaisOrigen: (clienteIndex: number) => void;
   onNuevoPaisDestino: (clienteIndex: number, destinoIndex: number) => void;
+  /** Si se pasa, agrega "+ Nuevo cliente" al selector de cada fila. */
+  onNuevoCliente?: (clienteIndex: number) => void;
   opcionesProducto: OpcionProducto[];
   getToken?: () => Promise<string | null>;
   onProductoCreado?: (p: Producto) => void;
+  /** Filas con índice menor a este valor no muestran botón "Quitar" (mínimo de filas del viaje). Default 0. */
+  minRows?: number;
+  /** Prefijo del título cuando no hay nombre de cliente cargado (ej. "Cliente" vs "Cliente adicional"). */
+  labelPrefix?: string;
+  /** Si se muestra la sección de Carga (productos) por fila. Default true. */
+  mostrarProductos?: boolean;
 }
 
 /**
- * Clientes adicionales del viaje (multi-cliente, opcional): mismos campos que el
- * cliente principal (origen con ciudad de catálogo, destinos múltiples, productos)
- * más su propio cobro (cantidad×precioUnitario o monto, según `desgloseActivo` —
- * el mismo criterio de tenant que usa el resto del viaje, sin selector manual de
- * "forma de cobro"). Se muestra junto a la tarjeta del cliente principal.
+ * Lista de clientes del viaje: cada fila tiene los mismos campos (cliente, origen con
+ * ciudad de catálogo, destinos múltiples, productos, cobro por cantidad×precioUnitario
+ * o monto según `desgloseActivo`), sin distinción entre "cliente principal" y
+ * "adicionales" — todas las filas se validan y muestran igual.
  */
 export function ViajeClientesFieldset({
   rows,
@@ -106,9 +113,13 @@ export function ViajeClientesFieldset({
   paisesLoading,
   onNuevoPaisOrigen,
   onNuevoPaisDestino,
+  onNuevoCliente,
   opcionesProducto,
   getToken,
   onProductoCreado,
+  minRows = 0,
+  labelPrefix = 'Cliente adicional',
+  mostrarProductos = true,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
@@ -135,21 +146,24 @@ export function ViajeClientesFieldset({
         return (
           <ClienteCard
             key={i}
-            title={nombre || `Cliente adicional ${i + 1}`}
+            title={nombre || `${labelPrefix} ${i + 1}`}
             summary={summary}
-            removable={!bloqueado}
+            removable={!bloqueado && i >= minRows}
             onRemove={() => setRemoveIndex(i)}
           >
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Cliente</span>
+                <span className={fieldLabelClass}>
+                  Cliente {i < minRows && <span className="text-red-500">*</span>}
+                </span>
                 <ClienteSearchSelect
                   clientes={clientes}
                   value={row.clienteId}
                   onChange={(id) => update(i, { clienteId: id })}
                   inputClassName={inputClass}
                   disabled={bloqueado}
-                  aria-label={`Cliente adicional ${i + 1}`}
+                  aria-label={`${labelPrefix} ${i + 1}`}
+                  onNuevo={onNuevoCliente ? () => onNuevoCliente(i) : undefined}
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -190,20 +204,22 @@ export function ViajeClientesFieldset({
                   onNuevoPais={(destinoIndex) => onNuevoPaisDestino(i, destinoIndex)}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Carga</span>
-                <ViajeProductosLista
-                  groupId={`viaje-cliente-${i}`}
-                  value={row.productoItems}
-                  onChange={(productoItems) => update(i, { productoItems })}
-                  opciones={opcionesProducto}
-                  triggerClassName={inputClass}
-                  inputClassName={inputClass}
-                  disabled={bloqueado}
-                  getToken={getToken}
-                  onProductoCreado={onProductoCreado}
-                />
-              </div>
+              {mostrarProductos && (
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Carga</span>
+                  <ViajeProductosLista
+                    groupId={`viaje-cliente-${i}`}
+                    value={row.productoItems}
+                    onChange={(productoItems) => update(i, { productoItems })}
+                    opciones={opcionesProducto}
+                    triggerClassName={inputClass}
+                    inputClassName={inputClass}
+                    disabled={bloqueado}
+                    getToken={getToken}
+                    onProductoCreado={onProductoCreado}
+                  />
+                </div>
+              )}
               {desgloseActivo ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="flex flex-col gap-1">
@@ -297,7 +313,7 @@ export function ViajeClientesFieldset({
       <ConfirmDialog
         open={removeIndex !== null}
         title="Quitar cliente"
-        message="¿Quitás este cliente adicional del viaje?"
+        message="¿Quitás este cliente del viaje?"
         confirmLabel="Quitar"
         tone="danger"
         onCancel={() => setRemoveIndex(null)}

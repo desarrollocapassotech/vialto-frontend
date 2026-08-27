@@ -270,7 +270,7 @@ export function ConceptosLiquidacionConfigSection({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
-              <CrudFieldLabel>Monto base (Opcional)</CrudFieldLabel>
+              <CrudFieldLabel>Monto base</CrudFieldLabel>
               <input
                 type="number"
                 min={0}
