@@ -20,6 +20,40 @@ export interface OtroGasto {
   createdByLabel?: string | null;
 }
 
+/** Cliente adicional de un viaje multi-cliente: origen/destino(s)/productos y cobro propios. */
+export interface ViajeCliente {
+  id: string;
+  orden: number;
+  clienteId: string;
+  cliente?: { id: string; nombre: string; condicionIva?: number | null };
+  origen: string | null;
+  /** Denormalizado: último destino de la ruta de este cliente (legacy/compat). */
+  destino: string | null;
+  /** Destinos ordenados de este cliente (orden = secuencia de la ruta). */
+  destinosCliente?: Array<{
+    id: string;
+    orden: number;
+    etiqueta: string;
+    createdAt?: string;
+  }>;
+  /** Productos que le corresponden a este cliente (orden operativo). */
+  productosCliente?: Array<{
+    id: string;
+    productoId: string;
+    orden: number;
+    cantidad: number | null;
+    pesoKg: number | null;
+    producto: { id: string; nombre: string; activo: boolean };
+  }>;
+  /** Igual que Viaje.cantidadFactura/precioUnitarioFactura: si ambos vienen, `monto` = cantidad × precioUnitario. */
+  monto: number | null;
+  monedaMonto: string;
+  cantidad: number | null;
+  precioUnitario: number | null;
+  facturaId?: string | null;
+  facturacionEstado: string;
+}
+
 export interface Viaje {
   id: string;
   tenantId: string;
@@ -68,6 +102,8 @@ export interface Viaje {
     etiqueta: string;
     createdAt?: string;
   }>;
+  /** Clientes adicionales del viaje (multi-cliente, opcional) — conviven con `clienteId`, no lo reemplazan. */
+  clientesViaje?: ViajeCliente[];
   fechaCarga: string | null;
   fechaDescarga: string | null;
   /** Productos vinculados al viaje (orden operativo). */

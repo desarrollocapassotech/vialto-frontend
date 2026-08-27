@@ -31,7 +31,7 @@ import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   mergeMaestroPorId,
-  nombreClienteListadoViaje,
+  clientesRutaListadoViaje,
   nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
@@ -2108,7 +2108,8 @@ export function ViajesTenantPage({
           </tr>
         }
         renderTableRow={(v) => {
-          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const clientesRuta = clientesRutaListadoViaje(v, clientes);
+          const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
             v,
             transportistas,
@@ -2149,10 +2150,15 @@ export function ViajesTenantPage({
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
                 <span
                   className="block truncate font-medium"
-                  title={nombreCliente}
+                  title={clientesRuta.map((c) => c.nombre).join(", ")}
                 >
                   {nombreCliente}
                 </span>
+                {clientesRuta.length > 1 && (
+                  <span className="block text-[11px] text-vialto-fire">
+                    +{clientesRuta.length - 1} más
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
                 <span className="block truncate" title={nombreTransp}>
@@ -2239,6 +2245,11 @@ export function ViajesTenantPage({
                   destino={v.destino}
                   destinosViaje={v.destinosViaje}
                 />
+                {clientesRuta.length > 1 && (
+                  <span className="mt-0.5 block text-[11px] text-vialto-fire">
+                    +{clientesRuta.length - 1} más
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                 <div className="flex min-w-0 flex-col gap-0.5">
@@ -2310,7 +2321,8 @@ export function ViajesTenantPage({
           );
         }}
         renderMobileCard={(v) => {
-          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const clientesRuta = clientesRutaListadoViaje(v, clientes);
+          const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
             v,
             transportistas,
@@ -2413,11 +2425,18 @@ export function ViajesTenantPage({
                       aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
                     />
                   ) : null}
-                  <span
-                    className="min-w-0 truncate font-medium"
-                    title={nombreCliente}
-                  >
-                    {nombreCliente}
+                  <span className="min-w-0">
+                    <span
+                      className="block truncate font-medium"
+                      title={clientesRuta.map((c) => c.nombre).join(", ")}
+                    >
+                      {nombreCliente}
+                    </span>
+                    {clientesRuta.length > 1 && (
+                      <span className="block text-[11px] text-vialto-fire">
+                        +{clientesRuta.length - 1} más
+                      </span>
+                    )}
                   </span>
                 </div>
               }
@@ -2433,11 +2452,18 @@ export function ViajesTenantPage({
                 {
                   label: "Origen — Destino",
                   value: (
-                    <ViajeOrigenDestinoLinea
-                      origen={v.origen}
-                      destino={v.destino}
-                      destinosViaje={v.destinosViaje}
-                    />
+                    <>
+                      <ViajeOrigenDestinoLinea
+                        origen={v.origen}
+                        destino={v.destino}
+                        destinosViaje={v.destinosViaje}
+                      />
+                      {clientesRuta.length > 1 && (
+                        <span className="mt-0.5 block text-[11px] text-vialto-fire">
+                          +{clientesRuta.length - 1} más
+                        </span>
+                      )}
+                    </>
                   ),
                 },
                 {
@@ -2590,6 +2616,8 @@ export function ViajesTenantPage({
             fechaDescargaError={viajeEditor.fechaDescargaError}
             destinosError={viajeEditor.destinosError}
             onClearDestinosError={viajeEditor.onClearDestinosError}
+            clientesRowErrors={viajeEditor.clientesRowErrors}
+            onClearClientesRowErrors={viajeEditor.onClearClientesRowErrors}
             transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
             onClearTransportistaEfectivoError={
               viajeEditor.onClearTransportistaEfectivoError

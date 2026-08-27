@@ -49,9 +49,6 @@ export function ViajeProductosLista({
 
   return (
     <div className="flex flex-col gap-2">
-      {value.length === 0 ? (
-        <p className="text-xs text-vialto-steel">Sin productos indicados (opcional).</p>
-      ) : null}
       {value.map((item, i) => (
         <div key={`${groupId}-prod-${i}`} className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1 basis-[14rem]">

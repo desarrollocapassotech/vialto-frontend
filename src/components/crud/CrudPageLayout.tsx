@@ -4,15 +4,18 @@ interface CrudPageLayoutProps {
   title: string;
   error?: string | null;
   children: ReactNode;
+  /** Clases del contenedor raíz. Default: ancho fijo sin centrar (comportamiento histórico). */
+  contentClassName?: string;
 }
 
 export function CrudPageLayout({
   title,
   error,
   children,
+  contentClassName = "max-w-4xl w-full min-w-0",
 }: CrudPageLayoutProps) {
   return (
-    <div className="max-w-4xl w-full min-w-0">
+    <div className={contentClassName}>
       <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-wide sm:text-4xl">
         {title}
       </h1>

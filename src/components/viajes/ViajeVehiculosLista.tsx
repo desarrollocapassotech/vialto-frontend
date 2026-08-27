@@ -51,7 +51,7 @@ export function ViajeVehiculosLista({
 }: Props) {
   const titulo =
     labelVehiculos ??
-    (alMenosUno ? 'Vehículos del viaje (al menos uno)' : 'Vehículos del viaje (opcional)');
+    (alMenosUno ? 'Vehículos del viaje (al menos uno)' : 'Vehículos del viaje');
   const [showNuevoVehiculo, setShowNuevoVehiculo] = useState(false);
   const [nuevoParaRowIndex, setNuevoParaRowIndex] = useState<number | null>(null);
   const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);

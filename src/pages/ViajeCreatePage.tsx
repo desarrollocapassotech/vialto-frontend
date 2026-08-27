@@ -1,46 +1,31 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useToast } from "@/lib/toast"; // <-- IMPORTACIÓN DEL TOAST
-import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { useToast } from "@/lib/toast";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
-import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
-import {
-  ChoferSearchSelect,
-  ClienteSearchSelect,
-  TransportistaSearchSelect,
-} from "@/components/forms/MaestroSearchSelects";
-import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
-import { MonedaSelect } from "@/components/forms/MonedaSelect";
-import { PaisSearchSelect } from "@/components/forms/PaisSearchSelect";
+import { Stepper } from "@/components/ui/Stepper";
+import { useWizardStep } from "@/hooks/useWizardStep";
 import { PaisModal } from "@/components/viajes/PaisModal";
 import type { Pais } from "@/types/api";
-import {
-  ViajeOperacionTipoFieldset,
-  type ViajeOperacionModo,
-} from "@/components/viajes/ViajeOperacionTipoFieldset";
-import { ViajeFechaHoraFields } from "@/components/viajes/ViajeFechaHoraFields";
+import { type ViajeOperacionModo } from "@/components/viajes/ViajeOperacionTipoFieldset";
 import { ViajeKmLitrosDialog } from "@/components/viajes/ViajeKmLitrosDialog";
-import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
-import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
-import {
-  ViajeGananciaBrutaManualFieldset,
-  gananciaBrutaManualPayloadFromDraft,
-} from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
+import { type GananciaBrutaManualDraftSlice } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
 import { draftRequiereGananciaBrutaManual } from "@/lib/viajesGananciaBruta";
 import {
-  OtrosGastosFieldset,
-  emptyOtroGasto,
   otroGastoAutorFromClerk,
   otroGastoDraftToApi,
   type OtroGastoDraft,
 } from "@/components/viajes/OtrosGastosFieldset";
 import {
-  PagosTransportistaFieldset,
-  emptyPagoTransportista,
   pagosTransportistaDraftsToApi,
   type PagoTransportistaDraft,
 } from "@/components/viajes/PagosTransportistaFieldset";
+import {
+  emptyClienteRow,
+  clientesPayloadParaApi,
+  validarClientesRows,
+  type ViajeClienteDraft,
+} from "@/lib/viajesClientes";
 import { apiJson, ApiError } from "@/lib/api";
 import {
   parseCurrencyForMoneda,
@@ -61,10 +46,7 @@ import {
   mensajeErrorTransportistaEfectivoExterno,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
-import {
-  ViajeVehiculosLista,
-  type ViajeVehiculoRowDraft,
-} from "@/components/viajes/ViajeVehiculosLista";
+import { type ViajeVehiculoRowDraft } from "@/components/viajes/ViajeVehiculosLista";
 import { vehiculosPorTipo } from "@/lib/vehiculoTipos";
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
@@ -72,13 +54,9 @@ import { ChoferModal } from "@/components/viajes/ChoferModal";
 import { esEtiquetaCiudadValida, type PaisCodigo } from "@/lib/ciudades";
 import {
   destinosPayloadParaApi,
-  emptyDestinoRow,
   validarDestinosRows,
-  type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import {
-  etapaViajeLabel,
-  tooltipEtapaViaje,
   etapaMuestraKmLitros,
   draftKmLitrosVacios,
   parseKmLitrosOpcionales,
@@ -99,19 +77,22 @@ import type {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
-import {
-  type OpcionProducto,
-  type ViajeProductoItem,
-} from "@/lib/productosViaje";
+import { type OpcionProducto } from "@/lib/productosViaje";
+import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
+import { ViajeCreateStep1ClientesYCarga } from "@/components/viajes/steps/ViajeCreateStep1ClientesYCarga";
+import { ViajeCreateStep2Operacion } from "@/components/viajes/steps/ViajeCreateStep2Operacion";
+import { ViajeCreateStep3Cierre } from "@/components/viajes/steps/ViajeCreateStep3Cierre";
 
-const ESTADOS = VIAJE_ETAPAS_ALTA;
+/** A qué cliente del viaje aplicar el país recién creado desde "+ Nuevo país". */
+type PaisQuickCreateTarget =
+  | { kind: "origen-cliente"; clienteIndex: number }
+  | { kind: "destino-cliente"; clienteIndex: number; destinoIndex: number };
 
-const fieldLabelClass =
-  "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
-
-const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
-const textareaLongClass =
-  "min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm";
+const VIAJE_CREATE_STEPS = [
+  { label: "Clientes y destinos" },
+  { label: "Operación" },
+  { label: "Cierre" },
+];
 
 export function ViajeCreatePage() {
   // ─── HOOKS GLOBALES E INICIALIZACIÓN ─────────────────────────────────────
@@ -128,7 +109,10 @@ export function ViajeCreatePage() {
     "alta_viaje",
     "precioTransportistaIvaIncluidoPct",
   );
-  const { showToast } = useToast(); // <-- Inicialización del hook para notificaciones
+  const { showToast } = useToast();
+
+  // ─── WIZARD ───────────────────────────────────────────────────────────────
+  const { step, setStep, goNext } = useWizardStep(3);
 
   // ─── ESTADOS DEL FORMULARIO ──────────────────────────────────────────────
   const [localClientes, setLocalClientes] = useState<Cliente[]>([]);
@@ -138,8 +122,8 @@ export function ViajeCreatePage() {
   >([]);
   const [localVehiculos, setLocalVehiculos] = useState<Vehiculo[]>([]);
 
-  const [estado, setEstado] = useState<(typeof ESTADOS)[number]>("pendiente");
-  const [clienteId, setClienteId] = useState("");
+  // Los viajes se crean siempre en estado "pendiente" (sin selector en el alta); el cambio de etapa se hace desde edición.
+  const estado: (typeof VIAJE_ETAPAS_ALTA)[number] = "pendiente";
   const [choferId, setChoferId] = useState("");
   const [transportistaId, setTransportistaId] = useState("");
   const [realizaFlete, setRealizaFlete] = useState(true);
@@ -158,12 +142,6 @@ export function ViajeCreatePage() {
   >([]);
   const [choferExternoId, setChoferExternoId] = useState("");
 
-  const [paisOrigen, setPaisOrigen] = useState<PaisCodigo>("AR");
-  const [origen, setOrigen] = useState("");
-  const [destinosRows, setDestinosRows] = useState<ViajeDestinoRowDraft[]>([
-    emptyDestinoRow(),
-  ]);
-
   const [fechaCarga, setFechaCarga] = useState("");
   const [horaCarga, setHoraCarga] = useState("");
   const [fechaDescarga, setFechaDescarga] = useState("");
@@ -174,7 +152,6 @@ export function ViajeCreatePage() {
   );
 
   const [productosCatalogo, setProductosCatalogo] = useState<Producto[]>([]);
-  const [productoItems, setProductoItems] = useState<ViajeProductoItem[]>([]);
 
   const [detalleCarga, setDetalleCarga] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -182,11 +159,6 @@ export function ViajeCreatePage() {
     useState("");
   const [kmRecorridos, setKmRecorridos] = useState("");
   const [litrosConsumidos, setLitrosConsumidos] = useState("");
-
-  const [monto, setMonto] = useState("");
-  const [monedaMonto, setMonedaMonto] = useState<ViajeMonedaCodigo>("ARS");
-  const [cantidadFactura, setCantidadFactura] = useState("");
-  const [precioUnitarioFactura, setPrecioUnitarioFactura] = useState("");
 
   const [precioTransportistaExterno, setPrecioTransportistaExterno] =
     useState("");
@@ -205,6 +177,14 @@ export function ViajeCreatePage() {
     PagoTransportistaDraft[]
   >([]);
 
+  /** Todos los clientes del viaje: la fila 0 no es removible (equivalente al ex "cliente principal"). */
+  const [clientesRows, setClientesRows] = useState<ViajeClienteDraft[]>([
+    emptyClienteRow(),
+  ]);
+  const [clientesRowErrors, setClientesRowErrors] = useState<
+    Record<number, string>
+  >({});
+
   // ─── ESTADOS PARA CREACIÓN RÁPIDA (MODALES) ─────────────────────────────
   type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop" | "pais";
   const [quickCreate, setQuickCreate] = useState<QuickCreate | null>(null);
@@ -218,13 +198,14 @@ export function ViajeCreatePage() {
   const [localChoferesRapidos, setLocalChoferesRapidos] = useState<Chofer[]>(
     [],
   );
+  /** A qué fila de `clientesRows` aplicar el cliente recién creado desde "+ Nuevo cliente". */
+  const [clienteQuickCreateTarget, setClienteQuickCreateTarget] = useState(0);
 
   const [paises, setPaises] = useState<Pais[]>([]);
   const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
   const [paisesLoading, setPaisesLoading] = useState(true);
-  /** Índice del destino que disparó "+ Nuevo país" (null = fue el origen). */
-  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
-    useState<number | null>(null);
+  const [paisQuickCreateTarget, setPaisQuickCreateTarget] =
+    useState<PaisQuickCreateTarget>({ kind: "origen-cliente", clienteIndex: 0 });
 
   const paisesConSesion = useMemo(() => {
     const ids = new Set(paises.map((p) => p.id));
@@ -276,7 +257,6 @@ export function ViajeCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
 
-  // Referencias para mantener los IDs de choferes sincronizados
   const choferIdRef = useRef("");
   const choferExternoIdRef = useRef("");
 
@@ -300,7 +280,6 @@ export function ViajeCreatePage() {
 
   // ─── EFECTOS DE CARGA INICIAL ────────────────────────────────────────────
   useEffect(() => {
-    // Si operamos bajo un tenantId (modo superadmin), traemos la data del tenant
     if (!tenantId) return;
     let cancelled = false;
     (async () => {
@@ -341,7 +320,6 @@ export function ViajeCreatePage() {
     };
   }, [getToken, tenantId]);
 
-  // Carga inicial de países
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -363,7 +341,6 @@ export function ViajeCreatePage() {
     };
   }, [getToken, isLoaded, isSignedIn, tenantId]);
 
-  // Carga del catálogo de productos de stock activos
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
@@ -481,7 +458,6 @@ export function ViajeCreatePage() {
     [choferes, vehiculos],
   );
 
-  // Limpieza de inputs si se cambia entre flota propia y externa
   useEffect(() => {
     if (modoOperacion !== "propio") return;
     setChoferId((prev) => {
@@ -518,33 +494,51 @@ export function ViajeCreatePage() {
     }
   }
 
-  // ─── LÓGICA DE GUARDADO (SUBMIT) ──────────────────────────────────────────
-  async function onSubmit(opts?: {
-    kmLitrosFromModal?: boolean;
-    km?: number;
-    litros?: number;
-  }) {
-    if (submitBusyRef.current) return;
-    const externo = modoOperacion === "externo";
-    const choferPropioId = choferIdRef.current.trim();
-    const choferExternoSeleccionado = choferExternoIdRef.current.trim();
+  function buildGananciaDraft(): GananciaBrutaManualDraftSlice {
+    return {
+      operacionModo: modoOperacion,
+      monto: clientesRows[0]?.montoStr ?? "",
+      monedaMonto: clientesRows[0]?.moneda ?? "ARS",
+      precioTransportistaExterno,
+      monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+      gananciaBrutaManual,
+      monedaGananciaBrutaManual,
+      otrosGastos,
+    };
+  }
 
-    // 1. Validaciones básicas del formulario
-    const errs: Record<string, string> = {};
-    if (!clienteId) errs.clienteId = "Seleccioná un cliente.";
-    if (externo && !transportistaId.trim())
-      errs.transportistaId = "Seleccioná un transportista externo.";
-    if (!origen.trim()) errs.origen = "Completá el origen.";
-    if (!destinosRows[0]?.etiqueta.trim())
-      errs.destinos = "Ingresá el destino 1.";
+  // ─── NAVEGACIÓN ENTRE PASOS ───────────────────────────────────────────────
+  async function handleContinuar1() {
+    const principal = clientesRows[0];
+    let clienteRowErr = "";
+    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
+    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
+    else if (!principal?.destinosRows[0]?.etiqueta.trim())
+      clienteRowErr = "Ingresá el destino 1.";
+    if (clienteRowErr) {
+      setError(clienteRowErr);
+      return;
+    }
 
-    setFieldErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-
-    setFieldErrors({});
+    const clientesValidacion = await validarClientesRows(clientesRows);
+    if (!clientesValidacion.ok) {
+      setClientesRowErrors(clientesValidacion.rowErrors);
+      setError(clientesValidacion.message);
+      return;
+    }
+    setClientesRowErrors({});
     setError(null);
+    goNext();
+  }
 
-    // 2. Validación de transportista efectivo (si no realiza el flete)
+  async function handleContinuar2() {
+    const externo = modoOperacion === "externo";
+    if (externo && !transportistaId.trim()) {
+      setError("Seleccioná un transportista externo.");
+      return;
+    }
+    setFieldErrors({});
+
     const teErr = mensajeErrorTransportistaEfectivoExterno({
       operacionModo: modoOperacion,
       transportistaId,
@@ -558,6 +552,135 @@ export function ViajeCreatePage() {
     }
     setTransportistaEfectivoError(null);
 
+    const vids = externo
+      ? vehiculoIdsDesdeRows(vehiculosExternosRows)
+      : vehiculoIdsDesdeRows(vehiculosRows);
+    if (!externo && vids.length === 0) {
+      setError(
+        "Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).",
+      );
+      return;
+    }
+    if (
+      !externo &&
+      !flotaPropiaVehiculosListaValida(
+        choferIdRef.current.trim(),
+        vids,
+        choferesPropios,
+        vehiculosPropios,
+      )
+    ) {
+      setError(
+        "En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).",
+      );
+      return;
+    }
+
+    const gananciaDraft = buildGananciaDraft();
+    if (draftRequiereGananciaBrutaManual(gananciaDraft)) {
+      if (
+        parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual) ==
+        null
+      ) {
+        setError(
+          "Ingresá la ganancia bruta manual: las monedas de facturación y del transportista son distintas.",
+        );
+        return;
+      }
+    }
+
+    const precioTransportistaNum = desgloseActivo
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
+    const pagoTransportistaError = externo
+      ? validarPagosTransportistaDraftForm({
+          transportistaId: transportistaId.trim(),
+          precioTransportistaExterno: String(precioTransportistaNum || 0),
+          monedaPrecioTransportistaExterno: monedaPrecioTransportista,
+          pagosTransportista,
+        })
+      : null;
+    if (pagoTransportistaError) {
+      setError(pagoTransportistaError);
+      return;
+    }
+
+    setError(null);
+    goNext();
+  }
+
+  // ─── LÓGICA DE GUARDADO (SUBMIT) ──────────────────────────────────────────
+  async function onSubmit(opts?: {
+    kmLitrosFromModal?: boolean;
+    km?: number;
+    litros?: number;
+  }) {
+    if (submitBusyRef.current) return;
+    submitBusyRef.current = true;
+    setLoading(true);
+    try {
+      await onSubmitInner(opts);
+    } finally {
+      submitBusyRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  async function onSubmitInner(opts?: {
+    kmLitrosFromModal?: boolean;
+    km?: number;
+    litros?: number;
+  }) {
+    const externo = modoOperacion === "externo";
+    const choferPropioId = choferIdRef.current.trim();
+    const choferExternoSeleccionado = choferExternoIdRef.current.trim();
+    const principal = clientesRows[0];
+
+    // 1. Validaciones básicas del formulario
+    let clienteRowErr = "";
+    if (!principal?.clienteId.trim()) clienteRowErr = "Seleccioná un cliente.";
+    else if (!principal?.origen.trim()) clienteRowErr = "Completá el origen.";
+    else if (!principal?.destinosRows[0]?.etiqueta.trim())
+      clienteRowErr = "Ingresá el destino 1.";
+    if (clienteRowErr) {
+      setError(clienteRowErr);
+      setStep(1);
+      return;
+    }
+    if (externo && !transportistaId.trim()) {
+      setError("Seleccioná un transportista externo.");
+      setStep(2);
+      return;
+    }
+    setFieldErrors({});
+
+    const clientesValidacion = await validarClientesRows(clientesRows);
+    if (!clientesValidacion.ok) {
+      setClientesRowErrors(clientesValidacion.rowErrors);
+      setError(clientesValidacion.message);
+      setStep(1);
+      return;
+    }
+    setClientesRowErrors({});
+    setFieldErrors({});
+    setError(null);
+
+    // 2. Validación de transportista efectivo (si no realiza el flete)
+    const teErr = mensajeErrorTransportistaEfectivoExterno({
+      operacionModo: modoOperacion,
+      transportistaId,
+      realizaFlete,
+      transportistaEfectivoId,
+    });
+    if (teErr) {
+      setTransportistaEfectivoError(teErr);
+      setError(teErr);
+      setStep(2);
+      return;
+    }
+    setTransportistaEfectivoError(null);
+
     // 3. Validación de vehículos seleccionados
     const vids = externo
       ? vehiculoIdsDesdeRows(vehiculosExternosRows)
@@ -566,6 +689,7 @@ export function ViajeCreatePage() {
       setError(
         "Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).",
       );
+      setStep(2);
       return;
     }
     if (
@@ -580,22 +704,21 @@ export function ViajeCreatePage() {
       setError(
         "En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).",
       );
+      setStep(2);
       return;
     }
 
     // 4. Validación de la ubicación de origen y destinos
-    const okOrigen = await esEtiquetaCiudadValida(paisOrigen, origen);
+    const okOrigen = await esEtiquetaCiudadValida(principal.paisOrigen, principal.origen);
     if (!okOrigen) {
-      setFieldErrors({
-        origen:
-          "El origen debe elegirse de la lista de ciudades (no se admite texto libre).",
-      });
+      setError("El origen debe elegirse de la lista de ciudades (no se admite texto libre).");
+      setStep(1);
       return;
     }
-    setFieldErrors({});
-    const destinosVal = await validarDestinosRows(destinosRows);
+    const destinosVal = await validarDestinosRows(principal.destinosRows);
     if (!destinosVal.ok) {
-      setFieldErrors({ destinos: destinosVal.message });
+      setError(destinosVal.message);
+      setStep(1);
       return;
     }
 
@@ -606,43 +729,50 @@ export function ViajeCreatePage() {
       : null;
     setFechaCargaError(fcError);
     setFechaDescargaError(fdError);
-    if (fcError || fdError) return;
+    if (fcError || fdError) {
+      setStep(3);
+      return;
+    }
     if (fechaDescarga < fechaCarga) {
       setFechaDescargaError(
         "La fecha de descarga no puede ser anterior a la de carga.",
       );
+      setStep(3);
       return;
     }
 
     // 6. Validación de Montos y Pagos
     const montoNum = desgloseActivo
-      ? (Number(cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
-      : parseCurrencyForMoneda(monto, monedaMonto);
+      ? (Number(principal.cantidadStr.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) || 0)
+      : parseCurrencyForMoneda(principal.montoStr, principal.moneda);
     if (montoNum == null || montoNum < 0.01) {
-      setError("Ingresá un monto a facturar mayor a 0.");
+      setError("Cargá el monto de este cliente.");
+      setStep(1);
       return;
     }
-    const gananciaDraft = {
-      operacionModo: modoOperacion,
-      monto,
-      monedaMonto,
-      precioTransportistaExterno,
-      monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-      gananciaBrutaManual,
-      monedaGananciaBrutaManual,
-      otrosGastos,
-    };
+    const gananciaDraft = buildGananciaDraft();
+    let gananciaBrutaManualPayload: {
+      gananciaBrutaManual: number | null;
+      monedaGananciaBrutaManual: string | null;
+    } = { gananciaBrutaManual: null, monedaGananciaBrutaManual: null };
     if (draftRequiereGananciaBrutaManual(gananciaDraft)) {
-      const manualPayload = gananciaBrutaManualPayloadFromDraft(gananciaDraft);
-      if (manualPayload.gananciaBrutaManual == null) {
+      const manual = parseCurrencyForMoneda(gananciaBrutaManual, monedaGananciaBrutaManual);
+      if (manual == null) {
         setError(
           "Ingresá la ganancia bruta manual: las monedas de facturación y del transportista son distintas.",
         );
+        setStep(2);
         return;
       }
+      gananciaBrutaManualPayload = {
+        gananciaBrutaManual: manual,
+        monedaGananciaBrutaManual,
+      };
     }
     const precioTransportistaNum = desgloseActivo
-      ? (Number(cantidadTransportista.replace(",", ".")) || 0) * (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
+      ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+        (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
       : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
     const pagosTransportistaApi =
       pagosTransportistaDraftsToApi(pagosTransportista);
@@ -656,6 +786,7 @@ export function ViajeCreatePage() {
       : null;
     if (pagoTransportistaError) {
       setError(pagoTransportistaError);
+      setStep(2);
       return;
     }
 
@@ -683,8 +814,6 @@ export function ViajeCreatePage() {
         : undefined;
 
     // 8. EJECUCIÓN DE LA API (POST)
-    submitBusyRef.current = true;
-    setLoading(true);
     setError(null);
     try {
       const path = tenantId
@@ -694,7 +823,7 @@ export function ViajeCreatePage() {
         method: "POST",
         body: JSON.stringify({
           etapa: estado,
-          clienteId,
+          clienteId: principal.clienteId.trim(),
           ...(externo
             ? {
                 transportistaId: transportistaId.trim(),
@@ -711,11 +840,11 @@ export function ViajeCreatePage() {
                 choferId: choferPropioId,
                 vehiculoIds: vids,
               }),
-          origen: origen.trim(),
+          origen: principal.origen.trim(),
           ...destinosPayloadParaApi(destinosVal.destinos),
           fechaCarga: fechaHoraToIso(fechaCarga, horaCarga),
           fechaDescarga: fechaHoraToIso(fechaDescarga, horaDescarga),
-          productoItems: productoItems.filter((x) => x.productoId.trim()),
+          productoItems: principal.productoItems.filter((x) => x.productoId.trim()),
           detalleCarga: detalleCarga.trim() || undefined,
           observaciones: observaciones.trim() || undefined,
           numeroIdentificacionPersonalizado:
@@ -727,27 +856,26 @@ export function ViajeCreatePage() {
               ? litNum
               : undefined,
           monto: desgloseActivo ? undefined : montoNum,
-          monedaMonto,
+          monedaMonto: principal.moneda,
           precioTransportistaExterno: desgloseActivo ? undefined : precioTransportistaNum,
           monedaPrecioTransportistaExterno: monedaPrecioTransportista,
           precioTransportistaIvaIncluidoPct:
             externo && precioTransportistaIvaIncluidoPct.trim()
               ? Number(precioTransportistaIvaIncluidoPct.replace(",", "."))
               : undefined,
-          cantidadFactura: desgloseActivo && cantidadFactura.trim() ? Number(cantidadFactura.replace(",", ".")) : undefined,
-          precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) : undefined,
+          cantidadFactura: desgloseActivo && principal.cantidadStr.trim() ? Number(principal.cantidadStr.replace(",", ".")) : undefined,
+          precioUnitarioFactura: desgloseActivo ? parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) : undefined,
           cantidadTransportista: desgloseActivo && externo && cantidadTransportista.trim() ? Number(cantidadTransportista.replace(",", ".")) : undefined,
           precioUnitarioTransportista: desgloseActivo && externo ? parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) : undefined,
-          ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
+          ...gananciaBrutaManualPayload,
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: externo ? pagosTransportistaApi : [],
+          clientes: clientesPayloadParaApi(clientesRows.slice(1)),
         }),
       });
 
-      // --> TOAST INYECTADO: ÉXITO AL CREAR <--
       showToast("Viaje creado exitosamente", "success");
 
-      // Redirección al listado principal con persistencia de sesiones locales
       navigate(
         `/viajes${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ""}`,
         {
@@ -769,21 +897,27 @@ export function ViajeCreatePage() {
     } catch (e) {
       setError(friendlyError(e, "viajes"));
 
-      // Si el backend devolvió errores por campo (ValidationPipe), los nombres
-      // coinciden 1 a 1 con los estados de los montos de este formulario
-      // (monto, cantidadFactura, precioUnitarioFactura, precioTransportistaExterno,
-      // cantidadTransportista, precioUnitarioTransportista, gananciaBrutaManual):
-      // se resalta el input puntual en vez de dejar solo el mensaje genérico.
       if (e instanceof ApiError && e.status === 400) {
         const body = e.body as { fieldErrors?: Record<string, string> } | undefined;
-        if (body?.fieldErrors) setFieldErrors(body.fieldErrors);
+        if (body?.fieldErrors) {
+          const { monto, cantidadFactura, precioUnitarioFactura, ...resto } =
+            body.fieldErrors;
+          const principalMsg = monto || cantidadFactura || precioUnitarioFactura;
+          if (principalMsg) {
+            setError(principalMsg);
+            setStep(1);
+          } else if (
+            ["precioTransportistaExterno", "cantidadTransportista", "precioUnitarioTransportista", "gananciaBrutaManual"].some(
+              (k) => k in resto,
+            )
+          ) {
+            setStep(2);
+          }
+          setFieldErrors(resto);
+        }
       }
 
-      // --> TOAST INYECTADO: ERROR AL CREAR <--
       showToast("No se pudo crear el viaje", "error");
-    } finally {
-      submitBusyRef.current = false;
-      setLoading(false);
     }
   }
 
@@ -800,10 +934,8 @@ export function ViajeCreatePage() {
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
-  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
-  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
-  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
-  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
+  // Desglose transportista: pago bruto (cantidad × precio unitario), pago neto (bruto
+  // "engrosado" sumándole el % de IVA) y el monto de IVA.
   const desglosePagoBruto =
     (Number(cantidadTransportista.replace(",", ".")) || 0) *
     (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
@@ -812,722 +944,233 @@ export function ViajeCreatePage() {
   const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
   const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
 
-  // ─── RENDERIZADO DEL FORMULARIO ──────────────────────────────────────────
+  function handleMonedaPrecioTransportistaChange(m: ViajeMonedaCodigo) {
+    if (!desgloseActivo) {
+      setPrecioTransportistaExterno((prev) =>
+        preserveAmountOnMonedaChange(prev, monedaPrecioTransportista, m),
+      );
+    }
+    setMonedaPrecioTransportista(m);
+  }
+
+  function handleRealizaFleteChange(v: boolean) {
+    setTransportistaEfectivoError(null);
+    setRealizaFlete(v);
+    if (v) setTransportistaEfectivoId("");
+  }
+
+  const opcionesProducto = productosCatalogo.map<OpcionProducto>((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    activo: p.activo,
+  }));
+
+  const mostrarGananciaBrutaManual = isVisible("alta_viaje", "gananciaBrutaManual");
+  const mostrarPagosTransportista =
+    modoOperacion === "externo" && isVisible("alta_viaje", "pagosTransportista");
+
+  // ─── RENDERIZADO ──────────────────────────────────────────────────────────
   return (
     <>
-      <CrudPageLayout
-        title="Crear viaje"
-      >
+      <CrudPageLayout title="Crear viaje" contentClassName="w-full min-w-0">
         {loadingRefs ? (
           <p className="mt-6 text-vialto-steel">Cargando referencias…</p>
         ) : (
           <form
             autoComplete="off"
-            className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+            className="mt-6 max-w-2xl mx-auto space-y-6"
             onSubmit={(e) => {
               e.preventDefault();
               onSubmit();
             }}
           >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
-                  {labelIdentificacionPersonalizadaViajes(maestro.tenant)}{" "}
-                  <span className="normal-case tracking-normal">(opcional)</span>
-                </span>
-                <input
-                  type="text"
-                  value={numeroIdentificacionPersonalizado}
-                  onChange={(e) => setNumeroIdentificacionPersonalizado(e.target.value)}
-                  placeholder="Ej: número de CTG"
-                  className={inputClass}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Estado</span>
-                <select
-                  value={estado}
-                  onChange={(e) =>
-                    setEstado(e.target.value as (typeof ESTADOS)[number])
-                  }
-                  className={inputClass}
-                >
-                  {ESTADOS.map((x) => (
-                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                      {etapaViajeLabel[x] ?? x}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex justify-center">
+              <Stepper steps={VIAJE_CREATE_STEPS} currentStep={step} />
             </div>
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Origen</span>
-              <div className="flex flex-wrap gap-2 items-start">
-                <PaisSearchSelect
-                  paises={paisesConSesion}
-                  loading={paisesLoading}
-                  value={paisOrigen}
-                  onChange={(p) => {
-                    setPaisOrigen(p as PaisCodigo);
-                    setOrigen("");
-                    setFieldErrors((prev) => ({ ...prev, origen: "" }));
-                  }}
-                  aria-label="País de origen"
-                  className="w-full sm:w-40"
-                  inputClassName={inputClass}
-                  onNuevo={() => {
-                    setPaisQuickCreateDestinoIndex(null);
-                    setQuickCreate("pais");
-                  }}
-                />
-                <div className="min-w-[200px] flex-1">
-                  <CiudadCombobox
-                    pais={paisOrigen}
-                    paisNombre={paisesConSesion.find((p) => (p.codigo || p.id) === paisOrigen)?.nombre}
-                    value={origen}
-                    onChange={(next) => {
-                      setOrigen(next);
-                      if (next.trim())
-                        setFieldErrors((prev) => ({ ...prev, origen: "" }));
-                    }}
-                    inputClassName={inputClass}
-                    disableBrowserAutocomplete
-                  />
-                </div>
+
+            {step > 1 && (
+              <div className="mb-6">
+                <ViajeCreateResumenClientes clientesRows={clientesRows} clientes={clientes} />
               </div>
-              <CrudFieldError message={fieldErrors.origen} />
-            </div>
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <ViajeDestinosLista
-                groupId="viaje-create"
-                rows={destinosRows}
-                onChange={(rows) => {
-                  setDestinosRows(rows);
-                  if (rows[0]?.etiqueta.trim()) {
-                    setFieldErrors((prev) => ({ ...prev, destinos: "" }));
-                  }
+            )}
+
+            <div className="bg-white rounded-lg border border-black/10 p-6">
+            {step === 1 && (
+              <ViajeCreateStep1ClientesYCarga
+                clientesRows={clientesRows}
+                onClientesRowsChange={(rows) => {
+                  setClientesRows(rows);
+                  setClientesRowErrors({});
+                  setError(null);
                 }}
-                inputClassName={inputClass}
-                disableBrowserAutocomplete
+                clientesRowErrors={clientesRowErrors}
+                clientes={clientes}
+                desgloseActivo={desgloseActivo}
+                mostrarProductos={isVisible("alta_viaje", "productoItems")}
                 paises={paisesConSesion}
                 paisesLoading={paisesLoading}
-                onNuevoPais={(index) => {
-                  setPaisQuickCreateDestinoIndex(index);
+                onNuevoPaisOrigen={(clienteIndex) => {
+                  setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex });
                   setQuickCreate("pais");
                 }}
-              />
-              <CrudFieldError message={fieldErrors.destinos} />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>
-                  Cliente <span className="text-red-500">*</span>
-                </span>
-                <ClienteSearchSelect
-                  clientes={clientes}
-                  value={clienteId}
-                  onChange={(id) => {
-                    setClienteId(id);
-                    if (id) setFieldErrors((p) => ({ ...p, clienteId: "" }));
-                  }}
-                  inputClassName={inputClass}
-                  aria-label="Cliente"
-                  onNuevo={() => setQuickCreate("cliente")}
-                />
-                <CrudFieldError message={fieldErrors.clienteId} />
-              </div>
-              {desgloseActivo ? (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Cantidad</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={cantidadFactura}
-                      onChange={(e) => {
-                        setCantidadFactura(e.target.value);
-                        setFieldErrors((p) => ({ ...p, cantidadFactura: "" }));
-                      }}
-                      placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadFactura ? "border-red-400" : ""}`}
-                    />
-                    <CrudFieldError message={fieldErrors.cantidadFactura} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio unitario</span>
-                    <div className="flex min-w-0 gap-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={precioUnitarioFactura}
-                        onChange={(e) => {
-                          setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto));
-                          setFieldErrors((p) => ({ ...p, precioUnitarioFactura: "" }));
-                        }}
-                        placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioFactura ? "border-red-400" : ""}`}
-                      />
-                      <MonedaSelect
-                        value={monedaMonto}
-                        onChange={(m) => setMonedaMonto(m)}
-                        aria-label="Moneda precio unitario"
-                      />
-                    </div>
-                    <CrudFieldError message={fieldErrors.precioUnitarioFactura} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Total a facturar</span>
-                    <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                      <span className="w-full truncate">
-                        {(
-                          (Number(cantidadFactura.replace(",", ".")) || 0) * 
-                          (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
-                        ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className={fieldLabelClass}>Monto a facturar</span>
-                  <div className="flex min-w-0 gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={monto}
-                      onChange={(e) => {
-                        setMonto(
-                          maskCurrencyForMoneda(e.target.value, monedaMonto),
-                        );
-                        setFieldErrors((p) => ({ ...p, monto: "" }));
-                      }}
-                      placeholder="0.00"
-                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
-                    />
-                    <MonedaSelect
-                      value={monedaMonto}
-                      onChange={(m) => {
-                        setMonto((prev) =>
-                          preserveAmountOnMonedaChange(prev, monedaMonto, m),
-                        );
-                        setMonedaMonto(m);
-                      }}
-                      aria-label="Moneda monto a facturar"
-                    />
-                  </div>
-                  <CrudFieldError message={fieldErrors.monto} />
-                </div>
-              )}
-            </div>
-            <ViajeOperacionTipoFieldset
-              modo={modoOperacion}
-              onModoChange={applyModoOperacion}
-              externoContent={
-                <div className="grid gap-3">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>
-                      Transportista externo{" "}
-                      <span className="text-red-500">*</span>
-                    </span>
-                    <TransportistaSearchSelect
-                      transportistas={transportistas}
-                      value={transportistaId}
-                      onChange={(id) => {
-                        setTransportistaId(id);
-                        setRealizaFlete(true);
-                        setTransportistaEfectivoId("");
-                        setChoferExternoIdDraft("");
-                        if (id)
-                          setFieldErrors((p) => ({
-                            ...p,
-                            transportistaId: "",
-                          }));
-                      }}
-                      inputClassName={inputClass}
-                      aria-label="Transportista externo"
-                      onNuevo={() => setQuickCreate("transportista")}
-                    />
-                    <CrudFieldError message={fieldErrors.transportistaId} />
-                  </div>
-                  {desgloseActivo ? (
-                    <>
-                      <div
-                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-[0.6fr_1.4fr_1fr]" : "sm:grid-cols-[0.6fr_1.4fr]"}`}
-                      >
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Cantidad</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={cantidadTransportista}
-                            onChange={(e) => {
-                              setCantidadTransportista(e.target.value);
-                              setFieldErrors((p) => ({ ...p, cantidadTransportista: "" }));
-                            }}
-                            placeholder="0.00"
-                            className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadTransportista ? "border-red-400" : ""}`}
-                          />
-                          <CrudFieldError message={fieldErrors.cantidadTransportista} />
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>Precio unitario</span>
-                          <div className="flex min-w-0 gap-2">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              value={precioUnitarioTransportista}
-                              onChange={(e) => {
-                                setPrecioUnitarioTransportista(maskCurrencyForMoneda(e.target.value, monedaPrecioTransportista));
-                                setFieldErrors((p) => ({ ...p, precioUnitarioTransportista: "" }));
-                              }}
-                              placeholder="0.00"
-                              className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioTransportista ? "border-red-400" : ""}`}
-                            />
-                            <MonedaSelect
-                              value={monedaPrecioTransportista}
-                              onChange={(m) => setMonedaPrecioTransportista(m)}
-                              aria-label="Moneda precio unitario transportista"
-                            />
-                          </div>
-                          <CrudFieldError message={fieldErrors.precioUnitarioTransportista} />
-                        </div>
-                        {ivaTransportistaVisible && (
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={fieldLabelClass}>% de IVA</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              value={precioTransportistaIvaIncluidoPct}
-                              onChange={(e) =>
-                                setPrecioTransportistaIvaIncluidoPct(e.target.value)
-                              }
-                              placeholder="0"
-                              className={`${inputClass} text-right tabular-nums`}
-                            />
-                            <p className="text-xs text-vialto-steel">
-                              Dejalo en 0 si el transportista no suma IVA al cobrar.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      {ivaTransportistaVisible && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={fieldLabelClass}>Pago bruto a transporte</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                              <span className="w-full truncate">
-                                {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={fieldLabelClass}>Pago neto</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                              <span className="w-full truncate">
-                                {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={fieldLabelClass}>Monto IVA</span>
-                            <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                              <span className="w-full truncate">
-                                {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div
-                      className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
-                    >
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className={fieldLabelClass}>Precio transporte</span>
-                        <div className="flex min-w-0 gap-2">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={precioTransportistaExterno}
-                            onChange={(e) => {
-                              setPrecioTransportistaExterno(
-                                maskCurrencyForMoneda(
-                                  e.target.value,
-                                  monedaPrecioTransportista,
-                                ),
-                              );
-                              setFieldErrors((p) => ({ ...p, precioTransportistaExterno: "" }));
-                            }}
-                            placeholder="0.00"
-                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioTransportistaExterno ? "border-red-400" : ""}`}
-                          />
-                          <MonedaSelect
-                            value={monedaPrecioTransportista}
-                            onChange={(m) => {
-                              setPrecioTransportistaExterno((prev) =>
-                                preserveAmountOnMonedaChange(
-                                  prev,
-                                  monedaPrecioTransportista,
-                                  m,
-                                ),
-                              );
-                              setMonedaPrecioTransportista(m);
-                            }}
-                            aria-label="Moneda precio transportista externo"
-                          />
-                        </div>
-                        <CrudFieldError message={fieldErrors.precioTransportistaExterno} />
-                      </div>
-                      {ivaTransportistaVisible && (
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={fieldLabelClass}>% de IVA</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={precioTransportistaIvaIncluidoPct}
-                            onChange={(e) =>
-                              setPrecioTransportistaIvaIncluidoPct(e.target.value)
-                            }
-                            placeholder="0"
-                            className={`${inputClass} text-right tabular-nums`}
-                          />
-                          <p className="text-xs text-vialto-steel">
-                            Dejalo en 0 si el transportista no suma IVA al cobrar.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {transportistaId && (
-                    <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
-                      <span className={fieldLabelClass}>
-                        ¿El transportista seleccionado realiza el flete?
-                      </span>
-                      <div className="flex gap-5">
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <input
-                            type="radio"
-                            name="realiza-flete-create"
-                            checked={realizaFlete}
-                            onChange={() => {
-                              setTransportistaEfectivoError(null);
-                              setRealizaFlete(true);
-                              setTransportistaEfectivoId("");
-                            }}
-                            className="accent-vialto-charcoal"
-                          />
-                          Sí
-                        </label>
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <input
-                            type="radio"
-                            name="realiza-flete-create"
-                            checked={!realizaFlete}
-                            onChange={() => {
-                              setTransportistaEfectivoError(null);
-                              setRealizaFlete(false);
-                            }}
-                            className="accent-vialto-charcoal"
-                          />
-                          No
-                        </label>
-                      </div>
-                      {!realizaFlete && (
-                        <div className="flex min-w-0 flex-col gap-1 mt-1">
-                          <span className={fieldLabelClass}>
-                            Transportista que realiza el flete{" "}
-                            <span className="text-red-500">*</span>
-                          </span>
-                          <TransportistaSearchSelect
-                            transportistas={transportistas.filter(
-                              (t) => t.id !== transportistaId,
-                            )}
-                            value={transportistaEfectivoId}
-                            onChange={(id) => {
-                              setTransportistaEfectivoError(null);
-                              setTransportistaEfectivoId(id);
-                            }}
-                            inputClassName={`${inputClass}${
-                              transportistaEfectivoError
-                                ? " border-red-400"
-                                : ""
-                            }`}
-                            aria-label="Transportista que realiza el flete"
-                            onNuevo={() => setQuickCreate("transportista")}
-                          />
-                          {transportistaEfectivoError && (
-                            <span className="text-xs text-red-600">
-                              {transportistaEfectivoError}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="grid gap-3">
-                    <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                      <span className={fieldLabelClass}>Chofer</span>
-                      <ChoferSearchSelect
-                        choferes={choferesExterno}
-                        value={choferExternoId}
-                        onChange={setChoferExternoIdDraft}
-                        inputClassName={inputClass}
-                        aria-label="Chofer transportista externo"
-                        onNuevo={() => setQuickCreate("chofer-ext")}
-                      />
-                    </div>
-                    <ViajeVehiculosLista
-                      groupId="viaje-create-ext"
-                      crearVehiculoHref={
-                        tenantId
-                          ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tenantId)}`
-                          : "/vehiculos/nuevo"
-                      }
-                      rows={vehiculosExternosRows}
-                      onChange={setVehiculosExternosRows}
-                      vehiculos={vehiculos}
-                      alMenosUno={false}
-                      onRefreshVehiculos={() => void refreshVehiculosMaestro()}
-                      refreshingVehiculos={refreshingFlota}
-                      getToken={getToken}
-                      tenantId={tenantId || undefined}
-                      onVehiculoCreado={(v) =>
-                        setSessionVehiculos((prev) => [...prev, v])
-                      }
-                    />
-                  </div>
-                </div>
-              }
-              propioContent={
-                <div className="grid gap-3">
-                  <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                    <span className={fieldLabelClass}>
-                      Chofer (flota propia)
-                    </span>
-                    <ChoferSearchSelect
-                      choferes={choferesPropios}
-                      value={choferId}
-                      onChange={setChoferIdDraft}
-                      inputClassName={inputClass}
-                      aria-label="Chofer flota propia"
-                      onNuevo={() => setQuickCreate("chofer-prop")}
-                    />
-                    {ayudaFlota.chofer && (
-                      <p className="text-xs text-amber-800/90">
-                        {ayudaFlota.chofer}
-                      </p>
-                    )}
-                  </div>
-                  <ViajeVehiculosLista
-                    groupId="viaje-create"
-                    crearVehiculoHref="/vehiculos/nuevo"
-                    rows={vehiculosRows}
-                    onChange={setVehiculosRows}
-                    vehiculos={vehiculosPropios}
-                    onRefreshVehiculos={() => void refreshFlotaVehiculos()}
-                    refreshingVehiculos={refreshingFlota}
-                    getToken={getToken}
-                    tenantId={tenantId || undefined}
-                    onVehiculoCreado={(v) =>
-                      setSessionVehiculos((prev) => [...prev, v])
-                    }
-                  />
-                  {ayudaFlota.vehiculo && (
-                    <p className="text-xs text-amber-800/90">
-                      {ayudaFlota.vehiculo}
-                    </p>
-                  )}
-                </div>
-              }
-            />
-
-            {isVisible("alta_viaje", "gananciaBrutaManual") && (
-              <ViajeGananciaBrutaManualFieldset
-                draft={{
-                  operacionModo: modoOperacion,
-                  monto,
-                  monedaMonto,
-                  precioTransportistaExterno,
-                  monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-                  gananciaBrutaManual,
-                  monedaGananciaBrutaManual,
-                  otrosGastos,
+                onNuevoPaisDestino={(clienteIndex, destinoIndex) => {
+                  setPaisQuickCreateTarget({ kind: "destino-cliente", clienteIndex, destinoIndex });
+                  setQuickCreate("pais");
                 }}
-                onPatch={(p) => {
+                onNuevoCliente={(clienteIndex) => {
+                  setClienteQuickCreateTarget(clienteIndex);
+                  setQuickCreate("cliente");
+                }}
+                opcionesProducto={opcionesProducto}
+                getToken={getToken}
+                onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
+                error={error}
+                onContinuar={() => void handleContinuar1()}
+              />
+            )}
+
+            {step === 2 && (
+              <ViajeCreateStep2Operacion
+                modoOperacion={modoOperacion}
+                onModoChange={applyModoOperacion}
+                transportistaId={transportistaId}
+                onTransportistaIdChange={(id) => {
+                  setTransportistaId(id);
+                  setRealizaFlete(true);
+                  setTransportistaEfectivoId("");
+                  setChoferExternoIdDraft("");
+                  if (id) setError(null);
+                }}
+                transportistas={transportistas}
+                fieldErrorTransportistaId={fieldErrors.transportistaId}
+                onNuevoTransportista={() => setQuickCreate("transportista")}
+                desgloseActivo={desgloseActivo}
+                ivaTransportistaVisible={ivaTransportistaVisible}
+                cantidadTransportista={cantidadTransportista}
+                onCantidadTransportistaChange={setCantidadTransportista}
+                precioUnitarioTransportista={precioUnitarioTransportista}
+                onPrecioUnitarioTransportistaChange={(v) =>
+                  setPrecioUnitarioTransportista(maskCurrencyForMoneda(v, monedaPrecioTransportista))
+                }
+                monedaPrecioTransportista={monedaPrecioTransportista}
+                onMonedaPrecioTransportistaChange={handleMonedaPrecioTransportistaChange}
+                precioTransportistaIvaIncluidoPct={precioTransportistaIvaIncluidoPct}
+                onPrecioTransportistaIvaIncluidoPctChange={setPrecioTransportistaIvaIncluidoPct}
+                desglosePagoBruto={desglosePagoBruto}
+                desglosePagoNeto={desglosePagoNeto}
+                desgloseMontoIva={desgloseMontoIva}
+                precioTransportistaExterno={precioTransportistaExterno}
+                onPrecioTransportistaExternoChange={(v) =>
+                  setPrecioTransportistaExterno(maskCurrencyForMoneda(v, monedaPrecioTransportista))
+                }
+                realizaFlete={realizaFlete}
+                onRealizaFleteChange={handleRealizaFleteChange}
+                transportistaEfectivoId={transportistaEfectivoId}
+                onTransportistaEfectivoIdChange={(id) => {
+                  setTransportistaEfectivoError(null);
+                  setTransportistaEfectivoId(id);
+                  setError(null);
+                }}
+                transportistaEfectivoError={transportistaEfectivoError}
+                choferExternoId={choferExternoId}
+                onChoferExternoIdChange={setChoferExternoIdDraft}
+                choferesExterno={choferesExterno}
+                onNuevoChoferExterno={() => setQuickCreate("chofer-ext")}
+                vehiculosExternosRows={vehiculosExternosRows}
+                onVehiculosExternosRowsChange={(rows) => {
+                  setVehiculosExternosRows(rows);
+                  setError(null);
+                }}
+                choferId={choferId}
+                onChoferIdChange={setChoferIdDraft}
+                choferesPropios={choferesPropios}
+                onNuevoChoferPropio={() => setQuickCreate("chofer-prop")}
+                ayudaFlotaChofer={ayudaFlota.chofer}
+                vehiculosRows={vehiculosRows}
+                onVehiculosRowsChange={(rows) => {
+                  setVehiculosRows(rows);
+                  setError(null);
+                }}
+                vehiculosPropios={vehiculosPropios}
+                ayudaFlotaVehiculo={ayudaFlota.vehiculo}
+                vehiculos={vehiculos}
+                onRefreshVehiculosPropios={() => void refreshFlotaVehiculos()}
+                onRefreshVehiculosExternos={() => void refreshVehiculosMaestro()}
+                refreshingFlota={refreshingFlota}
+                getToken={getToken}
+                tenantId={tenantId}
+                onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}
+                mostrarGananciaBrutaManual={mostrarGananciaBrutaManual}
+                gananciaDraft={buildGananciaDraft()}
+                onGananciaBrutaManualPatch={(p) => {
                   if (p.gananciaBrutaManual !== undefined)
                     setGananciaBrutaManual(p.gananciaBrutaManual);
                   if (p.monedaGananciaBrutaManual !== undefined) {
                     setMonedaGananciaBrutaManual(p.monedaGananciaBrutaManual);
                   }
+                  setError(null);
                 }}
-                labelClassName={fieldLabelClass}
-                inputClassName={inputClass}
+                mostrarPagosTransportista={mostrarPagosTransportista}
+                pagosTransportista={pagosTransportista}
+                onPagosTransportistaChange={(rows) => {
+                  setPagosTransportista(rows);
+                  setError(null);
+                }}
+                error={error}
+                onVolver={() => setStep(1)}
+                onContinuar={() => void handleContinuar2()}
               />
             )}
-            <ViajeFechaHoraFields
-              fechaCarga={fechaCarga}
-              horaCarga={horaCarga}
-              fechaDescarga={fechaDescarga}
-              horaDescarga={horaDescarga}
-              onPatch={(p) => {
-                if (p.fechaCarga !== undefined) {
-                  setFechaCarga(p.fechaCarga);
-                  if (p.fechaCarga) setFechaCargaError(null);
+
+            {step === 3 && (
+              <ViajeCreateStep3Cierre
+                labelIdentificacion={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
+                numeroIdentificacionPersonalizado={numeroIdentificacionPersonalizado}
+                onNumeroIdentificacionChange={setNumeroIdentificacionPersonalizado}
+                fechaCarga={fechaCarga}
+                horaCarga={horaCarga}
+                fechaDescarga={fechaDescarga}
+                horaDescarga={horaDescarga}
+                onFechasPatch={(p) => {
+                  if (p.fechaCarga !== undefined) {
+                    setFechaCarga(p.fechaCarga);
+                    if (p.fechaCarga) setFechaCargaError(null);
+                  }
+                  if (p.horaCarga !== undefined) setHoraCarga(p.horaCarga);
+                  if (p.fechaDescarga !== undefined) {
+                    setFechaDescarga(p.fechaDescarga);
+                    if (p.fechaDescarga) setFechaDescargaError(null);
+                  }
+                  if (p.horaDescarga !== undefined) setHoraDescarga(p.horaDescarga);
+                }}
+                fechaCargaError={fechaCargaError}
+                fechaDescargaError={fechaDescargaError}
+                mostrarKmLitros={
+                  isVisible("alta_viaje", "kmRecorridos") ||
+                  isVisible("alta_viaje", "litrosConsumidos")
                 }
-                if (p.horaCarga !== undefined) setHoraCarga(p.horaCarga);
-                if (p.fechaDescarga !== undefined) {
-                  setFechaDescarga(p.fechaDescarga);
-                  if (p.fechaDescarga) setFechaDescargaError(null);
-                }
-                if (p.horaDescarga !== undefined)
-                  setHoraDescarga(p.horaDescarga);
-              }}
-              labelClassName={fieldLabelClass}
-              inputClassName={inputClass}
-              errorFechaCarga={fechaCargaError}
-              errorFechaDescarga={fechaDescargaError}
-            />
-            {(isVisible("alta_viaje", "kmRecorridos") ||
-              isVisible("alta_viaje", "litrosConsumidos")) && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-              {isVisible("alta_viaje", "kmRecorridos") && (
-                <div className="flex flex-col gap-1">
-                  <span className={fieldLabelClass}>Km recorridos</span>
-                  <input
-                    type="number"
-                    value={kmRecorridos}
-                    onChange={(e) => setKmRecorridos(e.target.value)}
-                    placeholder="0"
-                    className={inputClass}
-                  />
-                </div>
-              )}
-              {isVisible("alta_viaje", "litrosConsumidos") && (
-                <div className="flex flex-col gap-1">
-                  <span className={fieldLabelClass}>Litros consumidos</span>
-                  <input
-                    type="number"
-                    value={litrosConsumidos}
-                    onChange={(e) => setLitrosConsumidos(e.target.value)}
-                    placeholder="0"
-                    className={inputClass}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-            {isVisible("alta_viaje", "productoItems") && (
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Productos</span>
-              <ViajeProductosLista
-                groupId="viaje-create"
-                value={productoItems}
-                onChange={setProductoItems}
-                opciones={productosCatalogo.map<OpcionProducto>((p) => ({
-                  id: p.id,
-                  nombre: p.nombre,
-                  activo: p.activo,
-                }))}
-                triggerClassName={inputClass}
-                inputClassName={inputClass}
-                disabled={loading}
-                getToken={getToken}
-                onProductoCreado={(p) =>
-                  setProductosCatalogo((prev) => [...prev, p])
-                }
-              />
-            </div>
-          )}
-          {isVisible("alta_viaje", "detalleCarga") && (
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Detalle adicional</span>
-              <textarea
-                value={detalleCarga}
-                onChange={(e) => setDetalleCarga(e.target.value)}
-                placeholder="Notas extra: bultos, temperatura, precinto, etc."
-                className={textareaLongClass}
-              />
-            </div>
-          )}
-          {isVisible("alta_viaje", "observaciones") && (
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Observaciones</span>
-              <textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Notas adicionales"
-                className={textareaLongClass}
-              />
-            </div>
-          )}
-          {isVisible("alta_viaje", "otrosGastos") && (
-            <div className="md:col-span-2 lg:col-span-3">
-              <OtrosGastosFieldset
-                rows={otrosGastos}
-                onChange={setOtrosGastos}
+                mostrarKm={isVisible("alta_viaje", "kmRecorridos")}
+                mostrarLitros={isVisible("alta_viaje", "litrosConsumidos")}
+                kmRecorridos={kmRecorridos}
+                onKmRecorridosChange={setKmRecorridos}
+                litrosConsumidos={litrosConsumidos}
+                onLitrosConsumidosChange={setLitrosConsumidos}
+                mostrarDetalleCarga={isVisible("alta_viaje", "detalleCarga")}
+                detalleCarga={detalleCarga}
+                onDetalleCargaChange={setDetalleCarga}
+                mostrarObservaciones={isVisible("alta_viaje", "observaciones")}
+                observaciones={observaciones}
+                onObservacionesChange={setObservaciones}
+                mostrarOtrosGastos={isVisible("alta_viaje", "otrosGastos")}
+                otrosGastos={otrosGastos}
+                onOtrosGastosChange={setOtrosGastos}
+                gastoAutor={gastoAutor}
                 tenantId={tenantId || undefined}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setOtrosGastos((prev) => [...prev, emptyOtroGasto(gastoAutor)])
-                }
-                className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
-              >
-                + Agregar gasto
-              </button>
-            </div>
-          )}
-          {modoOperacion === "externo" && isVisible("alta_viaje", "pagosTransportista") && (
-            <div className="md:col-span-2 lg:col-span-3">
-              <PagosTransportistaFieldset
-                rows={pagosTransportista}
-                onChange={setPagosTransportista}
-                saldoContext={{
-                  transportistaId,
-                  precioTransportistaExterno,
-                  monedaPrecioTransportistaExterno: monedaPrecioTransportista,
-                }}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setPagosTransportista((prev) => [
-                    ...prev,
-                    emptyPagoTransportista(monedaPrecioTransportista),
-                  ])
-                }
-                className="mt-2 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
-              >
-                + Agregar pago al transportista
-              </button>
-            </div>
-          )}
-            {error && (
-              <div className="md:col-span-2 lg:col-span-3">
-                <p
-                  role="alert"
-                  className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2"
-                >
-                  {error}
-                </p>
-              </div>
-            )}
-            <div className="md:col-span-2 lg:col-span-3 pt-2">
-              <CrudSubmitButton
+                error={error}
                 loading={loading}
-                label="Crear viaje"
-                disableWhileLoading={false}
+                onVolver={() => setStep(2)}
               />
+            )}
             </div>
           </form>
         )}
@@ -1555,24 +1198,36 @@ export function ViajeCreatePage() {
           tenantId={tenantId || undefined}
           onClose={() => {
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex: 0 });
           }}
           onSaved={(p: Pais) => {
             setSessionPaises((prev) => [...prev, p]);
-            const codigo = (p.codigo || p.id);
-            if (paisQuickCreateDestinoIndex === null) {
-              setPaisOrigen(codigo);
-              setOrigen("");
-            } else {
-              const idx = paisQuickCreateDestinoIndex;
-              setDestinosRows((rows) =>
+            const codigo = (p.codigo || p.id) as PaisCodigo;
+            const target = paisQuickCreateTarget;
+            if (target.kind === "origen-cliente") {
+              const ci = target.clienteIndex;
+              setClientesRows((rows) =>
                 rows.map((r, i) =>
-                  i === idx ? { ...r, pais: codigo, etiqueta: "" } : r,
+                  i === ci ? { ...r, paisOrigen: codigo, origen: "" } : r,
+                ),
+              );
+            } else {
+              const { clienteIndex, destinoIndex } = target;
+              setClientesRows((rows) =>
+                rows.map((r, i) =>
+                  i === clienteIndex
+                    ? {
+                        ...r,
+                        destinosRows: r.destinosRows.map((d, j) =>
+                          j === destinoIndex ? { ...d, pais: codigo, etiqueta: "" } : d,
+                        ),
+                      }
+                    : r,
                 ),
               );
             }
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex: 0 });
           }}
         />
       )}
@@ -1583,7 +1238,10 @@ export function ViajeCreatePage() {
           onClose={() => setQuickCreate(null)}
           onSaved={(c) => {
             setSessionClientes((prev) => [...prev, c]);
-            setClienteId(c.id);
+            const ci = clienteQuickCreateTarget;
+            setClientesRows((rows) =>
+              rows.map((r, i) => (i === ci ? { ...r, clienteId: c.id } : r)),
+            );
             setQuickCreate(null);
           }}
         />

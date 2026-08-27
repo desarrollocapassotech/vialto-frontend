@@ -402,6 +402,48 @@ export function nombreClienteListadoViaje(
   return "—";
 }
 
+/** Ruta/carga de un cliente del viaje (principal o adicional) para listados. */
+export type ClienteRutaListadoViaje = {
+  clienteId: string;
+  nombre: string;
+  origen: string | null;
+  destino: string | null;
+  destinosViaje?: Array<{ id: string; orden: number; etiqueta: string }>;
+};
+
+/**
+ * Todos los clientes del viaje (principal primero, luego `clientesViaje` en orden) con
+ * su propio nombre/origen/destino — para no mostrar en listados solo el primero.
+ */
+export function clientesRutaListadoViaje(
+  v: Viaje,
+  clientes?: Cliente[],
+): ClienteRutaListadoViaje[] {
+  const out: ClienteRutaListadoViaje[] = [
+    {
+      clienteId: v.clienteId,
+      nombre: nombreClienteListadoViaje(v, clientes),
+      origen: v.origen,
+      destino: v.destino,
+      destinosViaje: v.destinosViaje,
+    },
+  ];
+  for (const c of v.clientesViaje ?? []) {
+    const nombre =
+      c.cliente?.nombre?.trim() ||
+      clientes?.find((x) => x.id === c.clienteId)?.nombre?.trim() ||
+      "—";
+    out.push({
+      clienteId: c.clienteId,
+      nombre,
+      origen: c.origen,
+      destino: c.destino,
+      destinosViaje: c.destinosCliente,
+    });
+  }
+  return out;
+}
+
 /**
  * Nombre del chofer en tablas de viajes: relación del API o búsqueda por `choferId` en el maestro cargado.
  */
