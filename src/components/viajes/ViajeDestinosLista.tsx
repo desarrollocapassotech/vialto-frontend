@@ -46,16 +46,7 @@ export function ViajeDestinosLista({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <span className={LABEL}>Destinos</span>
-        <button
-          type="button"
-          onClick={addRow}
-          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-        >
-          + Agregar destino
-        </button>
-      </div>
+      <span className={LABEL}>Destinos</span>
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
           const esPrimero = i === 0;
@@ -106,6 +97,13 @@ export function ViajeDestinosLista({
           );
         })}
       </div>
+      <button
+        type="button"
+        onClick={addRow}
+        className="self-start text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+      >
+        + Agregar destino
+      </button>
     </div>
   );
 }

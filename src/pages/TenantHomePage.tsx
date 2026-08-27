@@ -365,6 +365,8 @@ export function TenantHomePage() {
             fechaDescargaError={viajeEditor.fechaDescargaError}
             destinosError={viajeEditor.destinosError}
             onClearDestinosError={viajeEditor.onClearDestinosError}
+            clientesRowErrors={viajeEditor.clientesRowErrors}
+            onClearClientesRowErrors={viajeEditor.onClearClientesRowErrors}
             transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
             onClearTransportistaEfectivoError={
               viajeEditor.onClearTransportistaEfectivoError

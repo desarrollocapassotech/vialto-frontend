@@ -83,8 +83,17 @@ import type { OpcionProducto } from "@/lib/productosViaje";
 import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
 import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
-import type { ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
+import { textoRutaViaje, type ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { ViajeClientesFieldset, ClienteCard } from "@/components/viajes/ViajeClientesFieldset";
+import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
+
+/** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
+type PaisQuickCreateTarget =
+  | { kind: "origen" }
+  | { kind: "destino"; index: number }
+  | { kind: "origen-cliente"; clienteIndex: number }
+  | { kind: "destino-cliente"; clienteIndex: number; destinoIndex: number };
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -99,6 +108,7 @@ export type ViajeInlineDraft = {
   paisOrigen: PaisCodigo;
   origen: string;
   destinosRows: ViajeDestinoRowDraft[];
+  clientesRows: ViajeClienteDraft[];
   fechaCarga: string;
   horaCarga: string;
   fechaDescarga: string;
@@ -145,6 +155,8 @@ export type ViajeEditModalProps = {
   fechaDescargaError: string | null;
   destinosError?: string | null;
   onClearDestinosError?: () => void;
+  clientesRowErrors?: Record<number, string>;
+  onClearClientesRowErrors?: () => void;
   transportistaEfectivoError?: string | null;
   onClearTransportistaEfectivoError?: () => void;
   onDraftFechasPatch: (
@@ -207,6 +219,8 @@ export function ViajeEditModal({
   fechaDescargaError,
   destinosError,
   onClearDestinosError,
+  clientesRowErrors,
+  onClearClientesRowErrors,
   transportistaEfectivoError,
   onClearTransportistaEfectivoError,
   onDraftFechasPatch,
@@ -252,9 +266,9 @@ export function ViajeEditModal({
   const [paises, setPaises] = useState<Pais[]>([]);
   const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
   const [paisesLoading, setPaisesLoading] = useState(true);
-  /** Índice del destino que disparó "+ Nuevo país". */
-  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
-    useState<number | null>(null);
+  /** A qué campo aplicar el país recién creado desde "+ Nuevo país" (origen/destino, principal o de un cliente adicional). */
+  const [paisQuickCreateTarget, setPaisQuickCreateTarget] =
+    useState<PaisQuickCreateTarget>({ kind: "origen" });
 
   const todosClientes = useMemo(() => {
     const ids = new Set(clientes.map((c) => c.id));
@@ -570,209 +584,277 @@ export function ViajeEditModal({
               </div>
 
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Origen</span>
-                <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                  <PaisUbicacionSelect
-                    value={draft.paisOrigen}
-                    onChange={(p) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, paisOrigen: p, origen: "" } : prev,
-                      )
-                    }
-                    aria-label="País de origen"
-                    className={`${inputClass} w-full sm:w-40`}
-                  />
-                  <CiudadCombobox
-                    pais={draft.paisOrigen}
-                    value={draft.origen}
-                    onChange={(next) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, origen: next } : prev,
-                      )
-                    }
-                    inputClassName={`${inputClass} w-full`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <ViajeDestinosLista
-                  groupId={`viaje-edit-${draft.numero || "e"}`}
-                  rows={draft.destinosRows}
-                  onChange={(destinosRows) => {
-                    setDraft((prev) =>
-                      prev ? { ...prev, destinosRows } : prev,
-                    );
-                    if (destinosRows[0]?.etiqueta.trim())
-                      onClearDestinosError?.();
+                <span className={labelClass}>Clientes del viaje</span>
+                <ClienteCard
+                  title={
+                    todosClientes.find((c) => c.id === draft.clienteId)?.nombre ||
+                    "Cliente principal"
+                  }
+                  summary={textoRutaViaje(
+                    draft.origen,
+                    draft.destinosRows.map((r) => r.etiqueta).filter(Boolean),
+                  )}
+                  defaultOpen
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Cliente</span>
+                      <ClienteSearchSelect
+                        clientes={todosClientes}
+                        value={draft.clienteId}
+                        onChange={(id) =>
+                          setDraft((p) => (p ? { ...p, clienteId: id } : p))
+                        }
+                        inputClassName={inputClass}
+                        aria-label="Cliente"
+                        disabled={datosComercialesBloqueados || saving}
+                        onNuevo={
+                          getToken && !datosComercialesBloqueados
+                            ? () => setQuickCreate("cliente")
+                            : undefined
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Origen</span>
+                      <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
+                        <PaisUbicacionSelect
+                          value={draft.paisOrigen}
+                          onChange={(p) =>
+                            setDraft((prev) =>
+                              prev ? { ...prev, paisOrigen: p, origen: "" } : prev,
+                            )
+                          }
+                          aria-label="País de origen"
+                          className={`${inputClass} w-full sm:w-40`}
+                        />
+                        <CiudadCombobox
+                          pais={draft.paisOrigen}
+                          value={draft.origen}
+                          onChange={(next) =>
+                            setDraft((prev) =>
+                              prev ? { ...prev, origen: next } : prev,
+                            )
+                          }
+                          inputClassName={`${inputClass} w-full`}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <ViajeDestinosLista
+                        groupId={`viaje-edit-${draft.numero || "e"}`}
+                        rows={draft.destinosRows}
+                        onChange={(destinosRows) => {
+                          setDraft((prev) =>
+                            prev ? { ...prev, destinosRows } : prev,
+                          );
+                          if (destinosRows[0]?.etiqueta.trim())
+                            onClearDestinosError?.();
+                        }}
+                        inputClassName={inputClass}
+                        paises={todosPaises}
+                        paisesLoading={paisesLoading}
+                        onNuevoPais={(index) => {
+                          setPaisQuickCreateTarget({ kind: "destino", index });
+                          setQuickCreate("pais");
+                        }}
+                      />
+                      <CrudFieldError message={destinosError} />
+                    </div>
+                    {isVisible("edicion_viaje", "productoItems") && (
+                      <div className="flex flex-col gap-1">
+                        <span className={labelClass}>Carga</span>
+                        <ViajeProductosLista
+                          groupId="viaje-edit"
+                          value={draft.productoItems}
+                          onChange={(items) =>
+                            setDraft((p) => (p ? { ...p, productoItems: items } : p))
+                          }
+                          opciones={opcionesProducto}
+                          triggerClassName={inputClass}
+                          inputClassName={inputClass}
+                          disabled={saving}
+                          getToken={getToken}
+                          onProductoCreado={onProductoCreado}
+                        />
+                      </div>
+                    )}
+                    {desgloseActivo ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Cantidad</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={datosComercialesBloqueados}
+                            value={draft.cantidadFactura}
+                            onChange={(e) =>
+                              setDraft((p) =>
+                                p ? { ...p, cantidadFactura: e.target.value } : p,
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Precio unitario</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              disabled={datosComercialesBloqueados}
+                              value={draft.precioUnitarioFactura}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        precioUnitarioFactura: maskCurrencyForMoneda(
+                                          e.target.value,
+                                          p.monedaMonto,
+                                        ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder="0.00"
+                              className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                            />
+                            <MonedaSelect
+                              value={draft.monedaMonto}
+                              disabled={datosComercialesBloqueados}
+                              onChange={(m) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        monedaMonto: m,
+                                        precioUnitarioFactura:
+                                          preserveAmountOnMonedaChange(
+                                            p.precioUnitarioFactura,
+                                            p.monedaMonto,
+                                            m,
+                                          ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              aria-label="Moneda precio unitario"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Total a facturar</span>
+                          <div
+                            className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                          >
+                            <span className="w-full truncate text-sm">
+                              {(
+                                (Number(draft.cantidadFactura.replace(",", ".")) ||
+                                  0) *
+                                (parseCurrencyForMoneda(
+                                  draft.precioUnitarioFactura,
+                                  draft.monedaMonto,
+                                ) || 0)
+                              ).toLocaleString("es-AR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <span className={labelClass}>Monto a facturar</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={datosComercialesBloqueados}
+                            value={draft.monto}
+                            onChange={(e) =>
+                              setDraft((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      monto: maskCurrencyForMoneda(
+                                        e.target.value,
+                                        p.monedaMonto,
+                                      ),
+                                    }
+                                  : p,
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                          />
+                          <MonedaSelect
+                            value={draft.monedaMonto}
+                            disabled={datosComercialesBloqueados}
+                            onChange={(m: ViajeMonedaCodigo) =>
+                              setDraft((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      monedaMonto: m,
+                                      monto: preserveAmountOnMonedaChange(
+                                        p.monto,
+                                        p.monedaMonto,
+                                        m,
+                                      ),
+                                    }
+                                  : p,
+                              )
+                            }
+                            aria-label="Moneda monto a facturar"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ClienteCard>
+                <ViajeClientesFieldset
+                  rows={draft.clientesRows}
+                  onChange={(rows) => {
+                    setDraft((p) => (p ? { ...p, clientesRows: rows } : p));
+                    onClearClientesRowErrors?.();
                   }}
-                  inputClassName={inputClass}
+                  clientes={todosClientes}
+                  rowErrors={clientesRowErrors}
+                  desgloseActivo={desgloseActivo}
                   paises={todosPaises}
                   paisesLoading={paisesLoading}
-                  onNuevoPais={(index) => {
-                    setPaisQuickCreateDestinoIndex(index);
+                  onNuevoPaisOrigen={(clienteIndex) => {
+                    setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex });
                     setQuickCreate("pais");
                   }}
+                  onNuevoPaisDestino={(clienteIndex, destinoIndex) => {
+                    setPaisQuickCreateTarget({ kind: "destino-cliente", clienteIndex, destinoIndex });
+                    setQuickCreate("pais");
+                  }}
+                  opcionesProducto={opcionesProducto}
+                  getToken={getToken}
+                  onProductoCreado={onProductoCreado}
                 />
-                <CrudFieldError message={destinosError} />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className={labelClass}>Cliente</span>
-                <ClienteSearchSelect
-                  clientes={todosClientes}
-                  value={draft.clienteId}
-                  onChange={(id) =>
-                    setDraft((p) => (p ? { ...p, clienteId: id } : p))
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((p) =>
+                      p
+                        ? { ...p, clientesRows: [...p.clientesRows, emptyClienteRow()] }
+                        : p,
+                    )
                   }
-                  inputClassName={inputClass}
-                  aria-label="Cliente"
-                  disabled={datosComercialesBloqueados || saving}
-                  onNuevo={
-                    getToken && !datosComercialesBloqueados
-                      ? () => setQuickCreate("cliente")
-                      : undefined
-                  }
-                />
+                  className="mt-1 self-start text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+                >
+                  + Agregar cliente
+                </button>
               </div>
-
-              {desgloseActivo ? (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Cantidad</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      disabled={datosComercialesBloqueados}
-                      value={draft.cantidadFactura}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p ? { ...p, cantidadFactura: e.target.value } : p,
-                        )
-                      }
-                      placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums`}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Precio unitario</span>
-                    <div className="flex min-w-0 gap-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        disabled={datosComercialesBloqueados}
-                        value={draft.precioUnitarioFactura}
-                        onChange={(e) =>
-                          setDraft((p) =>
-                            p
-                              ? {
-                                  ...p,
-                                  precioUnitarioFactura: maskCurrencyForMoneda(
-                                    e.target.value,
-                                    p.monedaMonto,
-                                  ),
-                                }
-                              : p,
-                          )
-                        }
-                        placeholder="0.00"
-                        className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                      />
-                      <MonedaSelect
-                        value={draft.monedaMonto}
-                        disabled={datosComercialesBloqueados}
-                        onChange={(m) =>
-                          setDraft((p) =>
-                            p
-                              ? {
-                                  ...p,
-                                  monedaMonto: m,
-                                  precioUnitarioFactura:
-                                    preserveAmountOnMonedaChange(
-                                      p.precioUnitarioFactura,
-                                      p.monedaMonto,
-                                      m,
-                                    ),
-                                }
-                              : p,
-                          )
-                        }
-                        aria-label="Moneda precio unitario"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Total a facturar</span>
-                    <div
-                      className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                    >
-                      <span className="w-full truncate text-sm">
-                        {(
-                          (Number(draft.cantidadFactura.replace(",", ".")) ||
-                            0) *
-                          (parseCurrencyForMoneda(
-                            draft.precioUnitarioFactura,
-                            draft.monedaMonto,
-                          ) || 0)
-                        ).toLocaleString("es-AR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className={labelClass}>Monto a facturar</span>
-                  <div className="flex min-w-0 gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      disabled={datosComercialesBloqueados}
-                      value={draft.monto}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p
-                            ? {
-                                ...p,
-                                monto: maskCurrencyForMoneda(
-                                  e.target.value,
-                                  p.monedaMonto,
-                                ),
-                              }
-                            : p,
-                        )
-                      }
-                      placeholder="0.00"
-                      className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                    />
-                    <MonedaSelect
-                      value={draft.monedaMonto}
-                      disabled={datosComercialesBloqueados}
-                      onChange={(m: ViajeMonedaCodigo) =>
-                        setDraft((p) =>
-                          p
-                            ? {
-                                ...p,
-                                monedaMonto: m,
-                                monto: preserveAmountOnMonedaChange(
-                                  p.monto,
-                                  p.monedaMonto,
-                                  m,
-                                ),
-                              }
-                            : p,
-                        )
-                      }
-                      aria-label="Moneda monto a facturar"
-                    />
-                  </div>
-                </div>
-              )}
 
               <ViajeOperacionTipoFieldset
                 modo={draft.operacionModo}
@@ -1280,25 +1362,6 @@ export function ViajeEditModal({
                 </div>
               )}
 
-              {isVisible("edicion_viaje", "productoItems") && (
-                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                  <span className={labelClass}>Productos</span>
-                  <ViajeProductosLista
-                    groupId="viaje-edit"
-                    value={draft.productoItems}
-                    onChange={(items) =>
-                      setDraft((p) => (p ? { ...p, productoItems: items } : p))
-                    }
-                    opciones={opcionesProducto}
-                    triggerClassName={inputClass}
-                    inputClassName={inputClass}
-                    disabled={saving}
-                    getToken={getToken}
-                    onProductoCreado={onProductoCreado}
-                  />
-                </div>
-              )}
-
               {isVisible("edicion_viaje", "detalleCarga") && (
                 <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
                   <span className={labelClass}>Detalle adicional</span>
@@ -1490,13 +1553,16 @@ export function ViajeEditModal({
           tenantId={tenantId}
           onClose={() => {
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
           onSaved={(p) => {
             setSessionPaises((prev) => [...prev, p]);
             const codigo = p.codigo || p.id;
-            const idx = paisQuickCreateDestinoIndex;
-            if (idx !== null) {
+            const target = paisQuickCreateTarget;
+            if (target.kind === "origen") {
+              setDraft((prev) => (prev ? { ...prev, paisOrigen: codigo, origen: "" } : prev));
+            } else if (target.kind === "destino") {
+              const idx = target.index;
               setDraft((prev) =>
                 prev
                   ? {
@@ -1507,9 +1573,40 @@ export function ViajeEditModal({
                     }
                   : prev,
               );
+            } else if (target.kind === "origen-cliente") {
+              const ci = target.clienteIndex;
+              setDraft((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientesRows: prev.clientesRows.map((r, i) =>
+                        i === ci ? { ...r, paisOrigen: codigo, origen: "" } : r,
+                      ),
+                    }
+                  : prev,
+              );
+            } else {
+              const { clienteIndex, destinoIndex } = target;
+              setDraft((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientesRows: prev.clientesRows.map((r, i) =>
+                        i === clienteIndex
+                          ? {
+                              ...r,
+                              destinosRows: r.destinosRows.map((d, j) =>
+                                j === destinoIndex ? { ...d, pais: codigo, etiqueta: "" } : d,
+                              ),
+                            }
+                          : r,
+                      ),
+                    }
+                  : prev,
+              );
             }
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
         />
       )}

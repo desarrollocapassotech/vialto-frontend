@@ -41,6 +41,13 @@ import {
   pagosTransportistaDraftsToApi,
   type PagoTransportistaDraft,
 } from "@/components/viajes/PagosTransportistaFieldset";
+import { ViajeClientesFieldset, ClienteCard } from "@/components/viajes/ViajeClientesFieldset";
+import {
+  emptyClienteRow,
+  clientesPayloadParaApi,
+  validarClientesRows,
+  type ViajeClienteDraft,
+} from "@/lib/viajesClientes";
 import { apiJson, ApiError } from "@/lib/api";
 import {
   parseCurrencyForMoneda,
@@ -73,6 +80,7 @@ import { esEtiquetaCiudadValida, type PaisCodigo } from "@/lib/ciudades";
 import {
   destinosPayloadParaApi,
   emptyDestinoRow,
+  textoRutaViaje,
   validarDestinosRows,
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
@@ -103,6 +111,13 @@ import {
   type OpcionProducto,
   type ViajeProductoItem,
 } from "@/lib/productosViaje";
+
+/** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
+type PaisQuickCreateTarget =
+  | { kind: "origen" }
+  | { kind: "destino"; index: number }
+  | { kind: "origen-cliente"; clienteIndex: number }
+  | { kind: "destino-cliente"; clienteIndex: number; destinoIndex: number };
 
 const ESTADOS = VIAJE_ETAPAS_ALTA;
 
@@ -204,6 +219,10 @@ export function ViajeCreatePage() {
   const [pagosTransportista, setPagosTransportista] = useState<
     PagoTransportistaDraft[]
   >([]);
+  const [clientesRows, setClientesRows] = useState<ViajeClienteDraft[]>([]);
+  const [clientesRowErrors, setClientesRowErrors] = useState<
+    Record<number, string>
+  >({});
 
   // ─── ESTADOS PARA CREACIÓN RÁPIDA (MODALES) ─────────────────────────────
   type QuickCreate = "cliente" | "transportista" | "chofer-ext" | "chofer-prop" | "pais";
@@ -222,9 +241,9 @@ export function ViajeCreatePage() {
   const [paises, setPaises] = useState<Pais[]>([]);
   const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
   const [paisesLoading, setPaisesLoading] = useState(true);
-  /** Índice del destino que disparó "+ Nuevo país" (null = fue el origen). */
-  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
-    useState<number | null>(null);
+  /** A qué campo aplicar el país recién creado desde "+ Nuevo país" (origen/destino, principal o de un cliente adicional). */
+  const [paisQuickCreateTarget, setPaisQuickCreateTarget] =
+    useState<PaisQuickCreateTarget>({ kind: "origen" });
 
   const paisesConSesion = useMemo(() => {
     const ids = new Set(paises.map((p) => p.id));
@@ -541,6 +560,14 @@ export function ViajeCreatePage() {
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
+    const clientesValidacion = await validarClientesRows(clientesRows);
+    if (!clientesValidacion.ok) {
+      setClientesRowErrors(clientesValidacion.rowErrors);
+      setError(clientesValidacion.message);
+      return;
+    }
+    setClientesRowErrors({});
+
     setFieldErrors({});
     setError(null);
 
@@ -741,6 +768,7 @@ export function ViajeCreatePage() {
           ...gananciaBrutaManualPayloadFromDraft(gananciaDraft),
           otrosGastos: otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
           pagosTransportista: externo ? pagosTransportistaApi : [],
+          clientes: clientesPayloadParaApi(clientesRows),
         }),
       });
 
@@ -861,166 +889,234 @@ export function ViajeCreatePage() {
               </div>
             </div>
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Origen</span>
-              <div className="flex flex-wrap gap-2 items-start">
-                <PaisSearchSelect
-                  paises={paisesConSesion}
-                  loading={paisesLoading}
-                  value={paisOrigen}
-                  onChange={(p) => {
-                    setPaisOrigen(p as PaisCodigo);
-                    setOrigen("");
-                    setFieldErrors((prev) => ({ ...prev, origen: "" }));
-                  }}
-                  aria-label="País de origen"
-                  className="w-full sm:w-40"
-                  inputClassName={inputClass}
-                  onNuevo={() => {
-                    setPaisQuickCreateDestinoIndex(null);
-                    setQuickCreate("pais");
-                  }}
-                />
-                <div className="min-w-[200px] flex-1">
-                  <CiudadCombobox
-                    pais={paisOrigen}
-                    paisNombre={paisesConSesion.find((p) => (p.codigo || p.id) === paisOrigen)?.nombre}
-                    value={origen}
-                    onChange={(next) => {
-                      setOrigen(next);
-                      if (next.trim())
-                        setFieldErrors((prev) => ({ ...prev, origen: "" }));
-                    }}
-                    inputClassName={inputClass}
-                    disableBrowserAutocomplete
-                  />
+              <span className={fieldLabelClass}>Clientes del viaje</span>
+              <ClienteCard
+                title={clientes.find((c) => c.id === clienteId)?.nombre || "Cliente principal"}
+                summary={textoRutaViaje(
+                  origen,
+                  destinosRows.map((r) => r.etiqueta).filter(Boolean),
+                )}
+                defaultOpen
+              >
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>
+                      Cliente <span className="text-red-500">*</span>
+                    </span>
+                    <ClienteSearchSelect
+                      clientes={clientes}
+                      value={clienteId}
+                      onChange={(id) => {
+                        setClienteId(id);
+                        if (id) setFieldErrors((p) => ({ ...p, clienteId: "" }));
+                      }}
+                      inputClassName={inputClass}
+                      aria-label="Cliente"
+                      onNuevo={() => setQuickCreate("cliente")}
+                    />
+                    <CrudFieldError message={fieldErrors.clienteId} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className={fieldLabelClass}>Origen</span>
+                    <div className="flex flex-wrap gap-2 items-start">
+                      <PaisSearchSelect
+                        paises={paisesConSesion}
+                        loading={paisesLoading}
+                        value={paisOrigen}
+                        onChange={(p) => {
+                          setPaisOrigen(p as PaisCodigo);
+                          setOrigen("");
+                          setFieldErrors((prev) => ({ ...prev, origen: "" }));
+                        }}
+                        aria-label="País de origen"
+                        className="w-full sm:w-40"
+                        inputClassName={inputClass}
+                        onNuevo={() => {
+                          setPaisQuickCreateTarget({ kind: "origen" });
+                          setQuickCreate("pais");
+                        }}
+                      />
+                      <div className="min-w-[200px] flex-1">
+                        <CiudadCombobox
+                          pais={paisOrigen}
+                          paisNombre={paisesConSesion.find((p) => (p.codigo || p.id) === paisOrigen)?.nombre}
+                          value={origen}
+                          onChange={(next) => {
+                            setOrigen(next);
+                            if (next.trim())
+                              setFieldErrors((prev) => ({ ...prev, origen: "" }));
+                          }}
+                          inputClassName={inputClass}
+                          disableBrowserAutocomplete
+                        />
+                      </div>
+                    </div>
+                    <CrudFieldError message={fieldErrors.origen} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <ViajeDestinosLista
+                      groupId="viaje-create"
+                      rows={destinosRows}
+                      onChange={(rows) => {
+                        setDestinosRows(rows);
+                        if (rows[0]?.etiqueta.trim()) {
+                          setFieldErrors((prev) => ({ ...prev, destinos: "" }));
+                        }
+                      }}
+                      inputClassName={inputClass}
+                      disableBrowserAutocomplete
+                      paises={paisesConSesion}
+                      paisesLoading={paisesLoading}
+                      onNuevoPais={(index) => {
+                        setPaisQuickCreateTarget({ kind: "destino", index });
+                        setQuickCreate("pais");
+                      }}
+                    />
+                    <CrudFieldError message={fieldErrors.destinos} />
+                  </div>
+                  {isVisible("alta_viaje", "productoItems") && (
+                    <div className="flex flex-col gap-1">
+                      <span className={fieldLabelClass}>Carga</span>
+                      <ViajeProductosLista
+                        groupId="viaje-create"
+                        value={productoItems}
+                        onChange={setProductoItems}
+                        opciones={productosCatalogo.map<OpcionProducto>((p) => ({
+                          id: p.id,
+                          nombre: p.nombre,
+                          activo: p.activo,
+                        }))}
+                        triggerClassName={inputClass}
+                        inputClassName={inputClass}
+                        disabled={loading}
+                        getToken={getToken}
+                        onProductoCreado={(p) =>
+                          setProductosCatalogo((prev) => [...prev, p])
+                        }
+                      />
+                    </div>
+                  )}
+                  {desgloseActivo ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="flex flex-col gap-1">
+                        <span className={fieldLabelClass}>Cantidad</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={cantidadFactura}
+                          onChange={(e) => {
+                            setCantidadFactura(e.target.value);
+                            setFieldErrors((p) => ({ ...p, cantidadFactura: "" }));
+                          }}
+                          placeholder="0.00"
+                          className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadFactura ? "border-red-400" : ""}`}
+                        />
+                        <CrudFieldError message={fieldErrors.cantidadFactura} />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className={fieldLabelClass}>Precio unitario</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={precioUnitarioFactura}
+                            onChange={(e) => {
+                              setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto));
+                              setFieldErrors((p) => ({ ...p, precioUnitarioFactura: "" }));
+                            }}
+                            placeholder="0.00"
+                            className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioFactura ? "border-red-400" : ""}`}
+                          />
+                          <MonedaSelect
+                            value={monedaMonto}
+                            onChange={(m) => setMonedaMonto(m)}
+                            aria-label="Moneda precio unitario"
+                          />
+                        </div>
+                        <CrudFieldError message={fieldErrors.precioUnitarioFactura} />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className={fieldLabelClass}>Total a facturar</span>
+                        <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
+                          <span className="w-full truncate">
+                            {(
+                              (Number(cantidadFactura.replace(",", ".")) || 0) *
+                              (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
+                            ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <span className={fieldLabelClass}>Monto a facturar</span>
+                      <div className="flex min-w-0 gap-2">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={monto}
+                          onChange={(e) => {
+                            setMonto(
+                              maskCurrencyForMoneda(e.target.value, monedaMonto),
+                            );
+                            setFieldErrors((p) => ({ ...p, monto: "" }));
+                          }}
+                          placeholder="0.00"
+                          className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
+                        />
+                        <MonedaSelect
+                          value={monedaMonto}
+                          onChange={(m) => {
+                            setMonto((prev) =>
+                              preserveAmountOnMonedaChange(prev, monedaMonto, m),
+                            );
+                            setMonedaMonto(m);
+                          }}
+                          aria-label="Moneda monto a facturar"
+                        />
+                      </div>
+                      <CrudFieldError message={fieldErrors.monto} />
+                    </div>
+                  )}
                 </div>
-              </div>
-              <CrudFieldError message={fieldErrors.origen} />
-            </div>
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <ViajeDestinosLista
-                groupId="viaje-create"
-                rows={destinosRows}
+              </ClienteCard>
+              <ViajeClientesFieldset
+                rows={clientesRows}
                 onChange={(rows) => {
-                  setDestinosRows(rows);
-                  if (rows[0]?.etiqueta.trim()) {
-                    setFieldErrors((prev) => ({ ...prev, destinos: "" }));
-                  }
+                  setClientesRows(rows);
+                  setClientesRowErrors({});
                 }}
-                inputClassName={inputClass}
-                disableBrowserAutocomplete
+                clientes={clientes}
+                rowErrors={clientesRowErrors}
+                desgloseActivo={desgloseActivo}
                 paises={paisesConSesion}
                 paisesLoading={paisesLoading}
-                onNuevoPais={(index) => {
-                  setPaisQuickCreateDestinoIndex(index);
+                onNuevoPaisOrigen={(clienteIndex) => {
+                  setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex });
                   setQuickCreate("pais");
                 }}
+                onNuevoPaisDestino={(clienteIndex, destinoIndex) => {
+                  setPaisQuickCreateTarget({ kind: "destino-cliente", clienteIndex, destinoIndex });
+                  setQuickCreate("pais");
+                }}
+                opcionesProducto={productosCatalogo.map<OpcionProducto>((p) => ({
+                  id: p.id,
+                  nombre: p.nombre,
+                  activo: p.activo,
+                }))}
+                getToken={getToken}
+                onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
               />
-              <CrudFieldError message={fieldErrors.destinos} />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
-              <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>
-                  Cliente <span className="text-red-500">*</span>
-                </span>
-                <ClienteSearchSelect
-                  clientes={clientes}
-                  value={clienteId}
-                  onChange={(id) => {
-                    setClienteId(id);
-                    if (id) setFieldErrors((p) => ({ ...p, clienteId: "" }));
-                  }}
-                  inputClassName={inputClass}
-                  aria-label="Cliente"
-                  onNuevo={() => setQuickCreate("cliente")}
-                />
-                <CrudFieldError message={fieldErrors.clienteId} />
-              </div>
-              {desgloseActivo ? (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Cantidad</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={cantidadFactura}
-                      onChange={(e) => {
-                        setCantidadFactura(e.target.value);
-                        setFieldErrors((p) => ({ ...p, cantidadFactura: "" }));
-                      }}
-                      placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums ${fieldErrors.cantidadFactura ? "border-red-400" : ""}`}
-                    />
-                    <CrudFieldError message={fieldErrors.cantidadFactura} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Precio unitario</span>
-                    <div className="flex min-w-0 gap-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={precioUnitarioFactura}
-                        onChange={(e) => {
-                          setPrecioUnitarioFactura(maskCurrencyForMoneda(e.target.value, monedaMonto));
-                          setFieldErrors((p) => ({ ...p, precioUnitarioFactura: "" }));
-                        }}
-                        placeholder="0.00"
-                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.precioUnitarioFactura ? "border-red-400" : ""}`}
-                      />
-                      <MonedaSelect
-                        value={monedaMonto}
-                        onChange={(m) => setMonedaMonto(m)}
-                        aria-label="Moneda precio unitario"
-                      />
-                    </div>
-                    <CrudFieldError message={fieldErrors.precioUnitarioFactura} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Total a facturar</span>
-                    <div className={`flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0`}>
-                      <span className="w-full truncate">
-                        {(
-                          (Number(cantidadFactura.replace(",", ".")) || 0) * 
-                          (parseCurrencyForMoneda(precioUnitarioFactura, monedaMonto) || 0)
-                        ).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className={fieldLabelClass}>Monto a facturar</span>
-                  <div className="flex min-w-0 gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={monto}
-                      onChange={(e) => {
-                        setMonto(
-                          maskCurrencyForMoneda(e.target.value, monedaMonto),
-                        );
-                        setFieldErrors((p) => ({ ...p, monto: "" }));
-                      }}
-                      placeholder="0.00"
-                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
-                    />
-                    <MonedaSelect
-                      value={monedaMonto}
-                      onChange={(m) => {
-                        setMonto((prev) =>
-                          preserveAmountOnMonedaChange(prev, monedaMonto, m),
-                        );
-                        setMonedaMonto(m);
-                      }}
-                      aria-label="Moneda monto a facturar"
-                    />
-                  </div>
-                  <CrudFieldError message={fieldErrors.monto} />
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setClientesRows((prev) => [...prev, emptyClienteRow()])}
+                className="mt-1 text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist self-start"
+              >
+                + Agregar cliente
+              </button>
             </div>
             <ViajeOperacionTipoFieldset
               modo={modoOperacion}
@@ -1424,28 +1520,6 @@ export function ViajeCreatePage() {
               )}
             </div>
           )}
-            {isVisible("alta_viaje", "productoItems") && (
-            <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-              <span className={fieldLabelClass}>Productos</span>
-              <ViajeProductosLista
-                groupId="viaje-create"
-                value={productoItems}
-                onChange={setProductoItems}
-                opciones={productosCatalogo.map<OpcionProducto>((p) => ({
-                  id: p.id,
-                  nombre: p.nombre,
-                  activo: p.activo,
-                }))}
-                triggerClassName={inputClass}
-                inputClassName={inputClass}
-                disabled={loading}
-                getToken={getToken}
-                onProductoCreado={(p) =>
-                  setProductosCatalogo((prev) => [...prev, p])
-                }
-              />
-            </div>
-          )}
           {isVisible("alta_viaje", "detalleCarga") && (
             <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
               <span className={fieldLabelClass}>Detalle adicional</span>
@@ -1554,24 +1628,46 @@ export function ViajeCreatePage() {
           tenantId={tenantId || undefined}
           onClose={() => {
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
           onSaved={(p: Pais) => {
             setSessionPaises((prev) => [...prev, p]);
             const codigo = (p.codigo || p.id);
-            if (paisQuickCreateDestinoIndex === null) {
+            const target = paisQuickCreateTarget;
+            if (target.kind === "origen") {
               setPaisOrigen(codigo);
               setOrigen("");
-            } else {
-              const idx = paisQuickCreateDestinoIndex;
+            } else if (target.kind === "destino") {
+              const idx = target.index;
               setDestinosRows((rows) =>
                 rows.map((r, i) =>
                   i === idx ? { ...r, pais: codigo, etiqueta: "" } : r,
                 ),
               );
+            } else if (target.kind === "origen-cliente") {
+              const ci = target.clienteIndex;
+              setClientesRows((rows) =>
+                rows.map((r, i) =>
+                  i === ci ? { ...r, paisOrigen: codigo, origen: "" } : r,
+                ),
+              );
+            } else {
+              const { clienteIndex, destinoIndex } = target;
+              setClientesRows((rows) =>
+                rows.map((r, i) =>
+                  i === clienteIndex
+                    ? {
+                        ...r,
+                        destinosRows: r.destinosRows.map((d, j) =>
+                          j === destinoIndex ? { ...d, pais: codigo, etiqueta: "" } : d,
+                        ),
+                      }
+                    : r,
+                ),
+              );
             }
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
         />
       )}
