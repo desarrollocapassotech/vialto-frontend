@@ -9,6 +9,7 @@ import {
 import { resolveClerkUserLabel } from '@/lib/clerkUserLabels';
 import { useOrgUserLabels } from '@/hooks/useOrgUserLabels';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ClienteCard } from '@/components/viajes/ViajeClientesFieldset';
 import type { OtroGasto } from '@/types/api';
 
 export type OtroGastoAutor = { id: string; label: string };
@@ -132,13 +133,20 @@ const fieldLabelClass =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const smallInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
-const gastoRowGridClass =
+const gastoRowGridClassCompact =
   'grid grid-cols-1 gap-4 mb-6 border-b border-black/10 pb-4 last:mb-4 last:border-0 last:pb-0 lg:mb-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(7rem,11rem)_auto] lg:items-end lg:gap-2 lg:border-0 lg:pb-0';
 
 function gastoFieldLabel(label: string, rowIndex: number) {
   return (
     <span className={`${fieldLabelClass} ${rowIndex > 0 ? 'lg:hidden' : ''}`}>{label}</span>
   );
+}
+
+/** Resumen mostrado colapsado en modo tarjeta (`stacked`): monto formateado, o vacío si no hay monto cargado. */
+function formatGastoSummary(row: OtroGastoDraft): string {
+  const monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
+  if (monto == null) return '';
+  return `${row.moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 interface Props {
@@ -148,9 +156,20 @@ interface Props {
   className?: string;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
+  /** Fuerza layout de una columna (con label en cada fila) en vez del grid compacto a partir de `lg:`. Usar cuando el fieldset vive en un contenedor angosto. */
+  stacked?: boolean;
+  /** Si se muestra la columna "Cargado por". Default true; el dato se sigue guardando igual aunque no se muestre. */
+  mostrarCargadoPor?: boolean;
 }
 
-export function OtrosGastosFieldset({ rows, onChange, className, tenantId }: Props) {
+export function OtrosGastosFieldset({
+  rows,
+  onChange,
+  className,
+  tenantId,
+  stacked = false,
+  mostrarCargadoPor = true,
+}: Props) {
   const userLabelMap = useOrgUserLabels(tenantId);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
@@ -172,100 +191,175 @@ export function OtrosGastosFieldset({ rows, onChange, className, tenantId }: Pro
         <span className={fieldLabelClass}>Otros gastos</span>
       </div>
 
-      {rows.length === 0 && (
-        <p className="text-xs text-vialto-steel">Sin otros gastos cargados.</p>
-      )}
+      {rows.map((row, i) =>
+        stacked ? (
+          <ClienteCard
+            key={i}
+            title={row.descripcion.trim() || `Gasto ${i + 1}`}
+            summary={formatGastoSummary(row)}
+            removable
+            onRemove={() => setRemoveIndex(i)}
+          >
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClass}>Descripción</span>
+                <input
+                  type="text"
+                  value={row.descripcion}
+                  onChange={(e) => update(i, { descripcion: e.target.value })}
+                  placeholder="Ej. Peaje, estadía…"
+                  className={inputClass}
+                  aria-label={`Descripción gasto ${i + 1}`}
+                />
+              </div>
+              <div className="grid grid-cols-[minmax(5rem,1fr)_5rem_minmax(7rem,1fr)] gap-2">
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Monto</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={row.montoStr}
+                    onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
+                    placeholder="0.00"
+                    className={`${smallInputClass} text-right tabular-nums`}
+                    aria-label={`Monto gasto ${i + 1}`}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Moneda</span>
+                  <select
+                    value={row.moneda}
+                    onChange={(e) => {
+                      const m = e.target.value as ViajeMonedaCodigo;
+                      update(i, {
+                        moneda: m,
+                        montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
+                      });
+                    }}
+                    className={smallInputClass}
+                    aria-label={`Moneda gasto ${i + 1}`}
+                  >
+                    <option value="ARS">ARS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={fieldLabelClass}>Fecha</span>
+                  <input
+                    type="date"
+                    value={row.fecha}
+                    onChange={(e) => update(i, { fecha: e.target.value })}
+                    className={smallInputClass}
+                    aria-label={`Fecha gasto ${i + 1}`}
+                  />
+                </div>
+              </div>
+              {mostrarCargadoPor && (
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className={fieldLabelClass}>Cargado por</span>
+                  <OtroGastoAutorDisplay
+                    row={row}
+                    labelMap={userLabelMap}
+                    variant="field"
+                    aria-label={`Usuario que cargó el gasto ${i + 1}`}
+                  />
+                </div>
+              )}
+            </div>
+          </ClienteCard>
+        ) : (
+          <div key={i} className={gastoRowGridClassCompact}>
+            {/* Descripción */}
+            <div className="flex min-w-0 flex-col gap-1">
+              {gastoFieldLabel('Descripción', i)}
+              <input
+                type="text"
+                value={row.descripcion}
+                onChange={(e) => update(i, { descripcion: e.target.value })}
+                placeholder="Ej. Peaje, estadía…"
+                className={inputClass}
+                aria-label={`Descripción gasto ${i + 1}`}
+              />
+            </div>
 
-      {rows.map((row, i) => (
-        <div key={i} className={gastoRowGridClass}>
-          {/* Descripción */}
-          <div className="flex min-w-0 flex-col gap-1">
-            {gastoFieldLabel('Descripción', i)}
-            <input
-              type="text"
-              value={row.descripcion}
-              onChange={(e) => update(i, { descripcion: e.target.value })}
-              placeholder="Ej. Peaje, estadía…"
-              className={inputClass}
-              aria-label={`Descripción gasto ${i + 1}`}
-            />
-          </div>
+            {/* Monto */}
+            <div className="flex flex-col gap-1 lg:w-36">
+              {gastoFieldLabel('Monto', i)}
+              <input
+                type="text"
+                inputMode="decimal"
+                value={row.montoStr}
+                onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
+                placeholder="0.00"
+                className={`${smallInputClass} text-right tabular-nums lg:w-36`}
+                aria-label={`Monto gasto ${i + 1}`}
+              />
+            </div>
 
-          {/* Monto */}
-          <div className="flex flex-col gap-1 lg:w-36">
-            {gastoFieldLabel('Monto', i)}
-            <input
-              type="text"
-              inputMode="decimal"
-              value={row.montoStr}
-              onChange={(e) => update(i, { montoStr: maskCurrencyForMoneda(e.target.value, row.moneda) })}
-              placeholder="0.00"
-              className={`${smallInputClass} text-right tabular-nums lg:w-36`}
-              aria-label={`Monto gasto ${i + 1}`}
-            />
-          </div>
+            {/* Moneda */}
+            <div className="flex flex-col gap-1 lg:w-20">
+              {gastoFieldLabel('Moneda', i)}
+              <select
+                value={row.moneda}
+                onChange={(e) => {
+                  const m = e.target.value as ViajeMonedaCodigo;
+                  update(i, {
+                    moneda: m,
+                    montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
+                  });
+                }}
+                className={`${smallInputClass} lg:w-20`}
+                aria-label={`Moneda gasto ${i + 1}`}
+              >
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
 
-          {/* Moneda */}
-          <div className="flex flex-col gap-1 lg:w-20">
-            {gastoFieldLabel('Moneda', i)}
-            <select
-              value={row.moneda}
-              onChange={(e) => {
-                const m = e.target.value as ViajeMonedaCodigo;
-                update(i, {
-                  moneda: m,
-                  montoStr: preserveAmountOnMonedaChange(row.montoStr, row.moneda, m),
-                });
-              }}
-              className={`${smallInputClass} lg:w-20`}
-              aria-label={`Moneda gasto ${i + 1}`}
-            >
-              <option value="ARS">ARS</option>
-              <option value="USD">USD</option>
-            </select>
-          </div>
+            {/* Fecha */}
+            <div className="flex flex-col gap-1 lg:w-36">
+              {gastoFieldLabel('Fecha', i)}
+              <input
+                type="date"
+                value={row.fecha}
+                onChange={(e) => update(i, { fecha: e.target.value })}
+                className={`${smallInputClass} lg:w-36`}
+                aria-label={`Fecha gasto ${i + 1}`}
+              />
+            </div>
 
-          {/* Fecha */}
-          <div className="flex flex-col gap-1 lg:w-36">
-            {gastoFieldLabel('Fecha', i)}
-            <input
-              type="date"
-              value={row.fecha}
-              onChange={(e) => update(i, { fecha: e.target.value })}
-              className={`${smallInputClass} lg:w-36`}
-              aria-label={`Fecha gasto ${i + 1}`}
-            />
-          </div>
-
-          {/* Cargado por (solo lectura) */}
-          <div className="flex min-w-0 flex-col gap-1">
-            {gastoFieldLabel('Cargado por', i)}
-            <OtroGastoAutorDisplay
-              row={row}
-              labelMap={userLabelMap}
-              variant="field"
-              aria-label={`Usuario que cargó el gasto ${i + 1}`}
-            />
-          </div>
-
-          {/* Eliminar */}
-          <div className="flex flex-col gap-1">
-            {i === 0 ? (
-              <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
-            ) : (
-              gastoFieldLabel('Eliminar', i)
+            {/* Cargado por (solo lectura) */}
+            {mostrarCargadoPor && (
+              <div className="flex min-w-0 flex-col gap-1">
+                {gastoFieldLabel('Cargado por', i)}
+                <OtroGastoAutorDisplay
+                  row={row}
+                  labelMap={userLabelMap}
+                  variant="field"
+                  aria-label={`Usuario que cargó el gasto ${i + 1}`}
+                />
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => setRemoveIndex(i)}
-              className="h-9 w-full px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100 lg:w-auto"
-              aria-label={`Eliminar gasto ${i + 1}`}
-            >
-              ✕
-            </button>
+
+            {/* Eliminar */}
+            <div className="flex flex-col gap-1">
+              {i === 0 ? (
+                <span className={`${fieldLabelClass} hidden lg:block`}>&nbsp;</span>
+              ) : (
+                gastoFieldLabel('Eliminar', i)
+              )}
+              <button
+                type="button"
+                onClick={() => setRemoveIndex(i)}
+                className="h-9 w-full px-2 border border-red-200 text-red-700 text-xs hover:bg-red-50 active:bg-red-100 lg:w-auto"
+                aria-label={`Eliminar gasto ${i + 1}`}
+              >
+                ✕
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        ),
+      )}
       <ConfirmDialog
         open={removeIndex !== null}
         title="Eliminar gasto"

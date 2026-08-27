@@ -438,6 +438,15 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   async function saveInline() {
     const viajeId = editingId;
     if (!viajeId || !draft) return;
+    setSavingId(viajeId);
+    try {
+      await saveInlineInner(viajeId, draft);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function saveInlineInner(viajeId: string, draft: ViajeInlineDraft) {
     if (!draft.numero.trim()) {
       setError("Ingresá el número de viaje.");
       return;
@@ -587,7 +596,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
         !!r.facturacionEstado &&
         !["sin_facturar", "anulado"].includes(r.facturacionEstado),
     );
-    setSavingId(viajeId);
     setError(null);
     try {
       const destinosBody = destinosPayloadParaApi(destinosVal.destinos);
@@ -696,8 +704,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     } catch (e) {
       setError(friendlyError(e, "viajes"));
       showToast("No se pudo guardar el viaje", "error");
-    } finally {
-      setSavingId(null);
     }
   }
 
