@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
+  Bell,
   Building2,
   Split,
   Calculator,
@@ -23,6 +24,7 @@ import {
   PackageMinus,
   PackagePlus,
   Receipt,
+  Settings,
   SlidersHorizontal,
   Truck,
   Warehouse,
@@ -65,6 +67,8 @@ type NavGroup = {
   /** `null` = sin rótulo (p. ej. solo inicio). */
   title: string | null;
   items: NavItem[];
+  /** Ícono representativo en el riel colapsado. Por defecto usa el del primer ítem. */
+  icon?: LucideIcon;
 };
 
 const HEADER_HEIGHT_CLASS = "h-16";
@@ -221,7 +225,6 @@ export function AppShell() {
         title: "Plataforma",
         items: [
           { to: "/superadmin/empresas", label: "Empresas", icon: Building2 },
-          { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
           {
             to: "/superadmin/campos-empresa",
             label: "Configuración por empresa",
@@ -336,6 +339,21 @@ export function AppShell() {
       ],
     });
 
+    if (superadmin) {
+      groups.push({
+        title: "Ajustes",
+        icon: Settings,
+        items: [
+          { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
+          {
+            to: "/configuracion/notificaciones",
+            label: "Notificaciones",
+            icon: Bell,
+          },
+        ],
+      });
+    }
+
     return groups;
   }, [superadmin, tenant?.modules, roleCtx]);
 
@@ -444,7 +462,11 @@ export function AppShell() {
           ) : (
             navGroups.map((group, gi) => {
               const open = isGroupOpen(group);
-              const isCollapsibleGroup = collapsed && group.title !== null;
+              // Un grupo con un solo ítem no necesita accordion: el ícono va directo a esa pantalla.
+              const singleItemGroup =
+                collapsed && group.title !== null && group.items.length === 1;
+              const isCollapsibleGroup =
+                collapsed && group.title !== null && group.items.length > 1;
               return (
               <div
                 key={group.title ?? `g-${gi}`}
@@ -471,7 +493,7 @@ export function AppShell() {
                   // Riel de iconos: un solo botón representativo por grupo colapsable.
                   // Al hacer click, expande el menú con labels y abre ese grupo puntual.
                   (() => {
-                    const GroupIcon = group.items[0]?.icon ?? House;
+                    const GroupIcon = group.icon ?? group.items[0]?.icon ?? House;
                     return (
                       <button
                         type="button"
@@ -500,7 +522,7 @@ export function AppShell() {
                     );
                   })()
                 ) : (
-                  open &&
+                  (singleItemGroup || open) &&
                   group.items.map((item) => (
                     <NavLink
                       key={item.to}
