@@ -69,6 +69,8 @@ type NavGroup = {
   items: NavItem[];
   /** Ícono representativo en el riel colapsado. Por defecto usa el del primer ítem. */
   icon?: LucideIcon;
+  /** Texto del tooltip al pasar el mouse sobre el ícono colapsado. Por defecto usa `title`. */
+  tooltip?: string;
 };
 
 const HEADER_HEIGHT_CLASS = "h-16";
@@ -265,27 +267,13 @@ export function AppShell() {
           icon: Calculator,
           end: true,
         });
-
-        // --- NUEVA LÓGICA DE CONFIGURACIÓN ---
-        if (!superadmin) {
-          if (hasArca) {
-            facturacionItems.push({
-              to: "/configuracion/arca",
-              label: "Configuración ARCA",
-              icon: Landmark,
-            });
-          } else if (hasFacturacion) {
-            facturacionItems.push({
-              to: "/configuracion/conceptos",
-              label: "Configuración de conceptos",
-              icon: SlidersHorizontal, // Podés usar SlidersHorizontal o importar Settings / FileText
-            });
-          }
-        }
-        // -------------------------------------
       }
 
-      groups.push({ title: "Facturación", items: facturacionItems });
+      groups.push({
+        title: "Facturación",
+        tooltip: "Facturación y liquidaciones",
+        items: facturacionItems,
+      });
     }
 
     if (superadmin || canAccessStock(tenant?.modules ?? [])) {
@@ -352,6 +340,27 @@ export function AppShell() {
           },
         ],
       });
+    } else {
+      const ajustesItems: NavItem[] = [];
+      if (hasArca) {
+        ajustesItems.push({
+          to: "/configuracion/arca",
+          label: "Configuración ARCA",
+          icon: Landmark,
+        });
+      } else if (hasFacturacion) {
+        ajustesItems.push({
+          to: "/configuracion/conceptos",
+          label: "Configuración de conceptos",
+          icon: SlidersHorizontal,
+        });
+      }
+      ajustesItems.push({
+        to: "/configuracion/notificaciones",
+        label: "Notificaciones",
+        icon: Bell,
+      });
+      groups.push({ title: "Ajustes", icon: Settings, items: ajustesItems });
     }
 
     return groups;
@@ -494,10 +503,11 @@ export function AppShell() {
                   // Al hacer click, expande el menú con labels y abre ese grupo puntual.
                   (() => {
                     const GroupIcon = group.icon ?? group.items[0]?.icon ?? House;
+                    const groupTooltip = group.tooltip ?? (group.title as string);
                     return (
                       <button
                         type="button"
-                        aria-label={group.title ?? undefined}
+                        aria-label={groupTooltip}
                         onClick={() => {
                           setOpenGroups((prev) => ({
                             ...prev,
@@ -509,7 +519,7 @@ export function AppShell() {
                         onMouseEnter={(e) => {
                           const rect = e.currentTarget.getBoundingClientRect();
                           setNavTooltip({
-                            label: group.title as string,
+                            label: groupTooltip,
                             top: rect.top + rect.height / 2,
                             left: rect.right + 10,
                           });
