@@ -382,6 +382,26 @@ export function AppShell() {
     }
   }, [openGroups]);
 
+  // Al colapsar el menú a solo-iconos, plegamos todos los grupos: si después se
+  // vuelve a expandir (botón de flecha), arranca todo cerrado. El único caso que
+  // queda abierto es el que el usuario haya clickeado en el riel de iconos, que
+  // setea ese grupo en `true` en el mismo gesto que expande el menú (por eso este
+  // efecto solo corre mientras `sidebarCollapsed` sigue en `true`).
+  useEffect(() => {
+    if (!sidebarCollapsed || !sidebarUsesAccordion) return;
+    setOpenGroups((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const group of navGroups) {
+        if (group.title !== null && next[group.title] !== false) {
+          next[group.title] = false;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [sidebarCollapsed, sidebarUsesAccordion, navGroups]);
+
   // Un grupo queda abierto salvo que el usuario lo haya colapsado explícitamente
   // (la preferencia manual siempre gana, incluso si el grupo es el de la ruta activa).
   function isGroupOpen(group: NavGroup) {
