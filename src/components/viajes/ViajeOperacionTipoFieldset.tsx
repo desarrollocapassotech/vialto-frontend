@@ -31,9 +31,7 @@ export function ViajeOperacionTipoFieldset({
         "min-w-0 space-y-3 border-0 p-0 md:col-span-2 lg:col-span-3 [&:disabled]:opacity-60"
       }
     >
-      <legend className={`${legendClass} mb-2`}>
-        ¿Quién realiza el transporte?
-      </legend>
+      <legend className={`${legendClass} mb-2`}>Tipo de flota</legend>
       <div className="flex flex-wrap gap-4 sm:gap-6">
         <label className="flex cursor-pointer items-center gap-2 text-base text-vialto-charcoal">
           <input

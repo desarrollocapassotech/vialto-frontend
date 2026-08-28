@@ -10,9 +10,14 @@ import { CrudInput, CrudSelect } from "@/components/crud/CrudFields";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from "@/components/crud/TransportistaAsignacionFields";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTransportistasList } from "@/hooks/useTransportistasList";
 import {
   vehiculoCreatePayloadFromForm,
   type VehiculoFormState,
@@ -40,6 +45,7 @@ const emptyForm = (): VehiculoFormState => ({
   vencimientoPoliza: "",
   tara: "",
   precinto: "",
+  transportistaId: "",
 });
 
 export function VehiculoCreatePage() {
@@ -48,11 +54,22 @@ export function VehiculoCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const transportistasPlatform = useTransportistasList(
+    tenantId || undefined,
+    !tenantId,
+  );
+  const transportistas = tenantId
+    ? (transportistasPlatform ?? [])
+    : maestro.transportistas;
+  const loadingTransportistas = tenantId
+    ? transportistasPlatform === null
+    : maestro.loading;
 
   // ---> INICIALIZAMOS EL TOAST
   const { showToast } = useToast();
 
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
+  const [asignacionModo, setAsignacionModo] = useState<AsignacionModo>("propio");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -61,9 +78,17 @@ export function VehiculoCreatePage() {
     setForm((prev) => ({ ...prev, ...p }));
   }
 
+  function applyAsignacionModo(modo: AsignacionModo) {
+    setAsignacionModo(modo);
+    if (modo === "propio") patch({ transportistaId: "" });
+  }
+
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!form.patente.trim()) errs.patente = "Ingresá la patente.";
+    if (asignacionModo === "externo" && !form.transportistaId.trim()) {
+      errs.transportistaId = "Seleccioná un transportista o elegí flota propia.";
+    }
     if (form.tara.trim() && vehiculoCreatePayloadFromForm(form).tara == null)
       errs.tara = "La tara debe ser un número válido.";
     if (Object.keys(errs).length > 0) {
@@ -204,6 +229,20 @@ export function VehiculoCreatePage() {
             onChange={(e) => patch({ precinto: e.target.value })}
           />
         </label>
+        <div className="md:col-span-2 grid gap-1.5">
+          <TransportistaAsignacionFields
+            modo={asignacionModo}
+            onModoChange={applyAsignacionModo}
+            transportistaId={form.transportistaId}
+            onTransportistaIdChange={(id) => {
+              patch({ transportistaId: id });
+              if (id) setFieldErrors((p) => ({ ...p, transportistaId: "" }));
+            }}
+            transportistas={transportistas}
+            loadingTransportistas={loadingTransportistas}
+          />
+          <CrudFieldError message={fieldErrors.transportistaId} />
+        </div>
         <div className="md:col-span-2">
           <CrudFormErrorAlert message={error} />
         </div>

@@ -8,6 +8,10 @@ import { CrudFieldLabel, CrudInput } from "@/components/crud/CrudFields";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from "@/components/crud/TransportistaAsignacionFields";
 import { apiJson } from "@/lib/api";
 import {
   choferFormStateFromApi,
@@ -18,6 +22,7 @@ import {
 } from "@/lib/choferForm";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTransportistasList } from "@/hooks/useTransportistasList";
 import { canAccessCombustible } from "@/lib/tenantModules";
 import type { Chofer } from "@/types/api";
 
@@ -35,6 +40,16 @@ export function ChoferEditPage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const transportistasPlatform = useTransportistasList(
+    tenantId || undefined,
+    !tenantId,
+  );
+  const transportistas = tenantId
+    ? (transportistasPlatform ?? [])
+    : maestro.transportistas;
+  const loadingTransportistas = tenantId
+    ? transportistasPlatform === null
+    : maestro.loading;
 
   // ---> INICIALIZAMOS EL TOAST
   const { showToast } = useToast();
@@ -42,6 +57,7 @@ export function ChoferEditPage() {
   const showPinField =
     !!tenantId || canAccessCombustible(maestro.tenant?.modules ?? []);
   const [form, setForm] = useState<ChoferFormState | null>(null);
+  const [asignacionModo, setAsignacionModo] = useState<AsignacionModo>("propio");
   const [confirmDelete, setConfirmDelete] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -54,6 +70,11 @@ export function ChoferEditPage() {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }
 
+  function applyAsignacionModo(modo: AsignacionModo) {
+    setAsignacionModo(modo);
+    if (modo === "propio") patch({ transportistaId: "" });
+  }
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -64,7 +85,9 @@ export function ChoferEditPage() {
           getToken(),
         );
         if (!cancelled) {
-          setForm(choferFormStateFromApi(row));
+          const next = choferFormStateFromApi(row);
+          setForm(next);
+          setAsignacionModo(next.transportistaId.trim() ? "externo" : "propio");
           setShowPinInput(false);
           setError(null);
         }
@@ -85,6 +108,9 @@ export function ChoferEditPage() {
     if (!form.nombre.trim()) errs.nombre = "Ingresá el nombre del chofer.";
     const dniError = validarDniForm(form.dni);
     if (dniError) errs.dni = dniError;
+    if (asignacionModo === "externo" && !form.transportistaId.trim()) {
+      errs.transportistaId = "Seleccioná un transportista o elegí flota propia.";
+    }
     const pinError = showPinField ? validarPinForm(form.pin) : null;
     if (pinError) errs.pin = pinError;
     if (Object.keys(errs).length > 0) {
@@ -192,6 +218,34 @@ export function ChoferEditPage() {
                 onChange={(e) => patch({ telefono: e.target.value })}
               />
             </label>
+            <label className="grid gap-1.5">
+              <CrudFieldLabel>N.° licencia</CrudFieldLabel>
+              <CrudInput
+                value={form.licencia}
+                placeholder="Ej: B1234567"
+                onChange={(e) => patch({ licencia: e.target.value })}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <CrudFieldLabel>Vencimiento de licencia</CrudFieldLabel>
+              <CrudInput
+                type="date"
+                value={form.licenciaVence}
+                onChange={(e) => patch({ licenciaVence: e.target.value })}
+              />
+            </label>
+            <TransportistaAsignacionFields
+              modo={asignacionModo}
+              onModoChange={applyAsignacionModo}
+              transportistaId={form.transportistaId}
+              onTransportistaIdChange={(id) => {
+                patch({ transportistaId: id });
+                if (id) setFieldErrors((p) => ({ ...p, transportistaId: "" }));
+              }}
+              transportistas={transportistas}
+              loadingTransportistas={loadingTransportistas}
+            />
+            <CrudFieldError message={fieldErrors.transportistaId} />
             {showPinField && (
               <div className="grid gap-2">
                 <div className="flex items-center gap-2">

@@ -62,6 +62,30 @@ export function ViajeProductosLista({
               onNuevoProducto={getToken ? () => { setNuevoParaIndex(i); setShowNuevo(true); } : undefined}
             />
           </div>
+          <label className="flex shrink-0 items-center gap-1.5">
+            <span className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+              Cantidad
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              disabled={disabled}
+              placeholder="0"
+              value={item.cantidad != null ? String(item.cantidad) : ''}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (!raw) {
+                  patchRow(i, { cantidad: null });
+                  return;
+                }
+                const n = Number(raw.replace(',', '.'));
+                patchRow(i, { cantidad: Number.isFinite(n) ? n : null });
+              }}
+              className={`${triggerClassName} w-24 text-right tabular-nums`}
+              aria-label={`Cantidad de producto ${i + 1}`}
+            />
+          </label>
           <button
             type="button"
             disabled={disabled}

@@ -1145,7 +1145,10 @@ export function ViajeCreatePage() {
                 }}
                 fechaCargaError={fechaCargaError}
                 fechaDescargaError={fechaDescargaError}
-                mostrarKmLitros={etapaMuestraKmLitros(estado)}
+                mostrarKmLitros={
+                  isVisible("alta_viaje", "kmRecorridos") ||
+                  isVisible("alta_viaje", "litrosConsumidos")
+                }
                 mostrarKm={isVisible("alta_viaje", "kmRecorridos")}
                 mostrarLitros={isVisible("alta_viaje", "litrosConsumidos")}
                 kmRecorridos={kmRecorridos}

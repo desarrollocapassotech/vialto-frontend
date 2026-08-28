@@ -11,6 +11,8 @@ export type VehiculoFormState = {
   vencimientoPoliza: string;
   tara: string;
   precinto: string;
+  /** Vacío = flota propia; cuid = transportista externo. */
+  transportistaId: string;
 };
 
 /** Valor para `<input type="date">` sin corrimiento por zona horaria. */
@@ -41,6 +43,7 @@ export function vehiculoFormStateFromApi(row: Vehiculo): VehiculoFormState {
     ),
     tara: row.tara != null ? String(row.tara) : "",
     precinto: row.precinto ?? "",
+    transportistaId: row.transportistaId ?? "",
   };
 }
 
@@ -59,8 +62,8 @@ function parseOptionalTara(raw: string): number | null {
 }
 
 /**
- * Cuerpo POST alineado con CreateVehiculoDto del backend.
- * No incluye `transportistaId`: la pertenencia queda sin asignar (null) hasta nueva lógica de vinculación.
+ * Cuerpo POST/PATCH alineado con CreateVehiculoDto / UpdateVehiculoDto.
+ * `transportistaId: null` = flota propia.
  */
 export function vehiculoCreatePayloadFromForm(
   form: VehiculoFormState,
@@ -76,6 +79,7 @@ export function vehiculoCreatePayloadFromForm(
     vencimientoPoliza: form.vencimientoPoliza.trim() || null,
     tara: parseOptionalTara(form.tara),
     precinto: form.precinto.trim() || null,
+    transportistaId: form.transportistaId.trim() || null,
   };
 }
 
