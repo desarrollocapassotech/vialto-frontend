@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { useToast } from "@/lib/toast";
+import { roundMoney2 } from "@/lib/facturaTotales";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   formatNumberForMoneda,
@@ -526,7 +527,10 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     }
     
     const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
-      ? (Number(draft.cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+      ? roundMoney2(
+          (Number(draft.cantidadFactura.replace(",", ".")) || 0) *
+            (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0),
+        )
       : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
 
     if (calcMonto == null || calcMonto < 0.01) {

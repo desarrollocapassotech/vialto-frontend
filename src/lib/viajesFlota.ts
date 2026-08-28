@@ -1,5 +1,6 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
+import { importeNetoViajeParaFactura } from "@/lib/facturaTotales";
 
 import type {
   Chofer,
@@ -380,9 +381,13 @@ export function formatViajeImporteForListado(
 
 /** Celda de tabla: monto a facturar. */
 export function textoMontoFacturarListado(v: Viaje): string {
-  const m = v.monto;
-  if (m == null) return "—";
-  return formatViajeImporteForListado(m, v.monedaMonto);
+  const hasDesglose =
+    v.cantidadFactura != null && v.precioUnitarioFactura != null;
+  if (!hasDesglose && v.monto == null) return "—";
+  return formatViajeImporteForListado(
+    importeNetoViajeParaFactura(v),
+    v.monedaMonto,
+  );
 }
 
 /**
@@ -564,10 +569,10 @@ export function textoImporteFacturaSeleccion(
     const v = viajes.find((x) => x.id === id);
     if (!v) continue;
 
-    const monto = v.monto;
+    const monto = importeNetoViajeParaFactura(v);
     const moneda = v.monedaMonto;
 
-    if (monto == null) continue;
+    if (monto <= 0 && v.monto == null) continue;
     if (normalizeViajeMoneda(moneda) === "USD") usd += monto;
     else ars += monto;
   }

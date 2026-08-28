@@ -7,6 +7,7 @@ import {
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
 import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
+import { roundMoney2 } from '@/lib/facturaTotales';
 import {
   AfipInfraErrorBanner,
   ArcaErrorMessage,
@@ -113,14 +114,18 @@ export function FacturaViewModal({
   let totalConIva = factura.importe;
   if (porTramo) {
     const sumaTramos = tramos.reduce((s, t) => s + t.monto, 0);
-    const undivided = Math.max(0, factura.importe - sumaTramos);
-    const ivaTramos = tramos.reduce((s, t) => s + (t.monto * t.ivaPct) / 100, 0);
-    const ivaUndivided = (undivided * ivaN) / 100;
-    totalConIva = factura.importe + ivaTramos + ivaUndivided;
+    const undivided = Math.max(0, roundMoney2(factura.importe - sumaTramos));
+    const ivaTramos = tramos.reduce(
+      (s, t) => s + roundMoney2((t.monto * t.ivaPct) / 100),
+      0,
+    );
+    const ivaUndivided = roundMoney2((undivided * ivaN) / 100);
+    totalConIva = roundMoney2(factura.importe + ivaTramos + ivaUndivided);
     muestraIva = true;
   } else {
     muestraIva = ivaN > 0 && factura.importe > 0;
-    totalConIva = factura.importe * (1 + ivaN / 100);
+    const ivaMonto = roundMoney2((factura.importe * ivaN) / 100);
+    totalConIva = roundMoney2(factura.importe + ivaMonto);
   }
 
   const letraFromCbte = facturaLetraFromCbteTipo(factura.cbteTipo);
