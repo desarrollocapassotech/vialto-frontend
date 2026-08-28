@@ -346,7 +346,7 @@ export function AppShell() {
         items: [
           { to: "/superadmin/arca", label: "ARCA / AFIP", icon: Landmark },
           {
-            to: "/configuracion/notificaciones",
+            to: "/superadmin/notificaciones",
             label: "Notificaciones",
             icon: Bell,
           },

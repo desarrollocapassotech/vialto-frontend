@@ -199,6 +199,10 @@ const ENTRIES: Entry[] = [
     pattern: "/superadmin/campos-empresa",
     build: (_p, ctx) => [homeCrumb(ctx), { label: "Configuración por empresa" }],
   },
+  {
+    pattern: "/superadmin/notificaciones",
+    build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones" }],
+  },
   { pattern: "/superadmin/combustible", build: (_p, ctx) => [homeCrumb(ctx), { label: "Combustible" }] },
 ];
 
