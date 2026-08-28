@@ -724,16 +724,13 @@ export function ViajeCreatePage() {
 
     // 5. Validaciones de Fechas de Carga y Descarga
     const fcError = !fechaCarga.trim() ? "Ingresá la fecha de carga." : null;
-    const fdError = !fechaDescarga.trim()
-      ? "Ingresá la fecha de descarga."
-      : null;
     setFechaCargaError(fcError);
-    setFechaDescargaError(fdError);
-    if (fcError || fdError) {
+    setFechaDescargaError(null);
+    if (fcError) {
       setStep(3);
       return;
     }
-    if (fechaDescarga < fechaCarga) {
+    if (fechaDescarga.trim() && fechaDescarga < fechaCarga) {
       setFechaDescargaError(
         "La fecha de descarga no puede ser anterior a la de carga.",
       );

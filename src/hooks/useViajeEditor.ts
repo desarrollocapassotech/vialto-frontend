@@ -512,13 +512,10 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     }
     setClientesRowErrors({});
     const fcError = !draft.fechaCarga.trim() ? "Ingresá la fecha de carga." : null;
-    const fdError = !draft.fechaDescarga.trim()
-      ? "Ingresá la fecha de descarga."
-      : null;
     setFechaCargaError(fcError);
-    setFechaDescargaError(fdError);
-    if (fcError || fdError) return;
-    if (draft.fechaDescarga < draft.fechaCarga) {
+    setFechaDescargaError(null);
+    if (fcError) return;
+    if (draft.fechaDescarga.trim() && draft.fechaDescarga < draft.fechaCarga) {
       setFechaDescargaError(
         "La fecha de descarga no puede ser anterior a la de carga.",
       );
@@ -635,10 +632,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             origen: draft.origen.trim() || undefined,
             ...destinosBody,
             fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
-            fechaDescarga: fechaHoraToIso(
-              draft.fechaDescarga,
-              draft.horaDescarga,
-            ),
+            fechaDescarga: draft.fechaDescarga.trim()
+              ? fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga)
+              : null,
             productoItems: draft.productoItems.filter((x) =>
               x.productoId.trim(),
             ),
