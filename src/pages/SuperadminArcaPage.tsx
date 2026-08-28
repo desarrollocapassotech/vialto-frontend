@@ -719,6 +719,9 @@ export function SuperadminArcaPage() {
   const tenants = useTenantsList();
   const [tenantId, setTenantId] = useState("");
   const [tab, setTab] = useState<Tab>("config");
+  const selectedTenantModules = tenants?.find(
+    (t) => t.clerkOrgId === tenantId,
+  )?.modules;
 
   function handleTenantChange(next: string) {
     setTenantId(next);
@@ -774,6 +777,7 @@ export function SuperadminArcaPage() {
                 key={`cfg-${tenantId}`}
                 tenantId={tenantId}
                 embeddedInSuperadmin
+                modules={selectedTenantModules}
               />
             )}
             {tab === "liquidaciones" && (

@@ -1,7 +1,8 @@
 export const AVAILABLE_MODULES = [
   'viajes',
   'facturacion',
-  'integracion-arca',
+  'emision-facturas-arca',
+  'emision-liquido-producto-arca',
   'cuenta-corriente',
   'stock',
   'combustible',

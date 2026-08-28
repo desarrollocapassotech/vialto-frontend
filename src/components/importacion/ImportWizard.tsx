@@ -131,7 +131,10 @@ export function ImportWizard({
     () => getToken(),
   );
 
-  const hasArca = tenantModules.includes("integracion-arca");
+  const hasFacturasArca = tenantModules.includes("emision-facturas-arca");
+  const hasLiquidoProductoArca = tenantModules.includes(
+    "emision-liquido-producto-arca",
+  );
   const hasFacturacion = tenantModules.includes("facturacion");
 
   const [numerosPorCliente, setNumerosPorCliente] = useState<
@@ -177,7 +180,8 @@ export function ImportWizard({
     <div className="flex flex-col gap-6">
       <WizardStepper
         wizard={wizard}
-        hasArca={hasArca}
+        hasFacturasArca={hasFacturasArca}
+        hasLiquidoProductoArca={hasLiquidoProductoArca}
         hasFacturacion={hasFacturacion}
       />
 
@@ -262,7 +266,8 @@ export function ImportWizard({
           <EtapaModulo wizard={wizard} />
         )}
 
-      {wizard.fase === "post-liquidaciones" && hasArca && (
+      {wizard.fase === "post-liquidaciones" &&
+        (hasFacturacion || hasLiquidoProductoArca) && (
         <EtapaOpcional
           titulo="Generar liquidaciones borrador"
           descripcion="Se van a agrupar los viajes recién creados por transportista. Ninguna liquidación se emite a AFIP — quedan en borrador para que las emitas manualmente cuando quieras."
@@ -308,11 +313,13 @@ export function ImportWizard({
           }
         />
       )}
-      {wizard.fase === "post-liquidaciones" && !hasArca && (
-        <AvanceSilencioso onNext={wizard.saltearLiquidaciones} />
-      )}
+      {wizard.fase === "post-liquidaciones" &&
+        !hasFacturacion &&
+        !hasLiquidoProductoArca && (
+          <AvanceSilencioso onNext={wizard.saltearLiquidaciones} />
+        )}
 
-      {wizard.fase === "post-facturas" && (hasArca || hasFacturacion) && (
+      {wizard.fase === "post-facturas" && (hasFacturasArca || hasFacturacion) && (
         <div className="flex flex-col gap-4">
           {mayoriaYaFacturada && (
             <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -335,11 +342,11 @@ export function ImportWizard({
           onSaltear={wizard.saltearFacturas}
           onConfirmar={() =>
             wizard.confirmarFacturas(
-              hasArca ? undefined : numerosPorCliente,
+              hasFacturasArca ? undefined : numerosPorCliente,
             )
           }
           confirmDisabled={
-            !hasArca &&
+            !hasFacturasArca &&
             (wizard.facturasPreview?.some(
               (g) => !numerosPorCliente[g.clienteId]?.trim(),
             ) ??
@@ -353,7 +360,7 @@ export function ImportWizard({
                     <th className={th}>Cliente</th>
                     <th className={th}>Viajes</th>
                     <th className={th}>Importe</th>
-                    {!hasArca && <th className={th}>N° de factura</th>}
+                    {!hasFacturasArca && <th className={th}>N° de factura</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -367,7 +374,7 @@ export function ImportWizard({
                           currency: g.moneda,
                         })}
                       </td>
-                      {!hasArca && (
+                      {!hasFacturasArca && (
                         <td className={td}>
                           <input
                             type="text"
@@ -396,7 +403,7 @@ export function ImportWizard({
           />
         </div>
       )}
-      {wizard.fase === "post-facturas" && !hasArca && !hasFacturacion && (
+      {wizard.fase === "post-facturas" && !hasFacturasArca && !hasFacturacion && (
         <AvanceSilencioso onNext={wizard.saltearFacturas} />
       )}
 
@@ -613,11 +620,13 @@ function SelectorModulos({
 
 function WizardStepper({
   wizard,
-  hasArca,
+  hasFacturasArca,
+  hasLiquidoProductoArca,
   hasFacturacion,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
-  hasArca: boolean;
+  hasFacturasArca: boolean;
+  hasLiquidoProductoArca: boolean;
   hasFacturacion: boolean;
 }) {
   // Liquidaciones (y el resto de las etapas opcionales post-viajes) solo son
@@ -626,12 +635,14 @@ function WizardStepper({
   // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
   const tieneViajes = wizard.secuencia.includes("viajes");
 
+  const ofreceLiquidaciones = hasFacturacion || hasLiquidoProductoArca;
+
   const pasos = [
     ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
-    ...(tieneViajes && hasArca
+    ...(tieneViajes && ofreceLiquidaciones
       ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
       : []),
-    ...(hasArca || hasFacturacion
+    ...(hasFacturasArca || hasFacturacion
       ? [{ key: "post-facturas", label: "Resumen" }]
       : []),
   ];
@@ -644,7 +655,7 @@ function WizardStepper({
         : wizard.fase === "post-liquidaciones"
           ? wizard.secuencia.length
           : wizard.fase === "post-facturas"
-            ? wizard.secuencia.length + (tieneViajes && hasArca ? 1 : 0)
+            ? wizard.secuencia.length + (tieneViajes && ofreceLiquidaciones ? 1 : 0)
             : pasos.length;
 
   return (

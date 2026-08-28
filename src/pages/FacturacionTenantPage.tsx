@@ -28,7 +28,7 @@ import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTenantsList } from "@/hooks/useTenantsList";
-import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import { canAccessEmisionFacturasArca } from "@/lib/tenantModules";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
@@ -136,7 +136,7 @@ export function FacturacionTenantPage({
   const tenantModules = platform
     ? (platformTenant?.modules ?? [])
     : (maestro.tenant?.modules ?? []);
-  const hasArca = canAccessIntegracionArca(tenantModules);
+  const hasArca = canAccessEmisionFacturasArca(tenantModules);
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);

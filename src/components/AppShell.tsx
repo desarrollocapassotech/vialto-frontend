@@ -40,8 +40,9 @@ import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   canAccessCombustible,
+  canAccessEmisionFacturasArca,
+  canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
-  canAccessIntegracionArca,
   canAccessMantenimiento,
   canAccessStock,
   canAccessViajes,
@@ -250,10 +251,14 @@ export function AppShell() {
 
     const hasFacturacion =
       superadmin || canAccessFacturacion(tenant?.modules ?? []);
-    const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
-    const hasLiquidaciones = superadmin || hasFacturacion || hasArca;
+    const hasFacturasArca = canAccessEmisionFacturasArca(tenant?.modules ?? []);
+    const hasLiquidoProductoArca = canAccessEmisionLiquidoProductoArca(
+      tenant?.modules ?? [],
+    );
+    const hasLiquidaciones =
+      superadmin || hasFacturacion || hasLiquidoProductoArca;
 
-    if (hasFacturacion || hasArca) {
+    if (hasFacturacion || hasFacturasArca || hasLiquidoProductoArca) {
       const facturacionItems: NavItem[] = [];
 
       if (hasFacturacion) {
@@ -347,7 +352,7 @@ export function AppShell() {
       });
     } else {
       const ajustesItems: NavItem[] = [];
-      if (hasArca) {
+      if (hasFacturasArca || hasLiquidoProductoArca) {
         ajustesItems.push({
           to: "/configuracion/arca",
           label: "Configuración ARCA",
