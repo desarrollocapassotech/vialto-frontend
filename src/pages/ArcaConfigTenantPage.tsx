@@ -172,11 +172,22 @@ function SectionCard({
   );
 }
 
-export function ArcaConfigTenantPage() {
+export function ArcaConfigTenantPage({
+  tenantId,
+  embeddedInSuperadmin,
+}: { tenantId?: string; embeddedInSuperadmin?: boolean } = {}) {
   const { getToken } = useAuth();
   const { user } = useUser();
-  const canEditAmbiente = isPlatformSuperadmin(user?.publicMetadata);
+  const platform = Boolean(tenantId?.trim());
+  const tid = tenantId?.trim() ?? "";
+  const canEditAmbiente = platform || isPlatformSuperadmin(user?.publicMetadata);
   const { showToast } = useToast();
+  const configUrl = platform
+    ? `/api/platform/arca/config?tenantId=${encodeURIComponent(tid)}`
+    : "/api/integracion-arca/config";
+  const logoUrl = platform
+    ? `/api/platform/arca/config/logo?tenantId=${encodeURIComponent(tid)}`
+    : "/api/integracion-arca/config/logo";
   const [existing, setExisting] = useState<ArcaConfig | null>(null);
   const [values, setValues] = useState<FormValues>(EMPTY);
   const [savedValues, setSavedValues] = useState<FormValues>(EMPTY);
@@ -196,12 +207,16 @@ export function ArcaConfigTenantPage() {
   );
 
   useEffect(() => {
+    if (platform && !tid) return;
     let cancelled = false;
     setInitialLoading(true);
+    setExisting(null);
+    setValues(EMPTY);
+    setSavedValues(EMPTY);
     void (async () => {
       try {
         const config = await apiJson<ArcaConfig | null>(
-          "/api/integracion-arca/config",
+          configUrl,
           () => getToken(),
         );
         if (!cancelled) {
@@ -220,7 +235,7 @@ export function ArcaConfigTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken]);
+  }, [getToken, configUrl, platform, tid]);
 
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -282,7 +297,7 @@ export function ArcaConfigTenantPage() {
         keyPemProduccion: v.keyPemProduccion.trim() || undefined,
       };
       const config = await apiJson<ArcaConfig>(
-        "/api/integracion-arca/config",
+        configUrl,
         () => getToken(),
         { method: "POST", body: JSON.stringify(body) },
       );
@@ -322,7 +337,7 @@ export function ArcaConfigTenantPage() {
       const form = new FormData();
       form.append("file", file);
       const config = await apiJson<ArcaConfig>(
-        "/api/integracion-arca/config/logo",
+        logoUrl,
         () => getToken(),
         { method: "POST", body: form },
       );
@@ -341,7 +356,7 @@ export function ArcaConfigTenantPage() {
     setLogoUploading(true);
     try {
       const config = await apiJson<ArcaConfig>(
-        "/api/integracion-arca/config/logo",
+        logoUrl,
         () => getToken(),
         { method: "DELETE" },
       );
@@ -369,12 +384,16 @@ export function ArcaConfigTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Configuración ARCA / AFIP
-      </h1>
-      <p className="mt-2 text-vialto-steel">
-        Datos para la emisión de comprobantes electrónicos.
-      </p>
+      {!embeddedInSuperadmin && (
+        <>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+            Configuración ARCA / AFIP
+          </h1>
+          <p className="mt-2 text-vialto-steel">
+            Datos para la emisión de comprobantes electrónicos.
+          </p>
+        </>
+      )}
       {existing && (
         <p className="mt-1 text-xs text-vialto-steel/70">
           Última actualización: {fmtDate(existing.updatedAt)}
@@ -405,7 +424,10 @@ export function ArcaConfigTenantPage() {
             title="Conceptos de liquidación"
             description="Catálogo de conceptos adicionales que se pueden sumar o restar al liquidar."
           >
-            <ConceptosLiquidacionConfigSection getToken={() => getToken()} />
+            <ConceptosLiquidacionConfigSection
+              getToken={() => getToken()}
+              tenantId={tenantId}
+            />
           </SectionCard>
         </div>
       )}
