@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
+import { resolveNotificacionRoute } from "@/lib/notificacionRoutes";
 import type { NotificacionFeed } from "@/types/notificaciones";
 
 const LIMIT = 50;
@@ -19,6 +20,7 @@ function formatFecha(iso: string): string {
 
 export function NotificacionesPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const [feed, setFeed] = useState<NotificacionFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,20 +76,29 @@ export function NotificacionesPage() {
           <div className="overflow-hidden border border-black/15">
             <table className="w-full text-sm">
               <tbody>
-                {feed.items.map((item) => (
-                  <tr key={item.id} className="border-t border-black/10 first:border-t-0">
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vialto-steel">
-                        {item.label}
-                      </p>
-                      <p className="mt-1 text-sm text-vialto-charcoal">{item.titulo}</p>
-                      <p className="mt-0.5 text-xs text-vialto-steel">{item.detalle}</p>
-                    </td>
-                    <td className="w-40 whitespace-nowrap px-4 py-3 text-right align-top text-xs text-vialto-steel">
-                      {formatFecha(item.enviadoAt)}
-                    </td>
-                  </tr>
-                ))}
+                {feed.items.map((item) => {
+                  const to = resolveNotificacionRoute(item);
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={to ? () => navigate(to) : undefined}
+                      className={`border-t border-black/10 first:border-t-0 ${
+                        to ? "cursor-pointer hover:bg-vialto-mist/60" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vialto-steel">
+                          {item.label}
+                        </p>
+                        <p className="mt-1 text-sm text-vialto-charcoal">{item.titulo}</p>
+                        <p className="mt-0.5 text-xs text-vialto-steel">{item.detalle}</p>
+                      </td>
+                      <td className="w-40 whitespace-nowrap px-4 py-3 text-right align-top text-xs text-vialto-steel">
+                        {formatFecha(item.enviadoAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

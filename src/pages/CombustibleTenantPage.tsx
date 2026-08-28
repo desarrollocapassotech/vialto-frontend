@@ -257,6 +257,20 @@ export function CombustibleTenantPage({
     setSearchParams,
   ]);
 
+  useEffect(() => {
+    const id = searchParams.get("carga")?.trim();
+    if (!id) return;
+    setViewTargetId(id);
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete("carga");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
   function resetPage() {
     setPage(1);
   }
