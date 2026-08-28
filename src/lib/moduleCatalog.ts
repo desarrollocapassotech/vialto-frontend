@@ -6,9 +6,6 @@ export const AVAILABLE_MODULES = [
   'stock',
   'combustible',
   'mantenimiento',
-  'remitos',
-  'turnos',
-  'reportes',
 ] as const;
 
 export type AvailableModuleCode = (typeof AVAILABLE_MODULES)[number];

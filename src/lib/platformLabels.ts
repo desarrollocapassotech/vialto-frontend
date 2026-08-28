@@ -17,9 +17,6 @@ const modulos: Record<string, string> = {
   stock: 'Stock',
   combustible: 'Combustible',
   mantenimiento: 'Mantenimiento',
-  remitos: 'Remitos',
-  turnos: 'Turnos',
-  reportes: 'Reportes',
 };
 
 export function labelBillingStatus(status: string): string {
