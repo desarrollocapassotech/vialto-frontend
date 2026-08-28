@@ -215,7 +215,8 @@ export function LiquidacionesTenantPage() {
   const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
-  const { tenant, transportistas, refreshTransportistas, refreshClientes } = useMaestroData();
+  const { tenant, transportistas, refreshTransportistas, refreshClientes } =
+    useMaestroData();
 
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
@@ -383,7 +384,14 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, activeTenantId, searchParams, setSearchParams, getToken]);
+  }, [
+    isLoaded,
+    isSignedIn,
+    activeTenantId,
+    searchParams,
+    setSearchParams,
+    getToken,
+  ]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
@@ -494,7 +502,11 @@ export function LiquidacionesTenantPage() {
   }
 
   /** Abre el PDF en una pestaña nueva (a diferencia de descargarPdf/Nc, que fuerzan la descarga). */
-  async function verPdfEnPestania(url: string, errorMsg: string, liqId: string) {
+  async function verPdfEnPestania(
+    url: string,
+    errorMsg: string,
+    liqId: string,
+  ) {
     const ventana = window.open("", "_blank");
     try {
       const res = await apiFetch(url, () => getToken());
