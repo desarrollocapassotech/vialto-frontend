@@ -934,15 +934,26 @@ export function ViajeCreatePage() {
     void onSubmit({ kmLitrosFromModal: true, km: p.km, litros: p.litros });
   }
 
-  // Desglose transportista: pago bruto (cantidad × precio unitario), pago neto (bruto
-  // "engrosado" sumándole el % de IVA) y el monto de IVA.
-  const desglosePagoBruto =
-    (Number(cantidadTransportista.replace(",", ".")) || 0) *
-    (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0);
-  const desglosePctIva =
+  // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
+  // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
+  const pagoBrutoTransportista = desgloseActivo
+    ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
+      (parseCurrencyForMoneda(
+        precioUnitarioTransportista,
+        monedaPrecioTransportista,
+      ) || 0)
+    : parseCurrencyForMoneda(
+        precioTransportistaExterno,
+        monedaPrecioTransportista,
+      ) || 0;
+  const pctIvaTransportista =
     Number(precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
-  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
+  const pagoNetoTransportista = engrosarConIva(
+    pagoBrutoTransportista,
+    pctIvaTransportista,
+  );
+  const montoIvaTransportista =
+    pagoNetoTransportista - pagoBrutoTransportista;
 
   function handleMonedaPrecioTransportistaChange(m: ViajeMonedaCodigo) {
     if (!desgloseActivo) {
@@ -1048,21 +1059,24 @@ export function ViajeCreatePage() {
                 ivaTransportistaVisible={ivaTransportistaVisible}
                 cantidadTransportista={cantidadTransportista}
                 onCantidadTransportistaChange={setCantidadTransportista}
+                fieldErrorCantidadTransportista={fieldErrors.cantidadTransportista}
                 precioUnitarioTransportista={precioUnitarioTransportista}
                 onPrecioUnitarioTransportistaChange={(v) =>
                   setPrecioUnitarioTransportista(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
+                fieldErrorPrecioUnitarioTransportista={fieldErrors.precioUnitarioTransportista}
                 monedaPrecioTransportista={monedaPrecioTransportista}
                 onMonedaPrecioTransportistaChange={handleMonedaPrecioTransportistaChange}
                 precioTransportistaIvaIncluidoPct={precioTransportistaIvaIncluidoPct}
                 onPrecioTransportistaIvaIncluidoPctChange={setPrecioTransportistaIvaIncluidoPct}
-                desglosePagoBruto={desglosePagoBruto}
-                desglosePagoNeto={desglosePagoNeto}
-                desgloseMontoIva={desgloseMontoIva}
+                desglosePagoBruto={pagoBrutoTransportista}
+                desglosePagoNeto={pagoNetoTransportista}
+                desgloseMontoIva={montoIvaTransportista}
                 precioTransportistaExterno={precioTransportistaExterno}
                 onPrecioTransportistaExternoChange={(v) =>
                   setPrecioTransportistaExterno(maskCurrencyForMoneda(v, monedaPrecioTransportista))
                 }
+                fieldErrorPrecioTransportistaExterno={fieldErrors.precioTransportistaExterno}
                 realizaFlete={realizaFlete}
                 onRealizaFleteChange={handleRealizaFleteChange}
                 transportistaEfectivoId={transportistaEfectivoId}

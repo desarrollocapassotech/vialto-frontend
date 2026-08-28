@@ -28,6 +28,15 @@ import type { Chofer, Transportista, Vehiculo } from "@/types/api";
 const fieldLabelClass =
   "text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel";
 const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
+const readonlyMoneyClass =
+  "flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0";
+
+function fmtReadonlyMoney(n: number) {
+  return n.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 interface Props {
   modoOperacion: ViajeOperacionModo;
@@ -256,75 +265,100 @@ export function ViajeCreateStep2Operacion({
                     </div>
                   )}
                 </div>
-                {ivaTransportistaVisible && (
+                {ivaTransportistaVisible ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={fieldLabelClass}>Pago bruto a transporte</span>
-                      <div className="flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0">
-                        <span className="w-full truncate">
-                          {desglosePagoBruto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={fieldLabelClass}>Pago neto</span>
-                      <div className="flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0">
-                        <span className="w-full truncate">
-                          {desglosePagoNeto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className={fieldLabelClass}>Monto IVA</span>
-                      <div className="flex items-center px-3 h-10 rounded-md border border-gray-200 bg-gray-50 text-gray-500 text-right tabular-nums min-w-0">
-                        <span className="w-full truncate">
-                          {desgloseMontoIva.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
+                    <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                    <div className={readonlyMoneyClass}>
+                      <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
                     </div>
                   </div>
                 )}
               </>
             ) : (
-              <div className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={fieldLabelClass}>Precio transporte</span>
-                  <div className="flex min-w-0 gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={precioTransportistaExterno}
-                      onChange={(e) => onPrecioTransportistaExternoChange(e.target.value)}
-                      placeholder="0.00"
-                      className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrorPrecioTransportistaExterno ? "border-red-400" : ""}`}
-                    />
-                    <MonedaSelect
-                      value={monedaPrecioTransportista}
-                      onChange={onMonedaPrecioTransportistaChange}
-                      aria-label="Moneda precio transportista externo"
-                    />
+              <>
+                <div className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className={fieldLabelClass}>Precio transporte</span>
+                    <div className="flex min-w-0 gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={precioTransportistaExterno}
+                        onChange={(e) => onPrecioTransportistaExternoChange(e.target.value)}
+                        placeholder="0.00"
+                        className={`min-w-0 flex-1 ${inputClass} text-right tabular-nums ${fieldErrorPrecioTransportistaExterno ? "border-red-400" : ""}`}
+                      />
+                      <MonedaSelect
+                        value={monedaPrecioTransportista}
+                        onChange={onMonedaPrecioTransportistaChange}
+                        aria-label="Moneda precio transportista externo"
+                      />
+                    </div>
+                    <CrudFieldError message={fieldErrorPrecioTransportistaExterno} />
                   </div>
-                  <CrudFieldError message={fieldErrorPrecioTransportistaExterno} />
+                  {ivaTransportistaVisible && (
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={fieldLabelClass}>% de IVA</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={precioTransportistaIvaIncluidoPct}
+                        onChange={(e) => onPrecioTransportistaIvaIncluidoPctChange(e.target.value)}
+                        placeholder="0"
+                        className={`${inputClass} text-right tabular-nums`}
+                      />
+                      <p className="text-xs text-vialto-steel">
+                        Dejalo en 0 si el transportista no suma IVA al cobrar.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {ivaTransportistaVisible && (
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className={fieldLabelClass}>% de IVA</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={precioTransportistaIvaIncluidoPct}
-                      onChange={(e) => onPrecioTransportistaIvaIncluidoPctChange(e.target.value)}
-                      placeholder="0"
-                      className={`${inputClass} text-right tabular-nums`}
-                    />
-                    <p className="text-xs text-vialto-steel">
-                      Dejalo en 0 si el transportista no suma IVA al cobrar.
-                    </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={fieldLabelClass}>Pago bruto a transporte</span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoBruto)}</span>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={fieldLabelClass}>Pago neto</span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desglosePagoNeto)}</span>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className={fieldLabelClass}>Monto IVA</span>
+                      <div className={readonlyMoneyClass}>
+                        <span className="w-full truncate">{fmtReadonlyMoney(desgloseMontoIva)}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
             {transportistaId && (
               <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">

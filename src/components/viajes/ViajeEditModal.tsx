@@ -345,20 +345,35 @@ export function ViajeEditModal({
     );
   }, [snapshotViaje]);
 
-  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
-  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
-  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
-  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
-  const desglosePagoBruto =
-    (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
-    (parseCurrencyForMoneda(
-      draft.precioUnitarioTransportista,
-      draft.monedaPrecioTransportistaExterno,
-    ) || 0);
-  const desglosePctIva =
+  // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
+  // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
+  const pagoBrutoTransportista = desgloseActivo
+    ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
+      (parseCurrencyForMoneda(
+        draft.precioUnitarioTransportista,
+        draft.monedaPrecioTransportistaExterno,
+      ) || 0)
+    : parseCurrencyForMoneda(
+        draft.precioTransportistaExterno,
+        draft.monedaPrecioTransportistaExterno,
+      ) || 0;
+  const pctIvaTransportista =
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
-  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
+  const pagoNetoTransportista = engrosarConIva(
+    pagoBrutoTransportista,
+    pctIvaTransportista,
+  );
+  const montoIvaTransportista =
+    pagoNetoTransportista - pagoBrutoTransportista;
+
+  const readonlyMoneyClass =
+    "flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0";
+  function fmtReadonlyMoney(n: number) {
+    return n.toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -997,52 +1012,49 @@ export function ViajeEditModal({
                             </div>
                           )}
                         </div>
-                        {ivaTransportistaVisible && (
+                        {ivaTransportistaVisible ? (
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Pago bruto</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desglosePagoBruto.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(pagoBrutoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Pago neto</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desglosePagoNeto.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(pagoNetoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Monto IVA</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desgloseMontoIva.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(montoIvaTransportista)}
                                 </span>
                               </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
+                            <span className={labelClass}>Pago bruto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
                             </div>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <>
+                      <div
+                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                      >
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={labelClass}>Precio transporte</span>
                           <div className="flex min-w-0 gap-2">
@@ -1121,6 +1133,35 @@ export function ViajeEditModal({
                           </div>
                         )}
                       </div>
+                      {ivaTransportistaVisible && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago bruto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago neto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoNetoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Monto IVA</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(montoIvaTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      </>
                     )}
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
