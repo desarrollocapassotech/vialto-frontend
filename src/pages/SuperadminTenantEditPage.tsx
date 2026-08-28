@@ -20,7 +20,6 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
       (t.billingStatus as TenantFormValues["billingStatus"]) ?? "trial",
     maxUsers: String(t.maxUsers),
     billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
-    whiteLabelDomain: t.whiteLabelDomain ?? "",
   };
 }
 
@@ -89,7 +88,6 @@ export function SuperadminTenantEditPage() {
             billingStatus: values.billingStatus,
             maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
             billingRenewsAt: values.billingRenewsAt || null,
-            whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
           }),
         },
       );
@@ -136,9 +134,6 @@ export function SuperadminTenantEditPage() {
         <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
           Editar empresa
         </h1>
-        <p className="mt-2 text-vialto-steel">
-          Actualizá módulos y configuración comercial de la empresa.
-        </p>
 
         {initialLoading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>

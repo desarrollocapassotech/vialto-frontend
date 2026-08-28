@@ -344,7 +344,6 @@ export interface Tenant {
   maxUsers: number;
   billingStatus: string;
   billingRenewsAt: string | null;
-  whiteLabelDomain: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */

@@ -11,7 +11,6 @@ export interface TenantFormValues {
   billingStatus?: 'trial' | 'active' | 'suspended' | 'expired';
   maxUsers?: string;
   billingRenewsAt?: string;
-  whiteLabelDomain?: string;
 }
 
 interface TenantFormProps {
@@ -162,18 +161,6 @@ export function TenantForm({
               value={values.billingRenewsAt ?? ''}
               onChange={(e) =>
                 onChange({ ...values, billingRenewsAt: e.target.value })
-              }
-              className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
-            />
-          </label>
-          <label className="space-y-1 md:col-span-3">
-            <span className="text-xs uppercase tracking-wider text-vialto-steel">
-              Dominio white-label
-            </span>
-            <input
-              value={values.whiteLabelDomain ?? ''}
-              onChange={(e) =>
-                onChange({ ...values, whiteLabelDomain: e.target.value })
               }
               className="h-10 w-full border border-black/15 bg-white px-3 text-sm"
             />
