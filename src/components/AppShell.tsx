@@ -111,6 +111,11 @@ export function AppShell() {
   useEnsureTenantOrganization();
 
   const superadmin = userLoaded && isPlatformSuperadmin(user?.publicMetadata);
+  // El menú por grupos colapsables solo tiene sentido si hay bastante para ordenar:
+  // superadmin siempre lo ve (siempre tiene muchos módulos); un tenant lo ve recién
+  // a partir de 2 módulos contratados — con 0 o 1, el menú vuelve al listado plano
+  // de siempre (sin headers de grupo ni accordion).
+  const sidebarUsesAccordion = superadmin || (tenant?.modules?.length ?? 0) >= 2;
 
   async function handleSignOut() {
     await signOut();
@@ -473,18 +478,26 @@ export function AppShell() {
               const open = isGroupOpen(group);
               // Un grupo con un solo ítem no necesita accordion: el ícono va directo a esa pantalla.
               const singleItemGroup =
-                collapsed && group.title !== null && group.items.length === 1;
+                collapsed &&
+                sidebarUsesAccordion &&
+                group.title !== null &&
+                group.items.length === 1;
               const isCollapsibleGroup =
-                collapsed && group.title !== null && group.items.length > 1;
+                collapsed &&
+                sidebarUsesAccordion &&
+                group.title !== null &&
+                group.items.length > 1;
               return (
               <div
                 key={group.title ?? `g-${gi}`}
                 className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
               >
-                {collapsed && gi > 0 && (
-                  <div className="mb-2 w-8 border-t border-white/[0.12]" />
+                {(collapsed || !sidebarUsesAccordion) && gi > 0 && (
+                  <div
+                    className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
+                  />
                 )}
-                {!collapsed && group.title !== null && (
+                {sidebarUsesAccordion && !collapsed && group.title !== null && (
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.title as string)}
