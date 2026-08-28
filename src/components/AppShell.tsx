@@ -12,6 +12,7 @@ import {
   Building2,
   Split,
   Calculator,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -68,6 +69,17 @@ type NavGroup = {
 
 const HEADER_HEIGHT_CLASS = "h-16";
 
+const SIDEBAR_GROUPS_STORAGE_KEY = "vialto:sidebarOpenGroups";
+
+function readStoredOpenGroups(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
 const sidebarBaseClass =
   "sidebar-scrollbar shrink-0 bg-vialto-charcoal text-vialto-mist flex flex-col py-6 gap-6 overflow-y-auto transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
 const sidebarExpandedWidthClass = "w-[16rem] max-w-[92vw] px-4";
@@ -82,6 +94,9 @@ export function AppShell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
+    readStoredOpenGroups,
+  );
   const [navTooltip, setNavTooltip] = useState<{
     label: string;
     top: number;
@@ -194,11 +209,10 @@ export function AppShell() {
       return [];
     }
 
-    const homeLabel = superadmin ? "Panorama" : "Inicio";
     const groups: NavGroup[] = [
       {
         title: null,
-        items: [{ to: "/", label: homeLabel, icon: House, end: true }],
+        items: [{ to: "/", label: "Inicio", icon: House, end: true }],
       },
     ];
 
@@ -325,6 +339,28 @@ export function AppShell() {
     return groups;
   }, [superadmin, tenant?.modules, roleCtx]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SIDEBAR_GROUPS_STORAGE_KEY,
+        JSON.stringify(openGroups),
+      );
+    } catch {
+      // localStorage no disponible (modo privado, etc.) — la preferencia simplemente no persiste.
+    }
+  }, [openGroups]);
+
+  // Un grupo queda abierto salvo que el usuario lo haya colapsado explícitamente
+  // (la preferencia manual siempre gana, incluso si el grupo es el de la ruta activa).
+  function isGroupOpen(group: NavGroup) {
+    if (group.title === null) return true;
+    return openGroups[group.title] ?? true;
+  }
+
+  function toggleGroup(title: string) {
+    setOpenGroups((prev) => ({ ...prev, [title]: !(prev[title] ?? true) }));
+  }
+
   const platformRole =
     typeof user?.publicMetadata?.vialtoRole === "string"
       ? user.publicMetadata.vialtoRole
@@ -406,63 +442,121 @@ export function AppShell() {
               ))}
             </div>
           ) : (
-            navGroups.map((group, gi) => (
+            navGroups.map((group, gi) => {
+              const open = isGroupOpen(group);
+              const isCollapsibleGroup = collapsed && group.title !== null;
+              return (
               <div
                 key={group.title ?? `g-${gi}`}
                 className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
               >
-                {gi > 0 && (
-                  <div
-                    className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
-                  />
+                {collapsed && gi > 0 && (
+                  <div className="mb-2 w-8 border-t border-white/[0.12]" />
                 )}
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end === true}
-                    aria-label={collapsed ? item.label : undefined}
-                    onMouseEnter={(e) => {
-                      if (!collapsed) return;
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setNavTooltip({
-                        label: item.label,
-                        top: rect.top + rect.height / 2,
-                        left: rect.right + 10,
-                      });
-                    }}
-                    onMouseLeave={() => setNavTooltip(null)}
-                    onClick={() => {
-                      setSidebarOpen(false);
-                      setNavTooltip(null);
-                    }}
-                    className={({ isActive }) => {
-                      const active =
-                        isActive ||
-                        (item.extraActivePaths?.some((p) =>
-                          location.pathname.startsWith(p),
-                        ) ??
-                          false);
-                      return [
-                        "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] text-sm font-medium uppercase tracking-wider transition-colors border",
-                        collapsed ? "w-11 justify-center px-0" : "gap-2.5 px-3 py-2.5",
-                        active
-                          ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
-                          : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
-                      ].join(" ");
-                    }}
+                {!collapsed && group.title !== null && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.title as string)}
+                    aria-expanded={open}
+                    className="mt-3 mb-1.5 flex items-center justify-between gap-2 rounded px-1 py-2 font-[family-name:var(--font-ui)] text-2xl font-semibold uppercase tracking-normal text-white/55 transition-colors hover:text-white/85"
                   >
-                    <item.icon
-                      className="h-4 w-4 shrink-0"
-                      strokeWidth={1.75}
+                    <span>{group.title}</span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+                      strokeWidth={2}
                     />
-                    {!collapsed && (
-                      <span className="whitespace-nowrap">{item.label}</span>
-                    )}
-                  </NavLink>
-                ))}
+                  </button>
+                )}
+                {isCollapsibleGroup ? (
+                  // Riel de iconos: un solo botón representativo por grupo colapsable.
+                  // Al hacer click, expande el menú con labels y abre ese grupo puntual.
+                  (() => {
+                    const GroupIcon = group.items[0]?.icon ?? House;
+                    return (
+                      <button
+                        type="button"
+                        aria-label={group.title ?? undefined}
+                        onClick={() => {
+                          setOpenGroups((prev) => ({
+                            ...prev,
+                            [group.title as string]: true,
+                          }));
+                          setSidebarCollapsed(false);
+                          setNavTooltip(null);
+                        }}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setNavTooltip({
+                            label: group.title as string,
+                            top: rect.top + rect.height / 2,
+                            left: rect.right + 10,
+                          });
+                        }}
+                        onMouseLeave={() => setNavTooltip(null)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                      >
+                        <GroupIcon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                      </button>
+                    );
+                  })()
+                ) : (
+                  open &&
+                  group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end === true}
+                      aria-label={collapsed ? item.label : undefined}
+                      onMouseEnter={(e) => {
+                        if (!collapsed) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setNavTooltip({
+                          label: item.label,
+                          top: rect.top + rect.height / 2,
+                          left: rect.right + 10,
+                        });
+                      }}
+                      onMouseLeave={() => setNavTooltip(null)}
+                      onClick={() => {
+                        setSidebarOpen(false);
+                        setNavTooltip(null);
+                      }}
+                      className={({ isActive }) => {
+                        const active =
+                          isActive ||
+                          (item.extraActivePaths?.some((p) =>
+                            location.pathname.startsWith(p),
+                          ) ??
+                            false);
+                        // "Panorama"/"Inicio" (único ítem del grupo sin título) usa la misma
+                        // tipografía que los headers de grupo, en vez del tamaño chico del resto de ítems.
+                        const textClasses =
+                          group.title === null && !collapsed
+                            ? "text-2xl font-semibold tracking-normal"
+                            : "text-sm font-medium tracking-wider";
+                        return [
+                          "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] uppercase transition-colors border",
+                          textClasses,
+                          collapsed ? "w-11 justify-center px-0" : "gap-2.5 px-3 py-2.5",
+                          active
+                            ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
+                            : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                        ].join(" ");
+                      }}
+                    >
+                      <item.icon
+                        className="h-4 w-4 shrink-0"
+                        strokeWidth={1.75}
+                      />
+                      {!collapsed && (
+                        <span className="whitespace-nowrap">{item.label}</span>
+                      )}
+                    </NavLink>
+                  ))
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </nav>
       </>
