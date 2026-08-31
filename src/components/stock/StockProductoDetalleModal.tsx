@@ -26,7 +26,6 @@ export function StockProductoDetalleModal({
   productoNombre,
   disponibleAgrupadoUrl,
   depositoId,
-  tenantId,
   getToken,
   onClose,
 }: {
@@ -34,7 +33,6 @@ export function StockProductoDetalleModal({
   productoNombre: string;
   disponibleAgrupadoUrl: string;
   depositoId: string;
-  tenantId?: string;
   getToken: () => Promise<string | null>;
   onClose: () => void;
 }) {

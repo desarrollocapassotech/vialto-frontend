@@ -1299,7 +1299,6 @@ export function StockPanelTenantPage({
           productoNombre={productoDetalleModal.productoNombre}
           disponibleAgrupadoUrl={disponibleAgrupadoUrl}
           depositoId={depositoActivoId ?? ""}
-          tenantId={activeTenantId}
           getToken={getToken}
           onClose={() => setProductoDetalleModal(null)}
         />
