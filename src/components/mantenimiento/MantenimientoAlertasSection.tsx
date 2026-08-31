@@ -26,17 +26,11 @@ export function MantenimientoAlertasSection({
 
   return (
     <div>
-      <p className="text-sm text-vialto-steel max-w-2xl">
-        Compara el kilometraje actual de cada vehículo contra el próximo km
-        cargado en su última intervención de cada tipo. Cálculo preliminar de
-        demo — el margen de anticipación y si también debe correr por fecha
-        son reglas todavía pendientes de definir con el cliente.
-      </p>
-
       {alertas.length === 0 ? (
         <p className="mt-6 text-sm text-vialto-steel border border-black/10 bg-vialto-mist/40 px-4 py-6 text-center">
-          No hay vehículos próximos a su mantenimiento. Cargá el "próximo km"
-          en las intervenciones para que empiecen a calcularse alertas.
+          No hay vehículos próximos a su mantenimiento. Cargá el "próximo km" o
+          la "fecha de vencimiento" en las intervenciones para que empiecen a
+          calcularse alertas.
         </p>
       ) : (
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -45,7 +39,7 @@ export function MantenimientoAlertasSection({
             const vencido = alerta.severidad === "vencido";
             return (
               <div
-                key={`${alerta.vehiculoId}|${alerta.tipo}`}
+                key={`${alerta.vehiculoId}|${alerta.tipo}|${alerta.criterio}`}
                 className={`border p-4 ${
                   vencido
                     ? "border-red-200 bg-red-50"
@@ -69,15 +63,33 @@ export function MantenimientoAlertasSection({
                 <p className="mt-2 text-sm text-vialto-steel">
                   {fmtTipoIntervencion(alerta.tipo)}
                 </p>
-                <p className="mt-2 text-xs text-vialto-steel">
-                  Km actual: {fmtKm(alerta.kmActual)} · Próximo:{" "}
-                  {fmtKm(alerta.proximoKm)}
+                <p className="mt-1 text-[10px] uppercase tracking-wider text-vialto-steel/70">
+                  {alerta.criterio === "km" ? "Vencimiento por km" : "Vencimiento por fecha"}
                 </p>
-                <p className="text-xs text-vialto-steel">
-                  {vencido
-                    ? `Superado por ${fmtKm(Math.abs(alerta.faltanKm))}`
-                    : `Faltan ${fmtKm(alerta.faltanKm)}`}
-                </p>
+                {alerta.criterio === "km" ? (
+                  <>
+                    <p className="mt-2 text-xs text-vialto-steel">
+                      Km actual: {fmtKm(alerta.kmActual)} · Próximo:{" "}
+                      {fmtKm(alerta.proximoKm)}
+                    </p>
+                    <p className="text-xs text-vialto-steel">
+                      {vencido
+                        ? `Superado por ${fmtKm(Math.abs(alerta.faltanKm))}`
+                        : `Faltan ${fmtKm(alerta.faltanKm)}`}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs text-vialto-steel">
+                      Vence: {fmtFechaIntervencion(alerta.proximaFecha)}
+                    </p>
+                    <p className="text-xs text-vialto-steel">
+                      {vencido
+                        ? `Superado por ${Math.abs(alerta.faltanDias)} día${Math.abs(alerta.faltanDias) === 1 ? "" : "s"}`
+                        : `Faltan ${alerta.faltanDias} día${alerta.faltanDias === 1 ? "" : "s"}`}
+                    </p>
+                  </>
+                )}
                 <p className="mt-1 text-[11px] text-vialto-steel/80">
                   Última intervención: {fmtFechaIntervencion(alerta.ultimaFecha)}
                 </p>

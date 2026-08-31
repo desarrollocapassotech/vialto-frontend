@@ -286,20 +286,51 @@ export interface Vehiculo {
 }
 
 export type TipoIntervencionMantenimiento =
-  | 'service'
-  | 'aceite'
-  | 'filtro'
-  | 'cubiertas'
+  // Motor y sistema de propulsión
+  | 'cambio_aceite_motor'
+  | 'revision_filtros'
+  | 'inspeccion_bandas_correas'
+  | 'calibracion_valvulas'
+  | 'revision_inyectores'
+  | 'inspeccion_turbocompresor'
+  // Sistema de frenos
+  | 'revision_balatas_pastillas'
+  | 'rectificacion_tambores_discos'
+  | 'mantenimiento_sistema_aire'
+  | 'prueba_camaras_freno'
+  | 'ajuste_matracas'
+  // Tren motriz, suspensión y dirección
+  | 'servicio_transmision'
+  | 'servicio_diferencial'
+  | 'engrasado_chasis'
+  | 'alineacion_balanceo'
+  | 'revision_suspension'
+  | 'inspeccion_rodamientos'
+  // Sistema eléctrico y electrónico
+  | 'diagnostico_escaner'
+  | 'prueba_baterias'
+  | 'control_alternador'
+  | 'inspeccion_luces'
+  // Sistema de carga y acople
+  | 'mantenimiento_quinta_rueda'
+  | 'revision_perno_rey'
+  | 'inspeccion_lineas_acople'
+  // Neumáticos
+  | 'rotacion_cubiertas'
+  | 'cambio_cubiertas'
+  | 'reparacion_pinchadura'
+  // Catch-all
   | 'otro';
 
 export interface Intervencion {
   id: string;
   tenantId: string;
   vehiculoId: string;
-  tipo: TipoIntervencionMantenimiento;
+  tipos: TipoIntervencionMantenimiento[];
   descripcion: string | null;
   km: number | null;
   proximoKm: number | null;
+  proximaFecha: string | null;
   fecha: string;
   createdAt: string;
   createdBy: string;

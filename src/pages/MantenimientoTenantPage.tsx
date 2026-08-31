@@ -1,7 +1,7 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, ClipboardList, TriangleAlert, Wrench } from "lucide-react";
+import { ChevronDown, TriangleAlert, Wrench } from "lucide-react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/SelectorOpcionesSheet";
 import { IntervencionModal } from "@/components/mantenimiento/IntervencionModal";
 import { MantenimientoAlertasSection } from "@/components/mantenimiento/MantenimientoAlertasSection";
-import { MantenimientoChecklistSection } from "@/components/mantenimiento/MantenimientoChecklistSection";
+import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -26,17 +28,17 @@ import {
   fmtFechaIntervencion,
   fmtKm,
   fmtTipoIntervencion,
+  fmtTiposIntervencion,
 } from "@/lib/mantenimientoLabels";
 import { calcularAlertasMantenimiento } from "@/lib/mantenimientoAlertas";
 import { isOrgMember } from "@/lib/roleLabels";
-import type { Intervencion } from "@/types/api";
+import type { Intervencion, Vehiculo } from "@/types/api";
 
-type Tab = "intervenciones" | "alertas" | "checklist";
+type Tab = "intervenciones" | "alertas";
 
 const TABS: { id: Tab; label: string; icon: typeof Wrench }[] = [
   { id: "intervenciones", label: "Intervenciones", icon: Wrench },
   { id: "alertas", label: "Alertas", icon: TriangleAlert },
-  { id: "checklist", label: "Checklist diario", icon: ClipboardList },
 ];
 
 export function MantenimientoTenantPage() {
@@ -58,6 +60,9 @@ export function MantenimientoTenantPage() {
   const [vehiculoIdFiltro, setVehiculoIdFiltro] = useState(
     searchParams.get("vehiculoId") ?? "",
   );
+  const [tipoFiltro, setTipoFiltro] = useState("");
+  const [fechaDesdeFiltro, setFechaDesdeFiltro] = useState("");
+  const [fechaHastaFiltro, setFechaHastaFiltro] = useState("");
 
   const [intervenciones, setIntervenciones] = useState<Intervencion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,13 +109,35 @@ export function MantenimientoTenantPage() {
     };
   }, [isLoaded, isSignedIn, load, reloadKey]);
 
-  const intervencionesFiltradas = useMemo(
-    () =>
-      vehiculoIdFiltro
-        ? (intervenciones ?? []).filter((i) => i.vehiculoId === vehiculoIdFiltro)
-        : intervenciones,
-    [intervenciones, vehiculoIdFiltro],
-  );
+  const hayFiltrosIntervenciones =
+    !!vehiculoIdFiltro ||
+    !!tipoFiltro.trim() ||
+    !!fechaDesdeFiltro ||
+    !!fechaHastaFiltro;
+
+  const intervencionesFiltradas = useMemo(() => {
+    if (!hayFiltrosIntervenciones) return intervenciones;
+    const tipoQuery = tipoFiltro.trim().toLowerCase();
+    return (intervenciones ?? []).filter((i) => {
+      if (vehiculoIdFiltro && i.vehiculoId !== vehiculoIdFiltro) return false;
+      if (
+        tipoQuery &&
+        !fmtTiposIntervencion(i.tipos).toLowerCase().includes(tipoQuery)
+      )
+        return false;
+      const fechaValor = i.fecha.slice(0, 10);
+      if (fechaDesdeFiltro && fechaValor < fechaDesdeFiltro) return false;
+      if (fechaHastaFiltro && fechaValor > fechaHastaFiltro) return false;
+      return true;
+    });
+  }, [
+    intervenciones,
+    vehiculoIdFiltro,
+    tipoFiltro,
+    fechaDesdeFiltro,
+    fechaHastaFiltro,
+    hayFiltrosIntervenciones,
+  ]);
 
   const alertas = useMemo(
     () => calcularAlertasMantenimiento(maestro.vehiculos, intervenciones ?? []),
@@ -174,10 +201,6 @@ export function MantenimientoTenantPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Mantenimiento
       </h1>
-      <p className="mt-2 text-vialto-steel max-w-3xl">
-        Historial de intervenciones de mantenimiento por vehículo, alertas de
-        próximo service y vista previa del checklist diario del chofer.
-      </p>
 
       <div className="mt-6 border-b border-black/15">
         <div className="pb-3 lg:hidden">
@@ -246,25 +269,7 @@ export function MantenimientoTenantPage() {
       <div className="mt-6">
         {activeTab === "intervenciones" && (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <span className="text-xs uppercase tracking-wider text-vialto-steel">
-                  Vehículo
-                </span>
-                <select
-                  value={vehiculoIdFiltro}
-                  onChange={(e) => handleVehiculoFiltroChange(e.target.value)}
-                  className="h-9 border border-black/15 bg-white px-2 text-sm"
-                >
-                  <option value="">Todos</option>
-                  {vehiculoOptions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.patente}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
+            <div className="flex flex-wrap items-center justify-end gap-3">
               {!isReadOnly && (
                 <button
                   type="button"
@@ -284,14 +289,86 @@ export function MantenimientoTenantPage() {
 
             <ListadoDatos<Intervencion>
               className="mt-6"
-              tableColSpan={6}
+              tableColSpan={7}
               tableHead={
                 <tr className={listadoTablaHeadRowClass}>
-                  <th scope="col" className={listadoTablaThClass}>Vehículo</th>
-                  <th scope="col" className={listadoTablaThClass}>Tipo</th>
-                  <th scope="col" className={listadoTablaThClass}>Fecha</th>
+                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                    <ViajesListadoHeaderFiltro
+                      title="Vehículo"
+                      filterActive={!!vehiculoIdFiltro}
+                      filterSignature={vehiculoIdFiltro}
+                    >
+                      <SearchableEntitySelect<Vehiculo>
+                        id="mantenimiento-filtro-vehiculo"
+                        items={vehiculoOptions}
+                        value={vehiculoIdFiltro}
+                        onChange={(id) => handleVehiculoFiltroChange(id)}
+                        filterItems={filtrarVehiculos}
+                        getPrimaryLabel={(v) => v.patente}
+                        getSecondaryLabel={(v) =>
+                          [v.marca, v.modelo].filter(Boolean).join(" · ") || null
+                        }
+                        placeholderCerrado="Todos"
+                        placeholderBuscar="Buscar patente o marca…"
+                        searchAriaLabel="Filtrar vehículos"
+                        allowEmptyValue
+                        emptyListChoiceLabel="Todos"
+                        aria-label="Filtrar por vehículo"
+                        inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                          vehiculoIdFiltro ? "text-vialto-fire" : "text-vialto-charcoal"
+                        }`}
+                      />
+                    </ViajesListadoHeaderFiltro>
+                  </th>
+                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                    <ViajesListadoHeaderFiltro
+                      title="Tipo"
+                      filterActive={!!tipoFiltro.trim()}
+                      filterSignature={tipoFiltro}
+                    >
+                      <input
+                        type="text"
+                        value={tipoFiltro}
+                        onChange={(e) => setTipoFiltro(e.target.value)}
+                        placeholder="Buscar tipo…"
+                        className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                          tipoFiltro.trim() ? "text-vialto-fire" : "text-vialto-charcoal"
+                        }`}
+                        aria-label="Filtrar por tipo"
+                      />
+                    </ViajesListadoHeaderFiltro>
+                  </th>
+                  <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                    <ViajesListadoHeaderFiltro
+                      title="Fecha de intervención"
+                      filterActive={!!fechaDesdeFiltro || !!fechaHastaFiltro}
+                      filterSignature={`${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                          Desde
+                          <input
+                            type="date"
+                            value={fechaDesdeFiltro}
+                            onChange={(e) => setFechaDesdeFiltro(e.target.value)}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                          Hasta
+                          <input
+                            type="date"
+                            value={fechaHastaFiltro}
+                            onChange={(e) => setFechaHastaFiltro(e.target.value)}
+                            className="h-9 w-full border border-black/15 bg-white px-2 text-sm"
+                          />
+                        </label>
+                      </div>
+                    </ViajesListadoHeaderFiltro>
+                  </th>
                   <th scope="col" className={listadoTablaThClass}>Km</th>
                   <th scope="col" className={listadoTablaThClass}>Próximo km</th>
+                  <th scope="col" className={listadoTablaThClass}>Vencimiento</th>
                   <th scope="col" className={`${listadoTablaThClass} text-right`}>Acciones</th>
                 </tr>
               }
@@ -307,11 +384,32 @@ export function MantenimientoTenantPage() {
                 {
                   id: "tipo",
                   header: "Tipo",
-                  cell: (r) => fmtTipoIntervencion(r.tipo),
+                  cell: (r) => {
+                    const labels = r.tipos.map(fmtTipoIntervencion);
+                    const visibles = labels.slice(0, 2);
+                    const restantes = labels.length - visibles.length;
+                    return (
+                      <span>
+                        {visibles.join(", ")}
+                        {restantes > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModal({ mode: "view", intervencion: r });
+                            }}
+                            className="ml-1 text-xs font-medium text-vialto-fire hover:underline"
+                          >
+                            +{restantes}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  },
                 },
                 {
                   id: "fecha",
-                  header: "Fecha",
+                  header: "Fecha de intervención",
                   cell: (r) => fmtFechaIntervencion(r.fecha),
                 },
                 { id: "km", header: "Km", cell: (r) => fmtKm(r.km) },
@@ -320,13 +418,22 @@ export function MantenimientoTenantPage() {
                   header: "Próximo km",
                   cell: (r) => fmtKm(r.proximoKm),
                 },
+                {
+                  id: "proximaFecha",
+                  header: "Vencimiento",
+                  cell: (r) =>
+                    r.proximaFecha ? fmtFechaIntervencion(r.proximaFecha) : "—",
+                },
               ]}
               rows={error ? [] : intervencionesFiltradas}
               rowKey={(r) => r.id}
+              onRowClick={(r) => setModal({ mode: "view", intervencion: r })}
               emptyMessage={
                 error
                   ? "No se pudieron cargar las intervenciones."
-                  : "Todavía no hay intervenciones cargadas."
+                  : hayFiltrosIntervenciones
+                    ? "No hay intervenciones que coincidan con los filtros aplicados."
+                    : "Todavía no hay intervenciones cargadas."
               }
               loadingMessage="Cargando…"
               actionsTdClassName={listadoTablaTdClass}
@@ -359,10 +466,6 @@ export function MantenimientoTenantPage() {
             vehiculos={maestro.vehiculos}
             intervenciones={intervenciones ?? []}
           />
-        )}
-
-        {activeTab === "checklist" && (
-          <MantenimientoChecklistSection vehiculos={maestro.vehiculos} />
         )}
       </div>
 
