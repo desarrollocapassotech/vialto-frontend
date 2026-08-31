@@ -411,6 +411,7 @@ export function AppShell() {
   // (la preferencia manual siempre gana, incluso si el grupo es el de la ruta activa).
   function isGroupOpen(group: NavGroup) {
     if (group.title === null) return true;
+    if (!sidebarUsesAccordion) return true;
     return openGroups[group.title] ?? true;
   }
 
