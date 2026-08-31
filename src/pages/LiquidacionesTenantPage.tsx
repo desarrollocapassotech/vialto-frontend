@@ -9,6 +9,7 @@ import {
   Landmark,
   Receipt,
   Trash2,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -49,6 +50,11 @@ import {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  LIQUIDACIONES_EXPORT_COLUMNS,
+  generarLiquidacionesExcel,
+} from "@/lib/liquidacionesExcelExport";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
@@ -242,6 +248,9 @@ export function LiquidacionesTenantPage() {
   const [transportistaFilter, setTransportistaFilter] = useState("");
   const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
   const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
 
   function aplicarFiltroEstado(val: LiquidacionEstado | "todos") {
     setEstadoFilter(val);
@@ -666,6 +675,30 @@ export function LiquidacionesTenantPage() {
     ? filteredRows.slice((page - 1) * pageSize, page * pageSize)
     : null;
 
+  async function handleExportarExcel(selectedIds: string[]) {
+    if (!filteredRows || filteredRows.length === 0) {
+      showToast("No hay datos para exportar", "error");
+      return;
+    }
+    try {
+      setExportandoExcel(true);
+      const cols = LIQUIDACIONES_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarLiquidacionesExcel(
+        cols,
+        filteredRows,
+        "Liquidaciones_Exportadas",
+      );
+      showToast("Excel exportado exitosamente", "success");
+    } catch (err) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
+    }
+  }
+
   return (
     <div className="w-full">
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
@@ -721,6 +754,19 @@ export function LiquidacionesTenantPage() {
                 Limpiar filtros
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setExportModalOpen(true)}
+              disabled={
+                !filteredRows || filteredRows.length === 0 || exportandoExcel
+              }
+              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <FileSpreadsheet className="h-4 w-4" aria-hidden />
+              {exportandoExcel ? "Generando..." : "Descargar Excel"}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowCrear(true)}
@@ -1167,6 +1213,15 @@ export function LiquidacionesTenantPage() {
             );
             setDetail({ mode: "view", liq: withLineas });
           }}
+        />
+      )}
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={LIQUIDACIONES_EXPORT_COLUMNS}
+          rowCount={filteredRows?.length ?? 0}
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
         />
       )}
     </div>
