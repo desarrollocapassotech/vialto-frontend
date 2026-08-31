@@ -107,7 +107,9 @@ function stockTotalCell(
         aria-hidden
       />
       <span className="tabular-nums">
-        <span className={sinStock ? "" : "font-semibold"}>{item.cantidad1}</span>
+        <span className={sinStock ? "" : "font-semibold"}>
+          {item.cantidad1}
+        </span>
         <span className="text-xs text-vialto-steel"> {unidad1Nombre}</span>
         {showUnidad2 && unidad2Nombre != null && (
           <>
@@ -562,7 +564,7 @@ export function StockPanelTenantPage({
     setPage(1);
   }, [filtroClienteId, filtroProductoId, soloConStockCant1, soloConStockCant2]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!filtroProductoId) {
       setResumenProducto(null);
       return;
@@ -575,18 +577,20 @@ export function StockPanelTenantPage({
         const qs = buildQs(activeTenantId);
         const separador = qs ? "&" : "?";
         const url = `${disponibleAgrupadoUrl}${qs}${separador}productoId=${encodeURIComponent(filtroProductoId)}`;
-        const data = await apiJson<Array<{
-          productoId: string;
-          nombre: string;
-          totalKg: number;
-          composicion: Array<{
-            presentacionId: string | null;
-            presentacionNombre: string;
-            bultos: number;
-            sueltas: number;
-            kg: number;
-          }>;
-        }>>(url, () => getToken());
+        const data = await apiJson<
+          Array<{
+            productoId: string;
+            nombre: string;
+            totalKg: number;
+            composicion: Array<{
+              presentacionId: string | null;
+              presentacionNombre: string;
+              bultos: number;
+              sueltas: number;
+              kg: number;
+            }>;
+          }>
+        >(url, () => getToken());
         if (!cancelado) {
           setResumenProducto(data[0] ?? null);
         }
@@ -598,7 +602,13 @@ export function StockPanelTenantPage({
     return () => {
       cancelado = true;
     };
-  }, [filtroProductoId, disponibleAgrupadoUrl, activeTenantId, isPlatform, getToken]);
+  }, [
+    filtroProductoId,
+    disponibleAgrupadoUrl,
+    activeTenantId,
+    isPlatform,
+    getToken,
+  ]);
 
   const stockEmptyMessage =
     filtroClienteId ||
@@ -827,7 +837,7 @@ export function StockPanelTenantPage({
                   })}
                 </nav>
               </div>
-              
+
               {resumenProducto && (
                 <div className="mb-4 rounded border border-black/10 bg-vialto-mist/40 p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -859,7 +869,8 @@ export function StockPanelTenantPage({
                         className="flex flex-wrap items-center justify-between gap-2 text-sm text-vialto-steel"
                       >
                         <span>
-                          {c.bultos > 0 && `${c.bultos} ${c.presentacionNombre}`}
+                          {c.bultos > 0 &&
+                            `${c.bultos} ${c.presentacionNombre}`}
                           {c.bultos > 0 && c.sueltas > 0 && " + "}
                           {c.sueltas > 0 && `${c.sueltas} sueltas`}
                         </span>
@@ -871,7 +882,7 @@ export function StockPanelTenantPage({
                   </ul>
                 </div>
               )}
-              
+
               <ListadoDatos
                 columns={[]}
                 rows={paginatedItems}
@@ -1073,7 +1084,12 @@ export function StockPanelTenantPage({
                         <td
                           className={`${listadoTablaTdClass} text-right tabular-nums`}
                         >
-                          {stockTotalCell(item, units.unidad1, false, units.unidad2)}
+                          {stockTotalCell(
+                            item,
+                            units.unidad1,
+                            false,
+                            units.unidad2,
+                          )}
                         </td>
                         <td
                           className={`${listadoTablaTdClass} text-right tabular-nums font-medium`}
