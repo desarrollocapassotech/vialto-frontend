@@ -1252,85 +1252,95 @@ export function ViajeEditModal({
                       </div>
                     )}
                     <div className="grid gap-3">
-                      <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                        <span className={labelClass}>Chofer</span>
-                        <ChoferSearchSelect
-                          choferes={todosChoferes}
-                          value={draft.choferExternoId}
-                          onChange={(id) =>
+                      {isVisible("edicion_viaje", "choferExternoId") && (
+                        <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                          <span className={labelClass}>Chofer</span>
+                          <ChoferSearchSelect
+                            choferes={todosChoferes}
+                            value={draft.choferExternoId}
+                            onChange={(id) =>
+                              setDraft((p) =>
+                                p ? { ...p, choferExternoId: id } : p,
+                              )
+                            }
+                            inputClassName={inputClass}
+                            aria-label="Chofer transportista externo"
+                            onNuevo={
+                              getToken
+                                ? () => setQuickCreate("chofer-ext")
+                                : undefined
+                            }
+                          />
+                        </div>
+                      )}
+                      {isVisible("edicion_viaje", "vehiculosRows") && (
+                        <ViajeVehiculosLista
+                          groupId={`viaje-modal-ext-${draft.numero || "e"}`}
+                          crearVehiculoHref={crearVehiculoHref}
+                          rows={draft.vehiculosRows}
+                          onChange={(rows) =>
                             setDraft((p) =>
-                              p ? { ...p, choferExternoId: id } : p,
+                              p ? { ...p, vehiculosRows: rows } : p,
                             )
                           }
-                          inputClassName={inputClass}
-                          aria-label="Chofer transportista externo"
-                          onNuevo={
-                            getToken
-                              ? () => setQuickCreate("chofer-ext")
-                              : undefined
-                          }
+                          vehiculos={todosVehiculos}
+                          alMenosUno={false}
+                          getToken={getToken}
+                          tenantId={tenantId}
+                          onVehiculoCreado={onVehiculoCreado}
+                          quickCreateStacked
                         />
-                      </div>
-                      <ViajeVehiculosLista
-                        groupId={`viaje-modal-ext-${draft.numero || "e"}`}
-                        crearVehiculoHref={crearVehiculoHref}
-                        rows={draft.vehiculosRows}
-                        onChange={(rows) =>
-                          setDraft((p) =>
-                            p ? { ...p, vehiculosRows: rows } : p,
-                          )
-                        }
-                        vehiculos={todosVehiculos}
-                        alMenosUno={false}
-                        getToken={getToken}
-                        tenantId={tenantId}
-                        onVehiculoCreado={onVehiculoCreado}
-                        quickCreateStacked
-                      />
+                      )}
                     </div>
                   </div>
                 }
                 propioContent={
                   <div className="grid gap-3">
-                    <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                      <span className={labelClass}>Chofer (flota propia)</span>
-                      <ChoferSearchSelect
-                        choferes={todosChoferesPropios}
-                        value={draft.choferId}
-                        onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, choferId: id } : p))
-                        }
-                        inputClassName={inputClass}
-                        aria-label="Chofer flota propia"
-                        onNuevo={
-                          getToken
-                            ? () => setQuickCreate("chofer-prop")
-                            : undefined
-                        }
-                      />
-                      {ayudaFlota.chofer && (
-                        <p className="text-xs text-amber-800/90">
-                          {ayudaFlota.chofer}
-                        </p>
-                      )}
-                    </div>
-                    <ViajeVehiculosLista
-                      groupId={`viaje-modal-${draft.numero || "e"}`}
-                      crearVehiculoHref={crearVehiculoHref}
-                      rows={draft.vehiculosRows}
-                      onChange={(rows) =>
-                        setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
-                      }
-                      vehiculos={vehiculosPropios}
-                      getToken={getToken}
-                      tenantId={tenantId}
-                      onVehiculoCreado={onVehiculoCreado}
-                      quickCreateStacked
-                    />
-                    {ayudaFlota.vehiculo && (
-                      <p className="text-xs text-amber-800/90">
-                        {ayudaFlota.vehiculo}
-                      </p>
+                    {isVisible("edicion_viaje", "choferId") && (
+                      <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                        <span className={labelClass}>Chofer (flota propia)</span>
+                        <ChoferSearchSelect
+                          choferes={todosChoferesPropios}
+                          value={draft.choferId}
+                          onChange={(id) =>
+                            setDraft((p) => (p ? { ...p, choferId: id } : p))
+                          }
+                          inputClassName={inputClass}
+                          aria-label="Chofer flota propia"
+                          onNuevo={
+                            getToken
+                              ? () => setQuickCreate("chofer-prop")
+                              : undefined
+                          }
+                        />
+                        {ayudaFlota.chofer && (
+                          <p className="text-xs text-amber-800/90">
+                            {ayudaFlota.chofer}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {isVisible("edicion_viaje", "vehiculosRows") && (
+                      <>
+                        <ViajeVehiculosLista
+                          groupId={`viaje-modal-${draft.numero || "e"}`}
+                          crearVehiculoHref={crearVehiculoHref}
+                          rows={draft.vehiculosRows}
+                          onChange={(rows) =>
+                            setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
+                          }
+                          vehiculos={vehiculosPropios}
+                          getToken={getToken}
+                          tenantId={tenantId}
+                          onVehiculoCreado={onVehiculoCreado}
+                          quickCreateStacked
+                        />
+                        {ayudaFlota.vehiculo && (
+                          <p className="text-xs text-amber-800/90">
+                            {ayudaFlota.vehiculo}
+                          </p>
+                        )}
+                      </>
                     )}
                     {viajeEditHint && (
                       <p className="text-xs text-amber-800/90">

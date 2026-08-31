@@ -553,28 +553,42 @@ export function ViajeCreatePage() {
     }
     setTransportistaEfectivoError(null);
 
-    const vids = externo
+    const vehiculosRowsVisible = isVisible("alta_viaje", "vehiculosRows");
+    const choferPropioVisible = isVisible("alta_viaje", "choferId");
+
+    const vids = externo || !vehiculosRowsVisible
       ? vehiculoIdsDesdeRows(vehiculosExternosRows)
       : vehiculoIdsDesdeRows(vehiculosRows);
-    if (!externo && vids.length === 0) {
+
+    if (!externo && vehiculosRowsVisible && vids.length === 0) {
       setError(
         "Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).",
       );
       return;
     }
-    if (
-      !externo &&
-      !flotaPropiaVehiculosListaValida(
-        choferIdRef.current.trim(),
-        vids,
-        choferesPropios,
-        vehiculosPropios,
-      )
-    ) {
-      setError(
-        "En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).",
-      );
-      return;
+
+    if (!externo) {
+      // Si el chofer no es visible, pasamos un string que saltea su chequeo de existencia.
+      // Si vehículos no es visible, le pasamos vids vacíos y puenteamos la regla de flotaPropiaVehiculosListaValida.
+      if (choferPropioVisible && vehiculosRowsVisible) {
+        if (!flotaPropiaVehiculosListaValida(choferIdRef.current.trim(), vids, choferesPropios, vehiculosPropios)) {
+          setError("En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).");
+          return;
+        }
+      } else if (choferPropioVisible && !vehiculosRowsVisible) {
+        const c = String(choferIdRef.current.trim());
+        if (!c || !choferesPropios.some((x) => x.id === c)) {
+          setError("En flota propia, elegí chofer de la lista.");
+          return;
+        }
+      } else if (!choferPropioVisible && vehiculosRowsVisible) {
+        const vp = vehiculosFlotaPropia(vehiculosPropios);
+        const permitidos = new Set(vp.map((x) => x.id));
+        if (vids.length === 0 || !vids.every((id) => permitidos.has(id))) {
+          setError("En flota propia, elegí vehículos de la lista.");
+          return;
+        }
+      }
     }
 
     const gananciaDraft = buildGananciaDraft();
@@ -1100,6 +1114,10 @@ export function ViajeCreatePage() {
                 choferesPropios={choferesPropios}
                 onNuevoChoferPropio={() => setQuickCreate("chofer-prop")}
                 ayudaFlotaChofer={ayudaFlota.chofer}
+                mostrarChoferExterno={isVisible("alta_viaje", "choferExternoId")}
+                mostrarVehiculosExternos={isVisible("alta_viaje", "vehiculosRows")}
+                mostrarChoferPropio={isVisible("alta_viaje", "choferId")}
+                mostrarVehiculosPropios={isVisible("alta_viaje", "vehiculosRows")}
                 vehiculosRows={vehiculosRows}
                 onVehiculosRowsChange={(rows) => {
                   setVehiculosRows(rows);
