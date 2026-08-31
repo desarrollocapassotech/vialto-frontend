@@ -9,6 +9,15 @@ import {
 import type { Viaje, Cliente, Transportista, Chofer } from "@/types/api";
 import type { ExcelExportColOption } from "@/components/stock/ExcelExportModal";
 
+const ESTADO_LIQUIDACION_LABEL: Record<string, string> = {
+  borrador: "Borrador",
+  pendiente_cae: "Esperando AFIP",
+  autorizado: "Liquidado",
+  error: "Error de AFIP",
+  anulado: "Anulado",
+  sin_liquidar: "Sin liquidar",
+};
+
 export const VIAJES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "numero", label: "ID Sistema", required: true },
   { id: "ctg", label: "Identificación (CTG)" },
@@ -22,6 +31,7 @@ export const VIAJES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "fechaDescarga", label: "Fecha de Descarga" },
   { id: "estadoFacturacion", label: "Estado Facturación" },
   { id: "estadoPago", label: "Estado Pago Transportista" },
+  { id: "estadoLiquidacion", label: "Estado Liquidación" },
 ];
 
 export async function generarViajesExcel(
@@ -44,7 +54,6 @@ export async function generarViajesExcel(
           row[col.label] = v.numeroIdentificacionPersonalizado || "";
           break;
         case "cliente":
-          // Casteamos a any[] para solucionar el error de tipo 'never'
           const cRuta = clientesRutaListadoViaje(v, clientes) as any[];
           row[col.label] = cRuta.map((c) => c.nombre || "").join(" | ");
           break;
@@ -86,6 +95,17 @@ export async function generarViajesExcel(
             v.pagosTransportista && v.pagosTransportista.length > 0
               ? "Registrado"
               : "Sin pagar";
+          break;
+        case "estadoLiquidacion":
+          const estadoLiq = (v as any).liquidacionEstado;
+          if (!estadoLiq) {
+            row[col.label] = "Sin liquidar";
+          } else {
+            row[col.label] =
+              ESTADO_LIQUIDACION_LABEL[estadoLiq] ??
+              estadoLiq.charAt(0).toUpperCase() +
+                estadoLiq.slice(1).replace("_", " ");
+          }
           break;
         default:
           row[col.label] = "";
