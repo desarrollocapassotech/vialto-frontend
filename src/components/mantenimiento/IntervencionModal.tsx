@@ -7,6 +7,7 @@ import { useToast } from "@/lib/toast";
 import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
 import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
 import { TipoIntervencionSelect } from "@/components/mantenimiento/TipoIntervencionSelect";
+import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
 import {
   fmtFechaIntervencion,
   fmtKm,
@@ -14,7 +15,8 @@ import {
 } from "@/lib/mantenimientoLabels";
 import type { Intervencion, TipoIntervencionMantenimiento, Vehiculo } from "@/types/api";
 
-const INPUT_CLASS = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
+const INPUT_CLASS =
+  "h-11 w-full border border-black/15 bg-white px-3 text-base sm:h-9 sm:px-2 sm:text-sm";
 const LABEL_CLASS = "text-xs uppercase tracking-[0.08em] text-vialto-steel";
 
 function hoyIso(): string {
@@ -153,9 +155,9 @@ export function IntervencionModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-2xl rounded border border-black/10 bg-white shadow-lg"
+        className="flex max-h-[95dvh] w-full flex-col overflow-hidden rounded-t-xl border border-black/10 bg-white shadow-lg sm:max-h-[90vh] sm:max-w-2xl sm:rounded"
       >
-        <div className="flex items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
             {modo === "create"
               ? "Nueva intervención"
@@ -171,10 +173,10 @@ export function IntervencionModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 grid gap-3 max-h-[90vh] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 grid gap-3">
           {readOnly ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <p className={LABEL_CLASS}>Vehículo</p>
                   <p className="mt-1 text-sm">{vehiculo?.patente ?? "—"}</p>
@@ -194,7 +196,7 @@ export function IntervencionModal({
                   {fmtTiposIntervencion(intervencionInicial?.tipos ?? [])}
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <p className={LABEL_CLASS}>Km al momento</p>
                   <p className="mt-1 text-sm">{fmtKm(intervencionInicial?.km)}</p>
@@ -223,7 +225,7 @@ export function IntervencionModal({
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className={LABEL_CLASS}>
                     Vehículo <span className="text-red-500">*</span>
@@ -254,11 +256,11 @@ export function IntervencionModal({
                   <span className={LABEL_CLASS}>
                     Fecha de intervención <span className="text-red-500">*</span>
                   </span>
-                  <input
-                    type="date"
+                  <FechaPicker
                     value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className={`${INPUT_CLASS} ${fieldErrors.fecha ? "border-red-400" : ""}`}
+                    onChange={setFecha}
+                    error={fieldErrors.fecha}
+                    aria-label="Fecha de intervención"
                   />
                   {fieldErrors.fecha && (
                     <span className="text-xs font-medium text-red-600">
@@ -284,7 +286,7 @@ export function IntervencionModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1">
                   <span className={LABEL_CLASS}>Km al momento</span>
                   <input
@@ -324,11 +326,11 @@ export function IntervencionModal({
 
                 <label className="flex flex-col gap-1">
                   <span className={LABEL_CLASS}>Fecha de vencimiento</span>
-                  <input
-                    type="date"
+                  <FechaPicker
                     value={proximaFecha}
-                    onChange={(e) => setProximaFecha(e.target.value)}
-                    className={INPUT_CLASS}
+                    onChange={setProximaFecha}
+                    allowClear
+                    aria-label="Fecha de vencimiento"
                   />
                 </label>
               </div>
@@ -344,7 +346,7 @@ export function IntervencionModal({
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                   rows={3}
-                  className={`border px-2 py-2 text-sm ${fieldErrors.descripcion ? "border-red-400" : "border-black/15"}`}
+                  className={`border px-3 py-2.5 text-base sm:px-2 sm:py-2 sm:text-sm ${fieldErrors.descripcion ? "border-red-400" : "border-black/15"}`}
                 />
                 {fieldErrors.descripcion && (
                   <span className="text-xs font-medium text-red-600">
@@ -357,12 +359,12 @@ export function IntervencionModal({
         </div>
 
         {error && (
-          <p className="mx-5 mb-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
+          <p className="mx-5 mb-3 shrink-0 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
             {error}
           </p>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-5 py-4">
           <button
             type="button"
             disabled={saving}

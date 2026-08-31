@@ -131,7 +131,7 @@ export function TipoIntervencionSelect({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar tipo…"
-            className="h-9 w-full border border-black/15 px-2 text-sm outline-none focus:border-black/25"
+            className="h-11 w-full border border-black/15 px-3 text-base outline-none focus:border-black/25 sm:h-9 sm:px-2 sm:text-sm"
           />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
@@ -156,7 +156,7 @@ export function TipoIntervencionSelect({
                         toggle(v);
                         setOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-vialto-mist ${
+                      className={`flex w-full items-center justify-between px-3 py-3 text-left text-base hover:bg-vialto-mist sm:py-2 sm:text-sm ${
                         checked ? "font-medium text-vialto-fire" : ""
                       }`}
                     >
@@ -179,7 +179,7 @@ export function TipoIntervencionSelect({
           {value.map((v) => (
             <span
               key={v}
-              className="inline-flex items-center gap-1 border border-vialto-fire/40 bg-vialto-fire/10 px-2 py-1 text-xs text-vialto-charcoal"
+              className="inline-flex items-center gap-1.5 border border-vialto-fire/40 bg-vialto-fire/10 px-2.5 py-1.5 text-sm text-vialto-charcoal sm:px-2 sm:py-1 sm:text-xs"
             >
               {fmtTipoIntervencion(v)}
               <button
@@ -188,7 +188,7 @@ export function TipoIntervencionSelect({
                 aria-label={`Quitar ${fmtTipoIntervencion(v)}`}
                 className="text-vialto-steel hover:text-vialto-charcoal"
               >
-                <X className="h-3 w-3" strokeWidth={2.5} />
+                <X className="h-3.5 w-3.5" strokeWidth={2.5} />
               </button>
             </span>
           ))}
@@ -201,7 +201,7 @@ export function TipoIntervencionSelect({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`h-9 w-full border bg-white px-2 text-left text-sm text-vialto-steel hover:bg-vialto-mist ${
+        className={`h-11 w-full border bg-white px-3 text-left text-base text-vialto-steel hover:bg-vialto-mist sm:h-9 sm:px-2 sm:text-sm ${
           error ? "border-red-400" : "border-black/15"
         }`}
       >
