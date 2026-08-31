@@ -8,10 +8,12 @@ export function validateNombrePaisIdFiscalForm(
   pais: PaisCodigo | '',
   idFiscal: string,
   entidad: EntidadConPaisIdFiscal,
+  paisVisible: boolean = true,
+  idFiscalVisible: boolean = true,
 ): string | null {
   if (!nombre.trim()) return `Ingresá el nombre del ${entidad}.`;
-  if (!pais) return `Seleccioná el país del ${entidad}.`;
-  if (!idFiscal.trim()) {
+  if (paisVisible && !pais) return `Seleccioná el país del ${entidad}.`;
+  if (idFiscalVisible && !idFiscal.trim()) {
     const label = idFiscalPorPais(pais).label;
     return `Ingresá el ${label.toLowerCase()} del ${entidad}.`;
   }
@@ -22,14 +24,18 @@ export function validateClienteForm(
   nombre: string,
   pais: PaisCodigo | '',
   idFiscal: string,
+  paisVisible: boolean = true,
+  idFiscalVisible: boolean = true,
 ): string | null {
-  return validateNombrePaisIdFiscalForm(nombre, pais, idFiscal, 'cliente');
+  return validateNombrePaisIdFiscalForm(nombre, pais, idFiscal, 'cliente', paisVisible, idFiscalVisible);
 }
 
 export function validateTransportistaForm(
   nombre: string,
   pais: PaisCodigo | '',
   idFiscal: string,
+  paisVisible: boolean = true,
+  idFiscalVisible: boolean = true,
 ): string | null {
-  return validateNombrePaisIdFiscalForm(nombre, pais, idFiscal, 'transportista');
+  return validateNombrePaisIdFiscalForm(nombre, pais, idFiscal, 'transportista', paisVisible, idFiscalVisible);
 }

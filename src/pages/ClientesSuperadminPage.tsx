@@ -18,6 +18,7 @@ import {
 } from "@/lib/listadoTabla";
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
 
 export function ClientesSuperadminPage() {
@@ -32,6 +33,15 @@ export function ClientesSuperadminPage() {
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   const tenants = useTenantsList();
+  
+  const { isVisible } = useFieldConfig("clientes");
+  const idFiscalVisible = isVisible("detalle_cliente", "idFiscal");
+  const paisVisible = isVisible("detalle_cliente", "pais");
+  const condicionVisible = isVisible("detalle_cliente", "condicionIvaTributaria");
+  const direccionVisible = isVisible("detalle_cliente", "direccion");
+  const emailVisible = isVisible("detalle_cliente", "email");
+  const telefonoVisible = isVisible("detalle_cliente", "telefono");
+  const contactoVisible = emailVisible || telefonoVisible;
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -230,64 +240,77 @@ export function ClientesSuperadminPage() {
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="ID Fiscal"
-                filterActive={!!filtroIdFiscal}
-                filterSignature={filtroIdFiscal}
-              >
-                <select
-                  value={filtroIdFiscal}
-                  onChange={(e) => {
-                    setFiltroIdFiscal(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por ID Fiscal"
+            {idFiscalVisible && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="ID Fiscal"
+                  filterActive={!!filtroIdFiscal}
+                  filterSignature={filtroIdFiscal}
                 >
-                  <option value="">Todos</option>
-                  {opcionesIdFiscal.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="País"
-                filterActive={!!filtroPais}
-                filterSignature={filtroPais}
-              >
-                <select
-                  value={filtroPais}
-                  onChange={(e) => {
-                    setFiltroPais(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroPais ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por País"
+                  <select
+                    value={filtroIdFiscal}
+                    onChange={(e) => {
+                      setFiltroIdFiscal(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por ID Fiscal"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesIdFiscal.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            {paisVisible && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="País"
+                  filterActive={!!filtroPais}
+                  filterSignature={filtroPais}
                 >
-                  <option value="">Todos</option>
-                  {opcionesPais.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Dirección
-            </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Contacto
-            </th>
+                  <select
+                    value={filtroPais}
+                    onChange={(e) => {
+                      setFiltroPais(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroPais ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por País"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesPais.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            {condicionVisible && (
+              <th scope="col" className={listadoTablaThClass}>
+                Condición tributaria
+              </th>
+            )}
+            {direccionVisible && (
+              <th scope="col" className={listadoTablaThClass}>
+                Dirección
+              </th>
+            )}
+            {contactoVisible && (
+              <th scope="col" className={listadoTablaThClass}>
+                Contacto
+              </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
@@ -301,41 +324,44 @@ export function ClientesSuperadminPage() {
             cell: (c) => c.nombre,
             tdClassName: listadoTablaTdClass,
           },
-          {
+          ...(idFiscalVisible ? [{
             id: "idFiscal",
             header: "ID Fiscal",
-            cell: (c) => c.idFiscal ?? "—",
+            cell: (c: Cliente) => c.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(paisVisible ? [{
             id: "pais",
             header: "País",
-            cell: (c) => c.pais ?? "—",
+            cell: (c: Cliente) => c.pais ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(condicionVisible ? [{
             id: "condicionTributaria",
             header: "Condición tributaria",
-            cell: (c) =>
+            cell: (c: Cliente) =>
               c.pais === "AR"
                 ? c.condicionIva != null
                   ? condicionIvaLabel(c.condicionIva)
                   : "—"
                 : (c.condicionTributaria ?? "—"),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(direccionVisible ? [{
             id: "direccion",
             header: "Dirección",
-            cell: (c) => c.direccion ?? "—",
+            cell: (c: Cliente) => c.direccion ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(contactoVisible ? [{
             id: "contacto",
             header: "Contacto",
-            cell: (c) => c.email ?? c.telefono ?? "—",
+            cell: (c: Cliente) => {
+              const val = [emailVisible ? c.email : null, telefonoVisible ? c.telefono : null].filter(Boolean).join(" - ");
+              return val || "—";
+            },
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
+          }] : []),
         ]}
         rows={!filtroEmpresa || error ? [] : rowsPagina}
         rowKey={(c) => c.id}

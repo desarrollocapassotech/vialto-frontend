@@ -551,6 +551,7 @@ export function EmitirFacturaModal({
                         id={factura.clienteId}
                         tenantId={tenantId}
                         getToken={getToken}
+                        forceArcaFields={true}
                         initial={{
                           nombre: clienteDetalle?.nombre ?? "",
                           pais: clienteDetalle?.pais ?? null,

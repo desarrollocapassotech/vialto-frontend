@@ -56,6 +56,7 @@ export function DatosFiscalesFaltantesAlerta({
             id={transportistaSeleccionado.id!}
             tenantId={tenantId}
             getToken={getToken}
+            forceArcaFields={true}
             initial={{
               nombre: transportistaSeleccionado.nombre ?? "",
               pais: transportistaSeleccionado.pais ?? null,
@@ -78,6 +79,7 @@ export function DatosFiscalesFaltantesAlerta({
             id={clienteDetalle.id}
             tenantId={tenantId}
             getToken={getToken}
+            forceArcaFields={true}
             initial={{
               nombre: clienteDetalle.nombre ?? "",
               pais: clienteDetalle.pais ?? null,

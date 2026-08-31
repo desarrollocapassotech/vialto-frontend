@@ -21,6 +21,7 @@ import {
   condicionTributariaPorPais,
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export function ClienteCreatePage() {
   const { getToken } = useAuth();
@@ -29,6 +30,8 @@ export function ClienteCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { showToast } = useToast();
+  const { isVisible } = useFieldConfig("clientes");
+
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
@@ -43,7 +46,16 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const faltanDatosFiscales = !pais || !idFiscal.trim();
+  const paisVisible = isVisible("alta_cliente", "pais");
+  const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
+  const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
+  const direccionVisible = isVisible("alta_cliente", "direccion");
+  const emailVisible = isVisible("alta_cliente", "email");
+  const telefonoVisible = isVisible("alta_cliente", "telefono");
+
+  const faltanPais = paisVisible && !pais;
+  const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
+  const faltanDatosFiscales = faltanPais || faltanIdFiscal;
 
   function handlePaisChange(newPais: PaisCodigo | "") {
     setPais(newPais);
@@ -58,7 +70,7 @@ export function ClienteCreatePage() {
       setFieldErrors(errs);
       return;
     }
-    const errorFiscal = idFiscal.trim()
+    const errorFiscal = idFiscalVisible && idFiscal.trim()
       ? validarIdFiscal(pais, idFiscal.trim())
       : null;
     if (errorFiscal) {
@@ -106,7 +118,7 @@ export function ClienteCreatePage() {
   const labelClass =
     "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
   const condInfo = condicionTributariaPorPais(pais);
-  const errorFiscal = idFiscal.trim()
+  const errorFiscal = idFiscalVisible && idFiscal.trim()
     ? validarIdFiscal(pais, idFiscal.trim())
     : null;
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
@@ -132,61 +144,73 @@ export function ClienteCreatePage() {
           />
           <CrudFieldError message={fieldErrors.nombre} />
         </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
-          <PaisUbicacionSelect
-            value={pais}
-            onChange={handlePaisChange}
-            placeholder="Seleccioná un país"
-          />
-          <CrudFieldError message={fieldErrors.pais} />
-        </label>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {paisVisible && (
           <label className="grid gap-1.5">
-            <CrudFieldLabel>
-              {idFiscalPorPais(pais).label} (recomendado)
-            </CrudFieldLabel>
-            <CrudInput
-              placeholder={idFiscalPorPais(pais).placeholder}
-              value={idFiscal}
-              error={idFiscalError || undefined}
-              onChange={(e) => setIdFiscal(e.target.value)}
+            <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
+            <PaisUbicacionSelect
+              value={pais}
+              onChange={handlePaisChange}
+              placeholder="Seleccioná un país"
             />
-            <CrudFieldError message={idFiscalError} />
+            <CrudFieldError message={fieldErrors.pais} />
           </label>
-          <label className="grid gap-1.5">
-            <span className={labelClass}>{condInfo.label}</span>
-            {condInfo.type === "select" ? (
-              <CrudSelect
-                value={condicionIva ?? ""}
-                onChange={(e) =>
-                  setCondicionIva(
-                    e.target.value ? Number(e.target.value) : null,
-                  )
-                }
-              >
-                <option value="">Seleccioná una opción</option>
-                {condInfo.options.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </CrudSelect>
-            ) : (
-              <CrudInput
-                placeholder={condInfo.placeholder}
-                value={condicionTributaria}
-                onChange={(e) => setCondicionTributaria(e.target.value)}
-              />
+        )}
+        {(idFiscalVisible || condicionVisible) && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {idFiscalVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>
+                  {idFiscalPorPais(pais).label} (recomendado)
+                </CrudFieldLabel>
+                <CrudInput
+                  placeholder={idFiscalPorPais(pais).placeholder}
+                  value={idFiscal}
+                  error={idFiscalError || undefined}
+                  onChange={(e) => setIdFiscal(e.target.value)}
+                />
+                <CrudFieldError message={idFiscalError} />
+              </label>
             )}
-          </label>
-        </div>
+            {condicionVisible && (
+              <label className="grid gap-1.5">
+                <span className={labelClass}>{condInfo.label}</span>
+                {condInfo.type === "select" ? (
+                  <CrudSelect
+                    value={condicionIva ?? ""}
+                    onChange={(e) =>
+                      setCondicionIva(
+                        e.target.value ? Number(e.target.value) : null,
+                      )
+                    }
+                  >
+                    <option value="">Seleccioná una opción</option>
+                    {condInfo.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </CrudSelect>
+                ) : (
+                  <CrudInput
+                    placeholder={condInfo.placeholder}
+                    value={condicionTributaria}
+                    onChange={(e) => setCondicionTributaria(e.target.value)}
+                  />
+                )}
+              </label>
+            )}
+          </div>
+        )}
         {faltanDatosFiscales && (
           <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p>
-              Estás guardando el cliente sin país y/o{" "}
-              {idFiscalPorPais(pais).label.toLowerCase()} — esto puede
-              afectar la facturación más adelante si no se completa.
+              Estás guardando el cliente sin{" "}
+              {faltanPais && faltanIdFiscal
+                ? `país y/o ${idFiscalPorPais(pais).label.toLowerCase()}`
+                : faltanPais
+                  ? "país"
+                  : idFiscalPorPais(pais).label.toLowerCase()}
+              {" "}— esto puede afectar la facturación más adelante si no se completa.
             </p>
             <label className="flex items-center gap-2 font-medium">
               <input
@@ -201,30 +225,36 @@ export function ClienteCreatePage() {
             </label>
           </div>
         )}
-        <label className="grid gap-1.5">
-          <span className={labelClass}>Dirección</span>
-          <CrudInput
-            placeholder="Ej: Av. Corrientes 1234"
-            value={direccion}
-            onChange={(e) => setDireccion(e.target.value)}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={labelClass}>Email</span>
-          <CrudInput
-            placeholder="Ej: contacto@empresa.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={labelClass}>Teléfono</span>
-          <CrudInput
-            placeholder="Ej: +54 9 11 1234-5678"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-          />
-        </label>
+        {direccionVisible && (
+          <label className="grid gap-1.5">
+            <span className={labelClass}>Dirección</span>
+            <CrudInput
+              placeholder="Ej: Av. Corrientes 1234"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+            />
+          </label>
+        )}
+        {emailVisible && (
+          <label className="grid gap-1.5">
+            <span className={labelClass}>Email</span>
+            <CrudInput
+              placeholder="Ej: contacto@empresa.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+        )}
+        {telefonoVisible && (
+          <label className="grid gap-1.5">
+            <span className={labelClass}>Teléfono</span>
+            <CrudInput
+              placeholder="Ej: +54 9 11 1234-5678"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+            />
+          </label>
+        )}
         <CrudFormErrorAlert message={error} />
         <CrudSubmitButton
           loading={loading}
