@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Receipt, HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
+import { Receipt, HelpCircle } from "lucide-react";
 import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
@@ -138,8 +138,9 @@ export function CrearLiquidacionManualModal({
   const [transportistaId, setTransportistaId] = useState(
     viajeInicial?.transportistaId ?? "",
   );
-  
-  const [transportistaActualizado, setTransportistaActualizado] = useState<Transportista | null>(null);
+
+  const [transportistaActualizado, setTransportistaActualizado] =
+    useState<Transportista | null>(null);
 
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
@@ -230,14 +231,18 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     if (viajeInicial || selectedViajeIds.size === 0) return;
 
-      setConceptosLineas((prev) =>
-        prev.map((linea) => {
-          if (linea.modoAplicacion === 'VIAJE_PUNTUAL' && linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-            return { ...linea, viajeId: null, modoAplicacion: 'GENERAL' };
-          }
-          return linea;
-        }),
-      );
+    setConceptosLineas((prev) =>
+      prev.map((linea) => {
+        if (
+          linea.modoAplicacion === "VIAJE_PUNTUAL" &&
+          linea.viajeId &&
+          !selectedViajeIds.has(linea.viajeId)
+        ) {
+          return { ...linea, viajeId: null, modoAplicacion: "GENERAL" };
+        }
+        return linea;
+      }),
+    );
   }, [selectedViajeIds, viajeInicial]);
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
@@ -250,15 +255,23 @@ export function CrearLiquidacionManualModal({
   }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
 
   const transportistaSeleccionado = useMemo(() => {
-    if (transportistaActualizado && transportistaActualizado.id === transportistaId) {
+    if (
+      transportistaActualizado &&
+      transportistaActualizado.id === transportistaId
+    ) {
       return transportistaActualizado;
     }
     const fromList = transportistas.find((t) => t.id === transportistaId);
-    return (fromList as Partial<Transportista>) ?? (viajeInicial?.transportista as Partial<Transportista>) ?? null;
+    return (
+      (fromList as Partial<Transportista>) ??
+      (viajeInicial?.transportista as Partial<Transportista>) ??
+      null
+    );
   }, [viajeInicial, transportistas, transportistaId, transportistaActualizado]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
-  const cvlpClaseBAlerta = hasLiquidoProductoArca && cvlpClaseBEsperada(condicionIva);
+  const cvlpClaseBAlerta =
+    hasLiquidoProductoArca && cvlpClaseBEsperada(condicionIva);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -298,7 +311,7 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     let cid = viajeInicial?.clienteId;
     if (!cid && selectedViajeIds.size > 0) {
-      const primerViaje = viajes.find(v => selectedViajeIds.has(v.id));
+      const primerViaje = viajes.find((v) => selectedViajeIds.has(v.id));
       cid = (primerViaje as any)?.cliente?.id;
     }
     if (!cid) {
@@ -317,9 +330,10 @@ export function CrearLiquidacionManualModal({
         if (!cancelled) setClienteDetalle(null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [viajeInicial, selectedViajeIds, viajes, tenantId, getToken]);
-
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -346,17 +360,36 @@ export function CrearLiquidacionManualModal({
     if (!hasLiquidoProductoArca || transportistaId === "") return [];
     return collectCvlpEmitMissingFields({
       emisor: resolvedConfig,
-      transportista: transportistaSeleccionado ?? { idFiscal: null, domicilio: null, condicionIva: null },
+      transportista: transportistaSeleccionado ?? {
+        idFiscal: null,
+        domicilio: null,
+        condicionIva: null,
+      },
       cliente: clienteSeleccionado,
     });
-  }, [hasLiquidoProductoArca, resolvedConfig, transportistaSeleccionado, clienteSeleccionado, transportistaId]);
+  }, [
+    hasLiquidoProductoArca,
+    resolvedConfig,
+    transportistaSeleccionado,
+    clienteSeleccionado,
+    transportistaId,
+  ]);
 
-  const isLoadingCliente = selectedViajes.length > 0 && clienteSeleccionado === null;
-  const missingTransportistaFields = missingEmitFields.filter(f => f.startsWith("Transportista:"));
-  const missingClienteFields = selectedViajes.length > 0 && !isLoadingCliente ? missingEmitFields.filter(f => f.startsWith("Cliente:")) : [];
+  const isLoadingCliente =
+    selectedViajes.length > 0 && clienteSeleccionado === null;
+  const missingTransportistaFields = missingEmitFields.filter((f) =>
+    f.startsWith("Transportista:"),
+  );
+  const missingClienteFields =
+    selectedViajes.length > 0 && !isLoadingCliente
+      ? missingEmitFields.filter((f) => f.startsWith("Cliente:"))
+      : [];
 
   const bloqueadoUsd = selectedViajes.some((v) =>
-    arcaBloqueaLiquidarUsd(hasLiquidoProductoArca, v.monedaPrecioTransportistaExterno),
+    arcaBloqueaLiquidarUsd(
+      hasLiquidoProductoArca,
+      v.monedaPrecioTransportistaExterno,
+    ),
   );
 
   function toggleViaje(id: string) {
@@ -436,14 +469,20 @@ export function CrearLiquidacionManualModal({
       setError("Ingresá un punto de venta válido.");
       return;
     }
-    if (action === "emitir" && hasLiquidoProductoArca && cvlpClaseBEsperada(condicionIva)) {
+    if (
+      action === "emitir" &&
+      hasLiquidoProductoArca &&
+      cvlpClaseBEsperada(condicionIva)
+    ) {
       setError(
         "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
       );
       return;
     }
     if (action === "emitir" && missingEmitFields.length > 0) {
-      setError("No se puede emitir. Faltan datos obligatorios del transportista o cliente.");
+      setError(
+        "No se puede emitir. Faltan datos obligatorios del transportista o cliente.",
+      );
       return;
     }
     setConceptosIncomplete([]);
@@ -549,9 +588,11 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
-  
+
   const getMultiplicador = (modo?: string) =>
-    modo === "TODOS_LOS_VIAJES" ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0)) : 1;
+    modo === "TODOS_LOS_VIAJES"
+      ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0))
+      : 1;
 
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
@@ -703,11 +744,20 @@ export function CrearLiquidacionManualModal({
               </div>
 
               {missingTransportistaFields.length > 0 && (
-                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                <div
+                  className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  role="alert"
+                >
                   <p className="font-medium">
-                    Faltan datos del transportista: {missingTransportistaFields.map(f => f.replace("Transportista: ", "")).join(", ")}.
+                    Faltan datos del transportista:{" "}
+                    {missingTransportistaFields
+                      .map((f) => f.replace("Transportista: ", ""))
+                      .join(", ")}
+                    .
                     <br />
-                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                    <strong className="font-bold">
+                      Desplazate hacia abajo para completarlos.
+                    </strong>
                   </p>
                 </div>
               )}
@@ -766,7 +816,9 @@ export function CrearLiquidacionManualModal({
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">ID personalizado</span>
+                      <span className="text-vialto-steel">
+                        ID personalizado
+                      </span>
                       <span className="font-medium tabular-nums text-vialto-charcoal">
                         {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
                           "—"}
@@ -793,7 +845,9 @@ export function CrearLiquidacionManualModal({
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">Precio del viaje</span>
+                      <span className="text-vialto-steel">
+                        Precio del viaje
+                      </span>
                       <span className="font-medium tabular-nums text-vialto-charcoal">
                         {fmtMoney(
                           viajeInicial.precioTransportistaExterno,
@@ -862,11 +916,20 @@ export function CrearLiquidacionManualModal({
               )}
 
               {missingClienteFields.length > 0 && (
-                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                <div
+                  className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  role="alert"
+                >
                   <p className="font-medium">
-                    Faltan datos del cliente: {missingClienteFields.map(f => f.replace("Cliente: ", "")).join(", ")}.
+                    Faltan datos del cliente:{" "}
+                    {missingClienteFields
+                      .map((f) => f.replace("Cliente: ", ""))
+                      .join(", ")}
+                    .
                     <br />
-                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                    <strong className="font-bold">
+                      Desplazate hacia abajo para completarlos.
+                    </strong>
                   </p>
                 </div>
               )}
@@ -915,7 +978,8 @@ export function CrearLiquidacionManualModal({
                     <div className="group relative flex items-center">
                       <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%
+                        Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y
+                        27%
                         <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
                       </div>
                     </div>
@@ -992,7 +1056,9 @@ export function CrearLiquidacionManualModal({
                   missingEmitFields={
                     selectedViajes.length > 0 && !isLoadingCliente
                       ? missingEmitFields
-                      : missingEmitFields.filter((f) => !f.startsWith("Cliente:"))
+                      : missingEmitFields.filter(
+                          (f) => !f.startsWith("Cliente:"),
+                        )
                   }
                   clienteDetalle={clienteSeleccionado}
                   onClienteUpdated={(c) => {
@@ -1082,13 +1148,12 @@ export function CrearLiquidacionManualModal({
                         </div>
                       );
                     })}
+
                     {netoGravado !== null && (
                       <div className="flex items-baseline justify-between gap-3 border-t border-black/10 pt-2">
-                        <span className={labelClass}>
-                          Subtotal (flete − comisión)
-                        </span>
+                        <span className={labelClass}>Subtotal</span>
                         <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                          {fmtLiquidacionMoney(netoGravado)}
+                          {fmtLiquidacionMoney(netoGravado + conceptosEfecto)}
                         </span>
                       </div>
                     )}
@@ -1097,17 +1162,6 @@ export function CrearLiquidacionManualModal({
                         <span>IVA {ivaPctNum}% (flete/comisión)</span>
                         <span className="tabular-nums">
                           {fmtSignedLiquidacionMoney(ivaMonto, "plus")}
-                        </span>
-                      </div>
-                    )}
-                    {conceptosCompletos.length > 0 && (
-                      <div className="flex items-baseline justify-between gap-3 text-xs text-vialto-steel">
-                        <span>Efecto neto de conceptos</span>
-                        <span className="tabular-nums">
-                          {fmtSignedLiquidacionMoney(
-                            Math.abs(conceptosEfecto),
-                            conceptosEfecto >= 0 ? "plus" : "minus",
-                          )}
                         </span>
                       </div>
                     )}
