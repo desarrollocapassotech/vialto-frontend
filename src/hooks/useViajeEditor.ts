@@ -56,6 +56,7 @@ import {
   facturacionPermiteVincular,
   liquidacionPermiteVincular,
 } from "@/lib/viajesIndicadores";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   Chofer,
   Cliente,
@@ -99,6 +100,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   configRef.current = config;
 
   const { showToast } = useToast();
+  const { isVisible } = useFieldConfig("viajes");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
@@ -468,26 +470,36 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       return;
     }
     setTransportistaEfectivoError(null);
+    const vehiculosRowsVisible = isVisible("edicion_viaje", "vehiculosRows");
+    const choferPropioVisible = isVisible("edicion_viaje", "choferId");
+
     const vids = vehiculoIdsDesdeRows(draft.vehiculosRows);
-    if (!externo && vids.length === 0) {
-      setError(
-        "Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).",
-      );
+
+    if (!externo && vehiculosRowsVisible && vids.length === 0) {
+      setError("Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).");
       return;
     }
-    if (
-      !externo &&
-      !flotaPropiaVehiculosListaValida(
-        draft.choferId,
-        vids,
-        choferesPropios,
-        vehiculosPropios,
-      )
-    ) {
-      setError(
-        "En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).",
-      );
-      return;
+
+    if (!externo) {
+      if (choferPropioVisible && vehiculosRowsVisible) {
+        if (!flotaPropiaVehiculosListaValida(draft.choferId, vids, choferesPropios, vehiculosPropios)) {
+          setError("En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).");
+          return;
+        }
+      } else if (choferPropioVisible && !vehiculosRowsVisible) {
+        const c = String(draft.choferId ?? "").trim();
+        if (!c || !choferesPropios.some((x) => x.id === c)) {
+          setError("En flota propia, elegí chofer de la lista.");
+          return;
+        }
+      } else if (!choferPropioVisible && vehiculosRowsVisible) {
+        const vp = vehiculosFlotaPropia(vehiculosPropios);
+        const permitidos = new Set(vp.map((x) => x.id));
+        if (vids.length === 0 || !vids.every((id) => permitidos.has(id))) {
+          setError("En flota propia, elegí vehículos de la lista.");
+          return;
+        }
+      }
     }
     const o = draft.origen.trim();
     if (o) {

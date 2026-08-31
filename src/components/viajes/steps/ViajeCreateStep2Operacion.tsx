@@ -107,6 +107,11 @@ interface Props {
   tenantId: string;
   onVehiculoCreado: (v: Vehiculo) => void;
 
+  mostrarChoferExterno: boolean;
+  mostrarVehiculosExternos: boolean;
+  mostrarChoferPropio: boolean;
+  mostrarVehiculosPropios: boolean;
+
   // Ganancia bruta manual
   mostrarGananciaBrutaManual: boolean;
   gananciaDraft: GananciaBrutaManualDraftSlice;
@@ -177,6 +182,10 @@ export function ViajeCreateStep2Operacion({
   getToken,
   tenantId,
   onVehiculoCreado,
+  mostrarChoferExterno,
+  mostrarVehiculosExternos,
+  mostrarChoferPropio,
+  mostrarVehiculosPropios,
   mostrarGananciaBrutaManual,
   gananciaDraft,
   onGananciaBrutaManualPatch,
@@ -408,62 +417,75 @@ export function ViajeCreateStep2Operacion({
               </div>
             )}
             <div className="grid gap-3">
-              <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                <span className={fieldLabelClass}>Chofer</span>
-                <ChoferSearchSelect
-                  choferes={choferesExterno}
-                  value={choferExternoId}
-                  onChange={onChoferExternoIdChange}
-                  inputClassName={inputClass}
-                  aria-label="Chofer transportista externo"
-                  onNuevo={onNuevoChoferExterno}
+              {mostrarChoferExterno && (
+                <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                  <span className={fieldLabelClass}>Chofer</span>
+                  <ChoferSearchSelect
+                    choferes={choferesExterno}
+                    value={choferExternoId}
+                    onChange={onChoferExternoIdChange}
+                    inputClassName={inputClass}
+                    aria-label="Chofer transportista externo"
+                    onNuevo={onNuevoChoferExterno}
+                  />
+                </div>
+              )}
+              {mostrarVehiculosExternos && (
+                <ViajeVehiculosLista
+                  groupId="viaje-create-ext"
+                  crearVehiculoHref={
+                    tenantId ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tenantId)}` : "/vehiculos/nuevo"
+                  }
+                  rows={vehiculosExternosRows}
+                  onChange={onVehiculosExternosRowsChange}
+                  vehiculos={vehiculos}
+                  alMenosUno={false}
+                  onRefreshVehiculos={onRefreshVehiculosExternos}
+                  refreshingVehiculos={refreshingFlota}
+                  getToken={getToken}
+                  tenantId={tenantId || undefined}
+                  onVehiculoCreado={onVehiculoCreado}
                 />
-              </div>
-              <ViajeVehiculosLista
-                groupId="viaje-create-ext"
-                crearVehiculoHref={
-                  tenantId ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tenantId)}` : "/vehiculos/nuevo"
-                }
-                rows={vehiculosExternosRows}
-                onChange={onVehiculosExternosRowsChange}
-                vehiculos={vehiculos}
-                alMenosUno={false}
-                onRefreshVehiculos={onRefreshVehiculosExternos}
-                refreshingVehiculos={refreshingFlota}
-                getToken={getToken}
-                tenantId={tenantId || undefined}
-                onVehiculoCreado={onVehiculoCreado}
-              />
+              )}
             </div>
           </div>
         }
         propioContent={
           <div className="grid gap-3">
-            <div className="flex min-w-0 flex-col gap-1 max-w-md">
-              <span className={fieldLabelClass}>Chofer (flota propia)</span>
-              <ChoferSearchSelect
-                choferes={choferesPropios}
-                value={choferId}
-                onChange={onChoferIdChange}
-                inputClassName={inputClass}
-                aria-label="Chofer flota propia"
-                onNuevo={onNuevoChoferPropio}
-              />
-              {ayudaFlotaChofer && <p className="text-xs text-amber-800/90">{ayudaFlotaChofer}</p>}
-            </div>
-            <ViajeVehiculosLista
-              groupId="viaje-create"
-              crearVehiculoHref="/vehiculos/nuevo"
-              rows={vehiculosRows}
-              onChange={onVehiculosRowsChange}
-              vehiculos={vehiculosPropios}
-              onRefreshVehiculos={onRefreshVehiculosPropios}
-              refreshingVehiculos={refreshingFlota}
-              getToken={getToken}
-              tenantId={tenantId || undefined}
-              onVehiculoCreado={onVehiculoCreado}
-            />
-            {ayudaFlotaVehiculo && <p className="text-xs text-amber-800/90">{ayudaFlotaVehiculo}</p>}
+            {mostrarChoferPropio && (
+              <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                <span className={fieldLabelClass}>Chofer (flota propia)</span>
+                <ChoferSearchSelect
+                  choferes={choferesPropios}
+                  value={choferId}
+                  onChange={onChoferIdChange}
+                  inputClassName={inputClass}
+                  aria-label="Chofer flota propia"
+                  onNuevo={onNuevoChoferPropio}
+                />
+                {ayudaFlotaChofer && <p className="text-xs text-vialto-steel">{ayudaFlotaChofer}</p>}
+              </div>
+            )}
+            {mostrarVehiculosPropios && (
+              <>
+                <ViajeVehiculosLista
+                  groupId="viaje-create-propio"
+                  crearVehiculoHref={
+                    tenantId ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tenantId)}` : "/vehiculos/nuevo"
+                  }
+                  rows={vehiculosRows}
+                  onChange={onVehiculosRowsChange}
+                  vehiculos={vehiculosPropios}
+                  alMenosUno={true}
+                  onRefreshVehiculos={onRefreshVehiculosPropios}
+                  refreshingVehiculos={refreshingFlota}
+                  getToken={getToken}
+                  tenantId={tenantId || undefined}
+                  onVehiculoCreado={onVehiculoCreado}
+                />
+                {ayudaFlotaVehiculo && <p className="text-xs text-vialto-steel">{ayudaFlotaVehiculo}</p>}
+              </>
+            )}
           </div>
         }
       />
