@@ -25,10 +25,6 @@ export function FacturacionSuperadminPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Facturación
       </h1>
-      <p className="mt-2 text-vialto-steel">
-        Vista de plataforma — seleccioná una empresa para ver y administrar sus
-        facturas con las mismas herramientas que un admin de la empresa.
-      </p>
 
       <div className="mt-6">
         <EmpresaFilterBar

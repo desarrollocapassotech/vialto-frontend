@@ -67,7 +67,7 @@ export function ViajeViewModal({
   onClose,
   onEditar,
   tenantId,
-  hasArca = false,
+  hasLiquidoProductoArca = false,
   editando = false,
   onFacturar,
   facturando = false,
@@ -80,8 +80,8 @@ export function ViajeViewModal({
   onEditar: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
-  /** Tenant con módulo integracion-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
-  hasArca?: boolean;
+  /** Tenant con módulo emision-liquido-producto-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
+  hasLiquidoProductoArca?: boolean;
   /** El editor se está preparando (fetch de listas maestras, etc.): bloquea el modal hasta que esté listo. */
   editando?: boolean;
   /** Si se pasa, muestra un botón "Facturar" junto a "Editar" (hoy solo desde el dashboard). */
@@ -248,7 +248,7 @@ export function ViajeViewModal({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
-            {hasArca ? (
+            {hasLiquidoProductoArca ? (
               <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
             ) : (
               <ViajePagoTransportistaIndicador viaje={viaje} onClick={onRegistrarPago} />

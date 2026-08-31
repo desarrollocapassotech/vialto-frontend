@@ -12,11 +12,6 @@ export function CombustibleSuperadminPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
         Combustible
       </h1>
-      <p className="mt-2 text-vialto-steel max-w-3xl">
-        Vista de plataforma — seleccioná una empresa para listar y administrar
-        sus cargas de combustible con las mismas herramientas que un admin de la
-        empresa.
-      </p>
 
       <div className="mt-6">
         <EmpresaFilterBar

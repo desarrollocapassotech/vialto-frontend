@@ -91,7 +91,6 @@ export function TenantViewModal({
             { label: 'Estado billing', value: labelBillingStatus(tenant.billingStatus) },
             { label: 'Renueva', value: tenant.billingRenewsAt ? fmtDate(tenant.billingRenewsAt) : null },
             { label: 'Máx. usuarios', value: tenant.maxUsers },
-            { label: 'Dominio propio', value: tenant.whiteLabelDomain },
             { label: 'Alta', value: fmtDate(tenant.createdAt) },
           ].filter(c => c.value != null && c.value !== '').map((c, i) => (
             <div key={i}>

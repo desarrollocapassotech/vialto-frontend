@@ -35,6 +35,7 @@ function campoFechaHora({
   ariaFecha,
   ariaHora,
   errorFecha,
+  required = true,
 }: {
   labelFecha: string;
   labelHora: string;
@@ -47,6 +48,7 @@ function campoFechaHora({
   ariaFecha: string;
   ariaHora: string;
   errorFecha?: string | null;
+  required?: boolean;
 }) {
   const subLabel = `${labelClassName} block min-h-[1.25rem] leading-tight`;
   const inputCls = `${inputClassName}${errorFecha ? ' border-red-400' : ''}`;
@@ -54,7 +56,7 @@ function campoFechaHora({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-4 sm:items-start">
       <div className="flex min-w-0 flex-col gap-1">
         <span className={subLabel}>
-          {labelFecha} <span className="text-red-500">*</span>
+          {labelFecha} {required && <span className="text-red-500">*</span>}
         </span>
         <input
           type="date"
@@ -62,7 +64,7 @@ function campoFechaHora({
           onChange={(e) => onFecha(e.target.value)}
           className={inputCls}
           aria-label={ariaFecha}
-          required
+          required={required}
         />
         {errorFecha && (
           <span className="text-xs text-red-600">{errorFecha}</span>
@@ -150,6 +152,7 @@ export function ViajeFechaHoraFields({
             ariaFecha: 'Fecha de descarga',
             ariaHora: 'Hora de descarga',
             errorFecha: errorFechaDescarga,
+            required: false,
           })}
         </div>
       </div>
@@ -189,6 +192,7 @@ export function ViajeFechaHoraFields({
           ariaFecha: 'Fecha de descarga',
           ariaHora: 'Hora de descarga',
           errorFecha: errorFechaDescarga,
+          required: false,
         })}
       </div>
     </div>

@@ -163,13 +163,31 @@ const MODULO_LABEL: Record<string, string> = {
   combustible: "Combustible",
 };
 
-export function ConfiguracionNotificacionesTenantPage() {
+export function ConfiguracionNotificacionesTenantPage({
+  tenantId,
+  embeddedInSuperadmin,
+}: { tenantId?: string; embeddedInSuperadmin?: boolean } = {}) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const platform = Boolean(tenantId?.trim());
+  const tid = tenantId?.trim() ?? "";
   const [items, setItems] = useState<NotificacionConfigEfectiva[] | null>(null);
   const [usuarios, setUsuarios] = useState<TenantUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingTipo, setSavingTipo] = useState<string | null>(null);
+
+  const configUrl = platform
+    ? `/api/notificaciones/config?tenantId=${encodeURIComponent(tid)}`
+    : "/api/notificaciones/config";
+  const usersUrl = platform
+    ? `/api/platform/users?tenantId=${encodeURIComponent(tid)}`
+    : "/api/users";
+  const toggleUrl = platform
+    ? `/api/notificaciones/config/toggle?tenantId=${encodeURIComponent(tid)}`
+    : "/api/notificaciones/config/toggle";
+  const destinatariosUrl = platform
+    ? `/api/notificaciones/config/destinatarios?tenantId=${encodeURIComponent(tid)}`
+    : "/api/notificaciones/config/destinatarios";
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -178,8 +196,8 @@ export function ConfiguracionNotificacionesTenantPage() {
     (async () => {
       try {
         const [config, users] = await Promise.all([
-          apiJson<NotificacionConfigEfectiva[]>("/api/notificaciones/config", () => getToken()),
-          apiJson<TenantUser[]>("/api/users", () => getToken()),
+          apiJson<NotificacionConfigEfectiva[]>(configUrl, () => getToken()),
+          apiJson<TenantUser[]>(usersUrl, () => getToken()),
         ]);
         if (!cancelled) {
           setItems(config);
@@ -195,14 +213,14 @@ export function ConfiguracionNotificacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [getToken, isLoaded, isSignedIn, configUrl, usersUrl]);
 
   async function toggle(tipo: string, activoActual: boolean) {
     setSavingTipo(tipo);
     setError(null);
     const nuevoActivo = !activoActual;
     try {
-      await apiJson("/api/notificaciones/config/toggle", () => getToken(), {
+      await apiJson(toggleUrl, () => getToken(), {
         method: "POST",
         body: JSON.stringify({ tipo, activo: nuevoActivo }),
       });
@@ -222,7 +240,7 @@ export function ConfiguracionNotificacionesTenantPage() {
     setSavingTipo(tipo);
     setError(null);
     try {
-      await apiJson("/api/notificaciones/config/destinatarios", () => getToken(), {
+      await apiJson(destinatariosUrl, () => getToken(), {
         method: "POST",
         body: JSON.stringify({ tipo, destinatarios }),
       });
@@ -240,9 +258,11 @@ export function ConfiguracionNotificacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Notificaciones por email
-      </h1>
+      {!embeddedInSuperadmin && (
+        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+          Notificaciones por email
+        </h1>
+      )}
 
       {error && (
         <p className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -257,7 +277,9 @@ export function ConfiguracionNotificacionesTenantPage() {
 
         {!loading && grupos.length === 0 && !error && (
           <p className="text-sm text-vialto-steel">
-            Tu empresa todavía no tiene módulos con notificaciones disponibles.
+            {platform
+              ? "Esta empresa todavía no tiene módulos con notificaciones disponibles."
+              : "Tu empresa todavía no tiene módulos con notificaciones disponibles."}
           </p>
         )}
 

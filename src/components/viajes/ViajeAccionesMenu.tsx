@@ -11,8 +11,8 @@ import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
 interface Props {
   viaje: Viaje;
-  /** Tenant con módulo integracion-arca activo. */
-  hasArca?: boolean;
+  /** Tenant con módulo emision-facturas-arca activo (bloqueo de USD al facturar). */
+  hasFacturasArca?: boolean;
   onVer: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
@@ -25,7 +25,7 @@ interface Props {
 
 export function ViajeAccionesMenu({
   viaje,
-  hasArca = false,
+  hasFacturasArca = false,
   onVer,
   onAgregarGasto,
   onRegistrarPago,
@@ -40,7 +40,7 @@ export function ViajeAccionesMenu({
   const permitePago = viajeRequierePagosTransportista(viaje) && viaje.etapa !== 'cancelado';
   const permiteGasto = viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
-  const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasArca, viaje);
+  const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasFacturasArca, viaje);
   const permiteExportar = viaje.etapa !== 'cancelado';
 
   const options = useMemo(() => {

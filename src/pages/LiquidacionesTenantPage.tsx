@@ -48,7 +48,7 @@ import {
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
-import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
@@ -230,7 +230,7 @@ export function LiquidacionesTenantPage() {
   const empresaModules = isSuperAdmin
     ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
     : (tenant?.modules ?? []);
-  const hasArca = canAccessIntegracionArca(empresaModules);
+  const hasArca = canAccessEmisionLiquidoProductoArca(empresaModules);
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -1006,7 +1006,7 @@ export function LiquidacionesTenantPage() {
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           config={config}
-          hasArca={hasArca}
+          hasLiquidoProductoArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
           onDataSaved={() => {

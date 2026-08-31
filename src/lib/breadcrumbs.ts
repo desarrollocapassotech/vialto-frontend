@@ -30,7 +30,7 @@ function homeCrumb(ctx: BreadcrumbRoleCtx): Crumb {
   // lo redirige), así que su "inicio" real es inventario / ingresos respectivamente.
   if (ctx.stockViewer) return { label: "Inicio", to: "/stock/inventario" };
   if (ctx.stockOperator) return { label: "Inicio", to: "/stock/ingresos" };
-  return { label: ctx.superadmin ? "Panorama" : "Inicio", to: "/" };
+  return { label: "Inicio", to: "/" };
 }
 
 function baseDeDatosCrumb(search: URLSearchParams, tab: string): Crumb {
@@ -198,6 +198,10 @@ const ENTRIES: Entry[] = [
   {
     pattern: "/superadmin/campos-empresa",
     build: (_p, ctx) => [homeCrumb(ctx), { label: "Configuración por empresa" }],
+  },
+  {
+    pattern: "/superadmin/notificaciones",
+    build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones" }],
   },
   { pattern: "/superadmin/combustible", build: (_p, ctx) => [homeCrumb(ctx), { label: "Combustible" }] },
 ];

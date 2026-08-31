@@ -135,7 +135,7 @@ export function DivisionesStockHistorialTenantPage({
   // El tenant seleccionado por el superadmin es estado local (no está en la URL),
   // así que el breadcrumb automático (calculado por ruta) no lo puede reflejar.
   useBreadcrumbOverride([
-    { label: platform ? "Panorama" : "Inicio", to: "/" },
+    { label: "Inicio", to: "/" },
     { label: "División de bultos", to: volverHref },
     { label: "Historial de divisiones" },
   ]);

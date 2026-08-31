@@ -38,10 +38,25 @@ const EMPTY_FORM: FormState = {
 
 export function ConceptosLiquidacionConfigSection({
   getToken,
+  tenantId,
 }: {
   getToken: () => Promise<string | null>;
+  /** Presente = vista superadmin sobre una empresa elegida (pega contra /api/platform/...). */
+  tenantId?: string;
 }) {
   const { showToast } = useToast();
+  const platform = Boolean(tenantId?.trim());
+  const tid = tenantId?.trim() ?? '';
+  const baseUrl = platform
+    ? `/api/platform/arca/conceptos-liquidacion`
+    : '/api/integracion-arca/conceptos-liquidacion';
+  const listUrl = platform
+    ? `${baseUrl}?tenantId=${encodeURIComponent(tid)}`
+    : baseUrl;
+  function itemUrl(id: string) {
+    const path = `${baseUrl}/${encodeURIComponent(id)}`;
+    return platform ? `${path}?tenantId=${encodeURIComponent(tid)}` : path;
+  }
   const [items, setItems] = useState<ConceptoLiquidacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,7 +71,7 @@ export function ConceptosLiquidacionConfigSection({
     setError(null);
     try {
       const data = await apiJson<ConceptoLiquidacion[]>(
-        '/api/integracion-arca/conceptos-liquidacion',
+        listUrl,
         () => getToken(),
       );
       setItems(Array.isArray(data) ? data : []);
@@ -66,7 +81,7 @@ export function ConceptosLiquidacionConfigSection({
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, listUrl]);
 
   useEffect(() => {
     void load();
@@ -136,14 +151,14 @@ export function ConceptosLiquidacionConfigSection({
       };
       if (editingId) {
         await apiJson<ConceptoLiquidacion>(
-          `/api/integracion-arca/conceptos-liquidacion/${encodeURIComponent(editingId)}`,
+          itemUrl(editingId),
           () => getToken(),
           { method: 'PATCH', body: JSON.stringify(body) },
         );
         showToast('Concepto actualizado.');
       } else {
         await apiJson<ConceptoLiquidacion>(
-          '/api/integracion-arca/conceptos-liquidacion',
+          listUrl,
           () => getToken(),
           { method: 'POST', body: JSON.stringify(body) },
         );
@@ -163,7 +178,7 @@ export function ConceptosLiquidacionConfigSection({
     setError(null);
     try {
       await apiJson<ConceptoLiquidacion>(
-        `/api/integracion-arca/conceptos-liquidacion/${encodeURIComponent(c.id)}`,
+        itemUrl(c.id),
         () => getToken(),
         { method: 'PATCH', body: JSON.stringify({ activo: !c.activo }) },
       );

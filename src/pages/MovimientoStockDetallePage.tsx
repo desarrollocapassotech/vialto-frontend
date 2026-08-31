@@ -56,7 +56,7 @@ export function MovimientoStockDetallePage() {
 
   const homeCrumb = stockViewer
     ? { label: 'Inicio', to: '/stock/inventario' }
-    : { label: superadmin ? 'Panorama' : 'Inicio', to: '/' };
+    : { label: 'Inicio', to: '/' };
 
   // El origen de navegación (lista de movimientos vs. ingresos/egresos) y el
   // tipo del movimiento sólo se conocen en runtime, así que el breadcrumb
