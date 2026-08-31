@@ -77,6 +77,7 @@ import type {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
+import { roundMoney2 } from "@/lib/facturaTotales";
 import { type OpcionProducto } from "@/lib/productosViaje";
 import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
 import { ViajeCreateStep1ClientesYCarga } from "@/components/viajes/steps/ViajeCreateStep1ClientesYCarga";
@@ -740,8 +741,10 @@ export function ViajeCreatePage() {
 
     // 6. Validación de Montos y Pagos
     const montoNum = desgloseActivo
-      ? (Number(principal.cantidadStr.replace(",", ".")) || 0) *
-        (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) || 0)
+      ? roundMoney2(
+          (Number(principal.cantidadStr.replace(",", ".")) || 0) *
+            (parseCurrencyForMoneda(principal.precioUnitarioStr, principal.moneda) || 0),
+        )
       : parseCurrencyForMoneda(principal.montoStr, principal.moneda);
     if (montoNum == null || montoNum < 0.01) {
       setError("Cargá el monto de este cliente.");

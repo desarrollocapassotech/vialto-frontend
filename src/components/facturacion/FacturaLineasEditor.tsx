@@ -7,6 +7,10 @@ import {
 } from '@/components/facturacion/FacturaTramosEditor';
 import type { Factura, Viaje } from '@/types/api';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
+import {
+  computeFacturaTotalesFromBases,
+  importeNetoViajeParaFactura,
+} from '@/lib/facturaTotales';
 
 export type FacturaLineaDraft = {
   descripcion: string;
@@ -92,7 +96,7 @@ function lineasFromTramos(
     const v = viajes.find((x) => x.id === id);
     if (!v) continue;
     const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
-    const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
+    const monto = importeNetoViajeParaFactura(v);
     lineas.push({
       descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
       importe: monto,
@@ -137,7 +141,7 @@ export function defaultFacturaLineasFromDraft(
   if (linked.length > 0) {
     const lineas = linked.map((v) => {
       const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
-      const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
+      const monto = importeNetoViajeParaFactura(v);
       return {
         descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
@@ -146,7 +150,7 @@ export function defaultFacturaLineasFromDraft(
     });
     const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
     if (netoLineas > 0) return lineas;
-    const importe = linked.reduce((s, v) => s + (v.monto ?? 0), 0);
+    const importe = linked.reduce((s, v) => s + importeNetoViajeParaFactura(v), 0);
     if (importe > 0) {
       return [
         {
@@ -209,7 +213,7 @@ export function defaultFacturaLineas(
   if (linked.length > 0) {
     const lineas = linked.map((v) => {
       const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
-      const monto = v.monto != null && v.monto > 0 ? v.monto : 0;
+      const monto = importeNetoViajeParaFactura(v);
       return {
         descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
@@ -245,18 +249,12 @@ export function computeFacturaTotales(
   lineas: FacturaLineaDraft[],
   ivaPctDefault: number,
 ) {
-  let neto = 0;
-  let iva = 0;
-  for (const l of lineas.filter(isFacturaLineaCompleta)) {
-    const pct = l.ivaPct ?? ivaPctDefault;
-    neto += l.importe;
-    iva += (l.importe * pct) / 100;
-  }
-  return {
-    neto,
-    iva,
-    total: neto + iva,
-  };
+  return computeFacturaTotalesFromBases(
+    lineas.filter(isFacturaLineaCompleta).map((l) => ({
+      importe: l.importe,
+      ivaPct: l.ivaPct ?? ivaPctDefault,
+    })),
+  );
 }
 
 interface Props {

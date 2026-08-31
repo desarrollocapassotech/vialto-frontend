@@ -25,6 +25,10 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
+import {
+  computeFacturaTotalesFromBases,
+  importeNetoViajeParaFactura,
+} from "@/lib/facturaTotales";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -201,11 +205,11 @@ export function FacturaTotalesPreview({
       draft.viajeIds.length > 0
         ? draft.viajeIds.reduce((sum, id) => {
             const v = viajes.find((x) => x.id === id);
-            return sum + (v?.monto ?? 0);
+            return sum + (v ? importeNetoViajeParaFactura(v) : 0);
           }, 0)
         : 0;
-    const iva = neto * ((Number.isFinite(ivaN) ? ivaN : 0) / 100);
-    return { neto, iva, total: neto + iva };
+    const pct = Number.isFinite(ivaN) ? ivaN : 0;
+    return computeFacturaTotalesFromBases([{ importe: neto, ivaPct: pct }]);
   })();
 
   if (totales.neto <= 0 && totales.total <= 0) return null;

@@ -3,6 +3,10 @@ import { CrudFieldError } from "@/components/crud/CrudFieldError";
 import { CrudFieldLabel } from "@/components/crud/CrudFields";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
 import type { Viaje } from "@/types/api";
+import {
+  computeFacturaTotalesFromBases,
+  importeNetoViajeParaFactura,
+} from "@/lib/facturaTotales";
 
 export type FacturaTramoDraft = {
   viajeId: string;
@@ -109,23 +113,21 @@ export function computeTotalesFacturaPorTramo(
   const completos = tramos.filter(isFacturaTramoCompleto);
   const viajeIdsConTramo = new Set(completos.map((t) => t.viajeId));
 
-  let neto = 0;
-  let iva = 0;
-
-  for (const t of completos) {
-    neto += t.monto;
-    iva += (t.monto * t.ivaPct) / 100;
-  }
+  const items: Array<{ importe: number; ivaPct: number }> = completos.map((t) => ({
+    importe: t.monto,
+    ivaPct: t.ivaPct,
+  }));
 
   for (const id of viajeIds) {
     if (viajeIdsConTramo.has(id)) continue;
     const v = viajes.find((x) => x.id === id);
-    const monto = v?.monto ?? 0;
-    neto += monto;
-    iva += (monto * ivaPctViajesSinTramo) / 100;
+    items.push({
+      importe: v ? importeNetoViajeParaFactura(v) : 0,
+      ivaPct: ivaPctViajesSinTramo,
+    });
   }
 
-  return { neto, iva, total: neto + iva };
+  return computeFacturaTotalesFromBases(items);
 }
 
 interface Props {
