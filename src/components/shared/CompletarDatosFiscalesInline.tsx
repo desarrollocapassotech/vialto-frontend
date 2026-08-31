@@ -13,6 +13,7 @@ import {
 import type { PaisCodigo } from '@/lib/ciudades';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Cliente, Transportista } from '@/types/api';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 type Entidad = 'cliente' | 'transportista';
 
@@ -36,6 +37,8 @@ interface Props {
   onSaved: (updated: Cliente | Transportista) => void;
   /** Si se pasa, muestra un botón "Cancelar" (formulario mostrado en un toggle). */
   onCancel?: () => void;
+  /** Si es true, ignora la configuración del tenant y hace obligatorios los campos de facturación/AFIP. */
+  forceArcaFields?: boolean;
 }
 
 const labelClass =
@@ -49,6 +52,7 @@ export function CompletarDatosFiscalesInline({
   getToken,
   onSaved,
   onCancel,
+  forceArcaFields,
 }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [pais, setPais] = useState<PaisCodigo | ''>(
@@ -64,6 +68,14 @@ export function CompletarDatosFiscalesInline({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const formKey = entidad === 'cliente' ? 'edicion_cliente' : 'edicion_transportista';
+  const { isVisible } = useFieldConfig(entidad === 'cliente' ? 'clientes' : 'transportistas');
+  
+  const paisVisible = forceArcaFields || isVisible(formKey, "pais");
+  const idFiscalVisible = forceArcaFields || isVisible(formKey, "idFiscal");
+  const condicionVisible = forceArcaFields || isVisible(formKey, "condicionIvaTributaria");
+  const direccionVisible = forceArcaFields || isVisible(formKey, "direccion");
+
   const condInfo = condicionTributariaPorPais(pais);
   const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
@@ -78,24 +90,24 @@ export function CompletarDatosFiscalesInline({
 
   const redInputClass = "!border-red-400 bg-red-50/50";
   const isNombreMissing = !nombre.trim();
-  const isPaisMissing = !pais;
-  const isIdFiscalMissing = !idFiscal.trim();
-  const isDireccionMissing = !direccion.trim();
-  const isIvaMissing = pais === 'AR' && condicionIva === null;
-  const isTributariaMissing = pais !== 'AR' && !condicionTributaria.trim();
+  const isPaisMissing = paisVisible && !pais;
+  const isIdFiscalMissing = idFiscalVisible && !idFiscal.trim();
+  const isDireccionMissing = direccionVisible && !direccion.trim();
+  const isIvaMissing = condicionVisible && pais === 'AR' && condicionIva === null;
+  const isTributariaMissing = condicionVisible && pais !== 'AR' && !condicionTributaria.trim();
 
   async function onSave() {
     const validate = entidad === 'cliente' ? validateClienteForm : validateTransportistaForm;
-    const msg = validate(nombre, pais, idFiscal);
+    const msg = validate(nombre, pais, idFiscal, paisVisible, idFiscalVisible);
     if (msg) {
       const errs: Record<string, string> = {};
       if (!nombre.trim()) errs.nombre = msg;
-      else if (!pais) errs.pais = msg;
+      else if (paisVisible && !pais) errs.pais = msg;
       else errs.idFiscal = msg;
       setFieldErrors(errs);
       return;
     }
-    const errorFiscalCheck = validarIdFiscal(pais, idFiscal.trim());
+    const errorFiscalCheck = idFiscalVisible && idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
     if (errorFiscalCheck) {
       setFieldErrors({ idFiscal: errorFiscalCheck });
       return;
@@ -146,73 +158,85 @@ export function CompletarDatosFiscalesInline({
         <CrudFieldError message={fieldErrors.nombre} />
       </label>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="grid gap-1">
-          <CrudFieldLabel required>País</CrudFieldLabel>
-          <PaisUbicacionSelect
-            value={pais}
-            onChange={handlePaisChange}
-            placeholder="Seleccioná un país"
-            disabled={saving}
-            className={isPaisMissing ? redInputClass : undefined}
-          />
-          <CrudFieldError message={fieldErrors.pais} />
-        </label>
-
-        <label className="grid gap-1">
-          <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
-          <CrudInput
-            value={idFiscal}
-            placeholder={idFiscalPorPais(pais).placeholder}
-            disabled={saving}
-            className={isIdFiscalMissing ? redInputClass : undefined}
-            error={idFiscalError || undefined}
-            onChange={(e) => setIdFiscal(e.target.value)}
-          />
-          <CrudFieldError message={idFiscalError} />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="grid gap-1">
-          <CrudFieldLabel required>{condInfo.label}</CrudFieldLabel>
-          {condInfo.type === 'select' ? (
-            <CrudSelect
-              value={condicionIva ?? ''}
-              disabled={saving}
-              className={isIvaMissing ? redInputClass : undefined}
-              onChange={(e) =>
-                setCondicionIva(e.target.value ? Number(e.target.value) : null)
-              }
-            >
-              <option value="">Seleccioná una opción</option>
-              {condInfo.options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </CrudSelect>
-          ) : (
-            <CrudInput
-              value={condicionTributaria}
-              placeholder={condInfo.placeholder}
-              disabled={saving}
-              className={isTributariaMissing ? redInputClass : undefined}
-              onChange={(e) => setCondicionTributaria(e.target.value)}
-            />
+      {(paisVisible || idFiscalVisible) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {paisVisible && (
+            <label className="grid gap-1">
+              <CrudFieldLabel required>País</CrudFieldLabel>
+              <PaisUbicacionSelect
+                value={pais}
+                onChange={handlePaisChange}
+                placeholder="Seleccioná un país"
+                disabled={saving}
+                className={isPaisMissing ? redInputClass : undefined}
+              />
+              <CrudFieldError message={fieldErrors.pais} />
+            </label>
           )}
-        </label>
 
-        <label className="grid gap-1">
-          <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
-          <CrudInput
-            value={direccion}
-            disabled={saving}
-            className={isDireccionMissing ? redInputClass : undefined}
-            onChange={(e) => setDireccion(e.target.value)}
-          />
-        </label>
-      </div>
+          {idFiscalVisible && (
+            <label className="grid gap-1">
+              <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
+              <CrudInput
+                value={idFiscal}
+                placeholder={idFiscalPorPais(pais).placeholder}
+                disabled={saving}
+                className={isIdFiscalMissing ? redInputClass : undefined}
+                error={idFiscalError || undefined}
+                onChange={(e) => setIdFiscal(e.target.value)}
+              />
+              <CrudFieldError message={idFiscalError} />
+            </label>
+          )}
+        </div>
+      )}
+
+      {(condicionVisible || direccionVisible) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {condicionVisible && (
+            <label className="grid gap-1">
+              <CrudFieldLabel required>{condInfo.label}</CrudFieldLabel>
+              {condInfo.type === 'select' ? (
+                <CrudSelect
+                  value={condicionIva ?? ''}
+                  disabled={saving}
+                  className={isIvaMissing ? redInputClass : undefined}
+                  onChange={(e) =>
+                    setCondicionIva(e.target.value ? Number(e.target.value) : null)
+                  }
+                >
+                  <option value="">Seleccioná una opción</option>
+                  {condInfo.options.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </CrudSelect>
+              ) : (
+                <CrudInput
+                  value={condicionTributaria}
+                  placeholder={condInfo.placeholder}
+                  disabled={saving}
+                  className={isTributariaMissing ? redInputClass : undefined}
+                  onChange={(e) => setCondicionTributaria(e.target.value)}
+                />
+              )}
+            </label>
+          )}
+
+          {direccionVisible && (
+            <label className="grid gap-1">
+              <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
+              <CrudInput
+                value={direccion}
+                disabled={saving}
+                className={isDireccionMissing ? redInputClass : undefined}
+                onChange={(e) => setDireccion(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
+      )}
 
       {error && (
         <p className="text-xs text-red-700 border border-red-200 bg-red-50 px-3 py-2" role="alert">

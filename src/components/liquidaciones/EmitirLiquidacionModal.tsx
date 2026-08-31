@@ -462,6 +462,7 @@ export function EmitirLiquidacionModal({
               id={transportistaId}
               tenantId={tenantId}
               getToken={getToken}
+              forceArcaFields={true}
               initial={{
                 nombre: source.transportista?.nombre ?? liq.transportista?.nombre ?? "",
                 pais: source.transportista?.pais ?? null,
@@ -480,6 +481,7 @@ export function EmitirLiquidacionModal({
               id={clienteId}
               tenantId={tenantId}
               getToken={getToken}
+              forceArcaFields={true}
               initial={{
                 nombre: clienteDelViaje?.nombre ?? "",
                 pais: clienteDelViaje?.pais ?? null,

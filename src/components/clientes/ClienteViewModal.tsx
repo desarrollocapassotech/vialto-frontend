@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
 import type { Cliente } from '@/types/api';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -38,6 +39,8 @@ export function ClienteViewModal({
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  const { isVisible } = useFieldConfig("clientes");
+
   return (
     <ViewModalShell
       title={cliente.nombre}
@@ -55,18 +58,19 @@ export function ClienteViewModal({
     >
       <div className={viewModalGridClass}>
         {[
-          { label: 'Nombre', value: cliente.nombre },
-          { label: 'ID Fiscal', value: cliente.idFiscal },
-          { label: 'País', value: cliente.pais },
+          { key: 'nombre', label: 'Nombre', value: cliente.nombre },
+          { key: 'idFiscal', label: 'ID Fiscal', value: cliente.idFiscal },
+          { key: 'pais', label: 'País', value: cliente.pais },
           {
+            key: 'condicionIvaTributaria',
             label: cliente.pais === 'AR' ? 'Condición IVA' : 'Condición tributaria',
             value: labelCondicionCliente(cliente),
           },
-          { label: 'Email', value: cliente.email },
-          { label: 'Teléfono', value: cliente.telefono },
-          { label: 'Dirección', value: cliente.direccion },
-          { label: 'Alta', value: fmtDate(cliente.createdAt) },
-        ].filter(c => c.value != null && c.value !== '').map((c, i) => (
+          { key: 'email', label: 'Email', value: cliente.email },
+          { key: 'telefono', label: 'Teléfono', value: cliente.telefono },
+          { key: 'direccion', label: 'Dirección', value: cliente.direccion },
+          { key: 'createdAt', label: 'Alta', value: fmtDate(cliente.createdAt) },
+        ].filter(c => c.value != null && c.value !== '' && (c.key === 'createdAt' || isVisible("detalle_cliente", c.key))).map((c, i) => (
           <div key={i}>
             <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">{c.label}</p>
             <p className="mt-1 text-sm">{c.value}</p>
