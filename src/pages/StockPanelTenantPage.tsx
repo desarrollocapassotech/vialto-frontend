@@ -22,6 +22,7 @@ import {
   StockInventarioLotesDetalle,
   type StockInventarioLoteFila,
 } from "@/components/stock/StockInventarioLotesDetalle";
+import { StockProductoDetalleModal } from "@/components/stock/StockProductoDetalleModal";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import {
   SelectorOpcionesSheet,
@@ -228,21 +229,10 @@ export function StockPanelTenantPage({
     }>;
   } | null>(null);
 
-  const abrirProducto = useCallback(
-    async (productoId: string) => {
-      const qs = buildQs(activeTenantId);
-      try {
-        const producto = await apiJson<Producto>(
-          `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
-          () => getToken(),
-        );
-        setProductoModal({ mode: "view", producto });
-      } catch {
-        // sin feedback: el listado ya muestra el nombre del producto
-      }
-    },
-    [productosBase, activeTenantId, getToken],
-  );
+  const [productoDetalleModal, setProductoDetalleModal] = useState<{
+    productoId: string;
+    productoNombre: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     // Short-circuit: Si es admin y no eligió empresa, limpiamos la vista
@@ -844,9 +834,23 @@ export function StockPanelTenantPage({
                     <p className="text-sm font-medium text-vialto-charcoal">
                       {resumenProducto.nombre}
                     </p>
-                    <p className="text-lg font-semibold text-vialto-charcoal">
-                      {resumenProducto.totalKg} kg totales
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-lg font-semibold text-vialto-charcoal">
+                        {resumenProducto.totalKg} kg totales
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProductoDetalleModal({
+                            productoId: resumenProducto.productoId,
+                            productoNombre: resumenProducto.nombre,
+                          })
+                        }
+                        className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+                      >
+                        Ver detalle
+                      </button>
+                    </div>
                   </div>
                   <ul className="mt-2 space-y-1">
                     {resumenProducto.composicion.map((c, i) => (
@@ -1086,7 +1090,13 @@ export function StockPanelTenantPage({
                         <td className={`${listadoTablaTdClass} text-right`}>
                           <button
                             type="button"
-                            onClick={() => void abrirProducto(item.productoId)}
+                            onClick={() =>
+                              setProductoDetalleModal({
+                                productoId: item.productoId,
+                                productoNombre:
+                                  item.producto?.nombre ?? item.productoId,
+                              })
+                            }
                             className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
                           >
                             Ver
@@ -1212,7 +1222,13 @@ export function StockPanelTenantPage({
                           </button>
                           <button
                             type="button"
-                            onClick={() => void abrirProducto(item.productoId)}
+                            onClick={() =>
+                              setProductoDetalleModal({
+                                productoId: item.productoId,
+                                productoNombre:
+                                  item.producto?.nombre ?? item.productoId,
+                              })
+                            }
                             className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
                           >
                             Ver
@@ -1274,6 +1290,18 @@ export function StockPanelTenantPage({
                   })
               : undefined
           }
+        />
+      )}
+
+      {productoDetalleModal && (
+        <StockProductoDetalleModal
+          productoId={productoDetalleModal.productoId}
+          productoNombre={productoDetalleModal.productoNombre}
+          disponibleAgrupadoUrl={disponibleAgrupadoUrl}
+          depositoId={depositoActivoId ?? ""}
+          tenantId={activeTenantId}
+          getToken={getToken}
+          onClose={() => setProductoDetalleModal(null)}
         />
       )}
 
