@@ -115,6 +115,12 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
+import { FileSpreadsheet } from "lucide-react";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  VIAJES_EXPORT_COLUMNS,
+  generarViajesExcel,
+} from "@/lib/viajesExcelExport";
 
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
@@ -244,7 +250,11 @@ function AutocompleteInput({
                 handleApply(query.trim());
               }}
             >
-              Presiona <kbd className="font-sans font-medium px-1 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para buscar "{query}"
+              Presiona{" "}
+              <kbd className="font-sans font-medium px-1 bg-gray-100 border border-gray-300 rounded">
+                Enter
+              </kbd>{" "}
+              para buscar "{query}"
             </li>
           ) : (
             options.map((opt, idx) => {
@@ -409,6 +419,8 @@ export function ViajesTenantPage({
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
 
   const [listadoRefetching, setListadoRefetching] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>(
     [],
   );
@@ -436,7 +448,7 @@ export function ViajesTenantPage({
     pagados: number;
   } | null>(null);
 
-  // Funciones asincrónicas de búsqueda de Autocompletado 
+  // Funciones asincrónicas de búsqueda de Autocompletado
   const searchNumero = useCallback(
     async (q: string) => {
       const qClean = q.replace(/#/g, "").trim().toLowerCase();
@@ -1217,8 +1229,7 @@ export function ViajesTenantPage({
   function esElegibleFacturarLote(v: Viaje): boolean {
     if (v.etapa?.toLowerCase() === "cancelado") return false;
     if (!viajePermiteBotonFacturar(v)) return false;
-    if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto))
-      return false;
+    if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) return false;
     return true;
   }
 
@@ -1334,6 +1345,156 @@ export function ViajesTenantPage({
       setViajeDeleteImpacto(null);
     } finally {
       setDeletingViajeId(null);
+    }
+  }
+
+  // --- LOGICA DE EXPORTACIÓN A EXCEL ---
+  async function handleExportarExcel(selectedIds: string[]) {
+    try {
+      setExportandoExcel(true);
+      const filtros = new URLSearchParams();
+      const {
+        numero: numF,
+        ctg: ctgF,
+        clienteId: cid,
+        transportistaId: transpFiltro,
+        choferId: choferFiltro,
+        estado: estF,
+        facturacionEstado: facEstF,
+        pagoTransportista: pagoTranspF,
+        tipoFecha: tf,
+        fechaDesde: fd,
+        fechaHasta: fh,
+        tipoUbicacion: tu,
+        ubicacion: ut,
+        periodo: per,
+      } = filtrosAplicadosRef.current;
+
+      // Replicamos la logica de filtros exactamente igual al useEffect para descargar todo el set
+      if (numF.trim()) {
+        const cleanNum = numF.replace(/#/g, "").trim();
+        filtros.set("numero", cleanNum);
+        filtros.set("q", cleanNum);
+        filtros.set("busqueda", cleanNum);
+      }
+      if (ctgF.trim()) {
+        filtros.set("ctg", ctgF.trim());
+        filtros.set("numeroIdentificacionPersonalizado", ctgF.trim());
+        filtros.set("q", ctgF.trim());
+        filtros.set("busqueda", ctgF.trim());
+      }
+      if (cid) filtros.set("clienteId", cid);
+      if (transpFiltro) filtros.set("transportistaId", transpFiltro);
+      if (choferFiltro) filtros.set("choferId", choferFiltro);
+      if (estF.trim()) filtros.set("etapa", estF.trim());
+      if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
+      if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
+        filtros.set("pagoTransportista", pagoTranspF);
+      }
+      if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
+        filtros.set("tipoFecha", tf);
+        if (fd.trim()) filtros.set("fechaDesde", fd.trim());
+        if (fh.trim()) filtros.set("fechaHasta", fh.trim());
+      }
+      const utTrim = ut.trim();
+      if ((tu === "origen" || tu === "destino") && utTrim) {
+        filtros.set("tipoUbicacion", tu);
+        filtros.set("ubicacion", utTrim);
+      }
+      if (per === "desde_hoy" || per === "anteriores") {
+        filtros.set("periodo", per);
+      }
+
+      appendViajeSortQuery(
+        filtros,
+        ordenamientoAplicadoRef.current.sortBy,
+        ordenamientoAplicadoRef.current.sortDir,
+      );
+
+      const filtrosQs = filtros.toString();
+      const listBase = platform
+        ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
+        : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
+      const pageSizeApi = 5000; // Un lote grande para traer la tabla entera
+      let itemsExport: Viaje[] = [];
+      const sortFetch = ordenamientoAplicadoRef.current;
+      const pagoFiltroActivo =
+        pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
+          ? pagoTranspF
+          : null;
+
+      // Hacemos el pedido sin paginar
+      if (pagoFiltroActivo) {
+        const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
+          listBase,
+          pagoFiltroActivo,
+          1,
+          pageSizeApi,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+          () => getTokenRef.current(),
+        );
+        itemsExport = pagoData.items;
+      } else if (
+        viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)
+      ) {
+        const ordenData = await listarViajesOrdenadosClienteDesdeApi(
+          listBase,
+          1,
+          pageSizeApi,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+          () => getTokenRef.current(),
+        );
+        itemsExport = ordenData.items;
+      } else {
+        const data = await apiJson<ViajesPaginatedResponse>(
+          `${listBase}page=1&pageSize=${pageSizeApi}`,
+          () => getTokenRef.current(),
+        );
+        itemsExport = sortViajesListado(
+          data.items,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+        );
+      }
+
+      // Filtros locales si aplican
+      const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+      if (isLocalSearch) {
+        const qNum = numF.replace(/#/g, "").trim().toLowerCase();
+        const qCtg = ctgF.trim().toLowerCase();
+        if (qNum)
+          itemsExport = itemsExport.filter((v) =>
+            String(v.numero).toLowerCase().includes(qNum),
+          );
+        if (qCtg)
+          itemsExport = itemsExport.filter((v) =>
+            (v.numeroIdentificacionPersonalizado || "")
+              .toLowerCase()
+              .includes(qCtg),
+          );
+      }
+
+      const cols = VIAJES_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarViajesExcel(
+        cols,
+        itemsExport,
+        clientes,
+        transportistas,
+        choferes,
+        "Viajes_Exportados",
+      );
+
+      showToast("Excel exportado exitosamente", "success");
+    } catch (error) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
     }
   }
 
@@ -1775,6 +1936,22 @@ export function ViajesTenantPage({
             disabled={listadoRefetching}
             onChange={aplicarOrdenamiento}
           />
+
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={
+              listadoRefetching ||
+              !meta?.total ||
+              meta.total === 0 ||
+              exportandoExcel
+            }
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <FileSpreadsheet className="h-4 w-4" aria-hidden />
+            {exportandoExcel ? "Generando..." : "Descargar Excel"}
+          </button>
+
           <Link
             to={
               platform
@@ -1867,7 +2044,9 @@ export function ViajesTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
+                title={
+                  labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
+                }
                 filterActive={!!ctgFiltroActivo.trim()}
                 filterSignature={ctgFiltroActivo}
               >
@@ -2771,10 +2950,7 @@ export function ViajesTenantPage({
             !viajePendienteComprobanteTransportista(selectorViaje)
           }
           clienteBloqueadoMotivo={
-            arcaBloqueaFacturarUsd(
-              hasFacturasArca,
-              selectorViaje.monedaMonto,
-            )
+            arcaBloqueaFacturarUsd(hasFacturasArca, selectorViaje.monedaMonto)
               ? MSG_ARCA_NO_FACTURA_USD
               : null
           }
@@ -2796,10 +2972,7 @@ export function ViajesTenantPage({
           }
           onFacturarCliente={() => {
             if (
-              arcaBloqueaFacturarUsd(
-                hasFacturasArca,
-                selectorViaje.monedaMonto,
-              )
+              arcaBloqueaFacturarUsd(hasFacturasArca, selectorViaje.monedaMonto)
             ) {
               showToast(MSG_ARCA_NO_FACTURA_USD, "error");
               return;
@@ -2918,6 +3091,15 @@ export function ViajesTenantPage({
           ))}
         </ul>
       </ConfirmDialog>
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={VIAJES_EXPORT_COLUMNS}
+          rowCount={meta?.total ?? rows?.length ?? 0}
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
