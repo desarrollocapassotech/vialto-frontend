@@ -33,7 +33,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Landmark } from "lucide-react";
+import { Landmark, FileSpreadsheet } from "lucide-react";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
@@ -50,6 +50,11 @@ import {
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  FACTURAS_EXPORT_COLUMNS,
+  generarFacturasExcel,
+} from "@/lib/facturasExcelExport";
 import type {
   ArcaConfig,
   Cliente,
@@ -240,6 +245,9 @@ export function FacturacionTenantPage({
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
 
   const fetchRef = useRef(0);
   const expandFacturaHandledRef = useRef(false);
@@ -953,6 +961,48 @@ export function FacturacionTenantPage({
     setPage(1);
   }
 
+  async function handleExportarExcel(selectedIds: string[]) {
+    try {
+      setExportandoExcel(true);
+      await ensureViajesLoaded();
+
+      let itemsExport: Factura[] = [];
+
+      if (platform) {
+        itemsExport = facturasFiltradas ?? [];
+      } else {
+        const data = await apiJson<FacturasPaginatedResponse>(
+          `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(1, 5000)}`,
+          () => getToken(),
+        );
+        itemsExport = data.items;
+      }
+
+      if (itemsExport.length === 0) {
+        showToast("No hay facturas para exportar con estos filtros.", "error");
+        return;
+      }
+
+      const cols = FACTURAS_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarFacturasExcel(
+        cols,
+        itemsExport,
+        clientes,
+        viajes,
+        "Facturas_Exportadas",
+      );
+
+      showToast("Excel exportado exitosamente", "success");
+    } catch (err) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
+    }
+  }
+
   const facturasEmptyMessage =
     (metaListado?.total ?? 0) === 0 &&
     !anyFiltroActivo &&
@@ -1132,9 +1182,9 @@ export function FacturacionTenantPage({
         </div>
       )}
 
-      <div className="mt-4">
-        {error && <CrudFormErrorAlert message={error} />}
-        <div className="flex justify-end gap-2 mt-2">
+      <div className="mt-4 flex flex-wrap gap-2 justify-between">
+        {error ? <CrudFormErrorAlert message={error} /> : <div />}
+        <div className="flex gap-2 ml-auto">
           {anyFiltroActivo && (
             <button
               type="button"
@@ -1144,6 +1194,22 @@ export function FacturacionTenantPage({
               Limpiar filtros
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={
+              listadoRefetching ||
+              !metaListado?.total ||
+              metaListado.total === 0 ||
+              exportandoExcel
+            }
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <FileSpreadsheet className="h-4 w-4" aria-hidden />
+            {exportandoExcel ? "Generando..." : "Descargar Excel"}
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -1603,6 +1669,20 @@ export function FacturacionTenantPage({
         }}
         onConfirm={() => void confirmMarcarCobrada()}
       />
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={FACTURAS_EXPORT_COLUMNS}
+          rowCount={
+            metaListado?.total ??
+            facturasFiltradas?.length ??
+            facturas?.length ??
+            0
+          }
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
