@@ -19,9 +19,10 @@ import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
 import { apiFetch, apiJson } from '@/lib/api';
 import { clearMicCrtBorrador, loadMicCrtBorrador, saveMicCrtBorrador } from '@/lib/micCrtBorrador';
 import { formatMicCrtExportError } from '@/lib/micCrtFriendlyError';
-import { hasEditableViajeExportGroups, type ViajeExportMissingGroup } from '@/lib/viajeExportMissingFields';
+import { hasEditableViajeExportGroups, type ViajeExportMissingGroup, VIAJE_EXPORT_VEHICULO_FIELDS } from '@/lib/viajeExportMissingFields';
 import { ViajeExportMissingFieldsPanel } from '@/components/viajes/ViajeExportMissingFieldsPanel';
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { ViajeMonedaCodigo } from '@/lib/currencyMask';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
@@ -261,9 +262,31 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
   const [generando, setGenerando] = useState(false);
   const [guardandoBorrador, setGuardandoBorrador] = useState(false);
   const [borradorGuardado, setBorradorGuardado] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReactNode>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [missingGroups, setMissingGroups] = useState<Record<string, ViajeExportMissingGroup> | null>(null);
+
+  const { isVisible: isVehiculoVisible } = useFieldConfig("vehiculos");
+
+  function getVehiculoHiddenAndMissing(groups: Record<string, ViajeExportMissingGroup> | undefined) {
+    if (!groups) return [];
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+    for (const [groupName, entry] of Object.entries(groups)) {
+      if (groupName === "Camión" || groupName === "Semirremolque") {
+        for (const label of entry.fields) {
+          const def = VIAJE_EXPORT_VEHICULO_FIELDS[label];
+          if (def) {
+            faltantesTotales.push(label);
+            if (!isVehiculoVisible("edicion_vehiculo", def.key)) {
+              faltantesOcultos.push(label);
+            }
+          }
+        }
+      }
+    }
+    return faltantesOcultos.length > 0 ? Array.from(new Set(faltantesTotales)) : [];
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -348,6 +371,19 @@ export function MicCrtExportModal({ viaje, onClose, tenantId, onGenerated, onVia
           missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
         const groups = data.missingGroups ?? null;
+
+        const vehiculoFaltantes = getVehiculoHiddenAndMissing(groups ?? undefined);
+        if (vehiculoFaltantes.length > 0) {
+          setError(
+            <div className="space-y-1">
+              <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+              <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+              <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+            </div>
+          );
+          return;
+        }
+
         setMissingGroups(groups && hasEditableViajeExportGroups(groups) ? groups : null);
         setError(formatMicCrtExportError(data.message, groups));
         return;
