@@ -13,6 +13,7 @@ import {
   type ViajeExportMissingGroup,
 } from "@/lib/viajeExportMissingFields";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 type Props = {
   viaje: Viaje;
@@ -21,7 +22,7 @@ type Props = {
 };
 
 type DescargaError = {
-  message: string;
+  message: React.ReactNode;
   groups?: Record<string, ViajeExportMissingGroup>;
   endpoint: string;
   filename: string;
@@ -98,6 +99,35 @@ export function ExportarViajeModal({
   const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando || micCrtValidando;
 
+  const { isVisible: isTransportistaVisible } = useFieldConfig("transportistas");
+  const isHiddenAnywhere = (field: string) => !isTransportistaVisible("edicion_transportista", field);
+
+  function getPautHiddenAndMissing(t: Viaje["transportista"]) {
+    if (!t) return [];
+    const tFull = t as any; // Casteo para evitar el error de TS con las propiedades extendidas
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+
+    if (!tFull.paut?.trim()) {
+      faltantesTotales.push("N° PAUT");
+      if (isHiddenAnywhere("paut")) faltantesOcultos.push("N° PAUT");
+    }
+    if (!tFull.permisoInternacional?.trim()) {
+      faltantesTotales.push("Permiso Internacional");
+      if (isHiddenAnywhere("permisoInternacional")) faltantesOcultos.push("Permiso Internacional");
+    }
+    if (!tFull.fechaVencimientoPermiso?.trim()) {
+      faltantesTotales.push("Vencimiento del Permiso Internacional");
+      if (isHiddenAnywhere("fechaVencimientoPermiso")) faltantesOcultos.push("Vencimiento del Permiso Internacional");
+    }
+    if (!tFull.domicilio?.trim()) {
+      faltantesTotales.push("Domicilio");
+      if (isHiddenAnywhere("domicilio")) faltantesOcultos.push("Domicilio");
+    }
+    
+    return faltantesOcultos.length > 0 ? faltantesTotales : [];
+  }
+
   async function refetchViaje(): Promise<Viaje> {
     const v = await apiJson<Viaje>(viajeDetailUrl(), getToken);
     setViaje(v);
@@ -131,6 +161,22 @@ export function ExportarViajeModal({
   }
 
   async function abrirMicCrt() {
+    const faltantes = getPautHiddenAndMissing(viaje.transportista);
+    if (faltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ),
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
     setMicCrtBloqueo(null);
     setMicCrtValidando(true);
     try {
@@ -201,6 +247,24 @@ export function ExportarViajeModal({
     // lo realiza una empresa distinta al contratante.
     const fleteTercerizado = Boolean(viaje.transportistaEfectivo?.id);
 
+    if (!fleteTercerizado) {
+      const faltantes = getPautHiddenAndMissing(viaje.transportista);
+      if (faltantes.length > 0) {
+        setError({
+          message: (
+            <div className="space-y-1">
+              <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+              <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+              <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+            </div>
+          ),
+          endpoint: "",
+          filename: "",
+        });
+        return;
+      }
+    }
+
     if (fleteTercerizado) {
       setSelectorNominaAbierto(true);
       setError(null); // Limpiamos errores previos si los hubiera
@@ -210,6 +274,23 @@ export function ExportarViajeModal({
   }
 
   function emitirNomina(emisorId?: string | null) {
+    const t = emisorId === viaje.transportistaEfectivo?.id ? viaje.transportistaEfectivo : viaje.transportista;
+    const faltantes = getPautHiddenAndMissing(t);
+    if (faltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ),
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
     void ejecutarDescarga(
       viajePdfUrl("paut", emisorId),
       `NOMINA-${numeroVisibleViaje(viaje)}.pdf`,
@@ -407,7 +488,7 @@ export function ExportarViajeModal({
             </div>
           ) : error ? (
             <div className="mt-4 border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-              <p className="font-semibold">{error.message}</p>
+              <div className="font-semibold">{error.message}</div>
             </div>
           ) : null}
 

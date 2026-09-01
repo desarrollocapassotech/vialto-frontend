@@ -29,6 +29,7 @@ import {
   formatFacturaEmitMissingMessage,
 } from "@/lib/facturaEmitValidation";
 import { friendlyError } from "@/lib/friendlyError";
+import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import {
@@ -175,6 +176,15 @@ export function EmitirFacturaModal({
   const missingClienteFields = missingEmitFields.filter((f) =>
     f.startsWith("Cliente:"),
   );
+
+  const missingHiddenFields = useHiddenFiscalFields(missingClienteFields);
+
+  useEffect(() => {
+    if (missingHiddenFields.length === 0 && error?.includes("ocultos en la configuración")) {
+      setError(null);
+    }
+  }, [missingHiddenFields, error]);
+
   const sinConfigArca = datosReady && !arcaConfig;
   const tipoInvalido = factura.tipo !== "cliente";
 
@@ -235,6 +245,12 @@ export function EmitirFacturaModal({
         platform
           ? "Este tenant no tiene configuración ARCA. Configurala en Superadmin → ARCA / AFIP."
           : "No hay configuración ARCA para este tenant. Completala en Configuración ARCA.",
+      );
+      return;
+    }
+    if (missingHiddenFields.length > 0) {
+      notifyEmitBlock(
+        `No se puede emitir la factura. Faltan los siguientes datos: ${missingClienteFields.map(formatMissingFiscalField).join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`
       );
       return;
     }
@@ -447,7 +463,15 @@ export function EmitirFacturaModal({
                         País: {clienteDetalle.pais}
                       </p>
                     )}
-                    {missingClienteFields.length > 0 && (
+                    {missingHiddenFields.length > 0 ? (
+                      <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
+                        <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+                        <p className="mt-1">
+                          Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
+                          <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
+                        </p>
+                      </div>
+                    ) : missingClienteFields.length > 0 && (
                       <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
                         <p className="font-medium">
                           Faltan datos del cliente: {missingClienteFields.map((f) => f.replace("Cliente: ", "")).join(", ")}.
@@ -543,7 +567,7 @@ export function EmitirFacturaModal({
                     </div>
                   )}
 
-                  {missingClienteFields.length > 0 &&
+                  {missingHiddenFields.length === 0 && missingClienteFields.length > 0 &&
                     !sinConfigArca &&
                     factura.clienteId && (
                       <CompletarDatosFiscalesInline

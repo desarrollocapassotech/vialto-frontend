@@ -14,6 +14,7 @@ import {
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type { PaginatedMeta, Transportista } from "@/types/api";
 
 type TransportistasPaginatedResponse = {
@@ -31,6 +32,11 @@ export function TransportistasTenantPage() {
   const [listadoRefetching, setListadoRefetching] = useState(false);
   const [viewingTransportista, setViewingTransportista] =
     useState<Transportista | null>(null);
+
+  const { isVisible } = useFieldConfig("transportistas");
+  const idFiscalVisible = isVisible("detalle_transportista", "idFiscal");
+  const emailVisible = isVisible("detalle_transportista", "email");
+  const telefonoVisible = isVisible("detalle_transportista", "telefono");
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -150,7 +156,7 @@ export function TransportistasTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={5}
+        tableColSpan={2 + (idFiscalVisible ? 1 : 0) + (emailVisible ? 1 : 0) + (telefonoVisible ? 1 : 0)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -179,38 +185,44 @@ export function TransportistasTenantPage() {
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="ID Fiscal"
-                filterActive={!!filtroIdFiscal}
-                filterSignature={filtroIdFiscal}
-              >
-                <select
-                  value={filtroIdFiscal}
-                  onChange={(e) => {
-                    setFiltroIdFiscal(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar por ID Fiscal"
+            {idFiscalVisible && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="ID Fiscal"
+                  filterActive={!!filtroIdFiscal}
+                  filterSignature={filtroIdFiscal}
                 >
-                  <option value="">Todos</option>
-                  {opcionesIdFiscal.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Email
-            </th>
-            <th scope="col" className={listadoTablaThClass}>
-              Teléfono
-            </th>
+                  <select
+                    value={filtroIdFiscal}
+                    onChange={(e) => {
+                      setFiltroIdFiscal(e.target.value);
+                      setPage(1);
+                    }}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar por ID Fiscal"
+                  >
+                    <option value="">Todos</option>
+                    {opcionesIdFiscal.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            {emailVisible && (
+              <th scope="col" className={listadoTablaThClass}>
+                Email
+              </th>
+            )}
+            {telefonoVisible && (
+              <th scope="col" className={listadoTablaThClass}>
+                Teléfono
+              </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Acciones
             </th>
@@ -224,24 +236,24 @@ export function TransportistasTenantPage() {
             cell: (t) => t.nombre,
             tdClassName: `${listadoTablaTdClass} font-medium`,
           },
-          {
+          ...(idFiscalVisible ? [{
             id: "idFiscal",
             header: "ID Fiscal",
-            cell: (t) => t.idFiscal ?? "—",
+            cell: (t: Transportista) => t.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(emailVisible ? [{
             id: "email",
             header: "Email",
-            cell: (t) => t.email ?? "—",
+            cell: (t: Transportista) => t.email ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          }] : []),
+          ...(telefonoVisible ? [{
             id: "telefono",
             header: "Teléfono",
-            cell: (t) => t.telefono ?? "—",
+            cell: (t: Transportista) => t.telefono ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
+          }] : []),
         ]}
         rows={error ? [] : rowsFiltradas}
         rowKey={(t) => t.id}

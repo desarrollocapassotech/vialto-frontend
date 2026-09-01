@@ -46,6 +46,7 @@ import {
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import type {
   Cliente,
   Liquidacion,
@@ -123,11 +124,15 @@ export function CrearLiquidacionManualModal({
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
-  const { isVisible } = useFieldConfig("viajes");
-  const ivaTransportistaVisible = isVisible(
+  const { isVisible: isViajesVisible } = useFieldConfig("viajes");
+  const ivaTransportistaVisible = isViajesVisible(
     "detalle_viaje",
     "precioTransportistaIvaIncluidoPct",
   );
+
+
+
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
@@ -385,6 +390,10 @@ export function CrearLiquidacionManualModal({
       ? missingEmitFields.filter((f) => f.startsWith("Cliente:"))
       : [];
 
+  const missingHiddenFields = useHiddenFiscalFields(
+    hasLiquidoProductoArca ? [...missingTransportistaFields, ...missingClienteFields] : []
+  );
+
   const bloqueadoUsd = selectedViajes.some((v) =>
     arcaBloqueaLiquidarUsd(
       hasLiquidoProductoArca,
@@ -427,6 +436,11 @@ export function CrearLiquidacionManualModal({
       : Array.from(selectedViajeIds);
     if (viajeIds.length === 0) {
       setError("Seleccioná al menos un viaje.");
+      return;
+    }
+    if (missingHiddenFields.length > 0) {
+      const todosLosFaltantes = [...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField);
+      setError(`No se puede emitir la liquidación. Faltan los siguientes datos: ${todosLosFaltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`);
       return;
     }
     if (bloqueadoUsd) {
@@ -598,7 +612,7 @@ export function CrearLiquidacionManualModal({
     (sum, l) =>
       sum +
       signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) *
-        getMultiplicador(l.modoAplicacion),
+      getMultiplicador(l.modoAplicacion),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -626,6 +640,7 @@ export function CrearLiquidacionManualModal({
     Boolean(periodoHasta) &&
     !periodoInvalido &&
     !bloqueadoUsd &&
+    missingHiddenFields.length === 0 &&
     (viajeInicial ? true : selectedViajeIds.size > 0);
   const ptoVentaNumPreview = Number(ptoVenta);
   const ptoVentaInvalidoPreview =
@@ -743,7 +758,21 @@ export function CrearLiquidacionManualModal({
                 </div>
               </div>
 
-              {missingTransportistaFields.length > 0 && (
+
+              {missingHiddenFields.length > 0 && transportistaId && hasLiquidoProductoArca && (
+                <div
+                  className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900"
+                  role="alert"
+                >
+                  <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+                  <p className="mt-1">
+                    No se puede emitir la liquidación. Faltan los siguientes datos: <strong>{[...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField).join(", ")}</strong>.
+                    <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
+                  </p>
+                </div>
+              )}
+
+              {missingHiddenFields.length === 0 && missingTransportistaFields.length > 0 && (
                 <div
                   className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                   role="alert"
@@ -854,7 +883,7 @@ export function CrearLiquidacionManualModal({
                           viajeInicial.monedaPrecioTransportistaExterno,
                         )}
                         {ivaTransportistaVisible &&
-                        viajeInicial.precioTransportistaIvaIncluidoPct
+                          viajeInicial.precioTransportistaIvaIncluidoPct
                           ? ` (+${viajeInicial.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                           : ""}
                       </span>
@@ -892,7 +921,7 @@ export function CrearLiquidacionManualModal({
                         v.monedaPrecioTransportistaExterno,
                       ) +
                       (ivaTransportistaVisible &&
-                      v.precioTransportistaIvaIncluidoPct
+                        v.precioTransportistaIvaIncluidoPct
                         ? ` (+${v.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                         : "")
                     }
@@ -1057,8 +1086,8 @@ export function CrearLiquidacionManualModal({
                     selectedViajes.length > 0 && !isLoadingCliente
                       ? missingEmitFields
                       : missingEmitFields.filter(
-                          (f) => !f.startsWith("Cliente:"),
-                        )
+                        (f) => !f.startsWith("Cliente:"),
+                      )
                   }
                   clienteDetalle={clienteSeleccionado}
                   onClienteUpdated={(c) => {

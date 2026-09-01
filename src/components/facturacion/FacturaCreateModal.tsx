@@ -249,16 +249,13 @@ export function FacturaCreateModal({
   }, [hasArca, draft.viajeIds, viajes]);
 
   const missingEmitFields = useMemo(
-    () =>
-      collectFacturaEmitMissingFields({
+    () => {
+      if (!clienteDetalle) return [];
+      return collectFacturaEmitMissingFields({
         emisor: arcaConfig,
-        cliente: clienteDetalle ?? {
-          nombre: null,
-          direccion: null,
-          idFiscal: null,
-          condicionIva: null,
-        },
-      }),
+        cliente: clienteDetalle,
+      });
+    },
     [arcaConfig, clienteDetalle],
   );
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
