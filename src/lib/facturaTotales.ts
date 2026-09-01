@@ -41,3 +41,50 @@ export function computeFacturaTotalesFromBases(
   }
   return { neto, iva, total: roundMoney2(neto + iva) };
 }
+
+export type FacturaTramoTotal = {
+  monto: number;
+  ivaPct: number;
+};
+
+/** Total con IVA de una factura por tramo (misma fórmula que el cobro en backend). */
+export function importeTotalConIvaPorTramo(
+  importeNeto: number,
+  tramos: FacturaTramoTotal[],
+  ivaPctCabecera?: number | null,
+): number {
+  const sumaTramos = roundMoney2(tramos.reduce((s, t) => s + t.monto, 0));
+  const undivided = Math.max(0, roundMoney2(importeNeto - sumaTramos));
+  const ivaTramos = tramos.reduce(
+    (s, t) => roundMoney2(s + roundMoney2((t.monto * t.ivaPct) / 100)),
+    0,
+  );
+  const ivaUndivided = roundMoney2(
+    (undivided * (Number(ivaPctCabecera) || 0)) / 100,
+  );
+  return roundMoney2(importeNeto + ivaTramos + ivaUndivided);
+}
+
+/**
+ * Monto contra el que se mide el cobro.
+ * Por tramo sin ARCA: neto + IVA. ARCA / sin tramos: neto (`importe` o `importeACobrar` de la API).
+ */
+export function importeACobrarFactura(
+  f: {
+    importe: number;
+    facturarPorTramo?: boolean;
+    tramos?: FacturaTramoTotal[];
+    ivaPct?: number | null;
+    importeACobrar?: number;
+  },
+  hasArca: boolean,
+): number {
+  if (f.importeACobrar != null && Number.isFinite(f.importeACobrar)) {
+    return roundMoney2(f.importeACobrar);
+  }
+  const tramos = f.tramos ?? [];
+  if (!hasArca && f.facturarPorTramo && tramos.length > 0) {
+    return importeTotalConIvaPorTramo(f.importe, tramos, f.ivaPct);
+  }
+  return roundMoney2(f.importe);
+}

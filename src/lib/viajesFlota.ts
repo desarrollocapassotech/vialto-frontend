@@ -1,6 +1,9 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
-import { importeNetoViajeParaFactura } from "@/lib/facturaTotales";
+import {
+  importeACobrarFactura,
+  importeNetoViajeParaFactura,
+} from "@/lib/facturaTotales";
 
 import type {
   Chofer,
@@ -591,17 +594,54 @@ export function textoImporteFacturaSeleccion(
   return parts.join(" · ");
 }
 
+export function textoImporteMonedaFactura(
+  moneda: string | null | undefined,
+  monto: number,
+): string {
+  const n = Number.isFinite(monto) ? monto : 0;
+  if (moneda === "USD") {
+    return `US$ ${n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+  return `$ ${n.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 /**
- * Importe mostrado en tabla de facturas: usa viajes cargados; si no alcanza, el total persistido (formato ARS).
+ * Importe mostrado en tabla de facturas.
+ * Por tramo sin ARCA: el mismo total de cobro (neto + IVA). En el resto: viajes o `importe`.
  */
 export function textoImporteFacturaListado(
-  f: { viajeIds: string[]; importe: number },
+  f: {
+    viajeIds: string[];
+    importe: number;
+    moneda?: string;
+    facturarPorTramo?: boolean;
+    tramos?: { monto: number; ivaPct: number }[];
+    ivaPct?: number | null;
+    importeACobrar?: number;
+  },
   viajes: Viaje[],
+  opts?: { hasArca?: boolean },
 ): string {
+  const porTramoSinArca =
+    !opts?.hasArca &&
+    Boolean(f.facturarPorTramo) &&
+    (f.tramos?.length ?? 0) > 0;
+  if (porTramoSinArca) {
+    return textoImporteMonedaFactura(
+      f.moneda,
+      importeACobrarFactura(f, false),
+    );
+  }
   const t = textoImporteFacturaSeleccion(f.viajeIds, viajes);
   if (t !== "—") return t;
   if (f.importe != null && Number.isFinite(f.importe) && f.importe !== 0) {
-    return `$ ${f.importe.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return textoImporteMonedaFactura(f.moneda, f.importe);
   }
   return "—";
 }
