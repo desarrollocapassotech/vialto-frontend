@@ -11,6 +11,7 @@ import {
   mensajeBloqueoMicCrt,
   missingGroupsMicCrtDesdeViaje,
   type ViajeExportMissingGroup,
+  VIAJE_EXPORT_VEHICULO_FIELDS,
 } from "@/lib/viajeExportMissingFields";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -102,6 +103,47 @@ export function ExportarViajeModal({
   const { isVisible: isTransportistaVisible } = useFieldConfig("transportistas");
   const isHiddenAnywhere = (field: string) => !isTransportistaVisible("edicion_transportista", field);
 
+  const { isVisible: isVehiculoVisible } = useFieldConfig("vehiculos");
+  
+  function getVehiculoHiddenAndMissing(groups: Record<string, ViajeExportMissingGroup> | undefined) {
+    if (!groups) return [];
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+    for (const [groupName, entry] of Object.entries(groups)) {
+      if (groupName === "Camión" || groupName === "Semirremolque") {
+        for (const label of entry.fields) {
+          const def = VIAJE_EXPORT_VEHICULO_FIELDS[label];
+          if (def) {
+            faltantesTotales.push(label);
+            if (!isVehiculoVisible("edicion_vehiculo", def.key)) {
+              faltantesOcultos.push(label);
+            }
+          }
+        }
+      }
+    }
+    return faltantesOcultos.length > 0 ? Array.from(new Set(faltantesTotales)) : [];
+  }
+
+  function getVehiculoSincronoFaltantesOcultos(vj: Viaje): string[] {
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+    for (const vv of vj.vehiculosViaje || []) {
+      const v = vv.vehiculo;
+      if (!v) continue;
+      for (const [label, def] of Object.entries(VIAJE_EXPORT_VEHICULO_FIELDS)) {
+        const val = v[def.key as keyof typeof v];
+        if (val == null || val === "") {
+          faltantesTotales.push(label);
+          if (!isVehiculoVisible("edicion_vehiculo", def.key)) {
+            faltantesOcultos.push(label);
+          }
+        }
+      }
+    }
+    return faltantesOcultos.length > 0 ? Array.from(new Set(faltantesTotales)) : [];
+  }
+
   function getPautHiddenAndMissing(t: Viaje["transportista"]) {
     if (!t) return [];
     const tFull = t as any; // Casteo para evitar el error de TS con las propiedades extendidas
@@ -170,7 +212,23 @@ export function ExportarViajeModal({
             <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
             <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
           </div>
-        ),
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
+    const vehiculoFaltantes = getVehiculoSincronoFaltantesOcultos(viaje);
+    if (vehiculoFaltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+            <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
         endpoint: "",
         filename: "",
       });
@@ -202,6 +260,23 @@ export function ExportarViajeModal({
           message?: string;
           missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
+
+        const vehiculoFaltantes = getVehiculoHiddenAndMissing(data.missingGroups);
+        if (vehiculoFaltantes.length > 0) {
+          return {
+            message: (
+              <div className="space-y-1">
+                <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+                <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+                <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+              </div>
+            ) as unknown as string,
+            groups: undefined, // Ignoramos los groups para que no renderice el form
+            endpoint,
+            filename,
+          };
+        }
+
         return {
           message: data.message ?? "No se pudo generar el documento",
           groups: data.missingGroups,
@@ -257,12 +332,28 @@ export function ExportarViajeModal({
               <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
               <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
             </div>
-          ),
+          ) as unknown as string,
           endpoint: "",
           filename: "",
         });
         return;
       }
+    }
+
+    const vehiculoFaltantes = getVehiculoSincronoFaltantesOcultos(viaje);
+    if (vehiculoFaltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+            <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
     }
 
     if (fleteTercerizado) {
@@ -284,7 +375,7 @@ export function ExportarViajeModal({
             <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
             <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
           </div>
-        ),
+        ) as unknown as string,
         endpoint: "",
         filename: "",
       });

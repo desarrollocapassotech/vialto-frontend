@@ -87,21 +87,30 @@ export function missingGroupsMicCrtDesdeViaje(viaje: Viaje): Record<string, Viaj
     groups.Chofer = { fields: ['DNI'], entityId: choferId };
   }
 
+  // Validacion sincrona de los datos del vehiculo
+  for (const vv of viaje.vehiculosViaje || []) {
+    const v = vv.vehiculo;
+    if (!v) continue;
+    const groupName = v.tipo === "tractor" || v.tipo === "camion" ? "Camión" : v.tipo === "semirremolque" ? "Semirremolque" : "Vehículo";
+    const missingFields: string[] = [];
+    
+    for (const [label, def] of Object.entries(VIAJE_EXPORT_VEHICULO_FIELDS)) {
+      const val = v[def.key as keyof typeof v];
+      if (val == null || val === "") {
+        missingFields.push(label);
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      groups[groupName] = { fields: missingFields, entityId: v.id };
+    }
+  }
+
   return Object.keys(groups).length > 0 ? groups : null;
 }
 
-export function mensajeBloqueoMicCrt(groups: Record<string, ViajeExportMissingGroup>): string {
-  const items: string[] = [];
-  for (const [group, entry] of Object.entries(groups)) {
-    for (const field of entry.fields) {
-      if (group === 'Viaje' && field === 'Chofer asignado') items.push('chofer asignado al viaje');
-      else if (group === 'Viaje' && field === 'Vehículo asignado') items.push('vehículo asignado al viaje');
-      else if (group === 'Chofer' && field === 'DNI') items.push('DNI del chofer');
-      else items.push(`${group}: ${field}`);
-    }
-  }
-  const uniq = [...new Set(items)];
-  return `No podés generar este documento hasta completar: ${uniq.join(', ')}.`;
+export function mensajeBloqueoMicCrt(_groups: Record<string, ViajeExportMissingGroup>): string {
+  return "No podés generar este documento hasta completar los datos faltantes:";
 }
 
 export function hasEditableViajeExportGroups(

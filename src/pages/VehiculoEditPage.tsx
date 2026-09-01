@@ -22,6 +22,7 @@ import {
   type VehiculoFormState,
 } from "@/lib/vehiculoForm";
 import type { Vehiculo } from "@/types/api";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 const TIPOS = [
   "tractor",
@@ -69,6 +70,8 @@ export function VehiculoEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const { isVisible } = useFieldConfig("vehiculos");
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
@@ -206,87 +209,105 @@ export function VehiculoEditPage() {
               />
               <CrudFieldError message={fieldErrors.patente} />
             </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Tipo</span>
-              <CrudSelect
-                value={form.tipo}
-                onChange={(e) => patch({ tipo: e.target.value })}
-              >
-                {TIPOS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </CrudSelect>
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Marca</span>
-              <CrudInput
-                value={form.marca}
-                placeholder="Ej: Scania"
-                onChange={(e) => patch({ marca: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Modelo</span>
-              <CrudInput
-                value={form.modelo}
-                placeholder="Ej: R450"
-                onChange={(e) => patch({ modelo: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Año</span>
-              <CrudInput
-                type="number"
-                placeholder="Ej: 2020"
-                value={form.anio}
-                onChange={(e) => patch({ anio: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Nro. de chasis</span>
-              <CrudInput
-                value={form.nroChasis}
-                placeholder="Ej: 9BM379182LB123456"
-                onChange={(e) => patch({ nroChasis: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Póliza</span>
-              <CrudInput
-                value={form.poliza}
-                placeholder="Ej: POL-2024-001234"
-                onChange={(e) => patch({ poliza: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Vencimiento de póliza</span>
-              <CrudInput
-                type="date"
-                value={form.vencimientoPoliza}
-                onChange={(e) => patch({ vencimientoPoliza: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Tara (kg)</span>
-              <CrudInput
-                type="number"
-                placeholder="Ej: 8500"
-                value={form.tara}
-                error={fieldErrors.tara}
-                onChange={(e) => patch({ tara: e.target.value })}
-              />
-              <CrudFieldError message={fieldErrors.tara} />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={LABEL}>Precinto</span>
-              <CrudInput
-                value={form.precinto}
-                placeholder="Ej: 00123456"
-                onChange={(e) => patch({ precinto: e.target.value })}
-              />
-            </label>
+            {isVisible("edicion_vehiculo", "tipo") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Tipo</span>
+                <CrudSelect
+                  value={form.tipo}
+                  onChange={(e) => patch({ tipo: e.target.value })}
+                >
+                  {TIPOS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </CrudSelect>
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "marca") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Marca</span>
+                <CrudInput
+                  value={form.marca}
+                  placeholder="Ej: Scania"
+                  onChange={(e) => patch({ marca: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "modelo") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Modelo</span>
+                <CrudInput
+                  value={form.modelo}
+                  placeholder="Ej: R450"
+                  onChange={(e) => patch({ modelo: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "anio") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Año</span>
+                <CrudInput
+                  type="number"
+                  placeholder="Ej: 2020"
+                  value={form.anio}
+                  onChange={(e) => patch({ anio: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "nroChasis") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Nro. de chasis</span>
+                <CrudInput
+                  value={form.nroChasis}
+                  placeholder="Ej: 9BM379182LB123456"
+                  onChange={(e) => patch({ nroChasis: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "poliza") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Póliza</span>
+                <CrudInput
+                  value={form.poliza}
+                  placeholder="Ej: POL-2024-001234"
+                  onChange={(e) => patch({ poliza: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "vencimientoPoliza") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Vencimiento de póliza</span>
+                <CrudInput
+                  type="date"
+                  value={form.vencimientoPoliza}
+                  onChange={(e) => patch({ vencimientoPoliza: e.target.value })}
+                />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "tara") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Tara (kg)</span>
+                <CrudInput
+                  type="number"
+                  placeholder="Ej: 8500"
+                  value={form.tara}
+                  error={fieldErrors.tara}
+                  onChange={(e) => patch({ tara: e.target.value })}
+                />
+                <CrudFieldError message={fieldErrors.tara} />
+              </label>
+            )}
+            {isVisible("edicion_vehiculo", "precinto") && (
+              <label className="grid gap-1.5">
+                <span className={LABEL}>Precinto</span>
+                <CrudInput
+                  value={form.precinto}
+                  placeholder="Ej: 00123456"
+                  onChange={(e) => patch({ precinto: e.target.value })}
+                />
+              </label>
+            )}
             <div className="md:col-span-2 grid gap-1.5">
               <TransportistaAsignacionFields
                 modo={asignacionModo}

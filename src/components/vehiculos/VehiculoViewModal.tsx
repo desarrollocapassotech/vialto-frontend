@@ -12,6 +12,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { labelVehiculoTipo } from "@/lib/labels";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
 import type { Vehiculo } from "@/types/api";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -58,6 +59,8 @@ export function VehiculoViewModal({
     vehiculo?.transportistaId && transportistas
       ? transportistas.find((t) => t.id === vehiculo.transportistaId)?.nombre
       : undefined;
+
+  const { isVisible } = useFieldConfig("vehiculos");
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -158,13 +161,13 @@ export function VehiculoViewModal({
       {!loading && vehiculo && (
         <div className={viewModalGridClass}>
           {[
-            { label: "Patente", value: vehiculo.patente },
-            { label: "Tipo", value: labelVehiculoTipo(vehiculo.tipo) },
-            { label: "Marca", value: vehiculo.marca },
-            { label: "Modelo", value: vehiculo.modelo },
-            { label: "Año", value: anio },
+            { campo: "patente", label: "Patente", value: vehiculo.patente },
+            { campo: "tipo", label: "Tipo", value: labelVehiculoTipo(vehiculo.tipo) },
+            { campo: "marca", label: "Marca", value: vehiculo.marca },
+            { campo: "modelo", label: "Modelo", value: vehiculo.modelo },
+            { campo: "anio", label: "Año", value: anio },
           ]
-            .filter((c) => c.value != null && c.value !== "")
+            .filter((c) => c.value != null && c.value !== "" && isVisible("detalle_vehiculo", c.campo))
             .map((c) => (
               <div key={c.label}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
@@ -173,42 +176,47 @@ export function VehiculoViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Kilometraje actual
-            </p>
-            <p className="mt-1 flex items-center gap-1.5 text-sm">
-              {kmActualMostrado != null ? fmtNum(kmActualMostrado) : "—"}
-              {kmActualEsFallback && (
-                <span className="text-[11px] font-normal italic text-vialto-steel">
-                  (según última carga de combustible)
-                </span>
-              )}
-            </p>
-          </div>
+          {isVisible("detalle_vehiculo", "kmActual") && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Kilometraje actual
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm">
+                {kmActualMostrado != null ? fmtNum(kmActualMostrado) : "—"}
+                {kmActualEsFallback && (
+                  <span className="text-[11px] font-normal italic text-vialto-steel">
+                    (según última carga de combustible)
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
           {[
-            { label: "N.° Chasis", value: vehiculo.nroChasis },
-            { label: "Póliza", value: vehiculo.poliza },
+            { campo: "nroChasis", label: "N.° Chasis", value: vehiculo.nroChasis },
+            { campo: "poliza", label: "Póliza", value: vehiculo.poliza },
             {
+              campo: "vencimientoPoliza",
               label: "Vto. Póliza",
               value: vehiculo.vencimientoPoliza
                 ? fmtDate(vehiculo.vencimientoPoliza)
                 : null,
             },
             {
+              campo: "tara",
               label: "Tara (kg)",
               value: vehiculo.tara != null ? fmtNum(vehiculo.tara) : null,
             },
-            { label: "Precinto", value: vehiculo.precinto },
+            { campo: "precinto", label: "Precinto", value: vehiculo.precinto },
             {
+              campo: "transportistaId",
               label: "Pertenencia",
               value: vehiculo.transportistaId
                 ? (transportistaNombre ?? "Transportista externo")
                 : "Flota propia",
             },
-            { label: "Alta", value: fmtDate(vehiculo.createdAt) },
+            { campo: "createdAt", label: "Alta", value: fmtDate(vehiculo.createdAt) },
           ]
-            .filter((c) => c.value != null && c.value !== "")
+            .filter((c) => c.value != null && c.value !== "" && (c.campo === "transportistaId" || isVisible("detalle_vehiculo", c.campo)))
             .map((c) => (
               <div key={c.label}>
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
@@ -217,16 +225,18 @@ export function VehiculoViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Estado
-            </p>
-            <p
-              className={`mt-1 text-sm ${vehiculo.activo ? "text-emerald-800" : "text-vialto-steel"}`}
-            >
-              {vehiculo.activo ? "Activo" : "Inactivo"}
-            </p>
-          </div>
+          {isVisible("detalle_vehiculo", "activo") && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Estado
+              </p>
+              <p
+                className={`mt-1 text-sm ${vehiculo.activo ? "text-emerald-800" : "text-vialto-steel"}`}
+              >
+                {vehiculo.activo ? "Activo" : "Inactivo"}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </ViewModalShell>
