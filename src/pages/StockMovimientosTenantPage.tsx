@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { ExcelIcon } from "@/components/shared/ExcelIcon";
+import { Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -258,7 +258,7 @@ export function StockMovimientosTenantPage({
       disabled={items.length === 0}
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
-      <ExcelIcon className="h-3.5 w-3.5" />
+      <Download className="h-3.5 w-3.5" aria-hidden />
       Exportar
     </button>
   );

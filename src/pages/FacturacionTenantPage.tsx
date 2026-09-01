@@ -33,8 +33,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Landmark } from "lucide-react";
-import { ExcelIcon } from "@/components/shared/ExcelIcon";
+import { Download, Landmark } from "lucide-react";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
@@ -1162,7 +1161,7 @@ export function FacturacionTenantPage({
       }
       className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
     >
-      <ExcelIcon className="h-4 w-4" />
+      <Download className="h-4 w-4" aria-hidden />
       {exportandoExcel ? "Generando..." : "Exportar"}
     </button>
   );
@@ -1182,9 +1181,6 @@ export function FacturacionTenantPage({
 
       {!embeddedInSuperadmin && (
         <>
-          <p className="mt-2 text-vialto-steel">
-            Facturas emitidas a clientes.
-          </p>
           {hasArca && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">

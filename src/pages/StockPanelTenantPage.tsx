@@ -2,10 +2,10 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   ChevronDown,
   ChevronRight,
+  Download,
   Package,
   Warehouse,
 } from "lucide-react";
-import { ExcelIcon } from "@/components/shared/ExcelIcon";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
@@ -693,7 +693,7 @@ export function StockPanelTenantPage({
       disabled={filteredItems.length === 0}
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
-      <ExcelIcon className="h-3.5 w-3.5" />
+      <Download className="h-3.5 w-3.5" aria-hidden />
       Exportar
     </button>
   );

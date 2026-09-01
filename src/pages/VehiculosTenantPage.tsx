@@ -157,7 +157,7 @@ export function VehiculosTenantPage() {
         Vehículos
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Patentes, tipo y marca de cada unidad de tu flota.
+        Toda tu flota.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">

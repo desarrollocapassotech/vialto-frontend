@@ -1,4 +1,5 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { isOrgAdmin } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -115,7 +116,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { ExcelIcon } from "@/components/shared/ExcelIcon";
+import { Download, Upload } from "lucide-react";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -292,7 +293,8 @@ export function ViajesTenantPage({
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
 } = {}) {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+  const { user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -301,6 +303,10 @@ export function ViajesTenantPage({
   const { showToast } = useToast();
 
   const platform = Boolean(tenantId?.trim());
+  const puedeImportar =
+    !embeddedInSuperadmin &&
+    isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata }) &&
+    !currentTenant?.importacionesOcultas;
   const hasFacturasArca =
     !platform && canAccessEmisionFacturasArca(currentTenant?.modules ?? []);
   const hasLiquidoProductoArca =
@@ -1899,6 +1905,16 @@ export function ViajesTenantPage({
         )}
 
         <div className="flex shrink-0 gap-2">
+          {puedeImportar && (
+            <Link
+              to="/importar?modulo=viajes&volverA=/viajes"
+              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+            >
+              <Upload className="h-4 w-4" aria-hidden />
+              Importar
+            </Link>
+          )}
+
           <button
             type="button"
             onClick={() => setExportModalOpen(true)}
@@ -1910,7 +1926,7 @@ export function ViajesTenantPage({
             }
             className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
           >
-            <ExcelIcon className="h-4 w-4" />
+            <Download className="h-4 w-4" aria-hidden />
             {exportandoExcel ? "Generando..." : "Exportar"}
           </button>
         </div>

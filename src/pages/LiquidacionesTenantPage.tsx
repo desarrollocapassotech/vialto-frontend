@@ -10,7 +10,6 @@ import {
   Receipt,
   Trash2,
 } from "lucide-react";
-import { ExcelIcon } from "@/components/shared/ExcelIcon";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -706,7 +705,7 @@ export function LiquidacionesTenantPage() {
       disabled={!filteredRows || filteredRows.length === 0 || exportandoExcel}
       className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
     >
-      <ExcelIcon className="h-4 w-4" />
+      <Download className="h-4 w-4" aria-hidden />
       {exportandoExcel ? "Generando..." : "Exportar"}
     </button>
   );
@@ -719,11 +718,6 @@ export function LiquidacionesTenantPage() {
         </h1>
         <div className="flex shrink-0 gap-2">{exportButton}</div>
       </div>
-      <p className="mt-1 text-sm text-vialto-steel">
-        {isSuperAdmin
-          ? "Elegí una empresa para ver y gestionar sus liquidaciones."
-          : "Liquidaciones emitidas a transportistas."}
-      </p>
 
       {isSuperAdmin && (
         <div className="mt-6">
