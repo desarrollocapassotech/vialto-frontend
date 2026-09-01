@@ -64,7 +64,7 @@ export function ExcelExportModal({ columns, rowCount, onExport, onClose }: Props
 
   return (
     <ViewModalShell
-      title="Descargar Excel"
+      title="Exportar"
       onClose={onClose}
       maxWidthClass="sm:max-w-sm"
       scrollBody

@@ -115,7 +115,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { FileSpreadsheet } from "lucide-react";
+import { ExcelIcon } from "@/components/shared/ExcelIcon";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -1889,13 +1889,32 @@ export function ViajesTenantPage({
 
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {!embeddedInSuperadmin ? (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
             Viajes
           </h1>
-        </>
-      )}
+        ) : (
+          <span />
+        )}
+
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={
+              listadoRefetching ||
+              !meta?.total ||
+              meta.total === 0 ||
+              exportandoExcel
+            }
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <ExcelIcon className="h-4 w-4" />
+            {exportandoExcel ? "Generando..." : "Exportar"}
+          </button>
+        </div>
+      </div>
 
       {resumen && (
         <div className="mt-3">
@@ -1936,21 +1955,6 @@ export function ViajesTenantPage({
             disabled={listadoRefetching}
             onChange={aplicarOrdenamiento}
           />
-
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={
-              listadoRefetching ||
-              !meta?.total ||
-              meta.total === 0 ||
-              exportandoExcel
-            }
-            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <FileSpreadsheet className="h-4 w-4" aria-hidden />
-            {exportandoExcel ? "Generando..." : "Descargar Excel"}
-          </button>
 
           <Link
             to={

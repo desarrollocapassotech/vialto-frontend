@@ -9,8 +9,8 @@ import {
   Landmark,
   Receipt,
   Trash2,
-  FileSpreadsheet,
 } from "lucide-react";
+import { ExcelIcon } from "@/components/shared/ExcelIcon";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
@@ -699,11 +699,26 @@ export function LiquidacionesTenantPage() {
     }
   }
 
+  const exportButton = activeTenantId && (!error || !isSuperAdmin) && (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={!filteredRows || filteredRows.length === 0 || exportandoExcel}
+      className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+    >
+      <ExcelIcon className="h-4 w-4" />
+      {exportandoExcel ? "Generando..." : "Exportar"}
+    </button>
+  );
+
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Liquidaciones
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+          Liquidaciones
+        </h1>
+        <div className="flex shrink-0 gap-2">{exportButton}</div>
+      </div>
       <p className="mt-1 text-sm text-vialto-steel">
         {isSuperAdmin
           ? "Elegí una empresa para ver y gestionar sus liquidaciones."
@@ -754,18 +769,6 @@ export function LiquidacionesTenantPage() {
                 Limpiar filtros
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={() => setExportModalOpen(true)}
-              disabled={
-                !filteredRows || filteredRows.length === 0 || exportandoExcel
-              }
-              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
-            >
-              <FileSpreadsheet className="h-4 w-4" aria-hidden />
-              {exportandoExcel ? "Generando..." : "Descargar Excel"}
-            </button>
 
             <button
               type="button"

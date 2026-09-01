@@ -33,7 +33,8 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Landmark, FileSpreadsheet } from "lucide-react";
+import { Landmark } from "lucide-react";
+import { ExcelIcon } from "@/components/shared/ExcelIcon";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
@@ -1149,13 +1150,38 @@ export function FacturacionTenantPage({
     </>
   );
 
+  const exportButton = (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={
+        listadoRefetching ||
+        !metaListado?.total ||
+        metaListado.total === 0 ||
+        exportandoExcel
+      }
+      className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+    >
+      <ExcelIcon className="h-4 w-4" />
+      {exportandoExcel ? "Generando..." : "Exportar"}
+    </button>
+  );
+
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {!embeddedInSuperadmin ? (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
             Facturas
           </h1>
+        ) : (
+          <span />
+        )}
+        <div className="flex shrink-0 gap-2">{exportButton}</div>
+      </div>
+
+      {!embeddedInSuperadmin && (
+        <>
           <p className="mt-2 text-vialto-steel">
             Facturas emitidas a clientes.
           </p>
@@ -1196,21 +1222,6 @@ export function FacturacionTenantPage({
               Limpiar filtros
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={
-              listadoRefetching ||
-              !metaListado?.total ||
-              metaListado.total === 0 ||
-              exportandoExcel
-            }
-            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <FileSpreadsheet className="h-4 w-4" aria-hidden />
-            {exportandoExcel ? "Generando..." : "Descargar Excel"}
-          </button>
 
           <button
             type="button"
