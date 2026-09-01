@@ -340,7 +340,11 @@ export function viajesFiltradosParaFactura(
 ): Viaje[] {
   const cid = clienteId.trim();
   if (!cid) return [];
-  const list = todos.filter((v) => v.clienteId === cid);
+  const list = todos.filter(
+    (v) =>
+      v.clienteId === cid ||
+      (v.clientesViaje ?? []).some((vc) => vc.clienteId === cid),
+  );
 
   const fid = opciones?.facturaEdicionId?.trim() || null;
   const idsFactura = opciones?.viajeIdsFacturaEdicion;
@@ -364,7 +368,10 @@ export function viajesFiltradosParaFactura(
     if (seen.has(id)) continue;
     const v = todos.find((x) => x.id === id);
     if (!v) continue;
-    if (v.clienteId !== cid) continue;
+    const perteneceAlCliente =
+      v.clienteId === cid ||
+      (v.clientesViaje ?? []).some((vc) => vc.clienteId === cid);
+    if (!perteneceAlCliente) continue;
     seen.add(id);
     extra.push(v);
   }
