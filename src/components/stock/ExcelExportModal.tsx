@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -50,8 +50,14 @@ export function ExcelExportModal({ columns, rowCount, onExport, onClose }: Props
     setSelected(on ? new Set(optionalCols.map((c) => c.id)) : new Set());
   }
 
-  const allOn = selected.size === optionalCols.length;
+  const allOn = optionalCols.length > 0 && selected.size === optionalCols.length;
+  const someOn = selected.size > 0 && !allOn;
   const noneOn = selected.size === 0 && requiredCols.length === 0;
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someOn;
+  }, [someOn]);
 
   function handleExport() {
     const optionalIds = optionalCols.map((c) => c.id).filter((id) => selected.has(id));
@@ -90,30 +96,27 @@ export function ExcelExportModal({ columns, rowCount, onExport, onClose }: Props
         </p>
 
         {optionalCols.length > 0 && (
-          <>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => toggleAll(true)}
-                disabled={allOn}
-                className="text-xs text-vialto-fire hover:underline disabled:opacity-40"
-              >
-                Seleccionar todas
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleAll(false)}
-                disabled={selected.size === 0}
-                className="text-xs text-vialto-steel hover:underline disabled:opacity-40"
-              >
-                Deseleccionar todas
-              </button>
-            </div>
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center justify-between gap-3 border-b border-black/10 pb-2">
+              <span className="flex items-center gap-3 text-sm font-medium text-vialto-charcoal">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allOn}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  className="h-4 w-4 shrink-0 accent-vialto-charcoal"
+                />
+                Seleccionar todo
+              </span>
+              <span className="text-xs text-vialto-steel">
+                {selected.size} de {optionalCols.length}
+              </span>
+            </label>
 
             <ul className="space-y-2">
               {optionalCols.map((col) => (
                 <li key={col.id}>
-                  <label className="flex cursor-pointer items-center gap-3 text-sm text-vialto-charcoal">
+                  <label className="flex cursor-pointer items-center gap-3 pl-0.5 text-sm text-vialto-charcoal">
                     <input
                       type="checkbox"
                       checked={selected.has(col.id)}
@@ -125,7 +128,7 @@ export function ExcelExportModal({ columns, rowCount, onExport, onClose }: Props
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         )}
       </div>
     </ViewModalShell>
