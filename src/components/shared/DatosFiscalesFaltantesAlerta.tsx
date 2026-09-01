@@ -1,5 +1,6 @@
 import type { Cliente, Transportista } from "@/types/api";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
+import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 
 export type DatosFiscalesFaltantesAlertaProps = {
   missingEmitFields: string[];
@@ -20,7 +21,9 @@ export function DatosFiscalesFaltantesAlerta({
   tenantId,
   getToken,
 }: DatosFiscalesFaltantesAlertaProps) {
-  if (missingEmitFields.length === 0) return null;
+  const missingHiddenFields = useHiddenFiscalFields(missingEmitFields);
+
+  if (missingEmitFields.length === 0 || missingHiddenFields.length > 0) return null;
 
   const showCliente =
     clienteDetalle?.id &&
@@ -33,6 +36,7 @@ export function DatosFiscalesFaltantesAlerta({
     onTransportistaUpdated &&
     getToken &&
     missingEmitFields.some((f) => f.startsWith("Transportista:"));
+
 
   return (
     <>

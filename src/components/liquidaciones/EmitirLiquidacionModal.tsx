@@ -12,6 +12,7 @@ import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
 import { Spinner } from "@/components/ui/Spinner";
+import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import {
   CVLP_CLASE_B_WARNING,
   condicionIvaLabel,
@@ -137,6 +138,10 @@ export function EmitirLiquidacionModal({
   );
   const ptoVentaSynced = useRef(arcaConfigProp?.ptoVentaCvlp != null);
 
+
+
+
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !submitting) onClose();
@@ -215,6 +220,8 @@ export function EmitirLiquidacionModal({
   );
   const missingClienteFields = missingEmitFields.filter((f) => f.startsWith("Cliente:"));
 
+  const missingHiddenFields = useHiddenFiscalFields(missingEmitFields);
+
   const transportistaId = source.transportista?.id ?? liq.transportista?.id ?? null;
   const clienteDelViaje = source.viajes?.[0]?.viaje?.cliente ?? null;
   const clienteId = clienteDelViaje?.id ?? null;
@@ -277,6 +284,12 @@ export function EmitirLiquidacionModal({
     cvlpClaseBEsperada(source.transportista?.condicionIva);
 
   async function confirmar() {
+    if (missingHiddenFields.length > 0) {
+      const todosLosFaltantes = [...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField);
+      setError(`No se puede emitir la liquidación. Faltan los siguientes datos: ${todosLosFaltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`);
+      return;
+    }
+
     if (datosEmitIncompletos) {
       setError(missingEmitMessage);
       return;
@@ -456,42 +469,54 @@ export function EmitirLiquidacionModal({
             </div>
           )}
 
-          {missingTransportistaFields.length > 0 && transportistaId && (
-            <CompletarDatosFiscalesInline
-              entidad="transportista"
-              id={transportistaId}
-              tenantId={tenantId}
-              getToken={getToken}
-              forceArcaFields={true}
-              initial={{
-                nombre: source.transportista?.nombre ?? liq.transportista?.nombre ?? "",
-                pais: source.transportista?.pais ?? null,
-                idFiscal: source.transportista?.idFiscal ?? null,
-                condicionIva: source.transportista?.condicionIva ?? null,
-                condicionTributaria: source.transportista?.condicionTributaria ?? null,
-                direccion: source.transportista?.domicilio ?? null,
-              }}
-              onSaved={applyTransportistaUpdate}
-            />
-          )}
+          {missingHiddenFields.length > 0 ? (
+            <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
+              <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+              <p className="mt-1">
+                Faltan los siguientes datos: <strong>{[...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField).join(", ")}</strong>.
+                <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
+              </p>
+            </div>
+          ) : (
+            <>
+              {missingTransportistaFields.length > 0 && transportistaId && (
+                <CompletarDatosFiscalesInline
+                  entidad="transportista"
+                  id={transportistaId}
+                  tenantId={tenantId}
+                  getToken={getToken}
+                  forceArcaFields={true}
+                  initial={{
+                    nombre: source.transportista?.nombre ?? liq.transportista?.nombre ?? "",
+                    pais: source.transportista?.pais ?? null,
+                    idFiscal: source.transportista?.idFiscal ?? null,
+                    condicionIva: source.transportista?.condicionIva ?? null,
+                    condicionTributaria: source.transportista?.condicionTributaria ?? null,
+                    direccion: source.transportista?.domicilio ?? null,
+                  }}
+                  onSaved={applyTransportistaUpdate}
+                />
+              )}
 
-          {missingClienteFields.length > 0 && clienteId && (
-            <CompletarDatosFiscalesInline
-              entidad="cliente"
-              id={clienteId}
-              tenantId={tenantId}
-              getToken={getToken}
-              forceArcaFields={true}
-              initial={{
-                nombre: clienteDelViaje?.nombre ?? "",
-                pais: clienteDelViaje?.pais ?? null,
-                idFiscal: clienteDelViaje?.idFiscal ?? null,
-                condicionIva: clienteDelViaje?.condicionIva ?? null,
-                condicionTributaria: clienteDelViaje?.condicionTributaria ?? null,
-                direccion: clienteDelViaje?.direccion ?? null,
-              }}
-              onSaved={applyClienteUpdate}
-            />
+              {missingClienteFields.length > 0 && clienteId && (
+                <CompletarDatosFiscalesInline
+                  entidad="cliente"
+                  id={clienteId}
+                  tenantId={tenantId}
+                  getToken={getToken}
+                  forceArcaFields={true}
+                  initial={{
+                    nombre: clienteDelViaje?.nombre ?? "",
+                    pais: clienteDelViaje?.pais ?? null,
+                    idFiscal: clienteDelViaje?.idFiscal ?? null,
+                    condicionIva: clienteDelViaje?.condicionIva ?? null,
+                    condicionTributaria: clienteDelViaje?.condicionTributaria ?? null,
+                    direccion: clienteDelViaje?.direccion ?? null,
+                  }}
+                  onSaved={applyClienteUpdate}
+                />
+              )}
+            </>
           )}
 
           {!datosEmitIncompletos && (

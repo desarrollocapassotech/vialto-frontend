@@ -12,6 +12,7 @@ import {
 import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
 import type { ArcaConfig, Cliente } from "@/types/api";
+import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -83,6 +84,8 @@ export function FacturaArcaPreviewPanel({
     f.startsWith("Cliente:")
   );
 
+  const missingHiddenFields = useHiddenFiscalFields(missingClienteFields);
+
   return (
     <div className="space-y-4">
       <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
@@ -144,10 +147,18 @@ export function FacturaArcaPreviewPanel({
             País: {clienteDetalle.pais}
           </p>
         )}
-        {missingClienteFields.length > 0 && clienteDetalle && (
+        {missingHiddenFields.length > 0 ? (
+          <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
+            <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+            <p className="mt-1">
+              Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
+              <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
+            </p>
+          </div>
+        ) : missingHiddenFields.length === 0 && missingClienteFields.length > 0 && clienteDetalle && (
           <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
             <p className="font-medium">
-              Faltan datos del cliente: {missingClienteFields.map((f) => f.replace("Cliente: ", "")).join(", ")}.
+              Faltan datos del cliente: {missingClienteFields.map(formatMissingFiscalField).join(", ")}.
               <br />
               <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
             </p>

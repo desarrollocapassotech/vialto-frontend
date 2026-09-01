@@ -223,7 +223,8 @@ export function CamposEmpresaPage() {
       return;
     }
     let cancelled = false;
-    setCampos(null);
+    // No reseteamos 'campos' a null aquí para evitar que la tabla desaparezca
+    // y provoque que el navegador haga scroll hacia arriba bruscamente.
     setLoading(true);
     (async () => {
       try {
@@ -520,8 +521,8 @@ export function CamposEmpresaPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {loading && (
+              <tbody className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                {loading && (!camposConfigurables || camposConfigurables.length === 0) && (
                   <tr>
                     <td
                       colSpan={2}
@@ -541,8 +542,7 @@ export function CamposEmpresaPage() {
                     </td>
                   </tr>
                 )}
-                {!loading &&
-                  camposConfigurables?.map((c) => (
+                {camposConfigurables?.map((c) => (
                     <tr key={c.campo} className="border-t border-black/10">
                       <td className="px-4 py-2.5">{c.label}</td>
                       <td className="px-4 py-2.5 text-right">
