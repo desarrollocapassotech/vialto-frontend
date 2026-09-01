@@ -40,12 +40,6 @@ interface ImportWizardProps {
    * le pida el ajuste a su administrador.
    */
   templatesTo?: string;
-  /**
-   * Entrada directa a un único módulo (ej. desde el botón "Importar" de la
-   * grilla de Viajes) — saltea el chequeo de "tenant-tiene-datos" y el
-   * selector "¿Qué querés importar?", arrancando directo en ese módulo.
-   */
-  soloModulo?: ModuloWizard;
 }
 
 const th = "px-3 py-2 text-left font-semibold text-vialto-steel";
@@ -83,7 +77,6 @@ export function ImportWizard({
   tenantModules,
   backTo,
   templatesTo,
-  soloModulo,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,14 +95,6 @@ export function ImportWizard({
     let cancelado = false;
     setTieneDatos(null);
     setModulosElegidos(null);
-
-    // Entrada directa a un solo módulo: ni consulta "tenant-tiene-datos" ni
-    // selector, arranca ya mismo con ese único módulo en la secuencia.
-    if (soloModulo) {
-      setModulosElegidos([soloModulo]);
-      return;
-    }
-
     (async () => {
       try {
         const data = await apiJson<TenantTieneDatos>(
@@ -138,7 +123,7 @@ export function ImportWizard({
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, soloModulo]);
+  }, [tenantId]);
 
   const wizard = useImportWizard(
     tenantId,
@@ -174,30 +159,21 @@ export function ImportWizard({
     : null;
   const moduloLabel = labelModulo(wizard.moduloActual ?? "");
 
-  if (soloModulo) {
-    if (!modulosElegidos) {
-      return (
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <Spinner />
-        </div>
-      );
-    }
-  } else {
-    if (!tieneDatos) {
-      return (
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <Spinner />
-        </div>
-      );
-    }
-    if (!modulosElegidos) {
-      return (
-        <SelectorModulos
-          tieneDatos={tieneDatos}
-          onElegir={(modulos) => setModulosElegidos(modulos)}
-        />
-      );
-    }
+  if (!tieneDatos) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!modulosElegidos) {
+    return (
+      <SelectorModulos
+        tieneDatos={tieneDatos}
+        onElegir={(modulos) => setModulosElegidos(modulos)}
+      />
+    );
   }
 
   return (

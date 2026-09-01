@@ -1,18 +1,10 @@
 import { useSearchParams } from "react-router-dom";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { ImportWizard } from "@/components/importacion/ImportWizard";
-import { MODULOS_SECUENCIA, type ModuloWizard } from "@/hooks/useImportWizard";
-
-function moduloWizardDesdeQuery(valor: string | null): ModuloWizard | undefined {
-  return (MODULOS_SECUENCIA as readonly string[]).includes(valor ?? "")
-    ? (valor as ModuloWizard)
-    : undefined;
-}
 
 export function ImportarDatosTenantPage() {
   const { tenant, loading, error } = useCurrentTenant();
   const [searchParams] = useSearchParams();
-  const soloModulo = moduloWizardDesdeQuery(searchParams.get("modulo"));
   const backTo = searchParams.get("volverA") || "/base-de-datos";
 
   if (loading) {
@@ -40,7 +32,6 @@ export function ImportarDatosTenantPage() {
           tenantId={tenant.clerkOrgId}
           tenantModules={tenant.modules}
           backTo={backTo}
-          soloModulo={soloModulo}
         />
       </div>
     </div>

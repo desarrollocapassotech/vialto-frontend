@@ -1907,7 +1907,7 @@ export function ViajesTenantPage({
         <div className="flex shrink-0 gap-2">
           {puedeImportar && (
             <Link
-              to="/importar?modulo=viajes&volverA=/viajes"
+              to="/importar?volverA=/viajes"
               className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
             >
               <Upload className="h-4 w-4" aria-hidden />
