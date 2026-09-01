@@ -453,6 +453,13 @@ export interface Factura {
   transportistaId: string | null;
   viajeIds: string[];
   importe: number;
+  /**
+   * Monto contra el que se mide el cobro. En facturas por tramo de tenants
+   * sin ARCA incluye el IVA de cada tramo; en el resto coincide con `importe`.
+   */
+  importeACobrar?: number;
+  /** `max(0, importeACobrar − pagos)`. */
+  saldoPendiente?: number;
   moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;

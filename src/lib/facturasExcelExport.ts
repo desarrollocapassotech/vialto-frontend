@@ -49,6 +49,7 @@ export async function generarFacturasExcel(
   clientes: Cliente[],
   viajes: Viaje[],
   filename: string = "facturas_export",
+  hasArca = false,
 ) {
   const data = facturas.map((f) => {
     const row: Record<string, string | number> = {};
@@ -74,7 +75,7 @@ export async function generarFacturasExcel(
           row[col.label] = getEstadoDisplay(f);
           break;
         case "importe":
-          row[col.label] = textoImporteFacturaListado(f, viajes);
+          row[col.label] = textoImporteFacturaListado(f, viajes, { hasArca });
           break;
         default:
           row[col.label] = "";

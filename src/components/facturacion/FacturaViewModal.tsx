@@ -7,7 +7,7 @@ import {
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
 import { AmbienteTestBadge } from '@/components/liquidaciones/AmbienteTestBadge';
-import { roundMoney2 } from '@/lib/facturaTotales';
+import { importeTotalConIvaPorTramo, roundMoney2 } from '@/lib/facturaTotales';
 import {
   AfipInfraErrorBanner,
   ArcaErrorMessage,
@@ -113,20 +113,23 @@ export function FacturaViewModal({
   let muestraIva = false;
   let totalConIva = factura.importe;
   if (porTramo) {
-    const sumaTramos = tramos.reduce((s, t) => s + t.monto, 0);
-    const undivided = Math.max(0, roundMoney2(factura.importe - sumaTramos));
-    const ivaTramos = tramos.reduce(
-      (s, t) => s + roundMoney2((t.monto * t.ivaPct) / 100),
-      0,
-    );
-    const ivaUndivided = roundMoney2((undivided * ivaN) / 100);
-    totalConIva = roundMoney2(factura.importe + ivaTramos + ivaUndivided);
+    totalConIva = importeTotalConIvaPorTramo(factura.importe, tramos, ivaN);
     muestraIva = true;
   } else {
     muestraIva = ivaN > 0 && factura.importe > 0;
     const ivaMonto = roundMoney2((factura.importe * ivaN) / 100);
     totalConIva = roundMoney2(factura.importe + ivaMonto);
   }
+  const cobroEsTotalConIva =
+    factura.importeACobrar == null ||
+    Math.abs(factura.importeACobrar - totalConIva) < 0.011;
+  const saldoPendiente =
+    porTramo &&
+    !factura.cobrado &&
+    cobroEsTotalConIva &&
+    (factura.saldoPendiente ?? 0) > 0.005
+      ? factura.saldoPendiente
+      : null;
 
   const letraFromCbte = facturaLetraFromCbteTipo(factura.cbteTipo);
   const letra =
@@ -171,6 +174,14 @@ export function FacturaViewModal({
             ? [{ label: 'IVA viajes sin tramo', value: `${ivaN}%` }]
             : []),
           { label: 'Total con IVA', value: fmtImporte(factura.moneda, totalConIva, 2) },
+          ...(saldoPendiente != null
+            ? [
+                {
+                  label: 'Saldo pendiente',
+                  value: fmtImporte(factura.moneda, saldoPendiente, 2),
+                },
+              ]
+            : []),
         ]
       : muestraIva
         ? [

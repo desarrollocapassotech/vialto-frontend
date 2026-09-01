@@ -37,6 +37,7 @@ import { Landmark, FileSpreadsheet } from "lucide-react";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
+  textoImporteMonedaFactura,
   viajesFiltradosParaFactura,
 } from "@/lib/viajesFlota";
 import {
@@ -992,6 +993,7 @@ export function FacturacionTenantPage({
         clientes,
         viajes,
         "Facturas_Exportadas",
+        hasArca,
       );
 
       showToast("Excel exportado exitosamente", "success");
@@ -1430,7 +1432,18 @@ export function FacturacionTenantPage({
             </td>
             <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
-              {textoImporteFacturaListado(f, viajes)}
+              <div className="flex flex-col items-end gap-0.5">
+                <span>{textoImporteFacturaListado(f, viajes, { hasArca })}</span>
+                {!hasArca &&
+                  f.facturarPorTramo &&
+                  !f.cobrado &&
+                  (f.saldoPendiente ?? 0) > 0.005 && (
+                    <span className="text-xs font-normal text-amber-800/90">
+                      Saldo{" "}
+                      {textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}
+                    </span>
+                  )}
+              </div>
             </td>
             <td
               className="px-4 py-3 text-right"
@@ -1473,7 +1486,25 @@ export function FacturacionTenantPage({
               },
               {
                 label: "Importe",
-                value: textoImporteFacturaListado(f, viajes),
+                value: (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span>
+                      {textoImporteFacturaListado(f, viajes, { hasArca })}
+                    </span>
+                    {!hasArca &&
+                      f.facturarPorTramo &&
+                      !f.cobrado &&
+                      (f.saldoPendiente ?? 0) > 0.005 && (
+                        <span className="text-xs font-normal text-amber-800/90">
+                          Saldo{" "}
+                          {textoImporteMonedaFactura(
+                            f.moneda,
+                            f.saldoPendiente!,
+                          )}
+                        </span>
+                      )}
+                  </span>
+                ),
               },
             ]}
             actions={
@@ -1655,7 +1686,14 @@ export function FacturacionTenantPage({
         title="Marcar como cobrada"
         message={
           marcarCobradaConfirm
-            ? `¿Marcás la factura ${marcarCobradaConfirm.numero ?? "s/n"} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
+            ? `¿Marcás la factura ${marcarCobradaConfirm.numero ?? "s/n"} como cobrada? Se va a registrar el pago del saldo pendiente${
+                (marcarCobradaConfirm.saldoPendiente ?? 0) > 0.005
+                  ? ` (${textoImporteMonedaFactura(
+                      marcarCobradaConfirm.moneda,
+                      marcarCobradaConfirm.saldoPendiente!,
+                    )})`
+                  : ""
+              } y todos los viajes vinculados van a pasar a "Cobrado".`
             : ""
         }
         confirmLabel="Marcar como cobrada"
