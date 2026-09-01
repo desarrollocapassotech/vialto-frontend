@@ -22,7 +22,7 @@ type Props = {
 };
 
 type DescargaError = {
-  message: string;
+  message: React.ReactNode;
   groups?: Record<string, ViajeExportMissingGroup>;
   endpoint: string;
   filename: string;
@@ -164,7 +164,13 @@ export function ExportarViajeModal({
     const faltantes = getPautHiddenAndMissing(viaje.transportista);
     if (faltantes.length > 0) {
       setError({
-        message: `No se puede emitir el documento. Faltan los siguientes datos del transportista: ${faltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`,
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ),
         endpoint: "",
         filename: "",
       });
@@ -245,7 +251,13 @@ export function ExportarViajeModal({
       const faltantes = getPautHiddenAndMissing(viaje.transportista);
       if (faltantes.length > 0) {
         setError({
-          message: `No se puede emitir la Nómina. Faltan los siguientes datos del transportista: ${faltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`,
+          message: (
+            <div className="space-y-1">
+              <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+              <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+              <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+            </div>
+          ),
           endpoint: "",
           filename: "",
         });
@@ -266,7 +278,13 @@ export function ExportarViajeModal({
     const faltantes = getPautHiddenAndMissing(t);
     if (faltantes.length > 0) {
       setError({
-        message: `No se puede emitir la Nómina. Faltan los siguientes datos del transportista: ${faltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`,
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ),
         endpoint: "",
         filename: "",
       });
@@ -470,7 +488,7 @@ export function ExportarViajeModal({
             </div>
           ) : error ? (
             <div className="mt-4 border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-              <p className="font-semibold">{error.message}</p>
+              <div className="font-semibold">{error.message}</div>
             </div>
           ) : null}
 
