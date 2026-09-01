@@ -149,7 +149,7 @@ export function TransportistaEditPage() {
           nombre: nombre.trim(),
           pais: pais || "",
           idFiscal: idFiscal.trim(),
-          email: email.trim(),
+          email: email.trim() || null,
           telefono: telefono,
           domicilio: domicilio.trim(),
           condicionIva: pais === "AR" ? condicionIva : null,
@@ -210,9 +210,7 @@ export function TransportistaEditPage() {
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
   return (
-    <CrudPageLayout
-      title="Editar transportista"
-    >
+    <CrudPageLayout title="Editar transportista">
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
