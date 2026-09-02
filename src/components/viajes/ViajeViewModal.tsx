@@ -393,7 +393,7 @@ export function ViajeViewModal({
                 <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                   Observaciones
                 </p>
-                <p className="mt-1 text-sm">{viaje.observaciones}</p>
+                <p className="mt-1 whitespace-pre-line text-sm">{viaje.observaciones}</p>
               </div>
             )}
         </div>
