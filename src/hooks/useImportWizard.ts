@@ -152,6 +152,11 @@ export function useImportWizard(
 
         // Reaplica filas excluidas de antes de este preview, por la misma razón.
         if (filasExcluidasRef.current.size > 0) {
+          const viajesIgnorados = (previewResult.viajes ?? []).filter((v) =>
+            filasExcluidasRef.current.has(v.fila),
+          );
+          const nuevasIgnoradas = viajesIgnorados.filter((v) => v.nuevo).length;
+          const actualizadasIgnoradas = viajesIgnorados.length - nuevasIgnoradas;
           previewResult = {
             ...previewResult,
             viajes: previewResult.viajes?.filter(
@@ -167,6 +172,18 @@ export function useImportWizard(
             0,
             previewResult.exitosas - filasExcluidasRef.current.size,
           );
+          if (previewResult.entidadesNuevas != null) {
+            previewResult.entidadesNuevas = Math.max(
+              0,
+              previewResult.entidadesNuevas - nuevasIgnoradas,
+            );
+          }
+          if (previewResult.entidadesActualizadas != null) {
+            previewResult.entidadesActualizadas = Math.max(
+              0,
+              previewResult.entidadesActualizadas - actualizadasIgnoradas,
+            );
+          }
         }
       }
 
@@ -216,6 +233,8 @@ export function useImportWizard(
 
     setPreview((prev) => {
       if (!prev) return prev;
+      const viajeIgnorado = prev.viajes?.find((v) => v.fila === fila);
+      if (!viajeIgnorado) return prev;
       const viajes = prev.viajes?.filter((v) => v.fila !== fila);
       const advertenciasCiudad = prev.advertenciasCiudad?.filter(
         (a) => a.fila !== fila,
@@ -226,6 +245,20 @@ export function useImportWizard(
         advertenciasCiudad,
         totalAdvertenciasCiudad: advertenciasCiudad?.length ?? 0,
         exitosas: Math.max(0, prev.exitosas - 1),
+        // Mantiene el desglose "N nuevas · M a actualizar" en sync con lo que
+        // realmente se va a importar — si no se descuenta acá, ignorar una
+        // fila que actualizaba deja el contador de actualizaciones inflado.
+        entidadesNuevas:
+          prev.entidadesNuevas != null
+            ? Math.max(0, prev.entidadesNuevas - (viajeIgnorado.nuevo ? 1 : 0))
+            : prev.entidadesNuevas,
+        entidadesActualizadas:
+          prev.entidadesActualizadas != null
+            ? Math.max(
+                0,
+                prev.entidadesActualizadas - (viajeIgnorado.nuevo ? 0 : 1),
+              )
+            : prev.entidadesActualizadas,
       };
     });
   }
