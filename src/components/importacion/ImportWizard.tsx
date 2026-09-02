@@ -82,19 +82,40 @@ export function ImportWizard({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arrastrando, setArrastrando] = useState(false);
 
-  // Un tenant nuevo (sin nada cargado todavía) arranca directo con la
-  // secuencia completa — es el caso de uso principal. Si ya tiene datos, se
-  // le pregunta primero qué módulos quiere tocar en esta importación, para
-  // no forzarlo a pasar por hojas que no le interesan.
+  const hasFacturasArca = tenantModules.includes("emision-facturas-arca");
+  const hasLiquidoProductoArca = tenantModules.includes(
+    "emision-liquido-producto-arca",
+  );
+  const hasFacturacion = tenantModules.includes("facturacion");
+  const puedeLiquidaciones = hasFacturacion || hasLiquidoProductoArca;
+  const puedeFacturas = hasFacturasArca || hasFacturacion;
+
+  // Un tenant nuevo (sin nada cargado todavía, y sin liquidaciones/facturas
+  // que ofrecer) arranca directo con la secuencia completa — es el caso de
+  // uso principal. Si ya tiene datos, o si puede generar liquidaciones/
+  // facturas al final, se le pregunta primero qué quiere hacer en esta
+  // importación, para no forzarlo a pasar por hojas que no le interesan.
   const [tieneDatos, setTieneDatos] = useState<TenantTieneDatos | null>(null);
   const [modulosElegidos, setModulosElegidos] = useState<ModuloWizard[] | null>(
     null,
   );
+  // Generar liquidaciones/facturas borrador después de Viajes es opcional y
+  // arranca siempre destildado — el usuario lo elige a propósito, no por
+  // default. Si no seleccionó nada (selector salteado), queda en false.
+  const [postViajesElegido, setPostViajesElegido] = useState<{
+    liquidaciones: boolean;
+    facturas: boolean;
+  }>({ liquidaciones: false, facturas: false });
+  // Se incrementa al "Volver a importar" para forzar un re-chequeo de
+  // tenant-tiene-datos — después de una corrida puede haber cambiado (ej. se
+  // acaban de crear los clientes que antes faltaban).
+  const [refetchTieneDatos, setRefetchTieneDatos] = useState(0);
 
   useEffect(() => {
     let cancelado = false;
     setTieneDatos(null);
     setModulosElegidos(null);
+    setPostViajesElegido({ liquidaciones: false, facturas: false });
     (async () => {
       try {
         const data = await apiJson<TenantTieneDatos>(
@@ -103,7 +124,14 @@ export function ImportWizard({
         );
         if (cancelado) return;
         setTieneDatos(data);
-        if (!data.clientes && !data.transportistas && !data.choferes && !data.vehiculos) {
+        if (
+          !data.clientes &&
+          !data.transportistas &&
+          !data.choferes &&
+          !data.vehiculos &&
+          !puedeLiquidaciones &&
+          !puedeFacturas
+        ) {
           setModulosElegidos([...MODULOS_SECUENCIA]);
         }
       } catch {
@@ -123,19 +151,13 @@ export function ImportWizard({
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, refetchTieneDatos]);
 
   const wizard = useImportWizard(
     tenantId,
     modulosElegidos ?? [...MODULOS_SECUENCIA],
     () => getToken(),
   );
-
-  const hasFacturasArca = tenantModules.includes("emision-facturas-arca");
-  const hasLiquidoProductoArca = tenantModules.includes(
-    "emision-liquido-producto-arca",
-  );
-  const hasFacturacion = tenantModules.includes("facturacion");
 
   const [numerosPorCliente, setNumerosPorCliente] = useState<
     Record<string, string>
@@ -159,6 +181,13 @@ export function ImportWizard({
     : null;
   const moduloLabel = labelModulo(wizard.moduloActual ?? "");
 
+  function reiniciarImportacion() {
+    wizard.reset();
+    setModulosElegidos(null);
+    setPostViajesElegido({ liquidaciones: false, facturas: false });
+    setRefetchTieneDatos((n) => n + 1);
+  }
+
   if (!tieneDatos) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -171,19 +200,19 @@ export function ImportWizard({
     return (
       <SelectorModulos
         tieneDatos={tieneDatos}
-        onElegir={(modulos) => setModulosElegidos(modulos)}
+        puedeLiquidaciones={puedeLiquidaciones}
+        puedeFacturas={puedeFacturas}
+        onElegir={(modulos, postViajes) => {
+          setModulosElegidos(modulos);
+          setPostViajesElegido(postViajes);
+        }}
       />
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <WizardStepper
-        wizard={wizard}
-        hasFacturasArca={hasFacturasArca}
-        hasLiquidoProductoArca={hasLiquidoProductoArca}
-        hasFacturacion={hasFacturacion}
-      />
+      <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
 
       {wizard.error && columnasFaltantes && (
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -211,15 +240,34 @@ export function ImportWizard({
               columnas con esos nombres.
             </p>
           )}
+          {!wizard.preview && (
+            <button
+              type="button"
+              onClick={reiniciarImportacion}
+              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+            >
+              Volver a importar
+            </button>
+          )}
         </div>
       )}
 
       {wizard.error && !columnasFaltantes && (
         <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {wizard.error}
+          <p>{wizard.error}</p>
+          {!wizard.preview && (
+            <button
+              type="button"
+              onClick={reiniciarImportacion}
+              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+            >
+              Volver a importar
+            </button>
+          )}
         </div>
       )}
 
+      {!(wizard.error && !wizard.preview) && (
       <div className="border border-black/10 bg-white p-6">
         {wizard.fase === "upload" && (
           <div className="flex flex-col gap-4">
@@ -266,8 +314,7 @@ export function ImportWizard({
           <EtapaModulo wizard={wizard} />
         )}
 
-      {wizard.fase === "post-liquidaciones" &&
-        (hasFacturacion || hasLiquidoProductoArca) && (
+      {wizard.fase === "post-liquidaciones" && postViajesElegido.liquidaciones && (
         <EtapaOpcional
           titulo="Generar liquidaciones borrador"
           descripcion="Se van a agrupar los viajes recién creados por transportista. Ninguna liquidación se emite a AFIP — quedan en borrador para que las emitas manualmente cuando quieras."
@@ -313,13 +360,11 @@ export function ImportWizard({
           }
         />
       )}
-      {wizard.fase === "post-liquidaciones" &&
-        !hasFacturacion &&
-        !hasLiquidoProductoArca && (
-          <AvanceSilencioso onNext={wizard.saltearLiquidaciones} />
-        )}
+      {wizard.fase === "post-liquidaciones" && !postViajesElegido.liquidaciones && (
+        <AvanceSilencioso onNext={wizard.saltearLiquidaciones} />
+      )}
 
-      {wizard.fase === "post-facturas" && (hasFacturasArca || hasFacturacion) && (
+      {wizard.fase === "post-facturas" && postViajesElegido.facturas && (
         <div className="flex flex-col gap-4">
           {mayoriaYaFacturada && (
             <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -403,7 +448,7 @@ export function ImportWizard({
           />
         </div>
       )}
-      {wizard.fase === "post-facturas" && !hasFacturasArca && !hasFacturacion && (
+      {wizard.fase === "post-facturas" && !postViajesElegido.facturas && (
         <AvanceSilencioso onNext={wizard.saltearFacturas} />
       )}
 
@@ -414,12 +459,22 @@ export function ImportWizard({
               Resumen de la importación
             </h3>
             <p className="mt-1 text-sm text-vialto-steel">
-              Cada módulo ya quedó guardado al confirmarlo — esto es solo un
-              repaso de lo que se hizo.
+              {wizard.etapasCompletadas.length === 0 &&
+              !wizard.liquidacionesCreadas &&
+              !wizard.facturasCreadas
+                ? "No se importó nada, se saltearon todos los módulos."
+                : "Cada módulo ya quedó guardado al confirmarlo — esto es solo un repaso de lo que se hizo."}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
+            {wizard.etapasCompletadas.length === 0 &&
+              !wizard.liquidacionesCreadas &&
+              !wizard.facturasCreadas && (
+                <p className="border border-black/10 bg-vialto-mist/40 px-4 py-3 text-sm text-vialto-steel">
+                  No se guardó ningún dato en esta corrida.
+                </p>
+              )}
             {wizard.etapasCompletadas.map((e) => {
               const creados = e.log.detalles.filter(
                 (d) => d.estado === "ok" && d.creado,
@@ -512,15 +567,25 @@ export function ImportWizard({
             )}
           </div>
 
-          <Link
-            to={backTo}
-            className="self-start border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
-          >
-            Listo
-          </Link>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={reiniciarImportacion}
+              className="self-start border border-black/15 bg-white px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-charcoal hover:bg-vialto-mist"
+            >
+              Volver a importar
+            </button>
+            <Link
+              to={backTo}
+              className="self-start border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
+            >
+              Listo
+            </Link>
+          </div>
         </div>
       )}
       </div>
+      )}
     </div>
   );
 }
@@ -543,10 +608,17 @@ const MODULOS_SELECTOR: { key: ModuloWizard; tieneDatosKey?: keyof TenantTieneDa
  */
 function SelectorModulos({
   tieneDatos,
+  puedeLiquidaciones,
+  puedeFacturas,
   onElegir,
 }: {
   tieneDatos: TenantTieneDatos;
-  onElegir: (modulos: ModuloWizard[]) => void;
+  puedeLiquidaciones: boolean;
+  puedeFacturas: boolean;
+  onElegir: (
+    modulos: ModuloWizard[],
+    postViajes: { liquidaciones: boolean; facturas: boolean },
+  ) => void;
 }) {
   // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
   // todavía no tienen datos cargados — los que ya tienen algo se destildan
@@ -560,6 +632,11 @@ function SelectorModulos({
         ).map(({ key }) => key),
       ),
   );
+  // Generar liquidaciones/facturas borrador es una acción aparte (no un
+  // módulo del Excel) — siempre arranca destildada, el usuario la tiene que
+  // elegir a propósito.
+  const [liquidacionesSel, setLiquidacionesSel] = useState(false);
+  const [facturasSel, setFacturasSel] = useState(false);
 
   function toggle(modulo: ModuloWizard) {
     setSeleccionados((prev) => {
@@ -604,12 +681,53 @@ function SelectorModulos({
             />
           </label>
         ))}
+        {puedeLiquidaciones && (
+          <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+            <span className="flex flex-col">
+              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                Liquidaciones a transportistas
+              </span>
+              <span className="text-xs text-vialto-steel">
+                Genera un borrador por transportista al terminar viajes.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={liquidacionesSel}
+              onChange={(e) => setLiquidacionesSel(e.target.checked)}
+              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+            />
+          </label>
+        )}
+        {puedeFacturas && (
+          <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+            <span className="flex flex-col">
+              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                Facturas a clientes
+              </span>
+              <span className="text-xs text-vialto-steel">
+                Genera un borrador por cliente al terminar viajes.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={facturasSel}
+              onChange={(e) => setFacturasSel(e.target.checked)}
+              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+            />
+          </label>
+        )}
       </div>
 
       <button
         type="button"
         disabled={ordenados.length === 0}
-        onClick={() => onElegir(ordenados)}
+        onClick={() =>
+          onElegir(ordenados, {
+            liquidaciones: liquidacionesSel,
+            facturas: facturasSel,
+          })
+        }
         className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
       >
         Continuar →
@@ -620,31 +738,27 @@ function SelectorModulos({
 
 function WizardStepper({
   wizard,
-  hasFacturasArca,
-  hasLiquidoProductoArca,
-  hasFacturacion,
+  postViajesElegido,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
-  hasFacturasArca: boolean;
-  hasLiquidoProductoArca: boolean;
-  hasFacturacion: boolean;
+  postViajesElegido: { liquidaciones: boolean; facturas: boolean };
 }) {
   // Liquidaciones (y el resto de las etapas opcionales post-viajes) solo son
   // alcanzables si "viajes" está en la secuencia de este import — sin viajes,
   // useImportWizard salta directo a "terminado" (ver avanzarModulo). Mostrar
   // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
   const tieneViajes = wizard.secuencia.includes("viajes");
-
-  const ofreceLiquidaciones = hasFacturacion || hasLiquidoProductoArca;
+  const ofreceLiquidaciones = tieneViajes && postViajesElegido.liquidaciones;
 
   const pasos = [
     ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
-    ...(tieneViajes && ofreceLiquidaciones
+    ...(ofreceLiquidaciones
       ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
       : []),
-    ...(hasFacturasArca || hasFacturacion
-      ? [{ key: "post-facturas", label: "Resumen" }]
-      : []),
+    // "Resumen" es el paso final genérico (siempre hay uno al terminar
+    // Viajes, se hayan generado o no facturas/liquidaciones) — no depende
+    // de si el usuario tildó "Facturas a clientes".
+    ...(tieneViajes ? [{ key: "post-facturas", label: "Resumen" }] : []),
   ];
 
   const indiceActual =
@@ -655,7 +769,7 @@ function WizardStepper({
         : wizard.fase === "post-liquidaciones"
           ? wizard.secuencia.length
           : wizard.fase === "post-facturas"
-            ? wizard.secuencia.length + (tieneViajes && ofreceLiquidaciones ? 1 : 0)
+            ? wizard.secuencia.length + (ofreceLiquidaciones ? 1 : 0)
             : pasos.length;
 
   return (
@@ -773,13 +887,54 @@ function EtapaModulo({
     setConfirmarFacturasDuplicadas(false);
   }, [p?.sessionId]);
 
-  const vehiculosFaltantes = p?.entidadesFaltantes.find(
-    (e) => e.modelo === "vehiculos",
+  // Un lookup de Viajes (cliente/transportista/chofer/vehículo) puede fallar
+  // porque el valor no existe todavía — pero solo tiene sentido ofrecer
+  // "crear y reintentar" si el usuario eligió importar ese módulo en esta
+  // corrida. Si no lo eligió, la fila de Viajes simplemente no se importa
+  // (el lookup fallido ya la deja fuera de `valid` en el backend) y acá solo
+  // se avisa por qué, sin invitar a crear algo que no pidió tocar.
+  const ENTIDAD_MODULO: Partial<Record<string, ModuloWizard>> = {
+    clientes: "clientes",
+    transportistas: "transportistas",
+    choferes: "choferes",
+    vehiculos: "vehiculos",
+  };
+  function moduloElegido(modelo: string): boolean {
+    const modulo = ENTIDAD_MODULO[modelo];
+    return !modulo || wizard.secuencia.includes(modulo);
+  }
+  function filasSinImportarPor(modelo: string): number[] {
+    return [
+      ...new Set(
+        (p?.detalleErrores ?? [])
+          .filter((e) => e.lookupModel === modelo)
+          .map((e) => e.fila),
+      ),
+    ].sort((a, b) => a - b);
+  }
+
+  const entidadesFaltantesTodas = p?.entidadesFaltantes ?? [];
+  const vehiculosFaltantes = moduloElegido("vehiculos")
+    ? entidadesFaltantesTodas.find((e) => e.modelo === "vehiculos")
+    : undefined;
+  const otrasEntidadesFaltantes = entidadesFaltantesTodas.filter(
+    (e) => e.modelo !== "vehiculos" && e.valores.length > 0 && moduloElegido(e.modelo),
   );
-  const otrasEntidadesFaltantes =
-    p?.entidadesFaltantes.filter(
-      (e) => e.modelo !== "vehiculos" && e.valores.length > 0,
-    ) ?? [];
+  const entidadesFaltantesSinModulo = entidadesFaltantesTodas.filter(
+    (e) => e.valores.length > 0 && !moduloElegido(e.modelo),
+  );
+  // Los errores de lookup de un módulo no elegido ya se explican arriba
+  // (panel ámbar de "no se importan"), no hace falta duplicarlos acá abajo
+  // como si fueran un error bloqueante más.
+  const detalleErroresMostrados = (p?.detalleErrores ?? []).filter(
+    (e) => !e.lookupModel || moduloElegido(e.lookupModel),
+  );
+  // `p.errores` cuenta errores individuales (una fila puede fallar por
+  // varios campos a la vez, ej. cliente Y transportista Y chofer), no filas
+  // — para el stat box usamos filas distintas, que es lo que dice la etiqueta.
+  const filasConError = new Set(
+    (p?.detalleErrores ?? []).map((e) => e.fila),
+  ).size;
 
   const hasViajes = (p?.viajes?.length ?? 0) > 0;
   const hasFacturas = (p?.facturas?.length ?? 0) > 0;
@@ -836,6 +991,21 @@ function EtapaModulo({
             className={`grid gap-2 ${hasViajes ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-3"}`}
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
+            {hasFacturas && (
+              <StatBox label="Facturas" value={p.facturas?.length ?? 0} />
+            )}
+            <StatBox
+              label="Filas con error"
+              value={filasConError}
+              highlight={filasConError > 0 ? "error" : undefined}
+            />
+            {hasViajes && (
+              <StatBox
+                label="Adv. ciudades"
+                value={totalAdvertenciasCiudad}
+                highlight={totalAdvertenciasCiudad > 0 ? "warn" : undefined}
+              />
+            )}
             <StatBox
               label={
                 tieneDesgloseActualizacion
@@ -850,21 +1020,6 @@ function EtapaModulo({
                   : undefined
               }
             />
-            <StatBox
-              label="Filas con error"
-              value={p.errores}
-              highlight={p.errores > 0 ? "error" : undefined}
-            />
-            {hasFacturas && (
-              <StatBox label="Facturas" value={p.facturas?.length ?? 0} />
-            )}
-            {hasViajes && (
-              <StatBox
-                label="Adv. ciudades"
-                value={totalAdvertenciasCiudad}
-                highlight={totalAdvertenciasCiudad > 0 ? "warn" : undefined}
-              />
-            )}
           </div>
 
           {p.headersNoMapeados.length > 0 && (
@@ -1026,6 +1181,40 @@ function EtapaModulo({
             </div>
           ))}
 
+          {entidadesFaltantesSinModulo.map((grupo) => {
+            const filas = filasSinImportarPor(grupo.modelo);
+            return (
+              <div
+                key={grupo.modelo}
+                className="flex flex-col gap-1.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
+              >
+                <p>
+                  <strong>
+                    {filas.length > 0 ? filas.length : grupo.valores.length}
+                  </strong>{" "}
+                  fila{(filas.length || grupo.valores.length) !== 1 ? "s" : ""}{" "}
+                  de Viajes no se {(filas.length || grupo.valores.length) !== 1 ? "van" : "va"} a
+                  importar porque hacen referencia a{" "}
+                  {labelModulo(grupo.modelo).toLowerCase()} que no existen (
+                  <strong>
+                    {grupo.valores.map((v) => v.valor).join(", ")}
+                  </strong>
+                  ) y no elegiste importar ese módulo en esta corrida.
+                </p>
+                {filas.length > 0 && (
+                  <p className="text-amber-800">
+                    Fila{filas.length !== 1 ? "s" : ""}: {filas.join(", ")}.
+                  </p>
+                )}
+                <p className="text-amber-800">
+                  Para incluirlas, volvé a empezar y tildá{" "}
+                  {labelModulo(grupo.modelo)} en el selector, o cargá esos
+                  registros a mano antes de importar Viajes.
+                </p>
+              </div>
+            );
+          })}
+
           {advertenciasCamposFaltantes.length > 0 && (
             <div className="space-y-2.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
               <p>
@@ -1079,7 +1268,7 @@ function EtapaModulo({
             </div>
           )}
 
-          {p.detalleErrores.length > 0 && (
+          {detalleErroresMostrados.length > 0 && (
             <div className="max-h-40 overflow-y-auto border border-red-100">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-red-50">
@@ -1090,7 +1279,7 @@ function EtapaModulo({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-red-50">
-                  {p.detalleErrores.map((e, i) => (
+                  {detalleErroresMostrados.map((e, i) => (
                     <tr key={i} className="odd:bg-white even:bg-red-50/40">
                       <td className={td}>{e.fila}</td>
                       <td className={td}>{e.campo ?? "—"}</td>

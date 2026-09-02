@@ -511,6 +511,8 @@ export interface ImportRowError {
   campo?: string;
   error: string;
   valor?: unknown;
+  /** Si el error es un lookup no encontrado: qué modelo se buscó (clientes/transportistas/choferes/vehiculos/productos). */
+  lookupModel?: string;
 }
 
 export interface ImportCiudadAdvertencia {
