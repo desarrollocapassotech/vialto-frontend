@@ -61,6 +61,7 @@ import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
+import { ConfiguracionCamposViajesTenantPage } from "@/pages/ConfiguracionCamposViajesTenantPage";
 import { SuperadminNotificacionesPage } from "@/pages/SuperadminNotificacionesPage";
 import { NotificacionesPage } from "@/pages/NotificacionesPage";
 
@@ -375,6 +376,10 @@ export default function App() {
             <Route
               path="configuracion/notificaciones"
               element={<ConfiguracionNotificacionesTenantPage />}
+            />
+            <Route
+              path="configuracion/campos-viajes"
+              element={<ConfiguracionCamposViajesTenantPage />}
             />
             <Route path="notificaciones" element={<NotificacionesPage />} />
             <Route path="base-de-datos" element={<BaseDeDatosPage />} />

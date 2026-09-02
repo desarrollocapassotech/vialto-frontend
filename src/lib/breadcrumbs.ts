@@ -78,6 +78,10 @@ const ENTRIES: Entry[] = [
     pattern: "/configuracion/notificaciones",
     build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones por email" }],
   },
+  {
+    pattern: "/configuracion/campos-viajes",
+    build: (_p, ctx) => [homeCrumb(ctx), { label: "Campos del módulo Viajes" }],
+  },
   { pattern: "/notificaciones", build: (_p, ctx) => [homeCrumb(ctx), { label: "Notificaciones" }] },
 
   // Base de datos

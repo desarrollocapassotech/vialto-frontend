@@ -352,6 +352,13 @@ export function AppShell() {
       });
     } else {
       const ajustesItems: NavItem[] = [];
+      if (canAccessViajes(tenant?.modules ?? [])) {
+        ajustesItems.push({
+          to: "/configuracion/campos-viajes",
+          label: "Campos de Viajes",
+          icon: SlidersHorizontal,
+        });
+      }
       if (hasFacturasArca || hasLiquidoProductoArca) {
         ajustesItems.push({
           to: "/configuracion/arca",
