@@ -71,6 +71,7 @@ export function ViajeViewModal({
   editando = false,
   onFacturar,
   facturando = false,
+  onVerFactura,
   onLiquidar,
   liquidando = false,
   onRegistrarPago,
@@ -78,6 +79,7 @@ export function ViajeViewModal({
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
+  onVerFactura?: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
   /** Tenant con módulo emision-liquido-producto-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
@@ -258,7 +260,7 @@ export function ViajeViewModal({
             {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
+            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
             {hasLiquidoProductoArca ? (
               <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
             ) : (

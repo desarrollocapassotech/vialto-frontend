@@ -15,8 +15,14 @@ export function viajeTieneLiquidacionTransportista(
   return v.liquidacionEstado != null && !liquidacionPermiteVincular(v.liquidacionEstado);
 }
 
-export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEstado'>): boolean {
-  return facturacionPermiteVincular(v.facturacionEstado);
+export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEstado' | 'clientesViaje'>): boolean {
+  if (facturacionPermiteVincular(v.facturacionEstado)) return true;
+  if (v.clientesViaje) {
+    for (const c of v.clientesViaje) {
+      if (facturacionPermiteVincular(c.facturacionEstado)) return true;
+    }
+  }
+  return false;
 }
 
 export function viajePendienteComprobanteTransportista(
@@ -32,7 +38,7 @@ export function viajePendienteComprobanteTransportista(
  * liquidación son indicadores independientes: no se espera uno para completar el otro.
  */
 export function viajePermiteBotonFacturar(v: Viaje): boolean {
-  if (v.etapa === 'cancelado' || v.facturacionEstado === 'cobrado') return false;
+  if (v.etapa === 'cancelado') return false;
 
   if (viajeRequiereComprobanteDual(v)) {
     return (
