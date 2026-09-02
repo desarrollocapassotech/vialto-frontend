@@ -213,7 +213,16 @@ export function ImportWizard({
 
   return (
     <div className="flex flex-col gap-6">
-      <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
+        <button
+          type="button"
+          onClick={reiniciarImportacion}
+          className="shrink-0 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-steel hover:text-vialto-charcoal"
+        >
+          Volver a importar
+        </button>
+      </div>
 
       {wizard.error && columnasFaltantes && (
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
