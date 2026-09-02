@@ -708,7 +708,7 @@ function LiquidacionesTab({
           void marcarPendienteAnulacion(pendienteAnulacionId);
         }}
         title="Marcar pendiente de anulación"
-        message="¿Marcás esta liquidación como pendiente de anulación? No se emite nada a ARCA — el CVLP original se conserva. Los viajes siguen sin estar disponibles para una nueva liquidación hasta confirmar la anulación con el comprobante pre-impreso."
+        message="¿Marcás esta liquidación como pendiente de anulación? No se emite nada a ARCA."
         confirmText="Marcar pendiente"
       />
 

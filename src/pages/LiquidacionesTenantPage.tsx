@@ -1241,7 +1241,7 @@ export function LiquidacionesTenantPage() {
         title="Marcar pendiente de anulación"
         message={
           pendienteAnulacionConfirm
-            ? `¿Marcás como pendiente de anulación la liquidación de ${transportistaNombre(pendienteAnulacionConfirm)}? No se emite nada a ARCA — el CVLP original se conserva. Los viajes siguen sin estar disponibles para una nueva liquidación hasta confirmar la anulación con el comprobante pre-impreso.`
+            ? `¿Marcás como pendiente de anulación la liquidación de ${transportistaNombre(pendienteAnulacionConfirm)}? No se emite nada a ARCA.`
             : ""
         }
         confirmLabel="Marcar pendiente"
