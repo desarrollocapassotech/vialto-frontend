@@ -989,7 +989,17 @@ function EtapaModulo({
           className="flex flex-col gap-4 border-0 p-0 m-0 disabled:opacity-60 transition-opacity"
         >
           <div
-            className={`grid gap-2 ${hasViajes ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-3"}`}
+            className={`grid gap-2 ${
+              // Cantidad real de StatBox renderizados (3 fijos + Facturas +
+              // Adv. ciudades, cada uno independiente) — si el grid asume
+              // siempre 5 columnas cuando solo hay 4 boxes, queda un hueco
+              // en blanco a la derecha.
+              3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 5
+                ? "grid-cols-2 sm:grid-cols-5"
+                : 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 4
+                  ? "grid-cols-2 sm:grid-cols-4"
+                  : "grid-cols-3"
+            }`}
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
             {hasFacturas && (
