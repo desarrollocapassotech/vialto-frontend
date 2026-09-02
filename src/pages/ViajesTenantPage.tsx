@@ -1694,18 +1694,21 @@ export function ViajesTenantPage({
     });
   }
 
-  async function abrirFacturaModalEnContexto(v: Viaje) {
-    if (!v.facturaId || !v.clienteId) return;
+  async function abrirFacturaModalEnContexto(v: Viaje, targetFacturaId?: string, targetClienteId?: string) {
+    const fId = targetFacturaId ?? v.facturaId;
+    const cId = targetClienteId ?? v.clienteId;
+    
+    if (!fId || !cId) return;
 
-    setFacturandoLoadingId(v.facturaId);
+    setFacturandoLoadingId(fId);
 
     try {
       const facturasCliente = await apiJson<Factura[]>(
-        facturasPorClienteUrl(v.clienteId),
+        facturasPorClienteUrl(cId),
         () => getToken(),
       );
       const facturaEncontrada = facturasCliente.find(
-        (f) => f.id === v.facturaId,
+        (f) => f.id === fId,
       );
 
       if (facturaEncontrada) {
@@ -3229,17 +3232,11 @@ export function ViajesTenantPage({
         <VerFacturasMultiClienteModal
           viaje={verFacturasMultiClienteViaje}
           onClose={() => setVerFacturasMultiClienteViaje(null)}
-          onVerFactura={(facturaId) => {
-            navigate(
-              platform ? "/facturacion" : `/facturacion?factura=${facturaId}`,
-              platform
-                ? {
-                    state: {
-                      ...facturacionNavExtras(),
-                      viewFacturaId: facturaId,
-                    },
-                  }
-                : undefined,
+          onVerFactura={(facturaId, clienteId) => {
+            void abrirFacturaModalEnContexto(
+              verFacturasMultiClienteViaje,
+              facturaId,
+              clienteId,
             );
           }}
         />

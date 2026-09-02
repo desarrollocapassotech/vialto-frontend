@@ -37,7 +37,7 @@ export function VerFacturasMultiClienteModal({
 }: {
   viaje: Viaje;
   onClose: () => void;
-  onVerFactura: (facturaId: string) => void;
+  onVerFactura: (facturaId: string, clienteId: string) => void;
 }) {
   const { clientes } = useMaestroData();
 
@@ -155,7 +155,7 @@ export function VerFacturasMultiClienteModal({
                       <button
                         type="button"
                         onClick={() => {
-                          onVerFactura(r.facturaId!);
+                          onVerFactura(r.facturaId!, r.clienteId);
                           onClose();
                         }}
                         className="inline-flex h-8 items-center justify-center rounded border border-vialto-blue/20 px-3 text-xs font-medium text-vialto-blue hover:bg-vialto-blue/5"
