@@ -502,9 +502,9 @@ export function AppShell() {
           ) : (
             navGroups.map((group, gi) => {
               const open = isGroupOpen(group);
-              // Un grupo con un solo ítem no necesita accordion: el ícono va directo a esa pantalla.
+              // Un grupo con un solo ítem no necesita accordion (ni colapsado ni expandido):
+              // se muestra directo ese ítem, sin header intermedio para togglear/expandir.
               const singleItemGroup =
-                collapsed &&
                 sidebarUsesAccordion &&
                 group.title !== null &&
                 group.items.length === 1;
@@ -523,7 +523,7 @@ export function AppShell() {
                     className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
                   />
                 )}
-                {sidebarUsesAccordion && !collapsed && group.title !== null && (
+                {sidebarUsesAccordion && !collapsed && group.title !== null && !singleItemGroup && (
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.title as string)}
