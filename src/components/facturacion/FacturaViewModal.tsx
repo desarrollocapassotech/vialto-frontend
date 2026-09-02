@@ -113,7 +113,10 @@ export function FacturaViewModal({
   let muestraIva = false;
   let totalConIva = factura.importe;
   if (porTramo) {
-    totalConIva = importeTotalConIvaPorTramo(factura.importe, tramos, ivaN);
+    totalConIva =
+      factura.ivaMonto != null && Number.isFinite(factura.ivaMonto)
+        ? roundMoney2(factura.importe + factura.ivaMonto)
+        : importeTotalConIvaPorTramo(factura.importe, tramos, ivaN);
     muestraIva = true;
   } else {
     muestraIva = ivaN > 0 && factura.importe > 0;

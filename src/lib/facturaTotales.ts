@@ -47,8 +47,12 @@ export type FacturaTramoTotal = {
   ivaPct: number;
 };
 
-/** Total con IVA de una factura por tramo (misma fórmula que el cobro en backend). */
-export function importeTotalConIvaPorTramo(
+/**
+ * IVA de una factura por tramo: cada tramo con su alícuota, y la parte del
+ * neto no cubierta por tramos con el IVA de cabecera (0% = exento).
+ * Misma fórmula que `ivaMontoDeTramos` del backend.
+ */
+export function ivaMontoDeTramos(
   importeNeto: number,
   tramos: FacturaTramoTotal[],
   ivaPctCabecera?: number | null,
@@ -62,12 +66,24 @@ export function importeTotalConIvaPorTramo(
   const ivaUndivided = roundMoney2(
     (undivided * (Number(ivaPctCabecera) || 0)) / 100,
   );
-  return roundMoney2(importeNeto + ivaTramos + ivaUndivided);
+  return roundMoney2(ivaTramos + ivaUndivided);
+}
+
+/** Total con IVA de una factura por tramo (misma fórmula que el cobro en backend). */
+export function importeTotalConIvaPorTramo(
+  importeNeto: number,
+  tramos: FacturaTramoTotal[],
+  ivaPctCabecera?: number | null,
+): number {
+  return roundMoney2(
+    importeNeto + ivaMontoDeTramos(importeNeto, tramos, ivaPctCabecera),
+  );
 }
 
 /**
  * Monto contra el que se mide el cobro.
- * Por tramo sin ARCA: neto + IVA. ARCA / sin tramos: neto (`importe` o `importeACobrar` de la API).
+ * Por tramo sin ARCA: `importeACobrar` de la API, o neto + `ivaMonto` persistido,
+ * o recálculo live. ARCA / sin tramos: neto.
  */
 export function importeACobrarFactura(
   f: {
@@ -75,6 +91,7 @@ export function importeACobrarFactura(
     facturarPorTramo?: boolean;
     tramos?: FacturaTramoTotal[];
     ivaPct?: number | null;
+    ivaMonto?: number | null;
     importeACobrar?: number;
   },
   hasArca: boolean,
@@ -84,6 +101,9 @@ export function importeACobrarFactura(
   }
   const tramos = f.tramos ?? [];
   if (!hasArca && f.facturarPorTramo && tramos.length > 0) {
+    if (f.ivaMonto != null && Number.isFinite(f.ivaMonto)) {
+      return roundMoney2(f.importe + f.ivaMonto);
+    }
     return importeTotalConIvaPorTramo(f.importe, tramos, f.ivaPct);
   }
   return roundMoney2(f.importe);
