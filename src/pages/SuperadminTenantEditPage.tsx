@@ -21,6 +21,9 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
       (t.billingStatus as TenantFormValues["billingStatus"]) ?? "trial",
     maxUsers: String(t.maxUsers),
     billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
+    liquidacionAnulacionMetodo:
+      (t.liquidacionAnulacionMetodo as TenantFormValues["liquidacionAnulacionMetodo"]) ??
+      "nota_credito_debito",
   };
 }
 
@@ -89,6 +92,11 @@ export function SuperadminTenantEditPage() {
             billingStatus: values.billingStatus,
             maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
             billingRenewsAt: values.billingRenewsAt || null,
+            liquidacionAnulacionMetodo: values.modules.includes(
+              "emision-liquido-producto-arca",
+            )
+              ? (values.liquidacionAnulacionMetodo ?? "nota_credito_debito")
+              : undefined,
           }),
         },
       );

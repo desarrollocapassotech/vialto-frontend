@@ -379,6 +379,11 @@ export interface Tenant {
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
   importacionesOcultas: boolean;
+  /**
+   * Método de anulación del CVLP (060) — 'nota_credito_debito' (default, todo tenant nuevo) |
+   * 'manual'. Solo editable desde superadmin (panel Empresas). Ver Liquidacion.estado.
+   */
+  liquidacionAnulacionMetodo: string;
   createdAt: string;
 }
 
@@ -787,7 +792,8 @@ export type LiquidacionEstado =
   | "pendiente_cae"
   | "autorizado"
   | "error"
-  | "anulado";
+  | "anulado"
+  | "pendiente_anulacion";
 
 export type ConceptoLiquidacionSigno = "favor" | "contra";
 
@@ -871,6 +877,13 @@ export interface Liquidacion {
   /** Nombre legible resuelto desde Clerk (virtual; no se persiste). */
   anuladoPorNombre?: string | null;
   anuladoAt?: string | null;
+  /** Método usado en esta anulación puntual (snapshot): 'nota_credito_debito' | 'manual'. */
+  anulacionMetodo?: string | null;
+  /** Anulación manual (Tenant.liquidacionAnulacionMetodo = 'manual'): auditoría del paso
+   * "pendiente_anulacion" + comprobante pre-impreso adjunto al confirmar. */
+  anulacionPendienteDesde?: string | null;
+  anulacionPendientePor?: string | null;
+  anulacionManualComprobanteUrl?: string | null;
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
