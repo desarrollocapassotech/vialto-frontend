@@ -628,7 +628,8 @@ export function textoImporteMonedaFactura(
 
 /**
  * Importe mostrado en tabla de facturas.
- * Por tramo sin ARCA: el mismo total de cobro (neto + IVA). En el resto: viajes o `importe`.
+ * Por tramo sin ARCA: total de cobro (neto + IVA persistido / `importeACobrar`).
+ * En el resto: viajes o `importe`.
  */
 export function textoImporteFacturaListado(
   f: {
@@ -638,6 +639,7 @@ export function textoImporteFacturaListado(
     facturarPorTramo?: boolean;
     tramos?: { monto: number; ivaPct: number }[];
     ivaPct?: number | null;
+    ivaMonto?: number | null;
     importeACobrar?: number;
   },
   viajes: Viaje[],

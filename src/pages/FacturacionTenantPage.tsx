@@ -1440,7 +1440,9 @@ export function FacturacionTenantPage({
             <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
               <div className="flex flex-col items-end gap-0.5">
-                <span>{textoImporteFacturaListado(f, viajes, { hasArca })}</span>
+                <span>
+                  {textoImporteFacturaListado(f, viajes, { hasArca })}
+                </span>
                 {!hasArca &&
                   f.facturarPorTramo &&
                   !f.cobrado &&

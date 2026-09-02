@@ -24,6 +24,7 @@ import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
   ImportPreviewEntidad,
+  ImportPreviewFilaEntidad,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -212,7 +213,16 @@ export function ImportWizard({
 
   return (
     <div className="flex flex-col gap-6">
-      <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
+        <button
+          type="button"
+          onClick={reiniciarImportacion}
+          className="shrink-0 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-steel hover:text-vialto-charcoal"
+        >
+          Volver a importar
+        </button>
+      </div>
 
       {wizard.error && columnasFaltantes && (
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -988,7 +998,17 @@ function EtapaModulo({
           className="flex flex-col gap-4 border-0 p-0 m-0 disabled:opacity-60 transition-opacity"
         >
           <div
-            className={`grid gap-2 ${hasViajes ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-3"}`}
+            className={`grid gap-2 ${
+              // Cantidad real de StatBox renderizados (3 fijos + Facturas +
+              // Adv. ciudades, cada uno independiente) — si el grid asume
+              // siempre 5 columnas cuando solo hay 4 boxes, queda un hueco
+              // en blanco a la derecha.
+              3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 5
+                ? "grid-cols-2 sm:grid-cols-5"
+                : 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 4
+                  ? "grid-cols-2 sm:grid-cols-4"
+                  : "grid-cols-3"
+            }`}
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
             {hasFacturas && (
@@ -1021,6 +1041,19 @@ function EtapaModulo({
               }
             />
           </div>
+
+          {p.filasDetalle && p.filasDetalle.length > 0 && (
+            <div>
+              <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
+                {labelModulo(wizard.moduloActual ?? "")} en este archivo
+              </p>
+              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
+                {p.filasDetalle.map((f) => (
+                  <FilaDetalleCard key={f.fila} fila={f} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {p.headersNoMapeados.length > 0 && (
             <details className="group border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
@@ -1722,6 +1755,37 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
+  return (
+    <div className="rounded border border-black/10 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
+          Fila {fila.fila}
+        </span>
+        {fila.esNuevo ? (
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+            Nuevo
+          </span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+            Actualiza
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+        {fila.campos.map((c) => (
+          <div key={c.campo}>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
+              {c.label}
+            </p>
+            <p className="text-sm text-vialto-charcoal">{c.valor}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

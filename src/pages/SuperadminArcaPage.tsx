@@ -6,6 +6,7 @@ import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { EmitirLiquidacionModal } from "@/components/liquidaciones/EmitirLiquidacionModal";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
+import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/ConfirmarAnulacionManualModal";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
@@ -31,6 +32,7 @@ const ESTADO_LABEL: Record<string, string> = {
   autorizado: "LIQUIDADO",
   error: "ERROR DE AFIP",
   anulado: "ANULADO",
+  pendiente_anulacion: "PENDIENTE DE ANULACIÓN",
 };
 
 const ESTADO_CLASS: Record<string, string> = {
@@ -39,6 +41,7 @@ const ESTADO_CLASS: Record<string, string> = {
   autorizado: "bg-green-100 text-green-800",
   error: "bg-red-100 text-red-800",
   anulado: "bg-slate-100 text-slate-600",
+  pendiente_anulacion: "bg-amber-100 text-amber-800",
 };
 
 const ars = new Intl.NumberFormat("es-AR", {
@@ -104,7 +107,13 @@ function ConfirmModal({
 
 // ── LiquidacionesTab ──────────────────────────────────────────────────────────
 
-function LiquidacionesTab({ tenantId }: { tenantId: string }) {
+function LiquidacionesTab({
+  tenantId,
+  metodoAnulacion,
+}: {
+  tenantId: string;
+  metodoAnulacion: "nota_credito_debito" | "manual";
+}) {
   const { getToken } = useAuth();
   const { showToast } = useToast();
   const [items, setItems] = useState<Liquidacion[] | null>(null);
@@ -118,6 +127,11 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
   const [pendingEmitir, setPendingEmitir] = useState<Liquidacion | null>(null);
 
   const [anularId, setAnularId] = useState<string | null>(null);
+  const [pendienteAnulacionId, setPendienteAnulacionId] = useState<
+    string | null
+  >(null);
+  const [confirmarAnulacionManualId, setConfirmarAnulacionManualId] =
+    useState<string | null>(null);
   const [eliminarId, setEliminarId] = useState<string | null>(null);
 
   function load() {
@@ -242,6 +256,63 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
       );
       setAnularId(null);
       load();
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
+    } finally {
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+    }
+  }
+
+  async function marcarPendienteAnulacion(id: string) {
+    setRowProcessing((prev) => ({ ...prev, [id]: "marcar-pendiente-anulacion" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    try {
+      await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}/marcar-pendiente-anulacion?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+        { method: "POST" },
+      );
+      setPendienteAnulacionId(null);
+      load();
+      showToast("Liquidación marcada como pendiente de anulación.");
+    } catch (e) {
+      setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
+    } finally {
+      setRowProcessing((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+    }
+  }
+
+  async function confirmarAnulacionManual(
+    id: string,
+    args: { motivo: string; comprobanteUrl: string },
+  ) {
+    setRowProcessing((prev) => ({ ...prev, [id]: "confirmar-anulacion-manual" }));
+    setRowErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    try {
+      await apiFetch(
+        `/api/platform/arca/liquidaciones/${id}/confirmar-anulacion-manual?tenantId=${encodeURIComponent(tenantId)}`,
+        () => getToken(),
+        { method: "POST", body: JSON.stringify(args) },
+      );
+      setConfirmarAnulacionManualId(null);
+      load();
+      showToast("Liquidación anulada.");
     } catch (e) {
       setRowErrors((prev) => ({ ...prev, [id]: friendlyError(e, "arca") }));
     } finally {
@@ -383,7 +454,9 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   Emitir
                 </button>
               )}
-              {(liq.estado === "autorizado" || liq.estado === "anulado") && (
+              {(liq.estado === "autorizado" ||
+                liq.estado === "anulado" ||
+                liq.estado === "pendiente_anulacion") && (
                 <button
                   type="button"
                   disabled={!!isProc}
@@ -404,7 +477,24 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                 </button>
               )}
-              {liq.estado === "autorizado" && (
+              {liq.estado === "anulado" &&
+                liq.anulacionMetodo === "manual" &&
+                liq.anulacionManualComprobanteUrl && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        liq.anulacionManualComprobanteUrl as string,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                    className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                  >
+                    Ver comprobante
+                  </button>
+                )}
+              {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
                 <button
                   type="button"
                   disabled={!!isProc}
@@ -412,6 +502,26 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                   className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
                 >
                   {isProc === "anular" ? "…" : "Anular"}
+                </button>
+              )}
+              {liq.estado === "autorizado" && metodoAnulacion === "manual" && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() => setPendienteAnulacionId(liq.id)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                >
+                  {isProc === "marcar-pendiente-anulacion" ? "…" : "Marcar pendiente de anulación"}
+                </button>
+              )}
+              {liq.estado === "pendiente_anulacion" && (
+                <button
+                  type="button"
+                  disabled={!!isProc}
+                  onClick={() => setConfirmarAnulacionManualId(liq.id)}
+                  className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                >
+                  {isProc === "confirmar-anulacion-manual" ? "…" : "Confirmar anulación"}
                 </button>
               )}
               {(liq.estado === "borrador" ||
@@ -498,7 +608,8 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                     </button>
                   )}
                   {(liq.estado === "autorizado" ||
-                    liq.estado === "anulado") && (
+                    liq.estado === "anulado" ||
+                    liq.estado === "pendiente_anulacion") && (
                     <button
                       type="button"
                       disabled={!!isProc}
@@ -519,7 +630,24 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                       {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                     </button>
                   )}
-                  {liq.estado === "autorizado" && (
+                  {liq.estado === "anulado" &&
+                    liq.anulacionMetodo === "manual" &&
+                    liq.anulacionManualComprobanteUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            liq.anulacionManualComprobanteUrl as string,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                      >
+                        Ver comprobante
+                      </button>
+                    )}
+                  {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
                     <button
                       type="button"
                       disabled={!!isProc}
@@ -527,6 +655,26 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
                       className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
                     >
                       {isProc === "anular" ? "…" : "Anular"}
+                    </button>
+                  )}
+                  {liq.estado === "autorizado" && metodoAnulacion === "manual" && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() => setPendienteAnulacionId(liq.id)}
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                    >
+                      {isProc === "marcar-pendiente-anulacion" ? "…" : "Marcar pendiente de anulación"}
+                    </button>
+                  )}
+                  {liq.estado === "pendiente_anulacion" && (
+                    <button
+                      type="button"
+                      disabled={!!isProc}
+                      onClick={() => setConfirmarAnulacionManualId(liq.id)}
+                      className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-amber-600 hover:text-amber-700 disabled:opacity-50`}
+                    >
+                      {isProc === "confirmar-anulacion-manual" ? "…" : "Confirmar anulación"}
                     </button>
                   )}
                   {(liq.estado === "borrador" ||
@@ -575,6 +723,54 @@ function LiquidacionesTab({ tenantId }: { tenantId: string }) {
         onConfirm={(motivo) => {
           if (!anularId) return;
           void anular(anularId, motivo);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={pendienteAnulacionId != null}
+        onClose={() => {
+          if (
+            pendienteAnulacionId &&
+            rowProcessing[pendienteAnulacionId] === "marcar-pendiente-anulacion"
+          ) {
+            return;
+          }
+          setPendienteAnulacionId(null);
+        }}
+        onConfirm={() => {
+          if (!pendienteAnulacionId) return;
+          void marcarPendienteAnulacion(pendienteAnulacionId);
+        }}
+        title="Marcar pendiente de anulación"
+        message="¿Marcás esta liquidación como pendiente de anulación? No se emite nada a ARCA."
+        confirmText="Marcar pendiente"
+      />
+
+      <ConfirmarAnulacionManualModal
+        open={confirmarAnulacionManualId != null}
+        busy={
+          confirmarAnulacionManualId != null &&
+          rowProcessing[confirmarAnulacionManualId] === "confirmar-anulacion-manual"
+        }
+        error={
+          confirmarAnulacionManualId
+            ? (rowErrors[confirmarAnulacionManualId] ?? null)
+            : null
+        }
+        getToken={getToken}
+        tenantId={tenantId}
+        onCancel={() => {
+          if (
+            confirmarAnulacionManualId &&
+            rowProcessing[confirmarAnulacionManualId] === "confirmar-anulacion-manual"
+          ) {
+            return;
+          }
+          setConfirmarAnulacionManualId(null);
+        }}
+        onConfirm={(args) => {
+          if (!confirmarAnulacionManualId) return;
+          void confirmarAnulacionManual(confirmarAnulacionManualId, args);
         }}
       />
 
@@ -719,9 +915,12 @@ export function SuperadminArcaPage() {
   const tenants = useTenantsList();
   const [tenantId, setTenantId] = useState("");
   const [tab, setTab] = useState<Tab>("config");
-  const selectedTenantModules = tenants?.find(
-    (t) => t.clerkOrgId === tenantId,
-  )?.modules;
+  const selectedTenant = tenants?.find((t) => t.clerkOrgId === tenantId);
+  const selectedTenantModules = selectedTenant?.modules;
+  const metodoAnulacion: "nota_credito_debito" | "manual" =
+    selectedTenant?.liquidacionAnulacionMetodo === "manual"
+      ? "manual"
+      : "nota_credito_debito";
 
   function handleTenantChange(next: string) {
     setTenantId(next);
@@ -781,7 +980,11 @@ export function SuperadminArcaPage() {
               />
             )}
             {tab === "liquidaciones" && (
-              <LiquidacionesTab key={`liq-${tenantId}`} tenantId={tenantId} />
+              <LiquidacionesTab
+                key={`liq-${tenantId}`}
+                tenantId={tenantId}
+                metodoAnulacion={metodoAnulacion}
+              />
             )}
             {tab === "logs" && (
               <LogsTab key={`log-${tenantId}`} tenantId={tenantId} />

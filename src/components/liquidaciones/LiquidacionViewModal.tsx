@@ -37,6 +37,7 @@ const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   autorizado: "LIQUIDADO",
   error: "ERROR DE AFIP",
   anulado: "ANULADO",
+  pendiente_anulacion: "PENDIENTE DE ANULACIÓN",
 };
 
 const ESTADO_BADGE: Record<LiquidacionEstado, string> = {
@@ -45,6 +46,7 @@ const ESTADO_BADGE: Record<LiquidacionEstado, string> = {
   autorizado: "bg-emerald-100 text-emerald-800 border-emerald-400/80",
   error: "bg-red-100 text-red-800 border-red-300/80",
   anulado: "bg-gray-100 text-gray-500 border-gray-300/80",
+  pendiente_anulacion: "bg-amber-100 text-amber-800 border-amber-300/80",
 };
 
 const CBTE_TIPO: Record<number, string> = {
@@ -119,6 +121,7 @@ export function LiquidacionViewModal({
   ivaPct,
   canEdit = true,
   hasArca = false,
+  metodoAnulacion = "nota_credito_debito",
   getToken,
   detalleUrl,
   onClose,
@@ -126,14 +129,19 @@ export function LiquidacionViewModal({
   onEmitir,
   onEliminar,
   onAnular,
+  onMarcarPendienteAnulacion,
+  onConfirmarAnulacionManual,
   onVerComprobante,
   onVerAnulacion,
+  onVerComprobanteAnulacionManual,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
   canEdit?: boolean;
   /** Tenant con integración ARCA: habilita el botón de emitir/reintentar. */
   hasArca?: boolean;
+  /** Tenant.liquidacionAnulacionMetodo — decide qué acción de anulación mostrar. */
+  metodoAnulacion?: "nota_credito_debito" | "manual";
   /** Si se pasa, el modal refetch el detalle (incluye conceptosLineas). */
   getToken?: () => Promise<string | null>;
   detalleUrl?: string;
@@ -143,12 +151,18 @@ export function LiquidacionViewModal({
   onEmitir?: () => void;
   /** Baja de borrador (o error / esperando AFIP). El caller pide confirmación. */
   onEliminar?: () => void;
-  /** Anulación de liquidación autorizada (ARCA). El caller pide confirmación + motivo. */
+  /** Anulación de liquidación autorizada vía NC/ND (ARCA). Solo con metodoAnulacion = 'nota_credito_debito'. */
   onAnular?: () => void;
+  /** Anulación manual paso 1: marca pendiente_anulacion, sin ARCA. Solo con metodoAnulacion = 'manual'. */
+  onMarcarPendienteAnulacion?: () => void;
+  /** Anulación manual paso 2: confirma con comprobante pre-impreso adjunto. */
+  onConfirmarAnulacionManual?: () => void;
   /** Ver el comprobante: PDF del CVLP autorizado (ARCA) o adjunto manual (sin ARCA), según lo resuelva el caller. */
   onVerComprobante?: () => void;
-  /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'`. */
+  /** Ver el PDF de la Nota de Crédito/Débito de anulación. Solo tiene sentido si `estado === 'anulado'` y anulacionMetodo = 'nota_credito_debito'. */
   onVerAnulacion?: () => void;
+  /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
+  onVerComprobanteAnulacionManual?: () => void;
 }) {
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
@@ -208,6 +222,20 @@ export function LiquidacionViewModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- liq se usa como fallback
   }, [getToken, detalleUrl, liq.id]);
 
+  // Si el caller actualiza `liq` con datos frescos (ej. tras emitir/anular/marcar
+  // pendiente/confirmar anulación) sin cerrar el modal, reflejarlo de inmediato — el
+  // efecto de arriba solo dispara por cambio de `liq.id`, no por cambios de contenido.
+  useEffect(() => {
+    setDetail((prev) => ({
+      ...prev,
+      ...liq,
+      conceptosLineas: liq.conceptosLineas?.length
+        ? normalizeConceptosLineas(liq.conceptosLineas)
+        : prev.conceptosLineas,
+      viajes: liq.viajes?.length ? liq.viajes : prev.viajes,
+    }));
+  }, [liq]);
+
   const source = detail;
   const transportistaNombre =
     source.transportista?.nombre ?? source.transportistaId;
@@ -225,7 +253,19 @@ export function LiquidacionViewModal({
       source.estado === "error" ||
       source.estado === "pendiente_cae");
   const puedeAnular =
-    Boolean(onAnular) && hasArca && source.estado === "autorizado";
+    Boolean(onAnular) &&
+    hasArca &&
+    source.estado === "autorizado" &&
+    metodoAnulacion !== "manual";
+  const puedeMarcarPendienteAnulacion =
+    Boolean(onMarcarPendienteAnulacion) &&
+    hasArca &&
+    source.estado === "autorizado" &&
+    metodoAnulacion === "manual";
+  const puedeConfirmarAnulacionManual =
+    Boolean(onConfirmarAnulacionManual) &&
+    hasArca &&
+    source.estado === "pendiente_anulacion";
 
   return (
     <ViewModalShell
@@ -295,6 +335,34 @@ export function LiquidacionViewModal({
                 aria-hidden
               />
               Anular
+            </button>
+          )}
+          {puedeMarcarPendienteAnulacion && (
+            <button
+              type="button"
+              onClick={onMarcarPendienteAnulacion}
+              className="inline-flex min-h-11 items-center gap-1.5 border border-amber-300 px-3 text-xs uppercase tracking-wider text-amber-800 hover:bg-amber-50"
+            >
+              <Ban
+                className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              Marcar pendiente de anulación
+            </button>
+          )}
+          {puedeConfirmarAnulacionManual && (
+            <button
+              type="button"
+              onClick={onConfirmarAnulacionManual}
+              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+            >
+              <Ban
+                className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              Confirmar anulación
             </button>
           )}
           {canEdit && (
@@ -435,6 +503,23 @@ export function LiquidacionViewModal({
           <Campo label="Creada" value={fmtDate(source.createdAt)} />
         </div>
 
+        {source.estado === "pendiente_anulacion" && (
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Anulación
+            </p>
+            <div className="rounded border border-amber-300/80 bg-amber-50 px-4 py-3 space-y-1">
+              <p className="text-sm text-amber-900">
+                Marcada como pendiente de anulación
+                {source.anulacionPendienteDesde
+                  ? ` el ${fmtDateTime(source.anulacionPendienteDesde)}`
+                  : ""}
+                . Falta adjuntar el comprobante pre-impreso para confirmarla.
+              </p>
+            </div>
+          </div>
+        )}
+
         {source.estado === "anulado" && (
           <div>
             <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
@@ -449,15 +534,25 @@ export function LiquidacionViewModal({
                   value={source.anuladoPorNombre ?? source.anuladoPor}
                 />
               </div>
-              {onVerAnulacion && (
-                <button
-                  type="button"
-                  onClick={onVerAnulacion}
-                  className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                >
-                  Ver anulación
-                </button>
-              )}
+              {source.anulacionMetodo === "manual"
+                ? onVerComprobanteAnulacionManual && (
+                    <button
+                      type="button"
+                      onClick={onVerComprobanteAnulacionManual}
+                      className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Ver comprobante de anulación
+                    </button>
+                  )
+                : onVerAnulacion && (
+                    <button
+                      type="button"
+                      onClick={onVerAnulacion}
+                      className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+                    >
+                      Ver anulación
+                    </button>
+                  )}
             </div>
           </div>
         )}
