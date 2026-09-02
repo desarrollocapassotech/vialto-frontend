@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast";
 import { labelModulo } from "@/lib/platformLabels";
 import type { Tenant } from "@/types/api";
 
-/** Campo fijo del catálogo del backend (`TEMPLATE_CATALOGO`) para un módulo. */
+/** Campo importable del catálogo del backend (se arma desde el modelo Prisma + overlays). */
 type CatalogoColumn = {
   field: string;
   campoLabel: string;
@@ -497,7 +497,9 @@ export function SuperadminImportTemplatesPage() {
                     </label>
                     <span className="text-[11px] text-vialto-steel">
                       Completá el encabezado tal como aparece en el Excel del
-                      cliente. Dejalo vacío para no importar esa columna.
+                      cliente. Dejalo vacío para no importar esa columna. La
+                      lista sale del modelo de cada módulo: un campo nuevo
+                      aparece acá solo.
                     </span>
                   </div>
                   <div className="overflow-x-auto border border-black/15">
