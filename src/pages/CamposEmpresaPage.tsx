@@ -273,8 +273,8 @@ export function CamposEmpresaPage() {
       setCampos((prev) =>
         prev
           ? prev.map((c) =>
-              c.campo === campo ? { ...c, visible: nuevoVisible } : c,
-            )
+            c.campo === campo ? { ...c, visible: nuevoVisible } : c,
+          )
           : prev,
       );
     } catch (e) {
@@ -543,18 +543,18 @@ export function CamposEmpresaPage() {
                   </tr>
                 )}
                 {camposConfigurables?.map((c) => (
-                    <tr key={c.campo} className="border-t border-black/10">
-                      <td className="px-4 py-2.5">{c.label}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={c.visible}
-                          disabled={savingCampo === c.campo}
-                          onChange={() => toggleCampo(c.campo, c.visible)}
-                          label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  <tr key={c.campo} className="border-t border-black/10">
+                    <td className="px-4 py-2.5">{c.label}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <ToggleSwitch
+                        checked={c.visible}
+                        disabled={savingCampo === c.campo}
+                        onChange={() => toggleCampo(c.campo, c.visible)}
+                        label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
