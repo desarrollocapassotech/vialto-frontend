@@ -6,19 +6,21 @@ import {
   facturaLetraLabel,
   type FacturaLetra,
 } from "@/lib/arcaCbteTipo";
-import type { Viaje } from "@/types/api";
+import { type Cliente, type Viaje } from "@/types/api";
 
 interface Props {
   viaje: Viaje;
+  clienteAfacturar: Cliente | null;
   onClose: () => void;
   onConfirm: (letra: FacturaLetra) => void;
   /** Preparando el paso siguiente (ej. cargando viajes del cliente): bloquea el modal. */
   busy?: boolean;
 }
 
-export function TipoFacturaClienteModal({ viaje, onClose, onConfirm, busy = false }: Props) {
+export function TipoFacturaClienteModal({ viaje, clienteAfacturar, onClose, onConfirm, busy = false }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const condicionIva = viaje.cliente?.condicionIva ?? null;
+  const targetCliente = clienteAfacturar ?? viaje.cliente;
+  const condicionIva = targetCliente?.condicionIva ?? null;
   const sugerido = facturaLetraFromCondicionIva(condicionIva);
   const [letra, setLetra] = useState<FacturaLetra>(sugerido);
   const overrideManual = letra !== sugerido;
@@ -65,7 +67,7 @@ export function TipoFacturaClienteModal({ viaje, onClose, onConfirm, busy = fals
           <p className="text-sm text-vialto-charcoal">
             Cliente:{" "}
             <span className="font-medium">
-              {viaje.cliente?.nombre ?? viaje.clienteId}
+              {targetCliente?.nombre ?? viaje.clienteId}
             </span>
           </p>
 
