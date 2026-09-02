@@ -27,7 +27,7 @@ import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
 import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import type { FacturaLetra } from "@/lib/arcaCbteTipo";
-import { apiJson, ApiError } from "@/lib/api";
+import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -122,6 +122,8 @@ import {
   VIAJES_EXPORT_COLUMNS,
   generarViajesExcel,
 } from "@/lib/viajesExcelExport";
+import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
+import { LiquidacionViewModal } from "@/components/liquidaciones/LiquidacionViewModal";
 
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
@@ -301,6 +303,11 @@ export function ViajesTenantPage({
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
+
+  const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
+    null,
+  );
 
   const platform = Boolean(tenantId?.trim());
   const puedeImportar =
@@ -1304,6 +1311,7 @@ export function ViajesTenantPage({
     if (crearLiqViaje?.id === v.id) setCrearLiqViaje(null);
     if (selectorViaje?.id === v.id) setSelectorViaje(null);
     if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
+    if (viewingFactura?.id === v.facturaId) setViewingFactura(null);
     setViajeDeleteConfirm(null);
     setViajeDeleteImpacto(null);
   }
@@ -1644,6 +1652,75 @@ export function ViajesTenantPage({
     });
   }
 
+  async function abrirFacturaModalEnContexto(v: Viaje) {
+    if (!v.facturaId || !v.clienteId) return;
+
+    setFacturandoLoadingId(v.facturaId);
+
+    try {
+      const facturasCliente = await apiJson<Factura[]>(
+        facturasPorClienteUrl(v.clienteId),
+        () => getToken(),
+      );
+      const facturaEncontrada = facturasCliente.find(
+        (f) => f.id === v.facturaId,
+      );
+
+      if (facturaEncontrada) {
+        setViewingFactura(facturaEncontrada);
+      } else {
+        showToast("No se encontró el detalle de la factura", "error");
+      }
+    } catch (e) {
+      showToast("Error al cargar la factura", "error");
+    } finally {
+      setFacturandoLoadingId(null);
+    }
+  }
+
+  function abrirLiquidacionEnContexto(v: Viaje) {
+    const elegida = liquidacionElegidaDeViaje(v);
+    if (!elegida) return;
+
+    const transpId = v.transportistaId ?? (elegida as any).transportistaId;
+    const tData = transportistas.find((t) => t.id === transpId);
+    const tName =
+      tData?.nombre ?? (elegida as any).transportistaNombre ?? transpId;
+
+    let viajesLista = (elegida as any).viajes || [];
+
+    if (viajesLista.length === 0) {
+      viajesLista = [
+        {
+          viajeId: v.id,
+          viaje: v,
+          subtotal: v.precioTransportistaExterno ?? 0,
+        },
+      ];
+    } else {
+      viajesLista = viajesLista.map((item: any) => {
+        const viajeCompleto =
+          item.viajeId === v.id
+            ? v
+            : (rows ?? []).find((r) => r.id === item.viajeId);
+
+        return {
+          ...item,
+          viaje: viajeCompleto ?? item.viaje,
+        };
+      });
+    }
+    setViewingLiquidacion({
+      ...elegida,
+      transportista: {
+        id: transpId,
+        nombre: tName,
+        idFiscal: tData?.idFiscal ?? null,
+      },
+      viajes: viajesLista,
+    });
+  }
+
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
   const tableColSpanBase = 8;
   const tableColSpan = mostrarColumnaFacturarLote
@@ -1772,7 +1849,8 @@ export function ViajesTenantPage({
           aria-label="Filtrar listado por etapa"
         >
           <option value="">Todos</option>
-          {VIAJE_ETAPAS_TODAS.map((est) => (
+          <option value="cancelado">Cancelados</option>
+          {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map((est) => (
             <option key={est} value={est} title={tooltipEtapaViaje(est)}>
               {etapaViajeLabel[est] ?? est}
             </option>
@@ -2168,15 +2246,18 @@ export function ViajesTenantPage({
                   aria-label="Filtrar listado por etapa"
                 >
                   <option value="">Todos</option>
-                  {VIAJE_ETAPAS_TODAS.map((est) => (
-                    <option
-                      key={est}
-                      value={est}
-                      title={tooltipEtapaViaje(est)}
-                    >
-                      {etapaViajeLabel[est] ?? est}
-                    </option>
-                  ))}
+                  <option value="cancelado">Cancelados</option>
+                  {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
+                    (est) => (
+                      <option
+                        key={est}
+                        value={est}
+                        title={tooltipEtapaViaje(est)}
+                      >
+                        {etapaViajeLabel[est] ?? est}
+                      </option>
+                    ),
+                  )}
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
@@ -2488,33 +2569,12 @@ export function ViajesTenantPage({
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
-                      ? () =>
-                          navigate(
-                            platform
-                              ? "/facturacion"
-                              : `/facturacion?factura=${v.facturaId}`,
-                            platform
-                              ? {
-                                  state: {
-                                    ...facturacionNavExtras(),
-                                    viewFacturaId: v.facturaId,
-                                  },
-                                }
-                              : undefined,
-                          )
+                      ? () => abrirFacturaModalEnContexto(v)
                       : undefined
                   }
                   onVerLiquidacion={
                     liquidacionElegidaDeViaje(v)
-                      ? () => {
-                          const elegida = liquidacionElegidaDeViaje(v);
-                          if (elegida) {
-                            const params = new URLSearchParams();
-                            if (platform && tid) params.set("tenantId", tid);
-                            params.set("liquidacion", elegida.id);
-                            navigate(`/liquidaciones?${params.toString()}`);
-                          }
-                        }
+                      ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
@@ -2708,33 +2768,12 @@ export function ViajesTenantPage({
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
                     v.facturaId
-                      ? () =>
-                          navigate(
-                            platform
-                              ? "/facturacion"
-                              : `/facturacion?factura=${v.facturaId}`,
-                            platform
-                              ? {
-                                  state: {
-                                    ...facturacionNavExtras(),
-                                    viewFacturaId: v.facturaId,
-                                  },
-                                }
-                              : undefined,
-                          )
+                      ? () => abrirFacturaModalEnContexto(v)
                       : undefined
                   }
                   onVerLiquidacion={
                     liquidacionElegidaDeViaje(v)
-                      ? () => {
-                          const elegida = liquidacionElegidaDeViaje(v);
-                          if (elegida) {
-                            const params = new URLSearchParams();
-                            if (platform && tid) params.set("tenantId", tid);
-                            params.set("liquidacion", elegida.id);
-                            navigate(`/liquidaciones?${params.toString()}`);
-                          }
-                        }
+                      ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
@@ -3118,6 +3157,154 @@ export function ViajesTenantPage({
           rowCount={meta?.total ?? rows?.length ?? 0}
           onExport={handleExportarExcel}
           onClose={() => !exportandoExcel && setExportModalOpen(false)}
+        />
+      )}
+
+      {viewingFactura && (
+        <FacturaViewModal
+          factura={viewingFactura}
+          cliente={
+            clientes.find((c) => c.id === viewingFactura.clienteId) ??
+            (viewingFactura as any).cliente ??
+            ({
+              condicionIva:
+                (viewingFactura as any).letraComprobante === "a"
+                  ? "responsable_inscripto"
+                  : "consumidor_final",
+            } as any)
+          }
+          clienteNombre={
+            clientes.find((c) => c.id === viewingFactura.clienteId)?.nombre ??
+            (viewingFactura as any).clienteNombre ??
+            (viewingFactura as any).nombreCliente ??
+            "—"
+          }
+          hasArca={true}
+          onClose={() => setViewingFactura(null)}
+          onVerComprobante={
+            viewingFactura.comprobanteUrl
+              ? () =>
+                  window.open(
+                    viewingFactura.comprobanteUrl!,
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
+              : undefined
+          }
+          onEditar={() => {
+            setViewingFactura(null);
+            navigate("/facturacion", {
+              state: {
+                ...facturacionNavExtras(),
+                expandFacturaId: viewingFactura.id,
+              },
+            });
+          }}
+          onMarcarCobrada={() => {
+            setViewingFactura(null);
+            navigate("/facturacion", {
+              state: {
+                ...facturacionNavExtras(),
+                viewFacturaId: viewingFactura.id,
+              },
+            });
+          }}
+          onEmitirArca={() => {
+            setViewingFactura(null);
+            navigate("/facturacion", {
+              state: {
+                ...facturacionNavExtras(),
+                viewFacturaId: viewingFactura.id,
+              },
+            });
+          }}
+          onAnular={() => {
+            setViewingFactura(null);
+            navigate("/facturacion", {
+              state: {
+                ...facturacionNavExtras(),
+                viewFacturaId: viewingFactura.id,
+              },
+            });
+          }}
+          onVerNotaCredito={
+            viewingFactura.arcaEstado === "anulado"
+              ? () => {
+                  if (viewingFactura.notaCreditoUrl) {
+                    window.open(
+                      viewingFactura.notaCreditoUrl,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  } else {
+                    setViewingFactura(null);
+                    navigate("/facturacion", {
+                      state: {
+                        ...facturacionNavExtras(),
+                        viewFacturaId: viewingFactura.id,
+                      },
+                    });
+                  }
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {viewingLiquidacion && (
+        <LiquidacionViewModal
+          liq={viewingLiquidacion}
+          hasArca={
+            hasLiquidoProductoArca ||
+            viewingLiquidacion.cbteNro != null ||
+            viewingLiquidacion.cae != null
+          }
+          canEdit={false}
+          onEditar={() => {
+            setViewingLiquidacion(null);
+            const params = new URLSearchParams();
+            if (platform && tid) params.set("tenantId", tid);
+            params.set("liquidacion", viewingLiquidacion.id);
+            navigate(`/liquidaciones?${params.toString()}`);
+          }}
+          onClose={() => setViewingLiquidacion(null)}
+          onVerComprobante={
+            viewingLiquidacion.cbteNro != null || viewingLiquidacion.cae != null
+              ? () => {
+                  const url =
+                    platform && tid
+                      ? `/api/platform/integracion-arca/liquidaciones/${encodeURIComponent(viewingLiquidacion.id)}/pdf?tenantId=${encodeURIComponent(tid)}`
+                      : `/api/integracion-arca/liquidaciones/${encodeURIComponent(viewingLiquidacion.id)}/pdf`;
+
+                  const ventana = window.open("", "_blank");
+
+                  apiFetch(url, () => getToken())
+                    .then((res) => {
+                      if (!res.ok) throw new Error("Error al generar PDF");
+                      return res.blob();
+                    })
+                    .then((blob) => {
+                      const blobUrl = URL.createObjectURL(blob);
+                      if (ventana) ventana.location.href = blobUrl;
+                      else window.open(blobUrl, "_blank");
+                    })
+                    .catch(() => {
+                      ventana?.close();
+                      showToast(
+                        "No se pudo cargar el PDF del comprobante",
+                        "error",
+                      );
+                    });
+                }
+              : viewingLiquidacion.comprobanteUrl?.trim()
+                ? () =>
+                    window.open(
+                      viewingLiquidacion.comprobanteUrl,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                : undefined
+          }
         />
       )}
     </div>
