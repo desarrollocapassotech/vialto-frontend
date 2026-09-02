@@ -578,10 +578,10 @@ export function LiquidacionesTenantPage() {
         (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
       );
       setConfirmarAnulacionManualTarget(null);
+      // Acción terminal (mismo patrón que confirmEliminar): cerrar el detalle en vez de
+      // dejarlo abierto — el usuario ya confirmó, la grilla y el toast confirman el cambio.
       setDetail((prev) =>
-        prev?.liq.id === updated.id
-          ? { mode: "view", liq: { ...prev.liq, ...updated } }
-          : prev,
+        prev?.mode === "view" && prev.liq.id === updated.id ? null : prev,
       );
       showToast("Liquidación anulada.");
     } catch (err) {

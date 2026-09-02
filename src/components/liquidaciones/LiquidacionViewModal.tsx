@@ -222,6 +222,20 @@ export function LiquidacionViewModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- liq se usa como fallback
   }, [getToken, detalleUrl, liq.id]);
 
+  // Si el caller actualiza `liq` con datos frescos (ej. tras emitir/anular/marcar
+  // pendiente/confirmar anulación) sin cerrar el modal, reflejarlo de inmediato — el
+  // efecto de arriba solo dispara por cambio de `liq.id`, no por cambios de contenido.
+  useEffect(() => {
+    setDetail((prev) => ({
+      ...prev,
+      ...liq,
+      conceptosLineas: liq.conceptosLineas?.length
+        ? normalizeConceptosLineas(liq.conceptosLineas)
+        : prev.conceptosLineas,
+      viajes: liq.viajes?.length ? liq.viajes : prev.viajes,
+    }));
+  }, [liq]);
+
   const source = detail;
   const transportistaNombre =
     source.transportista?.nombre ?? source.transportistaId;
