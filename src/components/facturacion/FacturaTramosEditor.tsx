@@ -4,8 +4,9 @@ import { CrudFieldLabel } from "@/components/crud/CrudFields";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
 import type { Viaje } from "@/types/api";
 import {
-  computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
+  ivaMontoDeTramos,
+  roundMoney2,
 } from "@/lib/facturaTotales";
 
 export type FacturaTramoDraft = {
@@ -103,7 +104,10 @@ export function toFacturaTramosPayload(tramos: FacturaTramoDraft[]) {
   }));
 }
 
-/** Neto / IVA / total: tramos con su IVA propio + viajes sin ningún tramo con IVA de cabecera. */
+/**
+ * Neto = suma completa de los viajes. IVA = tramos cargados + el resto del
+ * neto con el IVA de cabecera (misma cuenta que se persiste al guardar).
+ */
 export function computeTotalesFacturaPorTramo(
   viajeIds: string[],
   viajes: Viaje[],
@@ -111,23 +115,14 @@ export function computeTotalesFacturaPorTramo(
   ivaPctViajesSinTramo: number,
 ): { neto: number; iva: number; total: number } {
   const completos = tramos.filter(isFacturaTramoCompleto);
-  const viajeIdsConTramo = new Set(completos.map((t) => t.viajeId));
-
-  const items: Array<{ importe: number; ivaPct: number }> = completos.map((t) => ({
-    importe: t.monto,
-    ivaPct: t.ivaPct,
-  }));
-
-  for (const id of viajeIds) {
-    if (viajeIdsConTramo.has(id)) continue;
-    const v = viajes.find((x) => x.id === id);
-    items.push({
-      importe: v ? importeNetoViajeParaFactura(v) : 0,
-      ivaPct: ivaPctViajesSinTramo,
-    });
-  }
-
-  return computeFacturaTotalesFromBases(items);
+  const neto = roundMoney2(
+    viajeIds.reduce((sum, id) => {
+      const v = viajes.find((x) => x.id === id);
+      return sum + (v ? importeNetoViajeParaFactura(v) : 0);
+    }, 0),
+  );
+  const iva = ivaMontoDeTramos(neto, completos, ivaPctViajesSinTramo);
+  return { neto, iva, total: roundMoney2(neto + iva) };
 }
 
 interface Props {

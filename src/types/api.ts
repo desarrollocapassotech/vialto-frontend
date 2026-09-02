@@ -452,10 +452,16 @@ export interface Factura {
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
+  /** Neto: suma completa de los viajes, sin IVA. */
   importe: number;
   /**
+   * IVA total persistido al guardar (solo facturas por tramo sin ARCA).
+   * Null = no aplica o todavía no backfilleado.
+   */
+  ivaMonto?: number | null;
+  /**
    * Monto contra el que se mide el cobro. En facturas por tramo de tenants
-   * sin ARCA incluye el IVA de cada tramo; en el resto coincide con `importe`.
+   * sin ARCA es neto + `ivaMonto`; en el resto coincide con `importe`.
    */
   importeACobrar?: number;
   /** `max(0, importeACobrar − pagos)`. */
@@ -471,7 +477,10 @@ export interface Factura {
   vencida: boolean;
   diferencia: number | null;
   ivaPct: number | null;
-  /** Si true, el importe neto se arma con tramos + viajes sin dividir. */
+  /**
+   * Si true, el IVA se arma por tramo; el neto (`importe`) sigue siendo la
+   * suma completa de los viajes (la parte no cubierta usa `ivaPct`).
+   */
   facturarPorTramo?: boolean;
   tramos?: FacturaTramo[];
   comprobanteUrl: string | null;
