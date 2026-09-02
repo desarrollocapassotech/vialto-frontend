@@ -755,11 +755,6 @@ export function LiquidacionesTenantPage() {
       onVerComprobante: () => {
         if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
       },
-      onVerComprobanteAnulacionManual: () => {
-        if (liq.anulacionManualComprobanteUrl) {
-          setPreviewComprobanteUrl(liq.anulacionManualComprobanteUrl);
-        }
-      },
     };
   }
 
@@ -1340,8 +1335,10 @@ export function LiquidacionesTenantPage() {
             detail.liq.anulacionMetodo === "manual" &&
             detail.liq.anulacionManualComprobanteUrl
               ? () =>
-                  setPreviewComprobanteUrl(
-                    detail.liq.anulacionManualComprobanteUrl ?? null,
+                  window.open(
+                    detail.liq.anulacionManualComprobanteUrl as string,
+                    "_blank",
+                    "noopener,noreferrer",
                   )
               : undefined
           }
