@@ -477,6 +477,23 @@ function LiquidacionesTab({
                   {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                 </button>
               )}
+              {liq.estado === "anulado" &&
+                liq.anulacionMetodo === "manual" &&
+                liq.anulacionManualComprobanteUrl && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        liq.anulacionManualComprobanteUrl as string,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                    className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                  >
+                    Ver comprobante
+                  </button>
+                )}
               {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
                 <button
                   type="button"
@@ -613,6 +630,23 @@ function LiquidacionesTab({
                       {isProc === "pdf-nc" ? "…" : "PDF anulación"}
                     </button>
                   )}
+                  {liq.estado === "anulado" &&
+                    liq.anulacionMetodo === "manual" &&
+                    liq.anulacionManualComprobanteUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            liq.anulacionManualComprobanteUrl as string,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        className={`${listadoTablaAccionClass} font-[family-name:var(--font-ui)] text-vialto-steel hover:text-vialto-charcoal`}
+                      >
+                        Ver comprobante
+                      </button>
+                    )}
                   {liq.estado === "autorizado" && metodoAnulacion !== "manual" && (
                     <button
                       type="button"
