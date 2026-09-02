@@ -575,6 +575,20 @@ export interface ImportPreviewEntidad {
   esNuevo: boolean;
 }
 
+export interface ImportPreviewFilaCampo {
+  campo: string;
+  label: string;
+  valor: string;
+}
+
+/** Detalle fila por fila de un módulo "simple" (Clientes/Transportistas/Choferes/Vehículos): todas las columnas configuradas con su valor tal como viene del Excel, no solo el nombre. */
+export interface ImportPreviewFilaEntidad {
+  fila: number;
+  /** true = alta nueva, false = actualiza un registro ya existente. */
+  esNuevo: boolean;
+  campos: ImportPreviewFilaCampo[];
+}
+
 export interface ImportEntidadFaltante {
   valor: string;
   /** Sugerencia por una regla simple (posición en el par tractor/semirremolque), no IA. */
@@ -614,6 +628,8 @@ export interface ImportPreviewResult {
   facturas?: ImportPreviewFactura[];
   clientes?: ImportPreviewEntidad[];
   transportistas?: ImportPreviewEntidad[];
+  /** Solo módulos "simples" (Clientes, Transportistas, Choferes, Vehículos): detalle fila por fila con todas las columnas del Excel + si es alta nueva o actualiza uno existente. */
+  filasDetalle?: ImportPreviewFilaEntidad[];
 }
 
 export interface ImportLogDetalle {

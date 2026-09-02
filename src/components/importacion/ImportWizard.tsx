@@ -24,6 +24,7 @@ import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
   ImportPreviewEntidad,
+  ImportPreviewFilaEntidad,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -1022,6 +1023,19 @@ function EtapaModulo({
             />
           </div>
 
+          {p.filasDetalle && p.filasDetalle.length > 0 && (
+            <div>
+              <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
+                {labelModulo(wizard.moduloActual ?? "")} en este archivo
+              </p>
+              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
+                {p.filasDetalle.map((f) => (
+                  <FilaDetalleCard key={f.fila} fila={f} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {p.headersNoMapeados.length > 0 && (
             <details className="group border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
               <summary className="cursor-pointer list-none marker:hidden">
@@ -1722,6 +1736,37 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
+  return (
+    <div className="rounded border border-black/10 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
+          Fila {fila.fila}
+        </span>
+        {fila.esNuevo ? (
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+            Nuevo
+          </span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+            Actualiza
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+        {fila.campos.map((c) => (
+          <div key={c.campo}>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
+              {c.label}
+            </p>
+            <p className="text-sm text-vialto-charcoal">{c.valor}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
