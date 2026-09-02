@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
@@ -95,6 +96,9 @@ export function CamposEmpresaPage() {
   const [loading, setLoading] = useState(false);
   const [savingCampo, setSavingCampo] = useState<string | null>(null);
   const [aplicarATodos, setAplicarATodos] = useState(false);
+  // Pestaña "Templates de importación" — vive en la misma barra de tabs que
+  // los módulos (Viajes/Stock/...), no como sección aparte apilada.
+  const [mostrarTemplates, setMostrarTemplates] = useState(false);
 
   // --- NUEVOS ESTADOS PARA AUDITORÍA ---
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -117,6 +121,9 @@ export function CamposEmpresaPage() {
   const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
     null,
   );
+  // Tenant completo (nombre + módulos contratados) — lo necesita la sección
+  // de templates de importación de abajo (`ImportTemplatesConfig`).
+  const [empresaTenant, setEmpresaTenant] = useState<Tenant | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
@@ -134,6 +141,7 @@ export function CamposEmpresaPage() {
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
+          setEmpresaTenant(tenant);
         }
       } catch (e) {
         if (!cancelled) setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
@@ -420,7 +428,7 @@ export function CamposEmpresaPage() {
         <>
           <div className="mt-6 border-b border-black/15">
             <nav
-              className="-mb-px flex gap-1"
+              className="-mb-px flex flex-wrap gap-1"
               aria-label="Módulos configurables"
             >
               {modulosDisponibles.map((m) => (
@@ -428,6 +436,7 @@ export function CamposEmpresaPage() {
                   key={m}
                   type="button"
                   onClick={() => {
+                    setMostrarTemplates(false);
                     setModulo(m);
                     setFormulario(
                       Object.keys(catalogo[m].formularios)[0] ?? null,
@@ -435,7 +444,7 @@ export function CamposEmpresaPage() {
                   }}
                   className={[
                     "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    modulo === m
+                    !mostrarTemplates && modulo === m
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
                   ].join(" ")}
@@ -443,9 +452,39 @@ export function CamposEmpresaPage() {
                   {catalogo[m].label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setMostrarTemplates(true)}
+                className={[
+                  "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                  mostrarTemplates
+                    ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
+                    : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                ].join(" ")}
+              >
+                Templates de importación
+              </button>
             </nav>
           </div>
 
+          {mostrarTemplates && empresaTenant && (
+            <div className="border border-t-0 border-black/15 bg-white p-6">
+              <p className="mb-4 text-sm text-vialto-steel">
+                Mapeo de columnas del Excel a los campos del sistema, por
+                módulo — lo mismo que se configura desde "Configurar
+                templates" al importar datos de esta empresa.
+              </p>
+              <ImportTemplatesConfig
+                tenantId={filtroEmpresa}
+                tenantNombre={empresaTenant.name}
+                tenantModules={empresaTenant.modules}
+                embedded
+              />
+            </div>
+          )}
+
+          {!mostrarTemplates && (
+          <>
           <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
             {modulo !== "viajes" && (
               <label className="flex flex-col gap-1">
@@ -558,6 +597,8 @@ export function CamposEmpresaPage() {
               </tbody>
             </table>
           </div>
+          </>
+          )}
         </>
       )}
 
