@@ -118,6 +118,8 @@ export function CamposEmpresaPage() {
   const [loadingEmpresaConfig, setLoadingEmpresaConfig] = useState(false);
   const [savingLabel, setSavingLabel] = useState(false);
   const [savingImportToggle, setSavingImportToggle] = useState(false);
+  const [empresaExportacionPautMicCrt, setEmpresaExportacionPautMicCrt] = useState(false);
+  const [savingExportacionPautMicCrt, setSavingExportacionPautMicCrt] = useState(false);
   const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
     null,
   );
@@ -141,6 +143,7 @@ export function CamposEmpresaPage() {
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
+          setEmpresaExportacionPautMicCrt(tenant.habilitarExportacionPautMicCrt ?? false);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -189,6 +192,24 @@ export function CamposEmpresaPage() {
       setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
     } finally {
       setSavingImportToggle(false);
+    }
+  }
+
+  async function toggleExportacionPautMicCrt() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaExportacionPautMicCrt;
+    setSavingExportacionPautMicCrt(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ habilitarExportacionPautMicCrt: nuevoValor }),
+      });
+      setEmpresaExportacionPautMicCrt(nuevoValor);
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingExportacionPautMicCrt(false);
     }
   }
 
@@ -597,6 +618,47 @@ export function CamposEmpresaPage() {
               </tbody>
             </table>
           </div>
+
+          {modulo === "viajes" && (
+            <div className="mt-8">
+              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+                Acciones del módulo
+              </h2>
+              <div className="mt-2 overflow-hidden border border-black/15">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-vialto-mist text-left">
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
+                        Acción
+                      </th>
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
+                        Habilitada
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Exportación de Reporte PAUT / MIC CRT
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <ToggleSwitch
+                          checked={empresaExportacionPautMicCrt}
+                          disabled={savingExportacionPautMicCrt}
+                          onChange={() => void toggleExportacionPautMicCrt()}
+                          label={
+                            empresaExportacionPautMicCrt
+                              ? "Deshabilitar exportación"
+                              : "Habilitar exportación"
+                          }
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           </>
           )}
         </>
