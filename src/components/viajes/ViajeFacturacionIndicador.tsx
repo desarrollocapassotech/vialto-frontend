@@ -70,8 +70,14 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: 
       displayLabel = facturacionEstadoLabel.facturado_parcial;
       displayClass = facturacionEstadoBadgeClass.facturado_parcial;
     } else if (todosFacturados) {
-      displayLabel = facturacionEstadoLabel.facturado;
-      displayClass = facturacionEstadoBadgeClass.facturado;
+      const todosCobrados = estados.every(e => e === 'cobrado');
+      if (todosCobrados) {
+        displayLabel = facturacionEstadoLabel.cobrado;
+        displayClass = facturacionEstadoBadgeClass.cobrado;
+      } else {
+        displayLabel = facturacionEstadoLabel.facturado;
+        displayClass = facturacionEstadoBadgeClass.facturado;
+      }
     } else {
       displayLabel = facturacionEstadoLabel.sin_facturar;
       displayClass = facturacionEstadoBadgeClass.sin_facturar;
@@ -110,17 +116,6 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: 
         >
           {displayLabel}
         </button>
-        {estado === 'cobrado' && (
-          <button
-            type="button"
-            onClick={() => void handleClick()}
-            disabled={cargando}
-            title={`Facturación: ${tooltipFacturacionEstado(viaje)}`}
-            className={`${badgeClass} ${facturacionEstadoBadgeClass.cobrado}`}
-          >
-            {facturacionEstadoLabel.cobrado}
-          </button>
-        )}
       </span>
       {open && (
         <ViajeFacturacionDetalleModal

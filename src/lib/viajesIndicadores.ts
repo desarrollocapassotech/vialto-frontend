@@ -152,15 +152,10 @@ export function viajePermiteAgregarGasto(
   return true;
 }
 
-/**
- * "Cobrado" se muestra como badge aditivo (nunca reemplaza al de ciclo de vida) — esta
- * función devuelve el estado de ciclo de vida a mostrar como badge principal, que en el
- * caso de "cobrado" siempre es "facturado" (es el único estado desde el que se llega a cobrado).
- */
 export function facturacionLifecycleEstado(
   estado: FacturacionEstado,
-): Exclude<FacturacionEstado, 'cobrado'> {
-  return estado === 'cobrado' ? 'facturado' : estado;
+): FacturacionEstado {
+  return estado;
 }
 
 export function tooltipFacturacionEstado(viaje: Pick<Viaje, 'facturacionEstado' | 'factura'>): string {
