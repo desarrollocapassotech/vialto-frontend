@@ -242,7 +242,7 @@ export function LiquidacionEditModal({
     void (async () => {
       try {
         const res = await apiJson<{ items: ViajeItem[] }>(
-          `/api/viajes/paginated?transportistaId=${encodeURIComponent(liq.transportistaId)}&pageSize=200&page=1`,
+          `/api/viajes/paginated?transportistaId=${encodeURIComponent(liq.transportistaId)}&pageSize=100&page=1`,
           () => getToken(),
         );
         if (!cancelled) setViajesTransportista(res.items ?? []);
