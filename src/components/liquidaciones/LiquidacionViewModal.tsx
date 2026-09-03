@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Ban, RotateCw, Trash2 } from "lucide-react";
+import { Ban, Receipt, RotateCw, Trash2 } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -327,11 +327,17 @@ export function LiquidacionViewModal({
                 <button
                   type="button"
                   onClick={onEmitir}
-                  className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+                  className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
                 >
-                  {source.estado === "error" && (
+                  {source.estado === "error" ? (
                     <RotateCw
-                      className="h-3.5 w-3.5 shrink-0"
+                      className="h-4 w-4 shrink-0"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                  ) : (
+                    <Receipt
+                      className="h-4 w-4 shrink-0"
                       strokeWidth={1.75}
                       aria-hidden
                     />
@@ -343,10 +349,10 @@ export function LiquidacionViewModal({
               <button
                 type="button"
                 onClick={onEliminar}
-                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-red-300 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
               >
                 <Trash2
-                  className="h-3.5 w-3.5 shrink-0"
+                  className="h-4 w-4 shrink-0"
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -357,10 +363,10 @@ export function LiquidacionViewModal({
               <button
                 type="button"
                 onClick={onAnular}
-                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-red-300 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
               >
                 <Ban
-                  className="h-3.5 w-3.5 shrink-0"
+                  className="h-4 w-4 shrink-0"
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -371,10 +377,10 @@ export function LiquidacionViewModal({
               <button
                 type="button"
                 onClick={onMarcarPendienteAnulacion}
-                className="inline-flex min-h-11 items-center gap-1.5 border border-amber-300 px-3 text-xs uppercase tracking-wider text-amber-800 hover:bg-amber-50"
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-amber-300 text-xs uppercase tracking-wider text-amber-800 hover:bg-amber-50"
               >
                 <Ban
-                  className="h-3.5 w-3.5 shrink-0"
+                  className="h-4 w-4 shrink-0"
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -385,10 +391,10 @@ export function LiquidacionViewModal({
               <button
                 type="button"
                 onClick={onConfirmarAnulacionManual}
-                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-red-300 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
               >
                 <Ban
-                  className="h-3.5 w-3.5 shrink-0"
+                  className="h-4 w-4 shrink-0"
                   strokeWidth={1.75}
                   aria-hidden
                 />
