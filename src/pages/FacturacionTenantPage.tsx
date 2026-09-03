@@ -972,11 +972,29 @@ export function FacturacionTenantPage({
       if (platform) {
         itemsExport = facturasFiltradas ?? [];
       } else {
-        const data = await apiJson<FacturasPaginatedResponse>(
-          `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(1, 5000)}`,
+        const MAX_PAGE_SIZE = 500;
+
+        const firstPageData = await apiJson<FacturasPaginatedResponse>(
+          `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(1, MAX_PAGE_SIZE)}`,
           () => getToken(),
         );
-        itemsExport = data.items;
+
+        itemsExport = [...firstPageData.items];
+        const totalPages = firstPageData.meta.totalPages;
+
+        if (totalPages > 1) {
+          const promises = [];
+          for (let p = 2; p <= totalPages; p++) {
+            promises.push(
+              apiJson<FacturasPaginatedResponse>(
+                `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(p, MAX_PAGE_SIZE)}`,
+                () => getToken(),
+              ).then((res) => res.items),
+            );
+          }
+          const remainingPages = await Promise.all(promises);
+          itemsExport = itemsExport.concat(...remainingPages);
+        }
       }
 
       if (itemsExport.length === 0) {
@@ -993,7 +1011,6 @@ export function FacturacionTenantPage({
         clientes,
         viajes,
         "Facturas_Exportadas",
-        hasArca,
       );
 
       showToast("Excel exportado exitosamente", "success");
