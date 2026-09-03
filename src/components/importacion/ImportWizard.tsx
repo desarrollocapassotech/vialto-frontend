@@ -1,7 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Upload } from "lucide-react";
+import { Check, Download, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -20,11 +20,13 @@ import {
   type ModuloWizard,
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
+import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelExport";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
   ImportPreviewEntidad,
   ImportPreviewFilaEntidad,
+  ImportColumnasEsperadasModulo,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -111,6 +113,31 @@ export function ImportWizard({
   // tenant-tiene-datos — después de una corrida puede haber cambiado (ej. se
   // acaban de crear los clientes que antes faltaban).
   const [refetchTieneDatos, setRefetchTieneDatos] = useState(0);
+  // Puramente informativo (qué columnas espera cada módulo) — no bloquea el
+  // selector si todavía no llegó o si falla.
+  const [columnasEsperadas, setColumnasEsperadas] = useState<
+    ImportColumnasEsperadasModulo[] | null
+  >(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    setColumnasEsperadas(null);
+    (async () => {
+      try {
+        const data = await apiJson<ImportColumnasEsperadasModulo[]>(
+          `/api/importaciones/columnas-esperadas?tenantId=${encodeURIComponent(tenantId)}`,
+          getToken,
+        );
+        if (!cancelado) setColumnasEsperadas(data);
+      } catch {
+        // Si falla, el selector se muestra igual sin la info de columnas.
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   useEffect(() => {
     let cancelado = false;
@@ -203,6 +230,7 @@ export function ImportWizard({
         tieneDatos={tieneDatos}
         puedeLiquidaciones={puedeLiquidaciones}
         puedeFacturas={puedeFacturas}
+        columnasEsperadas={columnasEsperadas}
         onElegir={(modulos, postViajes) => {
           setModulosElegidos(modulos);
           setPostViajesElegido(postViajes);
@@ -317,6 +345,25 @@ export function ImportWizard({
               }}
               className="hidden"
             />
+            {wizard.secuencia.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  disabled={!columnasEsperadas}
+                  onClick={() =>
+                    descargarPlantillaImportacion(
+                      (columnasEsperadas ?? []).filter((m) =>
+                        wizard.secuencia.includes(m.modulo as ModuloWizard),
+                      ),
+                    )
+                  }
+                  className="inline-flex items-center gap-2 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Descargar planilla
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -620,11 +667,13 @@ function SelectorModulos({
   tieneDatos,
   puedeLiquidaciones,
   puedeFacturas,
+  columnasEsperadas,
   onElegir,
 }: {
   tieneDatos: TenantTieneDatos;
   puedeLiquidaciones: boolean;
   puedeFacturas: boolean;
+  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
   onElegir: (
     modulos: ModuloWizard[],
     postViajes: { liquidaciones: boolean; facturas: boolean },
@@ -660,90 +709,208 @@ function SelectorModulos({
   const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-12 text-center">
-      <div className="max-w-xl">
-        <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-wide text-vialto-charcoal">
-          ¿Qué querés importar?
-        </h2>
-      </div>
+    <div className="flex flex-col ">
 
-      <div className="flex w-full max-w-md flex-col divide-y divide-black/10 border border-black/10 bg-white text-left">
-        {MODULOS_SELECTOR.map(({ key, tieneDatosKey }) => (
-          <label
-            key={key}
-            className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
-          >
-            <span className="flex flex-col">
-              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                {labelModulo(key)}
-              </span>
-              {tieneDatosKey && tieneDatos[tieneDatosKey] && (
-                <span className="text-xs text-vialto-steel">
-                  Ya tenés datos cargados
+      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left lg:grid-cols-2 lg:items-stretch">
+        <div className="flex h-full flex-col divide-y divide-black/10 border border-black/10 bg-white">
+          {MODULOS_SELECTOR.map(({ key, tieneDatosKey }) => (
+            <label
+              key={key}
+              className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
+            >
+              <span className="flex flex-col">
+                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                  {labelModulo(key)}
                 </span>
-              )}
-            </span>
-            <input
-              type="checkbox"
-              checked={seleccionados.has(key)}
-              onChange={() => toggle(key)}
-              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
-            />
-          </label>
-        ))}
-        {puedeLiquidaciones && (
-          <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
-            <span className="flex flex-col">
-              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                Liquidaciones a transportistas
+                {tieneDatosKey && tieneDatos[tieneDatosKey] && (
+                  <span className="text-xs text-vialto-steel">
+                    Ya tenés datos cargados
+                  </span>
+                )}
               </span>
-              <span className="text-xs text-vialto-steel">
-                Genera un borrador por transportista al terminar viajes.
+              <input
+                type="checkbox"
+                checked={seleccionados.has(key)}
+                onChange={() => toggle(key)}
+                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+              />
+            </label>
+          ))}
+          {puedeLiquidaciones && (
+            <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+              <span className="flex flex-col">
+                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                  Liquidaciones a transportistas
+                </span>
+                <span className="text-xs text-vialto-steel">
+                  Genera un borrador por transportista al terminar viajes.
+                </span>
               </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={liquidacionesSel}
-              onChange={(e) => setLiquidacionesSel(e.target.checked)}
-              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
-            />
-          </label>
-        )}
-        {puedeFacturas && (
-          <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
-            <span className="flex flex-col">
-              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                Facturas a clientes
+              <input
+                type="checkbox"
+                checked={liquidacionesSel}
+                onChange={(e) => setLiquidacionesSel(e.target.checked)}
+                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+              />
+            </label>
+          )}
+          {puedeFacturas && (
+            <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+              <span className="flex flex-col">
+                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
+                  Facturas a clientes
+                </span>
+                <span className="text-xs text-vialto-steel">
+                  Genera un borrador por cliente al terminar viajes.
+                </span>
               </span>
-              <span className="text-xs text-vialto-steel">
-                Genera un borrador por cliente al terminar viajes.
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={facturasSel}
-              onChange={(e) => setFacturasSel(e.target.checked)}
-              className="h-5 w-5 shrink-0 accent-vialto-charcoal"
-            />
-          </label>
-        )}
+              <input
+                type="checkbox"
+                checked={facturasSel}
+                onChange={(e) => setFacturasSel(e.target.checked)}
+                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+              />
+            </label>
+          )}
+        </div>
+
+        <div className="flex h-full min-h-[24rem] flex-col border border-black/10 bg-white lg:max-h-[32rem]">
+          <div className="shrink-0 border-b border-black/10 px-5 py-3">
+            <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
+              Columnas esperadas del Excel
+            </p>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+            {ordenados.length === 0 ? (
+              <p className="text-xs text-vialto-steel">
+                Elegí al menos un módulo para ver qué columnas espera.
+              </p>
+            ) : (
+              <ColumnasEsperadasLista
+                modulos={ordenados}
+                columnasEsperadas={columnasEsperadas}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
-      <button
-        type="button"
-        disabled={ordenados.length === 0}
-        onClick={() =>
-          onElegir(ordenados, {
-            liquidaciones: liquidacionesSel,
-            facturas: facturasSel,
-          })
-        }
-        className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
-      >
-        Continuar →
-      </button>
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-end gap-3">
+        <button
+          type="button"
+          disabled={ordenados.length === 0}
+          onClick={() =>
+            onElegir(ordenados, {
+              liquidaciones: liquidacionesSel,
+              facturas: facturasSel,
+            })
+          }
+          className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+        >
+          Continuar →
+        </button>
+      </div>
     </div>
   );
+}
+
+/** Lista pura (sin wrapper ni botón) de las columnas esperadas — una pestaña por módulo tildado, reusada en el selector y en la pantalla de carga. */
+function ColumnasEsperadasLista({
+  modulos,
+  columnasEsperadas,
+}: {
+  modulos: ModuloWizard[];
+  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
+}) {
+  const [tabElegido, setTabElegido] = useState<ModuloWizard | null>(null);
+
+  if (modulos.length === 0) return null;
+  const tab = tabElegido && modulos.includes(tabElegido) ? tabElegido : modulos[0];
+  const info = columnasEsperadas?.find((m) => m.modulo === tab);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap border-b border-black/10">
+        {modulos.map((modulo) => (
+          <button
+            key={modulo}
+            type="button"
+            onClick={() => setTabElegido(modulo)}
+            className={[
+              "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
+              modulo === tab
+                ? "border-vialto-fire text-vialto-fire"
+                : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
+            ].join(" ")}
+          >
+            {labelModulo(modulo)}
+          </button>
+        ))}
+      </div>
+      {!columnasEsperadas ? (
+        <p className="text-xs text-vialto-steel">Cargando…</p>
+      ) : !info || info.columnas.length === 0 ? (
+        <p className="text-xs text-vialto-steel">
+          Este módulo no tiene columnas configuradas.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-vialto-steel">Hoja "{info.sheet}"</p>
+          <div className="overflow-x-auto border border-black/10">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-vialto-mist/60">
+                  <th className={th}>Columna</th>
+                  <th className={th}>Tipo</th>
+                  <th className={th}>¿Obligatoria?</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/10">
+                {info.columnas.map((c) => (
+                  <tr key={c.excelHeader}>
+                    <td className={td}>{c.excelHeader}</td>
+                    <td className={td}>{tipoLabelColumna(c)}</td>
+                    <td className={td}>
+                      {c.requerido
+                        ? "Sí"
+                        : c.recomendado
+                          ? "Recomendada"
+                          : "No"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function tipoLabelColumna(c: {
+  tipo: string;
+  allowedValues?: string[];
+  lookupModel?: string;
+}): string {
+  switch (c.tipo) {
+    case "number":
+      return "Número";
+    case "date":
+      return "Fecha (DD/MM/AAAA)";
+    case "boolean":
+      return "Sí / No";
+    case "enum":
+      return c.allowedValues?.length
+        ? `Lista (${c.allowedValues.join(", ")})`
+        : "Lista";
+    case "lookup":
+      return c.lookupModel
+        ? `Búsqueda por ${labelModulo(c.lookupModel).toLowerCase()}`
+        : "Búsqueda";
+    default:
+      return "Texto";
+  }
 }
 
 function WizardStepper({

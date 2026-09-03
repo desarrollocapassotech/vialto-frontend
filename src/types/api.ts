@@ -600,6 +600,23 @@ export interface ImportEntidadesFaltantesModelo {
   valores: ImportEntidadFaltante[];
 }
 
+/** Una columna que el importador espera de un módulo — según el template activo del tenant, o el default. */
+export interface ImportColumnaEsperada {
+  excelHeader: string;
+  campoLabel: string;
+  tipo: "string" | "number" | "date" | "boolean" | "lookup" | "enum";
+  requerido: boolean;
+  recomendado?: boolean;
+  allowedValues?: string[];
+  lookupModel?: string;
+}
+
+export interface ImportColumnasEsperadasModulo {
+  modulo: string;
+  sheet: string;
+  columnas: ImportColumnaEsperada[];
+}
+
 export interface ImportPreviewResult {
   sessionId: string;
   modulo: string;
