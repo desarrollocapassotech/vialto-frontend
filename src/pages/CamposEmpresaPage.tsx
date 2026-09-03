@@ -7,7 +7,32 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
+import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
 import type { Tenant } from "@/types/api";
+
+/**
+ * Módulos de `FIELD_CATALOG` que son módulos vendibles reales (`Tenant.modules`)
+ * y por lo tanto deben ocultarse si el tenant no los contrató. Los que no
+ * aparecen acá (`clientes`/`transportistas`/`vehiculos`) son entidades del
+ * core, siempre presentes — nunca se filtran (ver `vialto-backend/CLAUDE.md`,
+ * "Entidades del Core").
+ */
+const MODULO_GATE: Record<string, (modules: string[]) => boolean> = {
+  viajes: canAccessViajes,
+  stock: canAccessStock,
+};
+
+function calcularModulosDisponibles(
+  catalogo: Catalogo | null,
+  tenant: Tenant | null,
+): string[] {
+  if (!catalogo) return [];
+  return Object.keys(catalogo).filter((m) => {
+    const gate = MODULO_GATE[m];
+    if (!gate) return true;
+    return !!tenant && gate(tenant.modules);
+  });
+}
 
 type CampoCatalogo = {
   campo: string;
@@ -317,7 +342,25 @@ export function CamposEmpresaPage() {
     }
   }, [showAuditModal, auditFilter, modulo, formulario]);
 
-  const modulosDisponibles = catalogo ? Object.keys(catalogo) : [];
+  // Si el módulo activo deja de estar disponible para el tenant elegido (ej.
+  // se cambió de un tenant con Stock a uno sin Stock), se cae al primer
+  // módulo que sí tenga. Espera a que `empresaTenant` haya cargado — antes de
+  // eso `calcularModulosDisponibles` oculta todo lo gateado por no saber
+  // todavía los módulos contratados, y correría igual aunque el tenant sí
+  // tenga el módulo activo.
+  useEffect(() => {
+    if (!catalogo || !modulo || !filtroEmpresa || !empresaTenant) return;
+    const disponibles = calcularModulosDisponibles(catalogo, empresaTenant);
+    if (disponibles.includes(modulo)) return;
+    const siguiente = disponibles[0] ?? null;
+    setModulo(siguiente);
+    setFormulario(
+      siguiente ? (Object.keys(catalogo[siguiente].formularios)[0] ?? null) : null,
+    );
+    setMostrarTemplates(false);
+  }, [catalogo, empresaTenant, modulo, filtroEmpresa]);
+
+  const modulosDisponibles = calcularModulosDisponibles(catalogo, empresaTenant);
   const formulariosDelModulo =
     catalogo && modulo ? Object.keys(catalogo[modulo].formularios) : [];
   // Los campos obligatorios del sistema no se pueden ocultar — no tiene
