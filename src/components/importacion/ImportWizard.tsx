@@ -2070,6 +2070,14 @@ function EtapaOpcional<T>({
   renderTabla: (items: T[] | null) => React.ReactNode;
   confirmDisabled?: boolean;
 }) {
+  // Se pide el preview apenas se entra a esta etapa — antes había un botón
+  // "Ver preview" intermedio que no aportaba nada (el usuario ya eligió el
+  // módulo en el selector previo), solo un click extra antes de ver la tabla.
+  useEffect(() => {
+    onPedirPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="flex flex-col gap-4">
       <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
@@ -2077,19 +2085,22 @@ function EtapaOpcional<T>({
       </h3>
       <p className="text-sm text-vialto-steel">{descripcion}</p>
 
-      {!preview && (
+      {!preview && loading && (
+        <p className="text-sm text-vialto-steel">Cargando…</p>
+      )}
+
+      {/* Si `onPedirPreview` falló, `loading` ya bajó pero `preview` sigue en null: sin esto el usuario quedaría sin forma de reintentar o saltear la etapa. */}
+      {!preview && !loading && (
         <div className="flex gap-3">
           <button
             type="button"
-            disabled={loading}
             onClick={onPedirPreview}
-            className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+            className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
           >
-            {loading ? "Cargando…" : "Ver preview"}
+            Reintentar
           </button>
           <button
             type="button"
-            disabled={loading}
             onClick={onSaltear}
             className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04]"
           >
