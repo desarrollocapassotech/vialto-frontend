@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { Ban, RotateCw, Trash2 } from "lucide-react";
 import {
   ViewModalShell,
@@ -14,13 +15,17 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
+import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { apiJson } from "@/lib/api";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
+import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
 import type {
   Liquidacion,
   LiquidacionConceptoLinea,
   LiquidacionEstado,
   LiquidacionViajeItem,
+  Viaje,
 } from "@/types/api";
 
 export type LiquidacionConTransportista = Liquidacion & {
@@ -164,8 +169,28 @@ export function LiquidacionViewModal({
   /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
   onVerComprobanteAnulacionManual?: () => void;
 }) {
+  const { getToken: getAuthToken } = useAuth();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [detail, setDetail] = useState<LiquidacionConTransportista>(liq);
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
+  const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+
+  async function handleVerViaje(viajeId: string) {
+    setLoadingViajeId(viajeId);
+    try {
+      const viaje = await apiJson<Viaje>(
+        `/api/viajes/${encodeURIComponent(viajeId)}`,
+        () => getAuthToken(),
+      );
+      setViewingViaje(viaje);
+    } catch (e) {
+      showToast(friendlyError(e, "viajes"), "error");
+    } finally {
+      setLoadingViajeId(null);
+    }
+  }
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -268,321 +293,343 @@ export function LiquidacionViewModal({
     source.estado === "pendiente_anulacion";
 
   return (
-    <ViewModalShell
-      title={
-        <span className="inline-flex items-center gap-3">
-          <span>Detalle de liquidación</span>
-          <span
-            className={[
-              "text-xs font-medium border rounded px-2 py-0.5",
-              ESTADO_BADGE[source.estado],
-            ].join(" ")}
-          >
-            {ESTADO_LABEL[source.estado]}
+    <>
+      <ViewModalShell
+        title={
+          <span className="inline-flex items-center gap-3">
+            <span>Detalle de liquidación</span>
+            <span
+              className={[
+                "text-xs font-medium border rounded px-2 py-0.5",
+                ESTADO_BADGE[source.estado],
+              ].join(" ")}
+            >
+              {ESTADO_LABEL[source.estado]}
+            </span>
+            <AmbienteTestBadge ambiente={source.ambiente} />
           </span>
-          <AmbienteTestBadge ambiente={source.ambiente} />
-        </span>
-      }
-      onClose={onClose}
-      scrollBody
-      maxWidthClass="sm:max-w-2xl"
-      footer={
-        <>
-          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-            Cerrar
-          </button>
-          {hasArca &&
-            onEmitir &&
-            (source.estado === "borrador" || source.estado === "error") && (
+        }
+        onClose={onClose}
+        scrollBody
+        maxWidthClass="sm:max-w-2xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className={viewModalBtnGhost}
+            >
+              Cerrar
+            </button>
+            {hasArca &&
+              onEmitir &&
+              (source.estado === "borrador" || source.estado === "error") && (
+                <button
+                  type="button"
+                  onClick={onEmitir}
+                  className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+                >
+                  {source.estado === "error" && (
+                    <RotateCw
+                      className="h-3.5 w-3.5 shrink-0"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                  )}
+                  {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
+                </button>
+              )}
+            {puedeEliminar && (
               <button
                 type="button"
-                onClick={onEmitir}
-                className={`inline-flex items-center gap-1.5 ${viewModalBtnPrimary}`}
+                onClick={onEliminar}
+                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
               >
-                {source.estado === "error" && (
-                  <RotateCw
-                    className="h-3.5 w-3.5 shrink-0"
-                    strokeWidth={1.75}
-                    aria-hidden
-                  />
-                )}
-                {source.estado === "error" ? "Reintentar emisión" : "Emitir"}
+                <Trash2
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Eliminar
               </button>
             )}
-          {puedeEliminar && (
-            <button
-              type="button"
-              onClick={onEliminar}
-              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
-            >
-              <Trash2
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              Eliminar
-            </button>
-          )}
-          {puedeAnular && (
-            <button
-              type="button"
-              onClick={onAnular}
-              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
-            >
-              <Ban
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              Anular
-            </button>
-          )}
-          {puedeMarcarPendienteAnulacion && (
-            <button
-              type="button"
-              onClick={onMarcarPendienteAnulacion}
-              className="inline-flex min-h-11 items-center gap-1.5 border border-amber-300 px-3 text-xs uppercase tracking-wider text-amber-800 hover:bg-amber-50"
-            >
-              <Ban
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              Marcar pendiente de anulación
-            </button>
-          )}
-          {puedeConfirmarAnulacionManual && (
-            <button
-              type="button"
-              onClick={onConfirmarAnulacionManual}
-              className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
-            >
-              <Ban
-                className="h-3.5 w-3.5 shrink-0"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              Confirmar anulación
-            </button>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              onClick={onEditar}
-              className={viewModalBtnPrimary}
-            >
-              Editar
-            </button>
-          )}
-        </>
-      }
-    >
-      <div className="space-y-6">
-        <div>
-          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-            Destinatario
-          </p>
-          <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
-            <p className="font-medium text-vialto-charcoal">
-              {transportistaNombre}
-            </p>
-            {source.transportista?.idFiscal && (
-              <p className="mt-0.5 text-xs text-vialto-steel">
-                CUIT {source.transportista.idFiscal}
-              </p>
+            {puedeAnular && (
+              <button
+                type="button"
+                onClick={onAnular}
+                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+              >
+                <Ban
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Anular
+              </button>
             )}
+            {puedeMarcarPendienteAnulacion && (
+              <button
+                type="button"
+                onClick={onMarcarPendienteAnulacion}
+                className="inline-flex min-h-11 items-center gap-1.5 border border-amber-300 px-3 text-xs uppercase tracking-wider text-amber-800 hover:bg-amber-50"
+              >
+                <Ban
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Marcar pendiente de anulación
+              </button>
+            )}
+            {puedeConfirmarAnulacionManual && (
+              <button
+                type="button"
+                onClick={onConfirmarAnulacionManual}
+                className="inline-flex min-h-11 items-center gap-1.5 border border-red-300 px-3 text-xs uppercase tracking-wider text-red-800 hover:bg-red-50"
+              >
+                <Ban
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                Confirmar anulación
+              </button>
+            )}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={onEditar}
+                className={viewModalBtnPrimary}
+              >
+                Editar
+              </button>
+            )}
+          </>
+        }
+      >
+        <div className="space-y-6">
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Destinatario
+            </p>
+            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3">
+              <p className="font-medium text-vialto-charcoal">
+                {transportistaNombre}
+              </p>
+              {source.transportista?.idFiscal && (
+                <p className="mt-0.5 text-xs text-vialto-steel">
+                  CUIT {source.transportista.idFiscal}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div>
-          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-            Detalle del comprobante
-          </p>
-          <div className="rounded border border-black/10 bg-white px-4 py-1 min-h-[4rem]">
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Detalle del comprobante
+            </p>
+            <div className="rounded border border-black/10 bg-white px-4 py-1 min-h-[4rem]">
+              {loadingDetail ? (
+                <div className="flex justify-center py-6">
+                  <Spinner className="h-5 w-5" />
+                </div>
+              ) : (
+                <LiquidacionMontosBreakdown
+                  variant="filas"
+                  bruto={source.bruto}
+                  comision={source.comision}
+                  comisionPct={source.comisionPct}
+                  conceptosLineas={conceptosLineas}
+                  gastosAdminIva={source.gastosAdminIva}
+                  ivaPct={ivaPctEfectivo}
+                  liquido={source.liquido}
+                />
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+              Viajes ({viajesIncluidos.length || source.cantViajes})
+            </p>
             {loadingDetail ? (
-              <div className="flex justify-center py-6">
+              <div className="flex justify-center rounded border border-black/10 py-6">
                 <Spinner className="h-5 w-5" />
               </div>
+            ) : viajesIncluidos.length === 0 ? (
+              <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
+                {source.cantViajes > 0
+                  ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
+                  : "Sin viajes asociados."}
+              </p>
             ) : (
-              <LiquidacionMontosBreakdown
-                variant="filas"
-                bruto={source.bruto}
-                comision={source.comision}
-                comisionPct={source.comisionPct}
-                conceptosLineas={conceptosLineas}
-                gastosAdminIva={source.gastosAdminIva}
-                ivaPct={ivaPctEfectivo}
-                liquido={source.liquido}
-              />
+              <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
+                {viajesIncluidos.map((row) => {
+                  const v = row.viaje;
+                  const viajeId = v?.id ?? row.viajeId;
+                  const numero =
+                    v?.numeroIdentificacionPersonalizado?.trim() ||
+                    v?.numero ||
+                    "—";
+                  return (
+                    <button
+                      key={row.viajeId}
+                      type="button"
+                      disabled={loadingViajeId === viajeId}
+                      onClick={() => void handleVerViaje(viajeId)}
+                      className="block w-full text-left px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      <p className="text-xs font-medium text-vialto-charcoal">
+                        Viaje #{numero}
+                        {v?.fechaCarga && (
+                          <span className="ml-1.5 font-normal text-vialto-steel">
+                            {fmtDate(v.fechaCarga)}
+                          </span>
+                        )}
+                      </p>
+                      {(v?.origen || v?.destino) && (
+                        <p className="text-[11px] text-vialto-steel truncate">
+                          {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                        {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
-        </div>
 
-        <div>
-          <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-            Viajes ({viajesIncluidos.length || source.cantViajes})
-          </p>
-          {loadingDetail ? (
-            <div className="flex justify-center rounded border border-black/10 py-6">
-              <Spinner className="h-5 w-5" />
-            </div>
-          ) : viajesIncluidos.length === 0 ? (
-            <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
-              {source.cantViajes > 0
-                ? `${source.cantViajes} viaje${source.cantViajes === 1 ? "" : "s"} (sin detalle disponible).`
-                : "Sin viajes asociados."}
-            </p>
-          ) : (
-            <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
-              {viajesIncluidos.map((row) => {
-                const v = row.viaje;
-                const viajeId = v?.id ?? row.viajeId;
-                const numero =
-                  v?.numeroIdentificacionPersonalizado?.trim() ||
-                  v?.numero ||
-                  "—";
-                return (
-                  <Link
-                    key={row.viajeId}
-                    to={`/viajes?viaje=${encodeURIComponent(viajeId)}`}
-                    onClick={onClose}
-                    className="block px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist"
-                  >
-                    <p className="text-xs font-medium text-vialto-charcoal">
-                      Viaje #{numero}
-                      {v?.fechaCarga && (
-                        <span className="ml-1.5 font-normal text-vialto-steel">
-                          {fmtDate(v.fechaCarga)}
-                        </span>
-                      )}
-                    </p>
-                    {(v?.origen || v?.destino) && (
-                      <p className="text-[11px] text-vialto-steel truncate">
-                        {v?.origen ?? "—"} → {v?.destino ?? "—"}
-                      </p>
-                    )}
-                    <p className="text-[11px] text-vialto-charcoal tabular-nums">
-                      {fmtLiquidacionMoney(Number(row.subtotal) || 0)}
-                    </p>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className={viewModalGridClass}>
-          <Campo
-            label="Período"
-            value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
-          />
-          <Campo
-            label="Tipo de comprobante"
-            value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
-          />
-          {source.cbteNro != null && (
-            <Campo label="Nº comprobante" value={source.cbteNro} />
-          )}
-          {source.ptoVenta != null && (
-            <Campo label="Punto de venta" value={source.ptoVenta} />
-          )}
-          {source.cae && <Campo label="CAE" value={source.cae} />}
-          {source.caeFechaVto && (
-            <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
-          )}
-          {source.ambiente && (
+          <div className={viewModalGridClass}>
             <Campo
-              label="Ambiente"
-              value={
-                source.ambiente === "homologacion"
-                  ? "Homologación (prueba)"
-                  : "Producción"
-              }
+              label="Período"
+              value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
             />
-          )}
-          <Campo label="Creada" value={fmtDate(source.createdAt)} />
-        </div>
+            <Campo
+              label="Tipo de comprobante"
+              value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
+            />
+            {source.cbteNro != null && (
+              <Campo label="Nº comprobante" value={source.cbteNro} />
+            )}
+            {source.ptoVenta != null && (
+              <Campo label="Punto de venta" value={source.ptoVenta} />
+            )}
+            {source.cae && <Campo label="CAE" value={source.cae} />}
+            {source.caeFechaVto && (
+              <Campo label="Vto. CAE" value={fmtDate(source.caeFechaVto)} />
+            )}
+            {source.ambiente && (
+              <Campo
+                label="Ambiente"
+                value={
+                  source.ambiente === "homologacion"
+                    ? "Homologación (prueba)"
+                    : "Producción"
+                }
+              />
+            )}
+            <Campo label="Creada" value={fmtDate(source.createdAt)} />
+          </div>
 
-        {source.estado === "pendiente_anulacion" && (
-          <div>
-            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-              Anulación
-            </p>
-            <div className="rounded border border-amber-300/80 bg-amber-50 px-4 py-3 space-y-1">
-              <p className="text-sm text-amber-900">
-                Marcada como pendiente de anulación
-                {source.anulacionPendienteDesde
-                  ? ` el ${fmtDateTime(source.anulacionPendienteDesde)}`
-                  : ""}
-                . Falta adjuntar el comprobante pre-impreso para confirmarla.
+          {source.estado === "pendiente_anulacion" && (
+            <div>
+              <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+                Anulación
               </p>
-            </div>
-          </div>
-        )}
-
-        {source.estado === "anulado" && (
-          <div>
-            <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
-              Anulación
-            </p>
-            <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
-              <Campo label="Motivo" value={source.motivoAnulacion} />
-              <div className={viewModalGridClass}>
-                <Campo label="Anulada el" value={fmtDateTime(source.anuladoAt)} />
-                <Campo
-                  label="Anulada por"
-                  value={source.anuladoPorNombre ?? source.anuladoPor}
-                />
+              <div className="rounded border border-amber-300/80 bg-amber-50 px-4 py-3 space-y-1">
+                <p className="text-sm text-amber-900">
+                  Marcada como pendiente de anulación
+                  {source.anulacionPendienteDesde
+                    ? ` el ${fmtDateTime(source.anulacionPendienteDesde)}`
+                    : ""}
+                  . Falta adjuntar el comprobante pre-impreso para confirmarla.
+                </p>
               </div>
-              {source.anulacionMetodo === "manual"
-                ? onVerComprobanteAnulacionManual && (
-                    <button
-                      type="button"
-                      onClick={onVerComprobanteAnulacionManual}
-                      className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver comprobante de anulación
-                    </button>
-                  )
-                : onVerAnulacion && (
-                    <button
-                      type="button"
-                      onClick={onVerAnulacion}
-                      className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-                    >
-                      Ver anulación
-                    </button>
-                  )}
             </div>
-          </div>
-        )}
+          )}
 
-        {source.arcaError && (
-          <div className="rounded px-0 py-0 text-sm">
-            <ArcaErrorMessage
-              message={
-                formatStoredArcaError(source.arcaError) ?? source.arcaError
-              }
-              detalle={source.arcaErrorDetalle ?? undefined}
-            />
-          </div>
-        )}
+          {source.estado === "anulado" && (
+            <div>
+              <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+                Anulación
+              </p>
+              <div className="rounded border border-black/10 bg-vialto-mist px-4 py-3 space-y-2">
+                <Campo label="Motivo" value={source.motivoAnulacion} />
+                <div className={viewModalGridClass}>
+                  <Campo
+                    label="Anulada el"
+                    value={fmtDateTime(source.anuladoAt)}
+                  />
+                  <Campo
+                    label="Anulada por"
+                    value={source.anuladoPorNombre ?? source.anuladoPor}
+                  />
+                </div>
+                {source.anulacionMetodo === "manual"
+                  ? onVerComprobanteAnulacionManual && (
+                      <button
+                        type="button"
+                        onClick={onVerComprobanteAnulacionManual}
+                        className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Ver comprobante de anulación
+                      </button>
+                    )
+                  : onVerAnulacion && (
+                      <button
+                        type="button"
+                        onClick={onVerAnulacion}
+                        className="px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+                      >
+                        Ver anulación
+                      </button>
+                    )}
+              </div>
+            </div>
+          )}
 
-        {onVerComprobante && (
-          <div className="border-t border-black/10 pt-4">
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Comprobante
-            </p>
-            <button
-              type="button"
-              onClick={onVerComprobante}
-              className="mt-2 px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
-            >
-              Ver comprobante
-            </button>
-          </div>
-        )}
-      </div>
-    </ViewModalShell>
+          {source.arcaError && (
+            <div className="rounded px-0 py-0 text-sm">
+              <ArcaErrorMessage
+                message={
+                  formatStoredArcaError(source.arcaError) ?? source.arcaError
+                }
+                detalle={source.arcaErrorDetalle ?? undefined}
+              />
+            </div>
+          )}
+
+          {onVerComprobante && (
+            <div className="border-t border-black/10 pt-4">
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Comprobante
+              </p>
+              <button
+                type="button"
+                onClick={onVerComprobante}
+                className="mt-2 px-3 py-1.5 text-xs uppercase tracking-wider border border-black/20 hover:bg-vialto-mist"
+              >
+                Ver comprobante
+              </button>
+            </div>
+          )}
+        </div>
+      </ViewModalShell>
+      {viewingViaje && (
+        <ViajeViewModal
+          viaje={viewingViaje}
+          onClose={() => setViewingViaje(null)}
+          onEditar={() => {
+            const viajeId = viewingViaje.id;
+            setViewingViaje(null);
+            onClose();
+            navigate(`/viajes?viaje=${encodeURIComponent(viajeId)}`);
+          }}
+        />
+      )}
+    </>
   );
 }

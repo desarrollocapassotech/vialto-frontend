@@ -333,12 +333,24 @@ export function useImportWizard(
     }
   }
 
-  async function avanzarModulo() {
+  /**
+   * `viajeIdsCreadosOverride` existe porque `confirmarModuloActual` llama a
+   * esta función en el mismo tick en que recién hizo `setViajeIdsCreados` —
+   * el estado todavía no se actualizó (closure vieja), así que sin este
+   * parámetro `avanzarModulo` lee el `viajeIdsCreados` de ANTES de confirmar
+   * Viajes (vacío en la primera pasada) y salta directo a "terminado" en vez
+   * de "post-liquidaciones", aunque la importación de Viajes haya creado o
+   * actualizado filas. Bug real encontrado en QA (NyM): con viajes
+   * actualizados con éxito, el wizard se salteaba Liquidaciones y Facturas
+   * igual, mostrándolas como "hechas" en el stepper sin haber pasado por ahí.
+   */
+  async function avanzarModulo(viajeIdsCreadosOverride?: string[]) {
     setPreview(null);
     setError(null);
     const nextIdx = moduloIndex + 1;
     if (nextIdx >= secuencia.length) {
-      setFase(viajeIdsCreados.length > 0 ? "post-liquidaciones" : "terminado");
+      const idsCreados = viajeIdsCreadosOverride ?? viajeIdsCreados;
+      setFase(idsCreados.length > 0 ? "post-liquidaciones" : "terminado");
       return;
     }
     setModuloIndex(nextIdx);
@@ -381,13 +393,14 @@ export function useImportWizard(
         body: JSON.stringify(body),
       });
       setEtapasCompletadas((prev) => [...prev, { modulo: moduloActual, log }]);
+      let viajeIdsRecienCreados: string[] | undefined;
       if (moduloActual === "viajes") {
-        const ids = log.detalles
+        viajeIdsRecienCreados = log.detalles
           .filter((d) => d.estado === "ok" && d.id)
           .map((d) => d.id as string);
-        setViajeIdsCreados(ids);
+        setViajeIdsCreados(viajeIdsRecienCreados);
       }
-      await avanzarModulo();
+      await avanzarModulo(viajeIdsRecienCreados);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Error al confirmar la importación",

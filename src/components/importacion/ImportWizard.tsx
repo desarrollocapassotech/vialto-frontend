@@ -374,7 +374,7 @@ export function ImportWizard({
       {wizard.fase === "post-liquidaciones" && postViajesElegido.liquidaciones && (
         <EtapaOpcional
           titulo="Generar liquidaciones borrador"
-          descripcion="Se van a agrupar los viajes recién creados por transportista. Ninguna liquidación se emite a AFIP — quedan en borrador para que las emitas manualmente cuando quieras."
+          descripcion="Se van a agrupar los viajes por transportista. Quedan en estado BORRADOR."
           loading={wizard.loading}
           preview={wizard.liquidacionesPreview}
           onPedirPreview={wizard.pedirPreviewLiquidaciones}
@@ -437,7 +437,7 @@ export function ImportWizard({
           )}
           <EtapaOpcional
           titulo="Facturar a clientes"
-          descripcion="Se van a agrupar los viajes recién creados por cliente."
+          descripcion="Se van a agrupar los viajes por cliente."
           loading={wizard.loading}
           preview={wizard.facturasPreview}
           onPedirPreview={wizard.pedirPreviewFacturas}
@@ -704,9 +704,17 @@ function SelectorModulos({
       else next.add(modulo);
       return next;
     });
+    // Liquidaciones/Facturas se generan a partir de los viajes recién
+    // creados en esta corrida — sin Viajes tildado no tienen de dónde salir,
+    // así que se destildan solas para no dejar una selección que no hace nada.
+    if (modulo === "viajes" && seleccionados.has("viajes")) {
+      setLiquidacionesSel(false);
+      setFacturasSel(false);
+    }
   }
 
   const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
+  const viajesSel = seleccionados.has("viajes");
 
   return (
     <div className="flex flex-col ">
@@ -737,38 +745,58 @@ function SelectorModulos({
             </label>
           ))}
           {puedeLiquidaciones && (
-            <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+            <label
+              className={[
+                "flex items-center justify-between gap-4 px-5 py-3.5",
+                viajesSel
+                  ? "cursor-pointer hover:bg-vialto-mist/60"
+                  : "cursor-not-allowed opacity-50",
+              ].join(" ")}
+            >
               <span className="flex flex-col">
                 <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
                   Liquidaciones a transportistas
                 </span>
                 <span className="text-xs text-vialto-steel">
-                  Genera un borrador por transportista al terminar viajes.
+                  {viajesSel
+                    ? "Genera un borrador por transportista al terminar viajes."
+                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
                 </span>
               </span>
               <input
                 type="checkbox"
                 checked={liquidacionesSel}
+                disabled={!viajesSel}
                 onChange={(e) => setLiquidacionesSel(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
               />
             </label>
           )}
           {puedeFacturas && (
-            <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60">
+            <label
+              className={[
+                "flex items-center justify-between gap-4 px-5 py-3.5",
+                viajesSel
+                  ? "cursor-pointer hover:bg-vialto-mist/60"
+                  : "cursor-not-allowed opacity-50",
+              ].join(" ")}
+            >
               <span className="flex flex-col">
                 <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
                   Facturas a clientes
                 </span>
                 <span className="text-xs text-vialto-steel">
-                  Genera un borrador por cliente al terminar viajes.
+                  {viajesSel
+                    ? "Genera un borrador por cliente al terminar viajes."
+                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
                 </span>
               </span>
               <input
                 type="checkbox"
                 checked={facturasSel}
+                disabled={!viajesSel}
                 onChange={(e) => setFacturasSel(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
+                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
               />
             </label>
           )}
@@ -927,15 +955,19 @@ function WizardStepper({
   const tieneViajes = wizard.secuencia.includes("viajes");
   const ofreceLiquidaciones = tieneViajes && postViajesElegido.liquidaciones;
 
+  const ofreceFacturas = tieneViajes && postViajesElegido.facturas;
+
   const pasos = [
     ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
     ...(ofreceLiquidaciones
       ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
       : []),
-    // "Resumen" es el paso final genérico (siempre hay uno al terminar
-    // Viajes, se hayan generado o no facturas/liquidaciones) — no depende
-    // de si el usuario tildó "Facturas a clientes".
-    ...(tieneViajes ? [{ key: "post-facturas", label: "Resumen" }] : []),
+    // "Facturas" es un paso propio solo si el usuario lo tildó (igual que
+    // "Liquidaciones" arriba). "Resumen" es aparte: el paso final genérico,
+    // siempre presente si corrió Viajes — es la pantalla de "terminado" que
+    // se ve al final, se hayan generado o no facturas/liquidaciones.
+    ...(ofreceFacturas ? [{ key: "post-facturas", label: "Facturas" }] : []),
+    ...(tieneViajes ? [{ key: "terminado", label: "Resumen" }] : []),
   ];
 
   const indiceActual =
@@ -947,7 +979,9 @@ function WizardStepper({
           ? wizard.secuencia.length
           : wizard.fase === "post-facturas"
             ? wizard.secuencia.length + (ofreceLiquidaciones ? 1 : 0)
-            : pasos.length;
+            : wizard.fase === "terminado" && tieneViajes
+              ? pasos.length - 1
+              : pasos.length;
 
   return (
     <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
