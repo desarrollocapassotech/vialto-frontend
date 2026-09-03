@@ -8,7 +8,12 @@ import {
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
-import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
+import {
+  type FacturaLetra,
+  facturaLetraFromCondicionIva,
+  facturaLetraLabel,
+  condicionIvaLabel,
+} from "@/lib/arcaCbteTipo";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -50,9 +55,6 @@ export function TenantHomePage() {
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
   const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
-  const [facturaLetraViaje, setFacturaLetraViaje] = useState<Viaje | null>(
-    null,
-  );
   const [abriendoFacturar, setAbriendoFacturar] = useState(false);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
 
@@ -160,7 +162,6 @@ export function TenantHomePage() {
               viewingFactura !== null ||
               viewingViaje !== null ||
               viajeEditor.editingId !== null ||
-              facturaLetraViaje !== null ||
               facturaCreator.creating ||
               crearLiqViaje !== null
             }
@@ -244,15 +245,19 @@ export function TenantHomePage() {
                     return;
                   }
                   setViewingViaje(null);
-                  // Tipo A/B solo aplica con emisión de facturas ARCA.
+                  let letra: FacturaLetra | undefined;
                   if (hasFacturasArca) {
-                    setFacturaLetraViaje(v);
-                    return;
+                    const cliente = maestro.clientes?.find((c) => c.id === v.clienteId);
+                    letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
+                    showToast(
+                      `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
+                      "success",
+                    );
                   }
                   void (async () => {
                     setAbriendoFacturar(true);
                     try {
-                      facturaCreator.prepararDraftParaViaje(v);
+                      facturaCreator.prepararDraftParaViaje(v, letra);
                       await facturaCreator.ensureViajesLoaded();
                       facturaCreator.abrir();
                     } finally {
@@ -297,29 +302,6 @@ export function TenantHomePage() {
           }}
           onSuccess={() => setCrearLiqViaje(null)}
           onClose={() => setCrearLiqViaje(null)}
-        />
-      )}
-
-      {facturaLetraViaje && (
-        <TipoFacturaClienteModal
-          viaje={facturaLetraViaje}
-          clienteAfacturar={maestro.clientes?.find(c => c.id === facturaLetraViaje.clienteId) ?? null}
-          busy={abriendoFacturar}
-          onClose={() => setFacturaLetraViaje(null)}
-          onConfirm={(letra) => {
-            const v = facturaLetraViaje;
-            void (async () => {
-              setAbriendoFacturar(true);
-              try {
-                facturaCreator.prepararDraftParaViaje(v, letra);
-                await facturaCreator.ensureViajesLoaded();
-                facturaCreator.abrir();
-                setFacturaLetraViaje(null);
-              } finally {
-                setAbriendoFacturar(false);
-              }
-            })();
-          }}
         />
       )}
 
