@@ -1134,11 +1134,17 @@ function EtapaModulo({
   const entidadesFaltantesSinModulo = entidadesFaltantesTodas.filter(
     (e) => e.valores.length > 0 && !moduloElegido(e.modelo),
   );
+  const cuitErrors = (p?.detalleErrores ?? []).filter((e) =>
+    e.error.includes("DNI/CUIT"),
+  );
   // Los errores de lookup de un módulo no elegido ya se explican arriba
   // (panel ámbar de "no se importan"), no hace falta duplicarlos acá abajo
-  // como si fueran un error bloqueante más.
+  // como si fueran un error bloqueante más. Los errores de CUIT se muestran
+  // agrupados en el panel superior rojo.
   const detalleErroresMostrados = (p?.detalleErrores ?? []).filter(
-    (e) => !e.lookupModel || moduloElegido(e.lookupModel),
+    (e) =>
+      (!e.lookupModel || moduloElegido(e.lookupModel)) &&
+      !e.error.includes("DNI/CUIT"),
   );
   // `p.errores` cuenta errores individuales (una fila puede fallar por
   // varios campos a la vez, ej. cliente Y transportista Y chofer), no filas
@@ -1289,8 +1295,36 @@ function EtapaModulo({
                   ▾
                 </span>
               </summary>
-              <p className="mt-1.5">
+              <p className="mt-1.5 leading-relaxed">
                 {p.columnasOpcionalesFaltantes.join(", ")}
+              </p>
+            </details>
+          )}
+
+          {cuitErrors.length > 0 && (
+            <details className="group border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+              <summary className="cursor-pointer list-none marker:hidden">
+                <span className="font-medium">
+                  {cuitErrors.length} transportista
+                  {cuitErrors.length !== 1 ? "s" : ""} bloqueado
+                  {cuitErrors.length !== 1 ? "s" : ""}
+                </span>{" "}
+                <span className="text-red-700/70">
+                  — no se pueden crear solo con DNI/CUIT
+                </span>
+                <span className="ml-1 inline-block transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <p className="mt-1.5 leading-relaxed">
+                El Excel tiene DNI/CUIT en la columna de Transportista, pero este
+                no existe en la base de datos. Para que el sistema pueda crearlo
+                automáticamente, necesitás poner su Nombre completo. Opcionalmente,
+                podés importar los transportistas primero. Afecta a las filas:{" "}
+                <span className="font-medium">
+                  {cuitErrors.map((e) => e.fila).join(", ")}
+                </span>
+                .
               </p>
             </details>
           )}
