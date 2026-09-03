@@ -134,7 +134,7 @@ export function ImportTemplatesConfig({
     setLoadingCatalogo(true);
     try {
       const catalogo = await apiJson<CatalogoColumn[]>(
-        `/api/importaciones/templates/catalogo?modulo=${encodeURIComponent(m)}`,
+        `/api/importaciones/templates/catalogo?modulo=${encodeURIComponent(m)}&tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
       );
       const guardadoPorCampo = new Map(
