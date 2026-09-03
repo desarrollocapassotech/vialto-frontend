@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { CiudadCombobox } from "@/components/forms/CiudadCombobox";
 import {
   PAISES_SOPORTADOS,
@@ -41,6 +41,15 @@ function agruparAdvertencias(
   }
   return [...grupos.values()];
 }
+
+/** El mensaje ya trae el valor citado al inicio (`"X" no coincide con...`) — se saca para no repetirlo dos veces si el valor ya se muestra como título del grupo. */
+function explicacionSinValor(mensaje: string, valor: string): string {
+  const prefijo = `"${valor}" `;
+  return mensaje.startsWith(prefijo) ? mensaje.slice(prefijo.length) : mensaje;
+}
+
+const excludeButtonClass =
+  "inline-flex h-7 items-center gap-1 rounded border border-black/15 bg-white px-2 text-[11px] text-vialto-steel hover:bg-black/[0.04]";
 
 /**
  * Deja elegir la ciudad correcta para cada grupo de filas con advertencia
@@ -85,81 +94,109 @@ export function CiudadAdvertenciasPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p className="text-xs uppercase tracking-wider text-vialto-steel">
         Ciudades a confirmar ({advertencias.length})
       </p>
-      <div className="space-y-3 rounded border border-amber-200 bg-amber-50 p-3">
+      <div className="space-y-3">
         {grupos.map((g) => {
           const pais = paisPorGrupo[g.mensaje] ?? inferirPaisDesdeUbicacion(g.valor);
           const filasUnicas = [...new Set(g.ocurrencias.map((o) => o.fila))];
+          const explicacion = explicacionSinValor(g.mensaje, g.valor);
+
           return (
-            <div key={g.mensaje} className="space-y-2">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
-                <div className="text-[11px] text-amber-900 sm:w-56 shrink-0">
-                  <span className="font-medium">
-                    {g.ocurrencias.map((o, idx) => (
-                      <span key={`${o.fila}-${o.campo}`}>
-                        {idx > 0 && ", "}
-                        Fila {o.fila} · {o.campo === "origen" ? "Origen" : "Destino"}
-                      </span>
-                    ))}
-                  </span>
-                  <br />
-                  {g.mensaje}{" "}
-                  <button
-                    type="button"
-                    onClick={() => copiarValor(g.valor)}
-                    className="inline-flex items-center gap-1 font-medium text-amber-800 underline decoration-dotted hover:text-amber-950"
-                    title="Copiar el texto de la ciudad para buscarla en el listado"
-                  >
-                    {valorCopiado === g.valor ? (
-                      <Check className="h-3 w-3" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                    Copiar "{g.valor}"
-                  </button>
+            <div
+              key={g.mensaje}
+              className="overflow-hidden rounded-lg border border-amber-200"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-200 bg-amber-100/70 px-4 py-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-amber-950">
+                      "{g.valor}"
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => copiarValor(g.valor)}
+                      className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50"
+                      title="Copiar el texto de la ciudad para buscarla en el listado"
+                    >
+                      {valorCopiado === g.valor ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      Copiar
+                    </button>
+                  </div>
+                  <p className="mt-0.5 text-xs text-amber-800">{explicacion}</p>
                 </div>
-                <select
-                  value={pais}
-                  onChange={(e) =>
-                    setPaisPorGrupo((prev) => ({
-                      ...prev,
-                      [g.mensaje]: e.target.value as PaisCodigo,
-                    }))
-                  }
-                  className="h-8 shrink-0 border border-black/20 bg-white px-1 text-xs"
-                  aria-label="País"
-                >
-                  {PAISES_SOPORTADOS.map((p) => (
-                    <option key={p.codigo} value={p.codigo}>
-                      {p.etiqueta}
-                    </option>
-                  ))}
-                </select>
-                <CiudadCombobox
-                  pais={pais}
-                  value=""
-                  onChange={(valor) => {
-                    for (const o of g.ocurrencias) onElegir(o.fila, o.campo, valor);
-                  }}
-                  placeholder={`Elegí la ciudad correcta para "${g.valor}"…`}
-                  inputClassName="h-8 w-full border border-black/20 bg-white px-2 text-xs"
-                />
+                <span className="shrink-0 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                  {filasUnicas.length} fila{filasUnicas.length > 1 ? "s" : ""}
+                </span>
               </div>
-              <div className="flex flex-wrap gap-1">
-                {filasUnicas.map((fila) => (
-                  <button
-                    key={fila}
-                    type="button"
-                    onClick={() => onIgnorarFila(fila)}
-                    className="h-8 border border-black/20 bg-white px-2 text-xs text-vialto-steel hover:bg-black/[0.04]"
-                    title="No corresponde a una sola ciudad (ej. multidestino) — esta fila no se va a importar."
+
+              <div className="space-y-3 bg-amber-50/60 px-4 py-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {g.ocurrencias.map((o) => (
+                    <span
+                      key={`${o.fila}-${o.campo}`}
+                      className="rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                    >
+                      Fila {o.fila} · {o.campo === "origen" ? "Origen" : "Destino"}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    value={pais}
+                    onChange={(e) =>
+                      setPaisPorGrupo((prev) => ({
+                        ...prev,
+                        [g.mensaje]: e.target.value as PaisCodigo,
+                      }))
+                    }
+                    className="h-9 shrink-0 border border-black/20 bg-white px-2 text-sm sm:w-40"
+                    aria-label="País"
                   >
-                    No importar fila {fila}
-                  </button>
-                ))}
+                    {PAISES_SOPORTADOS.map((p) => (
+                      <option key={p.codigo} value={p.codigo}>
+                        {p.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                  <CiudadCombobox
+                    pais={pais}
+                    value=""
+                    onChange={(valor) => {
+                      for (const o of g.ocurrencias) onElegir(o.fila, o.campo, valor);
+                    }}
+                    placeholder={`Elegí la ciudad correcta para "${g.valor}"…`}
+                    className="min-w-0 flex-1"
+                    inputClassName="h-9 w-full border border-black/20 bg-white px-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                    Excluir del import (no corresponde a una sola ciudad)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {filasUnicas.map((fila) => (
+                      <button
+                        key={fila}
+                        type="button"
+                        onClick={() => onIgnorarFila(fila)}
+                        className={excludeButtonClass}
+                        title="No corresponde a una sola ciudad (ej. multidestino) — esta fila no se va a importar."
+                      >
+                        <X className="h-3 w-3" />
+                        Fila {fila}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           );

@@ -47,7 +47,7 @@ async function buscarCoincidenciaCatalogo(
       if (byCity.length > 1) {
         return {
           ok: false,
-          advertencia: `"${trimmed}" coincide con varias ciudades del catálogo. Especificá provincia o departamento.`,
+          advertencia: `"${trimmed}" coincide con varias ciudades del catálogo.`,
         };
       }
     }
