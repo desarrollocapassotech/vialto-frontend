@@ -218,7 +218,7 @@ export function ImportWizard({
         <button
           type="button"
           onClick={reiniciarImportacion}
-          className="shrink-0 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-steel hover:text-vialto-charcoal"
+          className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
         >
           Volver a importar
         </button>
@@ -1111,6 +1111,30 @@ function EtapaModulo({
             </div>
           )}
 
+          {hasViajes && tieneDesgloseActualizacion && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <span>
+                <strong>{p.entidadesActualizadas}</strong> viaje
+                {p.entidadesActualizadas !== 1 ? "s" : ""} de este archivo ya
+                {p.entidadesActualizadas !== 1 ? "n existen" : " existe"} en
+                el sistema y se{" "}
+                {p.entidadesActualizadas !== 1 ? "van" : "va"} a actualizar —
+                el resto ({p.entidadesNuevas}) son altas nuevas.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("viajes");
+                  setTablaPage(1);
+                  setDetalleModalOpen(true);
+                }}
+                className="shrink-0 border border-amber-300 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-amber-900 hover:bg-amber-100"
+              >
+                Revisar actualizaciones
+              </button>
+            </div>
+          )}
+
           {vehiculosFaltantes && vehiculosFaltantes.valores.length > 0 && (
             <div className="flex flex-col gap-2 border border-vialto-charcoal/20 px-4 py-3">
               <p className="text-xs uppercase tracking-wider text-vialto-steel">
@@ -1484,6 +1508,22 @@ function EtapaModulo({
                   ))}
               </div>
 
+              {tab === "viajes" && (p.viajes ?? []).some((v) => !v.nuevo) && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      for (const v of p.viajes ?? []) {
+                        if (!v.nuevo) wizard.ignorarFila(v.fila);
+                      }
+                    }}
+                    className="border border-black/15 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    Ignorar todas las actualizaciones
+                  </button>
+                </div>
+              )}
+
               {(() => {
                 const items: unknown[] =
                   (tab === "viajes" && hasViajes && p.viajes) ||
@@ -1508,6 +1548,7 @@ function EtapaModulo({
                             tablaPage,
                             TABLA_PAGE_SIZE,
                           )}
+                          onIgnorarFila={wizard.ignorarFila}
                         />
                       )}
                       {tab === "facturas" && hasFacturas && (
@@ -1615,7 +1656,13 @@ const CAMPOS_VIAJE_MOSTRAR: { key: keyof ImportPreviewViaje; label: string }[] =
   { key: "monedaPrecioTransportistaExterno", label: "Moneda Flete" },
 ];
 
-function ViajesCambiosList({ viajes }: { viajes: ImportPreviewViaje[] }) {
+function ViajesCambiosList({
+  viajes,
+  onIgnorarFila,
+}: {
+  viajes: ImportPreviewViaje[];
+  onIgnorarFila: (fila: number) => void;
+}) {
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "—");
 
   if (viajes.length === 0) {
@@ -1634,15 +1681,26 @@ function ViajesCambiosList({ viajes }: { viajes: ImportPreviewViaje[] }) {
             <p className="text-sm font-medium text-vialto-charcoal">
               Fila {v.fila} · {fmt(v.cliente)}
             </p>
-            {v.nuevo ? (
-              <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
-                Nuevo
-              </span>
-            ) : (
-              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
-                Actualiza
-              </span>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {v.nuevo ? (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
+                  Nuevo
+                </span>
+              ) : (
+                <>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                    Actualiza
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onIgnorarFila(v.fila)}
+                    className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+                  >
+                    Ignorar (no actualizar)
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (

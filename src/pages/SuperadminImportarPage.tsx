@@ -49,7 +49,7 @@ export function SuperadminImportarPage() {
           </div>
           {orgId && (
             <Link
-              className="whitespace-nowrap text-sm text-vialto-fire hover:text-vialto-bright"
+              className="shrink-0 whitespace-nowrap border border-vialto-fire bg-vialto-fire px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm hover:bg-vialto-bright hover:border-vialto-bright"
               to={`/superadmin/empresas/${orgId}/importar/templates`}
             >
               Configurar templates →

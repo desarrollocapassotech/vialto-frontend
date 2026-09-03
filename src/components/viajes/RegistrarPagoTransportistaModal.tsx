@@ -1,21 +1,24 @@
-import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { CrudFieldError } from '@/components/crud/CrudFieldError';
-import { apiJson } from '@/lib/api';
-import { Spinner } from '@/components/ui/Spinner';
-import { friendlyError } from '@/lib/friendlyError';
+import { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { CrudFieldError } from "@/components/crud/CrudFieldError";
+import { apiJson } from "@/lib/api";
+import { Spinner } from "@/components/ui/Spinner";
+import { friendlyError } from "@/lib/friendlyError";
 import {
   normalizeViajeMoneda,
   parseCurrencyForMoneda,
-  maskCurrencyForMoneda
-} from '@/lib/currencyMask';
-import { modalOverlayClass } from '@/lib/modalLayers';
-import { formatViajeImporteForListado, numeroVisibleViaje } from '@/lib/viajesFlota';
+  maskCurrencyForMoneda,
+} from "@/lib/currencyMask";
+import { modalOverlayClass } from "@/lib/modalLayers";
+import {
+  formatViajeImporteForListado,
+  numeroVisibleViaje,
+} from "@/lib/viajesFlota";
 import {
   PAGO_TRANSPORTISTA_SALDO_ERROR,
   calcularSaldoTransportista,
-} from '@/lib/viajesTransportistaPagos';
-import type { Viaje } from '@/types/api';
+} from "@/lib/viajesTransportistaPagos";
+import type { Viaje } from "@/types/api";
 
 type Props = {
   open: boolean;
@@ -25,11 +28,19 @@ type Props = {
   tenantId?: string;
 };
 
-export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClose, tenantId }: Props) {
+export function RegistrarPagoTransportistaModal({
+  open,
+  viaje,
+  onSuccess,
+  onClose,
+  tenantId,
+}: Props) {
   const { getToken } = useAuth();
-  const [montoStr, setMontoStr] = useState('');
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
-  const [observaciones, setObservaciones] = useState('');
+  const [montoStr, setMontoStr] = useState("");
+  const [fecha, setFecha] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [observaciones, setObservaciones] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -37,15 +48,17 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
 
   if (!open || viaje == null) return null;
   const viajeActual = viaje;
-  const moneda = normalizeViajeMoneda(viajeActual.monedaPrecioTransportistaExterno);
+  const moneda = normalizeViajeMoneda(
+    viajeActual.monedaPrecioTransportistaExterno,
+  );
 
   const saldo = calcularSaldoTransportista(viajeActual);
   const pagos = viajeActual.pagosTransportista ?? [];
 
   function resetForm() {
-    setMontoStr('');
+    setMontoStr("");
     setFecha(new Date().toISOString().slice(0, 10));
-    setObservaciones('');
+    setObservaciones("");
     setFieldErrors({});
     setError(null);
     setShowPagosAnteriores(false);
@@ -59,12 +72,12 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
   async function handleSubmit() {
     const monto = parseCurrencyForMoneda(montoStr, moneda);
     if (monto == null || monto <= 0) {
-      setFieldErrors({ monto: 'Ingresá un monto mayor a 0.' });
+      setFieldErrors({ monto: "Ingresá un monto mayor a 0." });
       return;
     }
     if (saldo) {
       if (saldo.saldo <= 0) {
-        setError('El transportista ya está pagado en su totalidad.');
+        setError("El transportista ya está pagado en su totalidad.");
         return;
       }
       if (monto > saldo.saldo) {
@@ -82,32 +95,31 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
 
       const q = tenantId?.trim()
         ? `?tenantId=${encodeURIComponent(tenantId.trim())}`
-        : '';
+        : "";
       const base = tenantId?.trim()
         ? `/api/platform/viajes/${encodeURIComponent(viajeActual.id)}/pagos-transportista${q}`
         : `/api/viajes/${encodeURIComponent(viajeActual.id)}/pagos-transportista`;
 
-      const updated = await apiJson<Viaje>(
-        base,
-        () => getToken(),
-        { method: 'POST', body: JSON.stringify(body) },
-      );
+      const updated = await apiJson<Viaje>(base, () => getToken(), {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
       resetForm();
       onSuccess(updated);
     } catch (e) {
-      setError(friendlyError(e, 'viajes'));
+      setError(friendlyError(e, "viajes"));
     } finally {
       setSaving(false);
     }
   }
 
   const labelClass =
-    'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
-  const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+    "text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel";
+  const inputClass = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
 
   return (
     <div
-      className={modalOverlayClass.replace('z-50', 'z-[100]')}
+      className={modalOverlayClass.replace("z-50", "z-[100]")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="registrar-pago-title"
@@ -123,16 +135,21 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         {saldo && saldo.totalAcordado > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-3 rounded border border-black/10 bg-vialto-mist/60 px-3 py-2 text-xs">
             <span className="text-vialto-steel">
-              Acordado:{' '}
+              Acordado:{" "}
               <span className="font-medium text-vialto-charcoal">
-                {formatViajeImporteForListado(saldo.totalAcordado, saldo.moneda)}
+                {formatViajeImporteForListado(
+                  saldo.totalAcordado,
+                  saldo.moneda,
+                )}
               </span>
             </span>
             <span className="text-vialto-steel">
-              Saldo:{' '}
-              <span className={`font-medium ${saldo.pagado ? 'text-emerald-700' : 'text-red-700'}`}>
+              Saldo:{" "}
+              <span
+                className={`font-medium ${saldo.pagado ? "text-emerald-700" : "text-red-700"}`}
+              >
                 {saldo.pagado
-                  ? 'Pagado'
+                  ? "Pagado"
                   : formatViajeImporteForListado(saldo.saldo, saldo.moneda)}
               </span>
             </span>
@@ -142,12 +159,24 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
                 onClick={() => setShowPagosAnteriores((prev) => !prev)}
                 className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded border border-black/10 bg-white transition hover:bg-vialto-mist"
                 aria-expanded={showPagosAnteriores}
-                aria-label={showPagosAnteriores ? 'Ocultar pagos anteriores' : 'Mostrar pagos anteriores'}
-                title={showPagosAnteriores ? 'Ocultar pagos anteriores' : 'Mostrar pagos anteriores'}
+                aria-label={
+                  showPagosAnteriores
+                    ? "Ocultar pagos anteriores"
+                    : "Mostrar pagos anteriores"
+                }
+                title={
+                  showPagosAnteriores
+                    ? "Ocultar pagos anteriores"
+                    : "Mostrar pagos anteriores"
+                }
               >
                 <img
                   src="/icono-historial.png"
-                  alt={showPagosAnteriores ? 'Ocultar pagos anteriores' : 'Mostrar pagos anteriores'}
+                  alt={
+                    showPagosAnteriores
+                      ? "Ocultar pagos anteriores"
+                      : "Mostrar pagos anteriores"
+                  }
                   className="h-5 w-5"
                 />
               </button>
@@ -166,9 +195,14 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
             </div>
             <div className="mt-2 space-y-2">
               {pagos.map((p, i) => (
-                <div key={i} className="grid grid-cols-[1fr_auto] gap-2 items-center text-sm text-vialto-charcoal">
+                <div
+                  key={i}
+                  className="grid grid-cols-[1fr_auto] gap-2 items-center text-sm text-vialto-charcoal"
+                >
                   <div className="group relative min-w-0">
-                    <span className={`font-medium tabular-nums ${p.observaciones ? 'cursor-default underline decoration-dotted underline-offset-2' : ''}`}>
+                    <span
+                      className={`font-medium tabular-nums ${p.observaciones ? "cursor-default underline decoration-dotted underline-offset-2" : ""}`}
+                    >
                       {formatViajeImporteForListado(p.monto, p.moneda)}
                     </span>
                     {p.observaciones && (
@@ -179,12 +213,12 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
                   </div>
                   <span className="text-right text-vialto-steel tabular-nums">
                     {p.fecha
-                      ? new Date(p.fecha).toLocaleDateString('es-AR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
+                      ? new Date(p.fecha).toLocaleDateString("es-AR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
                         })
-                      : '—'}
+                      : "—"}
                   </span>
                 </div>
               ))}
@@ -195,14 +229,18 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex gap-2">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className={labelClass}>Monto <span className="text-red-500">*</span></span>
+              <span className={labelClass}>
+                Monto <span className="text-red-500">*</span>
+              </span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={montoStr}
-                onChange={(e) => setMontoStr(maskCurrencyForMoneda(e.target.value, moneda))}
+                onChange={(e) =>
+                  setMontoStr(maskCurrencyForMoneda(e.target.value, moneda))
+                }
                 placeholder="0.00"
-                className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? 'border-red-400' : ''}`}
+                className={`${inputClass} text-right tabular-nums ${fieldErrors.monto ? "border-red-400" : ""}`}
                 autoFocus
                 disabled={saving}
                 aria-label="Monto del pago"
@@ -211,7 +249,9 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
             </div>
             <div className="flex flex-col gap-1">
               <span className={labelClass}>Moneda</span>
-              <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal">{moneda}</span>
+              <span className="flex h-9 items-center text-sm font-medium text-vialto-charcoal">
+                {moneda}
+              </span>
             </div>
           </div>
 
@@ -240,7 +280,6 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
               />
             </div>
           </div>
-
         </div>
 
         {error && (
@@ -268,7 +307,7 @@ export function RegistrarPagoTransportistaModal({ open, viaje, onSuccess, onClos
             className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-3 py-1.5 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-50"
           >
             {saving && <Spinner className="h-3.5 w-3.5" />}
-            {saving ? 'Guardando…' : 'Guardar pago'}
+            {saving ? "Guardando…" : "Guardar pago"}
           </button>
         </div>
       </div>
