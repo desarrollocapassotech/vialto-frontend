@@ -93,6 +93,28 @@ export function ExportarViajeModal({
   const [error, setError] = useState<DescargaError | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  const [habilitarExportacionPautMicCrt, setHabilitarExportacionPautMicCrt] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchId = tid || viaje.tenantId; // usamos viaje.tenantId si tid no está presente
+    if (!fetchId) return;
+    
+    (async () => {
+      try {
+        const url = platform 
+           ? `/api/platform/tenants/${encodeURIComponent(fetchId)}` 
+           : `/api/tenants/${encodeURIComponent(fetchId)}`;
+        const data = await apiJson<any>(url, getToken);
+        if (!cancelled) {
+          setHabilitarExportacionPautMicCrt(data.habilitarExportacionPautMicCrt ?? false);
+        }
+      } catch (e) {
+        if (!cancelled) setHabilitarExportacionPautMicCrt(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tid, viaje.tenantId, platform, getToken]);
+
   // Nuevo estado para la vista de selección de transportista de Nómina
   const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
@@ -507,48 +529,60 @@ export function ExportarViajeModal({
           ) : (
             /* --- VISTA NORMAL DE BOTONES --- */
             <div className="mt-5 flex flex-col gap-2">
-              {permitePaut ? (
-                <button
-                  type="button"
-                  disabled={ocupado}
-                  onClick={handleClickNominaInit}
-                  className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm font-medium text-vialto-charcoal">
-                    {generandoPaut ? "Generando…" : "NOMINA"}
-                  </span>
-                  {!generandoPaut && (
-                    <span className="text-xs text-vialto-steel">↓ PDF</span>
-                  )}
-                </button>
-              ) : null}
+              {habilitarExportacionPautMicCrt === null ? (
+                <div className="flex justify-center p-4">
+                  <Spinner className="h-6 w-6 text-vialto-steel" />
+                </div>
+              ) : !habilitarExportacionPautMicCrt ? (
+                <div className="border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 rounded">
+                  La exportación de Nómina y MIC/CRT no está habilitada para esta empresa.
+                </div>
+              ) : (
+                <>
+                  {permitePaut ? (
+                    <button
+                      type="button"
+                      disabled={ocupado}
+                      onClick={handleClickNominaInit}
+                      className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-sm font-medium text-vialto-charcoal">
+                        {generandoPaut ? "Generando…" : "NOMINA"}
+                      </span>
+                      {!generandoPaut && (
+                        <span className="text-xs text-vialto-steel">↓ PDF</span>
+                      )}
+                    </button>
+                  ) : null}
 
-              <button
-                type="button"
-                disabled={ocupado || !permiteMicCrt}
-                onClick={() => void abrirMicCrt()}
-                className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                  !permiteMicCrt
-                    ? "No disponible para viajes cancelados"
-                    : undefined
-                }
-              >
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {micCrtValidando ? "Verificando…" : "MIC/CRT"}
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {permiteMicCrt ? (
-                    micCrtValidando ? (
-                      <Spinner className="h-3.5 w-3.5" />
-                    ) : (
-                      "Formulario"
-                    )
-                  ) : (
-                    "No disponible"
-                  )}
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={ocupado || !permiteMicCrt}
+                    onClick={() => void abrirMicCrt()}
+                    className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={
+                      !permiteMicCrt
+                        ? "No disponible para viajes cancelados"
+                        : undefined
+                    }
+                  >
+                    <span className="text-sm font-medium text-vialto-charcoal">
+                      {micCrtValidando ? "Verificando…" : "MIC/CRT"}
+                    </span>
+                    <span className="text-xs text-vialto-steel">
+                      {permiteMicCrt ? (
+                        micCrtValidando ? (
+                          <Spinner className="h-3.5 w-3.5" />
+                        ) : (
+                          "Formulario"
+                        )
+                      ) : (
+                        "No disponible"
+                      )}
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           )}
 

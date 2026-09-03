@@ -379,6 +379,7 @@ export interface Tenant {
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
   importacionesOcultas: boolean;
+  habilitarExportacionPautMicCrt?: boolean;
   /**
    * Método de anulación del CVLP (060) — 'nota_credito_debito' (default, todo tenant nuevo) |
    * 'manual'. Solo editable desde superadmin (panel Empresas). Ver Liquidacion.estado.
