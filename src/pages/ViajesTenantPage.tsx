@@ -24,9 +24,13 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { AgregarGastoModal } from "@/components/viajes/AgregarGastoModal";
 import { RegistrarPagoTransportistaModal } from "@/components/viajes/RegistrarPagoTransportistaModal";
 import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
-import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
-import type { FacturaLetra } from "@/lib/arcaCbteTipo";
+import {
+  type FacturaLetra,
+  facturaLetraFromCondicionIva,
+  facturaLetraLabel,
+  condicionIvaLabel,
+} from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
@@ -453,10 +457,7 @@ export function ViajesTenantPage({
     viaje: Viaje;
     targetClienteId?: string;
   } | null>(null);
-  const [tipoFacturaViaje, setTipoFacturaViaje] = useState<{
-    viaje: Viaje;
-    targetClienteId?: string;
-  } | null>(null);
+
   const [facturarMultiClienteViaje, setFacturarMultiClienteViaje] = useState<Viaje | null>(null);
   const [verFacturasMultiClienteViaje, setVerFacturasMultiClienteViaje] =
     useState<Viaje | null>(null);
@@ -1321,7 +1322,6 @@ export function ViajesTenantPage({
     if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
     if (crearLiqViaje?.id === v.id) setCrearLiqViaje(null);
     if (selectorViaje?.viaje.id === v.id) setSelectorViaje(null);
-    if (tipoFacturaViaje?.viaje.id === v.id) setTipoFacturaViaje(null);
     if (viewingFactura?.id === v.facturaId) setViewingFactura(null);
     setViajeDeleteConfirm(null);
     setViajeDeleteImpacto(null);
@@ -1650,7 +1650,15 @@ export function ViajesTenantPage({
 
   function proceedAfterMultiClientSelector(v: Viaje, targetClienteId?: string) {
     if (hasFacturasArca) {
-      setTipoFacturaViaje({ viaje: v, targetClienteId });
+      const cliente = clientes?.find(
+        (c) => c.id === (targetClienteId ?? v.clienteId),
+      );
+      const letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
+      showToast(
+        `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
+        "success",
+      );
+      void navigateToFacturacion(v, letra, targetClienteId);
     } else {
       void navigateToFacturacion(v, undefined, targetClienteId);
     }
@@ -3165,23 +3173,6 @@ export function ViajesTenantPage({
             }
             setCrearLiqViaje(selectorViaje.viaje);
             setSelectorViaje(null);
-          }}
-        />
-      )}
-
-      {tipoFacturaViaje && (
-        <TipoFacturaClienteModal
-          viaje={tipoFacturaViaje.viaje}
-          clienteAfacturar={clientes?.find(c => c.id === (
-            tipoFacturaViaje.targetClienteId ??
-              tipoFacturaViaje.viaje.clienteId
-          )) ?? null}
-          onClose={() => setTipoFacturaViaje(null)}
-          onConfirm={(letra) => {
-            const v = tipoFacturaViaje.viaje;
-            const cid = tipoFacturaViaje.targetClienteId;
-            setTipoFacturaViaje(null);
-            void navigateToFacturacion(v, letra, cid);
           }}
         />
       )}
