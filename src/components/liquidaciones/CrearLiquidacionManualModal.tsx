@@ -91,6 +91,24 @@ function monedaViaje(
   return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
 }
 
+/**
+ * IVA de la liquidación precargado desde el viaje (`precioTransportistaIvaIncluidoPct`).
+ * Solo si todos los viajes elegidos coinciden y el % es > 0 (0 = el transportista
+ * no suma IVA en efectivo, no es “liquidar sin IVA”).
+ */
+function uniqueIvaPctFromViajes(
+  viajes: Pick<ViajeItem, "precioTransportistaIvaIncluidoPct">[],
+): number | null {
+  const pcts = [
+    ...new Set(
+      viajes
+        .map((v) => Number(v.precioTransportistaIvaIncluidoPct))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ];
+  return pcts.length === 1 ? pcts[0] : null;
+}
+
 const inputClass =
   "h-9 w-full rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35";
 const selectClass = inputClass;
@@ -152,11 +170,15 @@ export function CrearLiquidacionManualModal({
   /** Precargada con la comisión propia del transportista o, a falta de ésta, la de config ARCA. */
   const [comisionPct, setComisionPct] = useState("");
   const comisionEditadaManualmente = useRef(false);
-  /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
+  /** Precargado con el % del viaje si hay uno; si no, config ARCA o 21%. */
   const [ivaPct, setIvaPct] = useState(
-    String(configProp?.ivaGastosAdmin ?? 21),
+    String(
+      uniqueIvaPctFromViajes(viajeInicial ? [viajeInicial] : []) ??
+        configProp?.ivaGastosAdmin ??
+        21,
+    ),
   );
-  const ivaSyncedFromConfig = useRef(configProp?.ivaGastosAdmin != null);
+  const ivaEditadaManualmente = useRef(false);
   /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
   const [ptoVenta, setPtoVenta] = useState(
     configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
@@ -212,14 +234,6 @@ export function CrearLiquidacionManualModal({
       cancelled = true;
     };
   }, [configProp, hasLiquidoProductoArca, getToken]);
-
-  useEffect(() => {
-    if (resolvedConfig?.ivaGastosAdmin == null || ivaSyncedFromConfig.current) {
-      return;
-    }
-    ivaSyncedFromConfig.current = true;
-    setIvaPct(String(resolvedConfig.ivaGastosAdmin));
-  }, [resolvedConfig?.ivaGastosAdmin]);
 
   useEffect(() => {
     if (
@@ -352,6 +366,18 @@ export function CrearLiquidacionManualModal({
     if (viajeInicial) return [viajeInicial as ViajeItem];
     return viajes.filter((v) => selectedViajeIds.has(v.id));
   }, [viajeInicial, viajes, selectedViajeIds]);
+
+  useEffect(() => {
+    if (ivaEditadaManualmente.current) return;
+    const fromViajes = uniqueIvaPctFromViajes(selectedViajes);
+    if (fromViajes != null) {
+      setIvaPct(String(fromViajes));
+      return;
+    }
+    if (resolvedConfig?.ivaGastosAdmin != null) {
+      setIvaPct(String(resolvedConfig.ivaGastosAdmin));
+    }
+  }, [selectedViajes, resolvedConfig?.ivaGastosAdmin]);
 
   /** Moneda ya fijada por la selección actual (null si no hay selección). */
   const monedaSeleccionada = useMemo<ViajeMonedaCodigo | null>(() => {
@@ -1020,12 +1046,16 @@ export function CrearLiquidacionManualModal({
                     max="100"
                     step="0.01"
                     value={ivaPct}
-                    onChange={(e) => setIvaPct(e.target.value)}
+                    onChange={(e) => {
+                      ivaEditadaManualmente.current = true;
+                      setIvaPct(e.target.value);
+                    }}
                     className={inputClass}
                   />
                   <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                    Por defecto se aplica {resolvedConfig?.ivaGastosAdmin ?? 21}
-                    %. Para liquidar sin IVA ingresá 0.
+                    Si el viaje tiene % de IVA, se precarga. Si no, se usa{" "}
+                    {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin
+                    IVA ingresá 0.
                   </p>
                 </div>
               </div>
