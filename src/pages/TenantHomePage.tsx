@@ -303,6 +303,7 @@ export function TenantHomePage() {
       {facturaLetraViaje && (
         <TipoFacturaClienteModal
           viaje={facturaLetraViaje}
+          clienteAfacturar={maestro.clientes?.find(c => c.id === facturaLetraViaje.clienteId) ?? null}
           busy={abriendoFacturar}
           onClose={() => setFacturaLetraViaje(null)}
           onConfirm={(letra) => {

@@ -354,8 +354,16 @@ export function viajesFiltradosParaFactura(
       fid && viajePerteneceAFacturaEnEdicion(v, fid, idsFactura),
     );
 
-    if (viajeTieneFacturaAsignada(v) && !enEstaFactura) return false;
-    if (v.facturacionEstado === "cobrado" && !enEstaFactura) return false;
+    let estadoFacturacionCliente = v.facturacionEstado;
+    if (v.clienteId !== cid && v.clientesViaje) {
+      const vc = v.clientesViaje.find(x => x.clienteId === cid);
+      if (vc) {
+        estadoFacturacionCliente = vc.facturacionEstado;
+      }
+    }
+
+    if (!facturacionPermiteVincular(estadoFacturacionCliente) && !enEstaFactura) return false;
+    if (estadoFacturacionCliente === "cobrado" && !enEstaFactura) return false;
     if (v.etapa === "cancelado" && !enEstaFactura) return false;
     return true;
   });

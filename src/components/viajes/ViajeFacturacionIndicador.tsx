@@ -17,9 +17,10 @@ import { useToast } from '@/lib/toast';
 import type { Factura, Viaje } from '@/types/api';
 
 type Props = {
-  viaje: Pick<Viaje, 'facturacionEstado' | 'factura' | 'cliente' | 'clienteId'>;
+  viaje: Pick<Viaje, 'facturacionEstado' | 'factura' | 'cliente' | 'clienteId' | 'clientesViaje'>;
   /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
   tenantId?: string;
+  onClickOverride?: () => void;
 };
 
 const badgeClass =
@@ -36,7 +37,7 @@ function facturaUrl(id: string, tenantId?: string) {
  * si ya hay una factura vinculada, va directo a su vista completa (ahorra el paso del
  * modal intermedio); si todavía no hay factura, muestra el modal de detalle actual.
  */
-export function ViajeFacturacionIndicador({ viaje, tenantId }: Props) {
+export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -47,7 +48,41 @@ export function ViajeFacturacionIndicador({ viaje, tenantId }: Props) {
   const estado = (viaje.facturacionEstado ?? 'sin_facturar') as FacturacionEstado;
   const lifecycle = facturacionLifecycleEstado(estado);
 
+  let displayLabel = facturacionEstadoLabel[lifecycle] ?? lifecycle;
+  let displayClass = facturacionEstadoBadgeClass[lifecycle];
+
+  if (viaje.clientesViaje && viaje.clientesViaje.length > 0) {
+    const estados = [viaje.facturacionEstado, ...viaje.clientesViaje.map(c => c.facturacionEstado)];
+    const isFacturado = (e: string | null | undefined) => e === 'facturado' || e === 'cobrado';
+
+    const todosFacturados = estados.every(isFacturado);
+    const algunoError = estados.some(e => e === 'error_afip');
+    const algunoEsperando = estados.some(e => e === 'esperando_afip');
+    const algunoFacturado = estados.some(isFacturado);
+
+    if (algunoError) {
+      displayLabel = facturacionEstadoLabel.error_afip;
+      displayClass = facturacionEstadoBadgeClass.error_afip;
+    } else if (algunoEsperando) {
+      displayLabel = facturacionEstadoLabel.esperando_afip;
+      displayClass = facturacionEstadoBadgeClass.esperando_afip;
+    } else if (algunoFacturado && !todosFacturados) {
+      displayLabel = facturacionEstadoLabel.facturado_parcial;
+      displayClass = facturacionEstadoBadgeClass.facturado_parcial;
+    } else if (todosFacturados) {
+      displayLabel = facturacionEstadoLabel.facturado;
+      displayClass = facturacionEstadoBadgeClass.facturado;
+    } else {
+      displayLabel = facturacionEstadoLabel.sin_facturar;
+      displayClass = facturacionEstadoBadgeClass.sin_facturar;
+    }
+  }
+
   async function handleClick() {
+    if (onClickOverride) {
+      onClickOverride();
+      return;
+    }
     if (!viaje.factura) {
       setOpen(true);
       return;
@@ -71,9 +106,9 @@ export function ViajeFacturacionIndicador({ viaje, tenantId }: Props) {
           onClick={() => void handleClick()}
           disabled={cargando}
           title={`Facturación: ${tooltipFacturacionEstado(viaje)}`}
-          className={`${badgeClass} ${facturacionEstadoBadgeClass[lifecycle]}`}
+          className={`${badgeClass} ${displayClass}`}
         >
-          {facturacionEstadoLabel[lifecycle] ?? lifecycle}
+          {displayLabel}
         </button>
         {estado === 'cobrado' && (
           <button

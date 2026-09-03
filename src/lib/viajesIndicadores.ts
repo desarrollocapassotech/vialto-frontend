@@ -93,6 +93,7 @@ export function parseKmLitrosOpcionales(
 export type FacturacionEstado =
   | 'sin_facturar'
   | 'esperando_afip'
+  | 'facturado_parcial'
   | 'facturado'
   | 'cobrado'
   | 'error_afip'
@@ -108,6 +109,7 @@ export function facturacionPermiteVincular(facturacionEstado: string): boolean {
 export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
   sin_facturar: 'Sin facturar',
   esperando_afip: 'Factura esperando AFIP',
+  facturado_parcial: 'Facturado Parcial',
   facturado: 'Facturado',
   cobrado: 'Cobrado',
   error_afip: 'Error de AFIP en factura',
@@ -118,6 +120,7 @@ export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
 export const facturacionEstadoBadgeClass: Record<FacturacionEstado, string> = {
   sin_facturar: 'bg-zinc-100 text-zinc-800 border-zinc-300/90',
   esperando_afip: 'bg-amber-50 text-amber-950 border-amber-200/95',
+  facturado_parcial: 'bg-amber-100 text-amber-950 border-amber-400/80',
   facturado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
   cobrado: 'bg-emerald-200 text-emerald-950 border-emerald-600/90',
   error_afip: 'bg-red-100 text-red-950 border-red-400/80',
@@ -128,9 +131,25 @@ export const facturacionEstadoBadgeClass: Record<FacturacionEstado, string> = {
  * Estados en los que se pueden agregar gastos adicionales al viaje.
  * Bloqueado en viajes facturados, cobrados y cancelados (mismo criterio que el backend).
  */
-export function viajePermiteAgregarGasto(v: Pick<Viaje, 'etapa' | 'facturacionEstado'>): boolean {
+export function viajePermiteAgregarGasto(
+  v: Pick<Viaje, 'etapa' | 'facturacionEstado'> & {
+    clientesViaje?: { facturacionEstado: string | null }[];
+  }
+): boolean {
   if (v.etapa === 'cancelado') return false;
-  return facturacionPermiteVincular(v.facturacionEstado);
+  
+  if (!facturacionPermiteVincular(v.facturacionEstado)) {
+    return false;
+  }
+  
+  if (v.clientesViaje && v.clientesViaje.length > 0) {
+    const algunoFacturado = v.clientesViaje.some(
+      (c) => c.facturacionEstado && !facturacionPermiteVincular(c.facturacionEstado)
+    );
+    if (algunoFacturado) return false;
+  }
+  
+  return true;
 }
 
 /**
