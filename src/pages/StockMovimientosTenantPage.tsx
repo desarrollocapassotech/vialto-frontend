@@ -30,7 +30,7 @@ import {
   stockOperacionProductoLabel,
 } from "@/lib/stockDivision";
 import { movimientoStockTipoNumeroClass } from "@/lib/stockMovimientoTipo";
-import { presentacionNombreFromLike } from "@/lib/stockPresentacion";
+import { presentacionLabelFromLike } from "@/lib/stockPresentacion";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
 import type {
   StockOperacion,
@@ -425,7 +425,7 @@ export function StockMovimientosTenantPage({
               );
               if (totalBultos === 0 && totalUnidades === 0) return "—";
               const ref = op.movimientos[0];
-              const u1 = presentacionNombreFromLike(ref?.presentacion) || "Bultos";
+              const u1 = presentacionLabelFromLike(ref?.presentacion) || "Bultos";
               const u2 = "Sueltas";
               const sign = op.tipo === "egreso" ? "−" : "+";
               return (

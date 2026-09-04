@@ -1,8 +1,9 @@
 ﻿import type { MovimientoStock, Producto, StockItem, StockOperacion } from '@/types/api';
 import {
   presentacionNombreFromLike,
+  presentacionLabelFromLike,
   presentacionNombreFromMovimiento,
-  presentacionNombreFromStockItem,
+  presentacionLabelFromStockItem,
 } from '@/lib/stockPresentacion';
 import { formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 
@@ -71,7 +72,7 @@ function collectPresentacionNombresFromStockItems(
   for (const producto of productos) {
     if (!productIds.has(producto.id)) continue;
     for (const pp of producto.productoPresentaciones ?? []) {
-      const nombre = pp.presentacion?.nombre?.trim();
+      const nombre = presentacionLabelFromLike(pp);
       if (!nombre || seen.has(nombre)) continue;
       seen.add(nombre);
       names.push(nombre);
@@ -79,7 +80,7 @@ function collectPresentacionNombresFromStockItems(
   }
 
   for (const item of items) {
-    const nombre = presentacionNombreFromStockItem(item, productos);
+    const nombre = presentacionLabelFromStockItem(item, productos);
     if (!nombre || seen.has(nombre)) continue;
     seen.add(nombre);
     names.push(nombre);
@@ -214,7 +215,7 @@ export function flattenStockOperaciones(
         remito: op.numeroRemito ?? '',
         remitoProveedor: op.numeroRemitoProveedor ?? '',
         producto: mov.producto?.nombre ?? mov.productoId,
-        presentacion: presentacionNombreFromLike(mov.presentacion) || mov.presentacionId || '',
+        presentacion: presentacionLabelFromLike(mov.presentacion) || mov.presentacionId || '',
         bultos: mov.bultos,
         sueltas: mov.unidades,
         lote: mov.lote ?? '',
@@ -328,7 +329,7 @@ export function stockItemColumnas(
         id: presentacionColId(nombre),
         label: nombre,
         getValue: (i: StockItem) =>
-          presentacionNombreFromStockItem(i, productos) === nombre ? i.cantidad1 : '',
+          presentacionLabelFromStockItem(i, productos) === nombre ? i.cantidad1 : '',
         required: true,
       })),
     );
