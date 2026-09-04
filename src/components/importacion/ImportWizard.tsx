@@ -28,6 +28,7 @@ import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdverten
 import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelExport";
 import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useMaestroData } from "@/hooks/useMaestroData";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
@@ -90,6 +91,7 @@ export function ImportWizard({
   templatesTo,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
+  const maestro = useMaestroData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arrastrando, setArrastrando] = useState(false);
 
@@ -228,6 +230,31 @@ export function ImportWizard({
     modulosElegidos ?? [...MODULOS_SECUENCIA],
     () => getToken(),
   );
+
+  // El wizard crea clientes/transportistas/choferes/vehículos por fuera del
+  // contexto global de maestros (MaestroDataProvider, en App.tsx) — ese
+  // contexto solo se re-fetchea cuando algo llama explícitamente a sus
+  // `refresh*`. Sin esto, pantallas que dependen de esas listas cacheadas
+  // (ej. la columna "Cliente" de Facturas, que resuelve el nombre buscando
+  // en `maestro.clientes` y si no lo encuentra muestra el ID crudo) quedan
+  // desactualizadas hasta un F5 después de importar. Se dispara una sola
+  // vez al llegar a "terminado" (no en cada módulo, para no spamear
+  // requests) y se rearma si se corre el wizard de nuevo.
+  const refrescoMaestroHecho = useRef(false);
+  useEffect(() => {
+    if (wizard.fase === "terminado") {
+      if (!refrescoMaestroHecho.current) {
+        refrescoMaestroHecho.current = true;
+        void maestro.refreshClientes();
+        void maestro.refreshTransportistas();
+        void maestro.refreshChoferes();
+        void maestro.refreshVehiculos();
+      }
+    } else {
+      refrescoMaestroHecho.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizard.fase]);
 
   const [numerosPorCliente, setNumerosPorCliente] = useState<
     Record<string, string>
