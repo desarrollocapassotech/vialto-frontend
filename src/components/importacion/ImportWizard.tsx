@@ -21,6 +21,8 @@ import {
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
 import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelExport";
+import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
@@ -1082,6 +1084,35 @@ function EtapaModulo({
   const [tiposVehiculo, setTiposVehiculo] = useState<Record<string, string>>(
     {},
   );
+
+  // Campos que el tenant ocultó desde configuración (ej. NyM sin PAUT) no
+  // deberían aparecer tampoco en el detalle de filas del import, aunque el
+  // Excel los traiga — mismo criterio que ya usan los ViewModal de
+  // Cliente/Transportista/Vehículo ("detalle_x"). Los 3 hooks se llaman
+  // siempre (reglas de hooks) — cada uno cachea por módulo y no pesa si el
+  // módulo actual no los necesita.
+  const clientesFieldConfig = useFieldConfig("clientes");
+  const transportistasFieldConfig = useFieldConfig("transportistas");
+  const vehiculosFieldConfig = useFieldConfig("vehiculos");
+  // El catálogo de import usa "condicionIva" (numérico); el de config de
+  // campos lo unificó con condición tributaria bajo "condicionIvaTributaria".
+  const ALIAS_CAMPO_VISIBILIDAD: Record<string, string> = {
+    condicionIva: "condicionIvaTributaria",
+  };
+  function campoVisible(modulo: ModuloWizard | null, campo: string): boolean {
+    const alias = ALIAS_CAMPO_VISIBILIDAD[campo] ?? campo;
+    switch (modulo) {
+      case "clientes":
+        return clientesFieldConfig.isVisible("detalle_cliente", alias);
+      case "transportistas":
+        return transportistasFieldConfig.isVisible("detalle_transportista", alias);
+      case "vehiculos":
+        return vehiculosFieldConfig.isVisible("detalle_vehiculo", alias);
+      default:
+        // Choferes no tiene config de campos propia todavía — se muestra igual.
+        return true;
+    }
+  }
   const [tab, setTab] = useState<PreviewTab>("viajes");
   const [tablaPage, setTablaPage] = useState(1);
   const TABLA_PAGE_SIZE = tab === "viajes" ? 5 : 10;
@@ -1256,7 +1287,15 @@ function EtapaModulo({
               </p>
               <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
                 {p.filasDetalle.map((f) => (
-                  <FilaDetalleCard key={f.fila} fila={f} />
+                  <FilaDetalleCard
+                    key={f.fila}
+                    fila={{
+                      ...f,
+                      campos: f.campos.filter((c) =>
+                        campoVisible(wizard.moduloActual, c.campo),
+                      ),
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -2052,6 +2091,15 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
   );
 }
 
+/** El backend manda `condicionIva` como el código crudo (1/4/5/6) — acá se traduce al mismo texto que ya usan las vistas de Cliente/Transportista, en vez de mostrar el número pelado. */
+function valorFilaDetalle(campo: string, valor: string): string {
+  if (campo === "condicionIva") {
+    const n = Number(valor);
+    if (Number.isFinite(n)) return condicionIvaLabel(n);
+  }
+  return valor;
+}
+
 function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
   return (
     <div className="rounded border border-black/10 p-3">
@@ -2075,7 +2123,9 @@ function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
             <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
               {c.label}
             </p>
-            <p className="text-sm text-vialto-charcoal">{c.valor}</p>
+            <p className="text-sm text-vialto-charcoal">
+              {valorFilaDetalle(c.campo, c.valor)}
+            </p>
           </div>
         ))}
       </div>
