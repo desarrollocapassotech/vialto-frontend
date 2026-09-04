@@ -29,7 +29,7 @@ import type {
   ImportPreviewEntidad,
   ImportPreviewFilaEntidad,
   ImportColumnasEsperadasModulo,
-  ImportIdFiscalConflicto,
+  ImportCampoUnicoConflicto,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -1121,7 +1121,7 @@ function EtapaModulo({
     useState(false);
   const [confirmarFacturasDuplicadas, setConfirmarFacturasDuplicadas] =
     useState(false);
-  const [decisionesIdFiscal, setDecisionesIdFiscal] = useState<
+  const [decisionesCampoUnico, setDecisionesCampoUnico] = useState<
     Record<number, "ignorar" | "actualizar">
   >({});
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
@@ -1131,7 +1131,7 @@ function EtapaModulo({
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
     setConfirmarFacturasDuplicadas(false);
-    setDecisionesIdFiscal({});
+    setDecisionesCampoUnico({});
   }, [p?.sessionId]);
 
   // Un lookup de Viajes (cliente/transportista/chofer/vehículo) puede fallar
@@ -1217,9 +1217,10 @@ function EtapaModulo({
     p?.advertenciasFacturasDuplicadas ?? [];
   const requiereConfirmarFacturasDuplicadas =
     advertenciasFacturasDuplicadas.length > 0 && !confirmarFacturasDuplicadas;
-  const advertenciasIdFiscalDuplicado = p?.advertenciasIdFiscalDuplicado ?? [];
-  const requiereResolverIdFiscalDuplicado = advertenciasIdFiscalDuplicado.some(
-    (c) => !decisionesIdFiscal[c.fila],
+  const advertenciasCampoUnicoDuplicado =
+    p?.advertenciasCampoUnicoDuplicado ?? [];
+  const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
+    (c) => !decisionesCampoUnico[c.fila],
   );
   const tieneDesgloseActualizacion =
     p != null &&
@@ -1296,7 +1297,7 @@ function EtapaModulo({
               </p>
               <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
                 {p.filasDetalle.map((f) => {
-                  const conflicto = advertenciasIdFiscalDuplicado.find(
+                  const conflicto = advertenciasCampoUnicoDuplicado.find(
                     (c) => c.fila === f.fila,
                   );
                   return (
@@ -1310,10 +1311,10 @@ function EtapaModulo({
                       }}
                       conflicto={conflicto}
                       decision={
-                        conflicto ? decisionesIdFiscal[conflicto.fila] : undefined
+                        conflicto ? decisionesCampoUnico[conflicto.fila] : undefined
                       }
                       onElegirDecision={(accion) =>
-                        setDecisionesIdFiscal((prev) => ({
+                        setDecisionesCampoUnico((prev) => ({
                           ...prev,
                           [f.fila]: accion,
                         }))
@@ -1676,13 +1677,13 @@ function EtapaModulo({
                 requiereConfirmarCamposFaltantes ||
                 requiereResolverCiudades ||
                 requiereConfirmarFacturasDuplicadas ||
-                requiereResolverIdFiscalDuplicado
+                requiereResolverCampoUnicoDuplicado
               }
               onClick={() =>
                 void wizard.confirmarModuloActual(
                   confirmarCamposFaltantes,
                   confirmarFacturasDuplicadas,
-                  Object.entries(decisionesIdFiscal).map(([fila, accion]) => ({
+                  Object.entries(decisionesCampoUnico).map(([fila, accion]) => ({
                     fila: Number(fila),
                     accion,
                   })),
@@ -1691,8 +1692,8 @@ function EtapaModulo({
               title={
                 requiereResolverCiudades
                   ? "Resolvé las ciudades pendientes para continuar"
-                  : requiereResolverIdFiscalDuplicado
-                    ? "Elegí ignorar o actualizar para cada fila con ID Fiscal duplicado"
+                  : requiereResolverCampoUnicoDuplicado
+                    ? "Elegí ignorar o actualizar para cada fila duplicada"
                     : requiereConfirmarCamposFaltantes ||
                         requiereConfirmarFacturasDuplicadas
                       ? "Marcá la casilla de arriba para confirmar"
@@ -2138,7 +2139,7 @@ function FilaDetalleCard({
   onElegirDecision,
 }: {
   fila: ImportPreviewFilaEntidad;
-  conflicto?: ImportIdFiscalConflicto;
+  conflicto?: ImportCampoUnicoConflicto;
   decision?: "ignorar" | "actualizar";
   onElegirDecision?: (accion: "ignorar" | "actualizar") => void;
 }) {
@@ -2154,7 +2155,7 @@ function FilaDetalleCard({
         </span>
         {conflicto ? (
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
-            ID Fiscal duplicado
+            {conflicto.campoLabel} duplicado
           </span>
         ) : fila.esNuevo ? (
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
@@ -2181,9 +2182,9 @@ function FilaDetalleCard({
       {conflicto && (
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
           <span>
-            ID Fiscal <strong>{conflicto.idFiscal}</strong> ya es de{" "}
-            <strong>{conflicto.clienteExistenteNombre}</strong> — elegí qué
-            hacer:
+            {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
+            de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
+            qué hacer:
           </span>
           <div className="flex gap-1.5">
             <button
@@ -2206,7 +2207,7 @@ function FilaDetalleCard({
                   : "border-amber-300 text-amber-900 hover:bg-amber-100"
               }`}
             >
-              Actualizar {conflicto.clienteExistenteNombre}
+              Actualizar {conflicto.entidadExistenteNombre}
             </button>
           </div>
         </div>

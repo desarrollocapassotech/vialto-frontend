@@ -590,12 +590,14 @@ export interface ImportPreviewFilaEntidad {
   campos: ImportPreviewFilaCampo[];
 }
 
-/** Solo clientes: fila cuyo ID Fiscal ya pertenece a otro cliente existente (nombre distinto) — requiere elegir "ignorar" o "actualizar" antes de confirmar. */
-export interface ImportIdFiscalConflicto {
+/** Clientes/Transportistas/Choferes: fila cuyo campo único (ID Fiscal o DNI) ya pertenece a otra entidad existente (nombre distinto) — requiere elegir "ignorar" o "actualizar" antes de confirmar. */
+export interface ImportCampoUnicoConflicto {
   fila: number;
-  idFiscal: string;
-  clienteExistenteId: string;
-  clienteExistenteNombre: string;
+  /** Nombre del campo en conflicto, para mostrar (ej. "ID Fiscal", "DNI"). */
+  campoLabel: string;
+  valor: string;
+  entidadExistenteId: string;
+  entidadExistenteNombre: string;
 }
 
 export interface ImportEntidadFaltante {
@@ -647,8 +649,8 @@ export interface ImportPreviewResult {
   entidadesActualizadas?: number;
   /** Solo viajes: números de factura compartidos por más de un viaje nuevo (o ya existentes) — se unifican en una sola factura, requiere confirmación explícita. */
   advertenciasFacturasDuplicadas?: { numero: string; filas: number[] }[];
-  /** Solo clientes: filas con un conflicto de ID Fiscal — requieren elegir "ignorar" o "actualizar" por fila antes de confirmar. */
-  advertenciasIdFiscalDuplicado?: ImportIdFiscalConflicto[];
+  /** Clientes/Transportistas/Choferes: filas con un conflicto de campo único (ID Fiscal/DNI) — requieren elegir "ignorar" o "actualizar" por fila antes de confirmar. */
+  advertenciasCampoUnicoDuplicado?: ImportCampoUnicoConflicto[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;
