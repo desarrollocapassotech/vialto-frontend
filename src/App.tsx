@@ -61,6 +61,7 @@ import { CamposEmpresaPage } from "@/pages/CamposEmpresaPage";
 import { CombustibleSuperadminPage } from "@/pages/CombustibleSuperadimPage";
 import { ConceptosConfigTenantPage } from "@/pages/ConceptosConfigTenatPage";
 import { ConfiguracionNotificacionesTenantPage } from "@/pages/ConfiguracionNotificacionesTenantPage";
+import { SuperadminNotificacionesPage } from "@/pages/SuperadminNotificacionesPage";
 import { NotificacionesPage } from "@/pages/NotificacionesPage";
 
 function RequireAuth() {
@@ -474,6 +475,10 @@ export default function App() {
           <Route
             path="superadmin/campos-empresa"
             element={<CamposEmpresaPage />}
+          />
+          <Route
+            path="superadmin/notificaciones"
+            element={<SuperadminNotificacionesPage />}
           />
           <Route
             path="superadmin/combustible"

@@ -85,9 +85,6 @@ export function SuperadminHomePage() {
         <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
           Panorama general
         </h1>
-        <p className="mt-2 text-vialto-steel max-w-2xl">
-          Accesos rápidos para gestionar empresas y operación de la plataforma.
-        </p>
         <TenantsStatsCards
           loading={loadingStats}
           stats={stats}

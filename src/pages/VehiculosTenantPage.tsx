@@ -7,6 +7,7 @@ import { VehiculoViewModal } from "@/components/vehiculos/VehiculoViewModal";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { apiJson } from "@/lib/api";
 import { labelVehiculoTipo } from "@/lib/labels";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   listadoTablaAccionClass,
@@ -32,6 +33,7 @@ const TIPO_OPCIONES = [
 
 export function VehiculosTenantPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { isVisible } = useFieldConfig("vehiculos");
   const [rows, setRows] = useState<Vehiculo[] | null>(null);
   const [serverMeta, setServerMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export function VehiculosTenantPage() {
         Vehículos
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Patentes, tipo y marca de cada unidad de tu flota.
+        Toda tu flota.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
@@ -184,7 +186,13 @@ export function VehiculosTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={6}
+        tableColSpan={
+          2 +
+          (isVisible("detalle_vehiculo", "tipo") ? 1 : 0) +
+          (isVisible("detalle_vehiculo", "marca") ? 1 : 0) +
+          (isVisible("detalle_vehiculo", "modelo") ? 1 : 0) +
+          (isVisible("detalle_vehiculo", "activo") ? 1 : 0)
+        }
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -224,30 +232,33 @@ export function VehiculosTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Tipo"
-                filterActive={!!filtroTipo}
-                filterSignature={filtroTipo}
-              >
-                <select
-                  value={filtroTipo}
-                  onChange={(e) => {
-                    setFiltroTipo(e.target.value);
-                    setPage(1);
-                  }}
-                  className={selectClass(!!filtroTipo)}
-                  aria-label="Filtrar por tipo de vehículo"
+            {isVisible("detalle_vehiculo", "tipo") && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Tipo"
+                  filterActive={!!filtroTipo}
+                  filterSignature={filtroTipo}
                 >
-                  {TIPO_OPCIONES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                  <select
+                    value={filtroTipo}
+                    onChange={(e) => {
+                      setFiltroTipo(e.target.value);
+                      setPage(1);
+                    }}
+                    className={selectClass(!!filtroTipo)}
+                    aria-label="Filtrar por tipo de vehículo"
+                  >
+                    {TIPO_OPCIONES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            {isVisible("detalle_vehiculo", "marca") && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Marca"
                 filterActive={!!filtroMarca}
@@ -284,7 +295,9 @@ export function VehiculosTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            )}
+            {isVisible("detalle_vehiculo", "modelo") && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Modelo"
                 filterActive={!!filtroModelo}
@@ -321,7 +334,9 @@ export function VehiculosTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+            )}
+            {isVisible("detalle_vehiculo", "activo") && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Estado"
                 filterActive={filtroActivo !== "todos"}
@@ -344,6 +359,7 @@ export function VehiculosTenantPage() {
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             <th
               scope="col"
               className={`${listadoTablaThClass} text-right align-top`}
@@ -357,31 +373,31 @@ export function VehiculosTenantPage() {
             id: "patente",
             header: "Patente",
             primary: true,
-            cell: (v) => v.patente,
+            cell: (v: Vehiculo) => v.patente,
             tdClassName: `${listadoTablaTdClass} font-[family-name:var(--font-ui)] tracking-wider font-semibold`,
           },
-          {
+          isVisible("detalle_vehiculo", "tipo") ? {
             id: "tipo",
             header: "Tipo",
-            cell: (v) => labelVehiculoTipo(v.tipo),
+            cell: (v: Vehiculo) => labelVehiculoTipo(v.tipo),
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          } : null,
+          isVisible("detalle_vehiculo", "marca") ? {
             id: "marca",
             header: "Marca",
-            cell: (v) => v.marca ?? "—",
+            cell: (v: Vehiculo) => v.marca ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          } : null,
+          isVisible("detalle_vehiculo", "modelo") ? {
             id: "modelo",
             header: "Modelo",
-            cell: (v) => v.modelo ?? "—",
+            cell: (v: Vehiculo) => v.modelo ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
-          },
-          {
+          } : null,
+          isVisible("detalle_vehiculo", "activo") ? {
             id: "estado",
             header: "Estado",
-            cell: (v) => (
+            cell: (v: Vehiculo) => (
               <span
                 className={
                   v.activo
@@ -393,8 +409,8 @@ export function VehiculosTenantPage() {
               </span>
             ),
             tdClassName: listadoTablaTdClass,
-          },
-        ]}
+          } : null,
+        ].filter(Boolean) as any}
         rows={error ? [] : rows || []}
         rowKey={(v) => v.id}
         emptyMessage={

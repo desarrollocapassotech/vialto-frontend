@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { useToast } from "@/lib/toast";
+import { roundMoney2 } from "@/lib/facturaTotales";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   formatNumberForMoneda,
@@ -45,11 +46,17 @@ import {
   validarDestinosRows,
   viajeConDestinosEnRespuesta,
 } from "@/lib/viajesDestinos";
+import {
+  clientesPayloadParaApi,
+  clientesRowsDesdeViaje,
+  validarClientesRows,
+} from "@/lib/viajesClientes";
 import { validarPagosTransportistaDraftForm } from "@/lib/viajesTransportistaPagos";
 import {
   facturacionPermiteVincular,
   liquidacionPermiteVincular,
 } from "@/lib/viajesIndicadores";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   Chofer,
   Cliente,
@@ -93,6 +100,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   configRef.current = config;
 
   const { showToast } = useToast();
+  const { isVisible } = useFieldConfig("viajes");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ViajeInlineDraft | null>(null);
@@ -100,6 +108,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   const [error, setError] = useState<string | null>(null);
   const [fechaCargaError, setFechaCargaError] = useState<string | null>(null);
   const [destinosError, setDestinosError] = useState<string | null>(null);
+  const [clientesRowErrors, setClientesRowErrors] = useState<
+    Record<number, string>
+  >({});
   const [transportistaEfectivoError, setTransportistaEfectivoError] =
     useState<string | null>(null);
   const [fechaDescargaError, setFechaDescargaError] = useState<string | null>(
@@ -234,6 +245,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       paisOrigen: inferirPaisDesdeUbicacion(v.origen ?? ""),
       origen: v.origen ?? "",
       destinosRows: destinosRowsDesdeViaje(v),
+      clientesRows: clientesRowsDesdeViaje(v),
       fechaCarga: partesFc.fecha,
       horaCarga: partesFc.hora,
       fechaDescarga: partesFd.fecha,
@@ -374,6 +386,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     setFechaDescargaError(null);
     setDestinosError(null);
     setTransportistaEfectivoError(null);
+    setClientesRowErrors({});
   }
 
   function applyDraftModo(m: NonNullable<ViajeInlineDraft["operacionModo"]>) {
@@ -428,6 +441,15 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   async function saveInline() {
     const viajeId = editingId;
     if (!viajeId || !draft) return;
+    setSavingId(viajeId);
+    try {
+      await saveInlineInner(viajeId, draft);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function saveInlineInner(viajeId: string, draft: ViajeInlineDraft) {
     if (!draft.numero.trim()) {
       setError("Ingresá el número de viaje.");
       return;
@@ -448,26 +470,36 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       return;
     }
     setTransportistaEfectivoError(null);
+    const vehiculosRowsVisible = isVisible("edicion_viaje", "vehiculosRows");
+    const choferPropioVisible = isVisible("edicion_viaje", "choferId");
+
     const vids = vehiculoIdsDesdeRows(draft.vehiculosRows);
-    if (!externo && vids.length === 0) {
-      setError(
-        "Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).",
-      );
+
+    if (!externo && vehiculosRowsVisible && vids.length === 0) {
+      setError("Agregá al menos un vehículo al viaje (tipo y patente desde el maestro).");
       return;
     }
-    if (
-      !externo &&
-      !flotaPropiaVehiculosListaValida(
-        draft.choferId,
-        vids,
-        choferesPropios,
-        vehiculosPropios,
-      )
-    ) {
-      setError(
-        "En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).",
-      );
-      return;
+
+    if (!externo) {
+      if (choferPropioVisible && vehiculosRowsVisible) {
+        if (!flotaPropiaVehiculosListaValida(draft.choferId, vids, choferesPropios, vehiculosPropios)) {
+          setError("En flota propia, elegí chofer y vehículos de las listas (si no aparecen, cargá la página).");
+          return;
+        }
+      } else if (choferPropioVisible && !vehiculosRowsVisible) {
+        const c = String(draft.choferId ?? "").trim();
+        if (!c || !choferesPropios.some((x) => x.id === c)) {
+          setError("En flota propia, elegí chofer de la lista.");
+          return;
+        }
+      } else if (!choferPropioVisible && vehiculosRowsVisible) {
+        const vp = vehiculosFlotaPropia(vehiculosPropios);
+        const permitidos = new Set(vp.map((x) => x.id));
+        if (vids.length === 0 || !vids.every((id) => permitidos.has(id))) {
+          setError("En flota propia, elegí vehículos de la lista.");
+          return;
+        }
+      }
     }
     const o = draft.origen.trim();
     if (o) {
@@ -485,14 +517,18 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       return;
     }
     setDestinosError(null);
+    const clientesValidacion = await validarClientesRows(draft.clientesRows);
+    if (!clientesValidacion.ok) {
+      setClientesRowErrors(clientesValidacion.rowErrors);
+      setError(clientesValidacion.message);
+      return;
+    }
+    setClientesRowErrors({});
     const fcError = !draft.fechaCarga.trim() ? "Ingresá la fecha de carga." : null;
-    const fdError = !draft.fechaDescarga.trim()
-      ? "Ingresá la fecha de descarga."
-      : null;
     setFechaCargaError(fcError);
-    setFechaDescargaError(fdError);
-    if (fcError || fdError) return;
-    if (draft.fechaDescarga < draft.fechaCarga) {
+    setFechaDescargaError(null);
+    if (fcError) return;
+    if (draft.fechaDescarga.trim() && draft.fechaDescarga < draft.fechaCarga) {
       setFechaDescargaError(
         "La fecha de descarga no puede ser anterior a la de carga.",
       );
@@ -500,7 +536,10 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     }
     
     const calcMonto = (draft.cantidadFactura.trim() || draft.precioUnitarioFactura.trim())
-      ? (Number(draft.cantidadFactura.replace(",", ".")) || 0) * (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0)
+      ? roundMoney2(
+          (Number(draft.cantidadFactura.replace(",", ".")) || 0) *
+            (parseCurrencyForMoneda(draft.precioUnitarioFactura, draft.monedaMonto) || 0),
+        )
       : parseCurrencyForMoneda(draft.monto, draft.monedaMonto);
 
     if (calcMonto == null || calcMonto < 0.01) {
@@ -561,7 +600,15 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     const precioIvaBloqueado = viajeSnapshot
       ? !liquidacionPermiteVincular(viajeSnapshot.liquidacionEstado)
       : false;
-    setSavingId(viajeId);
+    // Lock angosto, independiente del `bloqueado` general: si algún cliente adicional
+    // ya tiene su propio tramo facturado, el backend rechaza CUALQUIER reemplazo del
+    // array `clientes` (aunque esa fila puntual no cambie) — se omite el campo entero
+    // del PATCH, igual que se hace con los demás campos fiscales cuando `bloqueado`.
+    const clientesBloqueados = draft.clientesRows.some(
+      (r) =>
+        !!r.facturacionEstado &&
+        !["sin_facturar", "anulado"].includes(r.facturacionEstado),
+    );
     setError(null);
     try {
       const destinosBody = destinosPayloadParaApi(destinosVal.destinos);
@@ -601,10 +648,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             origen: draft.origen.trim() || undefined,
             ...destinosBody,
             fechaCarga: fechaHoraToIso(draft.fechaCarga, draft.horaCarga),
-            fechaDescarga: fechaHoraToIso(
-              draft.fechaDescarga,
-              draft.horaDescarga,
-            ),
+            fechaDescarga: draft.fechaDescarga.trim()
+              ? fechaHoraToIso(draft.fechaDescarga, draft.horaDescarga)
+              : null,
             productoItems: draft.productoItems.filter((x) =>
               x.productoId.trim(),
             ),
@@ -624,6 +670,9 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             ...(bloqueado ? {} : gananciaBrutaManualPayloadFromDraft(draft)),
             otrosGastos: bloqueado ? undefined : draft.otrosGastos.map(otroGastoDraftToApi).filter(Boolean),
             pagosTransportista: bloqueado ? undefined : (externo ? pagosTransportistaApi : []),
+            clientes: clientesBloqueados
+              ? undefined
+              : clientesPayloadParaApi(draft.clientesRows),
           }),
         },
       );
@@ -667,8 +716,6 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     } catch (e) {
       setError(friendlyError(e, "viajes"));
       showToast("No se pudo guardar el viaje", "error");
-    } finally {
-      setSavingId(null);
     }
   }
 
@@ -682,6 +729,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     fechaCargaError,
     fechaDescargaError,
     destinosError,
+    clientesRowErrors,
     transportistaEfectivoError,
     viajeEditHint,
     edicionMaestro,
@@ -711,6 +759,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       if (p.fechaDescarga) setFechaDescargaError(null);
     },
     onClearDestinosError: () => setDestinosError(null),
+    onClearClientesRowErrors: () => setClientesRowErrors({}),
     onClearTransportistaEfectivoError: () => setTransportistaEfectivoError(null),
     seedSessionMaestro,
   };

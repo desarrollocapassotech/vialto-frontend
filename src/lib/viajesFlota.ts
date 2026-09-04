@@ -1,5 +1,9 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
+import {
+  importeACobrarFactura,
+  importeNetoViajeParaFactura,
+} from "@/lib/facturaTotales";
 
 import type {
   Chofer,
@@ -336,7 +340,11 @@ export function viajesFiltradosParaFactura(
 ): Viaje[] {
   const cid = clienteId.trim();
   if (!cid) return [];
-  const list = todos.filter((v) => v.clienteId === cid);
+  const list = todos.filter(
+    (v) =>
+      v.clienteId === cid ||
+      (v.clientesViaje ?? []).some((vc) => vc.clienteId === cid),
+  );
 
   const fid = opciones?.facturaEdicionId?.trim() || null;
   const idsFactura = opciones?.viajeIdsFacturaEdicion;
@@ -346,8 +354,16 @@ export function viajesFiltradosParaFactura(
       fid && viajePerteneceAFacturaEnEdicion(v, fid, idsFactura),
     );
 
-    if (viajeTieneFacturaAsignada(v) && !enEstaFactura) return false;
-    if (v.facturacionEstado === "cobrado" && !enEstaFactura) return false;
+    let estadoFacturacionCliente = v.facturacionEstado;
+    if (v.clienteId !== cid && v.clientesViaje) {
+      const vc = v.clientesViaje.find(x => x.clienteId === cid);
+      if (vc) {
+        estadoFacturacionCliente = vc.facturacionEstado;
+      }
+    }
+
+    if (!facturacionPermiteVincular(estadoFacturacionCliente) && !enEstaFactura) return false;
+    if (estadoFacturacionCliente === "cobrado" && !enEstaFactura) return false;
     if (v.etapa === "cancelado" && !enEstaFactura) return false;
     return true;
   });
@@ -360,7 +376,10 @@ export function viajesFiltradosParaFactura(
     if (seen.has(id)) continue;
     const v = todos.find((x) => x.id === id);
     if (!v) continue;
-    if (v.clienteId !== cid) continue;
+    const perteneceAlCliente =
+      v.clienteId === cid ||
+      (v.clientesViaje ?? []).some((vc) => vc.clienteId === cid);
+    if (!perteneceAlCliente) continue;
     seen.add(id);
     extra.push(v);
   }
@@ -380,9 +399,13 @@ export function formatViajeImporteForListado(
 
 /** Celda de tabla: monto a facturar. */
 export function textoMontoFacturarListado(v: Viaje): string {
-  const m = v.monto;
-  if (m == null) return "—";
-  return formatViajeImporteForListado(m, v.monedaMonto);
+  const hasDesglose =
+    v.cantidadFactura != null && v.precioUnitarioFactura != null;
+  if (!hasDesglose && v.monto == null) return "—";
+  return formatViajeImporteForListado(
+    importeNetoViajeParaFactura(v),
+    v.monedaMonto,
+  );
 }
 
 /**
@@ -400,6 +423,48 @@ export function nombreClienteListadoViaje(
     if (c?.nombre?.trim()) return c.nombre.trim();
   }
   return "—";
+}
+
+/** Ruta/carga de un cliente del viaje (principal o adicional) para listados. */
+export type ClienteRutaListadoViaje = {
+  clienteId: string;
+  nombre: string;
+  origen: string | null;
+  destino: string | null;
+  destinosViaje?: Array<{ id: string; orden: number; etiqueta: string }>;
+};
+
+/**
+ * Todos los clientes del viaje (principal primero, luego `clientesViaje` en orden) con
+ * su propio nombre/origen/destino — para no mostrar en listados solo el primero.
+ */
+export function clientesRutaListadoViaje(
+  v: Viaje,
+  clientes?: Cliente[],
+): ClienteRutaListadoViaje[] {
+  const out: ClienteRutaListadoViaje[] = [
+    {
+      clienteId: v.clienteId,
+      nombre: nombreClienteListadoViaje(v, clientes),
+      origen: v.origen,
+      destino: v.destino,
+      destinosViaje: v.destinosViaje,
+    },
+  ];
+  for (const c of v.clientesViaje ?? []) {
+    const nombre =
+      c.cliente?.nombre?.trim() ||
+      clientes?.find((x) => x.id === c.clienteId)?.nombre?.trim() ||
+      "—";
+    out.push({
+      clienteId: c.clienteId,
+      nombre,
+      origen: c.origen,
+      destino: c.destino,
+      destinosViaje: c.destinosCliente,
+    });
+  }
+  return out;
 }
 
 /**
@@ -522,10 +587,10 @@ export function textoImporteFacturaSeleccion(
     const v = viajes.find((x) => x.id === id);
     if (!v) continue;
 
-    const monto = v.monto;
+    const monto = importeNetoViajeParaFactura(v);
     const moneda = v.monedaMonto;
 
-    if (monto == null) continue;
+    if (monto <= 0 && v.monto == null) continue;
     if (normalizeViajeMoneda(moneda) === "USD") usd += monto;
     else ars += monto;
   }
@@ -544,17 +609,56 @@ export function textoImporteFacturaSeleccion(
   return parts.join(" · ");
 }
 
+export function textoImporteMonedaFactura(
+  moneda: string | null | undefined,
+  monto: number,
+): string {
+  const n = Number.isFinite(monto) ? monto : 0;
+  if (moneda === "USD") {
+    return `US$ ${n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+  return `$ ${n.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 /**
- * Importe mostrado en tabla de facturas: usa viajes cargados; si no alcanza, el total persistido (formato ARS).
+ * Importe mostrado en tabla de facturas.
+ * Por tramo sin ARCA: total de cobro (neto + IVA persistido / `importeACobrar`).
+ * En el resto: viajes o `importe`.
  */
 export function textoImporteFacturaListado(
-  f: { viajeIds: string[]; importe: number },
+  f: {
+    viajeIds: string[];
+    importe: number;
+    moneda?: string;
+    facturarPorTramo?: boolean;
+    tramos?: { monto: number; ivaPct: number }[];
+    ivaPct?: number | null;
+    ivaMonto?: number | null;
+    importeACobrar?: number;
+  },
   viajes: Viaje[],
+  opts?: { hasArca?: boolean },
 ): string {
+  const porTramoSinArca =
+    !opts?.hasArca &&
+    Boolean(f.facturarPorTramo) &&
+    (f.tramos?.length ?? 0) > 0;
+  if (porTramoSinArca) {
+    return textoImporteMonedaFactura(
+      f.moneda,
+      importeACobrarFactura(f, false),
+    );
+  }
   const t = textoImporteFacturaSeleccion(f.viajeIds, viajes);
   if (t !== "—") return t;
   if (f.importe != null && Number.isFinite(f.importe) && f.importe !== 0) {
-    return `$ ${f.importe.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return textoImporteMonedaFactura(f.moneda, f.importe);
   }
   return "—";
 }

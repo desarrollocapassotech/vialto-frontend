@@ -148,7 +148,7 @@ export function ChoferesTenantPage() {
         Choferes
       </h1>
       <p className="mt-2 text-vialto-steel">
-        Quienes manejan tus unidades, con datos de contacto a mano.
+        Quienes manejan tus unidades.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">

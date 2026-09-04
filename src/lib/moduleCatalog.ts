@@ -1,14 +1,12 @@
 export const AVAILABLE_MODULES = [
   'viajes',
   'facturacion',
-  'integracion-arca',
+  'emision-facturas-arca',
+  'emision-liquido-producto-arca',
   'cuenta-corriente',
   'stock',
   'combustible',
   'mantenimiento',
-  'remitos',
-  'turnos',
-  'reportes',
 ] as const;
 
 export type AvailableModuleCode = (typeof AVAILABLE_MODULES)[number];

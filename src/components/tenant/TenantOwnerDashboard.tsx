@@ -8,7 +8,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessCombustible,
-  canAccessIntegracionArca,
+  canAccessEmisionLiquidoProductoArca,
 } from "@/lib/tenantModules";
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
@@ -800,7 +800,7 @@ export function TenantOwnerDashboard({
   const showFacturacionModulo = canAccessFacturacion(modules);
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
-  const showIntegracionArca = canAccessIntegracionArca(modules);
+  const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);
   const showFinanciero = showViajes || showFacturacionModulo;
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
   const [moduloSheetOpen, setModuloSheetOpen] = useState(false);

@@ -51,7 +51,6 @@ import {
 } from "@/lib/currencyMask";
 import type { PaisCodigo } from "@/lib/ciudades";
 import {
-  etapaMuestraKmLitros,
   etapaViajeLabel,
   liquidacionPermiteVincular,
   VIAJE_ETAPAS_TODAS,
@@ -83,8 +82,17 @@ import type { OpcionProducto } from "@/lib/productosViaje";
 import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
 import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
-import type { ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
+import { textoRutaViaje, type ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { ViajeClientesFieldset, ClienteCard } from "@/components/viajes/ViajeClientesFieldset";
+import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
+
+/** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
+type PaisQuickCreateTarget =
+  | { kind: "origen" }
+  | { kind: "destino"; index: number }
+  | { kind: "origen-cliente"; clienteIndex: number }
+  | { kind: "destino-cliente"; clienteIndex: number; destinoIndex: number };
 
 export type ViajeInlineDraft = {
   numero: string;
@@ -99,6 +107,7 @@ export type ViajeInlineDraft = {
   paisOrigen: PaisCodigo;
   origen: string;
   destinosRows: ViajeDestinoRowDraft[];
+  clientesRows: ViajeClienteDraft[];
   fechaCarga: string;
   horaCarga: string;
   fechaDescarga: string;
@@ -145,6 +154,8 @@ export type ViajeEditModalProps = {
   fechaDescargaError: string | null;
   destinosError?: string | null;
   onClearDestinosError?: () => void;
+  clientesRowErrors?: Record<number, string>;
+  onClearClientesRowErrors?: () => void;
   transportistaEfectivoError?: string | null;
   onClearTransportistaEfectivoError?: () => void;
   onDraftFechasPatch: (
@@ -207,6 +218,8 @@ export function ViajeEditModal({
   fechaDescargaError,
   destinosError,
   onClearDestinosError,
+  clientesRowErrors,
+  onClearClientesRowErrors,
   transportistaEfectivoError,
   onClearTransportistaEfectivoError,
   onDraftFechasPatch,
@@ -252,9 +265,9 @@ export function ViajeEditModal({
   const [paises, setPaises] = useState<Pais[]>([]);
   const [sessionPaises, setSessionPaises] = useState<Pais[]>([]);
   const [paisesLoading, setPaisesLoading] = useState(true);
-  /** Índice del destino que disparó "+ Nuevo país". */
-  const [paisQuickCreateDestinoIndex, setPaisQuickCreateDestinoIndex] =
-    useState<number | null>(null);
+  /** A qué campo aplicar el país recién creado desde "+ Nuevo país" (origen/destino, principal o de un cliente adicional). */
+  const [paisQuickCreateTarget, setPaisQuickCreateTarget] =
+    useState<PaisQuickCreateTarget>({ kind: "origen" });
 
   const todosClientes = useMemo(() => {
     const ids = new Set(clientes.map((c) => c.id));
@@ -332,20 +345,35 @@ export function ViajeEditModal({
     );
   }, [snapshotViaje]);
 
-  // Desglose transportista: pago bruto (cantidad × precio unitario, tal cual se carga —
-  // siempre sin IVA), pago neto (bruto "engrosado" sumándole el % de IVA — cuánto se le
-  // paga en efectivo al transportista) y el monto de IVA — usados en el resumen de
-  // "Pago bruto a transporte / Pago neto / Monto IVA" más abajo.
-  const desglosePagoBruto =
-    (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
-    (parseCurrencyForMoneda(
-      draft.precioUnitarioTransportista,
-      draft.monedaPrecioTransportistaExterno,
-    ) || 0);
-  const desglosePctIva =
+  // Pago bruto al transportista: con desglose = cantidad × precio unitario; sin desglose =
+  // el "Precio transporte" cargado. Con % IVA visible, se engrosa a pago neto / monto IVA.
+  const pagoBrutoTransportista = desgloseActivo
+    ? (Number(draft.cantidadTransportista.replace(",", ".")) || 0) *
+      (parseCurrencyForMoneda(
+        draft.precioUnitarioTransportista,
+        draft.monedaPrecioTransportistaExterno,
+      ) || 0)
+    : parseCurrencyForMoneda(
+        draft.precioTransportistaExterno,
+        draft.monedaPrecioTransportistaExterno,
+      ) || 0;
+  const pctIvaTransportista =
     Number(draft.precioTransportistaIvaIncluidoPct.replace(",", ".")) || 0;
-  const desglosePagoNeto = engrosarConIva(desglosePagoBruto, desglosePctIva);
-  const desgloseMontoIva = desglosePagoNeto - desglosePagoBruto;
+  const pagoNetoTransportista = engrosarConIva(
+    pagoBrutoTransportista,
+    pctIvaTransportista,
+  );
+  const montoIvaTransportista =
+    pagoNetoTransportista - pagoBrutoTransportista;
+
+  const readonlyMoneyClass =
+    "flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0";
+  function fmtReadonlyMoney(n: number) {
+    return n.toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -570,209 +598,277 @@ export function ViajeEditModal({
               </div>
 
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <span className={labelClass}>Origen</span>
-                <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                  <PaisUbicacionSelect
-                    value={draft.paisOrigen}
-                    onChange={(p) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, paisOrigen: p, origen: "" } : prev,
-                      )
-                    }
-                    aria-label="País de origen"
-                    className={`${inputClass} w-full sm:w-40`}
-                  />
-                  <CiudadCombobox
-                    pais={draft.paisOrigen}
-                    value={draft.origen}
-                    onChange={(next) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, origen: next } : prev,
-                      )
-                    }
-                    inputClassName={`${inputClass} w-full`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                <ViajeDestinosLista
-                  groupId={`viaje-edit-${draft.numero || "e"}`}
-                  rows={draft.destinosRows}
-                  onChange={(destinosRows) => {
-                    setDraft((prev) =>
-                      prev ? { ...prev, destinosRows } : prev,
-                    );
-                    if (destinosRows[0]?.etiqueta.trim())
-                      onClearDestinosError?.();
+                <span className={labelClass}>Clientes del viaje</span>
+                <ClienteCard
+                  title={
+                    todosClientes.find((c) => c.id === draft.clienteId)?.nombre ||
+                    "Cliente principal"
+                  }
+                  summary={textoRutaViaje(
+                    draft.origen,
+                    draft.destinosRows.map((r) => r.etiqueta).filter(Boolean),
+                  )}
+                  defaultOpen
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Cliente</span>
+                      <ClienteSearchSelect
+                        clientes={todosClientes}
+                        value={draft.clienteId}
+                        onChange={(id) =>
+                          setDraft((p) => (p ? { ...p, clienteId: id } : p))
+                        }
+                        inputClassName={inputClass}
+                        aria-label="Cliente"
+                        disabled={datosComercialesBloqueados || saving}
+                        onNuevo={
+                          getToken && !datosComercialesBloqueados
+                            ? () => setQuickCreate("cliente")
+                            : undefined
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className={labelClass}>Origen</span>
+                      <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
+                        <PaisUbicacionSelect
+                          value={draft.paisOrigen}
+                          onChange={(p) =>
+                            setDraft((prev) =>
+                              prev ? { ...prev, paisOrigen: p, origen: "" } : prev,
+                            )
+                          }
+                          aria-label="País de origen"
+                          className={`${inputClass} w-full sm:w-40`}
+                        />
+                        <CiudadCombobox
+                          pais={draft.paisOrigen}
+                          value={draft.origen}
+                          onChange={(next) =>
+                            setDraft((prev) =>
+                              prev ? { ...prev, origen: next } : prev,
+                            )
+                          }
+                          inputClassName={`${inputClass} w-full`}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <ViajeDestinosLista
+                        groupId={`viaje-edit-${draft.numero || "e"}`}
+                        rows={draft.destinosRows}
+                        onChange={(destinosRows) => {
+                          setDraft((prev) =>
+                            prev ? { ...prev, destinosRows } : prev,
+                          );
+                          if (destinosRows[0]?.etiqueta.trim())
+                            onClearDestinosError?.();
+                        }}
+                        inputClassName={inputClass}
+                        paises={todosPaises}
+                        paisesLoading={paisesLoading}
+                        onNuevoPais={(index) => {
+                          setPaisQuickCreateTarget({ kind: "destino", index });
+                          setQuickCreate("pais");
+                        }}
+                      />
+                      <CrudFieldError message={destinosError} />
+                    </div>
+                    {isVisible("edicion_viaje", "productoItems") && (
+                      <div className="flex flex-col gap-1">
+                        <span className={labelClass}>Carga</span>
+                        <ViajeProductosLista
+                          groupId="viaje-edit"
+                          value={draft.productoItems}
+                          onChange={(items) =>
+                            setDraft((p) => (p ? { ...p, productoItems: items } : p))
+                          }
+                          opciones={opcionesProducto}
+                          triggerClassName={inputClass}
+                          inputClassName={inputClass}
+                          disabled={saving}
+                          getToken={getToken}
+                          onProductoCreado={onProductoCreado}
+                        />
+                      </div>
+                    )}
+                    {desgloseActivo ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Cantidad</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={datosComercialesBloqueados}
+                            value={draft.cantidadFactura}
+                            onChange={(e) =>
+                              setDraft((p) =>
+                                p ? { ...p, cantidadFactura: e.target.value } : p,
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`${inputClass} text-right tabular-nums`}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Precio unitario</span>
+                          <div className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              disabled={datosComercialesBloqueados}
+                              value={draft.precioUnitarioFactura}
+                              onChange={(e) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        precioUnitarioFactura: maskCurrencyForMoneda(
+                                          e.target.value,
+                                          p.monedaMonto,
+                                        ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              placeholder="0.00"
+                              className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                            />
+                            <MonedaSelect
+                              value={draft.monedaMonto}
+                              disabled={datosComercialesBloqueados}
+                              onChange={(m) =>
+                                setDraft((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        monedaMonto: m,
+                                        precioUnitarioFactura:
+                                          preserveAmountOnMonedaChange(
+                                            p.precioUnitarioFactura,
+                                            p.monedaMonto,
+                                            m,
+                                          ),
+                                      }
+                                    : p,
+                                )
+                              }
+                              aria-label="Moneda precio unitario"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className={labelClass}>Total a facturar</span>
+                          <div
+                            className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
+                          >
+                            <span className="w-full truncate text-sm">
+                              {(
+                                (Number(draft.cantidadFactura.replace(",", ".")) ||
+                                  0) *
+                                (parseCurrencyForMoneda(
+                                  draft.precioUnitarioFactura,
+                                  draft.monedaMonto,
+                                ) || 0)
+                              ).toLocaleString("es-AR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <span className={labelClass}>Monto a facturar</span>
+                        <div className="flex min-w-0 gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={datosComercialesBloqueados}
+                            value={draft.monto}
+                            onChange={(e) =>
+                              setDraft((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      monto: maskCurrencyForMoneda(
+                                        e.target.value,
+                                        p.monedaMonto,
+                                      ),
+                                    }
+                                  : p,
+                              )
+                            }
+                            placeholder="0.00"
+                            className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                          />
+                          <MonedaSelect
+                            value={draft.monedaMonto}
+                            disabled={datosComercialesBloqueados}
+                            onChange={(m: ViajeMonedaCodigo) =>
+                              setDraft((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      monedaMonto: m,
+                                      monto: preserveAmountOnMonedaChange(
+                                        p.monto,
+                                        p.monedaMonto,
+                                        m,
+                                      ),
+                                    }
+                                  : p,
+                              )
+                            }
+                            aria-label="Moneda monto a facturar"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ClienteCard>
+                <ViajeClientesFieldset
+                  rows={draft.clientesRows}
+                  onChange={(rows) => {
+                    setDraft((p) => (p ? { ...p, clientesRows: rows } : p));
+                    onClearClientesRowErrors?.();
                   }}
-                  inputClassName={inputClass}
+                  clientes={todosClientes}
+                  rowErrors={clientesRowErrors}
+                  desgloseActivo={desgloseActivo}
                   paises={todosPaises}
                   paisesLoading={paisesLoading}
-                  onNuevoPais={(index) => {
-                    setPaisQuickCreateDestinoIndex(index);
+                  onNuevoPaisOrigen={(clienteIndex) => {
+                    setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex });
                     setQuickCreate("pais");
                   }}
+                  onNuevoPaisDestino={(clienteIndex, destinoIndex) => {
+                    setPaisQuickCreateTarget({ kind: "destino-cliente", clienteIndex, destinoIndex });
+                    setQuickCreate("pais");
+                  }}
+                  opcionesProducto={opcionesProducto}
+                  getToken={getToken}
+                  onProductoCreado={onProductoCreado}
                 />
-                <CrudFieldError message={destinosError} />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className={labelClass}>Cliente</span>
-                <ClienteSearchSelect
-                  clientes={todosClientes}
-                  value={draft.clienteId}
-                  onChange={(id) =>
-                    setDraft((p) => (p ? { ...p, clienteId: id } : p))
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((p) =>
+                      p
+                        ? { ...p, clientesRows: [...p.clientesRows, emptyClienteRow()] }
+                        : p,
+                    )
                   }
-                  inputClassName={inputClass}
-                  aria-label="Cliente"
-                  disabled={datosComercialesBloqueados || saving}
-                  onNuevo={
-                    getToken && !datosComercialesBloqueados
-                      ? () => setQuickCreate("cliente")
-                      : undefined
-                  }
-                />
+                  className="mt-1 self-start text-xs uppercase tracking-wider px-3 py-1 border border-black/20 hover:bg-vialto-mist"
+                >
+                  + Agregar cliente
+                </button>
               </div>
-
-              {desgloseActivo ? (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Cantidad</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      disabled={datosComercialesBloqueados}
-                      value={draft.cantidadFactura}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p ? { ...p, cantidadFactura: e.target.value } : p,
-                        )
-                      }
-                      placeholder="0.00"
-                      className={`${inputClass} text-right tabular-nums`}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Precio unitario</span>
-                    <div className="flex min-w-0 gap-2">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        disabled={datosComercialesBloqueados}
-                        value={draft.precioUnitarioFactura}
-                        onChange={(e) =>
-                          setDraft((p) =>
-                            p
-                              ? {
-                                  ...p,
-                                  precioUnitarioFactura: maskCurrencyForMoneda(
-                                    e.target.value,
-                                    p.monedaMonto,
-                                  ),
-                                }
-                              : p,
-                          )
-                        }
-                        placeholder="0.00"
-                        className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                      />
-                      <MonedaSelect
-                        value={draft.monedaMonto}
-                        disabled={datosComercialesBloqueados}
-                        onChange={(m) =>
-                          setDraft((p) =>
-                            p
-                              ? {
-                                  ...p,
-                                  monedaMonto: m,
-                                  precioUnitarioFactura:
-                                    preserveAmountOnMonedaChange(
-                                      p.precioUnitarioFactura,
-                                      p.monedaMonto,
-                                      m,
-                                    ),
-                                }
-                              : p,
-                          )
-                        }
-                        aria-label="Moneda precio unitario"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={labelClass}>Total a facturar</span>
-                    <div
-                      className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                    >
-                      <span className="w-full truncate text-sm">
-                        {(
-                          (Number(draft.cantidadFactura.replace(",", ".")) ||
-                            0) *
-                          (parseCurrencyForMoneda(
-                            draft.precioUnitarioFactura,
-                            draft.monedaMonto,
-                          ) || 0)
-                        ).toLocaleString("es-AR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className={labelClass}>Monto a facturar</span>
-                  <div className="flex min-w-0 gap-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      disabled={datosComercialesBloqueados}
-                      value={draft.monto}
-                      onChange={(e) =>
-                        setDraft((p) =>
-                          p
-                            ? {
-                                ...p,
-                                monto: maskCurrencyForMoneda(
-                                  e.target.value,
-                                  p.monedaMonto,
-                                ),
-                              }
-                            : p,
-                        )
-                      }
-                      placeholder="0.00"
-                      className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                    />
-                    <MonedaSelect
-                      value={draft.monedaMonto}
-                      disabled={datosComercialesBloqueados}
-                      onChange={(m: ViajeMonedaCodigo) =>
-                        setDraft((p) =>
-                          p
-                            ? {
-                                ...p,
-                                monedaMonto: m,
-                                monto: preserveAmountOnMonedaChange(
-                                  p.monto,
-                                  p.monedaMonto,
-                                  m,
-                                ),
-                              }
-                            : p,
-                        )
-                      }
-                      aria-label="Moneda monto a facturar"
-                    />
-                  </div>
-                </div>
-              )}
 
               <ViajeOperacionTipoFieldset
                 modo={draft.operacionModo}
@@ -916,52 +1012,49 @@ export function ViajeEditModal({
                             </div>
                           )}
                         </div>
-                        {ivaTransportistaVisible && (
+                        {ivaTransportistaVisible ? (
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Pago bruto</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desglosePagoBruto.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(pagoBrutoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Pago neto</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desglosePagoNeto.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(pagoNetoTransportista)}
                                 </span>
                               </div>
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
                               <span className={labelClass}>Monto IVA</span>
-                              <div
-                                className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
-                              >
+                              <div className={readonlyMoneyClass}>
                                 <span className="w-full truncate text-sm">
-                                  {desgloseMontoIva.toLocaleString("es-AR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  {fmtReadonlyMoney(montoIvaTransportista)}
                                 </span>
                               </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
+                            <span className={labelClass}>Pago bruto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
                             </div>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <>
+                      <div
+                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                      >
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className={labelClass}>Precio transporte</span>
                           <div className="flex min-w-0 gap-2">
@@ -1040,6 +1133,35 @@ export function ViajeEditModal({
                           </div>
                         )}
                       </div>
+                      {ivaTransportistaVisible && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago bruto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoBrutoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Pago neto</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(pagoNetoTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>Monto IVA</span>
+                            <div className={readonlyMoneyClass}>
+                              <span className="w-full truncate text-sm">
+                                {fmtReadonlyMoney(montoIvaTransportista)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      </>
                     )}
                     {draft.transportistaId && (
                       <div className="flex flex-col gap-2 rounded border border-black/10 bg-vialto-mist/40 px-3 py-3">
@@ -1130,85 +1252,95 @@ export function ViajeEditModal({
                       </div>
                     )}
                     <div className="grid gap-3">
-                      <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                        <span className={labelClass}>Chofer</span>
-                        <ChoferSearchSelect
-                          choferes={todosChoferes}
-                          value={draft.choferExternoId}
-                          onChange={(id) =>
+                      {isVisible("edicion_viaje", "choferExternoId") && (
+                        <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                          <span className={labelClass}>Chofer</span>
+                          <ChoferSearchSelect
+                            choferes={todosChoferes}
+                            value={draft.choferExternoId}
+                            onChange={(id) =>
+                              setDraft((p) =>
+                                p ? { ...p, choferExternoId: id } : p,
+                              )
+                            }
+                            inputClassName={inputClass}
+                            aria-label="Chofer transportista externo"
+                            onNuevo={
+                              getToken
+                                ? () => setQuickCreate("chofer-ext")
+                                : undefined
+                            }
+                          />
+                        </div>
+                      )}
+                      {isVisible("edicion_viaje", "vehiculosRows") && (
+                        <ViajeVehiculosLista
+                          groupId={`viaje-modal-ext-${draft.numero || "e"}`}
+                          crearVehiculoHref={crearVehiculoHref}
+                          rows={draft.vehiculosRows}
+                          onChange={(rows) =>
                             setDraft((p) =>
-                              p ? { ...p, choferExternoId: id } : p,
+                              p ? { ...p, vehiculosRows: rows } : p,
                             )
                           }
-                          inputClassName={inputClass}
-                          aria-label="Chofer transportista externo"
-                          onNuevo={
-                            getToken
-                              ? () => setQuickCreate("chofer-ext")
-                              : undefined
-                          }
+                          vehiculos={todosVehiculos}
+                          alMenosUno={false}
+                          getToken={getToken}
+                          tenantId={tenantId}
+                          onVehiculoCreado={onVehiculoCreado}
+                          quickCreateStacked
                         />
-                      </div>
-                      <ViajeVehiculosLista
-                        groupId={`viaje-modal-ext-${draft.numero || "e"}`}
-                        crearVehiculoHref={crearVehiculoHref}
-                        rows={draft.vehiculosRows}
-                        onChange={(rows) =>
-                          setDraft((p) =>
-                            p ? { ...p, vehiculosRows: rows } : p,
-                          )
-                        }
-                        vehiculos={todosVehiculos}
-                        alMenosUno={false}
-                        getToken={getToken}
-                        tenantId={tenantId}
-                        onVehiculoCreado={onVehiculoCreado}
-                        quickCreateStacked
-                      />
+                      )}
                     </div>
                   </div>
                 }
                 propioContent={
                   <div className="grid gap-3">
-                    <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                      <span className={labelClass}>Chofer (flota propia)</span>
-                      <ChoferSearchSelect
-                        choferes={todosChoferesPropios}
-                        value={draft.choferId}
-                        onChange={(id) =>
-                          setDraft((p) => (p ? { ...p, choferId: id } : p))
-                        }
-                        inputClassName={inputClass}
-                        aria-label="Chofer flota propia"
-                        onNuevo={
-                          getToken
-                            ? () => setQuickCreate("chofer-prop")
-                            : undefined
-                        }
-                      />
-                      {ayudaFlota.chofer && (
-                        <p className="text-xs text-amber-800/90">
-                          {ayudaFlota.chofer}
-                        </p>
-                      )}
-                    </div>
-                    <ViajeVehiculosLista
-                      groupId={`viaje-modal-${draft.numero || "e"}`}
-                      crearVehiculoHref={crearVehiculoHref}
-                      rows={draft.vehiculosRows}
-                      onChange={(rows) =>
-                        setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
-                      }
-                      vehiculos={vehiculosPropios}
-                      getToken={getToken}
-                      tenantId={tenantId}
-                      onVehiculoCreado={onVehiculoCreado}
-                      quickCreateStacked
-                    />
-                    {ayudaFlota.vehiculo && (
-                      <p className="text-xs text-amber-800/90">
-                        {ayudaFlota.vehiculo}
-                      </p>
+                    {isVisible("edicion_viaje", "choferId") && (
+                      <div className="flex min-w-0 flex-col gap-1 max-w-md">
+                        <span className={labelClass}>Chofer (flota propia)</span>
+                        <ChoferSearchSelect
+                          choferes={todosChoferesPropios}
+                          value={draft.choferId}
+                          onChange={(id) =>
+                            setDraft((p) => (p ? { ...p, choferId: id } : p))
+                          }
+                          inputClassName={inputClass}
+                          aria-label="Chofer flota propia"
+                          onNuevo={
+                            getToken
+                              ? () => setQuickCreate("chofer-prop")
+                              : undefined
+                          }
+                        />
+                        {ayudaFlota.chofer && (
+                          <p className="text-xs text-amber-800/90">
+                            {ayudaFlota.chofer}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {isVisible("edicion_viaje", "vehiculosRows") && (
+                      <>
+                        <ViajeVehiculosLista
+                          groupId={`viaje-modal-${draft.numero || "e"}`}
+                          crearVehiculoHref={crearVehiculoHref}
+                          rows={draft.vehiculosRows}
+                          onChange={(rows) =>
+                            setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
+                          }
+                          vehiculos={vehiculosPropios}
+                          getToken={getToken}
+                          tenantId={tenantId}
+                          onVehiculoCreado={onVehiculoCreado}
+                          quickCreateStacked
+                        />
+                        {ayudaFlota.vehiculo && (
+                          <p className="text-xs text-amber-800/90">
+                            {ayudaFlota.vehiculo}
+                          </p>
+                        )}
+                      </>
                     )}
                     {viajeEditHint && (
                       <p className="text-xs text-amber-800/90">
@@ -1243,7 +1375,8 @@ export function ViajeEditModal({
                 errorFechaDescarga={fechaDescargaError}
               />
 
-              {etapaMuestraKmLitros(draft.estado) && (
+              {(isVisible("edicion_viaje", "kmRecorridos") ||
+                isVisible("edicion_viaje", "litrosConsumidos")) && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2 lg:col-span-3">
                   {isVisible("edicion_viaje", "kmRecorridos") && (
                     <div className="flex flex-col gap-1">
@@ -1277,25 +1410,6 @@ export function ViajeEditModal({
                       />
                     </div>
                   )}
-                </div>
-              )}
-
-              {isVisible("edicion_viaje", "productoItems") && (
-                <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
-                  <span className={labelClass}>Productos</span>
-                  <ViajeProductosLista
-                    groupId="viaje-edit"
-                    value={draft.productoItems}
-                    onChange={(items) =>
-                      setDraft((p) => (p ? { ...p, productoItems: items } : p))
-                    }
-                    opciones={opcionesProducto}
-                    triggerClassName={inputClass}
-                    inputClassName={inputClass}
-                    disabled={saving}
-                    getToken={getToken}
-                    onProductoCreado={onProductoCreado}
-                  />
                 </div>
               )}
 
@@ -1490,13 +1604,16 @@ export function ViajeEditModal({
           tenantId={tenantId}
           onClose={() => {
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
           onSaved={(p) => {
             setSessionPaises((prev) => [...prev, p]);
             const codigo = p.codigo || p.id;
-            const idx = paisQuickCreateDestinoIndex;
-            if (idx !== null) {
+            const target = paisQuickCreateTarget;
+            if (target.kind === "origen") {
+              setDraft((prev) => (prev ? { ...prev, paisOrigen: codigo, origen: "" } : prev));
+            } else if (target.kind === "destino") {
+              const idx = target.index;
               setDraft((prev) =>
                 prev
                   ? {
@@ -1507,9 +1624,40 @@ export function ViajeEditModal({
                     }
                   : prev,
               );
+            } else if (target.kind === "origen-cliente") {
+              const ci = target.clienteIndex;
+              setDraft((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientesRows: prev.clientesRows.map((r, i) =>
+                        i === ci ? { ...r, paisOrigen: codigo, origen: "" } : r,
+                      ),
+                    }
+                  : prev,
+              );
+            } else {
+              const { clienteIndex, destinoIndex } = target;
+              setDraft((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientesRows: prev.clientesRows.map((r, i) =>
+                        i === clienteIndex
+                          ? {
+                              ...r,
+                              destinosRows: r.destinosRows.map((d, j) =>
+                                j === destinoIndex ? { ...d, pais: codigo, etiqueta: "" } : d,
+                              ),
+                            }
+                          : r,
+                      ),
+                    }
+                  : prev,
+              );
             }
             setQuickCreate(null);
-            setPaisQuickCreateDestinoIndex(null);
+            setPaisQuickCreateTarget({ kind: "origen" });
           }}
         />
       )}

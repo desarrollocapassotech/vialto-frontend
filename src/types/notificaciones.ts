@@ -11,6 +11,7 @@ export type NotificacionConfigEfectiva = {
 export type NotificacionFeedItem = {
   id: string;
   tipo: string;
+  entidadId: string;
   label: string;
   titulo: string;
   detalle: string;

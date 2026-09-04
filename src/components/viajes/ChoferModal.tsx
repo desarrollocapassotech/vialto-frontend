@@ -24,7 +24,15 @@ export function ChoferModal({
   stacked?: boolean;
 }) {
   const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
-  const [form, setForm] = useState<ChoferFormState>({ nombre: '', dni: '', cuit: '', telefono: '' });
+  const [form, setForm] = useState<ChoferFormState>({
+    nombre: '',
+    dni: '',
+    cuit: '',
+    telefono: '',
+    licencia: '',
+    licenciaVence: '',
+    transportistaId: '',
+  });
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);

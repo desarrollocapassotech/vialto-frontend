@@ -5,6 +5,7 @@ import {
   TenantForm,
   type TenantFormValues,
 } from "@/components/superadmin/TenantForm";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -20,7 +21,9 @@ function mapTenantToForm(t: Tenant): TenantFormValues {
       (t.billingStatus as TenantFormValues["billingStatus"]) ?? "trial",
     maxUsers: String(t.maxUsers),
     billingRenewsAt: t.billingRenewsAt?.slice(0, 10) ?? "",
-    whiteLabelDomain: t.whiteLabelDomain ?? "",
+    liquidacionAnulacionMetodo:
+      (t.liquidacionAnulacionMetodo as TenantFormValues["liquidacionAnulacionMetodo"]) ??
+      "nota_credito_debito",
   };
 }
 
@@ -89,7 +92,11 @@ export function SuperadminTenantEditPage() {
             billingStatus: values.billingStatus,
             maxUsers: values.maxUsers ? Number(values.maxUsers) : undefined,
             billingRenewsAt: values.billingRenewsAt || null,
-            whiteLabelDomain: values.whiteLabelDomain?.trim() || null,
+            liquidacionAnulacionMetodo: values.modules.includes(
+              "emision-liquido-producto-arca",
+            )
+              ? (values.liquidacionAnulacionMetodo ?? "nota_credito_debito")
+              : undefined,
           }),
         },
       );
@@ -132,14 +139,7 @@ export function SuperadminTenantEditPage() {
 
   return (
     <SuperadminOnly>
-      <div className="max-w-4xl">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-          Editar empresa
-        </h1>
-        <p className="mt-2 text-vialto-steel">
-          Actualizá módulos y configuración comercial de la empresa.
-        </p>
-
+      <CrudPageLayout title="Editar empresa" contentClassName="w-full min-w-0">
         {initialLoading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
         )}
@@ -158,7 +158,7 @@ export function SuperadminTenantEditPage() {
               formError={error}
             />
 
-            <section className="mt-10 border border-red-300 bg-red-50 p-5">
+            <section className="mt-6 rounded border border-red-300 bg-red-50 p-5 sm:p-6">
               <h2 className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-red-800">
                 Danger Zone
               </h2>
@@ -166,26 +166,30 @@ export function SuperadminTenantEditPage() {
                 Esta acción elimina la empresa y sus datos asociados en la
                 plataforma.
               </p>
-              <p className="mt-2 text-xs text-red-800">
-                Escribí <strong>{tenantName}</strong> para confirmar.
-              </p>
-              <input
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                className="mt-3 h-10 w-full border border-red-300 bg-white px-3 text-sm"
-              />
-              <button
-                type="button"
-                disabled={!canDelete || deleteLoading}
-                onClick={onDelete}
-                className="mt-3 h-10 px-4 bg-red-700 text-white text-sm uppercase tracking-wider disabled:opacity-50"
-              >
-                {deleteLoading ? "Eliminando…" : "Eliminar empresa"}
-              </button>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="flex flex-1 flex-col gap-1.5">
+                  <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-red-800">
+                    Escribí <strong>{tenantName}</strong> para confirmar
+                  </span>
+                  <input
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    className="h-10 w-full max-w-sm border border-red-300 bg-white px-3 text-sm"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!canDelete || deleteLoading}
+                  onClick={onDelete}
+                  className="h-10 shrink-0 px-4 bg-red-700 text-white text-sm uppercase tracking-wider disabled:opacity-50"
+                >
+                  {deleteLoading ? "Eliminando…" : "Eliminar empresa"}
+                </button>
+              </div>
             </section>
           </>
         )}
-      </div>
+      </CrudPageLayout>
     </SuperadminOnly>
   );
 }

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Bell } from "lucide-react";
 import { apiJson } from "@/lib/api";
-import type { NotificacionFeed } from "@/types/notificaciones";
+import { resolveNotificacionRoute } from "@/lib/notificacionRoutes";
+import type { NotificacionFeed, NotificacionFeedItem } from "@/types/notificaciones";
 
 const DROPDOWN_LIMIT = 3;
 const FETCH_LIMIT = DROPDOWN_LIMIT + 1; // uno de más solo para saber si "ver todas" tiene sentido
@@ -77,6 +78,13 @@ export function NotificationBell() {
   const hayMas = (feed?.items.length ?? 0) > DROPDOWN_LIMIT;
   const noLeidas = feed?.noLeidas ?? 0;
 
+  function handleItemClick(item: NotificacionFeedItem) {
+    const to = resolveNotificacionRoute(item);
+    if (!to) return;
+    setOpen(false);
+    navigate(to);
+  }
+
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -103,15 +111,27 @@ export function NotificationBell() {
               </p>
             ) : (
               <ul className="divide-y divide-black/5">
-                {items.map((item) => (
-                  <li key={item.id} className="px-4 py-3">
-                    <p className="text-sm font-medium text-vialto-charcoal">{item.titulo}</p>
-                    <p className="mt-0.5 text-xs text-vialto-steel">{item.detalle}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-vialto-steel/70">
-                      {formatRelative(item.enviadoAt)}
-                    </p>
-                  </li>
-                ))}
+                {items.map((item) => {
+                  const clickable = resolveNotificacionRoute(item) !== null;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleItemClick(item)}
+                        disabled={!clickable}
+                        className={`block w-full px-4 py-3 text-left ${
+                          clickable ? "cursor-pointer hover:bg-vialto-mist" : "cursor-default"
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-vialto-charcoal">{item.titulo}</p>
+                        <p className="mt-0.5 text-xs text-vialto-steel">{item.detalle}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wide text-vialto-steel/70">
+                          {formatRelative(item.enviadoAt)}
+                        </p>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

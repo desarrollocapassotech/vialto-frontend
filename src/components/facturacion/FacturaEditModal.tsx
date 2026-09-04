@@ -25,6 +25,10 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
+import {
+  computeFacturaTotalesFromBases,
+  importeNetoViajeParaFactura,
+} from "@/lib/facturaTotales";
 import type { Cliente, Factura, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -201,11 +205,11 @@ export function FacturaTotalesPreview({
       draft.viajeIds.length > 0
         ? draft.viajeIds.reduce((sum, id) => {
             const v = viajes.find((x) => x.id === id);
-            return sum + (v?.monto ?? 0);
+            return sum + (v ? importeNetoViajeParaFactura(v) : 0);
           }, 0)
         : 0;
-    const iva = neto * ((Number.isFinite(ivaN) ? ivaN : 0) / 100);
-    return { neto, iva, total: neto + iva };
+    const pct = Number.isFinite(ivaN) ? ivaN : 0;
+    return computeFacturaTotalesFromBases([{ importe: neto, ivaPct: pct }]);
   })();
 
   if (totales.neto <= 0 && totales.total <= 0) return null;
@@ -416,6 +420,65 @@ export function FacturaEditModal({
     }
   }, [open]);
 
+  const allowedClienteIds = useMemo(() => {
+    if (draft.viajeIds.length === 0) return null;
+    
+    const activeTrips = viajes.filter(v => draft.viajeIds.includes(v.id));
+    const ids = new Set<string>();
+    activeTrips.forEach(v => {
+      ids.add(v.clienteId);
+      v.clientesViaje?.forEach(cv => ids.add(cv.clienteId));
+    });
+    return ids;
+  }, [draft.viajeIds, viajes]);
+
+  const filteredClientes = useMemo(() => {
+    if (!allowedClienteIds) return clientes;
+    return clientes.filter(c => allowedClienteIds.has(c.id));
+  }, [clientes, allowedClienteIds]);
+
+  const derivedViajes = useMemo(() => {
+    return viajes.map(v => {
+      if (draft.clienteId && v.clientesViaje) {
+        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        if (vc) {
+          return {
+            ...v,
+            monto: vc.monto,
+            cantidadFactura: vc.cantidad,
+            precioUnitarioFactura: vc.precioUnitario,
+            monedaMonto: vc.monedaMonto,
+            destinosViaje: vc.destinosCliente,
+            origen: vc.origen,
+            destino: vc.destino,
+          };
+        }
+      }
+      return v;
+    });
+  }, [viajes, draft.clienteId]);
+
+  const derivedViajesEdicion = useMemo(() => {
+    return viajesEdicion.map(v => {
+      if (draft.clienteId && v.clientesViaje) {
+        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        if (vc) {
+          return {
+            ...v,
+            monto: vc.monto,
+            cantidadFactura: vc.cantidad,
+            precioUnitarioFactura: vc.precioUnitario,
+            monedaMonto: vc.monedaMonto,
+            destinosViaje: vc.destinosCliente,
+            origen: vc.origen,
+            destino: vc.destino,
+          };
+        }
+      }
+      return v;
+    });
+  }, [viajesEdicion, draft.clienteId]);
+
   if (!open) return null;
 
   function patch(p: Partial<FacturaDraft>) {
@@ -559,7 +622,7 @@ export function FacturaEditModal({
 
             <FacturaContraparteField
               clienteId={draft.clienteId}
-              clientes={clientes}
+              clientes={filteredClientes}
               onClienteChange={(id) =>
                 patch({
                   clienteId: id,
@@ -618,13 +681,13 @@ export function FacturaEditModal({
                 </label>
                 {draft.viajeIds.length > 0 && (
                   <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                    {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                    {textoImporteFacturaSeleccion(draft.viajeIds, derivedViajes)}
                   </span>
                 )}
               </div>
               <ViajesVinculadosEditor
-                viajes={viajes}
-                disponibles={viajesEdicion}
+                viajes={derivedViajes}
+                disponibles={derivedViajesEdicion}
                 selected={draft.viajeIds}
                 onChange={patchViajeIds}
                 loading={viajesLoading}
@@ -670,10 +733,10 @@ export function FacturaEditModal({
             )}
           </div>
 
-          <FacturaTotalesPreview draft={draft} viajes={viajes} />
+          <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
 
           {draft.viajeIds.length > 0 &&
-            monedaUnicaDeViajes(draft.viajeIds, viajes) === null && (
+            monedaUnicaDeViajes(draft.viajeIds, derivedViajes) === null && (
               <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
                 Los viajes seleccionados tienen distintas monedas. Una factura
                 no puede contener viajes en distintas monedas. Generá una

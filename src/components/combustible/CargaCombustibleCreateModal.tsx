@@ -398,7 +398,7 @@ export function CargaCombustibleCreateModal({
             </div>
 
             <div>
-              <label className={labelClass}>Conductor (Opcional)</label>
+              <label className={labelClass}>Conductor</label>
               <SearchableSelect
                 name="choferId"
                 options={choferesOptions}

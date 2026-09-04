@@ -1,4 +1,5 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { isOrgAdmin } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -23,15 +24,19 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { AgregarGastoModal } from "@/components/viajes/AgregarGastoModal";
 import { RegistrarPagoTransportistaModal } from "@/components/viajes/RegistrarPagoTransportistaModal";
 import { ExportarViajeModal } from "@/components/viajes/ExportarViajeModal";
-import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
-import type { FacturaLetra } from "@/lib/arcaCbteTipo";
-import { apiJson, ApiError } from "@/lib/api";
+import {
+  type FacturaLetra,
+  facturaLetraFromCondicionIva,
+  facturaLetraLabel,
+  condicionIvaLabel,
+} from "@/lib/arcaCbteTipo";
+import { apiJson, apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
   mergeMaestroPorId,
-  nombreClienteListadoViaje,
+  clientesRutaListadoViaje,
   nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
@@ -85,8 +90,9 @@ import {
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import {
+  canAccessEmisionFacturasArca,
+  canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
-  canAccessIntegracionArca,
 } from "@/lib/tenantModules";
 import {
   MSG_ARCA_NO_FACTURA_USD,
@@ -96,6 +102,8 @@ import {
   motivoBloqueoAccionFacturarArcaUsd,
 } from "@/lib/arcaUsdRestriction";
 import { FacturarSelectorModal } from "@/components/viajes/FacturarSelectorModal";
+import { FacturarSelectorMultiClienteModal } from "@/components/viajes/FacturarSelectorMultiClienteModal";
+import { VerFacturasMultiClienteModal } from "@/components/viajes/VerFacturasMultiClienteModal";
 import type {
   Chofer,
   Cliente,
@@ -114,6 +122,14 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
+import { Download, Upload } from "lucide-react";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  VIAJES_EXPORT_COLUMNS,
+  generarViajesExcel,
+} from "@/lib/viajesExcelExport";
+import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
+import { LiquidacionViewModal } from "@/components/liquidaciones/LiquidacionViewModal";
 
 // ─── COMPONENTE DE BUSCADOR CON COMBOBOX (AUTOCOMPLETE) ────────────────────
 function AutocompleteInput({
@@ -243,7 +259,11 @@ function AutocompleteInput({
                 handleApply(query.trim());
               }}
             >
-              Presiona <kbd className="font-sans font-medium px-1 bg-gray-100 border border-gray-300 rounded">Enter</kbd> para buscar "{query}"
+              Presiona{" "}
+              <kbd className="font-sans font-medium px-1 bg-gray-100 border border-gray-300 rounded">
+                Enter
+              </kbd>{" "}
+              para buscar "{query}"
             </li>
           ) : (
             options.map((opt, idx) => {
@@ -281,7 +301,8 @@ export function ViajesTenantPage({
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
 } = {}) {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
+  const { user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -289,12 +310,24 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
 
+  const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
+    null,
+  );
+
   const platform = Boolean(tenantId?.trim());
-  const hasLiquidacionesArca =
-    !platform && canAccessIntegracionArca(currentTenant?.modules ?? []);
+  const puedeImportar =
+    !embeddedInSuperadmin &&
+    isOrgAdmin({ orgRole, publicMetadata: user?.publicMetadata }) &&
+    !currentTenant?.importacionesOcultas;
+  const hasFacturasArca =
+    !platform && canAccessEmisionFacturasArca(currentTenant?.modules ?? []);
+  const hasLiquidoProductoArca =
+    !platform &&
+    canAccessEmisionLiquidoProductoArca(currentTenant?.modules ?? []);
   const hasFacturacionSinArca =
     !platform &&
-    !hasLiquidacionesArca &&
+    !hasFacturasArca &&
     canAccessFacturacion(currentTenant?.modules ?? []);
   const tid = tenantId?.trim() ?? "";
 
@@ -405,6 +438,8 @@ export function ViajesTenantPage({
   const [listadoQueryVersion, setListadoQueryVersion] = useState(0);
 
   const [listadoRefetching, setListadoRefetching] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
   const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>(
     [],
   );
@@ -418,8 +453,14 @@ export function ViajesTenantPage({
   const [registrarPagoViaje, setRegistrarPagoViaje] = useState<Viaje | null>(
     null,
   );
-  const [selectorViaje, setSelectorViaje] = useState<Viaje | null>(null);
-  const [tipoFacturaViaje, setTipoFacturaViaje] = useState<Viaje | null>(null);
+  const [selectorViaje, setSelectorViaje] = useState<{
+    viaje: Viaje;
+    targetClienteId?: string;
+  } | null>(null);
+
+  const [facturarMultiClienteViaje, setFacturarMultiClienteViaje] = useState<Viaje | null>(null);
+  const [verFacturasMultiClienteViaje, setVerFacturasMultiClienteViaje] =
+    useState<Viaje | null>(null);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
   const [facturandoLoadingId, setFacturandoLoadingId] = useState<string | null>(
     null,
@@ -432,7 +473,7 @@ export function ViajesTenantPage({
     pagados: number;
   } | null>(null);
 
-  // Funciones asincrónicas de búsqueda de Autocompletado 
+  // Funciones asincrónicas de búsqueda de Autocompletado
   const searchNumero = useCallback(
     async (q: string) => {
       const qClean = q.replace(/#/g, "").trim().toLowerCase();
@@ -1213,8 +1254,7 @@ export function ViajesTenantPage({
   function esElegibleFacturarLote(v: Viaje): boolean {
     if (v.etapa?.toLowerCase() === "cancelado") return false;
     if (!viajePermiteBotonFacturar(v)) return false;
-    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto))
-      return false;
+    if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) return false;
     return true;
   }
 
@@ -1244,7 +1284,7 @@ export function ViajesTenantPage({
     const ids = idsFacturarSeleccion;
     const cid = clienteIdFiltroActivo.trim();
     if (ids.length === 0 || !cid) return;
-    if (hasLiquidacionesArca) {
+    if (hasFacturasArca) {
       const seleccion = (rows ?? []).filter((v) => ids.includes(v.id));
       const conUsd = seleccion.some((v) =>
         arcaBloqueaFacturarUsd(true, v.monedaMonto),
@@ -1281,8 +1321,8 @@ export function ViajesTenantPage({
     if (agregarGastoViaje?.id === v.id) setAgregarGastoViaje(null);
     if (registrarPagoViaje?.id === v.id) setRegistrarPagoViaje(null);
     if (crearLiqViaje?.id === v.id) setCrearLiqViaje(null);
-    if (selectorViaje?.id === v.id) setSelectorViaje(null);
-    if (tipoFacturaViaje?.id === v.id) setTipoFacturaViaje(null);
+    if (selectorViaje?.viaje.id === v.id) setSelectorViaje(null);
+    if (viewingFactura?.id === v.facturaId) setViewingFactura(null);
     setViajeDeleteConfirm(null);
     setViajeDeleteImpacto(null);
   }
@@ -1330,6 +1370,156 @@ export function ViajesTenantPage({
       setViajeDeleteImpacto(null);
     } finally {
       setDeletingViajeId(null);
+    }
+  }
+
+  // --- LOGICA DE EXPORTACIÓN A EXCEL ---
+  async function handleExportarExcel(selectedIds: string[]) {
+    try {
+      setExportandoExcel(true);
+      const filtros = new URLSearchParams();
+      const {
+        numero: numF,
+        ctg: ctgF,
+        clienteId: cid,
+        transportistaId: transpFiltro,
+        choferId: choferFiltro,
+        estado: estF,
+        facturacionEstado: facEstF,
+        pagoTransportista: pagoTranspF,
+        tipoFecha: tf,
+        fechaDesde: fd,
+        fechaHasta: fh,
+        tipoUbicacion: tu,
+        ubicacion: ut,
+        periodo: per,
+      } = filtrosAplicadosRef.current;
+
+      // Replicamos la logica de filtros exactamente igual al useEffect para descargar todo el set
+      if (numF.trim()) {
+        const cleanNum = numF.replace(/#/g, "").trim();
+        filtros.set("numero", cleanNum);
+        filtros.set("q", cleanNum);
+        filtros.set("busqueda", cleanNum);
+      }
+      if (ctgF.trim()) {
+        filtros.set("ctg", ctgF.trim());
+        filtros.set("numeroIdentificacionPersonalizado", ctgF.trim());
+        filtros.set("q", ctgF.trim());
+        filtros.set("busqueda", ctgF.trim());
+      }
+      if (cid) filtros.set("clienteId", cid);
+      if (transpFiltro) filtros.set("transportistaId", transpFiltro);
+      if (choferFiltro) filtros.set("choferId", choferFiltro);
+      if (estF.trim()) filtros.set("etapa", estF.trim());
+      if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
+      if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
+        filtros.set("pagoTransportista", pagoTranspF);
+      }
+      if ((tf === "carga" || tf === "descarga") && (fd.trim() || fh.trim())) {
+        filtros.set("tipoFecha", tf);
+        if (fd.trim()) filtros.set("fechaDesde", fd.trim());
+        if (fh.trim()) filtros.set("fechaHasta", fh.trim());
+      }
+      const utTrim = ut.trim();
+      if ((tu === "origen" || tu === "destino") && utTrim) {
+        filtros.set("tipoUbicacion", tu);
+        filtros.set("ubicacion", utTrim);
+      }
+      if (per === "desde_hoy" || per === "anteriores") {
+        filtros.set("periodo", per);
+      }
+
+      appendViajeSortQuery(
+        filtros,
+        ordenamientoAplicadoRef.current.sortBy,
+        ordenamientoAplicadoRef.current.sortDir,
+      );
+
+      const filtrosQs = filtros.toString();
+      const listBase = platform
+        ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
+        : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
+
+      const pageSizeApi = 5000; // Un lote grande para traer la tabla entera
+      let itemsExport: Viaje[] = [];
+      const sortFetch = ordenamientoAplicadoRef.current;
+      const pagoFiltroActivo =
+        pagoTranspF === "sin_pagar" || pagoTranspF === "pagado"
+          ? pagoTranspF
+          : null;
+
+      // Hacemos el pedido sin paginar
+      if (pagoFiltroActivo) {
+        const pagoData = await listarViajesPorPagoTransportistaDesdeApi(
+          listBase,
+          pagoFiltroActivo,
+          1,
+          pageSizeApi,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+          () => getTokenRef.current(),
+        );
+        itemsExport = pagoData.items;
+      } else if (
+        viajeListadoRequiereOrdenCliente(sortFetch.sortBy, sortFetch.sortDir)
+      ) {
+        const ordenData = await listarViajesOrdenadosClienteDesdeApi(
+          listBase,
+          1,
+          pageSizeApi,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+          () => getTokenRef.current(),
+        );
+        itemsExport = ordenData.items;
+      } else {
+        const data = await apiJson<ViajesPaginatedResponse>(
+          `${listBase}page=1&pageSize=${pageSizeApi}`,
+          () => getTokenRef.current(),
+        );
+        itemsExport = sortViajesListado(
+          data.items,
+          sortFetch.sortBy,
+          sortFetch.sortDir,
+        );
+      }
+
+      // Filtros locales si aplican
+      const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+      if (isLocalSearch) {
+        const qNum = numF.replace(/#/g, "").trim().toLowerCase();
+        const qCtg = ctgF.trim().toLowerCase();
+        if (qNum)
+          itemsExport = itemsExport.filter((v) =>
+            String(v.numero).toLowerCase().includes(qNum),
+          );
+        if (qCtg)
+          itemsExport = itemsExport.filter((v) =>
+            (v.numeroIdentificacionPersonalizado || "")
+              .toLowerCase()
+              .includes(qCtg),
+          );
+      }
+
+      const cols = VIAJES_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarViajesExcel(
+        cols,
+        itemsExport,
+        clientes,
+        transportistas,
+        choferes,
+        "Viajes_Exportados",
+      );
+
+      showToast("Excel exportado exitosamente", "success");
+    } catch (error) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
     }
   }
 
@@ -1423,28 +1613,67 @@ export function ViajesTenantPage({
   }
 
   function openFacturarFlow(v: Viaje) {
-    if (viajeRequiereComprobanteDual(v)) {
-      if (hasLiquidacionesArca || hasFacturacionSinArca) {
-        setSelectorViaje(v);
-        return;
-      }
-    }
-    if (arcaBloqueaFacturarUsd(hasLiquidacionesArca, v.monedaMonto)) {
-      showToast(MSG_ARCA_NO_FACTURA_USD, "error");
-      return;
-    }
-    if (hasLiquidacionesArca) {
-      setTipoFacturaViaje(v);
-    } else {
-      void navigateToFacturacion(v);
+    handleFacturarViaje(v);
+  }
+
+  function openVerFacturaFlow(v: Viaje) {
+    if ((v.clientesViaje ?? []).length > 0) {
+      setVerFacturasMultiClienteViaje(v);
+    } else if (v.facturaId) {
+      void abrirFacturaModalEnContexto(v);
     }
   }
 
-  async function navigateToFacturacion(v: Viaje, letra?: FacturaLetra) {
+  function handleFacturarViaje(v: Viaje) {
+    if (viajeRequiereComprobanteDual(v)) {
+      if (hasFacturasArca || hasFacturacionSinArca) {
+        setSelectorViaje({ viaje: v, targetClienteId: undefined });
+        return;
+      }
+    }
+    proceedAfterDualSelector(v, undefined);
+  }
+
+  function proceedAfterDualSelector(v: Viaje, targetClienteId?: string) {
+    if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) {
+      showToast(MSG_ARCA_NO_FACTURA_USD, "error");
+      return;
+    }
+
+    if (!targetClienteId && isMultiClient(v)) {
+      setFacturarMultiClienteViaje(v);
+      return;
+    }
+
+    proceedAfterMultiClientSelector(v, targetClienteId);
+  }
+
+  function proceedAfterMultiClientSelector(v: Viaje, targetClienteId?: string) {
+    if (hasFacturasArca) {
+      const cliente = clientes?.find(
+        (c) => c.id === (targetClienteId ?? v.clienteId),
+      );
+      const letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
+      showToast(
+        `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
+        "success",
+      );
+      void navigateToFacturacion(v, letra, targetClienteId);
+    } else {
+      void navigateToFacturacion(v, undefined, targetClienteId);
+    }
+  }
+
+  function isMultiClient(v: Viaje) {
+    return (v.clientesViaje ?? []).length > 0;
+  }
+
+  async function navigateToFacturacion(v: Viaje, letra?: FacturaLetra, targetClienteId?: string) {
     setFacturandoLoadingId(v.id);
     try {
+      const cid = targetClienteId ?? v.clienteId ?? "";
       const facturasCliente = await apiJson<Factura[]>(
-        facturasPorClienteUrl(v.clienteId ?? ""),
+        facturasPorClienteUrl(cid),
         () => getToken(),
       );
       const yaVinculada = facturasCliente.find(
@@ -1465,11 +1694,83 @@ export function ViajesTenantPage({
       state: {
         ...facturacionNavExtras(),
         newFacturaDraft: {
-          clienteId: v.clienteId ?? "",
+          clienteId: targetClienteId ?? v.clienteId ?? "",
           viajeIds: [v.id],
           letraComprobante: letra,
         },
       },
+    });
+  }
+
+  async function abrirFacturaModalEnContexto(v: Viaje, targetFacturaId?: string, targetClienteId?: string) {
+    const fId = targetFacturaId ?? v.facturaId;
+    const cId = targetClienteId ?? v.clienteId;
+    
+    if (!fId || !cId) return;
+
+    setFacturandoLoadingId(fId);
+
+    try {
+      const facturasCliente = await apiJson<Factura[]>(
+        facturasPorClienteUrl(cId),
+        () => getToken(),
+      );
+      const facturaEncontrada = facturasCliente.find(
+        (f) => f.id === fId,
+      );
+
+      if (facturaEncontrada) {
+        setViewingFactura(facturaEncontrada);
+      } else {
+        showToast("No se encontró el detalle de la factura", "error");
+      }
+    } catch (e) {
+      showToast("Error al cargar la factura", "error");
+    } finally {
+      setFacturandoLoadingId(null);
+    }
+  }
+
+  function abrirLiquidacionEnContexto(v: Viaje) {
+    const elegida = liquidacionElegidaDeViaje(v);
+    if (!elegida) return;
+
+    const transpId = v.transportistaId ?? (elegida as any).transportistaId;
+    const tData = transportistas.find((t) => t.id === transpId);
+    const tName =
+      tData?.nombre ?? (elegida as any).transportistaNombre ?? transpId;
+
+    let viajesLista = (elegida as any).viajes || [];
+
+    if (viajesLista.length === 0) {
+      viajesLista = [
+        {
+          viajeId: v.id,
+          viaje: v,
+          subtotal: v.precioTransportistaExterno ?? 0,
+        },
+      ];
+    } else {
+      viajesLista = viajesLista.map((item: any) => {
+        const viajeCompleto =
+          item.viajeId === v.id
+            ? v
+            : (rows ?? []).find((r) => r.id === item.viajeId);
+
+        return {
+          ...item,
+          viaje: viajeCompleto ?? item.viaje,
+        };
+      });
+    }
+    setViewingLiquidacion({
+      ...elegida,
+      transportista: {
+        id: transpId,
+        nombre: tName,
+        idFiscal: tData?.idFiscal ?? null,
+      },
+      viajes: viajesLista,
     });
   }
 
@@ -1601,7 +1902,8 @@ export function ViajesTenantPage({
           aria-label="Filtrar listado por etapa"
         >
           <option value="">Todos</option>
-          {VIAJE_ETAPAS_TODAS.map((est) => (
+          <option value="cancelado">Cancelados</option>
+          {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map((est) => (
             <option key={est} value={est} title={tooltipEtapaViaje(est)}>
               {etapaViajeLabel[est] ?? est}
             </option>
@@ -1724,13 +2026,42 @@ export function ViajesTenantPage({
 
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {!embeddedInSuperadmin ? (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
             Viajes
           </h1>
-        </>
-      )}
+        ) : (
+          <span />
+        )}
+
+        <div className="flex shrink-0 gap-2">
+          {puedeImportar && (
+            <Link
+              to="/importar?volverA=/viajes"
+              className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+            >
+              <Upload className="h-4 w-4" aria-hidden />
+              Importar
+            </Link>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setExportModalOpen(true)}
+            disabled={
+              listadoRefetching ||
+              !meta?.total ||
+              meta.total === 0 ||
+              exportandoExcel
+            }
+            className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            {exportandoExcel ? "Generando..." : "Exportar"}
+          </button>
+        </div>
+      </div>
 
       {resumen && (
         <div className="mt-3">
@@ -1771,6 +2102,7 @@ export function ViajesTenantPage({
             disabled={listadoRefetching}
             onChange={aplicarOrdenamiento}
           />
+
           <Link
             to={
               platform
@@ -1863,7 +2195,9 @@ export function ViajesTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
-                title={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
+                title={
+                  labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
+                }
                 filterActive={!!ctgFiltroActivo.trim()}
                 filterSignature={ctgFiltroActivo}
               >
@@ -1965,15 +2299,18 @@ export function ViajesTenantPage({
                   aria-label="Filtrar listado por etapa"
                 >
                   <option value="">Todos</option>
-                  {VIAJE_ETAPAS_TODAS.map((est) => (
-                    <option
-                      key={est}
-                      value={est}
-                      title={tooltipEtapaViaje(est)}
-                    >
-                      {etapaViajeLabel[est] ?? est}
-                    </option>
-                  ))}
+                  <option value="cancelado">Cancelados</option>
+                  {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
+                    (est) => (
+                      <option
+                        key={est}
+                        value={est}
+                        title={tooltipEtapaViaje(est)}
+                      >
+                        {etapaViajeLabel[est] ?? est}
+                      </option>
+                    ),
+                  )}
                 </select>
               </ViajesListadoHeaderFiltro>
             </th>
@@ -2108,7 +2445,8 @@ export function ViajesTenantPage({
           </tr>
         }
         renderTableRow={(v) => {
-          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const clientesRuta = clientesRutaListadoViaje(v, clientes);
+          const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
             v,
             transportistas,
@@ -2149,10 +2487,15 @@ export function ViajesTenantPage({
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
                 <span
                   className="block truncate font-medium"
-                  title={nombreCliente}
+                  title={clientesRuta.map((c) => c.nombre).join(", ")}
                 >
                   {nombreCliente}
                 </span>
+                {clientesRuta.length > 1 && (
+                  <span className="block text-[11px] text-vialto-fire">
+                    +{clientesRuta.length - 1} más
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
                 <span className="block truncate" title={nombreTransp}>
@@ -2217,8 +2560,13 @@ export function ViajesTenantPage({
                       <ViajeFacturacionIndicador
                         viaje={v}
                         tenantId={platform ? tid : undefined}
+                        onClickOverride={
+                          (v.clientesViaje ?? []).length > 0
+                            ? () => openVerFacturaFlow(v)
+                            : undefined
+                        }
                       />
-                      {hasLiquidacionesArca ? (
+                      {hasLiquidoProductoArca ? (
                         <ViajeLiquidacionIndicador
                           viaje={v}
                           tenantId={platform ? tid : undefined}
@@ -2239,6 +2587,11 @@ export function ViajesTenantPage({
                   destino={v.destino}
                   destinosViaje={v.destinosViaje}
                 />
+                {clientesRuta.length > 1 && (
+                  <span className="mt-0.5 block text-[11px] text-vialto-fire">
+                    +{clientesRuta.length - 1} más
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
                 <div className="flex min-w-0 flex-col gap-0.5">
@@ -2266,41 +2619,20 @@ export function ViajesTenantPage({
               >
                 <ViajeAccionesMenu
                   viaje={v}
-                  hasArca={hasLiquidacionesArca}
+                  hasFacturasArca={hasFacturasArca}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
                   onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
-                    v.facturaId
-                      ? () =>
-                          navigate(
-                            platform
-                              ? "/facturacion"
-                              : `/facturacion?factura=${v.facturaId}`,
-                            platform
-                              ? {
-                                  state: {
-                                    ...facturacionNavExtras(),
-                                    viewFacturaId: v.facturaId,
-                                  },
-                                }
-                              : undefined,
-                          )
+                    v.facturaId || (v.clientesViaje && v.clientesViaje.some(c => c.facturaId))
+                      ? () => openVerFacturaFlow(v)
                       : undefined
                   }
                   onVerLiquidacion={
                     liquidacionElegidaDeViaje(v)
-                      ? () => {
-                          const elegida = liquidacionElegidaDeViaje(v);
-                          if (elegida) {
-                            const params = new URLSearchParams();
-                            if (platform && tid) params.set("tenantId", tid);
-                            params.set("liquidacion", elegida.id);
-                            navigate(`/liquidaciones?${params.toString()}`);
-                          }
-                        }
+                      ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
@@ -2310,7 +2642,8 @@ export function ViajesTenantPage({
           );
         }}
         renderMobileCard={(v) => {
-          const nombreCliente = nombreClienteListadoViaje(v, clientes);
+          const clientesRuta = clientesRutaListadoViaje(v, clientes);
+          const nombreCliente = clientesRuta[0].nombre;
           const nombreTransp = nombreTransportistaExternoListadoViaje(
             v,
             transportistas,
@@ -2382,8 +2715,13 @@ export function ViajesTenantPage({
                   <ViajeFacturacionIndicador
                     viaje={v}
                     tenantId={platform ? tid : undefined}
+                    onClickOverride={
+                      (v.clientesViaje ?? []).length > 0
+                        ? () => openVerFacturaFlow(v)
+                        : undefined
+                    }
                   />
-                  {hasLiquidacionesArca ? (
+                  {hasLiquidoProductoArca ? (
                     <ViajeLiquidacionIndicador
                       viaje={v}
                       tenantId={platform ? tid : undefined}
@@ -2413,11 +2751,18 @@ export function ViajesTenantPage({
                       aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
                     />
                   ) : null}
-                  <span
-                    className="min-w-0 truncate font-medium"
-                    title={nombreCliente}
-                  >
-                    {nombreCliente}
+                  <span className="min-w-0">
+                    <span
+                      className="block truncate font-medium"
+                      title={clientesRuta.map((c) => c.nombre).join(", ")}
+                    >
+                      {nombreCliente}
+                    </span>
+                    {clientesRuta.length > 1 && (
+                      <span className="block text-[11px] text-vialto-fire">
+                        +{clientesRuta.length - 1} más
+                      </span>
+                    )}
                   </span>
                 </div>
               }
@@ -2433,11 +2778,18 @@ export function ViajesTenantPage({
                 {
                   label: "Origen — Destino",
                   value: (
-                    <ViajeOrigenDestinoLinea
-                      origen={v.origen}
-                      destino={v.destino}
-                      destinosViaje={v.destinosViaje}
-                    />
+                    <>
+                      <ViajeOrigenDestinoLinea
+                        origen={v.origen}
+                        destino={v.destino}
+                        destinosViaje={v.destinosViaje}
+                      />
+                      {clientesRuta.length > 1 && (
+                        <span className="mt-0.5 block text-[11px] text-vialto-fire">
+                          +{clientesRuta.length - 1} más
+                        </span>
+                      )}
+                    </>
                   ),
                 },
                 {
@@ -2471,41 +2823,20 @@ export function ViajesTenantPage({
               actions={
                 <ViajeAccionesMenu
                   viaje={v}
-                  hasArca={hasLiquidacionesArca}
+                  hasFacturasArca={hasFacturasArca}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
                   onFacturar={() => openFacturarFlow(v)}
                   onExportar={() => setExportarViaje(v)}
                   onVerFactura={
-                    v.facturaId
-                      ? () =>
-                          navigate(
-                            platform
-                              ? "/facturacion"
-                              : `/facturacion?factura=${v.facturaId}`,
-                            platform
-                              ? {
-                                  state: {
-                                    ...facturacionNavExtras(),
-                                    viewFacturaId: v.facturaId,
-                                  },
-                                }
-                              : undefined,
-                          )
+                    v.facturaId || (v.clientesViaje && v.clientesViaje.some(c => c.facturaId))
+                      ? () => openVerFacturaFlow(v)
                       : undefined
                   }
                   onVerLiquidacion={
                     liquidacionElegidaDeViaje(v)
-                      ? () => {
-                          const elegida = liquidacionElegidaDeViaje(v);
-                          if (elegida) {
-                            const params = new URLSearchParams();
-                            if (platform && tid) params.set("tenantId", tid);
-                            params.set("liquidacion", elegida.id);
-                            navigate(`/liquidaciones?${params.toString()}`);
-                          }
-                        }
+                      ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
                   onEliminar={() => requestDeleteViaje(v)}
@@ -2538,7 +2869,7 @@ export function ViajesTenantPage({
         <ViajeViewModal
           viaje={viewingViaje}
           tenantId={platform ? tid : undefined}
-          hasArca={hasLiquidacionesArca}
+          hasLiquidoProductoArca={hasLiquidoProductoArca}
           editando={abriendoEditorViaje}
           onClose={() => setViewingViaje(null)}
           onEditar={() => {
@@ -2553,8 +2884,16 @@ export function ViajesTenantPage({
               }
             })();
           }}
+          onVerFactura={
+            (viewingViaje.clientesViaje ?? []).length > 0 || viewingViaje.facturaId
+              ? () => {
+                  setViewingViaje(null);
+                  openVerFacturaFlow(viewingViaje);
+                }
+              : undefined
+          }
           onRegistrarPago={
-            !hasLiquidacionesArca && viewingViaje.transportistaId
+            !hasLiquidoProductoArca && viewingViaje.transportistaId
               ? () => {
                   const v = viewingViaje;
                   setViewingViaje(null);
@@ -2565,137 +2904,188 @@ export function ViajesTenantPage({
         />
       )}
 
-      {/* Editor Modal Inferior para Editar Viajes en Listado */}
-      {viajeEditor.editingId &&
-        viajeEditor.draft &&
-        viajeEditor.viajeSnapshot && (
-          <ViajeEditModal
-            open
-            draft={viajeEditor.draft}
-            setDraft={viajeEditor.setDraft}
-            snapshotViaje={viajeEditor.viajeSnapshot}
-            opcionesProducto={viajeEditor.opcionesProducto}
-            clientes={viajeEditor.edicionMaestro?.clientes ?? clientes}
-            choferes={viajeEditor.edicionMaestro?.choferes ?? choferes}
-            transportistas={
-              viajeEditor.edicionMaestro?.transportistas ?? transportistas
-            }
-            vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
-            choferesPropios={viajeEditor.choferesPropios}
-            vehiculosPropios={viajeEditor.vehiculosPropios}
-            onModoChange={viajeEditor.applyDraftModo}
-            ayudaFlota={viajeEditor.ayudaFlota}
-            viajeEditHint={viajeEditor.viajeEditHint}
-            fechaCargaError={viajeEditor.fechaCargaError}
-            fechaDescargaError={viajeEditor.fechaDescargaError}
-            destinosError={viajeEditor.destinosError}
-            onClearDestinosError={viajeEditor.onClearDestinosError}
-            transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
-            onClearTransportistaEfectivoError={
-              viajeEditor.onClearTransportistaEfectivoError
-            }
-            onDraftFechasPatch={viajeEditor.onDraftFechasPatch}
-            onClose={cancelEdit}
-            onSave={() => void viajeEditor.saveInline()}
-            onFacturar={() => {
-              const draft = viajeEditor.draft!;
-              const snapshot = viajeEditor.viajeSnapshot!;
-              const v = {
-                ...snapshot,
-                clienteId: draft.clienteId.trim() || snapshot.clienteId,
-                monedaMonto: draft.monedaMonto,
-                monedaPrecioTransportistaExterno:
-                  draft.monedaPrecioTransportistaExterno,
-                transportistaId:
-                  draft.operacionModo === "externo"
-                    ? draft.transportistaId
-                    : snapshot.transportistaId,
-              };
-              openFacturarFlow(v);
-            }}
-            facturarBloqueoMotivo={motivoBloqueoAccionFacturarArcaUsd(
-              hasLiquidacionesArca,
-              {
-                ...viajeEditor.viajeSnapshot,
-                clienteId:
-                  viajeEditor.draft.clienteId.trim() ||
-                  viajeEditor.viajeSnapshot.clienteId,
-                monedaMonto: viajeEditor.draft.monedaMonto,
-                monedaPrecioTransportistaExterno:
-                  viajeEditor.draft.monedaPrecioTransportistaExterno,
-                transportistaId:
-                  viajeEditor.draft.operacionModo === "externo"
-                    ? viajeEditor.draft.transportistaId
-                    : viajeEditor.viajeSnapshot.transportistaId,
-              },
-            )}
-            onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
-            saving={viajeEditor.saving}
-            error={viajeEditor.error}
-            crearVehiculoHref={
-              platform
-                ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}`
-                : undefined
-            }
-            getToken={getToken}
+      {/* 1. Contexto de Apilamiento Base (z-100) para el Modal de Edición Principal.
+             Debe ser mayor al Header (que suele ser z-40 o z-50) pero menor a los modales secundarios. */}
+      <div className="relative" style={{ zIndex: 100 }}>
+        {viajeEditor.editingId &&
+          viajeEditor.draft &&
+          viajeEditor.viajeSnapshot && (
+            <ViajeEditModal
+              open
+              draft={viajeEditor.draft}
+              setDraft={viajeEditor.setDraft}
+              snapshotViaje={viajeEditor.viajeSnapshot}
+              opcionesProducto={viajeEditor.opcionesProducto}
+              clientes={viajeEditor.edicionMaestro?.clientes ?? clientes}
+              choferes={viajeEditor.edicionMaestro?.choferes ?? choferes}
+              transportistas={
+                viajeEditor.edicionMaestro?.transportistas ?? transportistas
+              }
+              vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
+              choferesPropios={viajeEditor.choferesPropios}
+              vehiculosPropios={viajeEditor.vehiculosPropios}
+              onModoChange={viajeEditor.applyDraftModo}
+              ayudaFlota={viajeEditor.ayudaFlota}
+              viajeEditHint={viajeEditor.viajeEditHint}
+              fechaCargaError={viajeEditor.fechaCargaError}
+              fechaDescargaError={viajeEditor.fechaDescargaError}
+              destinosError={viajeEditor.destinosError}
+              onClearDestinosError={viajeEditor.onClearDestinosError}
+              clientesRowErrors={viajeEditor.clientesRowErrors}
+              onClearClientesRowErrors={viajeEditor.onClearClientesRowErrors}
+              transportistaEfectivoError={
+                viajeEditor.transportistaEfectivoError
+              }
+              onClearTransportistaEfectivoError={
+                viajeEditor.onClearTransportistaEfectivoError
+              }
+              onDraftFechasPatch={viajeEditor.onDraftFechasPatch}
+              onClose={cancelEdit}
+              onSave={() => void viajeEditor.saveInline()}
+              onFacturar={() => {
+                const draft = viajeEditor.draft!;
+                const snapshot = viajeEditor.viajeSnapshot!;
+                const v = {
+                  ...snapshot,
+                  clienteId: draft.clienteId.trim() || snapshot.clienteId,
+                  monedaMonto: draft.monedaMonto,
+                  monedaPrecioTransportistaExterno:
+                    draft.monedaPrecioTransportistaExterno,
+                  transportistaId:
+                    draft.operacionModo === "externo"
+                      ? draft.transportistaId
+                      : snapshot.transportistaId,
+                };
+                openFacturarFlow(v);
+              }}
+              facturarBloqueoMotivo={motivoBloqueoAccionFacturarArcaUsd(
+                hasFacturasArca,
+                {
+                  ...viajeEditor.viajeSnapshot,
+                  clienteId:
+                    viajeEditor.draft.clienteId.trim() ||
+                    viajeEditor.viajeSnapshot.clienteId,
+                  monedaMonto: viajeEditor.draft.monedaMonto,
+                  monedaPrecioTransportistaExterno:
+                    viajeEditor.draft.monedaPrecioTransportistaExterno,
+                  transportistaId:
+                    viajeEditor.draft.operacionModo === "externo"
+                      ? viajeEditor.draft.transportistaId
+                      : viajeEditor.viajeSnapshot.transportistaId,
+                },
+              )}
+              onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
+              saving={viajeEditor.saving}
+              error={viajeEditor.error}
+              crearVehiculoHref={
+                platform
+                  ? `/vehiculos/nuevo?tenantId=${encodeURIComponent(tid)}`
+                  : undefined
+              }
+              getToken={getToken}
+              tenantId={platform ? tid : undefined}
+              tenant={!platform ? currentTenant : undefined}
+              onRegistrarPago={() =>
+                setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
+              }
+              onProductoCreado={viajeEditor.onProductoCreado}
+              onClienteCreado={(c) =>
+                viajeEditor.upsertMaestroEdicion("clientes", c)
+              }
+              onTransportistaCreado={(t) =>
+                viajeEditor.upsertMaestroEdicion("transportistas", t)
+              }
+              onChoferCreado={(c) =>
+                viajeEditor.upsertMaestroEdicion("choferes", c)
+              }
+              onVehiculoCreado={(v) =>
+                viajeEditor.upsertMaestroEdicion("vehiculos", v)
+              }
+            />
+          )}
+      </div>
+
+      {/* 2. Contexto de Apilamiento Máximo (z-9999) para Modales Secundarios y Overlays */}
+      <div className="relative" style={{ zIndex: 9999 }}>
+        {facturandoLoadingId && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-5 py-4 shadow-lg">
+              <Spinner className="h-5 w-5 text-vialto-fire" />
+              <span className="text-sm text-vialto-charcoal">Abriendo…</span>
+            </div>
+          </div>
+        )}
+
+        {agregarGastoViaje != null && (
+          <AgregarGastoModal
+            open={true}
+            viaje={agregarGastoViaje}
             tenantId={platform ? tid : undefined}
-            tenant={!platform ? currentTenant : undefined}
-            onRegistrarPago={() =>
-              setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
-            }
-            onProductoCreado={viajeEditor.onProductoCreado}
-            onClienteCreado={(c) =>
-              viajeEditor.upsertMaestroEdicion("clientes", c)
-            }
-            onTransportistaCreado={(t) =>
-              viajeEditor.upsertMaestroEdicion("transportistas", t)
-            }
-            onChoferCreado={(c) =>
-              viajeEditor.upsertMaestroEdicion("choferes", c)
-            }
-            onVehiculoCreado={(v) =>
-              viajeEditor.upsertMaestroEdicion("vehiculos", v)
-            }
+            onSuccess={(updated) => {
+              setRows((prev) =>
+                prev
+                  ? prev.map((r) => (r.id === updated.id ? updated : r))
+                  : prev,
+              );
+              if (viajeEditor.editingId === updated.id) {
+                viajeEditor.setDraft((d) =>
+                  d
+                    ? {
+                        ...d,
+                        otrosGastos: (updated.otrosGastos ?? []).map(
+                          otroGastoDraftFromApi,
+                        ),
+                      }
+                    : d,
+                );
+              }
+              setAgregarGastoViaje(null);
+            }}
+            onClose={() => setAgregarGastoViaje(null)}
           />
         )}
 
-      {facturandoLoadingId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-5 py-4 shadow-lg">
-            <Spinner className="h-5 w-5 text-vialto-fire" />
-            <span className="text-sm text-vialto-charcoal">Abriendo…</span>
-          </div>
-        </div>
-      )}
+        {registrarPagoViaje != null && (
+          <RegistrarPagoTransportistaModal
+            open={true}
+            viaje={registrarPagoViaje}
+            tenantId={platform ? tid : undefined}
+            onSuccess={(updated) => {
+              setRows((prev) =>
+                prev
+                  ? prev.map((r) => (r.id === updated.id ? updated : r))
+                  : prev,
+              );
+              if (viajeEditor.editingId === updated.id) {
+                viajeEditor.setDraft((d) =>
+                  d
+                    ? {
+                        ...d,
+                        pagosTransportista: (
+                          updated.pagosTransportista ?? []
+                        ).map(pagoTransportistaDraftFromApi),
+                      }
+                    : d,
+                );
+                viajeEditor.patchViajeSnapshot(updated);
+              }
+              setRegistrarPagoViaje(null);
+            }}
+            onClose={() => setRegistrarPagoViaje(null)}
+          />
+        )}
 
-      <AgregarGastoModal
-        open={agregarGastoViaje != null}
-        viaje={agregarGastoViaje}
-        tenantId={platform ? tid : undefined}
-        onSuccess={(updated) => {
-          setRows((prev) =>
-            prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev,
-          );
-          if (viajeEditor.editingId === updated.id) {
-            viajeEditor.setDraft((d) =>
-              d
-                ? {
-                    ...d,
-                    otrosGastos: (updated.otrosGastos ?? []).map(
-                      otroGastoDraftFromApi,
-                    ),
-                  }
-                : d,
-            );
-          }
-          setAgregarGastoViaje(null);
-        }}
-        onClose={() => setAgregarGastoViaje(null)}
-      />
+        {exportarViaje && (
+          <ExportarViajeModal
+            viaje={exportarViaje}
+            onClose={() => setExportarViaje(null)}
+            tenantId={platform ? tid : undefined}
+          />
+        )}
 
       <RegistrarPagoTransportistaModal
         open={registrarPagoViaje != null}
@@ -2734,158 +3124,324 @@ export function ViajesTenantPage({
       {selectorViaje && (
         <FacturarSelectorModal
           onClose={() => setSelectorViaje(null)}
-          clienteCompletado={!viajePendienteComprobanteCliente(selectorViaje)}
+          clienteCompletado={!viajePendienteComprobanteCliente(selectorViaje.viaje)}
           transportistaCompletado={
-            !viajePendienteComprobanteTransportista(selectorViaje)
+            !viajePendienteComprobanteTransportista(selectorViaje.viaje)
           }
           clienteBloqueadoMotivo={
-            arcaBloqueaFacturarUsd(
-              hasLiquidacionesArca,
-              selectorViaje.monedaMonto,
-            )
+            arcaBloqueaFacturarUsd(hasFacturasArca, selectorViaje.viaje.monedaMonto)
               ? MSG_ARCA_NO_FACTURA_USD
               : null
           }
           transportistaBloqueadoMotivo={
             arcaBloqueaLiquidarUsd(
-              hasLiquidacionesArca,
-              selectorViaje.monedaPrecioTransportistaExterno,
+              hasLiquidoProductoArca,
+              selectorViaje.viaje.monedaPrecioTransportistaExterno,
             )
               ? MSG_ARCA_NO_LIQUIDA_USD
               : null
           }
           subtituloCliente={
-            hasLiquidacionesArca
+            hasFacturasArca
               ? "Elegí Factura A o B según IVA del cliente"
               : "Registro manual"
           }
           subtituloTransportista={
-            hasLiquidacionesArca ? "CVLP tipo 60" : "Registro manual"
+            hasLiquidoProductoArca ? "CVLP tipo 60" : "Registro manual"
           }
           onFacturarCliente={() => {
             if (
-              arcaBloqueaFacturarUsd(
-                hasLiquidacionesArca,
-                selectorViaje.monedaMonto,
-              )
+              arcaBloqueaFacturarUsd(hasFacturasArca, selectorViaje.viaje.monedaMonto)
             ) {
               showToast(MSG_ARCA_NO_FACTURA_USD, "error");
               return;
             }
-            const v = selectorViaje;
+            const v = selectorViaje.viaje;
+            const cid = selectorViaje.targetClienteId;
             setSelectorViaje(null);
-            if (hasLiquidacionesArca) {
-              setTipoFacturaViaje(v);
-            } else {
-              void navigateToFacturacion(v);
-            }
+            proceedAfterDualSelector(v, cid);
           }}
           onLiquidacion={() => {
             if (
               arcaBloqueaLiquidarUsd(
-                hasLiquidacionesArca,
-                selectorViaje.monedaPrecioTransportistaExterno,
+                hasLiquidoProductoArca,
+                selectorViaje.viaje.monedaPrecioTransportistaExterno,
               )
             ) {
               showToast(MSG_ARCA_NO_LIQUIDA_USD, "error");
               return;
             }
-            setCrearLiqViaje(selectorViaje);
+            setCrearLiqViaje(selectorViaje.viaje);
             setSelectorViaje(null);
           }}
         />
       )}
 
-      {tipoFacturaViaje && (
-        <TipoFacturaClienteModal
-          viaje={tipoFacturaViaje}
-          onClose={() => setTipoFacturaViaje(null)}
-          onConfirm={(letra) => {
-            const v = tipoFacturaViaje;
-            setTipoFacturaViaje(null);
-            void navigateToFacturacion(v, letra);
+        {crearLiqViaje && (
+          <CrearLiquidacionManualModal
+            viajeInicial={crearLiqViaje}
+            transportistas={maestro.transportistas}
+            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            getToken={getToken}
+            onDataSaved={() => {
+              void maestro.refreshTransportistas();
+              void maestro.refreshClientes();
+            }}
+            onSuccess={() => {
+              setCrearLiqViaje(null);
+              setListadoQueryVersion((v) => v + 1);
+            }}
+            onClose={() => setCrearLiqViaje(null)}
+          />
+        )}
+
+        {viajeDeleteConfirm != null && (
+          <ConfirmDialog
+            open={true}
+            title="Eliminar viaje"
+            message={
+              viajeDeleteConfirm
+                ? `¿Seguro que querés eliminar el viaje ${numeroVisibleViaje(viajeDeleteConfirm)}? Esta acción no se puede deshacer.`
+                : ""
+            }
+            confirmLabel="Eliminar"
+            tone="danger"
+            busy={
+              !!deletingViajeId && deletingViajeId === viajeDeleteConfirm.id
+            }
+            onCancel={() => {
+              if (!deletingViajeId) setViajeDeleteConfirm(null);
+            }}
+            onConfirm={() => void confirmDeleteViaje()}
+          />
+        )}
+
+        {viajeDeleteImpacto != null && (
+          <ConfirmDialog
+            open={true}
+            title="Este viaje tiene liquidaciones asociadas"
+            message={
+              viajeDeleteImpacto
+                ? `El viaje ${numeroVisibleViaje(viajeDeleteImpacto.viaje)} está incluido en ${
+                    viajeDeleteImpacto.conflicto.liquidaciones.length === 1
+                      ? "esta liquidación sin autorizar por AFIP"
+                      : "estas liquidaciones sin autorizar por AFIP"
+                  }. Si continuás, se van a eliminar también:`
+                : ""
+            }
+            confirmLabel="Eliminar todo"
+            tone="danger"
+            busy={
+              !!deletingViajeId &&
+              deletingViajeId === viajeDeleteImpacto.viaje.id
+            }
+            onCancel={() => {
+              if (!deletingViajeId) setViajeDeleteImpacto(null);
+            }}
+            onConfirm={() => void confirmDeleteViajeForzado()}
+          >
+            <ul className="space-y-1.5 rounded border border-black/10 bg-vialto-mist/60 p-2.5 text-xs text-vialto-charcoal">
+              {viajeDeleteImpacto?.conflicto.liquidaciones.map((l) => (
+                <li key={l.id} className="flex flex-col">
+                  <span className="font-medium">
+                    Liquidación a {l.transportistaNombre}
+                  </span>
+                  <span className="text-vialto-steel">
+                    Período{" "}
+                    {new Date(l.periodoDesde).toLocaleDateString("es-AR")} –{" "}
+                    {new Date(l.periodoHasta).toLocaleDateString("es-AR")} ·
+                    estado: {l.estado}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ConfirmDialog>
+        )}
+
+      {facturarMultiClienteViaje && (
+        <FacturarSelectorMultiClienteModal
+          viaje={facturarMultiClienteViaje}
+          onClose={() => setFacturarMultiClienteViaje(null)}
+          onSelect={(clienteId) => {
+            const v = facturarMultiClienteViaje;
+            setFacturarMultiClienteViaje(null);
+            proceedAfterMultiClientSelector(v, clienteId);
           }}
         />
       )}
 
-      {crearLiqViaje && (
-        <CrearLiquidacionManualModal
-          viajeInicial={crearLiqViaje}
-          transportistas={maestro.transportistas}
-          hasArca={hasLiquidacionesArca}
-          getToken={getToken}
-          onDataSaved={() => {
-            void maestro.refreshTransportistas();
-            void maestro.refreshClientes();
+      {verFacturasMultiClienteViaje && (
+        <VerFacturasMultiClienteModal
+          viaje={verFacturasMultiClienteViaje}
+          onClose={() => setVerFacturasMultiClienteViaje(null)}
+          onVerFactura={(facturaId, clienteId) => {
+            void abrirFacturaModalEnContexto(
+              verFacturasMultiClienteViaje,
+              facturaId,
+              clienteId,
+            );
           }}
-          onSuccess={() => {
-            setCrearLiqViaje(null);
-            setListadoQueryVersion((v) => v + 1);
-          }}
-          onClose={() => setCrearLiqViaje(null)}
         />
       )}
 
-      <ConfirmDialog
-        open={viajeDeleteConfirm != null}
-        title="Eliminar viaje"
-        message={
-          viajeDeleteConfirm
-            ? `¿Seguro que querés eliminar el viaje ${numeroVisibleViaje(viajeDeleteConfirm)}? Esta acción no se puede deshacer.`
-            : ""
-        }
-        confirmLabel="Eliminar"
-        tone="danger"
-        busy={
-          !!deletingViajeId &&
-          viajeDeleteConfirm != null &&
-          deletingViajeId === viajeDeleteConfirm.id
-        }
-        onCancel={() => {
-          if (!deletingViajeId) setViajeDeleteConfirm(null);
-        }}
-        onConfirm={() => void confirmDeleteViaje()}
-      />
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={VIAJES_EXPORT_COLUMNS}
+          rowCount={meta?.total ?? rows?.length ?? 0}
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
+        />
+      )}
 
-      <ConfirmDialog
-        open={viajeDeleteImpacto != null}
-        title="Este viaje tiene liquidaciones asociadas"
-        message={
-          viajeDeleteImpacto
-            ? `El viaje ${numeroVisibleViaje(viajeDeleteImpacto.viaje)} está incluido en ${
-                viajeDeleteImpacto.conflicto.liquidaciones.length === 1
-                  ? "esta liquidación sin autorizar por AFIP"
-                  : "estas liquidaciones sin autorizar por AFIP"
-              }. Si continuás, se van a eliminar también:`
-            : ""
-        }
-        confirmLabel="Eliminar todo"
-        tone="danger"
-        busy={
-          !!deletingViajeId &&
-          viajeDeleteImpacto != null &&
-          deletingViajeId === viajeDeleteImpacto.viaje.id
-        }
-        onCancel={() => {
-          if (!deletingViajeId) setViajeDeleteImpacto(null);
-        }}
-        onConfirm={() => void confirmDeleteViajeForzado()}
-      >
-        <ul className="space-y-1.5 rounded border border-black/10 bg-vialto-mist/60 p-2.5 text-xs text-vialto-charcoal">
-          {viajeDeleteImpacto?.conflicto.liquidaciones.map((l) => (
-            <li key={l.id} className="flex flex-col">
-              <span className="font-medium">
-                Liquidación a {l.transportistaNombre}
-              </span>
-              <span className="text-vialto-steel">
-                Período {new Date(l.periodoDesde).toLocaleDateString("es-AR")} –{" "}
-                {new Date(l.periodoHasta).toLocaleDateString("es-AR")} · estado:{" "}
-                {l.estado}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </ConfirmDialog>
+        {viewingFactura && (
+          <FacturaViewModal
+            factura={viewingFactura}
+            cliente={
+              clientes.find((c) => c.id === viewingFactura.clienteId) ??
+              (viewingFactura as any).cliente ??
+              ({
+                condicionIva:
+                  (viewingFactura as any).letraComprobante === "a"
+                    ? "responsable_inscripto"
+                    : "consumidor_final",
+              } as any)
+            }
+            clienteNombre={
+              clientes.find((c) => c.id === viewingFactura.clienteId)?.nombre ??
+              (viewingFactura as any).clienteNombre ??
+              (viewingFactura as any).nombreCliente ??
+              "—"
+            }
+            hasArca={true}
+            onClose={() => setViewingFactura(null)}
+            onVerComprobante={
+              viewingFactura.comprobanteUrl
+                ? () =>
+                    window.open(
+                      viewingFactura.comprobanteUrl!,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                : undefined
+            }
+            onEditar={() => {
+              setViewingFactura(null);
+              navigate("/facturacion", {
+                state: {
+                  ...facturacionNavExtras(),
+                  expandFacturaId: viewingFactura.id,
+                },
+              });
+            }}
+            onMarcarCobrada={() => {
+              setViewingFactura(null);
+              navigate("/facturacion", {
+                state: {
+                  ...facturacionNavExtras(),
+                  viewFacturaId: viewingFactura.id,
+                },
+              });
+            }}
+            onEmitirArca={() => {
+              setViewingFactura(null);
+              navigate("/facturacion", {
+                state: {
+                  ...facturacionNavExtras(),
+                  viewFacturaId: viewingFactura.id,
+                },
+              });
+            }}
+            onAnular={() => {
+              setViewingFactura(null);
+              navigate("/facturacion", {
+                state: {
+                  ...facturacionNavExtras(),
+                  viewFacturaId: viewingFactura.id,
+                },
+              });
+            }}
+            onVerNotaCredito={
+              viewingFactura.arcaEstado === "anulado"
+                ? () => {
+                    if (viewingFactura.notaCreditoUrl) {
+                      window.open(
+                        viewingFactura.notaCreditoUrl,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    } else {
+                      setViewingFactura(null);
+                      navigate("/facturacion", {
+                        state: {
+                          ...facturacionNavExtras(),
+                          viewFacturaId: viewingFactura.id,
+                        },
+                      });
+                    }
+                  }
+                : undefined
+            }
+          />
+        )}
+
+        {viewingLiquidacion && (
+          <LiquidacionViewModal
+            liq={viewingLiquidacion}
+            hasArca={
+              hasLiquidoProductoArca ||
+              viewingLiquidacion.cbteNro != null ||
+              viewingLiquidacion.cae != null
+            }
+            canEdit={false}
+            onEditar={() => {
+              setViewingLiquidacion(null);
+              const params = new URLSearchParams();
+              if (platform && tid) params.set("tenantId", tid);
+              params.set("liquidacion", viewingLiquidacion.id);
+              navigate(`/liquidaciones?${params.toString()}`);
+            }}
+            onClose={() => setViewingLiquidacion(null)}
+            onVerComprobante={
+              viewingLiquidacion.cbteNro != null ||
+              viewingLiquidacion.cae != null
+                ? () => {
+                    const url =
+                      platform && tid
+                        ? `/api/platform/integracion-arca/liquidaciones/${encodeURIComponent(viewingLiquidacion.id)}/pdf?tenantId=${encodeURIComponent(tid)}`
+                        : `/api/integracion-arca/liquidaciones/${encodeURIComponent(viewingLiquidacion.id)}/pdf`;
+
+                    const ventana = window.open("", "_blank");
+
+                    apiFetch(url, () => getToken())
+                      .then((res) => {
+                        if (!res.ok) throw new Error("Error al generar PDF");
+                        return res.blob();
+                      })
+                      .then((blob) => {
+                        const blobUrl = URL.createObjectURL(blob);
+                        if (ventana) ventana.location.href = blobUrl;
+                        else window.open(blobUrl, "_blank");
+                      })
+                      .catch(() => {
+                        ventana?.close();
+                        showToast(
+                          "No se pudo cargar el PDF del comprobante",
+                          "error",
+                        );
+                      });
+                  }
+                : viewingLiquidacion.comprobanteUrl?.trim()
+                  ? () =>
+                      window.open(
+                        viewingLiquidacion.comprobanteUrl,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                  : undefined
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

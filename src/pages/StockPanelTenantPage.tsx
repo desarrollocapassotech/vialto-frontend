@@ -2,7 +2,7 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   ChevronDown,
   ChevronRight,
-  FileSpreadsheet,
+  Download,
   Package,
   Warehouse,
 } from "lucide-react";
@@ -22,6 +22,7 @@ import {
   StockInventarioLotesDetalle,
   type StockInventarioLoteFila,
 } from "@/components/stock/StockInventarioLotesDetalle";
+import { StockProductoDetalleModal } from "@/components/stock/StockProductoDetalleModal";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import {
   SelectorOpcionesSheet,
@@ -106,7 +107,9 @@ function stockTotalCell(
         aria-hidden
       />
       <span className="tabular-nums">
-        <span className={sinStock ? "" : "font-semibold"}>{item.cantidad1}</span>
+        <span className={sinStock ? "" : "font-semibold"}>
+          {item.cantidad1}
+        </span>
         <span className="text-xs text-vialto-steel"> {unidad1Nombre}</span>
         {showUnidad2 && unidad2Nombre != null && (
           <>
@@ -174,6 +177,10 @@ export function StockPanelTenantPage({
     ? `/api/platform/stock/disponible${buildQs(activeTenantId)}`
     : "/api/stock/disponible";
 
+  const disponibleAgrupadoUrl = isPlatform
+    ? `/api/platform/stock/disponible/agrupado${buildQs(activeTenantId)}`
+    : "/api/stock/disponible/agrupado";
+
   const depositosUrl = isPlatform
     ? `/api/platform/stock/depositos${buildQs(activeTenantId)}${activeTenantId ? "&" : "?"}page=1&pageSize=500`
     : "/api/stock/depositos?page=1&pageSize=500";
@@ -211,21 +218,23 @@ export function StockPanelTenantPage({
     {},
   );
 
-  const abrirProducto = useCallback(
-    async (productoId: string) => {
-      const qs = buildQs(activeTenantId);
-      try {
-        const producto = await apiJson<Producto>(
-          `${productosBase}/${encodeURIComponent(productoId)}${qs}`,
-          () => getToken(),
-        );
-        setProductoModal({ mode: "view", producto });
-      } catch {
-        // sin feedback: el listado ya muestra el nombre del producto
-      }
-    },
-    [productosBase, activeTenantId, getToken],
-  );
+  const [resumenProducto, setResumenProducto] = useState<{
+    productoId: string;
+    nombre: string;
+    totalKg: number;
+    composicion: Array<{
+      presentacionId: string | null;
+      presentacionNombre: string;
+      bultos: number;
+      sueltas: number;
+      kg: number;
+    }>;
+  } | null>(null);
+
+  const [productoDetalleModal, setProductoDetalleModal] = useState<{
+    productoId: string;
+    productoNombre: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     // Short-circuit: Si es admin y no eligió empresa, limpiamos la vista
@@ -531,8 +540,8 @@ export function StockPanelTenantPage({
     [items, depositoActivoId],
   );
 
-  // expand + cliente + producto + stock total (+ sueltas) + acciones
-  const colSpan = 5 + (showUnidad2 ? 1 : 0);
+  // expand + cliente + producto + stock total (+ sueltas) + kg + acciones
+  const colSpan = 6 + (showUnidad2 ? 1 : 0);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -554,6 +563,52 @@ export function StockPanelTenantPage({
   useEffect(() => {
     setPage(1);
   }, [filtroClienteId, filtroProductoId, soloConStockCant1, soloConStockCant2]);
+
+  useEffect(() => {
+    if (!filtroProductoId) {
+      setResumenProducto(null);
+      return;
+    }
+    if (isPlatform && !activeTenantId) return;
+
+    let cancelado = false;
+    (async () => {
+      try {
+        const qs = buildQs(activeTenantId);
+        const separador = qs ? "&" : "?";
+        const url = `${disponibleAgrupadoUrl}${qs}${separador}productoId=${encodeURIComponent(filtroProductoId)}`;
+        const data = await apiJson<
+          Array<{
+            productoId: string;
+            nombre: string;
+            totalKg: number;
+            composicion: Array<{
+              presentacionId: string | null;
+              presentacionNombre: string;
+              bultos: number;
+              sueltas: number;
+              kg: number;
+            }>;
+          }>
+        >(url, () => getToken());
+        if (!cancelado) {
+          setResumenProducto(data[0] ?? null);
+        }
+      } catch {
+        if (!cancelado) setResumenProducto(null);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    filtroProductoId,
+    disponibleAgrupadoUrl,
+    activeTenantId,
+    isPlatform,
+    getToken,
+  ]);
 
   const stockEmptyMessage =
     filtroClienteId ||
@@ -638,8 +693,8 @@ export function StockPanelTenantPage({
       disabled={filteredItems.length === 0}
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
-      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-      Descargar Excel
+      <Download className="h-3.5 w-3.5" aria-hidden />
+      Exportar
     </button>
   );
 
@@ -783,6 +838,51 @@ export function StockPanelTenantPage({
                 </nav>
               </div>
 
+              {resumenProducto && (
+                <div className="mb-4 rounded border border-black/10 bg-vialto-mist/40 p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium text-vialto-charcoal">
+                      {resumenProducto.nombre}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-lg font-semibold text-vialto-charcoal">
+                        {resumenProducto.totalKg} kg totales
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProductoDetalleModal({
+                            productoId: resumenProducto.productoId,
+                            productoNombre: resumenProducto.nombre,
+                          })
+                        }
+                        className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
+                      >
+                        Ver detalle
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {resumenProducto.composicion.map((c, i) => (
+                      <li
+                        key={i}
+                        className="flex flex-wrap items-center justify-between gap-2 text-sm text-vialto-steel"
+                      >
+                        <span>
+                          {c.bultos > 0 &&
+                            `${c.bultos} ${c.presentacionNombre}`}
+                          {c.bultos > 0 && c.sueltas > 0 && " + "}
+                          {c.sueltas > 0 && `${c.sueltas} sueltas`}
+                        </span>
+                        <span className="font-medium text-vialto-charcoal">
+                          {c.kg} kg
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <ListadoDatos
                 columns={[]}
                 rows={paginatedItems}
@@ -884,6 +984,12 @@ export function StockPanelTenantPage({
                         </label>
                       </ViajesListadoHeaderFiltro>
                     </th>
+                    <th
+                      scope="col"
+                      className={`${listadoTablaThClass} text-right align-top`}
+                    >
+                      Kg
+                    </th>
                     {showUnidad2 && (
                       <th
                         scope="col"
@@ -978,7 +1084,17 @@ export function StockPanelTenantPage({
                         <td
                           className={`${listadoTablaTdClass} text-right tabular-nums`}
                         >
-                          {stockTotalCell(item, units.unidad1, false, units.unidad2)}
+                          {stockTotalCell(
+                            item,
+                            units.unidad1,
+                            false,
+                            units.unidad2,
+                          )}
+                        </td>
+                        <td
+                          className={`${listadoTablaTdClass} text-right tabular-nums font-medium`}
+                        >
+                          {item.kg} kg
                         </td>
                         {showUnidad2 && (
                           <td
@@ -990,7 +1106,13 @@ export function StockPanelTenantPage({
                         <td className={`${listadoTablaTdClass} text-right`}>
                           <button
                             type="button"
-                            onClick={() => void abrirProducto(item.productoId)}
+                            onClick={() =>
+                              setProductoDetalleModal({
+                                productoId: item.productoId,
+                                productoNombre:
+                                  item.producto?.nombre ?? item.productoId,
+                              })
+                            }
                             className="rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist"
                           >
                             Ver
@@ -1116,7 +1238,13 @@ export function StockPanelTenantPage({
                           </button>
                           <button
                             type="button"
-                            onClick={() => void abrirProducto(item.productoId)}
+                            onClick={() =>
+                              setProductoDetalleModal({
+                                productoId: item.productoId,
+                                productoNombre:
+                                  item.producto?.nombre ?? item.productoId,
+                              })
+                            }
                             className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist transition-colors"
                           >
                             Ver
@@ -1178,6 +1306,17 @@ export function StockPanelTenantPage({
                   })
               : undefined
           }
+        />
+      )}
+
+      {productoDetalleModal && (
+        <StockProductoDetalleModal
+          productoId={productoDetalleModal.productoId}
+          productoNombre={productoDetalleModal.productoNombre}
+          disponibleAgrupadoUrl={disponibleAgrupadoUrl}
+          depositoId={depositoActivoId ?? ""}
+          getToken={getToken}
+          onClose={() => setProductoDetalleModal(null)}
         />
       )}
 

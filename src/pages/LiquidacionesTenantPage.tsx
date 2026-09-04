@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/AccionesOpcionesSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
+import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/ConfirmarAnulacionManualModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { TransportistaSearchSelect } from "@/components/forms/MaestroSearchSelects";
@@ -48,7 +49,12 @@ import {
 } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
-import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  LIQUIDACIONES_EXPORT_COLUMNS,
+  generarLiquidacionesExcel,
+} from "@/lib/liquidacionesExcelExport";
 import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
@@ -57,6 +63,7 @@ const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   autorizado: "LIQUIDADO",
   error: "ERROR DE AFIP",
   anulado: "ANULADO",
+  pendiente_anulacion: "PENDIENTE DE ANULACIÓN",
 };
 
 const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
@@ -65,6 +72,7 @@ const ESTADO_CLASS: Record<LiquidacionEstado, string> = {
   autorizado: "bg-emerald-100 text-emerald-800",
   error: "bg-red-100 text-red-800",
   anulado: "bg-gray-100 text-gray-500 line-through",
+  pendiente_anulacion: "bg-amber-100 text-amber-800",
 };
 
 function fmtMoney(n: number) {
@@ -85,6 +93,7 @@ function transportistaNombre(liq: LiquidacionConTransportista) {
 function LiquidacionAccionesMenu({
   liq,
   hasArca,
+  metodoAnulacion,
   isBusy,
   isDownloading,
   actionErrorMsg,
@@ -94,11 +103,14 @@ function LiquidacionAccionesMenu({
   onPdf,
   onPdfNc,
   onAnular,
+  onMarcarPendienteAnulacion,
+  onConfirmarAnulacionManual,
   onEliminar,
   onVerComprobante,
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
+  metodoAnulacion: "nota_credito_debito" | "manual";
   isBusy: boolean;
   isDownloading: boolean;
   actionErrorMsg?: string;
@@ -108,6 +120,8 @@ function LiquidacionAccionesMenu({
   onPdf: () => void;
   onPdfNc: () => void;
   onAnular: () => void;
+  onMarcarPendienteAnulacion: () => void;
+  onConfirmarAnulacionManual: () => void;
   onEliminar: () => void;
   onVerComprobante: () => void;
 }) {
@@ -119,9 +133,17 @@ function LiquidacionAccionesMenu({
     liq.estado === "borrador" ||
     liq.estado === "error" ||
     liq.estado === "pendiente_cae";
-  const puedeAnular = hasArca && liq.estado === "autorizado";
+  const puedeAnular =
+    hasArca && liq.estado === "autorizado" && metodoAnulacion !== "manual";
+  const puedeMarcarPendienteAnulacion =
+    hasArca && liq.estado === "autorizado" && metodoAnulacion === "manual";
+  const puedeConfirmarAnulacionManual =
+    hasArca && liq.estado === "pendiente_anulacion";
   const tienePdf =
-    hasArca && (liq.estado === "autorizado" || liq.estado === "anulado");
+    hasArca &&
+    (liq.estado === "autorizado" ||
+      liq.estado === "anulado" ||
+      liq.estado === "pendiente_anulacion");
   const tienePdfNc =
     hasArca && liq.estado === "anulado" && Boolean(liq.anulacionCae);
   const tieneComprobanteAdjunto =
@@ -177,6 +199,26 @@ function LiquidacionAccionesMenu({
       disabled: isBusy,
     });
   }
+  if (puedeMarcarPendienteAnulacion) {
+    options.push({
+      id: "marcar-pendiente-anulacion",
+      label: isBusy ? "Procesando…" : "Marcar pendiente de anulación",
+      icon: Ban,
+      onClick: onMarcarPendienteAnulacion,
+      danger: true,
+      disabled: isBusy,
+    });
+  }
+  if (puedeConfirmarAnulacionManual) {
+    options.push({
+      id: "confirmar-anulacion-manual",
+      label: isBusy ? "Procesando…" : "Confirmar anulación",
+      icon: Ban,
+      onClick: onConfirmarAnulacionManual,
+      danger: true,
+      disabled: isBusy,
+    });
+  }
   if (puedeEliminar) {
     options.push({
       id: "eliminar",
@@ -215,7 +257,8 @@ export function LiquidacionesTenantPage() {
   const { showToast } = useToast();
   const tenants = useTenantsList();
   const { filtroEmpresa, onChangeTenant } = useTenantFiltroUrl();
-  const { tenant, transportistas, refreshTransportistas, refreshClientes } = useMaestroData();
+  const { tenant, transportistas, refreshTransportistas, refreshClientes } =
+    useMaestroData();
 
   const isSuperAdmin = Boolean(
     user?.publicMetadata?.role === "superadmin" ||
@@ -229,7 +272,14 @@ export function LiquidacionesTenantPage() {
   const empresaModules = isSuperAdmin
     ? (tenants?.find((t) => t.clerkOrgId === activeTenantId)?.modules ?? [])
     : (tenant?.modules ?? []);
-  const hasArca = canAccessIntegracionArca(empresaModules);
+  const hasArca = canAccessEmisionLiquidoProductoArca(empresaModules);
+  const empresaTenant = isSuperAdmin
+    ? tenants?.find((t) => t.clerkOrgId === activeTenantId)
+    : tenant;
+  const metodoAnulacion: "nota_credito_debito" | "manual" =
+    empresaTenant?.liquidacionAnulacionMetodo === "manual"
+      ? "manual"
+      : "nota_credito_debito";
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -241,6 +291,9 @@ export function LiquidacionesTenantPage() {
   const [transportistaFilter, setTransportistaFilter] = useState("");
   const [periodoDesdeFilter, setPeriodoDesdeFilter] = useState("");
   const [periodoHastaFilter, setPeriodoHastaFilter] = useState("");
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
 
   function aplicarFiltroEstado(val: LiquidacionEstado | "todos") {
     setEstadoFilter(val);
@@ -286,6 +339,10 @@ export function LiquidacionesTenantPage() {
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
   const [anularConfirm, setAnularConfirm] =
+    useState<LiquidacionConTransportista | null>(null);
+  const [pendienteAnulacionConfirm, setPendienteAnulacionConfirm] =
+    useState<LiquidacionConTransportista | null>(null);
+  const [confirmarAnulacionManualTarget, setConfirmarAnulacionManualTarget] =
     useState<LiquidacionConTransportista | null>(null);
   const [eliminarConfirm, setEliminarConfirm] =
     useState<LiquidacionConTransportista | null>(null);
@@ -383,7 +440,14 @@ export function LiquidacionesTenantPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, activeTenantId, searchParams, setSearchParams, getToken]);
+  }, [
+    isLoaded,
+    isSignedIn,
+    activeTenantId,
+    searchParams,
+    setSearchParams,
+    getToken,
+  ]);
 
   function onEmitirSuccess(updated: LiquidacionConTransportista) {
     setRows(
@@ -462,6 +526,75 @@ export function LiquidacionesTenantPage() {
     }
   }
 
+  async function confirmMarcarPendienteAnulacion() {
+    const liq = pendienteAnulacionConfirm;
+    if (!liq || busyId) return;
+    setActionError(null);
+    setBusyId(liq.id);
+    try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+      const updated = await apiJson<LiquidacionConTransportista>(
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/marcar-pendiente-anulacion${qsTenant}`,
+        () => getToken(),
+        { method: "POST" },
+      );
+      setRows(
+        (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+      );
+      setPendienteAnulacionConfirm(null);
+      setDetail((prev) =>
+        prev?.liq.id === updated.id
+          ? { mode: "view", liq: { ...prev.liq, ...updated } }
+          : prev,
+      );
+      showToast("Liquidación marcada como pendiente de anulación.");
+    } catch (err) {
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmConfirmarAnulacionManual(args: {
+    motivo: string;
+    comprobanteUrl: string;
+  }) {
+    const liq = confirmarAnulacionManualTarget;
+    if (!liq || busyId) return;
+    setActionError(null);
+    setBusyId(liq.id);
+    try {
+      const qsTenant = `?tenantId=${encodeURIComponent(activeTenantId)}`;
+      const updated = await apiJson<LiquidacionConTransportista>(
+        `/api/integracion-arca/liquidaciones/${encodeURIComponent(liq.id)}/confirmar-anulacion-manual${qsTenant}`,
+        () => getToken(),
+        { method: "POST", body: JSON.stringify(args) },
+      );
+      setRows(
+        (prev) => prev?.map((r) => (r.id === updated.id ? updated : r)) ?? prev,
+      );
+      setConfirmarAnulacionManualTarget(null);
+      // Acción terminal (mismo patrón que confirmEliminar): cerrar el detalle en vez de
+      // dejarlo abierto — el usuario ya confirmó, la grilla y el toast confirman el cambio.
+      setDetail((prev) =>
+        prev?.mode === "view" && prev.liq.id === updated.id ? null : prev,
+      );
+      showToast("Liquidación anulada.");
+    } catch (err) {
+      setActionError({
+        id: liq.id,
+        msg: friendlyError(err, "arca"),
+        detalle: getArcaErrorDetalle(err),
+      });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function descargarPdf(liq: LiquidacionConTransportista) {
     setDownloading(liq.id);
     try {
@@ -494,7 +627,11 @@ export function LiquidacionesTenantPage() {
   }
 
   /** Abre el PDF en una pestaña nueva (a diferencia de descargarPdf/Nc, que fuerzan la descarga). */
-  async function verPdfEnPestania(url: string, errorMsg: string, liqId: string) {
+  async function verPdfEnPestania(
+    url: string,
+    errorMsg: string,
+    liqId: string,
+  ) {
     const ventana = window.open("", "_blank");
     try {
       const res = await apiFetch(url, () => getToken());
@@ -568,6 +705,7 @@ export function LiquidacionesTenantPage() {
     return {
       liq,
       hasArca,
+      metodoAnulacion,
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
@@ -611,6 +749,8 @@ export function LiquidacionesTenantPage() {
       onPdf: () => void descargarPdf(liq),
       onPdfNc: () => void descargarPdfNc(liq),
       onAnular: () => setAnularConfirm(liq),
+      onMarcarPendienteAnulacion: () => setPendienteAnulacionConfirm(liq),
+      onConfirmarAnulacionManual: () => setConfirmarAnulacionManualTarget(liq),
       onEliminar: () => setEliminarConfirm(liq),
       onVerComprobante: () => {
         if (liq.comprobanteUrl) setPreviewComprobanteUrl(liq.comprobanteUrl);
@@ -654,16 +794,50 @@ export function LiquidacionesTenantPage() {
     ? filteredRows.slice((page - 1) * pageSize, page * pageSize)
     : null;
 
+  async function handleExportarExcel(selectedIds: string[]) {
+    if (!filteredRows || filteredRows.length === 0) {
+      showToast("No hay datos para exportar", "error");
+      return;
+    }
+    try {
+      setExportandoExcel(true);
+      const cols = LIQUIDACIONES_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarLiquidacionesExcel(
+        cols,
+        filteredRows,
+        "Liquidaciones_Exportadas",
+      );
+      showToast("Excel exportado exitosamente", "success");
+    } catch (err) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
+    }
+  }
+
+  const exportButton = activeTenantId && (!error || !isSuperAdmin) && (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={!filteredRows || filteredRows.length === 0 || exportandoExcel}
+      className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+    >
+      <Download className="h-4 w-4" aria-hidden />
+      {exportandoExcel ? "Generando..." : "Exportar"}
+    </button>
+  );
+
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Liquidaciones
-      </h1>
-      <p className="mt-1 text-sm text-vialto-steel">
-        {isSuperAdmin
-          ? "Elegí una empresa para ver y gestionar sus liquidaciones."
-          : "Liquidaciones emitidas a transportistas."}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+          Liquidaciones
+        </h1>
+        <div className="flex shrink-0 gap-2">{exportButton}</div>
+      </div>
 
       {isSuperAdmin && (
         <div className="mt-6">
@@ -709,6 +883,7 @@ export function LiquidacionesTenantPage() {
                 Limpiar filtros
               </button>
             )}
+
             <button
               type="button"
               onClick={() => setShowCrear(true)}
@@ -994,7 +1169,7 @@ export function LiquidacionesTenantPage() {
         <CrearLiquidacionManualModal
           transportistas={transportistas}
           config={config}
-          hasArca={hasArca}
+          hasLiquidoProductoArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
           onDataSaved={() => {
@@ -1057,6 +1232,40 @@ export function LiquidacionesTenantPage() {
       </AnularLiquidacionModal>
 
       <ConfirmDialog
+        open={pendienteAnulacionConfirm != null}
+        title="Marcar pendiente de anulación"
+        message={
+          pendienteAnulacionConfirm
+            ? `¿Marcás como pendiente de anulación la liquidación de ${transportistaNombre(pendienteAnulacionConfirm)}? No se emite nada a ARCA.`
+            : ""
+        }
+        confirmLabel="Marcar pendiente"
+        tone="danger"
+        busy={busyId === pendienteAnulacionConfirm?.id}
+        onCancel={() => {
+          if (!busyId) setPendienteAnulacionConfirm(null);
+        }}
+        onConfirm={() => void confirmMarcarPendienteAnulacion()}
+      />
+
+      <ConfirmarAnulacionManualModal
+        open={confirmarAnulacionManualTarget != null}
+        busy={busyId === confirmarAnulacionManualTarget?.id}
+        error={
+          confirmarAnulacionManualTarget &&
+          actionError?.id === confirmarAnulacionManualTarget.id
+            ? actionError.msg
+            : null
+        }
+        getToken={getToken}
+        tenantId={isSuperAdmin ? activeTenantId : undefined}
+        onCancel={() => {
+          if (!busyId) setConfirmarAnulacionManualTarget(null);
+        }}
+        onConfirm={(args) => void confirmConfirmarAnulacionManual(args)}
+      />
+
+      <ConfirmDialog
         open={eliminarConfirm != null}
         title="Eliminar liquidación"
         message={
@@ -1100,6 +1309,7 @@ export function LiquidacionesTenantPage() {
           ivaPct={detail.liq.ivaPct ?? config?.ivaGastosAdmin}
           canEdit={canEditLiquidacion(detail.liq)}
           hasArca={hasArca}
+          metodoAnulacion={metodoAnulacion}
           getToken={getToken}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
@@ -1115,8 +1325,21 @@ export function LiquidacionesTenantPage() {
                 : undefined
           }
           onVerAnulacion={
-            detail.liq.estado === "anulado"
+            detail.liq.estado === "anulado" &&
+            detail.liq.anulacionMetodo !== "manual"
               ? () => void verPdfAnulacion(detail.liq)
+              : undefined
+          }
+          onVerComprobanteAnulacionManual={
+            detail.liq.estado === "anulado" &&
+            detail.liq.anulacionMetodo === "manual" &&
+            detail.liq.anulacionManualComprobanteUrl
+              ? () =>
+                  window.open(
+                    detail.liq.anulacionManualComprobanteUrl as string,
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
               : undefined
           }
           onEliminar={
@@ -1127,8 +1350,22 @@ export function LiquidacionesTenantPage() {
               : undefined
           }
           onAnular={
-            hasArca && detail.liq.estado === "autorizado"
+            hasArca &&
+            detail.liq.estado === "autorizado" &&
+            metodoAnulacion !== "manual"
               ? () => setAnularConfirm(detail.liq)
+              : undefined
+          }
+          onMarcarPendienteAnulacion={
+            hasArca &&
+            detail.liq.estado === "autorizado" &&
+            metodoAnulacion === "manual"
+              ? () => setPendienteAnulacionConfirm(detail.liq)
+              : undefined
+          }
+          onConfirmarAnulacionManual={
+            hasArca && detail.liq.estado === "pendiente_anulacion"
+              ? () => setConfirmarAnulacionManualTarget(detail.liq)
               : undefined
           }
         />
@@ -1155,6 +1392,15 @@ export function LiquidacionesTenantPage() {
             );
             setDetail({ mode: "view", liq: withLineas });
           }}
+        />
+      )}
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={LIQUIDACIONES_EXPORT_COLUMNS}
+          rowCount={filteredRows?.length ?? 0}
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
         />
       )}
     </div>

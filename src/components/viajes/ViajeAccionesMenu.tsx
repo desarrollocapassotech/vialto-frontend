@@ -9,15 +9,10 @@ import { viajePermiteBotonFacturar, liquidacionElegidaDeViaje } from '@/lib/viaj
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
 
-function fmtDate(iso: string) {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
-
 interface Props {
   viaje: Viaje;
-  /** Tenant con módulo integracion-arca activo. */
-  hasArca?: boolean;
+  /** Tenant con módulo emision-facturas-arca activo (bloqueo de USD al facturar). */
+  hasFacturasArca?: boolean;
   onVer: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
@@ -30,7 +25,7 @@ interface Props {
 
 export function ViajeAccionesMenu({
   viaje,
-  hasArca = false,
+  hasFacturasArca = false,
   onVer,
   onAgregarGasto,
   onRegistrarPago,
@@ -45,7 +40,7 @@ export function ViajeAccionesMenu({
   const permitePago = viajeRequierePagosTransportista(viaje) && viaje.etapa !== 'cancelado';
   const permiteGasto = viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
-  const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasArca, viaje);
+  const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasFacturasArca, viaje);
   const permiteExportar = viaje.etapa !== 'cancelado';
 
   const options = useMemo(() => {
@@ -110,14 +105,7 @@ export function ViajeAccionesMenu({
       <AccionesOpcionesSheet
         open={open}
         onClose={() => setOpen(false)}
-        subtitle={[
-          viaje.origen && viaje.destino ? `${viaje.origen} → ${viaje.destino}` : null,
-          viaje.fechaCarga && viaje.fechaDescarga
-            ? `${fmtDate(viaje.fechaCarga)} — ${fmtDate(viaje.fechaDescarga)}`
-            : viaje.fechaCarga
-              ? fmtDate(viaje.fechaCarga)
-              : null,
-        ].filter(Boolean).join(' · ') || `Viaje #${numeroVisibleViaje(viaje)}`}
+        subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
         options={options}
       />
     </>

@@ -1,18 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { friendlyError } from "@/lib/friendlyError";
 import { modalOverlayClass } from "@/lib/modalLayers";
 import { useToast } from "@/lib/toast";
+import { SearchableEntitySelect } from "@/components/forms/SearchableEntitySelect";
+import { filtrarVehiculos } from "@/components/forms/maestroSearchFilters";
+import { TipoIntervencionSelect } from "@/components/mantenimiento/TipoIntervencionSelect";
+import { FechaPicker } from "@/components/mantenimiento/FechaPicker";
 import {
   fmtFechaIntervencion,
   fmtKm,
-  fmtTipoIntervencion,
-  TIPO_INTERVENCION_OPTIONS,
+  fmtTiposIntervencion,
 } from "@/lib/mantenimientoLabels";
 import type { Intervencion, TipoIntervencionMantenimiento, Vehiculo } from "@/types/api";
 
-const INPUT_CLASS = "h-9 w-full border border-black/15 bg-white px-2 text-sm";
+const INPUT_CLASS =
+  "h-11 w-full border border-black/15 bg-white px-3 text-base sm:h-9 sm:px-2 sm:text-sm";
 const LABEL_CLASS = "text-xs uppercase tracking-[0.08em] text-vialto-steel";
 
 function hoyIso(): string {
@@ -20,11 +24,6 @@ function hoyIso(): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0];
-}
-
-function fmtVehiculoLabel(v: Vehiculo): string {
-  const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
-  return marcaModelo ? `${v.patente} — ${marcaModelo}` : v.patente;
 }
 
 export function IntervencionModal({
@@ -52,8 +51,8 @@ export function IntervencionModal({
   const [vehiculoId, setVehiculoId] = useState(
     intervencionInicial?.vehiculoId ?? vehiculoIdFiltro ?? "",
   );
-  const [tipo, setTipo] = useState<TipoIntervencionMantenimiento>(
-    intervencionInicial?.tipo ?? "service",
+  const [tipos, setTipos] = useState<TipoIntervencionMantenimiento[]>(
+    intervencionInicial?.tipos ?? [],
   );
   const [fecha, setFecha] = useState(
     intervencionInicial?.fecha ? intervencionInicial.fecha.slice(0, 10) : hoyIso(),
@@ -61,9 +60,15 @@ export function IntervencionModal({
   const [km, setKm] = useState(
     intervencionInicial?.km != null ? String(intervencionInicial.km) : "",
   );
+  const [kmTocadoManualmente, setKmTocadoManualmente] = useState(false);
   const [proximoKm, setProximoKm] = useState(
     intervencionInicial?.proximoKm != null
       ? String(intervencionInicial.proximoKm)
+      : "",
+  );
+  const [proximaFecha, setProximaFecha] = useState(
+    intervencionInicial?.proximaFecha
+      ? intervencionInicial.proximaFecha.slice(0, 10)
       : "",
   );
   const [descripcion, setDescripcion] = useState(
@@ -77,15 +82,30 @@ export function IntervencionModal({
   const readOnly = modo === "view";
   const vehiculo = vehiculos.find((v) => v.id === intervencionInicial?.vehiculoId);
 
+  // Al crear (no al editar), el km al momento se autocompleta con el km
+  // actual del vehículo elegido; se detiene en cuanto el usuario lo edita
+  // a mano, para no pisarle un valor que ya escribió.
+  useEffect(() => {
+    if (modo !== "create" || kmTocadoManualmente) return;
+    const v = vehiculos.find((x) => x.id === vehiculoId);
+    if (v && v.kmActual > 0) {
+      setKm(String(v.kmActual));
+    }
+  }, [modo, vehiculoId, vehiculos, kmTocadoManualmente]);
+
   async function submit() {
     const errs: Record<string, string> = {};
     if (!vehiculoId) errs.vehiculoId = "Seleccioná un vehículo.";
+    if (tipos.length === 0) errs.tipos = "Seleccioná al menos un tipo.";
     if (!fecha) errs.fecha = "Ingresá la fecha.";
     if (km && (isNaN(Number(km)) || Number(km) < 0)) {
       errs.km = "El km debe ser un número válido.";
     }
     if (proximoKm && (isNaN(Number(proximoKm)) || Number(proximoKm) < 0)) {
       errs.proximoKm = "El próximo km debe ser un número válido.";
+    }
+    if (tipos.includes("otro") && !descripcion.trim()) {
+      errs.descripcion = "Ingresá una descripción para el tipo \"Otro\".";
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -98,11 +118,12 @@ export function IntervencionModal({
     try {
       const body: Record<string, unknown> = {
         vehiculoId,
-        tipo,
+        tipos,
         fecha,
         descripcion: descripcion.trim() || undefined,
         km: km ? Number(km) : undefined,
         proximoKm: proximoKm ? Number(proximoKm) : undefined,
+        proximaFecha: proximaFecha || undefined,
       };
 
       let result: Intervencion;
@@ -134,9 +155,9 @@ export function IntervencionModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-lg rounded border border-black/10 bg-white shadow-lg"
+        className="flex max-h-[95dvh] w-full flex-col overflow-hidden rounded-t-xl border border-black/10 bg-white shadow-lg sm:max-h-[90vh] sm:max-w-2xl sm:rounded"
       >
-        <div className="flex items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-black/10 px-5 pt-5 pb-4">
           <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide">
             {modo === "create"
               ? "Nueva intervención"
@@ -152,36 +173,48 @@ export function IntervencionModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 grid gap-3 max-h-[65vh] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 grid gap-3">
           {readOnly ? (
             <>
-              <div>
-                <p className={LABEL_CLASS}>Vehículo</p>
-                <p className="mt-1 text-sm">{vehiculo?.patente ?? "—"}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <p className={LABEL_CLASS}>Vehículo</p>
+                  <p className="mt-1 text-sm">{vehiculo?.patente ?? "—"}</p>
+                </div>
+                <div>
+                  <p className={LABEL_CLASS}>Fecha de intervención</p>
+                  <p className="mt-1 text-sm">
+                    {intervencionInicial
+                      ? fmtFechaIntervencion(intervencionInicial.fecha)
+                      : "—"}
+                  </p>
+                </div>
               </div>
               <div>
                 <p className={LABEL_CLASS}>Tipo</p>
                 <p className="mt-1 text-sm">
-                  {fmtTipoIntervencion(intervencionInicial?.tipo ?? "")}
+                  {fmtTiposIntervencion(intervencionInicial?.tipos ?? [])}
                 </p>
               </div>
-              <div>
-                <p className={LABEL_CLASS}>Fecha</p>
-                <p className="mt-1 text-sm">
-                  {intervencionInicial
-                    ? fmtFechaIntervencion(intervencionInicial.fecha)
-                    : "—"}
-                </p>
-              </div>
-              <div>
-                <p className={LABEL_CLASS}>Km al momento</p>
-                <p className="mt-1 text-sm">{fmtKm(intervencionInicial?.km)}</p>
-              </div>
-              <div>
-                <p className={LABEL_CLASS}>Próximo km</p>
-                <p className="mt-1 text-sm">
-                  {fmtKm(intervencionInicial?.proximoKm)}
-                </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className={LABEL_CLASS}>Km al momento</p>
+                  <p className="mt-1 text-sm">{fmtKm(intervencionInicial?.km)}</p>
+                </div>
+                <div>
+                  <p className={LABEL_CLASS}>Próximo km</p>
+                  <p className="mt-1 text-sm">
+                    {fmtKm(intervencionInicial?.proximoKm)}
+                  </p>
+                </div>
+                <div>
+                  <p className={LABEL_CLASS}>Fecha de vencimiento</p>
+                  <p className="mt-1 text-sm">
+                    {intervencionInicial?.proximaFecha
+                      ? fmtFechaIntervencion(intervencionInicial.proximaFecha)
+                      : "—"}
+                  </p>
+                </div>
               </div>
               {intervencionInicial?.descripcion?.trim() && (
                 <div>
@@ -192,75 +225,78 @@ export function IntervencionModal({
             </>
           ) : (
             <>
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>
-                  Vehículo <span className="text-red-500">*</span>
-                </span>
-                <select
-                  value={vehiculoId}
-                  onChange={(e) => setVehiculoId(e.target.value)}
-                  className={`${INPUT_CLASS} ${fieldErrors.vehiculoId ? "border-red-400" : ""}`}
-                >
-                  <option value="">Seleccioná un vehículo…</option>
-                  {vehiculos
-                    .filter((v) => v.activo || v.id === vehiculoId)
-                    .map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {fmtVehiculoLabel(v)}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.vehiculoId && (
-                  <span className="text-xs font-medium text-red-600">
-                    {fieldErrors.vehiculoId}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    Vehículo <span className="text-red-500">*</span>
                   </span>
-                )}
-              </label>
+                  <SearchableEntitySelect<Vehiculo>
+                    items={vehiculos.filter((v) => v.activo || v.id === vehiculoId)}
+                    value={vehiculoId}
+                    onChange={setVehiculoId}
+                    filterItems={filtrarVehiculos}
+                    getPrimaryLabel={(v) => v.patente}
+                    getSecondaryLabel={(v) =>
+                      [v.marca, v.modelo].filter(Boolean).join(" · ") || null
+                    }
+                    placeholderCerrado="Seleccioná un vehículo…"
+                    placeholderBuscar="Buscar patente o marca…"
+                    searchAriaLabel="Filtrar vehículos"
+                    aria-label="Vehículo"
+                    inputClassName={`${INPUT_CLASS} ${fieldErrors.vehiculoId ? "border-red-400" : ""}`}
+                  />
+                  {fieldErrors.vehiculoId && (
+                    <span className="text-xs font-medium text-red-600">
+                      {fieldErrors.vehiculoId}
+                    </span>
+                  )}
+                </label>
 
-              <label className="flex flex-col gap-1">
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    Fecha de intervención <span className="text-red-500">*</span>
+                  </span>
+                  <FechaPicker
+                    value={fecha}
+                    onChange={setFecha}
+                    error={fieldErrors.fecha}
+                    aria-label="Fecha de intervención"
+                  />
+                  {fieldErrors.fecha && (
+                    <span className="text-xs font-medium text-red-600">
+                      {fieldErrors.fecha}
+                    </span>
+                  )}
+                </label>
+              </div>
+
+              <div className="flex flex-col gap-1">
                 <span className={LABEL_CLASS}>
                   Tipo <span className="text-red-500">*</span>
                 </span>
-                <select
-                  value={tipo}
-                  onChange={(e) =>
-                    setTipo(e.target.value as TipoIntervencionMantenimiento)
-                  }
-                  className={INPUT_CLASS}
-                >
-                  {TIPO_INTERVENCION_OPTIONS.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>
-                  Fecha <span className="text-red-500">*</span>
-                </span>
-                <input
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  className={`${INPUT_CLASS} ${fieldErrors.fecha ? "border-red-400" : ""}`}
+                <TipoIntervencionSelect
+                  value={tipos}
+                  onChange={setTipos}
+                  error={fieldErrors.tipos}
                 />
-                {fieldErrors.fecha && (
+                {fieldErrors.tipos && (
                   <span className="text-xs font-medium text-red-600">
-                    {fieldErrors.fecha}
+                    {fieldErrors.tipos}
                   </span>
                 )}
-              </label>
+              </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1">
                   <span className={LABEL_CLASS}>Km al momento</span>
                   <input
                     type="number"
                     min="0"
                     value={km}
-                    onChange={(e) => setKm(e.target.value)}
+                    onChange={(e) => {
+                      setKm(e.target.value);
+                      setKmTocadoManualmente(true);
+                    }}
                     placeholder="Ej. 120000"
                     className={`${INPUT_CLASS} ${fieldErrors.km ? "border-red-400" : ""}`}
                   />
@@ -287,28 +323,48 @@ export function IntervencionModal({
                     </span>
                   )}
                 </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>Fecha de vencimiento</span>
+                  <FechaPicker
+                    value={proximaFecha}
+                    onChange={setProximaFecha}
+                    allowClear
+                    aria-label="Fecha de vencimiento"
+                  />
+                </label>
               </div>
 
               <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>Descripción</span>
+                <span className={LABEL_CLASS}>
+                  Descripción{" "}
+                  {tipos.includes("otro") && (
+                    <span className="text-red-500">*</span>
+                  )}
+                </span>
                 <textarea
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                   rows={3}
-                  className="border border-black/15 px-2 py-2 text-sm"
+                  className={`border px-3 py-2.5 text-base sm:px-2 sm:py-2 sm:text-sm ${fieldErrors.descripcion ? "border-red-400" : "border-black/15"}`}
                 />
+                {fieldErrors.descripcion && (
+                  <span className="text-xs font-medium text-red-600">
+                    {fieldErrors.descripcion}
+                  </span>
+                )}
               </label>
             </>
           )}
         </div>
 
         {error && (
-          <p className="mx-5 mb-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
+          <p className="mx-5 mb-3 shrink-0 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
             {error}
           </p>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-black/10 px-5 py-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-black/10 px-5 py-4">
           <button
             type="button"
             disabled={saving}

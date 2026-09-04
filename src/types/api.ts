@@ -20,6 +20,40 @@ export interface OtroGasto {
   createdByLabel?: string | null;
 }
 
+/** Cliente adicional de un viaje multi-cliente: origen/destino(s)/productos y cobro propios. */
+export interface ViajeCliente {
+  id: string;
+  orden: number;
+  clienteId: string;
+  cliente?: { id: string; nombre: string; condicionIva?: number | null };
+  origen: string | null;
+  /** Denormalizado: último destino de la ruta de este cliente (legacy/compat). */
+  destino: string | null;
+  /** Destinos ordenados de este cliente (orden = secuencia de la ruta). */
+  destinosCliente?: Array<{
+    id: string;
+    orden: number;
+    etiqueta: string;
+    createdAt?: string;
+  }>;
+  /** Productos que le corresponden a este cliente (orden operativo). */
+  productosCliente?: Array<{
+    id: string;
+    productoId: string;
+    orden: number;
+    cantidad: number | null;
+    pesoKg: number | null;
+    producto: { id: string; nombre: string; activo: boolean };
+  }>;
+  /** Igual que Viaje.cantidadFactura/precioUnitarioFactura: si ambos vienen, `monto` = cantidad × precioUnitario. */
+  monto: number | null;
+  monedaMonto: string;
+  cantidad: number | null;
+  precioUnitario: number | null;
+  facturaId?: string | null;
+  facturacionEstado: string;
+}
+
 export interface Viaje {
   id: string;
   tenantId: string;
@@ -68,6 +102,8 @@ export interface Viaje {
     etiqueta: string;
     createdAt?: string;
   }>;
+  /** Clientes adicionales del viaje (multi-cliente, opcional) — conviven con `clienteId`, no lo reemplazan. */
+  clientesViaje?: ViajeCliente[];
   fechaCarga: string | null;
   fechaDescarga: string | null;
   /** Productos vinculados al viaje (orden operativo). */
@@ -250,20 +286,51 @@ export interface Vehiculo {
 }
 
 export type TipoIntervencionMantenimiento =
-  | 'service'
-  | 'aceite'
-  | 'filtro'
-  | 'cubiertas'
+  // Motor y sistema de propulsión
+  | 'cambio_aceite_motor'
+  | 'revision_filtros'
+  | 'inspeccion_bandas_correas'
+  | 'calibracion_valvulas'
+  | 'revision_inyectores'
+  | 'inspeccion_turbocompresor'
+  // Sistema de frenos
+  | 'revision_balatas_pastillas'
+  | 'rectificacion_tambores_discos'
+  | 'mantenimiento_sistema_aire'
+  | 'prueba_camaras_freno'
+  | 'ajuste_matracas'
+  // Tren motriz, suspensión y dirección
+  | 'servicio_transmision'
+  | 'servicio_diferencial'
+  | 'engrasado_chasis'
+  | 'alineacion_balanceo'
+  | 'revision_suspension'
+  | 'inspeccion_rodamientos'
+  // Sistema eléctrico y electrónico
+  | 'diagnostico_escaner'
+  | 'prueba_baterias'
+  | 'control_alternador'
+  | 'inspeccion_luces'
+  // Sistema de carga y acople
+  | 'mantenimiento_quinta_rueda'
+  | 'revision_perno_rey'
+  | 'inspeccion_lineas_acople'
+  // Neumáticos
+  | 'rotacion_cubiertas'
+  | 'cambio_cubiertas'
+  | 'reparacion_pinchadura'
+  // Catch-all
   | 'otro';
 
 export interface Intervencion {
   id: string;
   tenantId: string;
   vehiculoId: string;
-  tipo: TipoIntervencionMantenimiento;
+  tipos: TipoIntervencionMantenimiento[];
   descripcion: string | null;
   km: number | null;
   proximoKm: number | null;
+  proximaFecha: string | null;
   fecha: string;
   createdAt: string;
   createdBy: string;
@@ -308,11 +375,16 @@ export interface Tenant {
   maxUsers: number;
   billingStatus: string;
   billingRenewsAt: string | null;
-  whiteLabelDomain: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
   importacionesOcultas: boolean;
+  habilitarExportacionPautMicCrt?: boolean;
+  /**
+   * Método de anulación del CVLP (060) — 'nota_credito_debito' (default, todo tenant nuevo) |
+   * 'manual'. Solo editable desde superadmin (panel Empresas). Ver Liquidacion.estado.
+   */
+  liquidacionAnulacionMetodo: string;
   createdAt: string;
 }
 
@@ -386,7 +458,20 @@ export interface Factura {
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
+  /** Neto: suma completa de los viajes, sin IVA. */
   importe: number;
+  /**
+   * IVA total persistido al guardar (solo facturas por tramo sin ARCA).
+   * Null = no aplica o todavía no backfilleado.
+   */
+  ivaMonto?: number | null;
+  /**
+   * Monto contra el que se mide el cobro. En facturas por tramo de tenants
+   * sin ARCA es neto + `ivaMonto`; en el resto coincide con `importe`.
+   */
+  importeACobrar?: number;
+  /** `max(0, importeACobrar − pagos)`. */
+  saldoPendiente?: number;
   moneda: string;
   fechaEmision: string;
   fechaVencimiento: string | null;
@@ -398,7 +483,10 @@ export interface Factura {
   vencida: boolean;
   diferencia: number | null;
   ivaPct: number | null;
-  /** Si true, el importe neto se arma con tramos + viajes sin dividir. */
+  /**
+   * Si true, el IVA se arma por tramo; el neto (`importe`) sigue siendo la
+   * suma completa de los viajes (la parte no cubierta usa `ivaPct`).
+   */
   facturarPorTramo?: boolean;
   tramos?: FacturaTramo[];
   comprobanteUrl: string | null;
@@ -438,6 +526,8 @@ export interface ImportRowError {
   campo?: string;
   error: string;
   valor?: unknown;
+  /** Si el error es un lookup no encontrado: qué modelo se buscó (clientes/transportistas/choferes/vehiculos/productos). */
+  lookupModel?: string;
 }
 
 export interface ImportCiudadAdvertencia {
@@ -486,6 +576,20 @@ export interface ImportPreviewEntidad {
   esNuevo: boolean;
 }
 
+export interface ImportPreviewFilaCampo {
+  campo: string;
+  label: string;
+  valor: string;
+}
+
+/** Detalle fila por fila de un módulo "simple" (Clientes/Transportistas/Choferes/Vehículos): todas las columnas configuradas con su valor tal como viene del Excel, no solo el nombre. */
+export interface ImportPreviewFilaEntidad {
+  fila: number;
+  /** true = alta nueva, false = actualiza un registro ya existente. */
+  esNuevo: boolean;
+  campos: ImportPreviewFilaCampo[];
+}
+
 export interface ImportEntidadFaltante {
   valor: string;
   /** Sugerencia por una regla simple (posición en el par tractor/semirremolque), no IA. */
@@ -495,6 +599,23 @@ export interface ImportEntidadFaltante {
 export interface ImportEntidadesFaltantesModelo {
   modelo: string;
   valores: ImportEntidadFaltante[];
+}
+
+/** Una columna que el importador espera de un módulo — según el template activo del tenant, o el default. */
+export interface ImportColumnaEsperada {
+  excelHeader: string;
+  campoLabel: string;
+  tipo: "string" | "number" | "date" | "boolean" | "lookup" | "enum";
+  requerido: boolean;
+  recomendado?: boolean;
+  allowedValues?: string[];
+  lookupModel?: string;
+}
+
+export interface ImportColumnasEsperadasModulo {
+  modulo: string;
+  sheet: string;
+  columnas: ImportColumnaEsperada[];
 }
 
 export interface ImportPreviewResult {
@@ -525,6 +646,8 @@ export interface ImportPreviewResult {
   facturas?: ImportPreviewFactura[];
   clientes?: ImportPreviewEntidad[];
   transportistas?: ImportPreviewEntidad[];
+  /** Solo módulos "simples" (Clientes, Transportistas, Choferes, Vehículos): detalle fila por fila con todas las columnas del Excel + si es alta nueva o actualiza uno existente. */
+  filasDetalle?: ImportPreviewFilaEntidad[];
 }
 
 export interface ImportLogDetalle {
@@ -703,7 +826,8 @@ export type LiquidacionEstado =
   | "pendiente_cae"
   | "autorizado"
   | "error"
-  | "anulado";
+  | "anulado"
+  | "pendiente_anulacion";
 
 export type ConceptoLiquidacionSigno = "favor" | "contra";
 
@@ -787,6 +911,13 @@ export interface Liquidacion {
   /** Nombre legible resuelto desde Clerk (virtual; no se persiste). */
   anuladoPorNombre?: string | null;
   anuladoAt?: string | null;
+  /** Método usado en esta anulación puntual (snapshot): 'nota_credito_debito' | 'manual'. */
+  anulacionMetodo?: string | null;
+  /** Anulación manual (Tenant.liquidacionAnulacionMetodo = 'manual'): auditoría del paso
+   * "pendiente_anulacion" + comprobante pre-impreso adjunto al confirmar. */
+  anulacionPendienteDesde?: string | null;
+  anulacionPendientePor?: string | null;
+  anulacionManualComprobanteUrl?: string | null;
   createdAt: string;
   createdBy: string;
   conceptosLineas?: LiquidacionConceptoLinea[];
@@ -828,6 +959,7 @@ export interface StockItem {
   cantidad1: number;
   cantidad2: number;
   updatedAt: string;
+  kg: number;
 }
 
 export interface StockOperacionLinea {
@@ -846,6 +978,7 @@ export interface StockOperacionLinea {
   unidades: number;
   lote?: string | null;
   fechaVencimiento?: string | null;
+  kg: number;
 }
 
 export interface StockOperacion {

@@ -10,13 +10,19 @@ import { CrudInput, CrudSelect } from "@/components/crud/CrudFields";
 import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
+import {
+  TransportistaAsignacionFields,
+  type AsignacionModo,
+} from "@/components/crud/TransportistaAsignacionFields";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTransportistasList } from "@/hooks/useTransportistasList";
 import {
   vehiculoCreatePayloadFromForm,
   type VehiculoFormState,
 } from "@/lib/vehiculoForm";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 const TIPOS = [
   "tractor",
@@ -40,6 +46,7 @@ const emptyForm = (): VehiculoFormState => ({
   vencimientoPoliza: "",
   tara: "",
   precinto: "",
+  transportistaId: "",
 });
 
 export function VehiculoCreatePage() {
@@ -48,22 +55,43 @@ export function VehiculoCreatePage() {
   const [searchParams] = useSearchParams();
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
+  const transportistasPlatform = useTransportistasList(
+    tenantId || undefined,
+    !tenantId,
+  );
+  const transportistas = tenantId
+    ? (transportistasPlatform ?? [])
+    : maestro.transportistas;
+  const loadingTransportistas = tenantId
+    ? transportistasPlatform === null
+    : maestro.loading;
 
   // ---> INICIALIZAMOS EL TOAST
   const { showToast } = useToast();
 
   const [form, setForm] = useState<VehiculoFormState>(emptyForm);
+  const [asignacionModo, setAsignacionModo] = useState<AsignacionModo>("propio");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const { isVisible } = useFieldConfig("vehiculos");
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
   }
 
+  function applyAsignacionModo(modo: AsignacionModo) {
+    setAsignacionModo(modo);
+    if (modo === "propio") patch({ transportistaId: "" });
+  }
+
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!form.patente.trim()) errs.patente = "Ingresá la patente.";
+    if (asignacionModo === "externo" && !form.transportistaId.trim()) {
+      errs.transportistaId = "Seleccioná un transportista o elegí flota propia.";
+    }
     if (form.tara.trim() && vehiculoCreatePayloadFromForm(form).tara == null)
       errs.tara = "La tara debe ser un número válido.";
     if (Object.keys(errs).length > 0) {
@@ -123,87 +151,119 @@ export function VehiculoCreatePage() {
           />
           <CrudFieldError message={fieldErrors.patente} />
         </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Tipo</span>
-          <CrudSelect
-            value={form.tipo}
-            onChange={(e) => patch({ tipo: e.target.value })}
-          >
-            {TIPOS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </CrudSelect>
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Marca</span>
-          <CrudInput
-            placeholder="Ej: Scania"
-            value={form.marca}
-            onChange={(e) => patch({ marca: e.target.value })}
+        {isVisible("alta_vehiculo", "tipo") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Tipo</span>
+            <CrudSelect
+              value={form.tipo}
+              onChange={(e) => patch({ tipo: e.target.value })}
+            >
+              {TIPOS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </CrudSelect>
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "marca") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Marca</span>
+            <CrudInput
+              placeholder="Ej: Scania"
+              value={form.marca}
+              onChange={(e) => patch({ marca: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "modelo") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Modelo</span>
+            <CrudInput
+              placeholder="Ej: R450"
+              value={form.modelo}
+              onChange={(e) => patch({ modelo: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "anio") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Año</span>
+            <CrudInput
+              type="number"
+              placeholder="Ej: 2020"
+              value={form.anio}
+              onChange={(e) => patch({ anio: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "nroChasis") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Nro. de chasis</span>
+            <CrudInput
+              placeholder="Ej: 9BM379182LB123456"
+              value={form.nroChasis}
+              onChange={(e) => patch({ nroChasis: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "poliza") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Póliza</span>
+            <CrudInput
+              placeholder="Ej: POL-2024-001234"
+              value={form.poliza}
+              onChange={(e) => patch({ poliza: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "vencimientoPoliza") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Vencimiento de póliza</span>
+            <CrudInput
+              type="date"
+              value={form.vencimientoPoliza}
+              onChange={(e) => patch({ vencimientoPoliza: e.target.value })}
+            />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "tara") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Tara (kg)</span>
+            <CrudInput
+              type="number"
+              placeholder="Ej: 8500"
+              value={form.tara}
+              error={fieldErrors.tara}
+              onChange={(e) => patch({ tara: e.target.value })}
+            />
+            <CrudFieldError message={fieldErrors.tara} />
+          </label>
+        )}
+        {isVisible("alta_vehiculo", "precinto") && (
+          <label className="grid gap-1.5">
+            <span className={LABEL}>Precinto</span>
+            <CrudInput
+              placeholder="Ej: 00123456"
+              value={form.precinto}
+              onChange={(e) => patch({ precinto: e.target.value })}
+            />
+          </label>
+        )}
+        <div className="md:col-span-2 grid gap-1.5">
+          <TransportistaAsignacionFields
+            modo={asignacionModo}
+            onModoChange={applyAsignacionModo}
+            transportistaId={form.transportistaId}
+            onTransportistaIdChange={(id) => {
+              patch({ transportistaId: id });
+              if (id) setFieldErrors((p) => ({ ...p, transportistaId: "" }));
+            }}
+            transportistas={transportistas}
+            loadingTransportistas={loadingTransportistas}
           />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Modelo</span>
-          <CrudInput
-            placeholder="Ej: R450"
-            value={form.modelo}
-            onChange={(e) => patch({ modelo: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Año</span>
-          <CrudInput
-            type="number"
-            placeholder="Ej: 2020"
-            value={form.anio}
-            onChange={(e) => patch({ anio: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Nro. de chasis</span>
-          <CrudInput
-            placeholder="Ej: 9BM379182LB123456"
-            value={form.nroChasis}
-            onChange={(e) => patch({ nroChasis: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Póliza</span>
-          <CrudInput
-            placeholder="Ej: POL-2024-001234"
-            value={form.poliza}
-            onChange={(e) => patch({ poliza: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Vencimiento de póliza</span>
-          <CrudInput
-            type="date"
-            value={form.vencimientoPoliza}
-            onChange={(e) => patch({ vencimientoPoliza: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Tara (kg)</span>
-          <CrudInput
-            type="number"
-            placeholder="Ej: 8500"
-            value={form.tara}
-            error={fieldErrors.tara}
-            onChange={(e) => patch({ tara: e.target.value })}
-          />
-          <CrudFieldError message={fieldErrors.tara} />
-        </label>
-        <label className="grid gap-1.5">
-          <span className={LABEL}>Precinto</span>
-          <CrudInput
-            placeholder="Ej: 00123456"
-            value={form.precinto}
-            onChange={(e) => patch({ precinto: e.target.value })}
-          />
-        </label>
+          <CrudFieldError message={fieldErrors.transportistaId} />
+        </div>
         <div className="md:col-span-2">
           <CrudFormErrorAlert message={error} />
         </div>

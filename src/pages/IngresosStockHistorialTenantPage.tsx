@@ -1,5 +1,5 @@
 ﻿import { useAuth } from "@clerk/clerk-react";
-import { FileSpreadsheet } from "lucide-react";
+import { Download } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 // Asegúrate de que esta ruta coincida con dónde guardaste el ListadoPagination
@@ -137,8 +137,8 @@ export function IngresosStockHistorialTenantPage({
       disabled={exportLoading || (items.length === 0 && !meta)}
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
-      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-      {exportLoading ? "Preparando…" : "Descargar Excel"}
+      <Download className="h-3.5 w-3.5" aria-hidden />
+      {exportLoading ? "Preparando…" : "Exportar"}
     </button>
   );
 
@@ -149,6 +149,7 @@ export function IngresosStockHistorialTenantPage({
           <h1 className="text-2xl font-semibold text-vialto-charcoal">
             Historial de ingresos
           </h1>
+          {exportButton}
         </div>
       )}
 

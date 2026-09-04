@@ -11,8 +11,10 @@ import {
   mensajeBloqueoMicCrt,
   missingGroupsMicCrtDesdeViaje,
   type ViajeExportMissingGroup,
+  VIAJE_EXPORT_VEHICULO_FIELDS,
 } from "@/lib/viajeExportMissingFields";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 type Props = {
   viaje: Viaje;
@@ -21,7 +23,7 @@ type Props = {
 };
 
 type DescargaError = {
-  message: string;
+  message: React.ReactNode;
   groups?: Record<string, ViajeExportMissingGroup>;
   endpoint: string;
   filename: string;
@@ -91,12 +93,104 @@ export function ExportarViajeModal({
   const [error, setError] = useState<DescargaError | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  const [habilitarExportacionPautMicCrt, setHabilitarExportacionPautMicCrt] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchId = tid || viaje.tenantId; // usamos viaje.tenantId si tid no está presente
+    if (!fetchId) return;
+    
+    (async () => {
+      try {
+        const url = platform 
+           ? `/api/platform/tenants/${encodeURIComponent(fetchId)}` 
+           : `/api/tenants/${encodeURIComponent(fetchId)}`;
+        const data = await apiJson<any>(url, getToken);
+        if (!cancelled) {
+          setHabilitarExportacionPautMicCrt(data.habilitarExportacionPautMicCrt ?? false);
+        }
+      } catch (e) {
+        if (!cancelled) setHabilitarExportacionPautMicCrt(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tid, viaje.tenantId, platform, getToken]);
+
   // Nuevo estado para la vista de selección de transportista de Nómina
   const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.etapa);
   const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando || micCrtValidando;
+
+  const { isVisible: isTransportistaVisible } = useFieldConfig("transportistas");
+  const isHiddenAnywhere = (field: string) => !isTransportistaVisible("edicion_transportista", field);
+
+  const { isVisible: isVehiculoVisible } = useFieldConfig("vehiculos");
+  
+  function getVehiculoHiddenAndMissing(groups: Record<string, ViajeExportMissingGroup> | undefined) {
+    if (!groups) return [];
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+    for (const [groupName, entry] of Object.entries(groups)) {
+      if (groupName === "Camión" || groupName === "Semirremolque") {
+        for (const label of entry.fields) {
+          const def = VIAJE_EXPORT_VEHICULO_FIELDS[label];
+          if (def) {
+            faltantesTotales.push(label);
+            if (!isVehiculoVisible("edicion_vehiculo", def.key)) {
+              faltantesOcultos.push(label);
+            }
+          }
+        }
+      }
+    }
+    return faltantesOcultos.length > 0 ? Array.from(new Set(faltantesTotales)) : [];
+  }
+
+  function getVehiculoSincronoFaltantesOcultos(vj: Viaje): string[] {
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+    for (const vv of vj.vehiculosViaje || []) {
+      const v = vv.vehiculo;
+      if (!v) continue;
+      for (const [label, def] of Object.entries(VIAJE_EXPORT_VEHICULO_FIELDS)) {
+        const val = v[def.key as keyof typeof v];
+        if (val == null || val === "") {
+          faltantesTotales.push(label);
+          if (!isVehiculoVisible("edicion_vehiculo", def.key)) {
+            faltantesOcultos.push(label);
+          }
+        }
+      }
+    }
+    return faltantesOcultos.length > 0 ? Array.from(new Set(faltantesTotales)) : [];
+  }
+
+  function getPautHiddenAndMissing(t: Viaje["transportista"]) {
+    if (!t) return [];
+    const tFull = t as any; // Casteo para evitar el error de TS con las propiedades extendidas
+    const faltantesTotales: string[] = [];
+    const faltantesOcultos: string[] = [];
+
+    if (!tFull.paut?.trim()) {
+      faltantesTotales.push("N° PAUT");
+      if (isHiddenAnywhere("paut")) faltantesOcultos.push("N° PAUT");
+    }
+    if (!tFull.permisoInternacional?.trim()) {
+      faltantesTotales.push("Permiso Internacional");
+      if (isHiddenAnywhere("permisoInternacional")) faltantesOcultos.push("Permiso Internacional");
+    }
+    if (!tFull.fechaVencimientoPermiso?.trim()) {
+      faltantesTotales.push("Vencimiento del Permiso Internacional");
+      if (isHiddenAnywhere("fechaVencimientoPermiso")) faltantesOcultos.push("Vencimiento del Permiso Internacional");
+    }
+    if (!tFull.domicilio?.trim()) {
+      faltantesTotales.push("Domicilio");
+      if (isHiddenAnywhere("domicilio")) faltantesOcultos.push("Domicilio");
+    }
+    
+    return faltantesOcultos.length > 0 ? faltantesTotales : [];
+  }
 
   async function refetchViaje(): Promise<Viaje> {
     const v = await apiJson<Viaje>(viajeDetailUrl(), getToken);
@@ -131,6 +225,38 @@ export function ExportarViajeModal({
   }
 
   async function abrirMicCrt() {
+    const faltantes = getPautHiddenAndMissing(viaje.transportista);
+    if (faltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
+    const vehiculoFaltantes = getVehiculoSincronoFaltantesOcultos(viaje);
+    if (vehiculoFaltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+            <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
     setMicCrtBloqueo(null);
     setMicCrtValidando(true);
     try {
@@ -156,6 +282,23 @@ export function ExportarViajeModal({
           message?: string;
           missingGroups?: Record<string, ViajeExportMissingGroup>;
         };
+
+        const vehiculoFaltantes = getVehiculoHiddenAndMissing(data.missingGroups);
+        if (vehiculoFaltantes.length > 0) {
+          return {
+            message: (
+              <div className="space-y-1">
+                <span className="font-semibold block text-red-900">No se puede emitir el documento.</span>
+                <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+                <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+              </div>
+            ) as unknown as string,
+            groups: undefined, // Ignoramos los groups para que no renderice el form
+            endpoint,
+            filename,
+          };
+        }
+
         return {
           message: data.message ?? "No se pudo generar el documento",
           groups: data.missingGroups,
@@ -201,6 +344,40 @@ export function ExportarViajeModal({
     // lo realiza una empresa distinta al contratante.
     const fleteTercerizado = Boolean(viaje.transportistaEfectivo?.id);
 
+    if (!fleteTercerizado) {
+      const faltantes = getPautHiddenAndMissing(viaje.transportista);
+      if (faltantes.length > 0) {
+        setError({
+          message: (
+            <div className="space-y-1">
+              <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+              <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+              <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+            </div>
+          ) as unknown as string,
+          endpoint: "",
+          filename: "",
+        });
+        return;
+      }
+    }
+
+    const vehiculoFaltantes = getVehiculoSincronoFaltantesOcultos(viaje);
+    if (vehiculoFaltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+            <span className="block font-normal">Faltan los siguientes datos de los vehículos: {vehiculoFaltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
     if (fleteTercerizado) {
       setSelectorNominaAbierto(true);
       setError(null); // Limpiamos errores previos si los hubiera
@@ -210,6 +387,23 @@ export function ExportarViajeModal({
   }
 
   function emitirNomina(emisorId?: string | null) {
+    const t = emisorId === viaje.transportistaEfectivo?.id ? viaje.transportistaEfectivo : viaje.transportista;
+    const faltantes = getPautHiddenAndMissing(t);
+    if (faltantes.length > 0) {
+      setError({
+        message: (
+          <div className="space-y-1">
+            <span className="font-semibold block text-red-900">No se puede emitir la Nómina.</span>
+            <span className="block font-normal">Faltan los siguientes datos del transportista: {faltantes.join(", ")}.</span>
+            <span className="font-semibold block text-red-900 mt-2">Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.</span>
+          </div>
+        ) as unknown as string,
+        endpoint: "",
+        filename: "",
+      });
+      return;
+    }
+
     void ejecutarDescarga(
       viajePdfUrl("paut", emisorId),
       `NOMINA-${numeroVisibleViaje(viaje)}.pdf`,
@@ -335,48 +529,60 @@ export function ExportarViajeModal({
           ) : (
             /* --- VISTA NORMAL DE BOTONES --- */
             <div className="mt-5 flex flex-col gap-2">
-              {permitePaut ? (
-                <button
-                  type="button"
-                  disabled={ocupado}
-                  onClick={handleClickNominaInit}
-                  className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm font-medium text-vialto-charcoal">
-                    {generandoPaut ? "Generando…" : "NOMINA"}
-                  </span>
-                  {!generandoPaut && (
-                    <span className="text-xs text-vialto-steel">↓ PDF</span>
-                  )}
-                </button>
-              ) : null}
+              {habilitarExportacionPautMicCrt === null ? (
+                <div className="flex justify-center p-4">
+                  <Spinner className="h-6 w-6 text-vialto-steel" />
+                </div>
+              ) : !habilitarExportacionPautMicCrt ? (
+                <div className="border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 rounded">
+                  La exportación de Nómina y MIC/CRT no está habilitada para esta empresa.
+                </div>
+              ) : (
+                <>
+                  {permitePaut ? (
+                    <button
+                      type="button"
+                      disabled={ocupado}
+                      onClick={handleClickNominaInit}
+                      className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-sm font-medium text-vialto-charcoal">
+                        {generandoPaut ? "Generando…" : "NOMINA"}
+                      </span>
+                      {!generandoPaut && (
+                        <span className="text-xs text-vialto-steel">↓ PDF</span>
+                      )}
+                    </button>
+                  ) : null}
 
-              <button
-                type="button"
-                disabled={ocupado || !permiteMicCrt}
-                onClick={() => void abrirMicCrt()}
-                className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                  !permiteMicCrt
-                    ? "No disponible para viajes cancelados"
-                    : undefined
-                }
-              >
-                <span className="text-sm font-medium text-vialto-charcoal">
-                  {micCrtValidando ? "Verificando…" : "MIC/CRT"}
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {permiteMicCrt ? (
-                    micCrtValidando ? (
-                      <Spinner className="h-3.5 w-3.5" />
-                    ) : (
-                      "Formulario"
-                    )
-                  ) : (
-                    "No disponible"
-                  )}
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={ocupado || !permiteMicCrt}
+                    onClick={() => void abrirMicCrt()}
+                    className="flex items-center justify-between border border-black/15 px-4 py-3 text-left hover:bg-vialto-mist disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={
+                      !permiteMicCrt
+                        ? "No disponible para viajes cancelados"
+                        : undefined
+                    }
+                  >
+                    <span className="text-sm font-medium text-vialto-charcoal">
+                      {micCrtValidando ? "Verificando…" : "MIC/CRT"}
+                    </span>
+                    <span className="text-xs text-vialto-steel">
+                      {permiteMicCrt ? (
+                        micCrtValidando ? (
+                          <Spinner className="h-3.5 w-3.5" />
+                        ) : (
+                          "Formulario"
+                        )
+                      ) : (
+                        "No disponible"
+                      )}
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -407,7 +613,7 @@ export function ExportarViajeModal({
             </div>
           ) : error ? (
             <div className="mt-4 border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-              <p className="font-semibold">{error.message}</p>
+              <div className="font-semibold">{error.message}</div>
             </div>
           ) : null}
 

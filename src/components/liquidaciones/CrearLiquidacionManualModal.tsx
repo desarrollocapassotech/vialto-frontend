@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Receipt, HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
+import { Receipt, HelpCircle } from "lucide-react";
 import {
   ConceptosLiquidacionLineasEditor,
   isConceptoLineaCompleta,
@@ -46,6 +46,7 @@ import {
 } from "@/lib/viajesFlota";
 import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import type {
   Cliente,
   Liquidacion,
@@ -90,6 +91,24 @@ function monedaViaje(
   return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
 }
 
+/**
+ * IVA de la liquidación precargado desde el viaje (`precioTransportistaIvaIncluidoPct`).
+ * Solo si todos los viajes elegidos coinciden y el % es > 0 (0 = el transportista
+ * no suma IVA en efectivo, no es “liquidar sin IVA”).
+ */
+function uniqueIvaPctFromViajes(
+  viajes: Pick<ViajeItem, "precioTransportistaIvaIncluidoPct">[],
+): number | null {
+  const pcts = [
+    ...new Set(
+      viajes
+        .map((v) => Number(v.precioTransportistaIvaIncluidoPct))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ];
+  return pcts.length === 1 ? pcts[0] : null;
+}
+
 const inputClass =
   "h-9 w-full rounded border border-black/15 bg-white px-3 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35";
 const selectClass = inputClass;
@@ -102,7 +121,7 @@ interface Props {
   transportistas: Transportista[];
   config?: ArcaConfig | null;
   /** Tenants con ARCA: tipo CVLP, pto venta y emisión electrónica. Sin ARCA: adjunto manual. */
-  hasArca: boolean;
+  hasLiquidoProductoArca: boolean;
   getToken: () => Promise<string | null>;
   onSuccess: (liq: Liquidacion) => void;
   onClose: () => void;
@@ -114,20 +133,24 @@ export function CrearLiquidacionManualModal({
   viajeInicial,
   transportistas,
   config: configProp,
-  hasArca,
+  hasLiquidoProductoArca,
   getToken,
   onSuccess,
   onClose,
   tenantId,
   onDataSaved,
 }: Props) {
-  const showComprobante = !hasArca;
+  const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
-  const { isVisible } = useFieldConfig("viajes");
-  const ivaTransportistaVisible = isVisible(
+  const { isVisible: isViajesVisible } = useFieldConfig("viajes");
+  const ivaTransportistaVisible = isViajesVisible(
     "detalle_viaje",
     "precioTransportistaIvaIncluidoPct",
   );
+
+
+
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const [resolvedConfig, setResolvedConfig] = useState<ArcaConfig | null>(
@@ -138,19 +161,24 @@ export function CrearLiquidacionManualModal({
   const [transportistaId, setTransportistaId] = useState(
     viajeInicial?.transportistaId ?? "",
   );
-  
-  const [transportistaActualizado, setTransportistaActualizado] = useState<Transportista | null>(null);
+
+  const [transportistaActualizado, setTransportistaActualizado] =
+    useState<Transportista | null>(null);
 
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
   /** Precargada con la comisión propia del transportista o, a falta de ésta, la de config ARCA. */
   const [comisionPct, setComisionPct] = useState("");
   const comisionEditadaManualmente = useRef(false);
-  /** Precargado con config ARCA o 21%; el usuario puede poner 0 para liquidar sin IVA. */
+  /** Precargado con el % del viaje si hay uno; si no, config ARCA o 21%. */
   const [ivaPct, setIvaPct] = useState(
-    String(configProp?.ivaGastosAdmin ?? 21),
+    String(
+      uniqueIvaPctFromViajes(viajeInicial ? [viajeInicial] : []) ??
+        configProp?.ivaGastosAdmin ??
+        21,
+    ),
   );
-  const ivaSyncedFromConfig = useRef(configProp?.ivaGastosAdmin != null);
+  const ivaEditadaManualmente = useRef(false);
   /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
   const [ptoVenta, setPtoVenta] = useState(
     configProp?.ptoVentaCvlp != null ? String(configProp.ptoVentaCvlp) : "",
@@ -189,7 +217,7 @@ export function CrearLiquidacionManualModal({
       setResolvedConfig(configProp);
       return;
     }
-    if (!hasArca) return;
+    if (!hasLiquidoProductoArca) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -205,15 +233,7 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [configProp, hasArca, getToken]);
-
-  useEffect(() => {
-    if (resolvedConfig?.ivaGastosAdmin == null || ivaSyncedFromConfig.current) {
-      return;
-    }
-    ivaSyncedFromConfig.current = true;
-    setIvaPct(String(resolvedConfig.ivaGastosAdmin));
-  }, [resolvedConfig?.ivaGastosAdmin]);
+  }, [configProp, hasLiquidoProductoArca, getToken]);
 
   useEffect(() => {
     if (
@@ -230,14 +250,18 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     if (viajeInicial || selectedViajeIds.size === 0) return;
 
-      setConceptosLineas((prev) =>
-        prev.map((linea) => {
-          if (linea.modoAplicacion === 'VIAJE_PUNTUAL' && linea.viajeId && !selectedViajeIds.has(linea.viajeId)) {
-            return { ...linea, viajeId: null, modoAplicacion: 'GENERAL' };
-          }
-          return linea;
-        }),
-      );
+    setConceptosLineas((prev) =>
+      prev.map((linea) => {
+        if (
+          linea.modoAplicacion === "VIAJE_PUNTUAL" &&
+          linea.viajeId &&
+          !selectedViajeIds.has(linea.viajeId)
+        ) {
+          return { ...linea, viajeId: null, modoAplicacion: "GENERAL" };
+        }
+        return linea;
+      }),
+    );
   }, [selectedViajeIds, viajeInicial]);
 
   // Autocompletado de la comisión por defecto al cambiar el transportista
@@ -250,15 +274,23 @@ export function CrearLiquidacionManualModal({
   }, [transportistaId, transportistas, resolvedConfig?.comisionPctDefault]);
 
   const transportistaSeleccionado = useMemo(() => {
-    if (transportistaActualizado && transportistaActualizado.id === transportistaId) {
+    if (
+      transportistaActualizado &&
+      transportistaActualizado.id === transportistaId
+    ) {
       return transportistaActualizado;
     }
     const fromList = transportistas.find((t) => t.id === transportistaId);
-    return (fromList as Partial<Transportista>) ?? (viajeInicial?.transportista as Partial<Transportista>) ?? null;
+    return (
+      (fromList as Partial<Transportista>) ??
+      (viajeInicial?.transportista as Partial<Transportista>) ??
+      null
+    );
   }, [viajeInicial, transportistas, transportistaId, transportistaActualizado]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
-  const cvlpClaseBAlerta = hasArca && cvlpClaseBEsperada(condicionIva);
+  const cvlpClaseBAlerta =
+    hasLiquidoProductoArca && cvlpClaseBEsperada(condicionIva);
 
   // Cargar viajes cuando cambia el transportista seleccionado (modo sin viajeInicial)
   useEffect(() => {
@@ -298,7 +330,7 @@ export function CrearLiquidacionManualModal({
   useEffect(() => {
     let cid = viajeInicial?.clienteId;
     if (!cid && selectedViajeIds.size > 0) {
-      const primerViaje = viajes.find(v => selectedViajeIds.has(v.id));
+      const primerViaje = viajes.find((v) => selectedViajeIds.has(v.id));
       cid = (primerViaje as any)?.cliente?.id;
     }
     if (!cid) {
@@ -317,9 +349,10 @@ export function CrearLiquidacionManualModal({
         if (!cancelled) setClienteDetalle(null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [viajeInicial, selectedViajeIds, viajes, tenantId, getToken]);
-
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -334,6 +367,18 @@ export function CrearLiquidacionManualModal({
     return viajes.filter((v) => selectedViajeIds.has(v.id));
   }, [viajeInicial, viajes, selectedViajeIds]);
 
+  useEffect(() => {
+    if (ivaEditadaManualmente.current) return;
+    const fromViajes = uniqueIvaPctFromViajes(selectedViajes);
+    if (fromViajes != null) {
+      setIvaPct(String(fromViajes));
+      return;
+    }
+    if (resolvedConfig?.ivaGastosAdmin != null) {
+      setIvaPct(String(resolvedConfig.ivaGastosAdmin));
+    }
+  }, [selectedViajes, resolvedConfig?.ivaGastosAdmin]);
+
   /** Moneda ya fijada por la selección actual (null si no hay selección). */
   const monedaSeleccionada = useMemo<ViajeMonedaCodigo | null>(() => {
     if (selectedViajes.length === 0) return null;
@@ -343,20 +388,43 @@ export function CrearLiquidacionManualModal({
   const clienteSeleccionado = clienteDetalle;
 
   const missingEmitFields = useMemo(() => {
-    if (!hasArca || transportistaId === "") return [];
+    if (!hasLiquidoProductoArca || transportistaId === "") return [];
     return collectCvlpEmitMissingFields({
       emisor: resolvedConfig,
-      transportista: transportistaSeleccionado ?? { idFiscal: null, domicilio: null, condicionIva: null },
+      transportista: transportistaSeleccionado ?? {
+        idFiscal: null,
+        domicilio: null,
+        condicionIva: null,
+      },
       cliente: clienteSeleccionado,
     });
-  }, [hasArca, resolvedConfig, transportistaSeleccionado, clienteSeleccionado, transportistaId]);
+  }, [
+    hasLiquidoProductoArca,
+    resolvedConfig,
+    transportistaSeleccionado,
+    clienteSeleccionado,
+    transportistaId,
+  ]);
 
-  const isLoadingCliente = selectedViajes.length > 0 && clienteSeleccionado === null;
-  const missingTransportistaFields = missingEmitFields.filter(f => f.startsWith("Transportista:"));
-  const missingClienteFields = selectedViajes.length > 0 && !isLoadingCliente ? missingEmitFields.filter(f => f.startsWith("Cliente:")) : [];
+  const isLoadingCliente =
+    selectedViajes.length > 0 && clienteSeleccionado === null;
+  const missingTransportistaFields = missingEmitFields.filter((f) =>
+    f.startsWith("Transportista:"),
+  );
+  const missingClienteFields =
+    selectedViajes.length > 0 && !isLoadingCliente
+      ? missingEmitFields.filter((f) => f.startsWith("Cliente:"))
+      : [];
+
+  const missingHiddenFields = useHiddenFiscalFields(
+    hasLiquidoProductoArca ? [...missingTransportistaFields, ...missingClienteFields] : []
+  );
 
   const bloqueadoUsd = selectedViajes.some((v) =>
-    arcaBloqueaLiquidarUsd(hasArca, v.monedaPrecioTransportistaExterno),
+    arcaBloqueaLiquidarUsd(
+      hasLiquidoProductoArca,
+      v.monedaPrecioTransportistaExterno,
+    ),
   );
 
   function toggleViaje(id: string) {
@@ -394,6 +462,11 @@ export function CrearLiquidacionManualModal({
       : Array.from(selectedViajeIds);
     if (viajeIds.length === 0) {
       setError("Seleccioná al menos un viaje.");
+      return;
+    }
+    if (missingHiddenFields.length > 0) {
+      const todosLosFaltantes = [...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField);
+      setError(`No se puede emitir la liquidación. Faltan los siguientes datos: ${todosLosFaltantes.join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`);
       return;
     }
     if (bloqueadoUsd) {
@@ -436,14 +509,20 @@ export function CrearLiquidacionManualModal({
       setError("Ingresá un punto de venta válido.");
       return;
     }
-    if (action === "emitir" && hasArca && cvlpClaseBEsperada(condicionIva)) {
+    if (
+      action === "emitir" &&
+      hasLiquidoProductoArca &&
+      cvlpClaseBEsperada(condicionIva)
+    ) {
       setError(
         "No se puede emitir: la condición frente al IVA del transportista no corresponde a CVLP 060.",
       );
       return;
     }
     if (action === "emitir" && missingEmitFields.length > 0) {
-      setError("No se puede emitir. Faltan datos obligatorios del transportista o cliente.");
+      setError(
+        "No se puede emitir. Faltan datos obligatorios del transportista o cliente.",
+      );
       return;
     }
     setConceptosIncomplete([]);
@@ -510,7 +589,7 @@ export function CrearLiquidacionManualModal({
         );
       } else if (action === "borrador") {
         showToast(
-          hasArca
+          hasLiquidoProductoArca
             ? "Liquidación guardada en borrador."
             : "Liquidación creada en borrador.",
         );
@@ -549,15 +628,17 @@ export function CrearLiquidacionManualModal({
         0);
   const comisionMonto = anyHasPrice ? (bruto * comisionNum) / 100 : 0;
   const conceptosCompletos = conceptosLineas.filter(isConceptoLineaCompleta);
-  
+
   const getMultiplicador = (modo?: string) =>
-    modo === "TODOS_LOS_VIAJES" ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0)) : 1;
+    modo === "TODOS_LOS_VIAJES"
+      ? Math.max(1, selectedViajeIds.size + (viajeInicial ? 1 : 0))
+      : 1;
 
   const conceptosEfecto = conceptosCompletos.reduce(
     (sum, l) =>
       sum +
       signedMontoConIvaConcepto(l.signo, Number(l.monto) || 0, l.ivaPct) *
-        getMultiplicador(l.modoAplicacion),
+      getMultiplicador(l.modoAplicacion),
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
@@ -585,6 +666,7 @@ export function CrearLiquidacionManualModal({
     Boolean(periodoHasta) &&
     !periodoInvalido &&
     !bloqueadoUsd &&
+    missingHiddenFields.length === 0 &&
     (viajeInicial ? true : selectedViajeIds.size > 0);
   const ptoVentaNumPreview = Number(ptoVenta);
   const ptoVentaInvalidoPreview =
@@ -636,7 +718,7 @@ export function CrearLiquidacionManualModal({
             <h2 className="font-[family-name:var(--font-display)] text-xl tracking-wide text-vialto-charcoal">
               Nueva liquidación
             </h2>
-            {hasArca && (
+            {hasLiquidoProductoArca && (
               <AmbienteTestBadge ambiente={resolvedConfig?.ambiente} />
             )}
           </div>
@@ -659,7 +741,7 @@ export function CrearLiquidacionManualModal({
           <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
             <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
               {/* Tipo de comprobante (solo ARCA) */}
-              {hasArca && (
+              {hasLiquidoProductoArca && (
                 <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
                   <span className={labelClass}>Comprobante</span>
                   <span className="text-sm text-vialto-charcoal">
@@ -702,12 +784,35 @@ export function CrearLiquidacionManualModal({
                 </div>
               </div>
 
-              {missingTransportistaFields.length > 0 && (
-                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+
+              {missingHiddenFields.length > 0 && transportistaId && hasLiquidoProductoArca && (
+                <div
+                  className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900"
+                  role="alert"
+                >
+                  <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+                  <p className="mt-1">
+                    No se puede emitir la liquidación. Faltan los siguientes datos: <strong>{[...missingTransportistaFields, ...missingClienteFields].map(formatMissingFiscalField).join(", ")}</strong>.
+                    <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
+                  </p>
+                </div>
+              )}
+
+              {missingHiddenFields.length === 0 && missingTransportistaFields.length > 0 && (
+                <div
+                  className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  role="alert"
+                >
                   <p className="font-medium">
-                    Faltan datos del transportista: {missingTransportistaFields.map(f => f.replace("Transportista: ", "")).join(", ")}.
+                    Faltan datos del transportista:{" "}
+                    {missingTransportistaFields
+                      .map((f) => f.replace("Transportista: ", ""))
+                      .join(", ")}
+                    .
                     <br />
-                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                    <strong className="font-bold">
+                      Desplazate hacia abajo para completarlos.
+                    </strong>
                   </p>
                 </div>
               )}
@@ -766,7 +871,9 @@ export function CrearLiquidacionManualModal({
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">ID personalizado</span>
+                      <span className="text-vialto-steel">
+                        ID personalizado
+                      </span>
                       <span className="font-medium tabular-nums text-vialto-charcoal">
                         {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
                           "—"}
@@ -793,14 +900,16 @@ export function CrearLiquidacionManualModal({
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">Precio del viaje</span>
+                      <span className="text-vialto-steel">
+                        Precio del viaje
+                      </span>
                       <span className="font-medium tabular-nums text-vialto-charcoal">
                         {fmtMoney(
                           viajeInicial.precioTransportistaExterno,
                           viajeInicial.monedaPrecioTransportistaExterno,
                         )}
                         {ivaTransportistaVisible &&
-                        viajeInicial.precioTransportistaIvaIncluidoPct
+                          viajeInicial.precioTransportistaIvaIncluidoPct
                           ? ` (+${viajeInicial.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                           : ""}
                       </span>
@@ -838,7 +947,7 @@ export function CrearLiquidacionManualModal({
                         v.monedaPrecioTransportistaExterno,
                       ) +
                       (ivaTransportistaVisible &&
-                      v.precioTransportistaIvaIncluidoPct
+                        v.precioTransportistaIvaIncluidoPct
                         ? ` (+${v.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
                         : "")
                     }
@@ -862,11 +971,20 @@ export function CrearLiquidacionManualModal({
               )}
 
               {missingClienteFields.length > 0 && (
-                <div className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
+                <div
+                  className="rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  role="alert"
+                >
                   <p className="font-medium">
-                    Faltan datos del cliente: {missingClienteFields.map(f => f.replace("Cliente: ", "")).join(", ")}.
+                    Faltan datos del cliente:{" "}
+                    {missingClienteFields
+                      .map((f) => f.replace("Cliente: ", ""))
+                      .join(", ")}
+                    .
                     <br />
-                    <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
+                    <strong className="font-bold">
+                      Desplazate hacia abajo para completarlos.
+                    </strong>
                   </p>
                 </div>
               )}
@@ -915,7 +1033,8 @@ export function CrearLiquidacionManualModal({
                     <div className="group relative flex items-center">
                       <HelpCircle className="h-3.5 w-3.5 cursor-help text-vialto-steel transition-colors hover:text-vialto-charcoal" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[220px] -translate-x-1/2 whitespace-normal rounded bg-vialto-charcoal px-2.5 py-1.5 text-[11px] normal-case leading-tight tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y 27%
+                        Alícuotas válidas de AFIP: 0%, 2.5%, 5%, 10.5%, 21% y
+                        27%
                         <span className="absolute left-1/2 top-full -mt-[1px] -translate-x-1/2 border-[5px] border-transparent border-t-vialto-charcoal"></span>
                       </div>
                     </div>
@@ -927,17 +1046,21 @@ export function CrearLiquidacionManualModal({
                     max="100"
                     step="0.01"
                     value={ivaPct}
-                    onChange={(e) => setIvaPct(e.target.value)}
+                    onChange={(e) => {
+                      ivaEditadaManualmente.current = true;
+                      setIvaPct(e.target.value);
+                    }}
                     className={inputClass}
                   />
                   <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                    Por defecto se aplica {resolvedConfig?.ivaGastosAdmin ?? 21}
-                    %. Para liquidar sin IVA ingresá 0.
+                    Si el viaje tiene % de IVA, se precarga. Si no, se usa{" "}
+                    {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin
+                    IVA ingresá 0.
                   </p>
                 </div>
               </div>
 
-              {hasArca && (
+              {hasLiquidoProductoArca && (
                 <div>
                   <label htmlFor="ptoVentaLiquidacion" className={labelClass}>
                     Punto de venta
@@ -987,12 +1110,14 @@ export function CrearLiquidacionManualModal({
                 </div>
               )}
 
-              {hasArca && missingEmitFields.length > 0 && (
+              {hasLiquidoProductoArca && missingEmitFields.length > 0 && (
                 <DatosFiscalesFaltantesAlerta
                   missingEmitFields={
                     selectedViajes.length > 0 && !isLoadingCliente
                       ? missingEmitFields
-                      : missingEmitFields.filter((f) => !f.startsWith("Cliente:"))
+                      : missingEmitFields.filter(
+                        (f) => !f.startsWith("Cliente:"),
+                      )
                   }
                   clienteDetalle={clienteSeleccionado}
                   onClienteUpdated={(c) => {
@@ -1082,13 +1207,12 @@ export function CrearLiquidacionManualModal({
                         </div>
                       );
                     })}
+
                     {netoGravado !== null && (
                       <div className="flex items-baseline justify-between gap-3 border-t border-black/10 pt-2">
-                        <span className={labelClass}>
-                          Subtotal (flete − comisión)
-                        </span>
+                        <span className={labelClass}>Subtotal</span>
                         <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                          {fmtLiquidacionMoney(netoGravado)}
+                          {fmtLiquidacionMoney(netoGravado + conceptosEfecto)}
                         </span>
                       </div>
                     )}
@@ -1097,17 +1221,6 @@ export function CrearLiquidacionManualModal({
                         <span>IVA {ivaPctNum}% (flete/comisión)</span>
                         <span className="tabular-nums">
                           {fmtSignedLiquidacionMoney(ivaMonto, "plus")}
-                        </span>
-                      </div>
-                    )}
-                    {conceptosCompletos.length > 0 && (
-                      <div className="flex items-baseline justify-between gap-3 text-xs text-vialto-steel">
-                        <span>Efecto neto de conceptos</span>
-                        <span className="tabular-nums">
-                          {fmtSignedLiquidacionMoney(
-                            Math.abs(conceptosEfecto),
-                            conceptosEfecto >= 0 ? "plus" : "minus",
-                          )}
                         </span>
                       </div>
                     )}
@@ -1143,7 +1256,7 @@ export function CrearLiquidacionManualModal({
           >
             Cancelar
           </button>
-          {hasArca ? (
+          {hasLiquidoProductoArca ? (
             <>
               <button
                 type="button"

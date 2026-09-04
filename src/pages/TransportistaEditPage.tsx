@@ -28,6 +28,7 @@ import type { Transportista } from "@/types/api";
 import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoInput";
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
 import { isValidPhoneNumber } from "libphonenumber-js";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export function TransportistaEditPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -57,7 +58,20 @@ export function TransportistaEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const faltanDatosFiscales = !pais || !idFiscal.trim();
+  const { isVisible } = useFieldConfig("transportistas");
+  const paisVisible = isVisible("edicion_transportista", "pais");
+  const idFiscalVisible = isVisible("edicion_transportista", "idFiscal");
+  const condicionVisible = isVisible("edicion_transportista", "condicionIvaTributaria");
+  const domicilioVisible = isVisible("edicion_transportista", "domicilio");
+  const emailVisible = isVisible("edicion_transportista", "email");
+  const telefonoVisible = isVisible("edicion_transportista", "telefono");
+  const pautVisible = isVisible("edicion_transportista", "paut");
+  const permisoInternacionalVisible = isVisible("edicion_transportista", "permisoInternacional");
+  const fechaVencimientoPermisoVisible = isVisible("edicion_transportista", "fechaVencimientoPermiso");
+
+  const faltanPais = paisVisible && !pais;
+  const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
+  const faltanDatosFiscales = faltanPais || faltanIdFiscal;
 
   useEffect(() => {
     if (!id) return;
@@ -129,7 +143,7 @@ export function TransportistaEditPage() {
       setFieldErrors(errs);
       return;
     }
-    const errorFiscal = idFiscal.trim()
+    const errorFiscal = idFiscalVisible && idFiscal.trim()
       ? validarIdFiscal(pais, idFiscal.trim())
       : null;
     if (errorFiscal) {
@@ -149,7 +163,7 @@ export function TransportistaEditPage() {
           nombre: nombre.trim(),
           pais: pais || "",
           idFiscal: idFiscal.trim(),
-          email: email.trim(),
+          email: email.trim() || null,
           telefono: telefono,
           domicilio: domicilio.trim(),
           condicionIva: pais === "AR" ? condicionIva : null,
@@ -204,15 +218,18 @@ export function TransportistaEditPage() {
     "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
   const sectionClass = "mt-2 border-t border-black/10 pt-4";
   const condInfo = condicionTributariaPorPais(pais);
-  const errorFiscal = idFiscal.trim()
+  const errorFiscal = idFiscalVisible && idFiscal.trim()
     ? validarIdFiscal(pais, idFiscal.trim())
     : null;
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
 
+  const warningParts = [];
+  if (faltanPais) warningParts.push("país");
+  if (faltanIdFiscal) warningParts.push(idFiscalPorPais(pais).label.toLowerCase());
+  const warningText = warningParts.join(" y/o ");
+
   return (
-    <CrudPageLayout
-      title="Editar transportista"
-    >
+    <CrudPageLayout title="Editar transportista">
       {initialLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
@@ -234,60 +251,67 @@ export function TransportistaEditPage() {
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
-              <PaisUbicacionSelect
-                value={pais}
-                onChange={handlePaisChange}
-                placeholder="Seleccioná un país"
-              />
-              <CrudFieldError message={fieldErrors.pais} />
-            </label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {paisVisible && (
               <label className="grid gap-1.5">
-                <CrudFieldLabel>
-                  {idFiscalPorPais(pais).label} (recomendado)
-                </CrudFieldLabel>
-                <CrudInput
-                  value={idFiscal}
-                  placeholder={idFiscalPorPais(pais).placeholder}
-                  error={idFiscalError || undefined}
-                  onChange={(e) => setIdFiscal(e.target.value)}
+                <CrudFieldLabel>País (recomendado)</CrudFieldLabel>
+                <PaisUbicacionSelect
+                  value={pais}
+                  onChange={handlePaisChange}
+                  placeholder="Seleccioná un país"
                 />
-                <CrudFieldError message={idFiscalError} />
+                <CrudFieldError message={fieldErrors.pais} />
               </label>
-              <label className="grid gap-1.5">
-                <span className={labelClass}>{condInfo.label}</span>
-                {condInfo.type === "select" ? (
-                  <CrudSelect
-                    value={condicionIva ?? ""}
-                    onChange={(e) =>
-                      setCondicionIva(
-                        e.target.value ? Number(e.target.value) : null,
-                      )
-                    }
-                  >
-                    <option value="">Seleccioná una opción</option>
-                    {condInfo.options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </CrudSelect>
-                ) : (
-                  <CrudInput
-                    value={condicionTributaria}
-                    placeholder={condInfo.placeholder}
-                    onChange={(e) => setCondicionTributaria(e.target.value)}
-                  />
+            )}
+            {(idFiscalVisible || condicionVisible) && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {idFiscalVisible && (
+                  <label className="grid gap-1.5">
+                    <CrudFieldLabel>
+                      {idFiscalPorPais(pais).label} (recomendado)
+                    </CrudFieldLabel>
+                    <CrudInput
+                      placeholder={idFiscalPorPais(pais).placeholder}
+                      value={idFiscal}
+                      error={idFiscalError || undefined}
+                      onChange={(e) => setIdFiscal(e.target.value)}
+                    />
+                    <CrudFieldError message={idFiscalError} />
+                  </label>
                 )}
-              </label>
-            </div>
+                {condicionVisible && (
+                  <label className="grid gap-1.5">
+                    <span className={labelClass}>{condInfo.label}</span>
+                    {condInfo.type === "select" ? (
+                      <CrudSelect
+                        value={condicionIva ?? ""}
+                        onChange={(e) =>
+                          setCondicionIva(
+                            e.target.value ? Number(e.target.value) : null,
+                          )
+                        }
+                      >
+                        <option value="">Seleccioná una opción</option>
+                        {condInfo.options.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </CrudSelect>
+                    ) : (
+                      <CrudInput
+                        placeholder={condInfo.placeholder}
+                        value={condicionTributaria}
+                        onChange={(e) => setCondicionTributaria(e.target.value)}
+                      />
+                    )}
+                  </label>
+                )}
+              </div>
+            )}
             {faltanDatosFiscales && (
               <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p>
-                  Estás guardando el transportista sin país y/o{" "}
-                  {idFiscalPorPais(pais).label.toLowerCase()} — esto puede
+                  Estás guardando el transportista sin {warningText} — esto puede
                   afectar la facturación/liquidaciones más adelante si no se
                   completa.
                 </p>
@@ -304,64 +328,78 @@ export function TransportistaEditPage() {
                 </label>
               </div>
             )}
-            <label className="grid gap-1.5">
-              <span className={labelClass}>Domicilio</span>
-              <CrudInput
-                value={domicilio}
-                placeholder="Ej: Av. Libertador 1234, Buenos Aires"
-                onChange={(e) => setDomicilio(e.target.value)}
-              />
-            </label>
-            <TransportistaPautHelperNotice />
-            <label className="grid gap-1.5">
-              <span className={labelClass}>Email</span>
-              <CrudInput
-                value={email}
-                placeholder="Ej: contacto@empresa.com"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <span className={labelClass}>Teléfono</span>
-              <TelefonoInput
-                pais={pais}
-                value={telefono}
-                onChange={setTelefono}
-                error={fieldErrors.telefono}
-              />
-              <CrudFieldError message={fieldErrors.telefono} />
-            </label>
+            {domicilioVisible && (
+              <label className="grid gap-1.5">
+                <span className={labelClass}>Domicilio</span>
+                <CrudInput
+                  value={domicilio}
+                  placeholder="Ej: Av. Libertador 1234, Buenos Aires"
+                  onChange={(e) => setDomicilio(e.target.value)}
+                />
+              </label>
+            )}
+            <TransportistaPautHelperNotice isCreate={false} />
+            {emailVisible && (
+              <label className="grid gap-1.5">
+                <span className={labelClass}>Email</span>
+                <CrudInput
+                  value={email}
+                  placeholder="Ej: contacto@empresa.com"
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+            )}
+            {telefonoVisible && (
+              <label className="grid gap-1.5">
+                <span className={labelClass}>Teléfono</span>
+                <TelefonoInput
+                  pais={pais}
+                  value={telefono}
+                  onChange={setTelefono}
+                  error={fieldErrors.telefono}
+                />
+                <CrudFieldError message={fieldErrors.telefono} />
+              </label>
+            )}
 
-            <div className={sectionClass}>
-              <p className={`${labelClass} mb-3`}>Datos para Nómina</p>
-              <div className="grid gap-4">
-                <label className="grid gap-1.5">
-                  <span className={labelClass}>N° PAUT</span>
-                  <CrudInput
-                    placeholder="Ej: 17597"
-                    value={paut}
-                    onChange={(e) => setPaut(e.target.value)}
-                  />
-                </label>
-                <label className="grid gap-1.5">
-                  <span className={labelClass}>Permiso Internacional</span>
-                  <CrudInput
-                    placeholder="Ej: 20113C19113"
-                    value={permisoInternacional}
-                    onChange={(e) => setPermisoInternacional(e.target.value)}
-                  />
-                </label>
-                <label className="grid gap-1.5">
-                  <span className={labelClass}>
-                    Vencimiento Permiso Internacional
-                  </span>
-                  <VencimientoPermisoInput
-                    value={fechaVencimientoPermiso}
-                    onChange={setFechaVencimientoPermiso}
-                  />
-                </label>
+            {(pautVisible || permisoInternacionalVisible || fechaVencimientoPermisoVisible) && (
+              <div className={sectionClass}>
+                <p className={`${labelClass} mb-3`}>Datos para Nómina</p>
+                <div className="grid gap-4">
+                  {pautVisible && (
+                    <label className="grid gap-1.5">
+                      <span className={labelClass}>N° PAUT</span>
+                      <CrudInput
+                        placeholder="Ej: 17597"
+                        value={paut}
+                        onChange={(e) => setPaut(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  {permisoInternacionalVisible && (
+                    <label className="grid gap-1.5">
+                      <span className={labelClass}>Permiso Internacional</span>
+                      <CrudInput
+                        placeholder="Ej: 20113C19113"
+                        value={permisoInternacional}
+                        onChange={(e) => setPermisoInternacional(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  {fechaVencimientoPermisoVisible && (
+                    <label className="grid gap-1.5">
+                      <span className={labelClass}>
+                        Vencimiento Permiso Internacional
+                      </span>
+                      <VencimientoPermisoInput
+                        value={fechaVencimientoPermiso}
+                        onChange={setFechaVencimientoPermiso}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <CrudFormErrorAlert message={error} />
             <CrudSubmitButton

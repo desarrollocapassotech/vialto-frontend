@@ -5,6 +5,7 @@ import {
   TenantForm,
   type TenantFormValues,
 } from "@/components/superadmin/TenantForm";
+import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { SuperadminOnly } from "@/components/superadmin/SuperadminOnly";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -67,10 +68,7 @@ export function SuperadminTenantCreatePage() {
 
   return (
     <SuperadminOnly>
-      <div className="max-w-4xl">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-          Crear empresa
-        </h1>
+      <CrudPageLayout title="Crear empresa" contentClassName="w-full min-w-0">
         <p className="mt-2 text-vialto-steel">Alta de una nueva empresa.</p>
 
         <TenantForm
@@ -80,11 +78,10 @@ export function SuperadminTenantCreatePage() {
           submitLabel="Crear empresa"
           loading={loading}
           showOrgIdInput={false}
-          submitAlign="right"
           fieldErrors={fieldErrors}
           formError={error}
         />
-      </div>
+      </CrudPageLayout>
     </SuperadminOnly>
   );
 }

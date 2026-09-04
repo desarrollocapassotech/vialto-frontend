@@ -152,6 +152,11 @@ export function useImportWizard(
 
         // Reaplica filas excluidas de antes de este preview, por la misma razón.
         if (filasExcluidasRef.current.size > 0) {
+          const viajesIgnorados = (previewResult.viajes ?? []).filter((v) =>
+            filasExcluidasRef.current.has(v.fila),
+          );
+          const nuevasIgnoradas = viajesIgnorados.filter((v) => v.nuevo).length;
+          const actualizadasIgnoradas = viajesIgnorados.length - nuevasIgnoradas;
           previewResult = {
             ...previewResult,
             viajes: previewResult.viajes?.filter(
@@ -167,6 +172,18 @@ export function useImportWizard(
             0,
             previewResult.exitosas - filasExcluidasRef.current.size,
           );
+          if (previewResult.entidadesNuevas != null) {
+            previewResult.entidadesNuevas = Math.max(
+              0,
+              previewResult.entidadesNuevas - nuevasIgnoradas,
+            );
+          }
+          if (previewResult.entidadesActualizadas != null) {
+            previewResult.entidadesActualizadas = Math.max(
+              0,
+              previewResult.entidadesActualizadas - actualizadasIgnoradas,
+            );
+          }
         }
       }
 
@@ -216,6 +233,8 @@ export function useImportWizard(
 
     setPreview((prev) => {
       if (!prev) return prev;
+      const viajeIgnorado = prev.viajes?.find((v) => v.fila === fila);
+      if (!viajeIgnorado) return prev;
       const viajes = prev.viajes?.filter((v) => v.fila !== fila);
       const advertenciasCiudad = prev.advertenciasCiudad?.filter(
         (a) => a.fila !== fila,
@@ -226,6 +245,20 @@ export function useImportWizard(
         advertenciasCiudad,
         totalAdvertenciasCiudad: advertenciasCiudad?.length ?? 0,
         exitosas: Math.max(0, prev.exitosas - 1),
+        // Mantiene el desglose "N nuevas · M a actualizar" en sync con lo que
+        // realmente se va a importar — si no se descuenta acá, ignorar una
+        // fila que actualizaba deja el contador de actualizaciones inflado.
+        entidadesNuevas:
+          prev.entidadesNuevas != null
+            ? Math.max(0, prev.entidadesNuevas - (viajeIgnorado.nuevo ? 1 : 0))
+            : prev.entidadesNuevas,
+        entidadesActualizadas:
+          prev.entidadesActualizadas != null
+            ? Math.max(
+                0,
+                prev.entidadesActualizadas - (viajeIgnorado.nuevo ? 0 : 1),
+              )
+            : prev.entidadesActualizadas,
       };
     });
   }
@@ -300,12 +333,24 @@ export function useImportWizard(
     }
   }
 
-  async function avanzarModulo() {
+  /**
+   * `viajeIdsCreadosOverride` existe porque `confirmarModuloActual` llama a
+   * esta función en el mismo tick en que recién hizo `setViajeIdsCreados` —
+   * el estado todavía no se actualizó (closure vieja), así que sin este
+   * parámetro `avanzarModulo` lee el `viajeIdsCreados` de ANTES de confirmar
+   * Viajes (vacío en la primera pasada) y salta directo a "terminado" en vez
+   * de "post-liquidaciones", aunque la importación de Viajes haya creado o
+   * actualizado filas. Bug real encontrado en QA (NyM): con viajes
+   * actualizados con éxito, el wizard se salteaba Liquidaciones y Facturas
+   * igual, mostrándolas como "hechas" en el stepper sin haber pasado por ahí.
+   */
+  async function avanzarModulo(viajeIdsCreadosOverride?: string[]) {
     setPreview(null);
     setError(null);
     const nextIdx = moduloIndex + 1;
     if (nextIdx >= secuencia.length) {
-      setFase(viajeIdsCreados.length > 0 ? "post-liquidaciones" : "terminado");
+      const idsCreados = viajeIdsCreadosOverride ?? viajeIdsCreados;
+      setFase(idsCreados.length > 0 ? "post-liquidaciones" : "terminado");
       return;
     }
     setModuloIndex(nextIdx);
@@ -348,13 +393,14 @@ export function useImportWizard(
         body: JSON.stringify(body),
       });
       setEtapasCompletadas((prev) => [...prev, { modulo: moduloActual, log }]);
+      let viajeIdsRecienCreados: string[] | undefined;
       if (moduloActual === "viajes") {
-        const ids = log.detalles
+        viajeIdsRecienCreados = log.detalles
           .filter((d) => d.estado === "ok" && d.id)
           .map((d) => d.id as string);
-        setViajeIdsCreados(ids);
+        setViajeIdsCreados(viajeIdsRecienCreados);
       }
-      await avanzarModulo();
+      await avanzarModulo(viajeIdsRecienCreados);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Error al confirmar la importación",

@@ -12,14 +12,12 @@ const modulos: Record<string, string> = {
   choferes: 'Choferes',
   vehiculos: 'Vehículos',
   facturacion: 'Registro de Facturas',
-  'integracion-arca': 'Integración ARCA / AFIP',
+  'emision-facturas-arca': 'Emisión de facturas (ARCA)',
+  'emision-liquido-producto-arca': 'Emisión de líquido producto (ARCA)',
   'cuenta-corriente': 'Cuenta corriente',
   stock: 'Stock',
   combustible: 'Combustible',
   mantenimiento: 'Mantenimiento',
-  remitos: 'Remitos',
-  turnos: 'Turnos',
-  reportes: 'Reportes',
 };
 
 export function labelBillingStatus(status: string): string {

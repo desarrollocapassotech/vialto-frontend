@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { FileSpreadsheet } from "lucide-react";
+import { Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -258,8 +258,8 @@ export function StockMovimientosTenantPage({
       disabled={items.length === 0}
       className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider border border-black/20 px-3 py-2 hover:bg-vialto-mist disabled:opacity-40"
     >
-      <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-      Descargar Excel
+      <Download className="h-3.5 w-3.5" aria-hidden />
+      Exportar
     </button>
   );
 
@@ -454,6 +454,20 @@ export function StockMovimientosTenantPage({
                   )}
                 </span>
               );
+            },
+            tdClassName: listadoTablaTdClass,
+          },
+          {
+            id: "kg",
+            thClassName: `${listadoTablaThClass} align-top`,
+            header: "Kg",
+            cell: (op) => {
+              if (op.tipo === "division") {
+                const kg = op.movimientos[0]?.kg ?? 0;
+                return `${kg} kg`;
+              }
+              const totalKg = op.movimientos.reduce((s, m) => s + m.kg, 0);
+              return `${totalKg} kg`;
             },
             tdClassName: listadoTablaTdClass,
           },

@@ -8,7 +8,12 @@ import {
 import { FacturaViewModal } from "@/components/facturacion/FacturaViewModal";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
-import { TipoFacturaClienteModal } from "@/components/viajes/TipoFacturaClienteModal";
+import {
+  type FacturaLetra,
+  facturaLetraFromCondicionIva,
+  facturaLetraLabel,
+  condicionIvaLabel,
+} from "@/lib/arcaCbteTipo";
 import { CrearLiquidacionManualModal } from "@/components/liquidaciones/CrearLiquidacionManualModal";
 import { FacturaCreateModal } from "@/components/facturacion/FacturaCreateModal";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
@@ -20,8 +25,9 @@ import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
 import {
   canAccessCombustible,
+  canAccessEmisionFacturasArca,
+  canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
-  canAccessIntegracionArca,
   canAccessViajes,
 } from "@/lib/tenantModules";
 import {
@@ -49,19 +55,19 @@ export function TenantHomePage() {
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
   const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
-  const [facturaLetraViaje, setFacturaLetraViaje] = useState<Viaje | null>(
-    null,
-  );
   const [abriendoFacturar, setAbriendoFacturar] = useState(false);
   const [crearLiqViaje, setCrearLiqViaje] = useState<Viaje | null>(null);
 
-  const hasArca = canAccessIntegracionArca(tenant?.modules ?? []);
+  const hasFacturasArca = canAccessEmisionFacturasArca(tenant?.modules ?? []);
+  const hasLiquidoProductoArca = canAccessEmisionLiquidoProductoArca(
+    tenant?.modules ?? [],
+  );
   const facturaCreator = useFacturaCreator({
     getToken,
     apiUrlViajes: "/api/viajes",
     apiUrlFacturasCreate: "/api/facturacion/facturas",
-    hasArca,
-    showComprobanteAdjunto: !hasArca,
+    hasArca: hasFacturasArca,
+    showComprobanteAdjunto: !hasFacturasArca,
   });
 
   const viajeEditor = useViajeEditor({
@@ -156,7 +162,6 @@ export function TenantHomePage() {
               viewingFactura !== null ||
               viewingViaje !== null ||
               viajeEditor.editingId !== null ||
-              facturaLetraViaje !== null ||
               facturaCreator.creating ||
               crearLiqViaje !== null
             }
@@ -213,7 +218,7 @@ export function TenantHomePage() {
       {viewingViaje && (
         <ViajeViewModal
           viaje={viewingViaje}
-          hasArca={hasArca}
+          hasLiquidoProductoArca={hasLiquidoProductoArca}
           editando={abriendoEditorViaje}
           facturando={abriendoFacturar}
           onClose={() => setViewingViaje(null)}
@@ -235,20 +240,24 @@ export function TenantHomePage() {
             viajePermiteBotonFacturar(viewingViaje)
               ? () => {
                   const v = viewingViaje;
-                  if (arcaBloqueaFacturarUsd(hasArca, v.monedaMonto)) {
+                  if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) {
                     showToast(MSG_ARCA_NO_FACTURA_USD, "error");
                     return;
                   }
                   setViewingViaje(null);
-                  // Tipo A/B solo aplica con integración ARCA.
-                  if (hasArca) {
-                    setFacturaLetraViaje(v);
-                    return;
+                  let letra: FacturaLetra | undefined;
+                  if (hasFacturasArca) {
+                    const cliente = maestro.clientes?.find((c) => c.id === v.clienteId);
+                    letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
+                    showToast(
+                      `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
+                      "success",
+                    );
                   }
                   void (async () => {
                     setAbriendoFacturar(true);
                     try {
-                      facturaCreator.prepararDraftParaViaje(v);
+                      facturaCreator.prepararDraftParaViaje(v, letra);
                       await facturaCreator.ensureViajesLoaded();
                       facturaCreator.abrir();
                     } finally {
@@ -266,7 +275,7 @@ export function TenantHomePage() {
                   const v = viewingViaje;
                   if (
                     arcaBloqueaLiquidarUsd(
-                      hasArca,
+                      hasLiquidoProductoArca,
                       v.monedaPrecioTransportistaExterno,
                     )
                   ) {
@@ -285,7 +294,7 @@ export function TenantHomePage() {
         <CrearLiquidacionManualModal
           viajeInicial={crearLiqViaje}
           transportistas={maestro.transportistas}
-          hasArca={hasArca}
+          hasLiquidoProductoArca={hasLiquidoProductoArca}
           getToken={getToken}
           onDataSaved={() => {
             void maestro.refreshTransportistas();
@@ -293,28 +302,6 @@ export function TenantHomePage() {
           }}
           onSuccess={() => setCrearLiqViaje(null)}
           onClose={() => setCrearLiqViaje(null)}
-        />
-      )}
-
-      {facturaLetraViaje && (
-        <TipoFacturaClienteModal
-          viaje={facturaLetraViaje}
-          busy={abriendoFacturar}
-          onClose={() => setFacturaLetraViaje(null)}
-          onConfirm={(letra) => {
-            const v = facturaLetraViaje;
-            void (async () => {
-              setAbriendoFacturar(true);
-              try {
-                facturaCreator.prepararDraftParaViaje(v, letra);
-                await facturaCreator.ensureViajesLoaded();
-                facturaCreator.abrir();
-                setFacturaLetraViaje(null);
-              } finally {
-                setAbriendoFacturar(false);
-              }
-            })();
-          }}
         />
       )}
 
@@ -328,12 +315,14 @@ export function TenantHomePage() {
         viajesLoading={facturaCreator.viajesLoading}
         onClose={facturaCreator.cancelar}
         onSave={
-          hasArca ? undefined : () => void facturaCreator.handleCreate()
+          hasFacturasArca
+            ? undefined
+            : () => void facturaCreator.handleCreate()
         }
-        saving={hasArca ? false : facturaCreator.saving}
-        error={hasArca ? null : facturaCreator.error}
-        showComprobanteAdjunto={!hasArca}
-        hasArca={hasArca}
+        saving={hasFacturasArca ? false : facturaCreator.saving}
+        error={hasFacturasArca ? null : facturaCreator.error}
+        showComprobanteAdjunto={!hasFacturasArca}
+        hasArca={hasFacturasArca}
         getToken={getToken}
         facturasCreateUrl="/api/facturacion/facturas"
       />
@@ -365,6 +354,8 @@ export function TenantHomePage() {
             fechaDescargaError={viajeEditor.fechaDescargaError}
             destinosError={viajeEditor.destinosError}
             onClearDestinosError={viajeEditor.onClearDestinosError}
+            clientesRowErrors={viajeEditor.clientesRowErrors}
+            onClearClientesRowErrors={viajeEditor.onClearClientesRowErrors}
             transportistaEfectivoError={viajeEditor.transportistaEfectivoError}
             onClearTransportistaEfectivoError={
               viajeEditor.onClearTransportistaEfectivoError

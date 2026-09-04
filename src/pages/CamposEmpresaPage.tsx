@@ -1,12 +1,38 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
+import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
+import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
 import type { Tenant } from "@/types/api";
+
+/**
+ * Módulos de `FIELD_CATALOG` que son módulos vendibles reales (`Tenant.modules`)
+ * y por lo tanto deben ocultarse si el tenant no los contrató. Los que no
+ * aparecen acá (`clientes`/`transportistas`/`vehiculos`) son entidades del
+ * core, siempre presentes — nunca se filtran (ver `vialto-backend/CLAUDE.md`,
+ * "Entidades del Core").
+ */
+const MODULO_GATE: Record<string, (modules: string[]) => boolean> = {
+  viajes: canAccessViajes,
+  stock: canAccessStock,
+};
+
+function calcularModulosDisponibles(
+  catalogo: Catalogo | null,
+  tenant: Tenant | null,
+): string[] {
+  if (!catalogo) return [];
+  return Object.keys(catalogo).filter((m) => {
+    const gate = MODULO_GATE[m];
+    if (!gate) return true;
+    return !!tenant && gate(tenant.modules);
+  });
+}
 
 type CampoCatalogo = {
   campo: string;
@@ -95,6 +121,9 @@ export function CamposEmpresaPage() {
   const [loading, setLoading] = useState(false);
   const [savingCampo, setSavingCampo] = useState<string | null>(null);
   const [aplicarATodos, setAplicarATodos] = useState(false);
+  // Pestaña "Templates de importación" — vive en la misma barra de tabs que
+  // los módulos (Viajes/Stock/...), no como sección aparte apilada.
+  const [mostrarTemplates, setMostrarTemplates] = useState(false);
 
   // --- NUEVOS ESTADOS PARA AUDITORÍA ---
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -114,9 +143,14 @@ export function CamposEmpresaPage() {
   const [loadingEmpresaConfig, setLoadingEmpresaConfig] = useState(false);
   const [savingLabel, setSavingLabel] = useState(false);
   const [savingImportToggle, setSavingImportToggle] = useState(false);
+  const [empresaExportacionPautMicCrt, setEmpresaExportacionPautMicCrt] = useState(false);
+  const [savingExportacionPautMicCrt, setSavingExportacionPautMicCrt] = useState(false);
   const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
     null,
   );
+  // Tenant completo (nombre + módulos contratados) — lo necesita la sección
+  // de templates de importación de abajo (`ImportTemplatesConfig`).
+  const [empresaTenant, setEmpresaTenant] = useState<Tenant | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !filtroEmpresa) return;
@@ -134,6 +168,8 @@ export function CamposEmpresaPage() {
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
+          setEmpresaExportacionPautMicCrt(tenant.habilitarExportacionPautMicCrt ?? false);
+          setEmpresaTenant(tenant);
         }
       } catch (e) {
         if (!cancelled) setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
@@ -184,6 +220,24 @@ export function CamposEmpresaPage() {
     }
   }
 
+  async function toggleExportacionPautMicCrt() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaExportacionPautMicCrt;
+    setSavingExportacionPautMicCrt(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ habilitarExportacionPautMicCrt: nuevoValor }),
+      });
+      setEmpresaExportacionPautMicCrt(nuevoValor);
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingExportacionPautMicCrt(false);
+    }
+  }
+
   // Carga del catálogo completo (módulos/formularios disponibles) al montar
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -223,7 +277,8 @@ export function CamposEmpresaPage() {
       return;
     }
     let cancelled = false;
-    setCampos(null);
+    // No reseteamos 'campos' a null aquí para evitar que la tabla desaparezca
+    // y provoque que el navegador haga scroll hacia arriba bruscamente.
     setLoading(true);
     (async () => {
       try {
@@ -272,8 +327,8 @@ export function CamposEmpresaPage() {
       setCampos((prev) =>
         prev
           ? prev.map((c) =>
-              c.campo === campo ? { ...c, visible: nuevoVisible } : c,
-            )
+            c.campo === campo ? { ...c, visible: nuevoVisible } : c,
+          )
           : prev,
       );
     } catch (e) {
@@ -308,7 +363,25 @@ export function CamposEmpresaPage() {
     }
   }, [showAuditModal, auditFilter, modulo, formulario]);
 
-  const modulosDisponibles = catalogo ? Object.keys(catalogo) : [];
+  // Si el módulo activo deja de estar disponible para el tenant elegido (ej.
+  // se cambió de un tenant con Stock a uno sin Stock), se cae al primer
+  // módulo que sí tenga. Espera a que `empresaTenant` haya cargado — antes de
+  // eso `calcularModulosDisponibles` oculta todo lo gateado por no saber
+  // todavía los módulos contratados, y correría igual aunque el tenant sí
+  // tenga el módulo activo.
+  useEffect(() => {
+    if (!catalogo || !modulo || !filtroEmpresa || !empresaTenant) return;
+    const disponibles = calcularModulosDisponibles(catalogo, empresaTenant);
+    if (disponibles.includes(modulo)) return;
+    const siguiente = disponibles[0] ?? null;
+    setModulo(siguiente);
+    setFormulario(
+      siguiente ? (Object.keys(catalogo[siguiente].formularios)[0] ?? null) : null,
+    );
+    setMostrarTemplates(false);
+  }, [catalogo, empresaTenant, modulo, filtroEmpresa]);
+
+  const modulosDisponibles = calcularModulosDisponibles(catalogo, empresaTenant);
   const formulariosDelModulo =
     catalogo && modulo ? Object.keys(catalogo[modulo].formularios) : [];
   // Los campos obligatorios del sistema no se pueden ocultar — no tiene
@@ -419,7 +492,7 @@ export function CamposEmpresaPage() {
         <>
           <div className="mt-6 border-b border-black/15">
             <nav
-              className="-mb-px flex gap-1"
+              className="-mb-px flex flex-wrap gap-1"
               aria-label="Módulos configurables"
             >
               {modulosDisponibles.map((m) => (
@@ -427,6 +500,7 @@ export function CamposEmpresaPage() {
                   key={m}
                   type="button"
                   onClick={() => {
+                    setMostrarTemplates(false);
                     setModulo(m);
                     setFormulario(
                       Object.keys(catalogo[m].formularios)[0] ?? null,
@@ -434,7 +508,7 @@ export function CamposEmpresaPage() {
                   }}
                   className={[
                     "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    modulo === m
+                    !mostrarTemplates && modulo === m
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
                   ].join(" ")}
@@ -442,9 +516,39 @@ export function CamposEmpresaPage() {
                   {catalogo[m].label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setMostrarTemplates(true)}
+                className={[
+                  "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                  mostrarTemplates
+                    ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
+                    : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                ].join(" ")}
+              >
+                Templates de importación
+              </button>
             </nav>
           </div>
 
+          {mostrarTemplates && empresaTenant && (
+            <div className="border border-t-0 border-black/15 bg-white p-6">
+              <p className="mb-4 text-sm text-vialto-steel">
+                Mapeo de columnas del Excel a los campos del sistema, por
+                módulo — lo mismo que se configura desde "Configurar
+                templates" al importar datos de esta empresa.
+              </p>
+              <ImportTemplatesConfig
+                tenantId={filtroEmpresa}
+                tenantNombre={empresaTenant.name}
+                tenantModules={empresaTenant.modules}
+                embedded
+              />
+            </div>
+          )}
+
+          {!mostrarTemplates && (
+          <>
           <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
             {modulo !== "viajes" && (
               <label className="flex flex-col gap-1">
@@ -520,8 +624,8 @@ export function CamposEmpresaPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {loading && (
+              <tbody className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                {loading && (!camposConfigurables || camposConfigurables.length === 0) && (
                   <tr>
                     <td
                       colSpan={2}
@@ -541,23 +645,65 @@ export function CamposEmpresaPage() {
                     </td>
                   </tr>
                 )}
-                {!loading &&
-                  camposConfigurables?.map((c) => (
-                    <tr key={c.campo} className="border-t border-black/10">
-                      <td className="px-4 py-2.5">{c.label}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={c.visible}
-                          disabled={savingCampo === c.campo}
-                          onChange={() => toggleCampo(c.campo, c.visible)}
-                          label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                {camposConfigurables?.map((c) => (
+                  <tr key={c.campo} className="border-t border-black/10">
+                    <td className="px-4 py-2.5">{c.label}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <ToggleSwitch
+                        checked={c.visible}
+                        disabled={savingCampo === c.campo}
+                        onChange={() => toggleCampo(c.campo, c.visible)}
+                        label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+
+          {modulo === "viajes" && (
+            <div className="mt-8">
+              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+                Acciones del módulo
+              </h2>
+              <div className="mt-2 overflow-hidden border border-black/15">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-vialto-mist text-left">
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
+                        Acción
+                      </th>
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
+                        Habilitada
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Exportación de Reporte PAUT / MIC CRT
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <ToggleSwitch
+                          checked={empresaExportacionPautMicCrt}
+                          disabled={savingExportacionPautMicCrt}
+                          onChange={() => void toggleExportacionPautMicCrt()}
+                          label={
+                            empresaExportacionPautMicCrt
+                              ? "Deshabilitar exportación"
+                              : "Habilitar exportación"
+                          }
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          </>
+          )}
         </>
       )}
 

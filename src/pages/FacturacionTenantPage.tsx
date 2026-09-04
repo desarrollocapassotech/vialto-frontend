@@ -28,15 +28,16 @@ import { uploadComprobante } from "@/lib/comprobanteUpload";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTenantsList } from "@/hooks/useTenantsList";
-import { canAccessIntegracionArca } from "@/lib/tenantModules";
+import { canAccessEmisionFacturasArca } from "@/lib/tenantModules";
 import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Landmark } from "lucide-react";
+import { Download, Landmark } from "lucide-react";
 import {
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
+  textoImporteMonedaFactura,
   viajesFiltradosParaFactura,
 } from "@/lib/viajesFlota";
 import {
@@ -50,6 +51,11 @@ import {
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
+import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
+import {
+  FACTURAS_EXPORT_COLUMNS,
+  generarFacturasExcel,
+} from "@/lib/facturasExcelExport";
 import type {
   ArcaConfig,
   Cliente,
@@ -136,7 +142,7 @@ export function FacturacionTenantPage({
   const tenantModules = platform
     ? (platformTenant?.modules ?? [])
     : (maestro.tenant?.modules ?? []);
-  const hasArca = canAccessIntegracionArca(tenantModules);
+  const hasArca = canAccessEmisionFacturasArca(tenantModules);
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
@@ -240,6 +246,9 @@ export function FacturacionTenantPage({
   const [vencimientoDesdeFiltro, setVencimientoDesdeFiltro] = useState("");
   const [vencimientoHastaFiltro, setVencimientoHastaFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
 
   const fetchRef = useRef(0);
   const expandFacturaHandledRef = useRef(false);
@@ -953,6 +962,66 @@ export function FacturacionTenantPage({
     setPage(1);
   }
 
+  async function handleExportarExcel(selectedIds: string[]) {
+    try {
+      setExportandoExcel(true);
+      await ensureViajesLoaded();
+
+      let itemsExport: Factura[] = [];
+
+      if (platform) {
+        itemsExport = facturasFiltradas ?? [];
+      } else {
+        const MAX_PAGE_SIZE = 500;
+
+        const firstPageData = await apiJson<FacturasPaginatedResponse>(
+          `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(1, MAX_PAGE_SIZE)}`,
+          () => getToken(),
+        );
+
+        itemsExport = [...firstPageData.items];
+        const totalPages = firstPageData.meta.totalPages;
+
+        if (totalPages > 1) {
+          const promises = [];
+          for (let p = 2; p <= totalPages; p++) {
+            promises.push(
+              apiJson<FacturasPaginatedResponse>(
+                `/api/facturacion/facturas/paginated?${buildFacturasPaginatedQuery(p, MAX_PAGE_SIZE)}`,
+                () => getToken(),
+              ).then((res) => res.items),
+            );
+          }
+          const remainingPages = await Promise.all(promises);
+          itemsExport = itemsExport.concat(...remainingPages);
+        }
+      }
+
+      if (itemsExport.length === 0) {
+        showToast("No hay facturas para exportar con estos filtros.", "error");
+        return;
+      }
+
+      const cols = FACTURAS_EXPORT_COLUMNS.filter((c) =>
+        selectedIds.includes(c.id),
+      );
+      await generarFacturasExcel(
+        cols,
+        itemsExport,
+        clientes,
+        viajes,
+        "Facturas_Exportadas",
+      );
+
+      showToast("Excel exportado exitosamente", "success");
+    } catch (err) {
+      showToast("Ocurrió un error al exportar el Excel", "error");
+    } finally {
+      setExportandoExcel(false);
+      setExportModalOpen(false);
+    }
+  }
+
   const facturasEmptyMessage =
     (metaListado?.total ?? 0) === 0 &&
     !anyFiltroActivo &&
@@ -1097,16 +1166,38 @@ export function FacturacionTenantPage({
     </>
   );
 
+  const exportButton = (
+    <button
+      type="button"
+      onClick={() => setExportModalOpen(true)}
+      disabled={
+        listadoRefetching ||
+        !metaListado?.total ||
+        metaListado.total === 0 ||
+        exportandoExcel
+      }
+      className="inline-flex h-10 items-center gap-1.5 px-4 bg-white border border-black/15 text-sm uppercase tracking-wider text-vialto-charcoal transition-colors hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+    >
+      <Download className="h-4 w-4" aria-hidden />
+      {exportandoExcel ? "Generando..." : "Exportar"}
+    </button>
+  );
+
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {!embeddedInSuperadmin ? (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
             Facturas
           </h1>
-          <p className="mt-2 text-vialto-steel">
-            Facturas emitidas a clientes.
-          </p>
+        ) : (
+          <span />
+        )}
+        <div className="flex shrink-0 gap-2">{exportButton}</div>
+      </div>
+
+      {!embeddedInSuperadmin && (
+        <>
           {hasArca && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
@@ -1132,9 +1223,9 @@ export function FacturacionTenantPage({
         </div>
       )}
 
-      <div className="mt-4">
-        {error && <CrudFormErrorAlert message={error} />}
-        <div className="flex justify-end gap-2 mt-2">
+      <div className="mt-4 flex flex-wrap gap-2 justify-between">
+        {error ? <CrudFormErrorAlert message={error} /> : <div />}
+        <div className="flex gap-2 ml-auto">
           {anyFiltroActivo && (
             <button
               type="button"
@@ -1144,6 +1235,7 @@ export function FacturacionTenantPage({
               Limpiar filtros
             </button>
           )}
+
           <button
             type="button"
             onClick={() => {
@@ -1364,7 +1456,20 @@ export function FacturacionTenantPage({
             </td>
             <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
             <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
-              {textoImporteFacturaListado(f, viajes)}
+              <div className="flex flex-col items-end gap-0.5">
+                <span>
+                  {textoImporteFacturaListado(f, viajes, { hasArca })}
+                </span>
+                {!hasArca &&
+                  f.facturarPorTramo &&
+                  !f.cobrado &&
+                  (f.saldoPendiente ?? 0) > 0.005 && (
+                    <span className="text-xs font-normal text-amber-800/90">
+                      Saldo{" "}
+                      {textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}
+                    </span>
+                  )}
+              </div>
             </td>
             <td
               className="px-4 py-3 text-right"
@@ -1407,7 +1512,25 @@ export function FacturacionTenantPage({
               },
               {
                 label: "Importe",
-                value: textoImporteFacturaListado(f, viajes),
+                value: (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span>
+                      {textoImporteFacturaListado(f, viajes, { hasArca })}
+                    </span>
+                    {!hasArca &&
+                      f.facturarPorTramo &&
+                      !f.cobrado &&
+                      (f.saldoPendiente ?? 0) > 0.005 && (
+                        <span className="text-xs font-normal text-amber-800/90">
+                          Saldo{" "}
+                          {textoImporteMonedaFactura(
+                            f.moneda,
+                            f.saldoPendiente!,
+                          )}
+                        </span>
+                      )}
+                  </span>
+                ),
               },
             ]}
             actions={
@@ -1589,7 +1712,14 @@ export function FacturacionTenantPage({
         title="Marcar como cobrada"
         message={
           marcarCobradaConfirm
-            ? `¿Marcás la factura ${marcarCobradaConfirm.numero ?? "s/n"} como cobrada? Se va a registrar el pago del saldo pendiente y todos los viajes vinculados van a pasar a "Cobrado".`
+            ? `¿Marcás la factura ${marcarCobradaConfirm.numero ?? "s/n"} como cobrada? Se va a registrar el pago del saldo pendiente${
+                (marcarCobradaConfirm.saldoPendiente ?? 0) > 0.005
+                  ? ` (${textoImporteMonedaFactura(
+                      marcarCobradaConfirm.moneda,
+                      marcarCobradaConfirm.saldoPendiente!,
+                    )})`
+                  : ""
+              } y todos los viajes vinculados van a pasar a "Cobrado".`
             : ""
         }
         confirmLabel="Marcar como cobrada"
@@ -1603,6 +1733,20 @@ export function FacturacionTenantPage({
         }}
         onConfirm={() => void confirmMarcarCobrada()}
       />
+
+      {exportModalOpen && (
+        <ExcelExportModal
+          columns={FACTURAS_EXPORT_COLUMNS}
+          rowCount={
+            metaListado?.total ??
+            facturasFiltradas?.length ??
+            facturas?.length ??
+            0
+          }
+          onExport={handleExportarExcel}
+          onClose={() => !exportandoExcel && setExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

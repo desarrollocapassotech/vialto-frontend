@@ -208,7 +208,7 @@ export function ProductosTenantPage() {
         Productos
       </h1>
       <p className="mt-2 text-vialto-steel max-w-2xl">
-        {"Catálogo de productos del depósito."}
+        {"Los productos que manipulás."}
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">

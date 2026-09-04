@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
 import {
   ConceptosLiquidacionLineasEditor,
@@ -8,6 +8,7 @@ import {
   type ViajeOpcionDraft,
 } from "@/components/liquidaciones/ConceptosLiquidacionLineasEditor";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
+import { ViajesSeleccionTabla } from "@/components/shared/ViajesSeleccionTabla";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -16,9 +17,47 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { apiJson } from "@/lib/api";
 import { uploadComprobante } from "@/lib/comprobanteUpload";
+import {
+  normalizeViajeMoneda,
+  type ViajeMonedaCodigo,
+} from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
+import {
+  formatViajeImporteForListado,
+  numeroVisibleViaje,
+} from "@/lib/viajesFlota";
+import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
 import type { LiquidacionConTransportista } from "@/components/liquidaciones/LiquidacionViewModal";
+import type { Viaje } from "@/types/api";
+
+type ViajeItem = Pick<
+  Viaje,
+  | "id"
+  | "numero"
+  | "numeroIdentificacionPersonalizado"
+  | "fechaCarga"
+  | "origen"
+  | "destino"
+  | "precioTransportistaExterno"
+  | "monedaPrecioTransportistaExterno"
+  | "liquidacionesViaje"
+  | "liquidacionEstado"
+  | "choferId"
+  | "chofer"
+  | "productosViaje"
+>;
+
+function monedaDeViaje(
+  v: Pick<ViajeItem, "monedaPrecioTransportistaExterno">,
+): ViajeMonedaCodigo {
+  return normalizeViajeMoneda(v.monedaPrecioTransportistaExterno);
+}
+
+function fmtMontoViaje(n: number | null, moneda?: string | null): string {
+  if (n == null) return "—";
+  return formatViajeImporteForListado(n, moneda);
+}
 
 const INPUT =
   "h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal focus:outline-none focus:border-vialto-fire";
@@ -88,6 +127,9 @@ export function LiquidacionEditModal({
     liq.estado === "borrador" ||
     liq.estado === "error" ||
     liq.estado === "pendiente_cae";
+  // Agregar/quitar viajes solo se permite en borrador: una vez que la liquidación
+  // entra al circuito de emisión, el conjunto de viajes ya se comunicó a ARCA.
+  const canEditViajes = liq.estado === "borrador";
   const showComprobante = !hasArca;
 
   const [periodoDesde, setPeriodoDesde] = useState(
@@ -104,6 +146,19 @@ export function LiquidacionEditModal({
   const [viajesDisponibles, setViajesDisponibles] = useState<
     ViajeOpcionDraft[]
   >(() => extraerViajesDeLiquidacion(liq));
+
+  // — Agregar/quitar viajes (solo borrador) —
+  const [viajesTransportista, setViajesTransportista] = useState<ViajeItem[]>(
+    [],
+  );
+  const [viajesTransportistaLoading, setViajesTransportistaLoading] =
+    useState(canEditViajes);
+  const [selectedViajeIds, setSelectedViajeIds] = useState<Set<string>>(
+    () => new Set(extraerViajesDeLiquidacion(liq).map((v) => v.id)),
+  );
+  const [viajesFieldError, setViajesFieldError] = useState<string | null>(
+    null,
+  );
 
   const [conceptosLineas, setConceptosLineas] = useState<ConceptoLineaDraft[]>(
     () =>
@@ -175,6 +230,95 @@ export function LiquidacionEditModal({
     };
   }, [canEditDatos, getToken, liq.id]);
 
+  // Trae todos los viajes del transportista (incluidos y disponibles para agregar)
+  // para poder armar la tabla de selección con datos en vivo (moneda, precio).
+  useEffect(() => {
+    if (!canEditViajes) {
+      setViajesTransportistaLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setViajesTransportistaLoading(true);
+    void (async () => {
+      try {
+        const res = await apiJson<{ items: ViajeItem[] }>(
+          `/api/viajes/paginated?transportistaId=${encodeURIComponent(liq.transportistaId)}&pageSize=100&page=1`,
+          () => getToken(),
+        );
+        if (!cancelled) setViajesTransportista(res.items ?? []);
+      } catch {
+        if (!cancelled) setViajesTransportista([]);
+      } finally {
+        if (!cancelled) setViajesTransportistaLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEditViajes, liq.transportistaId, getToken]);
+
+  // Si se quita un viaje que tenía un concepto "por viaje puntual" asociado,
+  // el concepto se degrada a GENERAL en vez de perder el monto cargado.
+  useEffect(() => {
+    if (!canEditViajes) return;
+    setConceptosLineas((prev) =>
+      prev.map((linea) => {
+        if (
+          linea.modoAplicacion === "VIAJE_PUNTUAL" &&
+          linea.viajeId &&
+          !selectedViajeIds.has(linea.viajeId)
+        ) {
+          return { ...linea, viajeId: null, modoAplicacion: "GENERAL" };
+        }
+        return linea;
+      }),
+    );
+  }, [selectedViajeIds, canEditViajes]);
+
+  // Viajes elegibles en la tabla: los ya incluidos + los del transportista que no
+  // tengan otra liquidación activa (misma regla que "Nueva liquidación").
+  const viajesParaTabla = useMemo(() => {
+    return viajesTransportista.filter(
+      (v) =>
+        selectedViajeIds.has(v.id) || !viajeTieneLiquidacionTransportista(v),
+    );
+  }, [viajesTransportista, selectedViajeIds]);
+
+  const monedaSeleccionadaViajes = useMemo<ViajeMonedaCodigo | null>(() => {
+    const primero = viajesTransportista.find((v) => selectedViajeIds.has(v.id));
+    return primero ? monedaDeViaje(primero) : null;
+  }, [viajesTransportista, selectedViajeIds]);
+
+  function toggleViaje(id: string) {
+    setViajesFieldError(null);
+    setSelectedViajeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      const candidato = viajesTransportista.find((v) => v.id === id);
+      if (!candidato) return prev;
+      if (
+        monedaSeleccionadaViajes &&
+        monedaDeViaje(candidato) !== monedaSeleccionadaViajes
+      ) {
+        return prev;
+      }
+      next.add(id);
+      return next;
+    });
+  }
+
+  // Lista de viajes para el selector "por viaje puntual" de conceptos: mientras se
+  // pueden agregar/quitar viajes, refleja la selección en vivo en vez del snapshot inicial.
+  const viajesDisponiblesConceptos = useMemo<ViajeOpcionDraft[]>(() => {
+    if (!canEditViajes) return viajesDisponibles;
+    return viajesTransportista
+      .filter((v) => selectedViajeIds.has(v.id))
+      .map((v) => ({ id: v.id, numero: numeroVisibleViaje(v) }));
+  }, [canEditViajes, viajesTransportista, selectedViajeIds, viajesDisponibles]);
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === "Escape" && !saving) onClose();
@@ -211,6 +355,15 @@ export function LiquidacionEditModal({
       setError("Esperá a que terminen de cargar los conceptos.");
       return;
     }
+    if (canEditViajes && viajesTransportistaLoading) {
+      setError("Esperá a que terminen de cargar los viajes.");
+      return;
+    }
+    if (canEditViajes && selectedViajeIds.size === 0) {
+      setViajesFieldError("Seleccioná al menos un viaje.");
+      return;
+    }
+    setViajesFieldError(null);
     if (canEditDatos) {
       const conceptosCheck = validateConceptosLineasDraft(conceptosLineas);
       if (!conceptosCheck.ok) {
@@ -247,6 +400,9 @@ export function LiquidacionEditModal({
           ivaPct.trim() !== "" ? Number(ivaPct) : (liq.ivaPct ?? 21);
         body.conceptosLineas = toConceptosLineasPayload(conceptosLineas);
       }
+      if (canEditViajes) {
+        body.viajeIds = Array.from(selectedViajeIds);
+      }
       if (showComprobante) {
         body.comprobanteUrl = nextComprobanteUrl ?? null;
       }
@@ -271,13 +427,15 @@ export function LiquidacionEditModal({
   }
 
   const transportistaNombre = liq.transportista?.nombre ?? liq.transportistaId;
+  const cargandoDependencias =
+    lineasLoading || (canEditViajes && viajesTransportistaLoading);
 
   return (
     <ViewModalShell
       title="Editar liquidación"
       onClose={saving ? () => {} : onClose}
       scrollBody
-      maxWidthClass="sm:max-w-xl"
+      maxWidthClass={canEditViajes ? "sm:max-w-4xl" : "sm:max-w-xl"}
       footer={
         <>
           <button
@@ -291,7 +449,7 @@ export function LiquidacionEditModal({
           <button
             type="submit"
             form="liquidacion-edit-form"
-            disabled={saving || lineasLoading}
+            disabled={saving || cargandoDependencias}
             className={viewModalBtnPrimary}
           >
             {saving ? (
@@ -299,7 +457,7 @@ export function LiquidacionEditModal({
                 <Spinner className="h-3.5 w-3.5" />
                 Guardando…
               </span>
-            ) : lineasLoading ? (
+            ) : cargandoDependencias ? (
               "Cargando…"
             ) : (
               "Guardar cambios"
@@ -368,6 +526,61 @@ export function LiquidacionEditModal({
               </div>
             </div>
 
+            {canEditViajes && (
+              <div>
+                <p className={LABEL}>
+                  Viajes incluidos <span className="text-red-500">*</span>
+                  {selectedViajeIds.size > 0 && (
+                    <span className="ml-1 normal-case text-vialto-charcoal">
+                      ({selectedViajeIds.size} seleccionado
+                      {selectedViajeIds.size !== 1 ? "s" : ""}
+                      {monedaSeleccionadaViajes
+                        ? ` · ${monedaSeleccionadaViajes}`
+                        : ""}
+                      )
+                    </span>
+                  )}
+                </p>
+                {monedaSeleccionadaViajes && (
+                  <p className="mb-1.5 text-[11px] text-vialto-steel">
+                    Solo podés incluir viajes en {monedaSeleccionadaViajes}. Los
+                    de otra moneda quedan deshabilitados.
+                  </p>
+                )}
+                <ViajesSeleccionTabla
+                  viajes={viajesParaTabla}
+                  selectedIds={Array.from(selectedViajeIds)}
+                  onToggle={toggleViaje}
+                  renderMonto={(v) =>
+                    fmtMontoViaje(
+                      v.precioTransportistaExterno,
+                      v.monedaPrecioTransportistaExterno,
+                    )
+                  }
+                  disabledCheck={(v) => {
+                    const moneda = monedaDeViaje(v);
+                    const disabled =
+                      monedaSeleccionadaViajes != null &&
+                      moneda !== monedaSeleccionadaViajes;
+                    return {
+                      disabled,
+                      title: disabled
+                        ? `Este viaje está en ${moneda}. La liquidación ya tiene viajes en ${monedaSeleccionadaViajes}.`
+                        : undefined,
+                    };
+                  }}
+                  loading={viajesTransportistaLoading}
+                  maxHeightClass="max-h-56"
+                  emptyMessage="No hay viajes disponibles para este transportista."
+                />
+                {viajesFieldError && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {viajesFieldError}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="liq-comision" className={LABEL}>
@@ -429,12 +642,12 @@ export function LiquidacionEditModal({
             <ConceptosLiquidacionLineasEditor
               getToken={getToken}
               lineas={conceptosLineas}
-              viajesDisponibles={viajesDisponibles}
+              viajesDisponibles={viajesDisponiblesConceptos}
               onChange={(next) => {
                 setConceptosLineas(next);
                 setConceptosIncomplete([]);
               }}
-              disabled={saving || lineasLoading}
+              disabled={saving || cargandoDependencias}
               incompleteIndices={conceptosIncomplete}
             />
           </>

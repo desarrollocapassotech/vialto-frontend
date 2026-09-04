@@ -209,10 +209,70 @@ export function FacturaCreateModal({
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "autorizada">("form");
 
+  const allowedClienteIds = useMemo(() => {
+    if (draft.viajeIds.length === 0) return null;
+    
+    const activeTrips = viajes.filter(v => draft.viajeIds.includes(v.id));
+    const ids = new Set<string>();
+    
+    activeTrips.forEach(v => {
+      ids.add(v.clienteId);
+      v.clientesViaje?.forEach(cv => ids.add(cv.clienteId));
+    });
+    return ids;
+  }, [draft.viajeIds, viajes]);
+
+  const filteredClientes = useMemo(() => {
+    if (!allowedClienteIds) return clientes;
+    return clientes.filter(c => allowedClienteIds.has(c.id));
+  }, [clientes, allowedClienteIds]);
+
+  const derivedViajes = useMemo(() => {
+    return viajes.map(v => {
+      if (draft.clienteId && v.clientesViaje) {
+        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        if (vc) {
+          return {
+            ...v,
+            monto: vc.monto,
+            cantidadFactura: vc.cantidad,
+            precioUnitarioFactura: vc.precioUnitario,
+            monedaMonto: vc.monedaMonto,
+            destinosViaje: vc.destinosCliente,
+            origen: vc.origen,
+            destino: vc.destino,
+          };
+        }
+      }
+      return v;
+    });
+  }, [viajes, draft.clienteId]);
+
+  const derivedViajesNueva = useMemo(() => {
+    return viajesNueva.map(v => {
+      if (draft.clienteId && v.clientesViaje) {
+        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        if (vc) {
+          return {
+            ...v,
+            monto: vc.monto,
+            cantidadFactura: vc.cantidad,
+            precioUnitarioFactura: vc.precioUnitario,
+            monedaMonto: vc.monedaMonto,
+            destinosViaje: vc.destinosCliente,
+            origen: vc.origen,
+            destino: vc.destino,
+          };
+        }
+      }
+      return v;
+    });
+  }, [viajesNueva, draft.clienteId]);
+
   // Las líneas ahora son derivadas y estrictamente de solo lectura
   const lineas = useMemo(
-    () => defaultFacturaLineasFromDraft(draft, viajes),
-    [draft, viajes],
+    () => defaultFacturaLineasFromDraft(draft, derivedViajes),
+    [draft, derivedViajes],
   );
 
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
@@ -249,16 +309,13 @@ export function FacturaCreateModal({
   }, [hasArca, draft.viajeIds, viajes]);
 
   const missingEmitFields = useMemo(
-    () =>
-      collectFacturaEmitMissingFields({
+    () => {
+      if (!clienteDetalle) return [];
+      return collectFacturaEmitMissingFields({
         emisor: arcaConfig,
-        cliente: clienteDetalle ?? {
-          nombre: null,
-          direccion: null,
-          idFiscal: null,
-          condicionIva: null,
-        },
-      }),
+        cliente: clienteDetalle,
+      });
+    },
     [arcaConfig, clienteDetalle],
   );
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
@@ -532,7 +589,7 @@ export function FacturaCreateModal({
 
   const monedaInvalida =
     draft.viajeIds.length > 0 &&
-    monedaUnicaDeViajes(draft.viajeIds, viajes) === null;
+    monedaUnicaDeViajes(draft.viajeIds, derivedViajes) === null;
 
   const compactFields = (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -553,7 +610,7 @@ export function FacturaCreateModal({
         )}
         <FacturaContraparteField
           clienteId={draft.clienteId}
-          clientes={clientes}
+          clientes={filteredClientes}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
@@ -610,14 +667,14 @@ export function FacturaCreateModal({
           </label>
           {draft.viajeIds.length > 0 && (
             <span className="text-xs font-medium tabular-nums text-vialto-charcoal">
-              {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+              {textoImporteFacturaSeleccion(draft.viajeIds, derivedViajes)}
             </span>
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-hidden">
           <ViajesVinculadosEditor
-            viajes={viajes}
-            disponibles={viajesNueva}
+            viajes={derivedViajes}
+            disponibles={derivedViajesNueva}
             selected={draft.viajeIds}
             onChange={patchViajeIds}
             loading={viajesLoading}
@@ -647,13 +704,13 @@ export function FacturaCreateModal({
             setLocalError(null);
           }}
           viajeIds={draft.viajeIds}
-          viajes={viajes}
+          viajes={derivedViajes}
           ivaPctDefault={ivaPctDefault}
           disabled={busy}
           incompleteIndices={tramosIncomplete}
         />
       )}
-      <FacturaTotalesPreview draft={draft} viajes={viajes} />
+      <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
       {monedaInvalida && (
         <p className="shrink-0 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no
@@ -681,7 +738,7 @@ export function FacturaCreateModal({
         </div>
         <FacturaContraparteField
           clienteId={draft.clienteId}
-          clientes={clientes}
+          clientes={filteredClientes}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
@@ -736,13 +793,13 @@ export function FacturaCreateModal({
             </label>
             {draft.viajeIds.length > 0 && (
               <span className="text-sm font-medium tabular-nums text-vialto-charcoal">
-                {textoImporteFacturaSeleccion(draft.viajeIds, viajes)}
+                {textoImporteFacturaSeleccion(draft.viajeIds, derivedViajes)}
               </span>
             )}
           </div>
           <ViajesVinculadosEditor
-            viajes={viajes}
-            disponibles={viajesNueva}
+            viajes={derivedViajes}
+            disponibles={derivedViajesNueva}
             selected={draft.viajeIds}
             onChange={patchViajeIds}
             loading={viajesLoading}
@@ -773,7 +830,7 @@ export function FacturaCreateModal({
                 setLocalError(null);
               }}
               viajeIds={draft.viajeIds}
-              viajes={viajes}
+              viajes={derivedViajes}
               ivaPctDefault={
                 draft.ivaPct.trim() !== "" ? Number(draft.ivaPct) : 21
               }
@@ -783,7 +840,7 @@ export function FacturaCreateModal({
           </div>
         )}
       </div>
-      <FacturaTotalesPreview draft={draft} viajes={viajes} />
+      <FacturaTotalesPreview draft={draft} viajes={derivedViajes} />
       {monedaInvalida && (
         <p className="mt-3 rounded border border-red-300/80 bg-red-50 px-3 py-2 text-xs text-red-700">
           Los viajes seleccionados tienen distintas monedas. Una factura no

@@ -1,8 +1,11 @@
+import { useSearchParams } from "react-router-dom";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { ImportWizard } from "@/components/importacion/ImportWizard";
 
 export function ImportarDatosTenantPage() {
   const { tenant, loading, error } = useCurrentTenant();
+  const [searchParams] = useSearchParams();
+  const backTo = searchParams.get("volverA") || "/base-de-datos";
 
   if (loading) {
     return (
@@ -28,7 +31,7 @@ export function ImportarDatosTenantPage() {
         <ImportWizard
           tenantId={tenant.clerkOrgId}
           tenantModules={tenant.modules}
-          backTo="/base-de-datos"
+          backTo={backTo}
         />
       </div>
     </div>

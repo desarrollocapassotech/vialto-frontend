@@ -14,9 +14,6 @@ const MODULE_DESCRIPTIONS: Record<string, string> = {
   stock: 'Control de inventario y movimientos de carga.',
   combustible: 'Registro de cargas y control de consumo.',
   mantenimiento: 'Servicios de flota y alertas operativas.',
-  remitos: 'Emisión y seguimiento de remitos digitales.',
-  turnos: 'Asignación y administración de turnos de choferes.',
-  reportes: 'Indicadores y vistas analíticas por módulo.',
 };
 
 const MODULE_ROUTES: Record<string, string> = {
@@ -47,8 +44,12 @@ export function canAccessStock(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'stock');
 }
 
-export function canAccessIntegracionArca(modules: string[]): boolean {
-  return modules.some((m) => m.toLowerCase() === 'integracion-arca');
+export function canAccessEmisionFacturasArca(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'emision-facturas-arca');
+}
+
+export function canAccessEmisionLiquidoProductoArca(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'emision-liquido-producto-arca');
 }
 
 export function canAccessCombustible(modules: string[]): boolean {

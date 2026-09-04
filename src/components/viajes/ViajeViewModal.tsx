@@ -12,14 +12,20 @@ import {
   textoRutaViaje,
   etiquetasDestinosDesdeViaje,
 } from "@/lib/viajesDestinos";
+import type { ViajeCliente } from "@/types/api";
 import { OtroGastoAutorDisplay } from "@/components/viajes/OtrosGastosFieldset";
 import { useOrgUserLabels } from "@/hooks/useOrgUserLabels";
 import type { Viaje } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { etapaViajeLabel, tooltipFacturacionEstado, tooltipLiquidacionEstado } from "@/lib/viajesIndicadores";
+import {
+  etapaViajeBadgeClass,
+  etapaViajeBadgeClassDefault,
+  etapaViajeLabel,
+  tooltipFacturacionEstado,
+  tooltipLiquidacionEstado,
+} from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
-import { ViajeGananciaBrutaDetalle } from "@/components/viajes/ViajeGananciaBruta";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import { numeroVisibleViaje, viajeUsaNumeroInterno } from "@/lib/viajesFlota";
 
@@ -38,15 +44,34 @@ function fmtMonto(monto: number | null | undefined, moneda?: string | null) {
   return `${prefix}${monto.toLocaleString("es-AR")}`;
 }
 
+function rutaClienteAdicional(c: ViajeCliente): string {
+  return textoRutaViaje(
+    c.origen,
+    [...(c.destinosCliente ?? [])]
+      .sort((a, b) => a.orden - b.orden)
+      .map((d) => d.etiqueta)
+      .filter(Boolean),
+  );
+}
+
+function cargaClienteAdicional(c: ViajeCliente): string {
+  const productos = [...(c.productosCliente ?? [])]
+    .sort((a, b) => a.orden - b.orden)
+    .map((p) => `${p.producto.nombre}${p.cantidad ? ` × ${p.cantidad}` : ""}`)
+    .join(", ");
+  return productos || "—";
+}
+
 export function ViajeViewModal({
   viaje,
   onClose,
   onEditar,
   tenantId,
-  hasArca = false,
+  hasLiquidoProductoArca = false,
   editando = false,
   onFacturar,
   facturando = false,
+  onVerFactura,
   onLiquidar,
   liquidando = false,
   onRegistrarPago,
@@ -54,10 +79,11 @@ export function ViajeViewModal({
   viaje: Viaje;
   onClose: () => void;
   onEditar: () => void;
+  onVerFactura?: () => void;
   /** Clerk org id para resolver nombres en vista superadmin. */
   tenantId?: string;
-  /** Tenant con módulo integracion-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
-  hasArca?: boolean;
+  /** Tenant con módulo emision-liquido-producto-arca activo: define si se muestra el badge de liquidación o el de pago al transportista. */
+  hasLiquidoProductoArca?: boolean;
   /** El editor se está preparando (fetch de listas maestras, etc.): bloquea el modal hasta que esté listo. */
   editando?: boolean;
   /** Si se pasa, muestra un botón "Facturar" junto a "Editar" (hoy solo desde el dashboard). */
@@ -99,18 +125,81 @@ export function ViajeViewModal({
       )
       .join(", ") ?? null;
 
+  // Con más de un cliente en el viaje no hay uno "principal" — se listan todos
+  // por igual en una sola tabla (ver "Clientes del viaje" más abajo) en vez de
+  // destacar uno arriba y el resto como "otros".
+  const clientesExtra = viaje.clientesViaje ?? [];
+  const esMultiCliente = clientesExtra.length > 0;
+  const clientesDetalle = esMultiCliente
+    ? [
+        {
+          id: "principal",
+          nombre: clienteNombre,
+          ruta: textoRutaViaje(
+            viaje.origen,
+            etiquetasDestinosDesdeViaje(viaje),
+          ),
+          carga: productosDesc || "—",
+          monto: viaje.monto,
+          monedaMonto: viaje.monedaMonto ?? null,
+        },
+        ...clientesExtra.map((c) => ({
+          id: c.id,
+          nombre: c.cliente?.nombre || "—",
+          ruta: rutaClienteAdicional(c),
+          carga: cargaClienteAdicional(c),
+          monto: c.monto,
+          monedaMonto: c.monedaMonto,
+        })),
+      ]
+    : [];
+
   const campos = [
-    { key: "clienteId", label: "Cliente", value: clienteNombre },
+    ...(esMultiCliente
+      ? []
+      : [{ key: "clienteId", label: "Cliente", value: clienteNombre }]),
     {
       key: "transportistaId",
       label: "Transportista",
       value: viaje.transportistaId ? transportistaNombre : "Flota propia",
     },
     {
-      key: "origen",
-      label: "Ruta",
-      value: textoRutaViaje(viaje.origen, etiquetasDestinosDesdeViaje(viaje)),
+      key: "precioTransportistaExterno",
+      label: "Precio transportista",
+      value:
+        viaje.precioTransportistaExterno != null ? (
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span>
+              {fmtMonto(
+                viaje.precioTransportistaExterno,
+                viaje.monedaPrecioTransportistaExterno,
+              )}
+              {isVisible(
+                "detalle_viaje",
+                "precioTransportistaIvaIncluidoPct",
+              ) && viaje.precioTransportistaIvaIncluidoPct
+                ? ` (+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
+                : ""}
+            </span>
+            <ViajePagoTransportistaIndicador
+              viaje={viaje}
+              onClick={onRegistrarPago}
+            />
+          </span>
+        ) : null,
     },
+    ...(esMultiCliente
+      ? []
+      : [
+          {
+            key: "origen",
+            label: "Ruta",
+            value: textoRutaViaje(
+              viaje.origen,
+              etiquetasDestinosDesdeViaje(viaje),
+            ),
+          },
+        ]),
     {
       key: "fechaCarga",
       label: "Fecha de carga",
@@ -122,28 +211,21 @@ export function ViajeViewModal({
       value: viaje.fechaDescarga ? fmtDate(viaje.fechaDescarga) : null,
     },
     { key: "vehiculosRows", label: "Vehículos", value: vehiculoPatentes },
-    { key: "productoItems", label: "Productos", value: productosDesc },
-    {
-      key: "monto",
-      label: "Monto cliente",
-      value:
-        viaje.monto != null ? fmtMonto(viaje.monto, viaje.monedaMonto) : null,
-    },
-    {
-      key: "precioTransportistaExterno",
-      label: "Precio transportista",
-      value:
-        viaje.precioTransportistaExterno != null
-          ? fmtMonto(
-              viaje.precioTransportistaExterno,
-              viaje.monedaPrecioTransportistaExterno,
-            ) +
-            (isVisible("detalle_viaje", "precioTransportistaIvaIncluidoPct") &&
-            viaje.precioTransportistaIvaIncluidoPct
-              ? ` (+${viaje.precioTransportistaIvaIncluidoPct}% IVA en efectivo)`
-              : "")
-          : null,
-    },
+    ...(esMultiCliente
+      ? []
+      : [{ key: "productoItems", label: "Productos", value: productosDesc }]),
+    ...(esMultiCliente
+      ? []
+      : [
+          {
+            key: "monto",
+            label: "Monto cliente",
+            value:
+              viaje.monto != null
+                ? fmtMonto(viaje.monto, viaje.monedaMonto)
+                : null,
+          },
+        ]),
     { key: "kmRecorridos", label: "KM recorridos", value: viaje.kmRecorridos },
     {
       key: "litrosConsumidos",
@@ -157,9 +239,7 @@ export function ViajeViewModal({
     },
   ].filter(
     (c) =>
-      c.value != null &&
-      c.value !== "" &&
-      isVisible("detalle_viaje", c.key),
+      c.value != null && c.value !== "" && isVisible("detalle_viaje", c.key),
   );
 
   return (
@@ -172,15 +252,22 @@ export function ViajeViewModal({
               (número interno generado automáticamente)
             </span>
           )}
-          <span className="text-xs uppercase tracking-[0.1em] border rounded px-2 py-0.5 text-vialto-steel border-black/15">
+          <span
+            className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${
+              etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
+            }`}
+          >
             {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} />
-            {hasArca ? (
+            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
+            {hasLiquidoProductoArca ? (
               <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
             ) : (
-              <ViajePagoTransportistaIndicador viaje={viaje} onClick={onRegistrarPago} />
+              <ViajePagoTransportistaIndicador
+                viaje={viaje}
+                onClick={onRegistrarPago}
+              />
             )}
           </span>
         </span>
@@ -212,7 +299,11 @@ export function ViajeViewModal({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5">
-                  <Receipt className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  <Receipt
+                    className="h-3.5 w-3.5"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
                   Facturar
                 </span>
               )}
@@ -232,7 +323,11 @@ export function ViajeViewModal({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5">
-                  <Banknote className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  <Banknote
+                    className="h-3.5 w-3.5"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
                   Liquidar
                 </span>
               )}
@@ -262,13 +357,19 @@ export function ViajeViewModal({
         <div className="flex flex-col gap-4 pb-5">
           <div className={viewModalGridClass}>
             <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Facturación</p>
+              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                Facturación
+              </p>
               <p className="mt-1 text-sm">{tooltipFacturacionEstado(viaje)}</p>
             </div>
             {viaje.liquidacionEstado != null && (
               <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">Liquidación</p>
-                <p className="mt-1 text-sm">{tooltipLiquidacionEstado(viaje)}</p>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  Liquidación
+                </p>
+                <p className="mt-1 text-sm">
+                  {tooltipLiquidacionEstado(viaje)}
+                </p>
               </div>
             )}
             {campos.map((c, i) => (
@@ -279,7 +380,6 @@ export function ViajeViewModal({
                 <p className="mt-1 text-sm">{c.value}</p>
               </div>
             ))}
-            <ViajeGananciaBrutaDetalle viaje={viaje} onPagoClick={onRegistrarPago} />
           </div>
           {isVisible("detalle_viaje", "detalleCarga") && viaje.detalleCarga && (
             <div>
@@ -289,29 +389,84 @@ export function ViajeViewModal({
               <p className="mt-1 text-sm">{viaje.detalleCarga}</p>
             </div>
           )}
-          {isVisible("detalle_viaje", "observaciones") && viaje.observaciones && (
-            <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-                Observaciones
-              </p>
-              <p className="mt-1 text-sm">{viaje.observaciones}</p>
-            </div>
-          )}
+          {isVisible("detalle_viaje", "observaciones") &&
+            viaje.observaciones && (
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  Observaciones
+                </p>
+                <p className="mt-1 whitespace-pre-line text-sm">{viaje.observaciones}</p>
+              </div>
+            )}
         </div>
 
-        {isVisible("detalle_viaje", "otrosGastos") && (
+        {esMultiCliente && (
           <div className="py-5">
             <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
-              Gastos adicionales
-              {viaje.otrosGastos && viaje.otrosGastos.length > 0 && (
+              Clientes del viaje
+              <span className="ml-2 font-normal normal-case tracking-normal">
+                ({clientesDetalle.length})
+              </span>
+            </p>
+            <ListadoDatos
+              columns={[
+                {
+                  id: "cliente",
+                  header: "Cliente",
+                  primary: true,
+                  cell: (c) => c.nombre,
+                  tdClassName: listadoTablaTdClass,
+                },
+                {
+                  id: "ruta",
+                  header: "Ruta",
+                  cell: (c) => c.ruta,
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                },
+                {
+                  id: "carga",
+                  header: "Carga",
+                  cell: (c) => c.carga,
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                },
+                {
+                  id: "monto",
+                  header: "Monto",
+                  cell: (c) => fmtMonto(c.monto, c.monedaMonto),
+                  thClassName: `${listadoTablaThClass} text-right`,
+                  tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
+                },
+              ]}
+              rows={clientesDetalle}
+              rowKey={(c) => c.id}
+              emptyMessage="Sin clientes."
+            />
+            <p className="mt-2 text-right text-xs text-vialto-steel">
+              Total del viaje:{" "}
+              {Object.entries(
+                clientesDetalle.reduce<Record<string, number>>((acc, c) => {
+                  if (c.monto == null) return acc;
+                  const moneda = c.monedaMonto === "USD" ? "USD" : "ARS";
+                  acc[moneda] = (acc[moneda] ?? 0) + c.monto;
+                  return acc;
+                }, {}),
+              )
+                .map(([moneda, total]) => fmtMonto(total, moneda))
+                .join(" + ") || "—"}
+            </p>
+          </div>
+        )}
+
+        {isVisible("detalle_viaje", "otrosGastos") &&
+          viaje.otrosGastos &&
+          viaje.otrosGastos.length > 0 && (
+            <div className="py-5">
+              <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
+                Gastos adicionales
                 <span className="ml-2 font-normal normal-case tracking-normal">
                   ({viaje.otrosGastos.length})
                 </span>
-              )}
-            </p>
-            {!viaje.otrosGastos || viaje.otrosGastos.length === 0 ? (
-              <p className="text-sm text-vialto-steel/70">Sin gastos registrados.</p>
-            ) : (
+              </p>
               <ListadoDatos
                 columns={[
                   {
@@ -348,26 +503,24 @@ export function ViajeViewModal({
                   },
                 ]}
                 rows={viaje.otrosGastos}
-                rowKey={(g) => `${g.descripcion ?? ""}-${g.fecha ?? ""}-${g.monto ?? ""}`}
+                rowKey={(g) =>
+                  `${g.descripcion ?? ""}-${g.fecha ?? ""}-${g.monto ?? ""}`
+                }
                 emptyMessage="Sin gastos registrados."
               />
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {isVisible("detalle_viaje", "pagosTransportista") && (
-          <div className="pt-5">
-            <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
-              Pagos al transportista
-              {viaje.pagosTransportista && viaje.pagosTransportista.length > 0 && (
+        {isVisible("detalle_viaje", "pagosTransportista") &&
+          viaje.pagosTransportista &&
+          viaje.pagosTransportista.length > 0 && (
+            <div className="pt-5">
+              <p className="text-xs uppercase tracking-[0.12em] text-vialto-steel mb-3">
+                Pagos al transportista
                 <span className="ml-2 font-normal normal-case tracking-normal">
                   ({viaje.pagosTransportista.length})
                 </span>
-              )}
-            </p>
-            {!viaje.pagosTransportista || viaje.pagosTransportista.length === 0 ? (
-              <p className="text-sm text-vialto-steel/70">Sin pagos registrados.</p>
-            ) : (
+              </p>
               <ListadoDatos
                 columns={[
                   {
@@ -398,12 +551,13 @@ export function ViajeViewModal({
                   },
                 ]}
                 rows={viaje.pagosTransportista}
-                rowKey={(p) => `${p.fecha ?? ""}-${p.metodo ?? ""}-${p.monto ?? ""}`}
+                rowKey={(p) =>
+                  `${p.fecha ?? ""}-${p.metodo ?? ""}-${p.monto ?? ""}`
+                }
                 emptyMessage="Sin pagos registrados."
               />
-            )}
-          </div>
-        )}
+            </div>
+          )}
       </div>
     </ViewModalShell>
   );
