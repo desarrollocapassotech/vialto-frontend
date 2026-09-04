@@ -1295,7 +1295,7 @@ function EtapaModulo({
               <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
                 {labelModulo(wizard.moduloActual ?? "")} en este archivo
               </p>
-              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
+              <div className="flex flex-col gap-2">
                 {p.filasDetalle.map((f) => {
                   const conflicto = advertenciasCampoUnicoDuplicado.find(
                     (c) => c.fila === f.fila,
