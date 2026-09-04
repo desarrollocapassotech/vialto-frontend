@@ -29,6 +29,7 @@ import type {
   ImportPreviewEntidad,
   ImportPreviewFilaEntidad,
   ImportColumnasEsperadasModulo,
+  ImportIdFiscalConflicto,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -1294,17 +1295,32 @@ function EtapaModulo({
                 {labelModulo(wizard.moduloActual ?? "")} en este archivo
               </p>
               <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
-                {p.filasDetalle.map((f) => (
-                  <FilaDetalleCard
-                    key={f.fila}
-                    fila={{
-                      ...f,
-                      campos: f.campos.filter((c) =>
-                        campoVisible(wizard.moduloActual, c.campo),
-                      ),
-                    }}
-                  />
-                ))}
+                {p.filasDetalle.map((f) => {
+                  const conflicto = advertenciasIdFiscalDuplicado.find(
+                    (c) => c.fila === f.fila,
+                  );
+                  return (
+                    <FilaDetalleCard
+                      key={f.fila}
+                      fila={{
+                        ...f,
+                        campos: f.campos.filter((c) =>
+                          campoVisible(wizard.moduloActual, c.campo),
+                        ),
+                      }}
+                      conflicto={conflicto}
+                      decision={
+                        conflicto ? decisionesIdFiscal[conflicto.fila] : undefined
+                      }
+                      onElegirDecision={(accion) =>
+                        setDecisionesIdFiscal((prev) => ({
+                          ...prev,
+                          [f.fila]: accion,
+                        }))
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1604,67 +1620,6 @@ function EtapaModulo({
                 />
                 Entiendo, unificar estas facturas
               </label>
-            </div>
-          )}
-
-          {advertenciasIdFiscalDuplicado.length > 0 && (
-            <div className="space-y-2.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-              <p>
-                <strong>{advertenciasIdFiscalDuplicado.length}</strong> fila
-                {advertenciasIdFiscalDuplicado.length !== 1 ? "s" : ""} con un
-                ID Fiscal que ya pertenece a otro cliente — elegí qué hacer
-                con cada una antes de continuar.
-              </p>
-              <div className="divide-y divide-amber-200 border-t border-amber-200">
-                {advertenciasIdFiscalDuplicado.map((c) => {
-                  const decision = decisionesIdFiscal[c.fila];
-                  return (
-                    <div
-                      key={c.fila}
-                      className="flex flex-wrap items-center justify-between gap-2 py-2"
-                    >
-                      <span>
-                        Fila {c.fila}: ID Fiscal <strong>{c.idFiscal}</strong>{" "}
-                        ya es de <strong>{c.clienteExistenteNombre}</strong>
-                      </span>
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDecisionesIdFiscal((prev) => ({
-                              ...prev,
-                              [c.fila]: "ignorar",
-                            }))
-                          }
-                          className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
-                            decision === "ignorar"
-                              ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                              : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                          }`}
-                        >
-                          Ignorar fila
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDecisionesIdFiscal((prev) => ({
-                              ...prev,
-                              [c.fila]: "actualizar",
-                            }))
-                          }
-                          className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
-                            decision === "actualizar"
-                              ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                              : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                          }`}
-                        >
-                          Actualizar {c.clienteExistenteNombre}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           )}
 
@@ -2176,14 +2131,32 @@ function valorFilaDetalle(campo: string, valor: string): string {
   return valor;
 }
 
-function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
+function FilaDetalleCard({
+  fila,
+  conflicto,
+  decision,
+  onElegirDecision,
+}: {
+  fila: ImportPreviewFilaEntidad;
+  conflicto?: ImportIdFiscalConflicto;
+  decision?: "ignorar" | "actualizar";
+  onElegirDecision?: (accion: "ignorar" | "actualizar") => void;
+}) {
   return (
-    <div className="rounded border border-black/10 p-3">
+    <div
+      className={`rounded border p-3 ${
+        conflicto ? "border-amber-300 bg-amber-50/50" : "border-black/10"
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
           Fila {fila.fila}
         </span>
-        {fila.esNuevo ? (
+        {conflicto ? (
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+            ID Fiscal duplicado
+          </span>
+        ) : fila.esNuevo ? (
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
             Nuevo
           </span>
@@ -2205,6 +2178,39 @@ function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
           </div>
         ))}
       </div>
+      {conflicto && (
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
+          <span>
+            ID Fiscal <strong>{conflicto.idFiscal}</strong> ya es de{" "}
+            <strong>{conflicto.clienteExistenteNombre}</strong> — elegí qué
+            hacer:
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => onElegirDecision?.("ignorar")}
+              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                decision === "ignorar"
+                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+              }`}
+            >
+              Ignorar fila
+            </button>
+            <button
+              type="button"
+              onClick={() => onElegirDecision?.("actualizar")}
+              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                decision === "actualizar"
+                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+              }`}
+            >
+              Actualizar {conflicto.clienteExistenteNombre}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
