@@ -1120,6 +1120,9 @@ function EtapaModulo({
     useState(false);
   const [confirmarFacturasDuplicadas, setConfirmarFacturasDuplicadas] =
     useState(false);
+  const [decisionesIdFiscal, setDecisionesIdFiscal] = useState<
+    Record<number, "ignorar" | "actualizar">
+  >({});
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
   const [detalleModalOpen, setDetalleModalOpen] = useState(false);
   // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
@@ -1127,6 +1130,7 @@ function EtapaModulo({
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
     setConfirmarFacturasDuplicadas(false);
+    setDecisionesIdFiscal({});
   }, [p?.sessionId]);
 
   // Un lookup de Viajes (cliente/transportista/chofer/vehículo) puede fallar
@@ -1212,6 +1216,10 @@ function EtapaModulo({
     p?.advertenciasFacturasDuplicadas ?? [];
   const requiereConfirmarFacturasDuplicadas =
     advertenciasFacturasDuplicadas.length > 0 && !confirmarFacturasDuplicadas;
+  const advertenciasIdFiscalDuplicado = p?.advertenciasIdFiscalDuplicado ?? [];
+  const requiereResolverIdFiscalDuplicado = advertenciasIdFiscalDuplicado.some(
+    (c) => !decisionesIdFiscal[c.fila],
+  );
   const tieneDesgloseActualizacion =
     p != null &&
     p.entidadesNuevas != null &&
@@ -1599,6 +1607,67 @@ function EtapaModulo({
             </div>
           )}
 
+          {advertenciasIdFiscalDuplicado.length > 0 && (
+            <div className="space-y-2.5 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <p>
+                <strong>{advertenciasIdFiscalDuplicado.length}</strong> fila
+                {advertenciasIdFiscalDuplicado.length !== 1 ? "s" : ""} con un
+                ID Fiscal que ya pertenece a otro cliente — elegí qué hacer
+                con cada una antes de continuar.
+              </p>
+              <div className="divide-y divide-amber-200 border-t border-amber-200">
+                {advertenciasIdFiscalDuplicado.map((c) => {
+                  const decision = decisionesIdFiscal[c.fila];
+                  return (
+                    <div
+                      key={c.fila}
+                      className="flex flex-wrap items-center justify-between gap-2 py-2"
+                    >
+                      <span>
+                        Fila {c.fila}: ID Fiscal <strong>{c.idFiscal}</strong>{" "}
+                        ya es de <strong>{c.clienteExistenteNombre}</strong>
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDecisionesIdFiscal((prev) => ({
+                              ...prev,
+                              [c.fila]: "ignorar",
+                            }))
+                          }
+                          className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                            decision === "ignorar"
+                              ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                              : "border-amber-300 text-amber-900 hover:bg-amber-100"
+                          }`}
+                        >
+                          Ignorar fila
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDecisionesIdFiscal((prev) => ({
+                              ...prev,
+                              [c.fila]: "actualizar",
+                            }))
+                          }
+                          className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                            decision === "actualizar"
+                              ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                              : "border-amber-300 text-amber-900 hover:bg-amber-100"
+                          }`}
+                        >
+                          Actualizar {c.clienteExistenteNombre}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {detalleErroresMostrados.length > 0 && (
             <div className="max-h-40 overflow-y-auto border border-red-100">
               <table className="w-full text-xs">
@@ -1651,21 +1720,28 @@ function EtapaModulo({
                 p.exitosas === 0 ||
                 requiereConfirmarCamposFaltantes ||
                 requiereResolverCiudades ||
-                requiereConfirmarFacturasDuplicadas
+                requiereConfirmarFacturasDuplicadas ||
+                requiereResolverIdFiscalDuplicado
               }
               onClick={() =>
                 void wizard.confirmarModuloActual(
                   confirmarCamposFaltantes,
                   confirmarFacturasDuplicadas,
+                  Object.entries(decisionesIdFiscal).map(([fila, accion]) => ({
+                    fila: Number(fila),
+                    accion,
+                  })),
                 )
               }
               title={
                 requiereResolverCiudades
                   ? "Resolvé las ciudades pendientes para continuar"
-                  : requiereConfirmarCamposFaltantes ||
-                      requiereConfirmarFacturasDuplicadas
-                    ? "Marcá la casilla de arriba para confirmar"
-                    : undefined
+                  : requiereResolverIdFiscalDuplicado
+                    ? "Elegí ignorar o actualizar para cada fila con ID Fiscal duplicado"
+                    : requiereConfirmarCamposFaltantes ||
+                        requiereConfirmarFacturasDuplicadas
+                      ? "Marcá la casilla de arriba para confirmar"
+                      : undefined
               }
               className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
             >

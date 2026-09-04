@@ -1,6 +1,5 @@
 ﻿import type { MovimientoStock, Producto, StockItem, StockOperacion } from '@/types/api';
 import {
-  presentacionNombreFromLike,
   presentacionLabelFromLike,
   presentacionNombreFromMovimiento,
   presentacionLabelFromStockItem,

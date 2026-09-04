@@ -118,6 +118,17 @@ export function ClienteEditPage() {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
     }
+    // No aplica cuando se edita para otro tenant desde superadmin: maestro.clientes
+    // refleja la organización activa de Clerk, no el tenant elegido por query param.
+    if (!tenantId && idFiscal.trim()) {
+      const yaExiste = maestro.clientes.some(
+        (c) => c.id !== id && (c.idFiscal ?? "").trim() === idFiscal.trim(),
+      );
+      if (yaExiste) {
+        setFieldErrors({ idFiscal: "Ya existe un cliente con ese ID Fiscal." });
+        return;
+      }
+    }
     setFieldErrors({});
     setLoading(true);
     setError(null);

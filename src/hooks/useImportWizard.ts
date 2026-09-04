@@ -360,6 +360,7 @@ export function useImportWizard(
   async function confirmarModuloActual(
     confirmarCamposFaltantes?: boolean,
     confirmarFacturasDuplicadas?: boolean,
+    decisionesIdFiscalDuplicado?: { fila: number; accion: "ignorar" | "actualizar" }[],
   ) {
     if (!preview || !moduloActual) return;
     setLoading(true);
@@ -372,6 +373,7 @@ export function useImportWizard(
         filasExcluidas?: number[];
         confirmarCamposFaltantes?: boolean;
         confirmarFacturasDuplicadas?: boolean;
+        decisionesIdFiscalDuplicado?: { fila: number; accion: "ignorar" | "actualizar" }[];
       } = {
         sessionId: preview.sessionId,
         tenantId,
@@ -387,6 +389,9 @@ export function useImportWizard(
       }
       if (confirmarFacturasDuplicadas) {
         body.confirmarFacturasDuplicadas = true;
+      }
+      if (moduloActual === "clientes" && decisionesIdFiscalDuplicado?.length) {
+        body.decisionesIdFiscalDuplicado = decisionesIdFiscalDuplicado;
       }
       const log = await apiJson<ImportLog>("/api/importaciones/confirm", getToken, {
         method: "POST",
