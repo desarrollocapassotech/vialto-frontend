@@ -44,6 +44,7 @@ import {
   listadoTablaTdClass,
   listadoTablaThClass,
 } from "@/lib/listadoTabla";
+import { presentacionLabelFromLike } from "@/lib/stockPresentacion";
 import type {
   Cliente,
   Deposito,
@@ -225,6 +226,7 @@ export function StockPanelTenantPage({
     composicion: Array<{
       presentacionId: string | null;
       presentacionNombre: string;
+      unidadesPorBulto: number | null;
       bultos: number;
       sueltas: number;
       kg: number;
@@ -399,8 +401,8 @@ export function StockPanelTenantPage({
       (p) => p.id === item.presentacionId,
     );
     return (
-      item.presentacion?.presentacion?.nombre ??
-      pres?.presentacion?.nombre ??
+      presentacionLabelFromLike(item.presentacion) ||
+      (pres ? presentacionLabelFromLike(pres) : null) ||
       null
     );
   }
@@ -411,8 +413,8 @@ export function StockPanelTenantPage({
       (p) => p.id === item.presentacionId,
     );
     const nombrePres =
-      item.presentacion?.presentacion?.nombre ??
-      pres?.presentacion?.nombre ??
+      presentacionLabelFromLike(item.presentacion) ||
+      (pres ? presentacionLabelFromLike(pres) : null) ||
       null;
     const sinUnidad2 = item.producto?.unidad2Nombre === null;
     return {
@@ -585,6 +587,7 @@ export function StockPanelTenantPage({
             composicion: Array<{
               presentacionId: string | null;
               presentacionNombre: string;
+              unidadesPorBulto: number | null;
               bultos: number;
               sueltas: number;
               kg: number;
@@ -870,7 +873,7 @@ export function StockPanelTenantPage({
                       >
                         <span>
                           {c.bultos > 0 &&
-                            `${c.bultos} ${c.presentacionNombre}`}
+                            `${c.bultos} ${c.presentacionNombre}${c.unidadesPorBulto ? ` (x${c.unidadesPorBulto})` : ''}`}
                           {c.bultos > 0 && c.sueltas > 0 && " + "}
                           {c.sueltas > 0 && `${c.sueltas} sueltas`}
                         </span>

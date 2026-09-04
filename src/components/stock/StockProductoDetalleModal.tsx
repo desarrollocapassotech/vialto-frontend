@@ -6,6 +6,7 @@ import { friendlyError } from '@/lib/friendlyError';
 type ComposicionItem = {
   presentacionId: string | null;
   presentacionNombre: string;
+  unidadesPorBulto: number | null;
   bultos: number;
   sueltas: number;
   kg: number;
@@ -99,7 +100,10 @@ export function StockProductoDetalleModal({
                 <tbody className="divide-y divide-black/5">
                   {resumen.composicion.map((c, i) => (
                     <tr key={i} className="hover:bg-vialto-mist/20">
-                      <td className={TD}>{c.presentacionNombre}</td>
+                      <td className={TD}>
+                        {c.presentacionNombre}
+                        {c.unidadesPorBulto ? ` (x${c.unidadesPorBulto})` : ''}
+                      </td>
                       <td className={`${TD} text-right tabular-nums`}>{c.bultos}</td>
                       <td className={`${TD} text-right tabular-nums`}>{c.sueltas}</td>
                       <td className={`${TD} text-right tabular-nums font-medium`}>{c.kg} kg</td>

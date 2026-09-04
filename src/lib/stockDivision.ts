@@ -1,4 +1,4 @@
-import { presentacionNombreFromLike } from '@/lib/stockPresentacion';
+import { presentacionLabelFromLike } from '@/lib/stockPresentacion';
 import type { StockOperacion } from '@/types/api';
 
 export type DivisionImpacto = {
@@ -24,7 +24,7 @@ export function getDivisionImpacto(op: StockOperacion): DivisionImpacto | null {
 
   const ref = op.movimientos.find((m) => m.bultos > 0) ?? op.movimientos[0];
 
-  const presentacionNombre = presentacionNombreFromLike(ref.presentacion);
+  const presentacionNombre = presentacionLabelFromLike(ref.presentacion);
 
   return {
     bultosRestados,
