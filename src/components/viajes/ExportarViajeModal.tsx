@@ -119,11 +119,15 @@ export function ExportarViajeModal({
   const [selectorNominaAbierto, setSelectorNominaAbierto] = useState(false);
 
   const permiteMicCrt = viajePermiteGenerarMicCrt(viaje.etapa);
-  const permitePaut = !viajeUsaFlotaPropia(viaje);
   const ocupado = generandoPaut || guardando || micCrtValidando;
 
   const { isVisible: isTransportistaVisible } = useFieldConfig("transportistas");
   const isHiddenAnywhere = (field: string) => !isTransportistaVisible("edicion_transportista", field);
+  // Si el tenant ocultó el campo N° PAUT en la configuración de campos de
+  // Transportistas, es porque no trabaja con PAUT — no tiene sentido
+  // ofrecerle emitir la Nómina (mismo criterio que ya oculta el botón por
+  // completo cuando el viaje es de flota propia, no un disabled con aviso).
+  const permitePaut = !viajeUsaFlotaPropia(viaje) && !isHiddenAnywhere("paut");
 
   const { isVisible: isVehiculoVisible } = useFieldConfig("vehiculos");
   
