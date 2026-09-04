@@ -17,7 +17,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
-  esPaisSoportado,
+  paisCodigoDesdeTexto,
   idFiscalPorPais,
   validarIdFiscal,
   condicionTributariaPorPais,
@@ -76,9 +76,7 @@ export function ClienteEditPage() {
         const row = await apiJson<Cliente>(path, () => getToken());
         if (!cancelled) {
           setNombre(row.nombre);
-          setPais(
-            esPaisSoportado(row.pais ?? "") ? (row.pais as PaisCodigo) : "",
-          );
+          setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
           setCondicionIva(row.condicionIva ?? null);
           setCondicionTributaria(row.condicionTributaria ?? "");

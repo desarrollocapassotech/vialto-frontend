@@ -6,7 +6,7 @@ import { apiJson } from '@/lib/api';
 import { validateClienteForm, validateTransportistaForm } from '@/lib/clienteForm';
 import {
   condicionTributariaPorPais,
-  esPaisSoportado,
+  paisCodigoDesdeTexto,
   idFiscalPorPais,
   validarIdFiscal,
 } from '@/lib/ciudades';
@@ -56,7 +56,7 @@ export function CompletarDatosFiscalesInline({
 }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [pais, setPais] = useState<PaisCodigo | ''>(
-    esPaisSoportado(initial.pais ?? '') ? (initial.pais as PaisCodigo) : '',
+    paisCodigoDesdeTexto(initial.pais ?? ''),
   );
   const [idFiscal, setIdFiscal] = useState(initial.idFiscal ?? '');
   const [condicionIva, setCondicionIva] = useState<number | null>(initial.condicionIva);

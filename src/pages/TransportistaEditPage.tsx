@@ -17,7 +17,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
-  esPaisSoportado,
+  paisCodigoDesdeTexto,
   idFiscalPorPais,
   validarIdFiscal,
   condicionTributariaPorPais,
@@ -97,9 +97,7 @@ export function TransportistaEditPage() {
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
           setNombre(row.nombre);
-          setPais(
-            esPaisSoportado(row.pais ?? "") ? (row.pais as PaisCodigo) : "",
-          );
+          setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
           setEmail(row.email ?? "");
           setTelefono(row.telefono ?? "");
