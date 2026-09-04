@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
 import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelExport";
+import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
@@ -2052,6 +2053,15 @@ function EntidadTable({ entidades }: { entidades: ImportPreviewEntidad[] }) {
   );
 }
 
+/** El backend manda `condicionIva` como el código crudo (1/4/5/6) — acá se traduce al mismo texto que ya usan las vistas de Cliente/Transportista, en vez de mostrar el número pelado. */
+function valorFilaDetalle(campo: string, valor: string): string {
+  if (campo === "condicionIva") {
+    const n = Number(valor);
+    if (Number.isFinite(n)) return condicionIvaLabel(n);
+  }
+  return valor;
+}
+
 function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
   return (
     <div className="rounded border border-black/10 p-3">
@@ -2075,7 +2085,9 @@ function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
             <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
               {c.label}
             </p>
-            <p className="text-sm text-vialto-charcoal">{c.valor}</p>
+            <p className="text-sm text-vialto-charcoal">
+              {valorFilaDetalle(c.campo, c.valor)}
+            </p>
           </div>
         ))}
       </div>
