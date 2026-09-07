@@ -2885,7 +2885,7 @@ export function ViajesTenantPage({
             })();
           }}
           onVerFactura={
-            (viewingViaje.clientesViaje ?? []).length > 0 || viewingViaje.facturaId
+            viewingViaje.facturaId || (viewingViaje.clientesViaje ?? []).some(c => c.facturaId)
               ? () => {
                   setViewingViaje(null);
                   openVerFacturaFlow(viewingViaje);

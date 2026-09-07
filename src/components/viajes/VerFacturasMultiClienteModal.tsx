@@ -5,6 +5,7 @@ import { ViewModalShell } from "@/components/ui/ViewModalShell";
 import {
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
+  getVisualFacturacionEstado,
   type FacturacionEstado,
 } from "@/lib/viajesIndicadores";
 import { FileText, ExternalLink } from "lucide-react";
@@ -22,7 +23,7 @@ interface FacturaRow {
 
 function FacturacionBadge({ estado }: { estado: FacturacionEstado }) {
   const badgeClass =
-    "inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5";
+    "inline-block rounded-sm border text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 whitespace-nowrap";
   return (
     <span className={`${badgeClass} ${facturacionEstadoBadgeClass[estado]}`}>
       {facturacionEstadoLabel[estado] || estado}
@@ -63,7 +64,8 @@ export function VerFacturasMultiClienteModal({
         viaje.monedaMonto
       ),
       facturaId: viaje.facturaId,
-      facturacionEstado: "facturado",
+      // override visual a borrador si hay facturaId pero el estado de BD sigue siendo sin_facturar
+      facturacionEstado: getVisualFacturacionEstado(viaje.facturacionEstado, viaje.facturaId),
     });
   }
 
@@ -97,7 +99,8 @@ export function VerFacturasMultiClienteModal({
         c.monedaMonto
       ),
       facturaId: c.facturaId,
-      facturacionEstado: c.facturacionEstado,
+      // override visual a borrador si hay facturaId pero el estado de BD sigue siendo sin_facturar
+      facturacionEstado: getVisualFacturacionEstado(c.facturacionEstado, c.facturaId),
     });
   }
 
@@ -106,7 +109,7 @@ export function VerFacturasMultiClienteModal({
       title={
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-vialto-blue" />
-          Comprobantes Emitidos
+          Facturas del Viaje
         </div>
       }
       onClose={onClose}
@@ -114,12 +117,12 @@ export function VerFacturasMultiClienteModal({
     >
       <div className="p-4 sm:p-6 bg-[#f8f9fa]">
         <p className="mb-4 text-sm text-vialto-steel">
-          Este viaje tiene comprobantes emitidos para los siguientes clientes.
+          Este viaje tiene las siguientes facturas vinculadas a sus clientes (borradores o emitidos).
         </p>
 
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-black/15 bg-black/5 py-8 text-center text-sm text-vialto-steel">
-            No hay facturas emitidas para este viaje.
+            No hay facturas vinculadas a este viaje.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-black/5 bg-white shadow-sm">

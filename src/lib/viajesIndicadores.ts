@@ -92,6 +92,7 @@ export function parseKmLitrosOpcionales(
 
 export type FacturacionEstado =
   | 'sin_facturar'
+  | 'borrador'
   | 'esperando_afip'
   | 'facturado_parcial'
   | 'facturado'
@@ -100,7 +101,7 @@ export type FacturacionEstado =
   | 'anulado';
 
 /** Facturación en la que el viaje está disponible para vincular a una factura nueva. */
-const FACTURACION_ESTADOS_DISPONIBLES = new Set(['sin_facturar', 'anulado']);
+const FACTURACION_ESTADOS_DISPONIBLES = new Set(['sin_facturar', 'borrador', 'anulado']);
 
 export function facturacionPermiteVincular(facturacionEstado: string): boolean {
   return FACTURACION_ESTADOS_DISPONIBLES.has(facturacionEstado);
@@ -108,6 +109,7 @@ export function facturacionPermiteVincular(facturacionEstado: string): boolean {
 
 export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
   sin_facturar: 'Sin facturar',
+  borrador: 'Borrador',
   esperando_afip: 'Factura esperando AFIP',
   facturado_parcial: 'Facturado Parcial',
   facturado: 'Facturado',
@@ -119,6 +121,7 @@ export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
 /** Clases de color para el badge chico de facturación en la grilla. */
 export const facturacionEstadoBadgeClass: Record<FacturacionEstado, string> = {
   sin_facturar: 'bg-zinc-100 text-zinc-800 border-zinc-300/90',
+  borrador: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   esperando_afip: 'bg-amber-50 text-amber-950 border-amber-200/95',
   facturado_parcial: 'bg-amber-100 text-amber-950 border-amber-400/80',
   facturado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
@@ -156,6 +159,18 @@ export function facturacionLifecycleEstado(
   estado: FacturacionEstado,
 ): FacturacionEstado {
   return estado;
+}
+
+/**
+ * Helper para el frontend: Mapea el estado de la base de datos a un estado visual de la UI.
+ * Específicamente, transforma 'sin_facturar' en 'borrador' si el viaje ya tiene un borrador guardado (facturaId).
+ */
+export function getVisualFacturacionEstado(estadoBD: string | null | undefined, facturaId: string | null | undefined): FacturacionEstado {
+  const e = estadoBD || 'sin_facturar';
+  if (e === 'sin_facturar' && facturaId) {
+    return 'borrador';
+  }
+  return e as FacturacionEstado;
 }
 
 export function tooltipFacturacionEstado(viaje: Pick<Viaje, 'facturacionEstado' | 'factura'>): string {
