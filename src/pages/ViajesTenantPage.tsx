@@ -2620,6 +2620,7 @@ export function ViajesTenantPage({
                 <ViajeAccionesMenu
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
+                  hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -2824,6 +2825,7 @@ export function ViajesTenantPage({
                 <ViajeAccionesMenu
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
+                  hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
