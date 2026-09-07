@@ -59,6 +59,8 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: 
     const algunoError = estados.some(e => e === 'error_afip');
     const algunoEsperando = estados.some(e => e === 'esperando_afip');
     const algunoFacturado = estados.some(isFacturado);
+    const todosAnulados = estados.every(e => e === 'anulado');
+    const todosSinFacturarOAnulados = estados.every(e => e === 'sin_facturar' || e === 'anulado');
 
     if (algunoError) {
       displayLabel = facturacionEstadoLabel.error_afip;
@@ -66,6 +68,12 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: 
     } else if (algunoEsperando) {
       displayLabel = facturacionEstadoLabel.esperando_afip;
       displayClass = facturacionEstadoBadgeClass.esperando_afip;
+    } else if (todosAnulados) {
+      displayLabel = facturacionEstadoLabel.anulado;
+      displayClass = facturacionEstadoBadgeClass.anulado;
+    } else if (todosSinFacturarOAnulados) {
+      displayLabel = facturacionEstadoLabel.sin_facturar;
+      displayClass = facturacionEstadoBadgeClass.sin_facturar;
     } else if (algunoFacturado && !todosFacturados) {
       displayLabel = facturacionEstadoLabel.facturado_parcial;
       displayClass = facturacionEstadoBadgeClass.facturado_parcial;

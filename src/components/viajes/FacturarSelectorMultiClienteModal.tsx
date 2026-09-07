@@ -10,6 +10,7 @@ import {
 import {
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
+  getVisualFacturacionEstado,
   type FacturacionEstado,
 } from "@/lib/viajesIndicadores";
 import { FileText, CheckCircle2 } from "lucide-react";
@@ -86,7 +87,8 @@ export function FacturarSelectorMultiClienteModal({
       importeNetoViajeParaFactura(viaje),
       viaje.monedaMonto
     ),
-    facturacionEstado: principalFacturado ? "facturado" : "sin_facturar",
+    // override visual a borrador si hay facturaId pero el estado de BD sigue siendo sin_facturar
+    facturacionEstado: getVisualFacturacionEstado(viaje.facturacionEstado, viaje.facturaId),
     yaFacturado: principalFacturado,
   });
 
@@ -116,7 +118,8 @@ export function FacturarSelectorMultiClienteModal({
         }),
         c.monedaMonto
       ),
-      facturacionEstado: c.facturacionEstado,
+      // override visual a borrador si hay facturaId pero el estado de BD sigue siendo sin_facturar
+      facturacionEstado: getVisualFacturacionEstado(c.facturacionEstado, c.facturaId),
       yaFacturado: vcFacturado,
     });
   }
