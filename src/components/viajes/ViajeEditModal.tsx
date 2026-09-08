@@ -1527,6 +1527,7 @@ export function ViajeEditModal({
                         viaje={snapshotViaje}
                         tenantId={tenantId}
                         hasArca={hasLiquidoProductoArca}
+                        onRegistrarPago={onRegistrarPago}
                       />
                     </div>
                     <PagosTransportistaSummary

@@ -329,6 +329,13 @@ export function ViajesTenantPage({
     !platform &&
     !hasFacturasArca &&
     canAccessFacturacion(currentTenant?.modules ?? []);
+  // Mismo criterio que "hasLiquidaciones" en AppShell.tsx: la grilla debe mostrar el
+  // estado de liquidación (sin_liquidar/liquidado) apenas el tenant tiene acceso a
+  // Liquidaciones, no solo cuando además tiene emision-liquido-producto-arca — un
+  // tenant con facturación sin ARCA (ej. LSF) igual crea Liquidaciones manuales reales.
+  const hasLiquidaciones =
+    hasLiquidoProductoArca ||
+    (!platform && canAccessFacturacion(currentTenant?.modules ?? []));
   const tid = tenantId?.trim() ?? "";
 
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
@@ -2597,11 +2604,12 @@ export function ViajesTenantPage({
                             : undefined
                         }
                       />
-                      {hasLiquidoProductoArca ? (
+                      {hasLiquidaciones ? (
                         <ViajeLiquidacionIndicador
                           viaje={v}
                           tenantId={platform ? tid : undefined}
                           hasArca={hasLiquidoProductoArca}
+                          onRegistrarPago={() => setRegistrarPagoViaje(v)}
                         />
                       ) : (
                         <ViajePagoTransportistaIndicador
@@ -2756,11 +2764,12 @@ export function ViajesTenantPage({
                         : undefined
                     }
                   />
-                  {hasLiquidoProductoArca ? (
+                  {hasLiquidaciones ? (
                     <ViajeLiquidacionIndicador
                       viaje={v}
                       tenantId={platform ? tid : undefined}
                       hasArca={hasLiquidoProductoArca}
+                      onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     />
                   ) : (
                     <ViajePagoTransportistaIndicador

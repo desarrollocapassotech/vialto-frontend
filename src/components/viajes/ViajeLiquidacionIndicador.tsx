@@ -20,10 +20,14 @@ import { useToast } from "@/lib/toast";
 import type { Viaje } from "@/types/api";
 
 type Props = {
-  viaje: Pick<Viaje, "liquidacionEstado" | "liquidacionesViaje">;
+  // Tipo completo: el modal de detalle (sin liquidación vinculada) necesita los
+  // campos de pagosTransportista/precio para mostrar el resumen de pagos al transportista.
+  viaje: Viaje;
   tenantId?: string;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle. */
   hasArca?: boolean;
+  /** Si se pasa, el modal de detalle (sin liquidación vinculada) habilita "+ Registrar pago". */
+  onRegistrarPago?: () => void;
 };
 
 const badgeClass =
@@ -47,6 +51,7 @@ export function ViajeLiquidacionIndicador({
   viaje,
   tenantId,
   hasArca = false,
+  onRegistrarPago,
 }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -114,6 +119,7 @@ export function ViajeLiquidacionIndicador({
         <ViajeLiquidacionDetalleModal
           viaje={viaje}
           tenantId={tenantId}
+          onRegistrarPago={onRegistrarPago}
           onClose={() => setOpen(false)}
         />
       )}

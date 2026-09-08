@@ -266,6 +266,7 @@ export function ViajeViewModal({
                 viaje={viaje}
                 tenantId={tenantId}
                 hasArca={hasLiquidoProductoArca}
+                onRegistrarPago={onRegistrarPago}
               />
             ) : (
               <ViajePagoTransportistaIndicador
