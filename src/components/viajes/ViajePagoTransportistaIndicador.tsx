@@ -6,7 +6,7 @@ import {
 import type { Viaje } from '@/types/api';
 
 const badgeBase =
-  'mt-1 inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide';
+  'mt-1 inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide';
 const badgeInteractive = 'cursor-pointer hover:brightness-95 text-left';
 
 type Props = {

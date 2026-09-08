@@ -31,7 +31,7 @@ type Props = {
 };
 
 const badgeClass =
-  "inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait";
+  "inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait";
 
 function liquidacionUrl(id: string, tenantId?: string) {
   const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";

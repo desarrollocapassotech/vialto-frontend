@@ -13,6 +13,7 @@ import {
 } from "react-router-dom";
 import {
   ClienteSearchSelect,
+  ChoferSearchSelect,
   TransportistaSearchSelect,
 } from "@/components/forms/MaestroSearchSelects";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -37,6 +38,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import {
   mergeMaestroPorId,
   clientesRutaListadoViaje,
+  nombreChoferListadoViaje,
   nombreTransportistaExternoListadoViaje,
   nombreTransportistaEfectivoListadoViaje,
   numeroVisibleViaje,
@@ -428,8 +430,6 @@ export function ViajesTenantPage({
     ctg: "",
     clienteId: "",
     transportistaId: "",
-    // Ya no hay filtro de columna/UI para esto (se sacó la columna Chofer del listado),
-    // pero se deja el campo para que `handleExportarExcel` siga intacto tal como estaba.
     choferId: "",
     estado: initialEstadoFromUrl,
     facturacionEstado: "",
@@ -448,6 +448,7 @@ export function ViajesTenantPage({
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
+  const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
   const [facturacionFiltro, setFacturacionFiltro] = useState("");
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
@@ -759,6 +760,7 @@ export function ViajesTenantPage({
           ctg: ctgF,
           clienteId: cid,
           transportistaId: transpFiltro,
+          choferId: choferFiltro,
           estado: estF,
           facturacionEstado: facEstF,
           pagoTransportista: pagoTranspF,
@@ -786,6 +788,7 @@ export function ViajesTenantPage({
 
         if (cid) filtros.set("clienteId", cid);
         if (transpFiltro) filtros.set("transportistaId", transpFiltro);
+        if (choferFiltro) filtros.set("choferId", choferFiltro);
         if (estF.trim()) filtros.set("etapa", estF.trim());
         if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
         if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
@@ -987,6 +990,18 @@ export function ViajesTenantPage({
     };
     setListadoRefetching(true);
     setTransportistaIdFiltroActivo(tid);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaChofer(choferId: string) {
+    const chid = choferId.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      choferId: chid,
+    };
+    setListadoRefetching(true);
+    setChoferIdFiltroActivo(chid);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -1193,8 +1208,6 @@ export function ViajesTenantPage({
       ctg: "",
       clienteId: "",
       transportistaId: "",
-      // Se deja el campo (sin UI que lo modifique) para que `handleExportarExcel`
-      // conserve exactamente su forma anterior — ver `filtrosAplicadosRef`.
       choferId: "",
       estado: "",
       facturacionEstado: "",
@@ -1211,6 +1224,7 @@ export function ViajesTenantPage({
     setCtgFiltroActivo("");
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
+    setChoferIdFiltroActivo("");
     setEstadoFiltro("");
     setFacturacionFiltro("");
     setPagoTransportistaFiltro("");
@@ -1234,6 +1248,7 @@ export function ViajesTenantPage({
     !!ctgFiltroActivo.trim() ||
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
+    !!choferIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
     !!facturacionFiltro.trim() ||
     !!pagoTransportistaFiltro.trim() ||
@@ -1248,6 +1263,7 @@ export function ViajesTenantPage({
     if (ctgFiltroActivo.trim()) n += 1;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
+    if (choferIdFiltroActivo.trim()) n += 1;
     if (estadoFiltro.trim()) n += 1;
     if (facturacionFiltro.trim()) n += 1;
     if (pagoTransportistaFiltro.trim()) n += 1;
@@ -1260,6 +1276,7 @@ export function ViajesTenantPage({
     ctgFiltroActivo,
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
+    choferIdFiltroActivo,
     estadoFiltro,
     facturacionFiltro,
     pagoTransportistaFiltro,
@@ -1904,6 +1921,24 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
+      <ListadoFiltroCampo label="Chofer" active={!!choferIdFiltroActivo.trim()}>
+        <ChoferSearchSelect
+          id="viajes-filtro-chofer"
+          choferes={choferes}
+          value={choferIdFiltroActivo}
+          onChange={(id) => aplicarFiltroColumnaChofer(id)}
+          allowEmptyValue
+          emptyListChoiceLabel="Todos"
+          placeholderCerrado="Todos"
+          disabled={listadoRefetching}
+          aria-label="Filtrar listado por chofer"
+          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+            choferIdFiltroActivo.trim()
+              ? "text-vialto-fire"
+              : "text-vialto-charcoal"
+          }`}
+        />
+      </ListadoFiltroCampo>
       <ListadoFiltroCampo label="Etapa" active={!!estadoFiltro.trim()}>
         <select
           value={estadoFiltro}
@@ -1914,8 +1949,8 @@ export function ViajesTenantPage({
           }`}
           aria-label="Filtrar listado por etapa"
         >
-          <option value="">Todos</option>
-          <option value="cancelado">Cancelados</option>
+          <option value="">TODOS</option>
+          <option value="cancelado">CANCELADO</option>
           {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map((est) => (
             <option key={est} value={est} title={tooltipEtapaViaje(est)}>
               {etapaViajeLabel[est] ?? est}
@@ -2223,6 +2258,7 @@ export function ViajesTenantPage({
                 title="ID"
                 filterActive={!!numeroFiltroActivo.trim()}
                 filterSignature={numeroFiltroActivo}
+                minWidthClass="min-w-0"
               >
                 <AutocompleteInput
                   value={numeroFiltroActivo}
@@ -2241,6 +2277,7 @@ export function ViajesTenantPage({
                 }
                 filterActive={!!ctgFiltroActivo.trim()}
                 filterSignature={ctgFiltroActivo}
+                minWidthClass="min-w-0"
               >
                 <AutocompleteInput
                   value={ctgFiltroActivo}
@@ -2300,9 +2337,36 @@ export function ViajesTenantPage({
             </th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
+                title="Chofer"
+                filterActive={!!choferIdFiltroActivo.trim()}
+                filterSignature={choferIdFiltroActivo}
+                minWidthClass="min-w-0"
+              >
+                <ChoferSearchSelect
+                  id="viajes-col-filtro-chofer"
+                  choferes={choferes}
+                  value={choferIdFiltroActivo}
+                  onChange={(id) => aplicarFiltroColumnaChofer(id)}
+                  allowEmptyValue
+                  emptyListChoiceLabel="Todos"
+                  placeholderCerrado="Todos"
+                  disabled={listadoRefetching}
+                  aria-label="Filtrar listado por chofer"
+                  inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                    choferIdFiltroActivo.trim()
+                      ? "text-vialto-fire"
+                      : "text-vialto-charcoal"
+                  }`}
+                />
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
                 title="Etapa"
                 filterActive={!!estadoFiltro.trim()}
                 filterSignature={estadoFiltro}
+                minWidthClass="min-w-0"
+                titleNoWrap
               >
                 <select
                   value={estadoFiltro}
@@ -2315,8 +2379,8 @@ export function ViajesTenantPage({
                   }`}
                   aria-label="Filtrar listado por etapa"
                 >
-                  <option value="">Todos</option>
-                  <option value="cancelado">Cancelados</option>
+                  <option value="">TODOS</option>
+                  <option value="cancelado">CANCELADO</option>
                   {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
                     (est) => (
                       <option
@@ -2336,6 +2400,7 @@ export function ViajesTenantPage({
                 title="Origen — Destino"
                 filterActive={!!ubicacionFiltro.trim()}
                 filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+                minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
                   <select
@@ -2402,6 +2467,7 @@ export function ViajesTenantPage({
                   !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
                 }
                 filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
                   <select
@@ -2472,9 +2538,7 @@ export function ViajesTenantPage({
             v,
             transportistas,
           );
-          // La columna Transporte siempre muestra quien ejecuta el viaje: si no hay
-          // transportista efectivo distinto del contratante, el contratante es quien lo ejecuta.
-          const nombreTranspMostrar = nombreTranspEfectivo ?? nombreTransp;
+          const nombreChofer = nombreChoferListadoViaje(v, choferes);
           return (
             <tr
               key={v.id}
@@ -2497,10 +2561,10 @@ export function ViajesTenantPage({
                   ) : null}
                 </td>
               )}
-              <td className="px-4 py-3 text-vialto-steel tabular-nums">
+              <td className="px-4 py-3 max-w-24 break-words text-vialto-steel tabular-nums">
                 #{v.numero}
               </td>
-              <td className="px-4 py-3 text-vialto-steel tabular-nums">
+              <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
                 {v.numeroIdentificacionPersonalizado?.trim() || "—"}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
@@ -2517,12 +2581,25 @@ export function ViajesTenantPage({
                 )}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
-                <span className="block truncate" title={nombreTranspMostrar}>
-                  {nombreTranspMostrar}
+                <span className="block truncate" title={nombreTransp}>
+                  {nombreTransp}
+                </span>
+                {nombreTranspEfectivo && (
+                  <span
+                    className="block truncate text-[11px] text-vialto-steel/70"
+                    title={`Ejecuta: ${nombreTranspEfectivo}`}
+                  >
+                    Ejecuta: {nombreTranspEfectivo}
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
+                <span className="block truncate" title={nombreChofer}>
+                  {nombreChofer}
                 </span>
               </td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col gap-0.5 items-start">
+                <div className="flex w-full flex-col gap-0.5">
                   {estadoQuickId === v.id ? (
                     <select
                       autoFocus
@@ -2551,7 +2628,7 @@ export function ViajesTenantPage({
                         if (savingEstadoId) return;
                         setEstadoQuickId(v.id);
                       }}
-                      className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                      className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
                         etapaViajeBadgeClass[v.etapa] ??
                         etapaViajeBadgeClassDefault
                       }`}
@@ -2566,6 +2643,7 @@ export function ViajesTenantPage({
                       <ViajeFacturacionIndicador
                         viaje={v}
                         tenantId={platform ? tid : undefined}
+                        fullWidth
                         onClickOverride={
                           (v.clientesViaje ?? []).length > 0
                             ? () => openVerFacturaFlow(v)
@@ -2589,7 +2667,7 @@ export function ViajesTenantPage({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
+              <td className="px-4 py-3 align-top text-vialto-steel min-w-0 max-w-[7rem]">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
                   destino={v.destino}
@@ -2601,16 +2679,16 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
+              <td className="px-4 py-3 max-w-[6rem] text-vialto-steel tabular-nums align-top">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span
-                    className={`block ${ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""}`}
+                    className={`block whitespace-nowrap ${ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""}`}
                     title={v.fechaCarga ?? undefined}
                   >
                     {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                   </span>
                   <span
-                    className={`block text-xs ${
+                    className={`block whitespace-nowrap text-xs ${
                       ordenResaltaFechaDescarga
                         ? "font-medium text-vialto-charcoal"
                         : "text-vialto-steel/90"
@@ -2663,17 +2741,25 @@ export function ViajesTenantPage({
             v,
             transportistas,
           );
-          // La columna Transporte siempre muestra quien ejecuta el viaje: si no hay
-          // transportista efectivo distinto del contratante, el contratante es quien lo ejecuta.
-          const nombreTranspMostrar = nombreTranspEfectivo ?? nombreTransp;
+          const nombreChofer = nombreChoferListadoViaje(v, choferes);
           const transporteValue = (
-            <span className="block truncate" title={nombreTranspMostrar}>
-              {nombreTranspMostrar}
-            </span>
+            <>
+              <span className="block truncate" title={nombreTransp}>
+                {nombreTransp}
+              </span>
+              {nombreTranspEfectivo && (
+                <span
+                  className="block truncate text-[11px] text-vialto-steel/70"
+                  title={`Ejecuta: ${nombreTranspEfectivo}`}
+                >
+                  Ejecuta: {nombreTranspEfectivo}
+                </span>
+              )}
+            </>
           );
           const estadoValue = (
             <div
-              className="flex flex-col gap-0.5 items-start"
+              className="flex w-full flex-col gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               {estadoQuickId === v.id ? (
@@ -2704,7 +2790,7 @@ export function ViajesTenantPage({
                     if (savingEstadoId) return;
                     setEstadoQuickId(v.id);
                   }}
-                  className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                  className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
                     etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
                   }`}
                 >
@@ -2718,6 +2804,7 @@ export function ViajesTenantPage({
                   <ViajeFacturacionIndicador
                     viaje={v}
                     tenantId={platform ? tid : undefined}
+                    fullWidth
                     onClickOverride={
                       (v.clientesViaje ?? []).length > 0
                         ? () => openVerFacturaFlow(v)
@@ -2778,6 +2865,7 @@ export function ViajesTenantPage({
                   value: v.numeroIdentificacionPersonalizado?.trim() || "—",
                 },
                 { label: "Transporte", value: transporteValue },
+                { label: "Chofer", value: nombreChofer },
                 { label: "Etapa", value: estadoValue },
                 {
                   label: "Origen — Destino",
