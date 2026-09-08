@@ -458,10 +458,6 @@ export function CamposEmpresaPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Configuración por empresa
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-3xl">
-            Elegí una empresa y un formulario para configurar qué campos se
-            visualizan.
-          </p>
         </div>
       </div>
 
