@@ -122,7 +122,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { Download, Upload } from "lucide-react";
+import { Download, Filter, Upload } from "lucide-react";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -421,6 +421,7 @@ export function ViajesTenantPage({
   const [facturacionFiltro, setFacturacionFiltro] = useState("");
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
     useState<ViajePagoTransportistaFiltro>(initialPagoTransportistaFromUrl);
+  const [showFiltrosRapidos, setShowFiltrosRapidos] = useState(false);
   const [tipoFechaFiltro, setTipoFechaFiltro] = useState<
     "" | "carga" | "descarga"
   >("");
@@ -1204,6 +1205,10 @@ export function ViajesTenantPage({
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
+
+  const cantidadFiltrosRapidosActivos =
+    (facturacionFiltro.trim() ? 1 : 0) +
+    (pagoTransportistaFiltro.trim() ? 1 : 0);
 
   const hayFiltrosColumnasActivos =
     !!numeroFiltroActivo.trim() ||
@@ -2033,16 +2038,68 @@ export function ViajesTenantPage({
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        {!embeddedInSuperadmin ? (
+      <div className="flex flex-wrap items-center gap-4">
+        {!embeddedInSuperadmin && (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
             Viajes
           </h1>
-        ) : (
-          <span />
         )}
 
-        <div className="flex shrink-0 gap-2">
+        {resumen && (
+          <button
+            type="button"
+            onClick={() => setShowFiltrosRapidos((v) => !v)}
+            aria-expanded={showFiltrosRapidos}
+            aria-label="Mostrar filtros rápidos"
+            className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-charcoal ${
+              showFiltrosRapidos ? "bg-vialto-mist text-vialto-charcoal" : ""
+            }`}
+          >
+            <Filter className="h-4 w-4" aria-hidden />
+            {cantidadFiltrosRapidosActivos > 0 && (
+              <span
+                className="absolute -right-1 -top-1 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-vialto-fire px-1 font-[family-name:var(--font-ui)] text-[10px] font-semibold tabular-nums leading-none text-white"
+                aria-hidden
+              >
+                {cantidadFiltrosRapidosActivos}
+              </span>
+            )}
+          </button>
+        )}
+
+        {resumen && showFiltrosRapidos && (
+          <div className="min-w-0">
+            <ViajesResumenFiltros
+              resumen={resumen}
+              facturacionFiltro={facturacionFiltro}
+              pagoTransportistaFiltro={pagoTransportistaFiltro}
+              onFiltroFacturacion={aplicarFiltroFacturacion}
+              onFiltroPago={aplicarFiltroPagoTransportista}
+            />
+          </div>
+        )}
+
+        {resumen && showFiltrosRapidos && hayFiltrosColumnasActivos && (
+          <button
+            type="button"
+            onClick={limpiarFiltrosColumnas}
+            disabled={listadoRefetching}
+            className="hidden h-10 shrink-0 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
+            aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
+          >
+            Limpiar filtros
+            <span
+              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+              aria-hidden
+            >
+              {cantidadFiltrosColumnasActivos}
+            </span>
+          </button>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex shrink-0 items-center gap-2">
           {puedeImportar && (
             <Link
               to="/importar?volverA=/viajes"
@@ -2068,40 +2125,7 @@ export function ViajesTenantPage({
             {exportandoExcel ? "Generando..." : "Exportar"}
           </button>
         </div>
-      </div>
 
-      {resumen && (
-        <div className="mt-3">
-          <ViajesResumenFiltros
-            resumen={resumen}
-            facturacionFiltro={facturacionFiltro}
-            pagoTransportistaFiltro={pagoTransportistaFiltro}
-            onFiltroFacturacion={aplicarFiltroFacturacion}
-            onFiltroPago={aplicarFiltroPagoTransportista}
-          />
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="hidden min-h-10 items-center lg:flex">
-          {hayFiltrosColumnasActivos && (
-            <button
-              type="button"
-              onClick={limpiarFiltrosColumnas}
-              disabled={listadoRefetching}
-              className="inline-flex h-10 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none"
-              aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
-            >
-              Limpiar filtros
-              <span
-                className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-                aria-hidden
-              >
-                {cantidadFiltrosColumnasActivos}
-              </span>
-            </button>
-          )}
-        </div>
         <div className="ml-auto flex shrink-0 gap-2">
           <ViajesOrdenamientoMenu
             sortBy={sortBy}
