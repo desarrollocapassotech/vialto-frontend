@@ -12,6 +12,7 @@ const modulos: Record<string, string> = {
   choferes: 'Choferes',
   vehiculos: 'Vehículos',
   facturacion: 'Registro de Facturas',
+  liquidaciones: 'Registro de Liquidaciones',
   'emision-facturas-arca': 'Emisión de facturas (ARCA)',
   'emision-liquido-producto-arca': 'Emisión de líquido producto (ARCA)',
   'cuenta-corriente': 'Cuenta corriente',

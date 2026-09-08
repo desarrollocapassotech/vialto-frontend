@@ -23,9 +23,6 @@ export function SuperadminEmpresasPage() {
         <h1 className="font-[family-name:var(--font-display)] text-4xl md:text-5xl tracking-wide text-vialto-charcoal">
           Empresas
         </h1>
-        <p className="mt-2 text-vialto-steel max-w-2xl">
-          Listado completo de empresas registradas.
-        </p>
         <div className="mt-4 flex justify-end">
           <Link
             to="/superadmin/empresas/nueva"

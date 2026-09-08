@@ -93,6 +93,7 @@ import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
+  canAccessLiquidaciones,
 } from "@/lib/tenantModules";
 import {
   MSG_ARCA_NO_FACTURA_USD,
@@ -332,10 +333,11 @@ export function ViajesTenantPage({
   // Mismo criterio que "hasLiquidaciones" en AppShell.tsx: la grilla debe mostrar el
   // estado de liquidación (sin_liquidar/liquidado) apenas el tenant tiene acceso a
   // Liquidaciones, no solo cuando además tiene emision-liquido-producto-arca — un
-  // tenant con facturación sin ARCA (ej. LSF) igual crea Liquidaciones manuales reales.
+  // tenant con registro de liquidaciones sin ARCA (ej. LSF) igual crea Liquidaciones
+  // manuales reales.
   const hasLiquidaciones =
     hasLiquidoProductoArca ||
-    (!platform && canAccessFacturacion(currentTenant?.modules ?? []));
+    (!platform && canAccessLiquidaciones(currentTenant?.modules ?? []));
   const tid = tenantId?.trim() ?? "";
 
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
@@ -1639,7 +1641,10 @@ export function ViajesTenantPage({
 
   function handleFacturarViaje(v: Viaje) {
     if (viajeRequiereComprobanteDual(v)) {
-      if (hasFacturasArca || hasFacturacionSinArca) {
+      // El selector dual (Facturar/Liquidar) solo tiene sentido si el tenant
+      // realmente tiene acceso a ambos comprobantes — si no tiene Liquidaciones
+      // (ni ARCA), no hay nada para elegir del lado transportista.
+      if ((hasFacturasArca || hasFacturacionSinArca) && hasLiquidaciones) {
         setSelectorViaje({ viaje: v, targetClienteId: undefined });
         return;
       }
