@@ -30,6 +30,22 @@ const MODULO_GATE: Record<string, (modules: string[]) => boolean> = {
   stock: canAccessStock,
 };
 
+/**
+ * Módulos cuyos formularios son etapas del mismo registro (alta/edición/detalle
+ * de una misma entidad) — el backend comparte la visibilidad entre los tres
+ * (ver `MODULOS_CAMPOS_COMPARTIDOS` en `tenant-field-config.service.ts`), así
+ * que acá no se muestra el selector de "Formulario" ni "Aplicar a todos los
+ * formularios": cualquier cambio ya aplica a los tres. `stock` queda afuera a
+ * propósito — sus 3 formularios (ingreso/egreso/división) son operaciones
+ * distintas, no etapas de un mismo registro.
+ */
+const MODULOS_CAMPOS_COMPARTIDOS = new Set([
+  "viajes",
+  "clientes",
+  "transportistas",
+  "vehiculos",
+]);
+
 function calcularModulosDisponibles(
   catalogo: Catalogo | null,
   tenant: Tenant | null,
@@ -600,11 +616,7 @@ export function CamposEmpresaPage() {
 
           {mostrarTemplates && empresaTenant && (
             <div className="border border-t-0 border-black/15 bg-white p-6">
-              <p className="mb-4 text-sm text-vialto-steel">
-                Mapeo de columnas del Excel a los campos del sistema, por
-                módulo — lo mismo que se configura desde "Configurar
-                templates" al importar datos de esta empresa.
-              </p>
+              
               <ImportTemplatesConfig
                 tenantId={filtroEmpresa}
                 tenantNombre={empresaTenant.name}
@@ -634,7 +646,7 @@ export function CamposEmpresaPage() {
           {!mostrarTemplates && !mostrarLiquidaciones && (
           <>
           <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
-            {modulo !== "viajes" && (
+            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                   Formulario
@@ -653,7 +665,7 @@ export function CamposEmpresaPage() {
               </label>
             )}
 
-            {modulo !== "viajes" && (
+            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
               <div className="flex items-center gap-3">
                 <ToggleSwitch
                   checked={aplicarATodos}
