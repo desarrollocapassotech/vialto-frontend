@@ -10,7 +10,7 @@ export const COMBUSTIBLE_SORT_DEFAULT: {
   sortBy: CombustibleSortField;
   sortDir: CombustibleSortDir;
 } = {
-  sortBy: "fecha_creacion",
+  sortBy: "fecha_carga",
   sortDir: "desc",
 };
 
