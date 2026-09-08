@@ -832,12 +832,9 @@ export function LiquidacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-          Liquidaciones
-        </h1>
-        <div className="flex shrink-0 gap-2">{exportButton}</div>
-      </div>
+      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+        Liquidaciones
+      </h1>
 
       {isSuperAdmin && (
         <div className="mt-6">
@@ -873,24 +870,28 @@ export function LiquidacionesTenantPage() {
         )}
 
         {activeTenantId && (!error || !isSuperAdmin) && (
-          <div className="flex justify-end gap-2 mt-2">
-            {anyFiltroActivo && (
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+            <div className="flex shrink-0 items-center gap-2">{exportButton}</div>
+
+            <div className="flex gap-2 ml-auto">
+              {anyFiltroActivo && (
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
+                  className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={limpiarFiltros}
-                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+                onClick={() => setShowCrear(true)}
+                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
               >
-                Limpiar filtros
+                Nueva liquidación
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowCrear(true)}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              Nueva liquidación
-            </button>
+            </div>
           </div>
         )}
       </div>

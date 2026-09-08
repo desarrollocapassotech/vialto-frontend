@@ -1185,16 +1185,11 @@ export function FacturacionTenantPage({
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        {!embeddedInSuperadmin ? (
-          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
-            Facturas
-          </h1>
-        ) : (
-          <span />
-        )}
-        <div className="flex shrink-0 gap-2">{exportButton}</div>
-      </div>
+      {!embeddedInSuperadmin && (
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+          Facturas
+        </h1>
+      )}
 
       {!embeddedInSuperadmin && (
         <>
@@ -1223,8 +1218,11 @@ export function FacturacionTenantPage({
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2 justify-between">
-        {error ? <CrudFormErrorAlert message={error} /> : <div />}
+      <div className="mt-4 flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {exportButton}
+          {error && <CrudFormErrorAlert message={error} />}
+        </div>
         <div className="flex gap-2 ml-auto">
           {anyFiltroActivo && (
             <button

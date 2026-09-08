@@ -146,19 +146,12 @@ export function EgresosStockHistorialTenantPage({
   return (
     <div className="w-full space-y-6">
       {!embeddedInSuperadmin && (
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">
-            Historial de egresos
-          </h1>
-          <div className="flex items-center gap-4">{exportButton}</div>
-        </div>
+        <h1 className="text-2xl font-semibold text-vialto-charcoal">
+          Historial de egresos
+        </h1>
       )}
 
-      {embeddedInSuperadmin && (
-        <div className="flex flex-wrap items-center justify-end gap-4">
-          {exportButton}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">{exportButton}</div>
 
       {error && (
         <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -262,7 +262,12 @@ export function ViajeViewModal({
           <span className="inline-flex items-center gap-1.5">
             <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
             {hasLiquidoProductoArca ? (
-              <ViajeLiquidacionIndicador viaje={viaje} tenantId={tenantId} />
+              <ViajeLiquidacionIndicador
+                viaje={viaje}
+                tenantId={tenantId}
+                hasArca={hasLiquidoProductoArca}
+                onRegistrarPago={onRegistrarPago}
+              />
             ) : (
               <ViajePagoTransportistaIndicador
                 viaje={viaje}

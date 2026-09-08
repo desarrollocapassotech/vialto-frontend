@@ -43,6 +43,7 @@ import {
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
+  canAccessLiquidaciones,
   canAccessMantenimiento,
   canAccessStock,
   canAccessViajes,
@@ -258,10 +259,18 @@ export function AppShell() {
     const hasLiquidoProductoArca = canAccessEmisionLiquidoProductoArca(
       tenant?.modules ?? [],
     );
+    const hasLiquidacionesManual = canAccessLiquidaciones(
+      tenant?.modules ?? [],
+    );
     const hasLiquidaciones =
-      superadmin || hasFacturacion || hasLiquidoProductoArca;
+      superadmin || hasLiquidacionesManual || hasLiquidoProductoArca;
 
-    if (hasFacturacion || hasFacturasArca || hasLiquidoProductoArca) {
+    if (
+      hasFacturacion ||
+      hasFacturasArca ||
+      hasLiquidoProductoArca ||
+      hasLiquidacionesManual
+    ) {
       const facturacionItems: NavItem[] = [];
 
       if (hasFacturacion) {

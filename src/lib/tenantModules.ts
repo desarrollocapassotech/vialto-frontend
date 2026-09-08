@@ -40,6 +40,10 @@ export function canAccessFacturacion(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'facturacion');
 }
 
+export function canAccessLiquidaciones(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'liquidaciones');
+}
+
 export function canAccessStock(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'stock');
 }

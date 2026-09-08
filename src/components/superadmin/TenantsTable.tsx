@@ -161,7 +161,7 @@ export function TenantsTable({
               </ViajesListadoHeaderFiltro>
             </th>
             <th scope="col" className={listadoTablaThClass}>
-              Funciones
+              Módulos
             </th>
             <th scope="col" className={listadoTablaThClass}>
               Alta

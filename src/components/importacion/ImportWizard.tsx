@@ -100,7 +100,8 @@ export function ImportWizard({
     "emision-liquido-producto-arca",
   );
   const hasFacturacion = tenantModules.includes("facturacion");
-  const puedeLiquidaciones = hasFacturacion || hasLiquidoProductoArca;
+  const hasLiquidaciones = tenantModules.includes("liquidaciones");
+  const puedeLiquidaciones = hasLiquidaciones || hasLiquidoProductoArca;
   const puedeFacturas = hasFacturasArca || hasFacturacion;
 
   // Un tenant nuevo (sin nada cargado todavía, y sin liquidaciones/facturas
