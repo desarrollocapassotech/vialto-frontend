@@ -513,14 +513,16 @@ export function LiquidacionViewModal({
               label="Período"
               value={`${fmtDate(source.periodoDesde)} — ${fmtDate(source.periodoHasta)}`}
             />
-            <Campo
-              label="Tipo de comprobante"
-              value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
-            />
+            {hasArca && (
+              <Campo
+                label="Tipo de comprobante"
+                value={CBTE_TIPO[source.cbteTipo] ?? `Tipo ${source.cbteTipo}`}
+              />
+            )}
             {source.cbteNro != null && (
               <Campo label="Nº comprobante" value={source.cbteNro} />
             )}
-            {source.ptoVenta != null && (
+            {hasArca && source.ptoVenta != null && (
               <Campo label="Punto de venta" value={source.ptoVenta} />
             )}
             {source.cae && <Campo label="CAE" value={source.cae} />}

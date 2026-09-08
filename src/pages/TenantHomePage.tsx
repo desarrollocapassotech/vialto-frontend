@@ -366,6 +366,7 @@ export function TenantHomePage() {
             saving={viajeEditor.saving}
             error={viajeEditor.error}
             getToken={getToken}
+            hasLiquidoProductoArca={hasLiquidoProductoArca}
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)

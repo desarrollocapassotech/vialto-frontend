@@ -2577,6 +2577,7 @@ export function ViajesTenantPage({
                         <ViajeLiquidacionIndicador
                           viaje={v}
                           tenantId={platform ? tid : undefined}
+                          hasArca={hasLiquidoProductoArca}
                         />
                       ) : (
                         <ViajePagoTransportistaIndicador
@@ -2735,6 +2736,7 @@ export function ViajesTenantPage({
                     <ViajeLiquidacionIndicador
                       viaje={v}
                       tenantId={platform ? tid : undefined}
+                      hasArca={hasLiquidoProductoArca}
                     />
                   ) : (
                     <ViajePagoTransportistaIndicador
@@ -2999,6 +3001,7 @@ export function ViajesTenantPage({
               getToken={getToken}
               tenantId={platform ? tid : undefined}
               tenant={!platform ? currentTenant : undefined}
+              hasLiquidoProductoArca={hasLiquidoProductoArca}
               onRegistrarPago={() =>
                 setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
               }

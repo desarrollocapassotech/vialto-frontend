@@ -187,6 +187,8 @@ export type ViajeEditModalProps = {
   tenantId?: string;
   /** Tenant activo, usado para el label personalizable del ID de viaje. */
   tenant?: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null;
+  /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
+  hasLiquidoProductoArca?: boolean;
   /**
    * Abre el modal de registrar pago (`RegistrarPagoTransportistaModal`, mantenido
    * por la página que hostea este modal). Si no se pasa, el resumen de solo lectura
@@ -240,6 +242,7 @@ export function ViajeEditModal({
   getToken,
   tenantId,
   tenant,
+  hasLiquidoProductoArca = false,
   onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
@@ -1523,6 +1526,7 @@ export function ViajeEditModal({
                       <ViajeLiquidacionIndicador
                         viaje={snapshotViaje}
                         tenantId={tenantId}
+                        hasArca={hasLiquidoProductoArca}
                       />
                     </div>
                     <PagosTransportistaSummary

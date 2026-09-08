@@ -22,6 +22,8 @@ import type { Viaje } from "@/types/api";
 type Props = {
   viaje: Pick<Viaje, "liquidacionEstado" | "liquidacionesViaje">;
   tenantId?: string;
+  /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle. */
+  hasArca?: boolean;
 };
 
 const badgeClass =
@@ -41,7 +43,11 @@ function liquidacionPdfUrl(
   return `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}${q}`;
 }
 
-export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
+export function ViajeLiquidacionIndicador({
+  viaje,
+  tenantId,
+  hasArca = false,
+}: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -115,7 +121,7 @@ export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
         <LiquidacionViewModal
           liq={liquidacionCompleta}
           ivaPct={liquidacionCompleta.ivaPct ?? undefined}
-          hasArca
+          hasArca={hasArca}
           canEdit={["borrador", "error", "pendiente_cae"].includes(
             liquidacionCompleta.estado,
           )}
