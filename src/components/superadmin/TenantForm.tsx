@@ -4,6 +4,10 @@ import { CrudFormErrorAlert } from '@/components/crud/CrudFormErrorAlert';
 import { CrudSubmitButton } from '@/components/crud/CrudSubmitButton';
 import { labelModulo } from '@/lib/platformLabels';
 import { AVAILABLE_MODULES } from '@/lib/moduleCatalog';
+import {
+  LiquidacionAnulacionMetodoRadios,
+  type LiquidacionAnulacionMetodo,
+} from '@/components/superadmin/LiquidacionAnulacionMetodoFields';
 
 export interface TenantFormValues {
   name: string;
@@ -154,54 +158,15 @@ export function TenantForm({
           title="Anulación de liquidaciones (CVLP 060)"
           description="Cómo se anula un comprobante 060 ya emitido para este tenant."
         >
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {(
-              [
-                {
-                  value: 'nota_credito_debito',
-                  label: 'Nota de Crédito/Débito vía ARCA',
-                  desc: 'Comportamiento por defecto: emite un comprobante asociado (NC o ND) a través del web service de AFIP.',
-                },
-                {
-                  value: 'manual',
-                  label: 'Registro manual (sin ARCA)',
-                  desc: 'La anulación queda en 2 pasos (pendiente → anulada) y se respalda con un comprobante pre-impreso adjunto por el usuario. No se emite nada a ARCA.',
-                },
-              ] as const
-            ).map((opt) => {
-              const checked =
-                (values.liquidacionAnulacionMetodo ?? 'nota_credito_debito') ===
-                opt.value;
-              return (
-                <label
-                  key={opt.value}
-                  className={`flex items-start gap-2.5 rounded border px-3 py-2.5 text-sm transition-colors ${
-                    checked
-                      ? 'border-vialto-fire/50 bg-vialto-fire/5 text-vialto-charcoal'
-                      : 'border-black/10 text-vialto-steel hover:border-black/20'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="liquidacionAnulacionMetodo"
-                    checked={checked}
-                    onChange={() =>
-                      onChange({ ...values, liquidacionAnulacionMetodo: opt.value })
-                    }
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-vialto-fire"
-                  />
-                  <span>
-                    <span className="block font-medium text-vialto-charcoal">
-                      {opt.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-vialto-steel">
-                      {opt.desc}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          <LiquidacionAnulacionMetodoRadios
+            value={
+              (values.liquidacionAnulacionMetodo as LiquidacionAnulacionMetodo) ??
+              'nota_credito_debito'
+            }
+            onChange={(liquidacionAnulacionMetodo) =>
+              onChange({ ...values, liquidacionAnulacionMetodo })
+            }
+          />
         </SectionCard>
       )}
 
