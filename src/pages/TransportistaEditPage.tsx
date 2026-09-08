@@ -13,12 +13,11 @@ import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { CrudSubmitButton } from "@/components/crud/CrudSubmitButton";
 import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
-import { TransportistaPautHelperNotice } from "@/components/transportistas/TransportistaPautHelperNotice";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
-  esPaisSoportado,
+  paisCodigoDesdeTexto,
   idFiscalPorPais,
   validarIdFiscal,
   condicionTributariaPorPais,
@@ -98,9 +97,7 @@ export function TransportistaEditPage() {
         const row = await apiJson<Transportista>(detailPath, withToken);
         if (!cancelled) {
           setNombre(row.nombre);
-          setPais(
-            esPaisSoportado(row.pais ?? "") ? (row.pais as PaisCodigo) : "",
-          );
+          setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
           setEmail(row.email ?? "");
           setTelefono(row.telefono ?? "");
@@ -149,6 +146,19 @@ export function TransportistaEditPage() {
     if (errorFiscal) {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
+    }
+    // No aplica cuando se edita para otro tenant desde superadmin: maestro.transportistas
+    // refleja la organización activa de Clerk, no el tenant elegido por query param.
+    if (!tenantId && idFiscal.trim()) {
+      const yaExiste = maestro.transportistas.some(
+        (t) => t.id !== id && (t.idFiscal ?? "").trim() === idFiscal.trim(),
+      );
+      if (yaExiste) {
+        setFieldErrors({
+          idFiscal: "Ya existe un transportista con ese ID Fiscal.",
+        });
+        return;
+      }
     }
     setFieldErrors({});
     setLoading(true);
@@ -338,7 +348,6 @@ export function TransportistaEditPage() {
                 />
               </label>
             )}
-            <TransportistaPautHelperNotice isCreate={false} />
             {emailVisible && (
               <label className="grid gap-1.5">
                 <span className={labelClass}>Email</span>

@@ -17,7 +17,7 @@ import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
-  esPaisSoportado,
+  paisCodigoDesdeTexto,
   idFiscalPorPais,
   validarIdFiscal,
   condicionTributariaPorPais,
@@ -76,9 +76,7 @@ export function ClienteEditPage() {
         const row = await apiJson<Cliente>(path, () => getToken());
         if (!cancelled) {
           setNombre(row.nombre);
-          setPais(
-            esPaisSoportado(row.pais ?? "") ? (row.pais as PaisCodigo) : "",
-          );
+          setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
           setCondicionIva(row.condicionIva ?? null);
           setCondicionTributaria(row.condicionTributaria ?? "");
@@ -117,6 +115,17 @@ export function ClienteEditPage() {
     if (errorFiscal) {
       setFieldErrors({ idFiscal: errorFiscal });
       return;
+    }
+    // No aplica cuando se edita para otro tenant desde superadmin: maestro.clientes
+    // refleja la organización activa de Clerk, no el tenant elegido por query param.
+    if (!tenantId && idFiscal.trim()) {
+      const yaExiste = maestro.clientes.some(
+        (c) => c.id !== id && (c.idFiscal ?? "").trim() === idFiscal.trim(),
+      );
+      if (yaExiste) {
+        setFieldErrors({ idFiscal: "Ya existe un cliente con ese ID Fiscal." });
+        return;
+      }
     }
     setFieldErrors({});
     setLoading(true);

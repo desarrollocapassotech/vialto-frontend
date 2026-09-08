@@ -7,6 +7,7 @@ import { ViewModalShell, viewModalBtnGhost } from '@/components/ui/ViewModalShel
 import { getDivisionImpacto } from '@/lib/stockDivision';
 import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
+import { presentacionLabelFromLike } from '@/lib/stockPresentacion';
 import type { StockOperacion } from '@/types/api';
 
 const DT =
@@ -217,8 +218,8 @@ export function StockOperacionViewModal({
                       operacion.movimientos[0]?.productoId}
                   </td>
                   <td className={TD}>
-                    {operacion.movimientos[0]?.presentacion?.presentacion?.nombre ??
-                      operacion.movimientos[0]?.presentacionId ??
+                    {presentacionLabelFromLike(operacion.movimientos[0]?.presentacion) ||
+                      operacion.movimientos[0]?.presentacionId ||
                       '—'}
                   </td>
                   <td className={TD}>
@@ -235,7 +236,7 @@ export function StockOperacionViewModal({
                   <tr key={mov.id} className="hover:bg-vialto-mist/20">
                     <td className={TD}>{mov.producto?.nombre ?? mov.productoId}</td>
                     <td className={TD}>
-                      {mov.presentacion?.presentacion?.nombre ?? mov.presentacionId ?? '—'}
+                      {presentacionLabelFromLike(mov.presentacion) || mov.presentacionId || '—'}
                     </td>
                     <td className={`${TD} text-right tabular-nums`}>{mov.bultos}</td>
                     <td className={`${TD} text-right tabular-nums`}>{mov.unidades}</td>

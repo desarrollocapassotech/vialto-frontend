@@ -13,6 +13,7 @@ interface Props {
   viaje: Viaje;
   /** Tenant con módulo emision-facturas-arca activo (bloqueo de USD al facturar). */
   hasFacturasArca?: boolean;
+  hasExportacionActiva?: boolean;
   onVer: () => void;
   onAgregarGasto: () => void;
   onRegistrarPago: () => void;
@@ -26,6 +27,7 @@ interface Props {
 export function ViajeAccionesMenu({
   viaje,
   hasFacturasArca = false,
+  hasExportacionActiva = false,
   onVer,
   onAgregarGasto,
   onRegistrarPago,
@@ -41,7 +43,7 @@ export function ViajeAccionesMenu({
   const permiteGasto = viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
   const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasFacturasArca, viaje);
-  const permiteExportar = viaje.etapa !== 'cancelado';
+  const permiteExportar = viaje.etapa !== 'cancelado' && hasExportacionActiva;
 
   const options = useMemo(() => {
     const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', icon: Eye, onClick: onVer }];

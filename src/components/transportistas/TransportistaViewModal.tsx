@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/ViewModalShell';
 import type { Transportista } from '@/types/api';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -56,7 +57,7 @@ export function TransportistaViewModal({
           { label: 'Email', value: transportista.email, visible: isVisible("detalle_transportista", "email") },
           { label: 'Teléfono', value: transportista.telefono, visible: isVisible("detalle_transportista", "telefono") },
           { label: 'Domicilio', value: transportista.domicilio, visible: isVisible("detalle_transportista", "domicilio") },
-          { label: 'Condición IVA', value: transportista.condicionIva, visible: isVisible("detalle_transportista", "condicionIvaTributaria") },
+          { label: 'Condición IVA', value: transportista.condicionIva != null ? condicionIvaLabel(transportista.condicionIva) : null, visible: isVisible("detalle_transportista", "condicionIvaTributaria") },
           { label: 'Condición tributaria', value: transportista.condicionTributaria, visible: isVisible("detalle_transportista", "condicionIvaTributaria") },
           { label: 'PAUT', value: transportista.paut, visible: isVisible("detalle_transportista", "paut") },
           { label: 'Permiso internacional', value: transportista.permisoInternacional, visible: isVisible("detalle_transportista", "permisoInternacional") },

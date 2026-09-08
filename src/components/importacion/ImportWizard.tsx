@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Download, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  ViewModalShell,
+  viewModalBtnGhost,
+  viewModalBtnPrimary,
+} from "@/components/ui/ViewModalShell";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
 import { listadoTablaTdClass } from "@/lib/listadoTabla";
@@ -23,12 +28,14 @@ import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdverten
 import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelExport";
 import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useMaestroData } from "@/hooks/useMaestroData";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
   ImportPreviewEntidad,
   ImportPreviewFilaEntidad,
   ImportColumnasEsperadasModulo,
+  ImportCampoUnicoConflicto,
 } from "@/types/api";
 
 interface ImportWizardProps {
@@ -84,6 +91,7 @@ export function ImportWizard({
   templatesTo,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
+  const maestro = useMaestroData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arrastrando, setArrastrando] = useState(false);
 
@@ -104,6 +112,12 @@ export function ImportWizard({
   const [modulosElegidos, setModulosElegidos] = useState<ModuloWizard[] | null>(
     null,
   );
+  // Checks de la pantalla de selección — viven acá (no en SelectorModulos)
+  // para que el stepper de arriba se pueda actualizar en vivo a medida que
+  // se tildan/destildan módulos, antes de confirmar con "Continuar →".
+  const [seleccionados, setSeleccionados] = useState<Set<ModuloWizard>>(
+    new Set(),
+  );
   // Generar liquidaciones/facturas borrador después de Viajes es opcional y
   // arranca siempre destildado — el usuario lo elige a propósito, no por
   // default. Si no seleccionó nada (selector salteado), queda en false.
@@ -111,6 +125,12 @@ export function ImportWizard({
     liquidaciones: boolean;
     facturas: boolean;
   }>({ liquidaciones: false, facturas: false });
+  // Checks de Liquidaciones/Facturas en la pantalla de selección — misma
+  // razón que `seleccionados`: viven acá para que el stepper reaccione en
+  // vivo. `postViajesElegido` (arriba) recién se fija cuando se confirma con
+  // "Continuar →".
+  const [liquidacionesSel, setLiquidacionesSel] = useState(false);
+  const [facturasSel, setFacturasSel] = useState(false);
   // Se incrementa al "Volver a importar" para forzar un re-chequeo de
   // tenant-tiene-datos — después de una corrida puede haber cambiado (ej. se
   // acaban de crear los clientes que antes faltaban).
@@ -120,6 +140,10 @@ export function ImportWizard({
   const [columnasEsperadas, setColumnasEsperadas] = useState<
     ImportColumnasEsperadasModulo[] | null
   >(null);
+  // Paso ya completado que el usuario quiere volver a mirar (no navega el
+  // wizard hacia atrás, solo abre un resumen de lo que ya pasó en esa etapa
+  // — los pasos futuros o el actual no son clickeables).
+  const [pasoRevisando, setPasoRevisando] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -141,11 +165,26 @@ export function ImportWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
+  // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
+  // todavía no tienen datos cargados — los que ya tienen algo se destildan
+  // para no forzar un re-import de lo que ya está, aunque se puedan sumar a mano.
+  function seleccionPorDefecto(data: TenantTieneDatos): Set<ModuloWizard> {
+    return new Set(
+      MODULOS_SELECTOR.filter(
+        ({ key, tieneDatosKey }) =>
+          key === "viajes" || !tieneDatosKey || !data[tieneDatosKey],
+      ).map(({ key }) => key),
+    );
+  }
+
   useEffect(() => {
     let cancelado = false;
     setTieneDatos(null);
     setModulosElegidos(null);
     setPostViajesElegido({ liquidaciones: false, facturas: false });
+    setSeleccionados(new Set());
+    setLiquidacionesSel(false);
+    setFacturasSel(false);
     (async () => {
       try {
         const data = await apiJson<TenantTieneDatos>(
@@ -154,6 +193,7 @@ export function ImportWizard({
         );
         if (cancelado) return;
         setTieneDatos(data);
+        setSeleccionados(seleccionPorDefecto(data));
         if (
           !data.clientes &&
           !data.transportistas &&
@@ -167,12 +207,14 @@ export function ImportWizard({
       } catch {
         // Si falla la consulta, no bloqueamos el import: se arranca con la secuencia completa.
         if (!cancelado) {
-          setTieneDatos({
+          const data: TenantTieneDatos = {
             clientes: false,
             transportistas: false,
             choferes: false,
             vehiculos: false,
-          });
+          };
+          setTieneDatos(data);
+          setSeleccionados(seleccionPorDefecto(data));
           setModulosElegidos([...MODULOS_SECUENCIA]);
         }
       }
@@ -188,6 +230,31 @@ export function ImportWizard({
     modulosElegidos ?? [...MODULOS_SECUENCIA],
     () => getToken(),
   );
+
+  // El wizard crea clientes/transportistas/choferes/vehículos por fuera del
+  // contexto global de maestros (MaestroDataProvider, en App.tsx) — ese
+  // contexto solo se re-fetchea cuando algo llama explícitamente a sus
+  // `refresh*`. Sin esto, pantallas que dependen de esas listas cacheadas
+  // (ej. la columna "Cliente" de Facturas, que resuelve el nombre buscando
+  // en `maestro.clientes` y si no lo encuentra muestra el ID crudo) quedan
+  // desactualizadas hasta un F5 después de importar. Se dispara una sola
+  // vez al llegar a "terminado" (no en cada módulo, para no spamear
+  // requests) y se rearma si se corre el wizard de nuevo.
+  const refrescoMaestroHecho = useRef(false);
+  useEffect(() => {
+    if (wizard.fase === "terminado") {
+      if (!refrescoMaestroHecho.current) {
+        refrescoMaestroHecho.current = true;
+        void maestro.refreshClientes();
+        void maestro.refreshTransportistas();
+        void maestro.refreshChoferes();
+        void maestro.refreshVehiculos();
+      }
+    } else {
+      refrescoMaestroHecho.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizard.fase]);
 
   const [numerosPorCliente, setNumerosPorCliente] = useState<
     Record<string, string>
@@ -215,8 +282,29 @@ export function ImportWizard({
     wizard.reset();
     setModulosElegidos(null);
     setPostViajesElegido({ liquidaciones: false, facturas: false });
+    setPasoRevisando(null);
     setRefetchTieneDatos((n) => n + 1);
   }
+
+  function toggleModulo(modulo: ModuloWizard) {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(modulo)) next.delete(modulo);
+      else next.add(modulo);
+      return next;
+    });
+    // Liquidaciones/Facturas se generan a partir de los viajes recién
+    // creados en esta corrida — sin Viajes tildado no tienen de dónde salir,
+    // así que se destildan solas para no dejar una selección que no hace nada.
+    if (modulo === "viajes" && seleccionados.has("viajes")) {
+      setLiquidacionesSel(false);
+      setFacturasSel(false);
+    }
+  }
+
+  const ordenadosSeleccion = MODULOS_SECUENCIA.filter((m) =>
+    seleccionados.has(m),
+  );
 
   if (!tieneDatos) {
     return (
@@ -228,29 +316,53 @@ export function ImportWizard({
 
   if (!modulosElegidos) {
     return (
-      <SelectorModulos
-        tieneDatos={tieneDatos}
-        puedeLiquidaciones={puedeLiquidaciones}
-        puedeFacturas={puedeFacturas}
-        columnasEsperadas={columnasEsperadas}
-        onElegir={(modulos, postViajes) => {
-          setModulosElegidos(modulos);
-          setPostViajesElegido(postViajes);
-        }}
-      />
+      <div className="flex flex-col gap-6">
+        <WizardStepper
+          wizard={wizard}
+          secuencia={ordenadosSeleccion}
+          postViajesElegido={{
+            liquidaciones: liquidacionesSel,
+            facturas: facturasSel,
+          }}
+          seleccionCompleta={false}
+          onVerPaso={setPasoRevisando}
+        />
+        <SelectorModulos
+          tieneDatos={tieneDatos}
+          puedeLiquidaciones={puedeLiquidaciones}
+          puedeFacturas={puedeFacturas}
+          columnasEsperadas={columnasEsperadas}
+          seleccionados={seleccionados}
+          onToggleModulo={toggleModulo}
+          liquidacionesSel={liquidacionesSel}
+          onToggleLiquidaciones={setLiquidacionesSel}
+          facturasSel={facturasSel}
+          onToggleFacturas={setFacturasSel}
+          onElegir={(modulos, postViajes) => {
+            setModulosElegidos(modulos);
+            setPostViajesElegido(postViajes);
+          }}
+        />
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <WizardStepper wizard={wizard} postViajesElegido={postViajesElegido} />
+        <WizardStepper
+          wizard={wizard}
+          secuencia={wizard.secuencia}
+          postViajesElegido={postViajesElegido}
+          seleccionCompleta
+          onVerPaso={setPasoRevisando}
+        />
         <button
           type="button"
           onClick={reiniciarImportacion}
           className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
         >
-          Volver a importar
+          Volver a selección
         </button>
       </div>
 
@@ -645,6 +757,16 @@ export function ImportWizard({
       )}
       </div>
       )}
+      {pasoRevisando && (
+        <ResumenPasoModal
+          paso={pasoRevisando}
+          wizard={wizard}
+          modulosElegidos={modulosElegidos}
+          postViajesElegido={postViajesElegido}
+          onClose={() => setPasoRevisando(null)}
+          onSeleccionarNuevos={reiniciarImportacion}
+        />
+      )}
     </div>
   );
 }
@@ -670,51 +792,30 @@ function SelectorModulos({
   puedeLiquidaciones,
   puedeFacturas,
   columnasEsperadas,
+  seleccionados,
+  onToggleModulo,
+  liquidacionesSel,
+  onToggleLiquidaciones,
+  facturasSel,
+  onToggleFacturas,
   onElegir,
 }: {
   tieneDatos: TenantTieneDatos;
   puedeLiquidaciones: boolean;
   puedeFacturas: boolean;
   columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
+  /** Estado de los checks vive en ImportWizard (no acá) para que el stepper de arriba se actualice en vivo a medida que se tildan/destildan módulos. */
+  seleccionados: Set<ModuloWizard>;
+  onToggleModulo: (modulo: ModuloWizard) => void;
+  liquidacionesSel: boolean;
+  onToggleLiquidaciones: (checked: boolean) => void;
+  facturasSel: boolean;
+  onToggleFacturas: (checked: boolean) => void;
   onElegir: (
     modulos: ModuloWizard[],
     postViajes: { liquidaciones: boolean; facturas: boolean },
   ) => void;
 }) {
-  // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
-  // todavía no tienen datos cargados — los que ya tienen algo se destildan
-  // para no forzar un re-import de lo que ya está, aunque se puedan sumar a mano.
-  const [seleccionados, setSeleccionados] = useState<Set<ModuloWizard>>(
-    () =>
-      new Set(
-        MODULOS_SELECTOR.filter(
-          ({ key, tieneDatosKey }) =>
-            key === "viajes" || !tieneDatosKey || !tieneDatos[tieneDatosKey],
-        ).map(({ key }) => key),
-      ),
-  );
-  // Generar liquidaciones/facturas borrador es una acción aparte (no un
-  // módulo del Excel) — siempre arranca destildada, el usuario la tiene que
-  // elegir a propósito.
-  const [liquidacionesSel, setLiquidacionesSel] = useState(false);
-  const [facturasSel, setFacturasSel] = useState(false);
-
-  function toggle(modulo: ModuloWizard) {
-    setSeleccionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(modulo)) next.delete(modulo);
-      else next.add(modulo);
-      return next;
-    });
-    // Liquidaciones/Facturas se generan a partir de los viajes recién
-    // creados en esta corrida — sin Viajes tildado no tienen de dónde salir,
-    // así que se destildan solas para no dejar una selección que no hace nada.
-    if (modulo === "viajes" && seleccionados.has("viajes")) {
-      setLiquidacionesSel(false);
-      setFacturasSel(false);
-    }
-  }
-
   const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
   const viajesSel = seleccionados.has("viajes");
 
@@ -741,7 +842,7 @@ function SelectorModulos({
               <input
                 type="checkbox"
                 checked={seleccionados.has(key)}
-                onChange={() => toggle(key)}
+                onChange={() => onToggleModulo(key)}
                 className="h-5 w-5 shrink-0 accent-vialto-charcoal"
               />
             </label>
@@ -769,7 +870,7 @@ function SelectorModulos({
                 type="checkbox"
                 checked={liquidacionesSel}
                 disabled={!viajesSel}
-                onChange={(e) => setLiquidacionesSel(e.target.checked)}
+                onChange={(e) => onToggleLiquidaciones(e.target.checked)}
                 className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
               />
             </label>
@@ -797,7 +898,7 @@ function SelectorModulos({
                 type="checkbox"
                 checked={facturasSel}
                 disabled={!viajesSel}
-                onChange={(e) => setFacturasSel(e.target.checked)}
+                onChange={(e) => onToggleFacturas(e.target.checked)}
                 className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
               />
             </label>
@@ -945,22 +1046,42 @@ function tipoLabelColumna(c: {
 
 function WizardStepper({
   wizard,
+  secuencia,
   postViajesElegido,
+  seleccionCompleta,
+  onVerPaso,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
+  /**
+   * Módulos a mostrar en el stepper. Mientras `!seleccionCompleta` es la
+   * selección en vivo de la pantalla de checks (cambia con cada tilde);
+   * una vez confirmada, es siempre `wizard.secuencia` (fija para toda la
+   * corrida).
+   */
+  secuencia: ModuloWizard[];
   postViajesElegido: { liquidaciones: boolean; facturas: boolean };
+  /** false mientras se está en la pantalla de checks (paso "Selección" todavía no confirmado). */
+  seleccionCompleta: boolean;
+  /** Se llama solo al clickear un paso ya completado ("done") — abre un resumen de solo lectura, no navega el wizard. */
+  onVerPaso: (paso: string) => void;
 }) {
   // Liquidaciones (y el resto de las etapas opcionales post-viajes) solo son
   // alcanzables si "viajes" está en la secuencia de este import — sin viajes,
   // useImportWizard salta directo a "terminado" (ver avanzarModulo). Mostrar
   // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
-  const tieneViajes = wizard.secuencia.includes("viajes");
+  const tieneViajes = secuencia.includes("viajes");
   const ofreceLiquidaciones = tieneViajes && postViajesElegido.liquidaciones;
 
   const ofreceFacturas = tieneViajes && postViajesElegido.facturas;
 
   const pasos = [
-    ...wizard.secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
+    // Paso 0: la pantalla de checks (qué módulos importar, liquidaciones/
+    // facturas sí o no). No es parte de la máquina de fases de
+    // useImportWizard — vive en el estado de ImportWizard (modulosElegidos)
+    // — así que su estado "done"/"current" se resuelve aparte, con
+    // `seleccionCompleta`, en vez de con `wizard.fase`.
+    { key: "seleccion", label: "Selección" },
+    ...secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
     ...(ofreceLiquidaciones
       ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
       : []),
@@ -972,15 +1093,16 @@ function WizardStepper({
     ...(tieneViajes ? [{ key: "terminado", label: "Resumen" }] : []),
   ];
 
-  const indiceActual =
-    wizard.fase === "upload"
-      ? -1
+  const indiceActual = !seleccionCompleta
+    ? 0
+    : wizard.fase === "upload"
+      ? 1
       : wizard.fase === "modulo"
-        ? wizard.moduloIndex
+        ? 1 + wizard.moduloIndex
         : wizard.fase === "post-liquidaciones"
-          ? wizard.secuencia.length
+          ? 1 + secuencia.length
           : wizard.fase === "post-facturas"
-            ? wizard.secuencia.length + (ofreceLiquidaciones ? 1 : 0)
+            ? 1 + secuencia.length + (ofreceLiquidaciones ? 1 : 0)
             : wizard.fase === "terminado" && tieneViajes
               ? pasos.length - 1
               : pasos.length;
@@ -990,30 +1112,49 @@ function WizardStepper({
       {pasos.map((p, i) => {
         const estado =
           i < indiceActual ? "done" : i === indiceActual ? "current" : "pending";
+        const burbuja = (
+          <span
+            className={[
+              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] text-[11px] font-semibold",
+              estado === "done" ? "bg-vialto-charcoal text-white" : "",
+              estado === "current"
+                ? "bg-vialto-fire text-white"
+                : "",
+              estado === "pending"
+                ? "border border-black/15 text-vialto-steel"
+                : "",
+            ].join(" ")}
+          >
+            {estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+          </span>
+        );
         return (
           <li key={p.key} className="flex items-center gap-1.5">
-            <span
-              className={[
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] text-[11px] font-semibold",
-                estado === "done" ? "bg-vialto-charcoal text-white" : "",
-                estado === "current"
-                  ? "bg-vialto-fire text-white"
-                  : "",
-                estado === "pending"
-                  ? "border border-black/15 text-vialto-steel"
-                  : "",
-              ].join(" ")}
-            >
-              {estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
-            </span>
-            <span
-              className={[
-                "font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider",
-                estado === "current" ? "text-vialto-charcoal font-semibold" : "text-vialto-steel",
-              ].join(" ")}
-            >
-              {p.label}
-            </span>
+            {estado === "done" ? (
+              <button
+                type="button"
+                onClick={() => onVerPaso(p.key)}
+                className="flex items-center gap-1.5 rounded hover:opacity-75"
+                title={`Ver resumen de ${p.label}`}
+              >
+                {burbuja}
+                <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider text-vialto-steel underline decoration-dotted underline-offset-2">
+                  {p.label}
+                </span>
+              </button>
+            ) : (
+              <>
+                {burbuja}
+                <span
+                  className={[
+                    "font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider",
+                    estado === "current" ? "text-vialto-charcoal font-semibold" : "text-vialto-steel",
+                  ].join(" ")}
+                >
+                  {p.label}
+                </span>
+              </>
+            )}
             {i < pasos.length - 1 && (
               <span className="mx-1 text-black/15">—</span>
             )}
@@ -1021,6 +1162,158 @@ function WizardStepper({
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * Resumen de solo lectura de un paso ya completado — no vuelve a llamar al
+ * backend ni cambia el estado del wizard, solo muestra lo que ya se guardó
+ * en `etapasCompletadas`/`liquidacionesCreadas`/`facturasCreadas` (o, para
+ * "seleccion", lo que se tildó en la pantalla de checks). Volver a ese paso
+ * de verdad (para corregirlo) no es seguro una vez que hay pasos
+ * posteriores ya confirmados en la base — por eso esto es una foto, no una
+ * navegación real.
+ */
+function ResumenPasoModal({
+  paso,
+  wizard,
+  modulosElegidos,
+  postViajesElegido,
+  onClose,
+  onSeleccionarNuevos,
+}: {
+  paso: string;
+  wizard: ReturnType<typeof useImportWizard>;
+  modulosElegidos: ModuloWizard[] | null;
+  postViajesElegido: { liquidaciones: boolean; facturas: boolean };
+  onClose: () => void;
+  /** Solo se usa en el resumen de "Selección" — vuelve a la pantalla de checks para elegir otros módulos. */
+  onSeleccionarNuevos: () => void;
+}) {
+  const titulo =
+    paso === "seleccion"
+      ? "Selección"
+      : paso === "post-liquidaciones"
+        ? "Liquidaciones"
+        : paso === "post-facturas"
+          ? "Facturas"
+          : labelModulo(paso);
+
+  let contenido: React.ReactNode;
+
+  if (paso === "seleccion") {
+    contenido = (
+      <div className="flex flex-col gap-3 text-sm">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Módulos elegidos
+          </p>
+          <p className="mt-1">
+            {modulosElegidos?.map((m) => labelModulo(m)).join(", ") || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Liquidaciones a transportistas
+          </p>
+          <p className="mt-1">
+            {postViajesElegido.liquidaciones ? "Sí, al terminar Viajes" : "No"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Facturas a clientes
+          </p>
+          <p className="mt-1">
+            {postViajesElegido.facturas ? "Sí, al terminar Viajes" : "No"}
+          </p>
+        </div>
+      </div>
+    );
+  } else if (paso === "post-liquidaciones") {
+    contenido = wizard.liquidacionesCreadas ? (
+      <p className="text-sm">
+        {wizard.liquidacionesCreadas.length} liquidaciones borrador generadas.
+      </p>
+    ) : (
+      <p className="text-sm text-vialto-steel">Este paso se salteó.</p>
+    );
+  } else if (paso === "post-facturas") {
+    contenido = wizard.facturasCreadas ? (
+      <p className="text-sm">
+        {wizard.facturasCreadas.length} facturas borrador generadas.
+      </p>
+    ) : (
+      <p className="text-sm text-vialto-steel">Este paso se salteó.</p>
+    );
+  } else {
+    const etapa = wizard.etapasCompletadas.find((e) => e.modulo === paso);
+    if (!etapa) {
+      contenido = (
+        <p className="text-sm text-vialto-steel">
+          Este módulo se salteó, no se importó nada.
+        </p>
+      );
+    } else {
+      const { log } = etapa;
+      const nuevas = log.detalles.filter(
+        (d) => d.estado === "ok" && d.creado,
+      ).length;
+      const actualizadas = log.detalles.filter(
+        (d) => d.estado === "ok" && !d.creado,
+      ).length;
+      const errores = log.detalles.filter((d) => d.estado === "error");
+      contenido = (
+        <div className="flex flex-col gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatBox label="Filas en el Excel" value={log.totalFilas} />
+            <StatBox label="Nuevas" value={nuevas} highlight="ok" />
+            <StatBox label="Actualizadas" value={actualizadas} />
+            <StatBox label="Con error" value={errores.length} highlight="error" />
+          </div>
+          {errores.length > 0 && (
+            <div className="max-h-52 overflow-y-auto border border-black/10">
+              {errores.map((d, i) => (
+                <div
+                  key={i}
+                  className="border-b border-black/10 px-3 py-1.5 text-xs last:border-b-0"
+                >
+                  <span className="font-medium text-vialto-charcoal">
+                    Fila {d.fila}
+                  </span>{" "}
+                  <span className="text-vialto-steel">— {d.mensaje}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <ViewModalShell
+      title={`Resumen — ${titulo}`}
+      onClose={onClose}
+      footer={
+        <>
+          {paso === "seleccion" && (
+            <button
+              type="button"
+              onClick={onSeleccionarNuevos}
+              className={viewModalBtnPrimary}
+            >
+              Seleccionar nuevos
+            </button>
+          )}
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+            Cerrar
+          </button>
+        </>
+      }
+    >
+      {contenido}
+    </ViewModalShell>
   );
 }
 
@@ -1120,6 +1413,9 @@ function EtapaModulo({
     useState(false);
   const [confirmarFacturasDuplicadas, setConfirmarFacturasDuplicadas] =
     useState(false);
+  const [decisionesCampoUnico, setDecisionesCampoUnico] = useState<
+    Record<number, "ignorar" | "actualizar">
+  >({});
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
   const [detalleModalOpen, setDetalleModalOpen] = useState(false);
   // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
@@ -1127,6 +1423,7 @@ function EtapaModulo({
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
     setConfirmarFacturasDuplicadas(false);
+    setDecisionesCampoUnico({});
   }, [p?.sessionId]);
 
   // Un lookup de Viajes (cliente/transportista/chofer/vehículo) puede fallar
@@ -1212,6 +1509,11 @@ function EtapaModulo({
     p?.advertenciasFacturasDuplicadas ?? [];
   const requiereConfirmarFacturasDuplicadas =
     advertenciasFacturasDuplicadas.length > 0 && !confirmarFacturasDuplicadas;
+  const advertenciasCampoUnicoDuplicado =
+    p?.advertenciasCampoUnicoDuplicado ?? [];
+  const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
+    (c) => !decisionesCampoUnico[c.fila],
+  );
   const tieneDesgloseActualizacion =
     p != null &&
     p.entidadesNuevas != null &&
@@ -1285,18 +1587,33 @@ function EtapaModulo({
               <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
                 {labelModulo(wizard.moduloActual ?? "")} en este archivo
               </p>
-              <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
-                {p.filasDetalle.map((f) => (
-                  <FilaDetalleCard
-                    key={f.fila}
-                    fila={{
-                      ...f,
-                      campos: f.campos.filter((c) =>
-                        campoVisible(wizard.moduloActual, c.campo),
-                      ),
-                    }}
-                  />
-                ))}
+              <div className="flex flex-col gap-2">
+                {p.filasDetalle.map((f) => {
+                  const conflicto = advertenciasCampoUnicoDuplicado.find(
+                    (c) => c.fila === f.fila,
+                  );
+                  return (
+                    <FilaDetalleCard
+                      key={f.fila}
+                      fila={{
+                        ...f,
+                        campos: f.campos.filter((c) =>
+                          campoVisible(wizard.moduloActual, c.campo),
+                        ),
+                      }}
+                      conflicto={conflicto}
+                      decision={
+                        conflicto ? decisionesCampoUnico[conflicto.fila] : undefined
+                      }
+                      onElegirDecision={(accion) =>
+                        setDecisionesCampoUnico((prev) => ({
+                          ...prev,
+                          [f.fila]: accion,
+                        }))
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1651,21 +1968,28 @@ function EtapaModulo({
                 p.exitosas === 0 ||
                 requiereConfirmarCamposFaltantes ||
                 requiereResolverCiudades ||
-                requiereConfirmarFacturasDuplicadas
+                requiereConfirmarFacturasDuplicadas ||
+                requiereResolverCampoUnicoDuplicado
               }
               onClick={() =>
                 void wizard.confirmarModuloActual(
                   confirmarCamposFaltantes,
                   confirmarFacturasDuplicadas,
+                  Object.entries(decisionesCampoUnico).map(([fila, accion]) => ({
+                    fila: Number(fila),
+                    accion,
+                  })),
                 )
               }
               title={
                 requiereResolverCiudades
                   ? "Resolvé las ciudades pendientes para continuar"
-                  : requiereConfirmarCamposFaltantes ||
-                      requiereConfirmarFacturasDuplicadas
-                    ? "Marcá la casilla de arriba para confirmar"
-                    : undefined
+                  : requiereResolverCampoUnicoDuplicado
+                    ? "Elegí ignorar o actualizar para cada fila duplicada"
+                    : requiereConfirmarCamposFaltantes ||
+                        requiereConfirmarFacturasDuplicadas
+                      ? "Marcá la casilla de arriba para confirmar"
+                      : undefined
               }
               className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
             >
@@ -2100,14 +2424,32 @@ function valorFilaDetalle(campo: string, valor: string): string {
   return valor;
 }
 
-function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
+function FilaDetalleCard({
+  fila,
+  conflicto,
+  decision,
+  onElegirDecision,
+}: {
+  fila: ImportPreviewFilaEntidad;
+  conflicto?: ImportCampoUnicoConflicto;
+  decision?: "ignorar" | "actualizar";
+  onElegirDecision?: (accion: "ignorar" | "actualizar") => void;
+}) {
   return (
-    <div className="rounded border border-black/10 p-3">
+    <div
+      className={`rounded border p-3 ${
+        conflicto ? "border-amber-300 bg-amber-50/50" : "border-black/10"
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
           Fila {fila.fila}
         </span>
-        {fila.esNuevo ? (
+        {conflicto ? (
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+            {conflicto.campoLabel} duplicado
+          </span>
+        ) : fila.esNuevo ? (
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
             Nuevo
           </span>
@@ -2129,6 +2471,39 @@ function FilaDetalleCard({ fila }: { fila: ImportPreviewFilaEntidad }) {
           </div>
         ))}
       </div>
+      {conflicto && (
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
+          <span>
+            {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
+            de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
+            qué hacer:
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => onElegirDecision?.("ignorar")}
+              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                decision === "ignorar"
+                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+              }`}
+            >
+              Ignorar fila
+            </button>
+            <button
+              type="button"
+              onClick={() => onElegirDecision?.("actualizar")}
+              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+                decision === "actualizar"
+                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+              }`}
+            >
+              Actualizar {conflicto.entidadExistenteNombre}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

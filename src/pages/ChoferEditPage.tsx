@@ -117,6 +117,17 @@ export function ChoferEditPage() {
       setFieldErrors(errs);
       return;
     }
+    // No aplica cuando se edita para otro tenant desde superadmin: maestro.choferes
+    // refleja la organización activa de Clerk, no el tenant elegido por query param.
+    if (!tenantId && form.dni.trim()) {
+      const yaExiste = maestro.choferes.some(
+        (c) => c.id !== id && (c.dni ?? "").trim() === form.dni.trim(),
+      );
+      if (yaExiste) {
+        setFieldErrors({ dni: "Ya existe un chofer con ese DNI." });
+        return;
+      }
+    }
     setFieldErrors({});
     setLoading(true);
     setError(null);

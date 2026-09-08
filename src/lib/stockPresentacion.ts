@@ -35,3 +35,41 @@ export function presentacionNombreFromStockItem(
     );
   return productoPresentacion?.presentacion?.nombre?.trim() ?? '';
 }
+
+type PresentacionLikeConCantidad =
+  | {
+      nombre?: string | null;
+      unidadesPorBulto?: number | null;
+      presentacion?: { nombre?: string | null } | null;
+    }
+  | null
+  | undefined;
+
+/** Nombre + cantidad de unidades sueltas, ej: "Pallet (x12)". */
+export function presentacionLabelFromLike(
+  presentacion: PresentacionLikeConCantidad,
+): string {
+  const nombre = presentacionNombreFromLike(presentacion);
+  const unidades = presentacion?.unidadesPorBulto;
+  if (nombre && unidades) return `${nombre} (x${unidades})`;
+  return nombre;
+}
+
+export function presentacionLabelFromMovimiento(m: MovimientoStock): string {
+  return presentacionLabelFromLike(m.presentacion);
+}
+
+export function presentacionLabelFromStockItem(
+  item: StockItem,
+  productos: Producto[] = [],
+): string {
+  const directo = presentacionLabelFromLike(item.presentacion);
+  if (directo) return directo;
+
+  const productoPresentacion = productos
+    .find((p) => p.id === item.productoId)
+    ?.productoPresentaciones.find(
+      (pp) => pp.id === item.presentacionId || pp.presentacionId === item.presentacionId,
+    );
+  return productoPresentacion ? presentacionLabelFromLike(productoPresentacion) : '';
+}

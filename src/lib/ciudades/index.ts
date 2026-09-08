@@ -2,6 +2,7 @@ export type { PaisCodigo, CiudadOpcion } from './types';
 export {
   PAISES_SOPORTADOS,
   esPaisSoportado,
+  paisCodigoDesdeTexto,
   inferirPaisDesdeUbicacion,
   idFiscalPorPais,
   validarIdFiscal,

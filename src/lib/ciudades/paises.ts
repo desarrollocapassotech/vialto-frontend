@@ -23,6 +23,36 @@ export function esPaisSoportado(c: string): c is PaisCodigo {
   return c === "AR" || c === "UY" || c === "PY" || c === "CL" || c === "BR";
 }
 
+/**
+ * Resuelve un valor de país guardado (código o texto libre, ej. "Argentina"
+ * tal como lo trae una importación de Excel) al código de 2 letras que
+ * esperan los selects de país. Devuelve "" si no reconoce nada.
+ *
+ * Bug real encontrado en QA (ago 2026): la importación masiva guarda `pais`
+ * como texto libre (lo que venga en la columna del Excel), no como código —
+ * los formularios de edición de Cliente/Transportista solo aceptaban el
+ * código exacto (`esPaisSoportado`), así que un transportista importado con
+ * "Argentina" en la columna País aparecía con el select de país vacío al
+ * editar. Como el campo "Condición IVA" (numérico, solo AR) vs "Condición
+ * tributaria" (texto, resto de países) se decide según el país seleccionado,
+ * el select vacío hacía que se mostrara el campo de texto en vez del select
+ * numérico — el valor de Condición IVA seguía en memoria, pero no se veía,
+ * y se perdía si se guardaba sin querer.
+ */
+const DIACRITICOS = /[̀-ͯ]/g;
+const sinAcentos = (s: string) => s.toLowerCase().normalize("NFD").replace(DIACRITICOS, "");
+
+export function paisCodigoDesdeTexto(valor: string): PaisCodigo | "" {
+  const v = valor.trim();
+  if (!v) return "";
+  if (esPaisSoportado(v)) return v;
+  const normalizado = sinAcentos(v);
+  const match = PAISES_SOPORTADOS.find(
+    (p) => sinAcentos(p.etiqueta) === normalizado,
+  );
+  return match?.codigo ?? "";
+}
+
 type IdFiscalInfo = { label: string; placeholder: string };
 
 const ID_FISCAL_POR_PAIS: Record<PaisCodigo, IdFiscalInfo> = {

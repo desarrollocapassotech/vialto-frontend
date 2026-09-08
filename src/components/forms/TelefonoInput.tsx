@@ -108,9 +108,10 @@ export function TelefonoInput({
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-stretch">
       <div className="shrink-0 sm:w-60">
         <CrudSelect
+          className="w-full"
           value={country}
           onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
         >
@@ -124,6 +125,7 @@ export function TelefonoInput({
       <div className="flex-1">
         <CrudInput
           type="tel"
+          className="w-full"
           placeholder={placeholder ?? "Ej: 351 240 2751"}
           value={nacional}
           error={error}
