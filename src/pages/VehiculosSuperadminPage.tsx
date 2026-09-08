@@ -165,10 +165,6 @@ export function VehiculosSuperadminPage() {
       <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
         Vehículos
       </h1>
-      <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa para ver sus vehículos. El listado lo filtra el
-        servidor.
-      </p>
 
       <div className="mt-6">
         <EmpresaFilterBar

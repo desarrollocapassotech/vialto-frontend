@@ -80,22 +80,6 @@ function fmtNum(n: number) {
   return n.toLocaleString("es-AR");
 }
 
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function primerDiaMesActual(): string {
-  const now = new Date();
-  return toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
-}
-
-function hoyIso(): string {
-  return toIsoDate(new Date());
-}
-
 const BASE_COLUMNS: ListadoColumn<CargaCombustible>[] = [
   {
     id: "fecha",
@@ -168,10 +152,8 @@ export function CombustibleTenantPage({
   const [choferes, setChoferes] = useState<ConEmpresa<Chofer>[]>([]);
   const [estaciones, setEstaciones] = useState<string[]>([]);
 
-  const [desde, setDesde] = useState<string>(
-    () => initialFrom || primerDiaMesActual(),
-  );
-  const [hasta, setHasta] = useState<string>(() => initialTo || hoyIso());
+  const [desde, setDesde] = useState<string>(() => initialFrom || "");
+  const [hasta, setHasta] = useState<string>(() => initialTo || "");
   const [vehiculoId, setVehiculoId] = useState(initialVehiculoId);
   const [choferId, setChoferId] = useState(initialChoferId);
   const [estacion, setEstacion] = useState(initialEstacion);
@@ -202,10 +184,8 @@ export function CombustibleTenantPage({
   useEffect(() => {
     if (embeddedInSuperadmin && activeTenantId) {
       setPage(1);
-      const d = primerDiaMesActual();
-      const h = hoyIso();
-      setDesde(d);
-      setHasta(h);
+      setDesde("");
+      setHasta("");
       setVehiculoId("");
       setChoferId("");
       setEstacion("");
@@ -222,8 +202,7 @@ export function CombustibleTenantPage({
     setSearchParams(
       (prevParams) => {
         const qs = new URLSearchParams(prevParams);
-        const esRangoPorDefecto =
-          desde === primerDiaMesActual() && hasta === hoyIso();
+        const esRangoPorDefecto = desde === "" && hasta === "";
 
         if (!esRangoPorDefecto) {
           if (desde) qs.set("from", desde);
@@ -276,8 +255,8 @@ export function CombustibleTenantPage({
   }
 
   function handleClearFilters() {
-    setDesde(primerDiaMesActual());
-    setHasta(hoyIso());
+    setDesde("");
+    setHasta("");
     setVehiculoId("");
     setChoferId("");
     setEstacion("");
@@ -285,8 +264,7 @@ export function CombustibleTenantPage({
     setPage(1);
   }
 
-  const rangoFechaPorDefecto =
-    desde === primerDiaMesActual() && hasta === hoyIso();
+  const rangoFechaPorDefecto = desde === "" && hasta === "";
   const hayFiltros = Boolean(
     !rangoFechaPorDefecto || vehiculoId || choferId || estacion || formaPago,
   );
@@ -653,10 +631,6 @@ export function CombustibleTenantPage({
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Combustible
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-3xl">
-            Visualizá y gestioná las cargas de combustible de tu empresa. El
-            listado lo filtra el servidor.
-          </p>
         </>
       )}
 
@@ -793,12 +767,6 @@ export function CombustibleTenantPage({
         </p>
       )}
 
-      {activeTenantId && (!error || !embeddedInSuperadmin) && (
-        <p className="mt-4 text-xs text-vialto-steel">
-          Mostrando cargas del {fmtFecha(desde)} al {fmtFecha(hasta)}
-        </p>
-      )}
-
       <ListadoDatos<CargaCombustible>
         className="mt-6"
         tableColSpan={9}
@@ -822,7 +790,7 @@ export function CombustibleTenantPage({
                         resetPage();
                       }}
                       className={`${inputClass} min-w-[140px] ${
-                        desde !== primerDiaMesActual() ? "text-vialto-fire" : ""
+                        desde !== "" ? "text-vialto-fire" : ""
                       }`}
                     />
                   </label>
@@ -836,7 +804,7 @@ export function CombustibleTenantPage({
                         resetPage();
                       }}
                       className={`${inputClass} min-w-[140px] ${
-                        hasta !== hoyIso() ? "text-vialto-fire" : ""
+                        hasta !== "" ? "text-vialto-fire" : ""
                       }`}
                     />
                   </label>
