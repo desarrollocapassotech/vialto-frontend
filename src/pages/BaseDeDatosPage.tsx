@@ -38,6 +38,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessFacturacion,
+  canAccessEmisionFacturasArca,
   canAccessCombustible,
 } from "@/lib/tenantModules";
 import {
@@ -91,7 +92,10 @@ export function BaseDeDatosPage() {
   const modules = tenant?.modules ?? [];
   const hasViajes = superadmin || canAccessViajes(modules);
   const hasStock = superadmin || canAccessStock(modules);
-  const hasFacturacion = superadmin || canAccessFacturacion(modules);
+  const hasFacturacion =
+    superadmin ||
+    canAccessFacturacion(modules) ||
+    canAccessEmisionFacturasArca(modules);
   const hasCombustible = superadmin || canAccessCombustible(modules);
   const isOrgAdmin =
     superadmin ||

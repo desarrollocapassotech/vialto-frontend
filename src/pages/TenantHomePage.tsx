@@ -134,6 +134,7 @@ export function TenantHomePage() {
   const showAlertsBlock =
     tenant != null &&
     (canAccessFacturacion(tenant.modules) ||
+      hasFacturasArca ||
       canAccessCombustible(tenant.modules) ||
       canAccessViajes(tenant.modules)) &&
     alertas != null &&
@@ -236,7 +237,7 @@ export function TenantHomePage() {
           }}
           onFacturar={
             tenant &&
-            canAccessFacturacion(tenant.modules) &&
+            (canAccessFacturacion(tenant.modules) || hasFacturasArca) &&
             viajePermiteBotonFacturar(viewingViaje)
               ? () => {
                   const v = viewingViaje;
