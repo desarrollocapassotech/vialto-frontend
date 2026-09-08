@@ -82,9 +82,15 @@ import type { OpcionProducto } from "@/lib/productosViaje";
 import { ViajeProductosLista } from "@/components/viajes/ViajeProductosLista";
 import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
-import { textoRutaViaje, type ViajeDestinoRowDraft } from "@/lib/viajesDestinos";
+import {
+  textoRutaViaje,
+  type ViajeDestinoRowDraft,
+} from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { ViajeClientesFieldset, ClienteCard } from "@/components/viajes/ViajeClientesFieldset";
+import {
+  ViajeClientesFieldset,
+  ClienteCard,
+} from "@/components/viajes/ViajeClientesFieldset";
 import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
 
 /** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
@@ -363,8 +369,7 @@ export function ViajeEditModal({
     pagoBrutoTransportista,
     pctIvaTransportista,
   );
-  const montoIvaTransportista =
-    pagoNetoTransportista - pagoBrutoTransportista;
+  const montoIvaTransportista = pagoNetoTransportista - pagoBrutoTransportista;
 
   const readonlyMoneyClass =
     "flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0";
@@ -485,7 +490,7 @@ export function ViajeEditModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[110] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
+        className="fixed inset-0 z-[45] flex items-stretch justify-center sm:items-center sm:p-4 md:p-6"
         role="presentation"
       >
         <button
@@ -601,8 +606,8 @@ export function ViajeEditModal({
                 <span className={labelClass}>Clientes del viaje</span>
                 <ClienteCard
                   title={
-                    todosClientes.find((c) => c.id === draft.clienteId)?.nombre ||
-                    "Cliente principal"
+                    todosClientes.find((c) => c.id === draft.clienteId)
+                      ?.nombre || "Cliente principal"
                   }
                   summary={textoRutaViaje(
                     draft.origen,
@@ -636,7 +641,9 @@ export function ViajeEditModal({
                           value={draft.paisOrigen}
                           onChange={(p) =>
                             setDraft((prev) =>
-                              prev ? { ...prev, paisOrigen: p, origen: "" } : prev,
+                              prev
+                                ? { ...prev, paisOrigen: p, origen: "" }
+                                : prev,
                             )
                           }
                           aria-label="País de origen"
@@ -682,7 +689,9 @@ export function ViajeEditModal({
                           groupId="viaje-edit"
                           value={draft.productoItems}
                           onChange={(items) =>
-                            setDraft((p) => (p ? { ...p, productoItems: items } : p))
+                            setDraft((p) =>
+                              p ? { ...p, productoItems: items } : p,
+                            )
                           }
                           opciones={opcionesProducto}
                           triggerClassName={inputClass}
@@ -705,7 +714,9 @@ export function ViajeEditModal({
                             value={draft.cantidadFactura}
                             onChange={(e) =>
                               setDraft((p) =>
-                                p ? { ...p, cantidadFactura: e.target.value } : p,
+                                p
+                                  ? { ...p, cantidadFactura: e.target.value }
+                                  : p,
                               )
                             }
                             placeholder="0.00"
@@ -726,10 +737,11 @@ export function ViajeEditModal({
                                   p
                                     ? {
                                         ...p,
-                                        precioUnitarioFactura: maskCurrencyForMoneda(
-                                          e.target.value,
-                                          p.monedaMonto,
-                                        ),
+                                        precioUnitarioFactura:
+                                          maskCurrencyForMoneda(
+                                            e.target.value,
+                                            p.monedaMonto,
+                                          ),
                                       }
                                     : p,
                                 )
@@ -767,8 +779,9 @@ export function ViajeEditModal({
                           >
                             <span className="w-full truncate text-sm">
                               {(
-                                (Number(draft.cantidadFactura.replace(",", ".")) ||
-                                  0) *
+                                (Number(
+                                  draft.cantidadFactura.replace(",", "."),
+                                ) || 0) *
                                 (parseCurrencyForMoneda(
                                   draft.precioUnitarioFactura,
                                   draft.monedaMonto,
@@ -844,11 +857,18 @@ export function ViajeEditModal({
                   paises={todosPaises}
                   paisesLoading={paisesLoading}
                   onNuevoPaisOrigen={(clienteIndex) => {
-                    setPaisQuickCreateTarget({ kind: "origen-cliente", clienteIndex });
+                    setPaisQuickCreateTarget({
+                      kind: "origen-cliente",
+                      clienteIndex,
+                    });
                     setQuickCreate("pais");
                   }}
                   onNuevoPaisDestino={(clienteIndex, destinoIndex) => {
-                    setPaisQuickCreateTarget({ kind: "destino-cliente", clienteIndex, destinoIndex });
+                    setPaisQuickCreateTarget({
+                      kind: "destino-cliente",
+                      clienteIndex,
+                      destinoIndex,
+                    });
                     setQuickCreate("pais");
                   }}
                   opcionesProducto={opcionesProducto}
@@ -860,7 +880,13 @@ export function ViajeEditModal({
                   onClick={() =>
                     setDraft((p) =>
                       p
-                        ? { ...p, clientesRows: [...p.clientesRows, emptyClienteRow()] }
+                        ? {
+                            ...p,
+                            clientesRows: [
+                              ...p.clientesRows,
+                              emptyClienteRow(),
+                            ],
+                          }
                         : p,
                     )
                   }
@@ -877,9 +903,7 @@ export function ViajeEditModal({
                 externoContent={
                   <div className="grid gap-3">
                     <div className="flex min-w-0 flex-col gap-1">
-                      <span className={labelClass}>
-                        Transportista externo
-                      </span>
+                      <span className={labelClass}>Transportista externo</span>
                       <TransportistaSearchSelect
                         transportistas={todosTransportistas}
                         value={draft.transportistaId}
@@ -1007,7 +1031,8 @@ export function ViajeEditModal({
                                 className={`${inputClass} text-right tabular-nums`}
                               />
                               <p className="text-xs text-vialto-steel">
-                                Dejalo en 0 si el transportista no suma IVA al cobrar.
+                                Dejalo en 0 si el transportista no suma IVA al
+                                cobrar.
                               </p>
                             </div>
                           )}
@@ -1052,115 +1077,118 @@ export function ViajeEditModal({
                       </>
                     ) : (
                       <>
-                      <div
-                        className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
-                      >
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className={labelClass}>Precio transporte</span>
-                          <div className="flex min-w-0 gap-2">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              disabled={datosComercialesBloqueados}
-                              value={draft.precioTransportistaExterno}
-                              onChange={(e) =>
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        precioTransportistaExterno:
-                                          maskCurrencyForMoneda(
-                                            e.target.value,
-                                            p.monedaPrecioTransportistaExterno,
-                                          ),
-                                      }
-                                    : p,
-                                )
-                              }
-                              placeholder="0.00"
-                              className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
-                            />
-                            <MonedaSelect
-                              value={draft.monedaPrecioTransportistaExterno}
-                              disabled={datosComercialesBloqueados}
-                              onChange={(m: ViajeMonedaCodigo) =>
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        monedaPrecioTransportistaExterno: m,
-                                        precioTransportistaExterno:
-                                          preserveAmountOnMonedaChange(
-                                            p.precioTransportistaExterno,
-                                            p.monedaPrecioTransportistaExterno,
-                                            m,
-                                          ),
-                                      }
-                                    : p,
-                                )
-                              }
-                              aria-label="Moneda precio transportista externo"
-                            />
+                        <div
+                          className={`grid grid-cols-1 gap-3 ${ivaTransportistaVisible ? "sm:grid-cols-2" : ""}`}
+                        >
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className={labelClass}>
+                              Precio transporte
+                            </span>
+                            <div className="flex min-w-0 gap-2">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                disabled={datosComercialesBloqueados}
+                                value={draft.precioTransportistaExterno}
+                                onChange={(e) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          precioTransportistaExterno:
+                                            maskCurrencyForMoneda(
+                                              e.target.value,
+                                              p.monedaPrecioTransportistaExterno,
+                                            ),
+                                        }
+                                      : p,
+                                  )
+                                }
+                                placeholder="0.00"
+                                className={`${inputClass} min-w-0 flex-1 text-right tabular-nums`}
+                              />
+                              <MonedaSelect
+                                value={draft.monedaPrecioTransportistaExterno}
+                                disabled={datosComercialesBloqueados}
+                                onChange={(m: ViajeMonedaCodigo) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          monedaPrecioTransportistaExterno: m,
+                                          precioTransportistaExterno:
+                                            preserveAmountOnMonedaChange(
+                                              p.precioTransportistaExterno,
+                                              p.monedaPrecioTransportistaExterno,
+                                              m,
+                                            ),
+                                        }
+                                      : p,
+                                  )
+                                }
+                                aria-label="Moneda precio transportista externo"
+                              />
+                            </div>
                           </div>
+                          {ivaTransportistaVisible && (
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>% de IVA</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                disabled={liquidacionVigente}
+                                value={draft.precioTransportistaIvaIncluidoPct}
+                                onChange={(e) =>
+                                  setDraft((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          precioTransportistaIvaIncluidoPct:
+                                            e.target.value,
+                                        }
+                                      : p,
+                                  )
+                                }
+                                placeholder="0"
+                                className={`${inputClass} text-right tabular-nums`}
+                              />
+                              <p className="text-xs text-vialto-steel">
+                                Dejalo en 0 si el transportista no suma IVA al
+                                cobrar.
+                              </p>
+                            </div>
+                          )}
                         </div>
                         {ivaTransportistaVisible && (
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>% de IVA</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              disabled={liquidacionVigente}
-                              value={draft.precioTransportistaIvaIncluidoPct}
-                              onChange={(e) =>
-                                setDraft((p) =>
-                                  p
-                                    ? {
-                                        ...p,
-                                        precioTransportistaIvaIncluidoPct:
-                                          e.target.value,
-                                      }
-                                    : p,
-                                )
-                              }
-                              placeholder="0"
-                              className={`${inputClass} text-right tabular-nums`}
-                            />
-                            <p className="text-xs text-vialto-steel">
-                              Dejalo en 0 si el transportista no suma IVA al cobrar.
-                            </p>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Pago bruto</span>
+                              <div className={readonlyMoneyClass}>
+                                <span className="w-full truncate text-sm">
+                                  {fmtReadonlyMoney(pagoBrutoTransportista)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Pago neto</span>
+                              <div className={readonlyMoneyClass}>
+                                <span className="w-full truncate text-sm">
+                                  {fmtReadonlyMoney(pagoNetoTransportista)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className={labelClass}>Monto IVA</span>
+                              <div className={readonlyMoneyClass}>
+                                <span className="w-full truncate text-sm">
+                                  {fmtReadonlyMoney(montoIvaTransportista)}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         )}
-                      </div>
-                      {ivaTransportistaVisible && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>Pago bruto</span>
-                            <div className={readonlyMoneyClass}>
-                              <span className="w-full truncate text-sm">
-                                {fmtReadonlyMoney(pagoBrutoTransportista)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>Pago neto</span>
-                            <div className={readonlyMoneyClass}>
-                              <span className="w-full truncate text-sm">
-                                {fmtReadonlyMoney(pagoNetoTransportista)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className={labelClass}>Monto IVA</span>
-                            <div className={readonlyMoneyClass}>
-                              <span className="w-full truncate text-sm">
-                                {fmtReadonlyMoney(montoIvaTransportista)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       </>
                     )}
                     {draft.transportistaId && (
@@ -1298,7 +1326,9 @@ export function ViajeEditModal({
                   <div className="grid gap-3">
                     {isVisible("edicion_viaje", "choferId") && (
                       <div className="flex min-w-0 flex-col gap-1 max-w-md">
-                        <span className={labelClass}>Chofer (flota propia)</span>
+                        <span className={labelClass}>
+                          Chofer (flota propia)
+                        </span>
                         <ChoferSearchSelect
                           choferes={todosChoferesPropios}
                           value={draft.choferId}
@@ -1327,7 +1357,9 @@ export function ViajeEditModal({
                           crearVehiculoHref={crearVehiculoHref}
                           rows={draft.vehiculosRows}
                           onChange={(rows) =>
-                            setDraft((p) => (p ? { ...p, vehiculosRows: rows } : p))
+                            setDraft((p) =>
+                              p ? { ...p, vehiculosRows: rows } : p,
+                            )
                           }
                           vehiculos={vehiculosPropios}
                           getToken={getToken}
@@ -1611,7 +1643,9 @@ export function ViajeEditModal({
             const codigo = p.codigo || p.id;
             const target = paisQuickCreateTarget;
             if (target.kind === "origen") {
-              setDraft((prev) => (prev ? { ...prev, paisOrigen: codigo, origen: "" } : prev));
+              setDraft((prev) =>
+                prev ? { ...prev, paisOrigen: codigo, origen: "" } : prev,
+              );
             } else if (target.kind === "destino") {
               const idx = target.index;
               setDraft((prev) =>
@@ -1647,7 +1681,9 @@ export function ViajeEditModal({
                           ? {
                               ...r,
                               destinosRows: r.destinosRows.map((d, j) =>
-                                j === destinoIndex ? { ...d, pais: codigo, etiqueta: "" } : d,
+                                j === destinoIndex
+                                  ? { ...d, pais: codigo, etiqueta: "" }
+                                  : d,
                               ),
                             }
                           : r,

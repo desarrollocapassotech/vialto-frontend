@@ -1,50 +1,46 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import {
   liquidacionEstadoBadgeClass,
   liquidacionEstadoLabel,
   tooltipLiquidacionEstado,
   type LiquidacionEstado,
-} from '@/lib/viajesIndicadores';
-import { liquidacionElegidaDeViaje } from '@/lib/viajesComprobantes';
-import { ViajeLiquidacionDetalleModal } from '@/components/viajes/ViajeLiquidacionDetalleModal';
+} from "@/lib/viajesIndicadores";
+import { liquidacionElegidaDeViaje } from "@/lib/viajesComprobantes";
+import { ViajeLiquidacionDetalleModal } from "@/components/viajes/ViajeLiquidacionDetalleModal";
 import {
   LiquidacionViewModal,
   type LiquidacionConTransportista,
-} from '@/components/liquidaciones/LiquidacionViewModal';
-import { AdjuntoPreviewModal } from '@/components/shared/AdjuntoPreviewModal';
-import { apiFetch, apiJson } from '@/lib/api';
-import { friendlyError } from '@/lib/friendlyError';
-import { useToast } from '@/lib/toast';
-import type { Viaje } from '@/types/api';
+} from "@/components/liquidaciones/LiquidacionViewModal";
+import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
+import { apiFetch, apiJson } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/lib/toast";
+import type { Viaje } from "@/types/api";
 
 type Props = {
-  viaje: Pick<Viaje, 'liquidacionEstado' | 'liquidacionesViaje'>;
-  /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
+  viaje: Pick<Viaje, "liquidacionEstado" | "liquidacionesViaje">;
   tenantId?: string;
 };
 
 const badgeClass =
-  'inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait';
+  "inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait";
 
 function liquidacionUrl(id: string, tenantId?: string) {
-  const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+  const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
   return `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}${q}`;
 }
 
-function liquidacionPdfUrl(id: string, kind: 'pdf' | 'pdf-anulacion', tenantId?: string) {
-  const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+function liquidacionPdfUrl(
+  id: string,
+  kind: "pdf" | "pdf-anulacion",
+  tenantId?: string,
+) {
+  const q = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
   return `/api/integracion-arca/liquidaciones/${encodeURIComponent(id)}/${kind}${q}`;
 }
 
-/**
- * Badge chico de estado de liquidación al transportista, para la grilla de viajes.
- * Clickeable: si ya hay una liquidación vinculada, va directo a su vista completa
- * (ahorra el paso del modal intermedio); si todavía no hay, muestra el modal de
- * detalle actual. No se muestra si el viaje no tiene transportista externo o el
- * tenant no tiene integración ARCA (`liquidacionEstado` es `null`).
- */
 export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -72,15 +68,15 @@ export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
       );
       setLiquidacionCompleta(full);
     } catch (e) {
-      showToast(friendlyError(e, 'liquidaciones'), 'error');
+      showToast(friendlyError(e, "liquidaciones"), "error");
     } finally {
       setCargando(false);
     }
   }
 
-  async function verPdf(kind: 'pdf' | 'pdf-anulacion', errorMsg: string) {
+  async function verPdf(kind: "pdf" | "pdf-anulacion", errorMsg: string) {
     if (!liquidacionCompleta) return;
-    const ventana = window.open('', '_blank');
+    const ventana = window.open("", "_blank");
     try {
       const res = await apiFetch(
         liquidacionPdfUrl(liquidacionCompleta.id, kind, tenantId),
@@ -90,10 +86,10 @@ export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       if (ventana) ventana.location.href = blobUrl;
-      else window.open(blobUrl, '_blank');
+      else window.open(blobUrl, "_blank");
     } catch (e) {
       ventana?.close();
-      showToast(friendlyError(e, 'arca'), 'error');
+      showToast(friendlyError(e, "arca"), "error");
     }
   }
 
@@ -120,22 +116,33 @@ export function ViajeLiquidacionIndicador({ viaje, tenantId }: Props) {
           liq={liquidacionCompleta}
           ivaPct={liquidacionCompleta.ivaPct ?? undefined}
           hasArca
-          canEdit={['borrador', 'error', 'pendiente_cae'].includes(liquidacionCompleta.estado)}
+          canEdit={["borrador", "error", "pendiente_cae"].includes(
+            liquidacionCompleta.estado,
+          )}
           onClose={() => setLiquidacionCompleta(null)}
           onEditar={() => {
-            const params = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+            const params = tenantId
+              ? `?tenantId=${encodeURIComponent(tenantId)}`
+              : "";
             navigate(`/liquidaciones${params}`);
           }}
           onVerComprobante={
             liquidacionCompleta.cbteNro != null
-              ? () => void verPdf('pdf', 'Error al generar el PDF')
+              ? () => void verPdf("pdf", "Error al generar el PDF")
               : liquidacionCompleta.comprobanteUrl?.trim()
-                ? () => setComprobanteUrl(liquidacionCompleta.comprobanteUrl ?? null)
+                ? () =>
+                    setComprobanteUrl(
+                      liquidacionCompleta.comprobanteUrl ?? null,
+                    )
                 : undefined
           }
           onVerAnulacion={
-            liquidacionCompleta.estado === 'anulado'
-              ? () => void verPdf('pdf-anulacion', 'Error al generar el PDF de la anulación')
+            liquidacionCompleta.estado === "anulado"
+              ? () =>
+                  void verPdf(
+                    "pdf-anulacion",
+                    "Error al generar el PDF de la anulación",
+                  )
               : undefined
           }
         />

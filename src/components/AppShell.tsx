@@ -101,9 +101,8 @@ export function AppShell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    readStoredOpenGroups,
-  );
+  const [openGroups, setOpenGroups] =
+    useState<Record<string, boolean>>(readStoredOpenGroups);
   const [navTooltip, setNavTooltip] = useState<{
     label: string;
     top: number;
@@ -116,7 +115,8 @@ export function AppShell() {
   // superadmin siempre lo ve (siempre tiene muchos módulos); un tenant lo ve recién
   // a partir de 2 módulos contratados — con 0 o 1, el menú vuelve al listado plano
   // de siempre (sin headers de grupo ni accordion).
-  const sidebarUsesAccordion = superadmin || (tenant?.modules?.length ?? 0) >= 2;
+  const sidebarUsesAccordion =
+    superadmin || (tenant?.modules?.length ?? 0) >= 2;
 
   async function handleSignOut() {
     await signOut();
@@ -143,7 +143,8 @@ export function AppShell() {
   const stockViewer = isStockViewer(roleCtx);
   const stockOperator = isStockOperator(roleCtx);
   const canSeeNotificaciones =
-    Boolean(organization) && puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
+    Boolean(organization) &&
+    puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
 
   const navGroups = useMemo((): NavGroup[] => {
     if (isOrgMember(roleCtx)) {
@@ -175,7 +176,9 @@ export function AppShell() {
       if (canAccessMantenimiento(tenant?.modules ?? [])) {
         memberGroups.push({
           title: "Mantenimiento",
-          items: [{ to: "/mantenimiento", label: "Mantenimiento", icon: Wrench }],
+          items: [
+            { to: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
+          ],
         });
       }
 
@@ -485,7 +488,9 @@ export function AppShell() {
           </div>
         )}
 
-        <nav className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}>
+        <nav
+          className={`flex flex-col gap-3 ${collapsed ? "items-center" : ""}`}
+        >
           {navLoading ? (
             <div
               className={`flex flex-col gap-2 ${collapsed ? "items-center" : ""}`}
@@ -514,118 +519,130 @@ export function AppShell() {
                 group.title !== null &&
                 group.items.length > 1;
               return (
-              <div
-                key={group.title ?? `g-${gi}`}
-                className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
-              >
-                {(collapsed || !sidebarUsesAccordion) && gi > 0 && (
-                  <div
-                    className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
-                  />
-                )}
-                {sidebarUsesAccordion && !collapsed && group.title !== null && !singleItemGroup && (
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.title as string)}
-                    aria-expanded={open}
-                    className="mt-3 mb-1.5 flex items-center justify-between gap-2 rounded px-1 py-2 font-[family-name:var(--font-ui)] text-2xl font-semibold uppercase tracking-normal text-white/55 transition-colors hover:text-white/85"
-                  >
-                    <span>{group.title}</span>
-                    <ChevronDown
-                      className={`h-5 w-5 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
-                      strokeWidth={2}
+                <div
+                  key={group.title ?? `g-${gi}`}
+                  className={`flex flex-col gap-0.5 ${collapsed ? "items-center" : ""}`}
+                >
+                  {(collapsed || !sidebarUsesAccordion) && gi > 0 && (
+                    <div
+                      className={`mb-2 border-t border-white/[0.12] ${collapsed ? "w-8" : ""}`}
                     />
-                  </button>
-                )}
-                {isCollapsibleGroup ? (
-                  // Riel de iconos: un solo botón representativo por grupo colapsable.
-                  // Al hacer click, expande el menú con labels y abre ese grupo puntual.
-                  (() => {
-                    const GroupIcon = group.icon ?? group.items[0]?.icon ?? House;
-                    const groupTooltip = group.tooltip ?? (group.title as string);
-                    return (
+                  )}
+                  {sidebarUsesAccordion &&
+                    !collapsed &&
+                    group.title !== null &&
+                    !singleItemGroup && (
                       <button
                         type="button"
-                        aria-label={groupTooltip}
-                        onClick={() => {
-                          setOpenGroups((prev) => ({
-                            ...prev,
-                            [group.title as string]: true,
-                          }));
-                          setSidebarCollapsed(false);
-                          setNavTooltip(null);
-                        }}
-                        onMouseEnter={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setNavTooltip({
-                            label: groupTooltip,
-                            top: rect.top + rect.height / 2,
-                            left: rect.right + 10,
-                          });
-                        }}
-                        onMouseLeave={() => setNavTooltip(null)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                        onClick={() => toggleGroup(group.title as string)}
+                        aria-expanded={open}
+                        className="mt-3 mb-1.5 flex items-center justify-between gap-2 rounded px-1 py-2 font-[family-name:var(--font-ui)] text-2xl font-semibold uppercase tracking-normal text-white/55 transition-colors hover:text-white/85"
                       >
-                        <GroupIcon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                        <span>{group.title}</span>
+                        <ChevronDown
+                          className={`h-5 w-5 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+                          strokeWidth={2}
+                        />
                       </button>
-                    );
-                  })()
-                ) : (
-                  (singleItemGroup || open) &&
-                  group.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end === true}
-                      aria-label={collapsed ? item.label : undefined}
-                      onMouseEnter={(e) => {
-                        if (!collapsed) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setNavTooltip({
-                          label: item.label,
-                          top: rect.top + rect.height / 2,
-                          left: rect.right + 10,
-                        });
-                      }}
-                      onMouseLeave={() => setNavTooltip(null)}
-                      onClick={() => {
-                        setSidebarOpen(false);
-                        setNavTooltip(null);
-                      }}
-                      className={({ isActive }) => {
-                        const active =
-                          isActive ||
-                          (item.extraActivePaths?.some((p) =>
-                            location.pathname.startsWith(p),
-                          ) ??
-                            false);
-                        // "Panorama"/"Inicio" (único ítem del grupo sin título) usa la misma
-                        // tipografía que los headers de grupo, en vez del tamaño chico del resto de ítems.
-                        const textClasses =
-                          group.title === null && !collapsed
-                            ? "text-2xl font-semibold tracking-normal"
-                            : "text-sm font-medium tracking-wider";
-                        return [
-                          "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] uppercase transition-colors border",
-                          textClasses,
-                          collapsed ? "w-11 justify-center px-0" : "gap-2.5 px-3 py-2.5",
-                          active
-                            ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
-                            : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
-                        ].join(" ");
-                      }}
-                    >
-                      <item.icon
-                        className="h-4 w-4 shrink-0"
-                        strokeWidth={1.75}
-                      />
-                      {!collapsed && (
-                        <span className="whitespace-nowrap">{item.label}</span>
-                      )}
-                    </NavLink>
-                  ))
-                )}
-              </div>
+                    )}
+                  {isCollapsibleGroup
+                    ? // Riel de iconos: un solo botón representativo por grupo colapsable.
+                      // Al hacer click, expande el menú con labels y abre ese grupo puntual.
+                      (() => {
+                        const GroupIcon =
+                          group.icon ?? group.items[0]?.icon ?? House;
+                        const groupTooltip =
+                          group.tooltip ?? (group.title as string);
+                        return (
+                          <button
+                            type="button"
+                            aria-label={groupTooltip}
+                            onClick={() => {
+                              setOpenGroups((prev) => ({
+                                ...prev,
+                                [group.title as string]: true,
+                              }));
+                              setSidebarCollapsed(false);
+                              setNavTooltip(null);
+                            }}
+                            onMouseEnter={(e) => {
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+                              setNavTooltip({
+                                label: groupTooltip,
+                                top: rect.top + rect.height / 2,
+                                left: rect.right + 10,
+                              });
+                            }}
+                            onMouseLeave={() => setNavTooltip(null)}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                          >
+                            <GroupIcon
+                              className="h-4 w-4 shrink-0"
+                              strokeWidth={1.75}
+                            />
+                          </button>
+                        );
+                      })()
+                    : (singleItemGroup || open) &&
+                      group.items.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          end={item.end === true}
+                          aria-label={collapsed ? item.label : undefined}
+                          onMouseEnter={(e) => {
+                            if (!collapsed) return;
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+                            setNavTooltip({
+                              label: item.label,
+                              top: rect.top + rect.height / 2,
+                              left: rect.right + 10,
+                            });
+                          }}
+                          onMouseLeave={() => setNavTooltip(null)}
+                          onClick={() => {
+                            setSidebarOpen(false);
+                            setNavTooltip(null);
+                          }}
+                          className={({ isActive }) => {
+                            const active =
+                              isActive ||
+                              (item.extraActivePaths?.some((p) =>
+                                location.pathname.startsWith(p),
+                              ) ??
+                                false);
+                            // "Panorama"/"Inicio" (único ítem del grupo sin título) usa la misma
+                            // tipografía que los headers de grupo, en vez del tamaño chico del resto de ítems.
+                            const textClasses =
+                              group.title === null && !collapsed
+                                ? "text-2xl font-semibold tracking-normal"
+                                : "text-sm font-medium tracking-wider";
+                            return [
+                              "flex min-h-11 items-center rounded-md font-[family-name:var(--font-ui)] uppercase transition-colors border",
+                              textClasses,
+                              collapsed
+                                ? "w-11 justify-center px-0"
+                                : "gap-2.5 px-3 py-2.5",
+                              active
+                                ? "border-vialto-fire bg-vialto-fire text-white shadow-sm"
+                                : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                            ].join(" ");
+                          }}
+                        >
+                          <item.icon
+                            className="h-4 w-4 shrink-0"
+                            strokeWidth={1.75}
+                          />
+                          {!collapsed && (
+                            <span className="whitespace-nowrap">
+                              {item.label}
+                            </span>
+                          )}
+                        </NavLink>
+                      ))}
+                </div>
               );
             })
           )}
@@ -637,7 +654,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col bg-vialto-mist overflow-x-clip">
       <header
-        className={`sticky top-0 z-50 flex ${HEADER_HEIGHT_CLASS} shrink-0 items-center gap-3 bg-vialto-charcoal px-4`}
+        className={`sticky top-0 z-1 flex ${HEADER_HEIGHT_CLASS} shrink-0 items-center gap-3 bg-vialto-charcoal px-4`}
       >
         <div className="flex items-center gap-3">
           <button
@@ -747,7 +764,9 @@ export function AppShell() {
             className={[
               "flex h-full",
               sidebarBaseClass,
-              sidebarCollapsed ? sidebarCollapsedWidthClass : sidebarExpandedWidthClass,
+              sidebarCollapsed
+                ? sidebarCollapsedWidthClass
+                : sidebarExpandedWidthClass,
             ].join(" ")}
           >
             {renderSidebar(false, sidebarCollapsed)}
