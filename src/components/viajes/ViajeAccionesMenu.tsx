@@ -8,6 +8,7 @@ import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
 import { viajePermiteBotonFacturar, liquidacionElegidaDeViaje } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 interface Props {
   viaje: Viaje;
@@ -38,9 +39,14 @@ export function ViajeAccionesMenu({
   onEliminar,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const { isVisible } = useFieldConfig('viajes');
 
-  const permitePago = viajeRequierePagosTransportista(viaje) && viaje.etapa !== 'cancelado';
-  const permiteGasto = viajePermiteAgregarGasto(viaje);
+  const permitePago =
+    isVisible('detalle_viaje', 'pagosTransportista') &&
+    viajeRequierePagosTransportista(viaje) &&
+    viaje.etapa !== 'cancelado';
+  const permiteGasto =
+    isVisible('detalle_viaje', 'otrosGastos') && viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
   const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasFacturasArca, viaje);
   const permiteExportar = viaje.etapa !== 'cancelado' && hasExportacionActiva;

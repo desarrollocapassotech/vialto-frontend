@@ -2114,6 +2114,7 @@ export function ViajesTenantPage({
             pagoTransportistaFiltro={pagoTransportistaFiltro}
             onFiltroFacturacion={aplicarFiltroFacturacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
+            mostrarFiltroPago={isViajeFieldVisible("edicion_viaje", "pagosTransportista")}
           />
         </div>
       )}

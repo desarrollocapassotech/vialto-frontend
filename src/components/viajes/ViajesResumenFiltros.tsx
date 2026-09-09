@@ -39,6 +39,8 @@ type Props = {
   pagoTransportistaFiltro: ViajePagoTransportistaFiltro;
   onFiltroFacturacion: (val: string) => void;
   onFiltroPago: (val: ViajePagoTransportistaFiltro) => void;
+  /** false = el tenant tiene oculto "Pagos al transportista" — no mostrar los chips de pago. */
+  mostrarFiltroPago?: boolean;
 };
 
 export function ViajesResumenFiltros({
@@ -47,8 +49,12 @@ export function ViajesResumenFiltros({
   pagoTransportistaFiltro,
   onFiltroFacturacion,
   onFiltroPago,
+  mostrarFiltroPago = true,
 }: Props) {
   const activeId = activeFilterId(facturacionFiltro, pagoTransportistaFiltro);
+  const opciones = mostrarFiltroPago
+    ? OPCIONES
+    : OPCIONES.filter((o) => o.tipo !== 'pago');
 
   function toggleDesktop(id: FiltroId, tipo: 'facturacion' | 'pago') {
     if (activeId === id) {
@@ -66,7 +72,7 @@ export function ViajesResumenFiltros({
       role="tablist"
       aria-label="Filtros rápidos de viajes"
     >
-      {OPCIONES.map((o) => {
+      {opciones.map((o) => {
         const active = activeId === o.id;
         const count = resumen[o.countKey];
         return (
