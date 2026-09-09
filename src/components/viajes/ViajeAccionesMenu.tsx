@@ -23,6 +23,9 @@ interface Props {
   onVerFactura?: () => void;
   onVerLiquidacion?: () => void;
   onEliminar?: () => void;
+  /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ViajeAccionesMenu({
@@ -37,8 +40,13 @@ export function ViajeAccionesMenu({
   onVerFactura,
   onVerLiquidacion,
   onEliminar,
+  open: openProp,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : internalOpen;
+  const setOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
   const { isVisible } = useFieldConfig('viajes');
 
   const permitePago =

@@ -402,6 +402,8 @@ export function ViajesTenantPage({
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  /** Fila/card clickeada: abre el menú de acciones de ese viaje en vez del modal de detalle. */
+  const [accionesAbiertoViajeId, setAccionesAbiertoViajeId] = useState<string | null>(null);
   const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
   const [viajeDeleteConfirm, setViajeDeleteConfirm] = useState<Viaje | null>(
     null,
@@ -2567,7 +2569,7 @@ export function ViajesTenantPage({
             <tr
               key={v.id}
               className={`${listadoTablaBodyRowClass} cursor-pointer`}
-              onClick={() => setViewingViaje(v)}
+              onClick={() => setAccionesAbiertoViajeId(v.id)}
             >
               {mostrarColumnaFacturarLote && (
                 <td
@@ -2733,6 +2735,8 @@ export function ViajesTenantPage({
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
                   hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
+                  open={accionesAbiertoViajeId === v.id}
+                  onOpenChange={(o) => setAccionesAbiertoViajeId(o ? v.id : null)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -2856,7 +2860,7 @@ export function ViajesTenantPage({
           );
           return (
             <ListadoCard
-              onClick={() => setViewingViaje(v)}
+              onClick={() => setAccionesAbiertoViajeId(v.id)}
               primary={
                 <div className="flex items-start gap-2">
                   {mostrarColumnaFacturarLote && esElegibleFacturarLote(v) ? (
@@ -2945,6 +2949,8 @@ export function ViajesTenantPage({
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
                   hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
+                  open={accionesAbiertoViajeId === v.id}
+                  onOpenChange={(o) => setAccionesAbiertoViajeId(o ? v.id : null)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}

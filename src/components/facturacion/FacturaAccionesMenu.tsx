@@ -16,6 +16,9 @@ interface Props {
   onVerNotaCredito?: () => void;
   /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
+  /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function FacturaAccionesMenu({
@@ -29,8 +32,13 @@ export function FacturaAccionesMenu({
   onAnular,
   onVerNotaCredito,
   onMarcarCobrada,
+  open: openProp,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : internalOpen;
+  const setOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
 
   const options = useMemo<AccionOpcion[]>(() => {
     const opts: AccionOpcion[] = [

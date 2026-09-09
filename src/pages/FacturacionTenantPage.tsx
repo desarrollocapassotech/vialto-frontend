@@ -235,6 +235,8 @@ export function FacturacionTenantPage({
   const [marcarCobradaConfirm, setMarcarCobradaConfirm] =
     useState<Factura | null>(null);
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
+  /** Fila/card clickeada: abre el menú de acciones de esa factura en vez del modal de detalle. */
+  const [accionesAbiertoFacturaId, setAccionesAbiertoFacturaId] = useState<string | null>(null);
   const [emittingFactura, setEmittingFactura] = useState<Factura | null>(null);
   const [anularFactura, setAnularFactura] = useState<Factura | null>(null);
 
@@ -1432,7 +1434,7 @@ export function FacturacionTenantPage({
           <tr
             key={f.id}
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
-            onClick={() => setViewingFactura(f)}
+            onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
             <td className="px-4 py-3 font-medium break-all">{f.numero || "—"}</td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
@@ -1469,6 +1471,8 @@ export function FacturacionTenantPage({
                 factura={f}
                 deleting={deletingId === f.id}
                 hasArca={hasArca}
+                open={accionesAbiertoFacturaId === f.id}
+                onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
                 onMarcarCobrada={() => abrirMarcarCobrada(f)}
@@ -1490,7 +1494,7 @@ export function FacturacionTenantPage({
         )}
         renderMobileCard={(f) => (
           <ListadoCard
-            onClick={() => setViewingFactura(f)}
+            onClick={() => setAccionesAbiertoFacturaId(f.id)}
             primary={f.numero || "—"}
             fields={[
               { label: "Cliente", value: nombreContraparte(f) },
@@ -1528,6 +1532,8 @@ export function FacturacionTenantPage({
                 factura={f}
                 deleting={deletingId === f.id}
                 hasArca={hasArca}
+                open={accionesAbiertoFacturaId === f.id}
+                onOpenChange={(o) => setAccionesAbiertoFacturaId(o ? f.id : null)}
                 onVer={() => setViewingFactura(f)}
                 onEliminar={() => setFacturaDeleteConfirm(f)}
                 onMarcarCobrada={() => abrirMarcarCobrada(f)}
