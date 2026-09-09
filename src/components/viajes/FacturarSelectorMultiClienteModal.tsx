@@ -66,15 +66,7 @@ export function FacturarSelectorMultiClienteModal({
 
   function formatProductos(productos?: any[]) {
     if (!productos || productos.length === 0) return null;
-    return productos
-      .map((p) => {
-        const parts = [];
-        if (p.cantidad) parts.push(`${p.cantidad}u`);
-        if (p.pesoKg) parts.push(`${p.pesoKg}kg`);
-        const metrics = parts.join(" ");
-        return `${p.producto?.nombre || "Producto"}${metrics ? ` (${metrics})` : ""}`;
-      })
-      .join(", ");
+    return productos.map((p) => p.producto?.nombre || "Producto").join(", ");
   }
 
   rows.push({
