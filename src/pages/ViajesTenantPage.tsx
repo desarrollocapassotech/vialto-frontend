@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { isOrgAdmin } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
@@ -298,9 +299,20 @@ type ViajesPaginatedResponse = {
 export function ViajesTenantPage({
   tenantId,
   embeddedInSuperadmin,
+  tenantModules,
+  filtroRapidoPortalTarget,
 }: {
   tenantId?: string;
   embeddedInSuperadmin?: boolean;
+  /** Módulos de la empresa elegida (vista superadmin) — `useCurrentTenant()` no aplica acá. */
+  tenantModules?: string[];
+  /**
+   * Vista superadmin: nodo (junto al título "Viajes" que renderiza `ViajesSuperadminPage.tsx`)
+   * donde teletransportar el botón de filtros rápidos + panel, para que quede al lado del
+   * título igual que en la vista de tenant — acá no se puede simplemente mover el `<h1>`
+   * porque este componente recién monta después de elegir una empresa.
+   */
+  filtroRapidoPortalTarget?: HTMLElement | null;
 } = {}) {
   const { getToken, isLoaded, isSignedIn, orgRole } = useAuth();
   const { user } = useUser();
@@ -338,6 +350,17 @@ export function ViajesTenantPage({
   const hasLiquidaciones =
     hasLiquidoProductoArca ||
     (!platform && canAccessLiquidaciones(currentTenant?.modules ?? []));
+  // Vista superadmin: `useCurrentTenant()` no resuelve la empresa elegida (esa vive en
+  // `tenantModules`, que trae `ViajesSuperadminPage.tsx` desde `useTenantsList()`) — sin
+  // esto la grilla embebida en superadmin siempre caía al badge de "pago transportista"
+  // en vez de "sin liquidar"/"liquidado", aunque la empresa sí tuviera Liquidaciones.
+  const hasLiquidoProductoArcaResuelto = platform
+    ? canAccessEmisionLiquidoProductoArca(tenantModules ?? [])
+    : hasLiquidoProductoArca;
+  const hasLiquidacionesResuelto = platform
+    ? hasLiquidoProductoArcaResuelto ||
+      canAccessLiquidaciones(tenantModules ?? [])
+    : hasLiquidaciones;
   const tid = tenantId?.trim() ?? "";
 
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
@@ -982,6 +1005,7 @@ export function ViajesTenantPage({
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
+
 
   function aplicarFiltroEstado(val: string) {
     const e = val.trim();
@@ -1925,8 +1949,8 @@ export function ViajesTenantPage({
           }`}
           aria-label="Filtrar listado por etapa"
         >
-          <option value="">Todos</option>
-          <option value="cancelado">Cancelados</option>
+          <option value="">TODOS</option>
+          <option value="cancelado">CANCELADO</option>
           {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map((est) => (
             <option key={est} value={est} title={tooltipEtapaViaje(est)}>
               {etapaViajeLabel[est] ?? est}
@@ -2048,8 +2072,67 @@ export function ViajesTenantPage({
     </>
   );
 
+  const filtroRapidoContent = (
+    <>
+      {resumen && (
+        <button
+          type="button"
+          onClick={() => setShowFiltrosRapidos((v) => !v)}
+          aria-expanded={showFiltrosRapidos}
+          aria-label="Mostrar filtros rápidos"
+          className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-charcoal ${
+            showFiltrosRapidos ? "bg-vialto-mist text-vialto-charcoal" : ""
+          }`}
+        >
+          <Filter className="h-4 w-4" aria-hidden />
+          {cantidadFiltrosRapidosActivos > 0 && (
+            <span
+              className="absolute -right-1 -top-1 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-vialto-fire px-1 font-[family-name:var(--font-ui)] text-[10px] font-semibold tabular-nums leading-none text-white"
+              aria-hidden
+            >
+              {cantidadFiltrosRapidosActivos}
+            </span>
+          )}
+        </button>
+      )}
+
+      {resumen && showFiltrosRapidos && (
+        <div className="min-w-0">
+          <ViajesResumenFiltros
+            resumen={resumen}
+            facturacionFiltro={facturacionFiltro}
+            pagoTransportistaFiltro={pagoTransportistaFiltro}
+            onFiltroFacturacion={aplicarFiltroFacturacion}
+            onFiltroPago={aplicarFiltroPagoTransportista}
+          />
+        </div>
+      )}
+
+      {hayFiltrosColumnasActivos && (
+        <button
+          type="button"
+          onClick={limpiarFiltrosColumnas}
+          disabled={listadoRefetching}
+          className="hidden h-10 shrink-0 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
+          aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
+        >
+          Limpiar filtros
+          <span
+            className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
+            aria-hidden
+          >
+            {cantidadFiltrosColumnasActivos}
+          </span>
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="w-full">
+      {filtroRapidoPortalTarget
+        ? createPortal(filtroRapidoContent, filtroRapidoPortalTarget)
+        : null}
       <div className="flex flex-wrap items-center gap-4">
         {!embeddedInSuperadmin && (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
@@ -2057,57 +2140,7 @@ export function ViajesTenantPage({
           </h1>
         )}
 
-        {resumen && (
-          <button
-            type="button"
-            onClick={() => setShowFiltrosRapidos((v) => !v)}
-            aria-expanded={showFiltrosRapidos}
-            aria-label="Mostrar filtros rápidos"
-            className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-vialto-steel transition-colors hover:bg-vialto-mist hover:text-vialto-charcoal ${
-              showFiltrosRapidos ? "bg-vialto-mist text-vialto-charcoal" : ""
-            }`}
-          >
-            <Filter className="h-4 w-4" aria-hidden />
-            {cantidadFiltrosRapidosActivos > 0 && (
-              <span
-                className="absolute -right-1 -top-1 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-vialto-fire px-1 font-[family-name:var(--font-ui)] text-[10px] font-semibold tabular-nums leading-none text-white"
-                aria-hidden
-              >
-                {cantidadFiltrosRapidosActivos}
-              </span>
-            )}
-          </button>
-        )}
-
-        {resumen && showFiltrosRapidos && (
-          <div className="min-w-0">
-            <ViajesResumenFiltros
-              resumen={resumen}
-              facturacionFiltro={facturacionFiltro}
-              pagoTransportistaFiltro={pagoTransportistaFiltro}
-              onFiltroFacturacion={aplicarFiltroFacturacion}
-              onFiltroPago={aplicarFiltroPagoTransportista}
-            />
-          </div>
-        )}
-
-        {resumen && showFiltrosRapidos && hayFiltrosColumnasActivos && (
-          <button
-            type="button"
-            onClick={limpiarFiltrosColumnas}
-            disabled={listadoRefetching}
-            className="hidden h-10 shrink-0 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
-            aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
-          >
-            Limpiar filtros
-            <span
-              className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-              aria-hidden
-            >
-              {cantidadFiltrosColumnasActivos}
-            </span>
-          </button>
-        )}
+        {!filtroRapidoPortalTarget && filtroRapidoContent}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -2225,6 +2258,7 @@ export function ViajesTenantPage({
                 title="ID"
                 filterActive={!!numeroFiltroActivo.trim()}
                 filterSignature={numeroFiltroActivo}
+                minWidthClass="min-w-0"
               >
                 <AutocompleteInput
                   value={numeroFiltroActivo}
@@ -2243,6 +2277,7 @@ export function ViajesTenantPage({
                 }
                 filterActive={!!ctgFiltroActivo.trim()}
                 filterSignature={ctgFiltroActivo}
+                minWidthClass="min-w-0"
               >
                 <AutocompleteInput
                   value={ctgFiltroActivo}
@@ -2305,6 +2340,7 @@ export function ViajesTenantPage({
                 title="Chofer"
                 filterActive={!!choferIdFiltroActivo.trim()}
                 filterSignature={choferIdFiltroActivo}
+                minWidthClass="min-w-0"
               >
                 <ChoferSearchSelect
                   id="viajes-col-filtro-chofer"
@@ -2329,6 +2365,8 @@ export function ViajesTenantPage({
                 title="Etapa"
                 filterActive={!!estadoFiltro.trim()}
                 filterSignature={estadoFiltro}
+                minWidthClass="min-w-0"
+                titleNoWrap
               >
                 <select
                   value={estadoFiltro}
@@ -2341,8 +2379,8 @@ export function ViajesTenantPage({
                   }`}
                   aria-label="Filtrar listado por etapa"
                 >
-                  <option value="">Todos</option>
-                  <option value="cancelado">Cancelados</option>
+                  <option value="">TODOS</option>
+                  <option value="cancelado">CANCELADO</option>
                   {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
                     (est) => (
                       <option
@@ -2362,6 +2400,7 @@ export function ViajesTenantPage({
                 title="Origen — Destino"
                 filterActive={!!ubicacionFiltro.trim()}
                 filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+                minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
                   <select
@@ -2428,6 +2467,7 @@ export function ViajesTenantPage({
                   !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
                 }
                 filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
                   <select
@@ -2521,10 +2561,10 @@ export function ViajesTenantPage({
                   ) : null}
                 </td>
               )}
-              <td className="px-4 py-3 text-vialto-steel tabular-nums">
+              <td className="px-4 py-3 max-w-24 break-words text-vialto-steel tabular-nums">
                 #{v.numero}
               </td>
-              <td className="px-4 py-3 text-vialto-steel tabular-nums">
+              <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
                 {v.numeroIdentificacionPersonalizado?.trim() || "—"}
               </td>
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
@@ -2553,13 +2593,13 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 max-w-[10rem] text-vialto-steel">
+              <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
                 <span className="block truncate" title={nombreChofer}>
                   {nombreChofer}
                 </span>
               </td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col gap-0.5 items-start">
+                <div className="flex w-full flex-col gap-0.5">
                   {estadoQuickId === v.id ? (
                     <select
                       autoFocus
@@ -2588,7 +2628,7 @@ export function ViajesTenantPage({
                         if (savingEstadoId) return;
                         setEstadoQuickId(v.id);
                       }}
-                      className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                      className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
                         etapaViajeBadgeClass[v.etapa] ??
                         etapaViajeBadgeClassDefault
                       }`}
@@ -2603,17 +2643,18 @@ export function ViajesTenantPage({
                       <ViajeFacturacionIndicador
                         viaje={v}
                         tenantId={platform ? tid : undefined}
+                        fullWidth
                         onClickOverride={
                           (v.clientesViaje ?? []).length > 0
                             ? () => openVerFacturaFlow(v)
                             : undefined
                         }
                       />
-                      {hasLiquidaciones ? (
+                      {hasLiquidacionesResuelto ? (
                         <ViajeLiquidacionIndicador
                           viaje={v}
                           tenantId={platform ? tid : undefined}
-                          hasArca={hasLiquidoProductoArca}
+                          hasArca={hasLiquidoProductoArcaResuelto}
                           onRegistrarPago={() => setRegistrarPagoViaje(v)}
                         />
                       ) : (
@@ -2626,7 +2667,7 @@ export function ViajesTenantPage({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3 align-top text-vialto-steel min-w-[11rem] max-w-sm">
+              <td className="px-4 py-3 align-top text-vialto-steel min-w-0 max-w-[7rem]">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
                   destino={v.destino}
@@ -2638,16 +2679,16 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 text-vialto-steel tabular-nums align-top">
+              <td className="px-4 py-3 max-w-[6rem] text-vialto-steel tabular-nums align-top">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span
-                    className={`block ${ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""}`}
+                    className={`block whitespace-nowrap ${ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""}`}
                     title={v.fechaCarga ?? undefined}
                   >
                     {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
                   </span>
                   <span
-                    className={`block text-xs ${
+                    className={`block whitespace-nowrap text-xs ${
                       ordenResaltaFechaDescarga
                         ? "font-medium text-vialto-charcoal"
                         : "text-vialto-steel/90"
@@ -2718,7 +2759,7 @@ export function ViajesTenantPage({
           );
           const estadoValue = (
             <div
-              className="flex flex-col gap-0.5 items-start"
+              className="flex w-full flex-col gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               {estadoQuickId === v.id ? (
@@ -2749,7 +2790,7 @@ export function ViajesTenantPage({
                     if (savingEstadoId) return;
                     setEstadoQuickId(v.id);
                   }}
-                  className={`inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                  className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
                     etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
                   }`}
                 >
@@ -2763,17 +2804,18 @@ export function ViajesTenantPage({
                   <ViajeFacturacionIndicador
                     viaje={v}
                     tenantId={platform ? tid : undefined}
+                    fullWidth
                     onClickOverride={
                       (v.clientesViaje ?? []).length > 0
                         ? () => openVerFacturaFlow(v)
                         : undefined
                     }
                   />
-                  {hasLiquidaciones ? (
+                  {hasLiquidacionesResuelto ? (
                     <ViajeLiquidacionIndicador
                       viaje={v}
                       tenantId={platform ? tid : undefined}
-                      hasArca={hasLiquidoProductoArca}
+                      hasArca={hasLiquidoProductoArcaResuelto}
                       onRegistrarPago={() => setRegistrarPagoViaje(v)}
                     />
                   ) : (

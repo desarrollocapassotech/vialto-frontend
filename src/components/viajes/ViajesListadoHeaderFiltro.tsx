@@ -15,6 +15,19 @@ type Props = {
   filterSignature?: string;
   /** Alinea título + icono al borde derecho de la celda (columnas numéricas). */
   alignRight?: boolean;
+  /** Ancho mínimo del encabezado (clase Tailwind). Default: `min-w-[9rem]`, pensado para
+   * los controles de filtro (selects/search). Columnas angostas por contenido (ej. Etapa,
+   * con badges cortos) pueden pasar un valor menor o `min-w-0` para no imponer un piso. */
+  minWidthClass?: string;
+  /**
+   * true = el título nunca se parte en dos líneas (la columna se angosta como mucho hasta
+   * el ancho del título/contenido en una sola línea). Default false: el título puede saltar
+   * de línea si la columna se angosta (ok para columnas con contenido largo debajo, como
+   * "Origen — Destino" o "Carga — Descarga", donde no tiene sentido forzar el ancho del
+   * header). Usar junto con `minWidthClass="min-w-0"` en columnas de contenido corto (ej. ID,
+   * ID propio, Etapa) para que la columna se achique al mínimo posible sin cortar texto.
+   */
+  titleNoWrap?: boolean;
 };
 
 function IconoFiltro({ marcado }: { marcado: boolean }) {
@@ -42,6 +55,8 @@ export function ViajesListadoHeaderFiltro({
   filterActive,
   filterSignature,
   alignRight = false,
+  minWidthClass = "min-w-[9rem]",
+  titleNoWrap = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const iconoMarcado = filterActive || abierto;
@@ -75,7 +90,7 @@ export function ViajesListadoHeaderFiltro({
 
   return (
     <div
-      className={`flex flex-col gap-1.5 ${alignRight ? 'w-full items-end' : 'min-w-[9rem]'}`}
+      className={`flex flex-col gap-1.5 ${alignRight ? 'w-full items-end' : minWidthClass}`}
     >
       <div className="flex items-start gap-2">
         <div className="relative inline-flex shrink-0">
@@ -103,8 +118,8 @@ export function ViajesListadoHeaderFiltro({
         </div>
         <span
           className={`text-[15px] leading-tight tracking-[0.2em] text-vialto-fire uppercase ${
-            alignRight ? 'shrink-0' : 'min-w-0 flex-1'
-          }`}
+            titleNoWrap ? 'whitespace-nowrap' : ''
+          } ${alignRight ? 'shrink-0' : 'min-w-0 flex-1'}`}
         >
           {title}
         </span>

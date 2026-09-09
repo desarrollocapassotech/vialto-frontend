@@ -7,7 +7,15 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
-import { canAccessViajes, canAccessStock } from "@/lib/tenantModules";
+import {
+  canAccessViajes,
+  canAccessStock,
+  canAccessEmisionLiquidoProductoArca,
+} from "@/lib/tenantModules";
+import {
+  LiquidacionAnulacionMetodoRadios,
+  type LiquidacionAnulacionMetodo,
+} from "@/components/superadmin/LiquidacionAnulacionMetodoFields";
 import type { Tenant } from "@/types/api";
 
 /**
@@ -21,6 +29,22 @@ const MODULO_GATE: Record<string, (modules: string[]) => boolean> = {
   viajes: canAccessViajes,
   stock: canAccessStock,
 };
+
+/**
+ * Módulos cuyos formularios son etapas del mismo registro (alta/edición/detalle
+ * de una misma entidad) — el backend comparte la visibilidad entre los tres
+ * (ver `MODULOS_CAMPOS_COMPARTIDOS` en `tenant-field-config.service.ts`), así
+ * que acá no se muestra el selector de "Formulario" ni "Aplicar a todos los
+ * formularios": cualquier cambio ya aplica a los tres. `stock` queda afuera a
+ * propósito — sus 3 formularios (ingreso/egreso/división) son operaciones
+ * distintas, no etapas de un mismo registro.
+ */
+const MODULOS_CAMPOS_COMPARTIDOS = new Set([
+  "viajes",
+  "clientes",
+  "transportistas",
+  "vehiculos",
+]);
 
 function calcularModulosDisponibles(
   catalogo: Catalogo | null,
@@ -121,9 +145,11 @@ export function CamposEmpresaPage() {
   const [loading, setLoading] = useState(false);
   const [savingCampo, setSavingCampo] = useState<string | null>(null);
   const [aplicarATodos, setAplicarATodos] = useState(false);
-  // Pestaña "Templates de importación" — vive en la misma barra de tabs que
-  // los módulos (Viajes/Stock/...), no como sección aparte apilada.
+  // Pestañas "Templates de importación" y "Liquidaciones" — viven en la misma
+  // barra de tabs que los módulos (Viajes/Stock/...), no como sección aparte
+  // apilada.
   const [mostrarTemplates, setMostrarTemplates] = useState(false);
+  const [mostrarLiquidaciones, setMostrarLiquidaciones] = useState(false);
 
   // --- NUEVOS ESTADOS PARA AUDITORÍA ---
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -145,6 +171,10 @@ export function CamposEmpresaPage() {
   const [savingImportToggle, setSavingImportToggle] = useState(false);
   const [empresaExportacionPautMicCrt, setEmpresaExportacionPautMicCrt] = useState(false);
   const [savingExportacionPautMicCrt, setSavingExportacionPautMicCrt] = useState(false);
+  const [empresaLiquidacionAnulacionMetodo, setEmpresaLiquidacionAnulacionMetodo] =
+    useState<LiquidacionAnulacionMetodo>("nota_credito_debito");
+  const [savingLiquidacionAnulacionMetodo, setSavingLiquidacionAnulacionMetodo] =
+    useState(false);
   const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
     null,
   );
@@ -169,6 +199,11 @@ export function CamposEmpresaPage() {
           setEmpresaLabelGuardado(label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
           setEmpresaExportacionPautMicCrt(tenant.habilitarExportacionPautMicCrt ?? false);
+          setEmpresaLiquidacionAnulacionMetodo(
+            tenant.liquidacionAnulacionMetodo === "manual"
+              ? "manual"
+              : "nota_credito_debito",
+          );
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -235,6 +270,28 @@ export function CamposEmpresaPage() {
       setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
     } finally {
       setSavingExportacionPautMicCrt(false);
+    }
+  }
+
+  async function guardarLiquidacionAnulacionMetodo(
+    valor: LiquidacionAnulacionMetodo,
+  ) {
+    if (!filtroEmpresa || valor === empresaLiquidacionAnulacionMetodo) return;
+    const anterior = empresaLiquidacionAnulacionMetodo;
+    setEmpresaLiquidacionAnulacionMetodo(valor);
+    setSavingLiquidacionAnulacionMetodo(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ liquidacionAnulacionMetodo: valor }),
+      });
+      showToast("Método de anulación actualizado", "success");
+    } catch (e) {
+      setEmpresaLiquidacionAnulacionMetodo(anterior);
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingLiquidacionAnulacionMetodo(false);
     }
   }
 
@@ -379,7 +436,12 @@ export function CamposEmpresaPage() {
       siguiente ? (Object.keys(catalogo[siguiente].formularios)[0] ?? null) : null,
     );
     setMostrarTemplates(false);
+    setMostrarLiquidaciones(false);
   }, [catalogo, empresaTenant, modulo, filtroEmpresa]);
+
+  const mostrarTabLiquidaciones =
+    !!empresaTenant &&
+    canAccessEmisionLiquidoProductoArca(empresaTenant.modules);
 
   const modulosDisponibles = calcularModulosDisponibles(catalogo, empresaTenant);
   const formulariosDelModulo =
@@ -396,10 +458,6 @@ export function CamposEmpresaPage() {
           <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
             Configuración por empresa
           </h1>
-          <p className="mt-2 text-vialto-steel max-w-3xl">
-            Elegí una empresa y un formulario para configurar qué campos se
-            visualizan.
-          </p>
         </div>
       </div>
 
@@ -501,6 +559,7 @@ export function CamposEmpresaPage() {
                   type="button"
                   onClick={() => {
                     setMostrarTemplates(false);
+                    setMostrarLiquidaciones(false);
                     setModulo(m);
                     setFormulario(
                       Object.keys(catalogo[m].formularios)[0] ?? null,
@@ -508,7 +567,7 @@ export function CamposEmpresaPage() {
                   }}
                   className={[
                     "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    !mostrarTemplates && modulo === m
+                    !mostrarTemplates && !mostrarLiquidaciones && modulo === m
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
                   ].join(" ")}
@@ -516,9 +575,29 @@ export function CamposEmpresaPage() {
                   {catalogo[m].label}
                 </button>
               ))}
+              {mostrarTabLiquidaciones && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarTemplates(false);
+                    setMostrarLiquidaciones(true);
+                  }}
+                  className={[
+                    "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                    mostrarLiquidaciones
+                      ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
+                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                  ].join(" ")}
+                >
+                  Liquidaciones
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setMostrarTemplates(true)}
+                onClick={() => {
+                  setMostrarLiquidaciones(false);
+                  setMostrarTemplates(true);
+                }}
                 className={[
                   "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
                   mostrarTemplates
@@ -533,11 +612,7 @@ export function CamposEmpresaPage() {
 
           {mostrarTemplates && empresaTenant && (
             <div className="border border-t-0 border-black/15 bg-white p-6">
-              <p className="mb-4 text-sm text-vialto-steel">
-                Mapeo de columnas del Excel a los campos del sistema, por
-                módulo — lo mismo que se configura desde "Configurar
-                templates" al importar datos de esta empresa.
-              </p>
+              
               <ImportTemplatesConfig
                 tenantId={filtroEmpresa}
                 tenantNombre={empresaTenant.name}
@@ -547,10 +622,27 @@ export function CamposEmpresaPage() {
             </div>
           )}
 
-          {!mostrarTemplates && (
+          {mostrarLiquidaciones && mostrarTabLiquidaciones && (
+            <div className="border border-t-0 border-black/15 bg-white p-6">
+              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+                Anulación de liquidaciones (CVLP 060)
+              </h2>
+              <p className="mt-1 mb-4 text-sm text-vialto-steel">
+                Cómo se anula un comprobante 060 ya emitido para esta empresa
+                — lo mismo que se configura desde "Editar empresa".
+              </p>
+              <LiquidacionAnulacionMetodoRadios
+                value={empresaLiquidacionAnulacionMetodo}
+                disabled={savingLiquidacionAnulacionMetodo}
+                onChange={(v) => void guardarLiquidacionAnulacionMetodo(v)}
+              />
+            </div>
+          )}
+
+          {!mostrarTemplates && !mostrarLiquidaciones && (
           <>
           <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
-            {modulo !== "viajes" && (
+            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
                   Formulario
@@ -569,7 +661,7 @@ export function CamposEmpresaPage() {
               </label>
             )}
 
-            {modulo !== "viajes" && (
+            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
               <div className="flex items-center gap-3">
                 <ToggleSwitch
                   checked={aplicarATodos}

@@ -273,7 +273,7 @@ export function AppShell() {
     ) {
       const facturacionItems: NavItem[] = [];
 
-      if (hasFacturacion) {
+      if (hasFacturacion || hasFacturasArca) {
         facturacionItems.push({
           to: "/facturacion",
           label: "Facturas",

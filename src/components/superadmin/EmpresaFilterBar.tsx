@@ -69,19 +69,33 @@ export function EmpresaFilterBar({
       <span className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.22em] text-vialto-steel">
         Empresa
       </span>
-      <input
-        value={query}
-        onChange={(e) => handleQueryChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            handleEnterSelection();
-          }
-        }}
-        placeholder="Ingresá al menos 3 letras para buscar empresa…"
-        className="w-full border border-black/10 bg-white rounded px-3 py-2.5 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
-      />
-      {hasMinChars && (
+      <div className="flex items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleEnterSelection();
+            }
+          }}
+          placeholder="Ingresá al menos 3 letras para buscar empresa…"
+          className="min-w-0 flex-1 border border-black/10 bg-white rounded px-3 py-2.5 text-sm text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/35"
+        />
+        {value && selected && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange('');
+              setQuery('');
+            }}
+            className="shrink-0 text-xs uppercase tracking-wider text-vialto-fire hover:text-vialto-bright"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+      {hasMinChars && !value && (
         <div className="max-h-56 overflow-auto rounded border border-black/10 bg-white">
           {matches.length > 0 ? (
             <ul>
@@ -106,27 +120,10 @@ export function EmpresaFilterBar({
           )}
         </div>
       )}
-      {!hasMinChars && (
+      {!hasMinChars && !value && (
         <p className="text-xs text-vialto-steel">
           Ingresá al menos {MIN_SEARCH_CHARS} letras para buscar.
         </p>
-      )}
-      {value && selected && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-vialto-steel">
-            Seleccionada: <span className="font-medium text-vialto-charcoal">{selected.name}</span>
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              onChange('');
-              setQuery('');
-            }}
-            className="text-xs uppercase tracking-wider text-vialto-fire hover:text-vialto-bright"
-          >
-            Limpiar
-          </button>
-        </div>
       )}
     </div>
   );

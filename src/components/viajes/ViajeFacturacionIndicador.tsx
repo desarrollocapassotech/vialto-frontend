@@ -21,10 +21,12 @@ type Props = {
   /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
   tenantId?: string;
   onClickOverride?: () => void;
+  /** Columna ETAPA del listado: el badge ocupa todo el ancho disponible en vez de su ancho de contenido. */
+  fullWidth?: boolean;
 };
 
 const badgeClass =
-  'inline-block rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait';
+  'inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-wider px-1.5 py-0.5 cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-wait';
 
 function facturaUrl(id: string, tenantId?: string) {
   return tenantId
@@ -37,7 +39,7 @@ function facturaUrl(id: string, tenantId?: string) {
  * si ya hay una factura vinculada, va directo a su vista completa (ahorra el paso del
  * modal intermedio); si todavía no hay factura, muestra el modal de detalle actual.
  */
-export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: Props) {
+export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride, fullWidth = false }: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -114,13 +116,15 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride }: 
 
   return (
     <>
-      <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`flex flex-wrap items-center gap-1 ${fullWidth ? "w-full" : "inline-flex"}`}
+      >
         <button
           type="button"
           onClick={() => void handleClick()}
           disabled={cargando}
           title={`Facturación: ${tooltipFacturacionEstado(viaje)}`}
-          className={`${badgeClass} ${displayClass}`}
+          className={`${badgeClass} ${fullWidth ? "w-full" : ""} ${displayClass}`}
         >
           {displayLabel}
         </button>

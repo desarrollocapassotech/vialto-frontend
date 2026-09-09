@@ -81,13 +81,39 @@ export function useImportWizard(
     null,
   );
 
+  const [preflightErrors, setPreflightErrors] = useState<{ modulo: string; faltantes: string[] }[] | null>(null);
+
   const moduloActual: ModuloWizard | null = secuencia[moduloIndex] ?? null;
 
-  function startFile(f: File) {
+  async function startFile(f: File) {
     setFile(f);
     setError(null);
-    setFase("modulo");
-    void previewModuloActual(f, 0);
+    setPreflightErrors(null);
+    setLoading(true);
+
+    try {
+      if (secuencia.length > 0) {
+        const form = new FormData();
+        form.append("file", f);
+        const modulosStr = secuencia.join(",");
+        const res = await apiJson<{ valid: boolean; errores: { modulo: string; faltantes: string[] }[] }>(
+          `/api/importaciones/pre-flight?tenantId=${encodeURIComponent(tenantId)}&modulos=${encodeURIComponent(modulosStr)}`,
+          getToken,
+          { method: "POST", body: form },
+        );
+        if (!res.valid) {
+          setPreflightErrors(res.errores);
+          return;
+        }
+      }
+
+      setFase("modulo");
+      void previewModuloActual(f, 0);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al validar archivo.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   /** Núcleo del preview de un módulo, sin tocar correcciones/exclusiones ya hechas — lo usa tanto el cambio de módulo como "reintentar". */
@@ -538,6 +564,8 @@ export function useImportWizard(
     loading,
     validandoCiudades,
     error,
+    preflightErrors,
+    setError,
     preview,
     etapasCompletadas,
     viajeIdsCreados,

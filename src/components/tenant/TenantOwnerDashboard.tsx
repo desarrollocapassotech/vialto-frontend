@@ -5,6 +5,7 @@ import type {
 import type { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import {
   canAccessFacturacion,
+  canAccessEmisionFacturasArca,
   canAccessViajes,
   canAccessStock,
   canAccessCombustible,
@@ -797,7 +798,8 @@ export function TenantOwnerDashboard({
   loadingViajeId,
 }: TenantOwnerDashboardProps) {
   const showViajes = canAccessViajes(modules);
-  const showFacturacionModulo = canAccessFacturacion(modules);
+  const showFacturacionModulo =
+    canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
   const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);

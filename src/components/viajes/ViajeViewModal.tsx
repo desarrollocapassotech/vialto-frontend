@@ -164,6 +164,11 @@ export function ViajeViewModal({
       value: viaje.transportistaId ? transportistaNombre : "Flota propia",
     },
     {
+      key: "choferId",
+      label: "Chofer",
+      value: viaje.chofer?.nombre?.trim() || null,
+    },
+    {
       key: "precioTransportistaExterno",
       label: "Precio transportista",
       value:
