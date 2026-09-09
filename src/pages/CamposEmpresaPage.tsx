@@ -151,6 +151,9 @@ export function CamposEmpresaPage() {
   // apilada.
   const [mostrarTemplates, setMostrarTemplates] = useState(false);
   const [mostrarLiquidaciones, setMostrarLiquidaciones] = useState(false);
+  // Pestaña "General" — primera de la barra, agrupa la configuración general
+  // de la empresa (antes se mostraba siempre arriba de los tabs).
+  const [mostrarGeneral, setMostrarGeneral] = useState(true);
 
   // --- NUEVOS ESTADOS PARA AUDITORÍA ---
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -258,8 +261,11 @@ export function CamposEmpresaPage() {
         body: JSON.stringify({ importacionesOcultas: nuevoValor }),
       });
       setEmpresaImportOculto(nuevoValor);
+      showToast("Cambios guardados", "success");
     } catch (e) {
-      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
     } finally {
       setSavingImportToggle(false);
     }
@@ -276,8 +282,11 @@ export function CamposEmpresaPage() {
         body: JSON.stringify({ habilitarExportacionPautMicCrt: nuevoValor }),
       });
       setEmpresaExportacionPautMicCrt(nuevoValor);
+      showToast("Cambios guardados", "success");
     } catch (e) {
-      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
     } finally {
       setSavingExportacionPautMicCrt(false);
     }
@@ -299,7 +308,9 @@ export function CamposEmpresaPage() {
       showToast("Método de anulación actualizado", "success");
     } catch (e) {
       setEmpresaLiquidacionAnulacionMetodo(anterior);
-      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
     } finally {
       setSavingLiquidacionAnulacionMetodo(false);
     }
@@ -316,8 +327,11 @@ export function CamposEmpresaPage() {
         body: JSON.stringify({ paisOrigenDestinoOculto: nuevoValor }),
       });
       setEmpresaPaisOculto(nuevoValor);
+      showToast("Cambios guardados", "success");
     } catch (e) {
-      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
     } finally {
       setSavingPaisOculto(false);
     }
@@ -462,8 +476,11 @@ export function CamposEmpresaPage() {
           )
           : prev,
       );
+      showToast("Cambios guardados", "success");
     } catch (e) {
-      setError(friendlyError(e, "camposEmpresa"));
+      const msg = friendlyError(e, "camposEmpresa");
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setSavingCampo(null);
     }
@@ -549,138 +566,6 @@ export function CamposEmpresaPage() {
         />
       </div>
 
-      {filtroEmpresa && (
-        <div className="mt-6">
-          <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
-            Configuración general
-          </h2>
-          {empresaConfigError && (
-            <p className="mt-2 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {empresaConfigError}
-            </p>
-          )}
-          <div className="mt-2 overflow-hidden border border-black/15">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-vialto-mist text-left">
-                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
-                    Campo
-                  </th>
-                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
-                    Valor
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingEmpresaConfig ? (
-                  <tr>
-                    <td colSpan={2} className="px-4 py-6 text-center text-vialto-steel">
-                      Cargando…
-                    </td>
-                  </tr>
-                ) : (
-                  <>
-                    <tr className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        Label del ID propio (módulo Viajes)
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <input
-                          value={empresaLabel}
-                          onChange={(e) => setEmpresaLabel(e.target.value)}
-                          onBlur={() => void guardarEmpresaLabel()}
-                          disabled={savingLabel}
-                          placeholder="ID propio"
-                          className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
-                        />
-                      </td>
-                    </tr>
-                    <tr className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        Ocultar importación masiva de Excel para el admin
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={empresaImportOculto}
-                          disabled={savingImportToggle}
-                          onChange={() => void toggleImportOculto()}
-                          label={
-                            empresaImportOculto
-                              ? "Mostrar importación masiva"
-                              : "Ocultar importación masiva"
-                          }
-                        />
-                      </td>
-                    </tr>
-                    <tr className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        Ocultar país (Viajes, Clientes y Transportistas)
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={empresaPaisOculto}
-                          disabled={savingPaisOculto}
-                          onChange={() => void togglePaisOculto()}
-                          label={
-                            empresaPaisOculto
-                              ? "Mostrar selector de país"
-                              : "Ocultar selector de país"
-                          }
-                        />
-                      </td>
-                    </tr>
-                    {empresaPaisOculto && (
-                      <tr className="border-t border-black/10">
-                        <td className="px-4 py-2.5">
-                          País fijo
-                          <p className="mt-0.5 text-xs font-normal text-vialto-steel">
-                            Origen/destino de Viajes y el país fiscal de
-                            Clientes/Transportistas quedan fijados a este país
-                            (sin selector visible para el tenant).
-                          </p>
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {paisesEmpresaLoading ? (
-                            <span className="text-sm text-vialto-steel">Cargando…</span>
-                          ) : paisesEmpresa.length === 0 ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-sm text-vialto-steel">
-                                Esta empresa no tiene países cargados.
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setMostrarPaisModal(true)}
-                                className="border border-black/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-vialto-mist"
-                              >
-                                + Nuevo país
-                              </button>
-                            </div>
-                          ) : (
-                            <select
-                              value={empresaPaisFijoId}
-                              disabled={savingPaisFijo}
-                              onChange={(e) => void guardarPaisFijo(e.target.value)}
-                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
-                            >
-                              <option value="">Sin elegir…</option>
-                              {paisesEmpresa.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {mostrarPaisModal && filtroEmpresa && (
         <PaisModal
           getToken={getToken}
@@ -700,6 +585,22 @@ export function CamposEmpresaPage() {
               className="-mb-px flex flex-wrap gap-1"
               aria-label="Módulos configurables"
             >
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarTemplates(false);
+                  setMostrarLiquidaciones(false);
+                  setMostrarGeneral(true);
+                }}
+                className={[
+                  "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
+                  mostrarGeneral
+                    ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
+                    : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
+                ].join(" ")}
+              >
+                General
+              </button>
               {modulosDisponibles.map((m) => (
                 <button
                   key={m}
@@ -707,6 +608,7 @@ export function CamposEmpresaPage() {
                   onClick={() => {
                     setMostrarTemplates(false);
                     setMostrarLiquidaciones(false);
+                    setMostrarGeneral(false);
                     setModulo(m);
                     setFormulario(
                       Object.keys(catalogo[m].formularios)[0] ?? null,
@@ -714,7 +616,7 @@ export function CamposEmpresaPage() {
                   }}
                   className={[
                     "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    !mostrarTemplates && !mostrarLiquidaciones && modulo === m
+                    !mostrarGeneral && !mostrarTemplates && !mostrarLiquidaciones && modulo === m
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
                   ].join(" ")}
@@ -727,6 +629,7 @@ export function CamposEmpresaPage() {
                   type="button"
                   onClick={() => {
                     setMostrarTemplates(false);
+                    setMostrarGeneral(false);
                     setMostrarLiquidaciones(true);
                   }}
                   className={[
@@ -743,6 +646,7 @@ export function CamposEmpresaPage() {
                 type="button"
                 onClick={() => {
                   setMostrarLiquidaciones(false);
+                  setMostrarGeneral(false);
                   setMostrarTemplates(true);
                 }}
                 className={[
@@ -757,9 +661,137 @@ export function CamposEmpresaPage() {
             </nav>
           </div>
 
+          {mostrarGeneral && (
+            <div className="border border-t-0 border-black/15 bg-white p-6">
+              {empresaConfigError && (
+                <p className="mb-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+                  {empresaConfigError}
+                </p>
+              )}
+              <div className="overflow-hidden border border-black/15">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-vialto-mist text-left">
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
+                        Campo
+                      </th>
+                      <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
+                        Valor
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingEmpresaConfig ? (
+                      <tr>
+                        <td colSpan={2} className="px-4 py-6 text-center text-vialto-steel">
+                          Cargando…
+                        </td>
+                      </tr>
+                    ) : (
+                      <>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Label del ID propio (módulo Viajes)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <input
+                              value={empresaLabel}
+                              onChange={(e) => setEmpresaLabel(e.target.value)}
+                              onBlur={() => void guardarEmpresaLabel()}
+                              disabled={savingLabel}
+                              placeholder="ID propio"
+                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                            />
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Ocultar importación masiva de Excel para el admin
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaImportOculto}
+                              disabled={savingImportToggle}
+                              onChange={() => void toggleImportOculto()}
+                              label={
+                                empresaImportOculto
+                                  ? "Mostrar importación masiva"
+                                  : "Ocultar importación masiva"
+                              }
+                            />
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Ocultar país (Viajes, Clientes y Transportistas)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaPaisOculto}
+                              disabled={savingPaisOculto}
+                              onChange={() => void togglePaisOculto()}
+                              label={
+                                empresaPaisOculto
+                                  ? "Mostrar selector de país"
+                                  : "Ocultar selector de país"
+                              }
+                            />
+                          </td>
+                        </tr>
+                        {empresaPaisOculto && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              País fijo
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Origen/destino de Viajes y el país fiscal de
+                                Clientes/Transportistas quedan fijados a este país
+                                (sin selector visible para el tenant).
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              {paisesEmpresaLoading ? (
+                                <span className="text-sm text-vialto-steel">Cargando…</span>
+                              ) : paisesEmpresa.length === 0 ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <span className="text-sm text-vialto-steel">
+                                    Esta empresa no tiene países cargados.
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMostrarPaisModal(true)}
+                                    className="border border-black/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-vialto-mist"
+                                  >
+                                    + Nuevo país
+                                  </button>
+                                </div>
+                              ) : (
+                                <select
+                                  value={empresaPaisFijoId}
+                                  disabled={savingPaisFijo}
+                                  onChange={(e) => void guardarPaisFijo(e.target.value)}
+                                  className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                                >
+                                  <option value="">Sin elegir…</option>
+                                  {paisesEmpresa.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.nombre}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {mostrarTemplates && empresaTenant && (
             <div className="border border-t-0 border-black/15 bg-white p-6">
-              
               <ImportTemplatesConfig
                 tenantId={filtroEmpresa}
                 tenantNombre={empresaTenant.name}
@@ -786,9 +818,9 @@ export function CamposEmpresaPage() {
             </div>
           )}
 
-          {!mostrarTemplates && !mostrarLiquidaciones && (
-          <>
-          <div className="border border-t-0 border-black/15 bg-white p-4 flex flex-wrap items-end gap-6">
+          {!mostrarGeneral && !mostrarTemplates && !mostrarLiquidaciones && (
+          <div className="border border-t-0 border-black/15 bg-white p-6">
+          <div className="flex flex-wrap items-end gap-6">
             {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
@@ -823,7 +855,7 @@ export function CamposEmpresaPage() {
           </div>
 
           {filtroEmpresa && (
-            <div className="mt-8">
+            <div className="mt-6">
               <button
                 onClick={() => setShowAuditModal(true)}
                 className="flex w-max items-center gap-2 rounded border border-black/15 bg-white px-4 py-2 text-sm font-medium text-vialto-charcoal shadow-sm transition hover:bg-black/5"
@@ -941,7 +973,7 @@ export function CamposEmpresaPage() {
               </div>
             </div>
           )}
-          </>
+          </div>
           )}
         </>
       )}

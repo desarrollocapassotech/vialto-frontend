@@ -4,6 +4,7 @@ import { isOrgAdmin } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
@@ -322,6 +323,7 @@ export function ViajesTenantPage({
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
+  const { isVisible: isViajeFieldVisible } = useFieldConfig("viajes");
 
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
@@ -1823,7 +1825,13 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
-  const tableColSpanBase = 8;
+  // Si el tenant tiene ocultos tanto "Chofer (flota propia)" como "Chofer
+  // (externo)" en Configuración por empresa, no tiene sentido mostrar la
+  // columna (quedaría siempre vacía).
+  const mostrarColumnaChofer =
+    isViajeFieldVisible("edicion_viaje", "choferId") ||
+    isViajeFieldVisible("edicion_viaje", "choferExternoId");
+  const tableColSpanBase = mostrarColumnaChofer ? 8 : 7;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
@@ -1921,6 +1929,7 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
+      {mostrarColumnaChofer && (
       <ListadoFiltroCampo label="Chofer" active={!!choferIdFiltroActivo.trim()}>
         <ChoferSearchSelect
           id="viajes-filtro-chofer"
@@ -1939,6 +1948,7 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
+      )}
       <ListadoFiltroCampo label="Etapa" active={!!estadoFiltro.trim()}>
         <select
           value={estadoFiltro}
@@ -2335,6 +2345,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarColumnaChofer && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Chofer"
@@ -2360,6 +2371,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Etapa"
@@ -2593,11 +2605,13 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
+              {mostrarColumnaChofer && (
               <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
                 <span className="block truncate" title={nombreChofer}>
                   {nombreChofer}
                 </span>
               </td>
+              )}
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex w-full flex-col gap-0.5">
                   {estadoQuickId === v.id ? (
@@ -2865,7 +2879,9 @@ export function ViajesTenantPage({
                   value: v.numeroIdentificacionPersonalizado?.trim() || "—",
                 },
                 { label: "Transporte", value: transporteValue },
-                { label: "Chofer", value: nombreChofer },
+                ...(mostrarColumnaChofer
+                  ? [{ label: "Chofer", value: nombreChofer }]
+                  : []),
                 { label: "Etapa", value: estadoValue },
                 {
                   label: "Origen — Destino",
