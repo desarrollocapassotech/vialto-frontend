@@ -8,6 +8,7 @@ import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
 import { viajePermiteBotonFacturar, liquidacionElegidaDeViaje } from '@/lib/viajesComprobantes';
 import { viajeRequierePagosTransportista } from '@/lib/viajesTransportistaPagos';
 import { numeroVisibleViaje } from '@/lib/viajesFlota';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 
 interface Props {
   viaje: Viaje;
@@ -22,6 +23,9 @@ interface Props {
   onVerFactura?: () => void;
   onVerLiquidacion?: () => void;
   onEliminar?: () => void;
+  /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ViajeAccionesMenu({
@@ -36,11 +40,21 @@ export function ViajeAccionesMenu({
   onVerFactura,
   onVerLiquidacion,
   onEliminar,
+  open: openProp,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : internalOpen;
+  const setOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
+  const { isVisible } = useFieldConfig('viajes');
 
-  const permitePago = viajeRequierePagosTransportista(viaje) && viaje.etapa !== 'cancelado';
-  const permiteGasto = viajePermiteAgregarGasto(viaje);
+  const permitePago =
+    isVisible('detalle_viaje', 'pagosTransportista') &&
+    viajeRequierePagosTransportista(viaje) &&
+    viaje.etapa !== 'cancelado';
+  const permiteGasto =
+    isVisible('detalle_viaje', 'otrosGastos') && viajePermiteAgregarGasto(viaje);
   const permiteFacturar = viajePermiteBotonFacturar(viaje);
   const facturarBloqueoArcaUsd = motivoBloqueoAccionFacturarArcaUsd(hasFacturasArca, viaje);
   const permiteExportar = viaje.etapa !== 'cancelado' && hasExportacionActiva;
@@ -57,7 +71,7 @@ export function ViajeAccionesMenu({
     if (permiteFacturar) {
       items.push({
         id: 'facturar',
-        label: 'Emitir comprobante',
+        label: 'Facturar / Liquidar',
         icon: Receipt,
         onClick: onFacturar,
         disabled: Boolean(facturarBloqueoArcaUsd),

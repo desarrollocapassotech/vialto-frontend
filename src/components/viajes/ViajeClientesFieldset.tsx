@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ClienteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { PaisSearchSelect } from '@/components/forms/PaisSearchSelect';
 import { CiudadCombobox } from '@/components/forms/CiudadCombobox';
@@ -8,13 +8,29 @@ import { ViajeProductosLista } from '@/components/viajes/ViajeProductosLista';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { maskCurrencyForMoneda, parseCurrencyForMoneda, preserveAmountOnMonedaChange } from '@/lib/currencyMask';
 import { textoRutaViaje } from '@/lib/viajesDestinos';
-import type { ViajeClienteDraft } from '@/lib/viajesClientes';
+import { ultimoDestinoCargado, type ViajeClienteDraft } from '@/lib/viajesClientes';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import type { Cliente, Pais, Producto } from '@/types/api';
 
 const fieldLabelClass =
   'text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel';
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+const autocompletarBtnClass =
+  'text-[11px] text-vialto-steel underline decoration-dotted underline-offset-2 hover:text-vialto-fire';
+
+/** Monto formateado para el resumen colapsado, o '' si todavía no hay monto cargado. */
+function formatClienteMontoSummary(row: ViajeClienteDraft, desgloseActivo: boolean): string {
+  let monto: number | undefined;
+  if (desgloseActivo) {
+    const cantidad = Number(row.cantidadStr.replace(',', '.'));
+    const precioUnitario = parseCurrencyForMoneda(row.precioUnitarioStr, row.moneda);
+    monto = Number.isFinite(cantidad) && cantidad > 0 && precioUnitario != null ? cantidad * precioUnitario : undefined;
+  } else {
+    monto = parseCurrencyForMoneda(row.montoStr, row.moneda);
+  }
+  if (!monto) return '';
+  return `${row.moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 /**
  * Tarjeta colapsable genérica para un cliente del viaje (principal o adicional) —
@@ -23,25 +39,37 @@ const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 export function ClienteCard({
   title,
   summary,
+  summaryRight,
   removable,
   onRemove,
   defaultOpen = true,
+  open: openProp,
+  onToggle: onToggleProp,
   children,
 }: {
   title: string;
   summary?: string;
+  /** Dato corto (ej. monto) alineado a la derecha del resumen colapsado, separado del texto de ruta. */
+  summaryRight?: string;
   removable?: boolean;
   onRemove?: () => void;
+  /** Estado inicial cuando el open/close no es controlado (ver `open`/`onToggle`). */
   defaultOpen?: boolean;
+  /** Si se pasa junto con `onToggle`, el open/close pasa a ser controlado por el padre. */
+  open?: boolean;
+  onToggle?: () => void;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : internalOpen;
+  const toggle = controlado ? onToggleProp! : () => setInternalOpen((o) => !o);
   return (
     <div className="mb-3 border border-black/10 last:mb-0">
       <div className="flex items-center gap-2 bg-vialto-mist/40 px-3 py-2">
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggle}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-expanded={open}
         >
@@ -53,7 +81,10 @@ export function ClienteCard({
           </span>
           <span className="shrink-0 text-sm font-medium text-vialto-charcoal">{title}</span>
           {!open && summary && (
-            <span className="min-w-0 truncate text-xs text-vialto-steel">{summary}</span>
+            <span className="min-w-0 flex-1 truncate text-xs text-vialto-steel">{summary}</span>
+          )}
+          {!open && summaryRight && (
+            <span className="shrink-0 text-xs font-medium text-vialto-charcoal">{summaryRight}</span>
           )}
         </button>
         {removable && (
@@ -83,6 +114,12 @@ interface Props {
   paisesLoading: boolean;
   onNuevoPaisOrigen: (clienteIndex: number) => void;
   onNuevoPaisDestino: (clienteIndex: number, destinoIndex: number) => void;
+  /**
+   * Si se pasa, el país de origen/destino queda fijo a este país (config de
+   * superadmin `Tenant.paisOrigenDestinoOculto`): no se muestra el selector
+   * de país en ninguna fila, solo el buscador de ciudad.
+   */
+  paisFijo?: Pais | null;
   /** Si se pasa, agrega "+ Nuevo cliente" al selector de cada fila. */
   onNuevoCliente?: (clienteIndex: number) => void;
   opcionesProducto: OpcionProducto[];
@@ -120,8 +157,32 @@ export function ViajeClientesFieldset({
   minRows = 0,
   labelPrefix = 'Cliente adicional',
   mostrarProductos = true,
+  paisFijo = null,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
+  const [openIndexes, setOpenIndexes] = useState<Set<number>>(
+    () => new Set(rows.map((_, idx) => idx)),
+  );
+  const prevRowsLengthRef = useRef(rows.length);
+
+  useEffect(() => {
+    if (rows.length > prevRowsLengthRef.current) {
+      // Se agregó un cliente nuevo: colapsa el resto y deja expandido solo el último.
+      setOpenIndexes(new Set([rows.length - 1]));
+    } else if (rows.length < prevRowsLengthRef.current) {
+      setOpenIndexes((prev) => new Set([...prev].filter((idx) => idx < rows.length)));
+    }
+    prevRowsLengthRef.current = rows.length;
+  }, [rows.length]);
+
+  function toggleOpen(i: number) {
+    setOpenIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
 
   function update(i: number, patch: Partial<ViajeClienteDraft>) {
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -139,17 +200,23 @@ export function ViajeClientesFieldset({
       {rows.map((row, i) => {
         const bloqueado = !!row.facturacionEstado && !['sin_facturar', 'anulado'].includes(row.facturacionEstado);
         const nombre = clientes.find((c) => c.id === row.clienteId)?.nombre;
-        const summary = textoRutaViaje(
-          row.origen,
-          row.destinosRows.map((r) => r.etiqueta).filter(Boolean),
-        );
+        // Sugerencias "para la vuelta": solo tienen sentido a partir del 2do cliente.
+        const sugerenciaOrigen = i > 0 ? ultimoDestinoCargado(rows[i - 1]) : null;
+        const primero = rows[0];
+        const sugerenciaDestino =
+          i > 0 && primero?.origen.trim() ? { pais: primero.paisOrigen, etiqueta: primero.origen } : null;
+        const summary = textoRutaViaje(row.origen, row.destinosRows.map((r) => r.etiqueta).filter(Boolean));
+        const summaryMonto = formatClienteMontoSummary(row, desgloseActivo);
         return (
           <ClienteCard
             key={i}
             title={nombre || `${labelPrefix} ${i + 1}`}
             summary={summary}
+            summaryRight={summaryMonto}
             removable={!bloqueado && i >= minRows}
             onRemove={() => setRemoveIndex(i)}
+            open={openIndexes.has(i)}
+            onToggle={() => toggleOpen(i)}
           >
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
@@ -167,23 +234,41 @@ export function ViajeClientesFieldset({
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <span className={fieldLabelClass}>Origen</span>
+                <div className="flex items-center gap-2">
+                  <span className={fieldLabelClass}>Origen</span>
+                  {sugerenciaOrigen && !row.origen.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => update(i, { paisOrigen: sugerenciaOrigen.pais, origen: sugerenciaOrigen.etiqueta })}
+                      className={autocompletarBtnClass}
+                      title={`Autocompletar con ${sugerenciaOrigen.etiqueta}`}
+                    >
+                      ↺ Autocompletar con {sugerenciaOrigen.etiqueta}
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-start gap-2">
-                  <PaisSearchSelect
-                    paises={paises}
-                    loading={paisesLoading}
-                    value={row.paisOrigen}
-                    onChange={(p) => update(i, { paisOrigen: p, origen: '' })}
-                    aria-label={`País de origen del cliente ${i + 1}`}
-                    className="w-full sm:w-40"
-                    inputClassName={inputClass}
-                    disabled={bloqueado}
-                    onNuevo={() => onNuevoPaisOrigen(i)}
-                  />
+                  {!paisFijo && (
+                    <PaisSearchSelect
+                      paises={paises}
+                      loading={paisesLoading}
+                      value={row.paisOrigen}
+                      onChange={(p) => update(i, { paisOrigen: p, origen: '' })}
+                      aria-label={`País de origen del cliente ${i + 1}`}
+                      className="w-full sm:w-40"
+                      inputClassName={inputClass}
+                      disabled={bloqueado}
+                      onNuevo={() => onNuevoPaisOrigen(i)}
+                    />
+                  )}
                   <div className="min-w-[200px] flex-1">
                     <CiudadCombobox
-                      pais={row.paisOrigen}
-                      paisNombre={paises.find((p) => (p.codigo || p.id) === row.paisOrigen)?.nombre}
+                      pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : row.paisOrigen}
+                      paisNombre={
+                        paisFijo
+                          ? paisFijo.nombre
+                          : paises.find((p) => (p.codigo || p.id) === row.paisOrigen)?.nombre
+                      }
                       value={row.origen}
                       onChange={(next) => update(i, { origen: next })}
                       inputClassName={inputClass}
@@ -202,6 +287,8 @@ export function ViajeClientesFieldset({
                   paises={paises}
                   paisesLoading={paisesLoading}
                   onNuevoPais={(destinoIndex) => onNuevoPaisDestino(i, destinoIndex)}
+                  paisFijo={paisFijo}
+                  sugerenciaPrimerDestino={sugerenciaDestino}
                 />
               </div>
               {mostrarProductos && (

@@ -17,6 +17,14 @@ export function emptyDestinoRow(pais: PaisCodigo = 'AR'): ViajeDestinoRowDraft {
   return { pais, etiqueta: '' };
 }
 
+/** Pisa el país de cada fila con `paisFijoCodigo` — ver `conPaisFijo` en `viajesClientes.ts`. */
+export function destinosConPaisFijo(
+  rows: ViajeDestinoRowDraft[],
+  paisFijoCodigo: string,
+): ViajeDestinoRowDraft[] {
+  return rows.map((r) => ({ ...r, pais: paisFijoCodigo }));
+}
+
 /** Destinos del viaje en orden operativo (fallback al campo legacy `destino`). */
 export function etiquetasDestinosDesdeViaje(
   v: Pick<Viaje, 'destino' | 'destinosViaje'>,

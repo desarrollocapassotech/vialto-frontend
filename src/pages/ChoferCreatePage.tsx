@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
@@ -21,6 +21,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { canAccessCombustible } from "@/lib/tenantModules";
 
 const emptyForm = (): ChoferFormState => ({
@@ -61,6 +62,10 @@ export function ChoferCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const { isVisible } = useFieldConfig("choferes");
+  const flotaPropiaVisible = isVisible("alta_chofer", "flotaPropia");
+  const transportistaExternoVisible = isVisible("alta_chofer", "transportistaExterno");
+
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
   }
@@ -69,6 +74,17 @@ export function ChoferCreatePage() {
     setAsignacionModo(modo);
     if (modo === "propio") patch({ transportistaId: "" });
   }
+
+  // Si el superadmin dejó una sola opción habilitada ("Flota propia" o
+  // "Transportista externo" — ver Configuración por empresa), el modo queda
+  // forzado a esa opción sin mostrar el radio (ver TransportistaAsignacionFields).
+  useEffect(() => {
+    if (!transportistaExternoVisible && asignacionModo !== "propio") {
+      applyAsignacionModo("propio");
+    } else if (!flotaPropiaVisible && asignacionModo !== "externo") {
+      applyAsignacionModo("externo");
+    }
+  }, [flotaPropiaVisible, transportistaExternoVisible, asignacionModo]);
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
@@ -196,6 +212,8 @@ export function ChoferCreatePage() {
           }}
           transportistas={transportistas}
           loadingTransportistas={loadingTransportistas}
+          mostrarFlotaPropia={flotaPropiaVisible}
+          mostrarTransportistaExterno={transportistaExternoVisible}
         />
         <CrudFieldError message={fieldErrors.transportistaId} />
         {showPinField && (

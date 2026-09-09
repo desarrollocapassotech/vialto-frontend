@@ -44,7 +44,7 @@ export function ViajeProductosLista({
   }
 
   function addRow() {
-    onChange([...value, { productoId: '' }]);
+    onChange([...value, { productoId: '', cantidad: 1 }]);
   }
 
   return (
@@ -98,7 +98,7 @@ export function ViajeProductosLista({
       ))}
       <button
         type="button"
-        disabled={disabled}
+        disabled={disabled || value.some((item) => !item.productoId.trim())}
         onClick={addRow}
         className="h-9 w-fit px-3 text-xs uppercase tracking-wider border border-black/20 bg-white hover:bg-vialto-mist disabled:opacity-50"
       >
@@ -118,7 +118,7 @@ export function ViajeProductosLista({
             if (nuevoParaIndex !== null) {
               patchRow(nuevoParaIndex, { productoId: p.id });
             } else {
-              onChange([...value, { productoId: p.id }]);
+              onChange([...value, { productoId: p.id, cantidad: 1 }]);
             }
             setShowNuevo(false);
             setNuevoParaIndex(null);

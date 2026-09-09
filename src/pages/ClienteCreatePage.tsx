@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { CrudFieldError } from "@/components/crud/CrudFieldError";
@@ -15,6 +15,7 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import {
   idFiscalPorPais,
   validarIdFiscal,
@@ -46,7 +47,8 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const paisVisible = isVisible("alta_cliente", "pais");
+  const paisFijo = useTenantPaisFijo(tenantId || undefined);
+  const paisVisible = isVisible("alta_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
   const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
   const direccionVisible = isVisible("alta_cliente", "direccion");
@@ -62,6 +64,12 @@ export function ClienteCreatePage() {
     setCondicionIva(null);
     setCondicionTributaria("");
   }
+
+  // País oculto por config de superadmin: se completa solo con el país fijo del
+  // tenant, sin mostrar el selector (ver useTenantPaisFijo).
+  useEffect(() => {
+    if (paisFijo && pais !== paisFijo) setPais(paisFijo);
+  }, [paisFijo, pais]);
 
   async function onSubmit() {
     const errs: Record<string, string> = {};

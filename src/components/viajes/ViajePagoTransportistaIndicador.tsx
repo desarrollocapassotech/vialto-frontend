@@ -3,6 +3,7 @@ import {
   calcularSaldoTransportista,
   estadoPagoTransportistaExterno,
 } from '@/lib/viajesTransportistaPagos';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 import type { Viaje } from '@/types/api';
 
 const badgeBase =
@@ -17,6 +18,9 @@ type Props = {
 
 /** Badge bajo ganancia bruta: deuda pendiente o transportista liquidado. */
 export function ViajePagoTransportistaIndicador({ viaje, onClick }: Props) {
+  const { isVisible } = useFieldConfig('viajes');
+  if (!isVisible('detalle_viaje', 'pagosTransportista')) return null;
+
   const estado = estadoPagoTransportistaExterno(viaje);
   if (estado === 'no_aplica' || estado === 'sin_precio') return null;
 

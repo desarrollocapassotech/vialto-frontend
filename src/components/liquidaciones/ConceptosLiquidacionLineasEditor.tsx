@@ -435,9 +435,7 @@ export function ConceptosLiquidacionLineasEditor({
         </div>
       ) : lineas.length === 0 ? (
         <p className="text-xs text-vialto-steel">
-          {catalogo.length > 0
-            ? "Podés agregar conceptos precargados del catálogo (Configuración ARCA)."
-            : "No hay conceptos precargados. Creá uno acá o en Configuración ARCA."}
+          
         </p>
       ) : (
         <div className="space-y-2">

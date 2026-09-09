@@ -44,6 +44,24 @@ export interface ViajeClienteApiItem {
   precioUnitario?: number;
 }
 
+/**
+ * Pisa el país de origen y de cada destino de todas las filas con
+ * `paisFijoCodigo` — usado cuando el tenant tiene
+ * `paisOrigenDestinoOculto` activo (el selector de país está oculto en la
+ * UI, así que lo que se manda a la API tiene que ser siempre el país fijo,
+ * sin depender de qué traía el draft).
+ */
+export function conPaisFijo(
+  rows: ViajeClienteDraft[],
+  paisFijoCodigo: string,
+): ViajeClienteDraft[] {
+  return rows.map((row) => ({
+    ...row,
+    paisOrigen: paisFijoCodigo,
+    destinosRows: row.destinosRows.map((d) => ({ ...d, pais: paisFijoCodigo })),
+  }));
+}
+
 export function emptyClienteRow(): ViajeClienteDraft {
   return {
     clienteId: '',
@@ -56,6 +74,15 @@ export function emptyClienteRow(): ViajeClienteDraft {
     cantidadStr: '',
     precioUnitarioStr: '',
   };
+}
+
+/**
+ * Último destino con ciudad cargada de una fila de cliente (recorre desde el
+ * final) — usado para sugerir el origen del cliente siguiente en la vuelta.
+ */
+export function ultimoDestinoCargado(row: ViajeClienteDraft): { pais: PaisCodigo; etiqueta: string } | null {
+  const destino = [...row.destinosRows].reverse().find((d) => d.etiqueta.trim());
+  return destino ? { pais: destino.pais, etiqueta: destino.etiqueta } : null;
 }
 
 /** Filas de formulario a partir de `clientesViaje` del viaje (vacío si es un viaje legacy de un solo cliente). */
@@ -139,7 +166,18 @@ export async function validarClientesRows(
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const clienteId = row.clienteId.trim();
-    if (!clienteId) continue;
+    const filaSinUsar =
+      !clienteId &&
+      !row.origen.trim() &&
+      !row.destinosRows.some((d) => d.etiqueta.trim()) &&
+      !row.montoStr.trim() &&
+      !row.cantidadStr.trim() &&
+      !row.precioUnitarioStr.trim();
+    if (filaSinUsar) continue;
+    if (!clienteId) {
+      rowErrors[i] = 'Seleccioná un cliente.';
+      continue;
+    }
     if (seen.has(clienteId)) {
       rowErrors[i] = 'Este cliente ya está agregado al viaje.';
       continue;

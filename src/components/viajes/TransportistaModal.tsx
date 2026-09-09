@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError, apiJson } from '@/lib/api';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { friendlyError } from '@/lib/friendlyError';
 import { Spinner } from '@/components/ui/Spinner';
 import { idFiscalPorPais, validarIdFiscal, condicionTributariaPorPais } from '@/lib/ciudades';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
+import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
@@ -33,11 +34,19 @@ export function TransportistaModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  const paisFijo = useTenantPaisFijo(tenantId);
+
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
     setCondicionIva(null);
     setCondicionTributaria('');
   }
+
+  // País oculto por config de superadmin: se completa solo con el país fijo del
+  // tenant, sin mostrar el selector (ver useTenantPaisFijo).
+  useEffect(() => {
+    if (paisFijo && pais !== paisFijo) setPais(paisFijo);
+  }, [paisFijo, pais]);
 
   const errorFiscal = idFiscal.trim() ? validarIdFiscal(pais, idFiscal.trim()) : null;
   const condInfo = condicionTributariaPorPais(pais);
@@ -46,7 +55,7 @@ export function TransportistaModal({
   async function submit() {
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = 'Ingresá el nombre del transportista.';
-    if (!pais) errs.pais = 'Seleccioná el país.';
+    if (!paisFijo && !pais) errs.pais = 'Seleccioná el país.';
     if (!idFiscal.trim()) {
       const label = pais ? idFiscalPorPais(pais).label : 'ID fiscal';
       errs.idFiscal = `Ingresá el ${label.toLowerCase()}.`;
@@ -118,11 +127,13 @@ export function TransportistaModal({
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
-            <label className="flex flex-col gap-1">
-              <span className={L}>País <span className="text-red-500">*</span></span>
-              <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
-              <CrudFieldError message={fieldErrors.pais} />
-            </label>
+            {!paisFijo && (
+              <label className="flex flex-col gap-1">
+                <span className={L}>País <span className="text-red-500">*</span></span>
+                <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
+                <CrudFieldError message={fieldErrors.pais} />
+              </label>
+            )}
             <label className="flex flex-col gap-1">
               <span className={L}>{idFiscalPorPais(pais).label} <span className="text-red-500">*</span></span>
               <input

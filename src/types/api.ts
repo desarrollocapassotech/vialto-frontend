@@ -52,6 +52,7 @@ export interface ViajeCliente {
   precioUnitario: number | null;
   facturaId?: string | null;
   facturacionEstado: string;
+  factura?: { ivaPct: number | null } | null;
 }
 
 export interface Viaje {
@@ -157,6 +158,7 @@ export interface Viaje {
     cbteNro?: number | null;
     ptoVenta?: number | null;
     fechaEmision?: string;
+    ivaPct?: number | null;
   } | null;
   liquidacionesViaje?: {
     liquidacionId: string;
@@ -385,6 +387,14 @@ export interface Tenant {
    * 'manual'. Solo editable desde superadmin (panel Empresas). Ver Liquidacion.estado.
    */
   liquidacionAnulacionMetodo: string;
+  /** true = oculta el selector de país en origen/destino de Viajes (queda solo el buscador de ciudad). */
+  paisOrigenDestinoOculto?: boolean;
+  /** Id de Pais (catálogo propio del tenant) a usar cuando paisOrigenDestinoOculto=true. */
+  paisOrigenDestinoFijoId?: string | null;
+  /** Código de 2 letras resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
+  paisOrigenDestinoFijoCodigo?: string | null;
+  /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
+  paisOrigenDestinoFijoNombre?: string | null;
   createdAt: string;
 }
 

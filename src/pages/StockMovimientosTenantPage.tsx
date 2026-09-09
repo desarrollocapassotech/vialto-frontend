@@ -32,6 +32,7 @@ import {
 import { movimientoStockTipoNumeroClass } from "@/lib/stockMovimientoTipo";
 import { presentacionLabelFromLike } from "@/lib/stockPresentacion";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   StockOperacion,
   Producto,
@@ -71,6 +72,7 @@ export function StockMovimientosTenantPage({
 }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
+  const { isVisible } = useFieldConfig("stock");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -149,7 +151,12 @@ export function StockMovimientosTenantPage({
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const excelRows = flattenOperacionesMixtas(items);
-  const excelCols = stockOperacionesMixtasColumnas();
+  const excelCols = stockOperacionesMixtasColumnas().filter((c) => {
+    if (c.id === "conductor") return isVisible("alta_egreso", "choferId");
+    if (c.id === "destinatario") return isVisible("alta_egreso", "destinatarioId");
+    if (c.id === "destino") return isVisible("alta_egreso", "direccionEntregaId");
+    return true;
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
