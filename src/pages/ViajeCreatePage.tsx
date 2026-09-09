@@ -660,6 +660,16 @@ export function ViajeCreatePage() {
       ? (Number(cantidadTransportista.replace(",", ".")) || 0) *
         (parseCurrencyForMoneda(precioUnitarioTransportista, monedaPrecioTransportista) || 0)
       : parseCurrencyForMoneda(precioTransportistaExterno, monedaPrecioTransportista);
+
+    if (externo && (!precioTransportistaNum || precioTransportistaNum <= 0)) {
+      setError(
+        desgloseActivo
+          ? "Cargá la cantidad y el precio unitario del transporte."
+          : "Ingresá el precio del transporte.",
+      );
+      return;
+    }
+
     const pagoTransportistaError = externo
       ? validarPagosTransportistaDraftForm({
           transportistaId: transportistaId.trim(),

@@ -166,7 +166,18 @@ export async function validarClientesRows(
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const clienteId = row.clienteId.trim();
-    if (!clienteId) continue;
+    const filaSinUsar =
+      !clienteId &&
+      !row.origen.trim() &&
+      !row.destinosRows.some((d) => d.etiqueta.trim()) &&
+      !row.montoStr.trim() &&
+      !row.cantidadStr.trim() &&
+      !row.precioUnitarioStr.trim();
+    if (filaSinUsar) continue;
+    if (!clienteId) {
+      rowErrors[i] = 'Seleccioná un cliente.';
+      continue;
+    }
     if (seen.has(clienteId)) {
       rowErrors[i] = 'Este cliente ya está agregado al viaje.';
       continue;
