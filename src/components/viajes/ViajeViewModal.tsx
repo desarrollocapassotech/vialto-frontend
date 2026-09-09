@@ -21,6 +21,9 @@ import {
   etapaViajeBadgeClass,
   etapaViajeBadgeClassDefault,
   etapaViajeLabel,
+  facturacionEstadoAgregado,
+  facturacionEstadoLabel,
+  facturacionPermiteVincular,
   tooltipFacturacionEstado,
   tooltipLiquidacionEstado,
 } from "@/lib/viajesIndicadores";
@@ -130,6 +133,12 @@ export function ViajeViewModal({
   // destacar uno arriba y el resto como "otros".
   const clientesExtra = viaje.clientesViaje ?? [];
   const esMultiCliente = clientesExtra.length > 0;
+  /** Facturado: el monto a mostrar incluye el IVA de la factura. Sin facturar: neto tal cual. */
+  function montoConIva(monto: number | null, ivaPct: number | null, facturado: boolean) {
+    if (monto == null) return monto;
+    if (!facturado || ivaPct == null) return monto;
+    return Math.round(monto * (1 + ivaPct / 100) * 100) / 100;
+  }
   const clientesDetalle = esMultiCliente
     ? [
         {
@@ -140,16 +149,28 @@ export function ViajeViewModal({
             etiquetasDestinosDesdeViaje(viaje),
           ),
           carga: productosDesc || "—",
-          monto: viaje.monto,
           monedaMonto: viaje.monedaMonto ?? null,
+          facturado: !facturacionPermiteVincular(viaje.facturacionEstado),
+          ivaPct: viaje.factura?.ivaPct ?? null,
+          monto: montoConIva(
+            viaje.monto,
+            viaje.factura?.ivaPct ?? null,
+            !facturacionPermiteVincular(viaje.facturacionEstado),
+          ),
         },
         ...clientesExtra.map((c) => ({
           id: c.id,
           nombre: c.cliente?.nombre || "—",
           ruta: rutaClienteAdicional(c),
           carga: cargaClienteAdicional(c),
-          monto: c.monto,
           monedaMonto: c.monedaMonto,
+          facturado: !facturacionPermiteVincular(c.facturacionEstado),
+          ivaPct: c.factura?.ivaPct ?? null,
+          monto: montoConIva(
+            c.monto,
+            c.factura?.ivaPct ?? null,
+            !facturacionPermiteVincular(c.facturacionEstado),
+          ),
         })),
       ]
     : [];
@@ -283,7 +304,7 @@ export function ViajeViewModal({
         </span>
       }
       onClose={bloqueado ? () => {} : onClose}
-      maxWidthClass="sm:max-w-2xl"
+      maxWidthClass="sm:max-w-4xl"
       scrollBody
       footer={
         <>
@@ -370,7 +391,11 @@ export function ViajeViewModal({
               <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
                 Facturación
               </p>
-              <p className="mt-1 text-sm">{tooltipFacturacionEstado(viaje)}</p>
+              <p className="mt-1 text-sm">
+                {esMultiCliente
+                  ? facturacionEstadoLabel[facturacionEstadoAgregado(viaje)]
+                  : tooltipFacturacionEstado(viaje)}
+              </p>
             </div>
             {viaje.liquidacionEstado != null && (
               <div>
@@ -440,9 +465,30 @@ export function ViajeViewModal({
                   tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
                 },
                 {
+                  id: "facturado",
+                  header: "Facturado",
+                  cell: (c) =>
+                    c.facturado
+                      ? `Sí${c.ivaPct != null ? ` (${c.ivaPct}% IVA)` : ""}`
+                      : "No",
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                },
+                {
                   id: "monto",
                   header: "Monto",
-                  cell: (c) => fmtMonto(c.monto, c.monedaMonto),
+                  cell: (c) => (
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {c.facturado && c.ivaPct != null && (
+                        <span
+                          className="rounded-sm border border-black/10 px-1 py-px text-[9px] font-normal uppercase tracking-wide text-vialto-steel"
+                          title={`Incluye ${c.ivaPct}% de IVA`}
+                        >
+                          Con IVA
+                        </span>
+                      )}
+                      {fmtMonto(c.monto, c.monedaMonto)}
+                    </span>
+                  ),
                   thClassName: `${listadoTablaThClass} text-right`,
                   tdClassName: `${listadoTablaTdClass} text-right tabular-nums whitespace-nowrap font-medium`,
                 },

@@ -52,6 +52,7 @@ export interface ViajeCliente {
   precioUnitario: number | null;
   facturaId?: string | null;
   facturacionEstado: string;
+  factura?: { ivaPct: number | null } | null;
 }
 
 export interface Viaje {
@@ -157,6 +158,7 @@ export interface Viaje {
     cbteNro?: number | null;
     ptoVenta?: number | null;
     fechaEmision?: string;
+    ivaPct?: number | null;
   } | null;
   liquidacionesViaje?: {
     liquidacionId: string;

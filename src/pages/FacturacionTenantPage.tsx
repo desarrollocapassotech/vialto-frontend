@@ -647,10 +647,6 @@ export function FacturacionTenantPage({
 
   async function handleCreate() {
     setDraftError(null);
-    if (!draft.numero.trim()) {
-      setDraftError("Ingresá el número de factura.");
-      return;
-    }
     if (!draft.fechaEmision) {
       setDraftError("Ingresá la fecha de emisión.");
       return;
@@ -714,10 +710,6 @@ export function FacturacionTenantPage({
   async function saveEdit() {
     if (!editingId || !editDraft) return;
     setEditError(null);
-    if (!editDraft.numero.trim()) {
-      setEditError("Ingresá el número de factura.");
-      return;
-    }
     if (!editDraft.fechaEmision) {
       setEditError("Ingresá la fecha de emisión.");
       return;
@@ -1442,7 +1434,7 @@ export function FacturacionTenantPage({
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
             onClick={() => setViewingFactura(f)}
           >
-            <td className="px-4 py-3 font-medium break-all">{f.numero}</td>
+            <td className="px-4 py-3 font-medium break-all">{f.numero || "—"}</td>
             <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
               {nombreContraparte(f)}
             </td>
@@ -1499,7 +1491,7 @@ export function FacturacionTenantPage({
         renderMobileCard={(f) => (
           <ListadoCard
             onClick={() => setViewingFactura(f)}
-            primary={f.numero}
+            primary={f.numero || "—"}
             fields={[
               { label: "Cliente", value: nombreContraparte(f) },
               { label: "Emisión", value: fmtFecha(f.fechaEmision) },

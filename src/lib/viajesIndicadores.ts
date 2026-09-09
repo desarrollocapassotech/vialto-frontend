@@ -173,6 +173,46 @@ export function getVisualFacturacionEstado(estadoBD: string | null | undefined, 
   return e as FacturacionEstado;
 }
 
+/**
+ * Estado de facturación agregado de un viaje: si tiene clientes adicionales,
+ * combina el estado del principal + cada cliente adicional en un solo
+ * resultado (ej. `facturado_parcial` si unos sí y otros no) — mismo criterio
+ * para el badge de la grilla (`ViajeFacturacionIndicador`) y cualquier otro
+ * lugar de la UI (ej. el campo "Facturación" del detalle), para que ninguno
+ * muestre un texto distinto basado solo en `viaje.facturacionEstado` (que en
+ * un viaje multi-cliente representa únicamente al cliente principal).
+ */
+export function facturacionEstadoAgregado(
+  viaje: Pick<Viaje, 'facturacionEstado'> & {
+    clientesViaje?: { facturacionEstado: string | null }[];
+  },
+): FacturacionEstado {
+  const estadoPrincipal = (viaje.facturacionEstado ?? 'sin_facturar') as FacturacionEstado;
+  if (!viaje.clientesViaje || viaje.clientesViaje.length === 0) {
+    return estadoPrincipal;
+  }
+
+  const estados = [viaje.facturacionEstado, ...viaje.clientesViaje.map((c) => c.facturacionEstado)];
+  const isFacturado = (e: string | null | undefined) => e === 'facturado' || e === 'cobrado';
+
+  const todosFacturados = estados.every(isFacturado);
+  const algunoError = estados.some((e) => e === 'error_afip');
+  const algunoEsperando = estados.some((e) => e === 'esperando_afip');
+  const algunoFacturado = estados.some(isFacturado);
+  const todosAnulados = estados.every((e) => e === 'anulado');
+  const todosSinFacturarOAnulados = estados.every((e) => e === 'sin_facturar' || e === 'anulado');
+
+  if (algunoError) return 'error_afip';
+  if (algunoEsperando) return 'esperando_afip';
+  if (todosAnulados) return 'anulado';
+  if (todosSinFacturarOAnulados) return 'sin_facturar';
+  if (algunoFacturado && !todosFacturados) return 'facturado_parcial';
+  if (todosFacturados) {
+    return estados.every((e) => e === 'cobrado') ? 'cobrado' : 'facturado';
+  }
+  return 'sin_facturar';
+}
+
 export function tooltipFacturacionEstado(viaje: Pick<Viaje, 'facturacionEstado' | 'factura'>): string {
   const estado = (viaje.facturacionEstado ?? 'sin_facturar') as FacturacionEstado;
   if (estado === 'error_afip' && viaje.factura?.arcaError) {
