@@ -9,6 +9,7 @@ import {
 } from "@/lib/viajesIndicadores";
 import { viajeRequierePagosTransportista } from "@/lib/viajesTransportistaPagos";
 import { PagosTransportistaSummary } from "@/components/viajes/PagosTransportistaSummary";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type { Viaje } from "@/types/api";
 
 /**
@@ -30,6 +31,7 @@ export function ViajeLiquidacionDetalleModal({
   onRegistrarPago?: () => void;
 }) {
   const estado = viaje.liquidacionEstado as LiquidacionEstado | null;
+  const { isVisible } = useFieldConfig("viajes");
 
   return (
     <ViewModalShell
@@ -64,7 +66,8 @@ export function ViajeLiquidacionDetalleModal({
             </p>
           </>
         )}
-        {viajeRequierePagosTransportista(viaje) && (
+        {isVisible("detalle_viaje", "pagosTransportista") &&
+          viajeRequierePagosTransportista(viaje) && (
           <PagosTransportistaSummary
             viaje={viaje}
             onRegistrarPago={onRegistrarPago}

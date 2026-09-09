@@ -21,6 +21,7 @@ import {
   stockOperacionColumnas,
 } from "@/lib/stockExcelExport";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   StockOperacion,
   Cliente,
@@ -46,6 +47,8 @@ export function IngresosStockHistorialTenantPage({
 }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
+  const { isVisible } = useFieldConfig("stock");
+  const mostrarRemitoProveedor = isVisible("alta_ingreso", "numeroRemitoProveedor");
 
   const {
     setSearchParams,
@@ -127,7 +130,9 @@ export function IngresosStockHistorialTenantPage({
     }
   }, [platform, params, tenantId, getToken]);
 
-  const excelCols = stockOperacionColumnas("ingreso");
+  const excelCols = stockOperacionColumnas("ingreso").filter(
+    (c) => c.id !== "remitoProveedor" || mostrarRemitoProveedor,
+  );
   const excelRows = flattenStockOperaciones(exportRows);
 
   const exportButton = (
@@ -212,13 +217,17 @@ export function IngresosStockHistorialTenantPage({
             ),
             cell: (op) => formatMovimientoStockFechaFromIso(op.fecha),
           },
-          {
-            id: "numeroRemitoProveedor",
-            thClassName: `${listadoTablaThClass} align-top`,
-            header: "N° Remito Proveedor",
-            cell: (op) => op.numeroRemitoProveedor || "—",
-            tdClassName: `${listadoTablaTdClass} font-mono`,
-          },
+          ...(mostrarRemitoProveedor
+            ? [
+                {
+                  id: "numeroRemitoProveedor",
+                  thClassName: `${listadoTablaThClass} align-top`,
+                  header: "N° Remito Proveedor",
+                  cell: (op: StockOperacion) => op.numeroRemitoProveedor || "—",
+                  tdClassName: `${listadoTablaTdClass} font-mono`,
+                },
+              ]
+            : []),
           {
             id: "cliente",
             thClassName: `${listadoTablaThClass} align-top`,

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 
 export type ViajeSeleccionable = {
   id: string;
@@ -61,6 +62,11 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const { isVisible } = useFieldConfig("viajes");
+  const mostrarChofer =
+    isVisible("detalle_viaje", "choferId") ||
+    isVisible("detalle_viaje", "choferExternoId");
+  const mostrarProducto = isVisible("detalle_viaje", "productoItems");
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -69,8 +75,12 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
         const numero = numeroVisibleViaje(v).toLowerCase();
         const origen = (v.origen ?? "").toLowerCase();
         const destino = (v.destino ?? "").toLowerCase();
-        const chofer = nombreChoferSeleccion(v).toLowerCase();
-        const productos = nombresProductosSeleccion(v).toLowerCase();
+        const chofer = mostrarChofer
+          ? nombreChoferSeleccion(v).toLowerCase()
+          : "";
+        const productos = mostrarProducto
+          ? nombresProductosSeleccion(v).toLowerCase()
+          : "";
         if (
           !numero.includes(q) &&
           !origen.includes(q) &&
@@ -85,7 +95,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
       if (fechaHasta && (!fecha || fecha > fechaHasta)) return false;
       return true;
     });
-  }, [viajes, busqueda, fechaDesde, fechaHasta]);
+  }, [viajes, busqueda, fechaDesde, fechaHasta, mostrarChofer, mostrarProducto]);
 
   const hayFiltrosActivos = !!busqueda.trim() || !!fechaDesde || !!fechaHasta;
 
@@ -172,8 +182,12 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 <th className="px-2 py-2 text-left">ID personalizado</th>
                 <th className="px-2 py-2 text-left">Fecha</th>
                 <th className="px-2 py-2 text-left">Origen → Destino</th>
-                <th className="px-2 py-2 text-left">Producto</th>
-                <th className="px-2 py-2 text-left">Chofer</th>
+                {mostrarProducto && (
+                  <th className="px-2 py-2 text-left">Producto</th>
+                )}
+                {mostrarChofer && (
+                  <th className="px-2 py-2 text-left">Chofer</th>
+                )}
                 <th className="px-2 py-2 text-right">Monto</th>
               </tr>
             </thead>
@@ -215,12 +229,16 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                     <td className="px-2 py-1.5 text-vialto-steel">
                       {v.origen ?? "—"} → {v.destino ?? "—"}
                     </td>
-                    <td className="px-2 py-1.5 text-vialto-steel">
-                      {nombresProductosSeleccion(v)}
-                    </td>
-                    <td className="px-2 py-1.5 text-vialto-steel">
-                      {nombreChoferSeleccion(v)}
-                    </td>
+                    {mostrarProducto && (
+                      <td className="px-2 py-1.5 text-vialto-steel">
+                        {nombresProductosSeleccion(v)}
+                      </td>
+                    )}
+                    {mostrarChofer && (
+                      <td className="px-2 py-1.5 text-vialto-steel">
+                        {nombreChoferSeleccion(v)}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-right tabular-nums text-vialto-steel">
                       {renderMonto(v)}
                     </td>

@@ -8,6 +8,7 @@ import { getDivisionImpacto } from '@/lib/stockDivision';
 import { etiquetaStockDocumentoExterno } from '@/lib/stockDocumentoExterno';
 import { formatInstantEsAr24h, formatMovimientoStockFechaFromIso } from '@/lib/viajeFechaHora';
 import { presentacionLabelFromLike } from '@/lib/stockPresentacion';
+import { useFieldConfig } from '@/hooks/useFieldConfig';
 import type { StockOperacion } from '@/types/api';
 
 const DT =
@@ -44,6 +45,7 @@ export function StockOperacionViewModal({
   onClose: () => void;
 }) {
   const [previewFotoIdx, setPreviewFotoIdx] = useState<number | null>(null);
+  const { isVisible } = useFieldConfig('stock');
   const fotosUrls = operacion.tipo === 'ingreso' ? (operacion.fotosUrls ?? []) : [];
   const divisionImpacto =
     operacion.tipo === 'division' ? getDivisionImpacto(operacion) : null;
@@ -114,9 +116,11 @@ export function StockOperacionViewModal({
           <Campo label="N° Remito" value={operacion.numeroRemito} mono />
         )}
 
-        {operacion.tipo === 'ingreso' && operacion.numeroRemitoProveedor && (
-          <Campo label="N° Remito Proveedor" value={operacion.numeroRemitoProveedor} mono />
-        )}
+        {operacion.tipo === 'ingreso' &&
+          operacion.numeroRemitoProveedor &&
+          isVisible('alta_ingreso', 'numeroRemitoProveedor') && (
+            <Campo label="N° Remito Proveedor" value={operacion.numeroRemitoProveedor} mono />
+          )}
 
         {operacion.tipo === 'egreso' && (
           <>
@@ -124,9 +128,15 @@ export function StockOperacionViewModal({
               label="Nº documento externo"
               value={etiquetaStockDocumentoExterno(operacion.numeroDocumentoExterno)}
             />
-            <Campo label="Conductor" value={operacion.entregadoPor ?? '—'} />
-            <Campo label="Destinatario" value={operacion.destinatario ?? '—'} />
-            <Campo label="Dirección / Ruta" value={operacion.destinoFinal ?? '—'} />
+            {isVisible('alta_egreso', 'choferId') && (
+              <Campo label="Conductor" value={operacion.entregadoPor ?? '—'} />
+            )}
+            {isVisible('alta_egreso', 'destinatarioId') && (
+              <Campo label="Destinatario" value={operacion.destinatario ?? '—'} />
+            )}
+            {isVisible('alta_egreso', 'direccionEntregaId') && (
+              <Campo label="Dirección / Ruta" value={operacion.destinoFinal ?? '—'} />
+            )}
           </>
         )}
 
@@ -135,7 +145,7 @@ export function StockOperacionViewModal({
         )}
 
         {/* Fotos del producto (ingresos) */}
-        {operacion.tipo === 'ingreso' && (
+        {operacion.tipo === 'ingreso' && isVisible('alta_ingreso', 'fotoFiles') && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 px-4 py-3">
             <dt className={DT}>Fotos del producto</dt>
             <dd className="sm:col-span-2 flex flex-wrap gap-2">

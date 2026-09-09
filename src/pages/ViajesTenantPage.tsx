@@ -1543,7 +1543,7 @@ export function ViajesTenantPage({
           );
       }
 
-      const cols = VIAJES_EXPORT_COLUMNS.filter((c) =>
+      const cols = viajesExportColumnsDisponibles.filter((c) =>
         selectedIds.includes(c.id),
       );
       await generarViajesExcel(
@@ -1831,6 +1831,17 @@ export function ViajesTenantPage({
   const mostrarColumnaChofer =
     isViajeFieldVisible("edicion_viaje", "choferId") ||
     isViajeFieldVisible("edicion_viaje", "choferExternoId");
+  const mostrarPagosTransportista = isViajeFieldVisible(
+    "edicion_viaje",
+    "pagosTransportista",
+  );
+  // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
+  // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
+  const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
+    if (c.id === "chofer") return mostrarColumnaChofer;
+    if (c.id === "estadoPago") return mostrarPagosTransportista;
+    return true;
+  });
   const tableColSpanBase = mostrarColumnaChofer ? 8 : 7;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
@@ -2114,7 +2125,7 @@ export function ViajesTenantPage({
             pagoTransportistaFiltro={pagoTransportistaFiltro}
             onFiltroFacturacion={aplicarFiltroFacturacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
-            mostrarFiltroPago={isViajeFieldVisible("edicion_viaje", "pagosTransportista")}
+            mostrarFiltroPago={mostrarPagosTransportista}
           />
         </div>
       )}
@@ -3410,7 +3421,7 @@ export function ViajesTenantPage({
 
         {exportModalOpen && (
           <ExcelExportModal
-            columns={VIAJES_EXPORT_COLUMNS}
+            columns={viajesExportColumnsDisponibles}
             rowCount={meta?.total ?? rows?.length ?? 0}
             onExport={handleExportarExcel}
             onClose={() => !exportandoExcel && setExportModalOpen(false)}
