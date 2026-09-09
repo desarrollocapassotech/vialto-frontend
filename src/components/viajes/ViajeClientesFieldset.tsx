@@ -346,7 +346,7 @@ export function ViajeClientesFieldset({
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className={fieldLabelClass}>Total a facturar</span>
+                    <span className={fieldLabelClass}>Total</span>
                     <div className="flex h-9 items-center border border-black/15 bg-vialto-mist/40 px-3 text-right text-sm tabular-nums text-vialto-steel">
                       <span className="w-full truncate">
                         {(

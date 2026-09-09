@@ -821,7 +821,7 @@ export function ViajeEditModal({
                           </div>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Total a facturar</span>
+                          <span className={labelClass}>Total</span>
                           <div
                             className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
                           >
