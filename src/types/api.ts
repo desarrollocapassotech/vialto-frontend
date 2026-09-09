@@ -389,6 +389,10 @@ export interface Tenant {
   paisOrigenDestinoOculto?: boolean;
   /** Id de Pais (catálogo propio del tenant) a usar cuando paisOrigenDestinoOculto=true. */
   paisOrigenDestinoFijoId?: string | null;
+  /** Código de 2 letras resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
+  paisOrigenDestinoFijoCodigo?: string | null;
+  /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
+  paisOrigenDestinoFijoNombre?: string | null;
   createdAt: string;
 }
 

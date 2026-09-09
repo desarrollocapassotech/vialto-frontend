@@ -612,6 +612,67 @@ export function CamposEmpresaPage() {
                         />
                       </td>
                     </tr>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Ocultar país (Viajes, Clientes y Transportistas)
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <ToggleSwitch
+                          checked={empresaPaisOculto}
+                          disabled={savingPaisOculto}
+                          onChange={() => void togglePaisOculto()}
+                          label={
+                            empresaPaisOculto
+                              ? "Mostrar selector de país"
+                              : "Ocultar selector de país"
+                          }
+                        />
+                      </td>
+                    </tr>
+                    {empresaPaisOculto && (
+                      <tr className="border-t border-black/10">
+                        <td className="px-4 py-2.5">
+                          País fijo
+                          <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                            Origen/destino de Viajes y el país fiscal de
+                            Clientes/Transportistas quedan fijados a este país
+                            (sin selector visible para el tenant).
+                          </p>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {paisesEmpresaLoading ? (
+                            <span className="text-sm text-vialto-steel">Cargando…</span>
+                          ) : paisesEmpresa.length === 0 ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-sm text-vialto-steel">
+                                Esta empresa no tiene países cargados.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setMostrarPaisModal(true)}
+                                className="border border-black/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-vialto-mist"
+                              >
+                                + Nuevo país
+                              </button>
+                            </div>
+                          ) : (
+                            <select
+                              value={empresaPaisFijoId}
+                              disabled={savingPaisFijo}
+                              onChange={(e) => void guardarPaisFijo(e.target.value)}
+                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                            >
+                              <option value="">Sin elegir…</option>
+                              {paisesEmpresa.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </>
                 )}
               </tbody>
@@ -875,66 +936,6 @@ export function CamposEmpresaPage() {
                         />
                       </td>
                     </tr>
-                    <tr className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        Ocultar país de origen/destino
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={empresaPaisOculto}
-                          disabled={savingPaisOculto}
-                          onChange={() => void togglePaisOculto()}
-                          label={
-                            empresaPaisOculto
-                              ? "Mostrar selector de país"
-                              : "Ocultar selector de país"
-                          }
-                        />
-                      </td>
-                    </tr>
-                    {empresaPaisOculto && (
-                      <tr className="border-t border-black/10">
-                        <td className="px-4 py-2.5">
-                          País fijo
-                          <p className="mt-0.5 text-xs font-normal text-vialto-steel">
-                            Origen y destino quedan fijados a este país (sin
-                            selector visible para el tenant).
-                          </p>
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {paisesEmpresaLoading ? (
-                            <span className="text-sm text-vialto-steel">Cargando…</span>
-                          ) : paisesEmpresa.length === 0 ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-sm text-vialto-steel">
-                                Esta empresa no tiene países cargados.
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setMostrarPaisModal(true)}
-                                className="border border-black/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-vialto-mist"
-                              >
-                                + Nuevo país
-                              </button>
-                            </div>
-                          ) : (
-                            <select
-                              value={empresaPaisFijoId}
-                              disabled={savingPaisFijo}
-                              onChange={(e) => void guardarPaisFijo(e.target.value)}
-                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
-                            >
-                              <option value="">Sin elegir…</option>
-                              {paisesEmpresa.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>

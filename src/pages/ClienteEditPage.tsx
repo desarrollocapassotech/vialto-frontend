@@ -16,6 +16,7 @@ import { PaisUbicacionSelect } from "@/components/forms/PaisUbicacionSelect";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
 import {
   paisCodigoDesdeTexto,
   idFiscalPorPais,
@@ -53,7 +54,8 @@ export function ClienteEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const paisVisible = isVisible("edicion_cliente", "pais");
+  const paisFijo = useTenantPaisFijo(tenantId || undefined);
+  const paisVisible = isVisible("edicion_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("edicion_cliente", "idFiscal");
   const condicionVisible = isVisible("edicion_cliente", "condicionIvaTributaria");
   const direccionVisible = isVisible("edicion_cliente", "direccion");
@@ -100,6 +102,12 @@ export function ClienteEditPage() {
     setCondicionIva(null);
     setCondicionTributaria("");
   }
+
+  // País oculto por config de superadmin: pisa lo que traiga el registro (aunque
+  // sea distinto) con el país fijo del tenant, sin mostrar el selector.
+  useEffect(() => {
+    if (paisFijo && pais !== paisFijo) setPais(paisFijo);
+  }, [paisFijo, pais]);
 
   async function onSave() {
     if (!id) return;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CrudFieldError } from '@/components/crud/CrudFieldError';
 import { CrudFieldLabel, CrudInput, CrudSelect } from '@/components/crud/CrudFields';
 import { PaisUbicacionSelect } from '@/components/forms/PaisUbicacionSelect';
@@ -14,6 +14,7 @@ import type { PaisCodigo } from '@/lib/ciudades';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Cliente, Transportista } from '@/types/api';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
+import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 
 type Entidad = 'cliente' | 'transportista';
 
@@ -70,8 +71,9 @@ export function CompletarDatosFiscalesInline({
 
   const formKey = entidad === 'cliente' ? 'edicion_cliente' : 'edicion_transportista';
   const { isVisible } = useFieldConfig(entidad === 'cliente' ? 'clientes' : 'transportistas');
-  
-  const paisVisible = forceArcaFields || isVisible(formKey, "pais");
+  const paisFijo = useTenantPaisFijo(tenantId);
+
+  const paisVisible = (forceArcaFields || isVisible(formKey, "pais")) && !paisFijo;
   const idFiscalVisible = forceArcaFields || isVisible(formKey, "idFiscal");
   const condicionVisible = forceArcaFields || isVisible(formKey, "condicionIvaTributaria");
   const direccionVisible = forceArcaFields || isVisible(formKey, "direccion");
@@ -87,6 +89,12 @@ export function CompletarDatosFiscalesInline({
     setCondicionIva(null);
     setCondicionTributaria('');
   }
+
+  // País oculto por config de superadmin: pisa lo que traiga el registro (aunque
+  // sea distinto) con el país fijo del tenant, sin mostrar el selector.
+  useEffect(() => {
+    if (paisFijo && pais !== paisFijo) setPais(paisFijo);
+  }, [paisFijo, pais]);
 
   const redInputClass = "!border-red-400 bg-red-50/50";
   const isNombreMissing = !nombre.trim();
