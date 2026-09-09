@@ -76,6 +76,15 @@ export function emptyClienteRow(): ViajeClienteDraft {
   };
 }
 
+/**
+ * Último destino con ciudad cargada de una fila de cliente (recorre desde el
+ * final) — usado para sugerir el origen del cliente siguiente en la vuelta.
+ */
+export function ultimoDestinoCargado(row: ViajeClienteDraft): { pais: PaisCodigo; etiqueta: string } | null {
+  const destino = [...row.destinosRows].reverse().find((d) => d.etiqueta.trim());
+  return destino ? { pais: destino.pais, etiqueta: destino.etiqueta } : null;
+}
+
 /** Filas de formulario a partir de `clientesViaje` del viaje (vacío si es un viaje legacy de un solo cliente). */
 export function clientesRowsDesdeViaje(
   v: Pick<Viaje, 'clientesViaje'>,
