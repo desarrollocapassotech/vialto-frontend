@@ -44,6 +44,24 @@ export interface ViajeClienteApiItem {
   precioUnitario?: number;
 }
 
+/**
+ * Pisa el país de origen y de cada destino de todas las filas con
+ * `paisFijoCodigo` — usado cuando el tenant tiene
+ * `paisOrigenDestinoOculto` activo (el selector de país está oculto en la
+ * UI, así que lo que se manda a la API tiene que ser siempre el país fijo,
+ * sin depender de qué traía el draft).
+ */
+export function conPaisFijo(
+  rows: ViajeClienteDraft[],
+  paisFijoCodigo: string,
+): ViajeClienteDraft[] {
+  return rows.map((row) => ({
+    ...row,
+    paisOrigen: paisFijoCodigo,
+    destinosRows: row.destinosRows.map((d) => ({ ...d, pais: paisFijoCodigo })),
+  }));
+}
+
 export function emptyClienteRow(): ViajeClienteDraft {
   return {
     clienteId: '',

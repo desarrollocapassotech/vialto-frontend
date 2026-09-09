@@ -6,7 +6,7 @@ import { CrudPageLayout } from "@/components/crud/CrudPageLayout";
 import { Stepper } from "@/components/ui/Stepper";
 import { useWizardStep } from "@/hooks/useWizardStep";
 import { PaisModal } from "@/components/viajes/PaisModal";
-import type { Pais } from "@/types/api";
+import type { Pais, Tenant } from "@/types/api";
 import { type ViajeOperacionModo } from "@/components/viajes/ViajeOperacionTipoFieldset";
 import { ViajeKmLitrosDialog } from "@/components/viajes/ViajeKmLitrosDialog";
 import { type GananciaBrutaManualDraftSlice } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
@@ -24,6 +24,7 @@ import {
   emptyClienteRow,
   clientesPayloadParaApi,
   validarClientesRows,
+  conPaisFijo,
   type ViajeClienteDraft,
 } from "@/lib/viajesClientes";
 import { apiJson, ApiError } from "@/lib/api";
@@ -213,6 +214,57 @@ export function ViajeCreatePage() {
     const combinados = [...paises, ...sessionPaises.filter((p) => !ids.has(p.id))];
     return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [paises, sessionPaises]);
+
+  // Solo se usa en modo superadmin (`tenantId` presente): `useMaestroData()` resuelve el
+  // tenant logueado, no el elegido — ver `tenantConfig` más abajo.
+  const [tenantConfigPlatform, setTenantConfigPlatform] = useState<Tenant | null>(null);
+  useEffect(() => {
+    if (!tenantId || !isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiJson<Tenant>(
+          `/api/tenants/${encodeURIComponent(tenantId)}`,
+          () => getToken(),
+        );
+        if (!cancelled) setTenantConfigPlatform(data);
+      } catch {
+        if (!cancelled) setTenantConfigPlatform(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, tenantId]);
+
+  const tenantConfig = tenantId ? tenantConfigPlatform : maestro.tenant;
+  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — hay que resolverlo contra
+   * el catálogo de países ya cargado; si el país fijado fue borrado, no aplica (fallback
+   * seguro: se sigue mostrando el selector). */
+  const paisFijo = useMemo(() => {
+    if (!tenantConfig?.paisOrigenDestinoOculto || !tenantConfig.paisOrigenDestinoFijoId) {
+      return null;
+    }
+    return paisesConSesion.find((p) => p.id === tenantConfig.paisOrigenDestinoFijoId) ?? null;
+  }, [tenantConfig, paisesConSesion]);
+
+  // El selector de país queda oculto en la UI cuando `paisFijo` está seteado (ver
+  // `ViajeClientesFieldset`/`ViajeDestinosLista`) — acá se garantiza que lo que se valida
+  // y se manda a la API sea siempre ese país, sin depender de qué traían las filas.
+  useEffect(() => {
+    if (!paisFijo) return;
+    const codigo = paisFijo.codigo || paisFijo.id;
+    setClientesRows((prev) => {
+      const yaNormalizado = prev.every(
+        (r) =>
+          r.paisOrigen === codigo && r.destinosRows.every((d) => d.pais === codigo),
+      );
+      return yaNormalizado ? prev : conPaisFijo(prev, codigo);
+    });
+    // Repite también cuando cambian las filas (ej. "+ Agregar cliente"/"+ Agregar destino"),
+    // para que una fila nueva quede normalizada antes de poder enviarse — la guarda
+    // `yaNormalizado` evita el loop (no vuelve a setear si ya está todo en el país fijo).
+  }, [paisFijo, clientesRows]);
 
   // ─── CÁLCULO DE MAESTROS COMBINADOS (BBDD + SESIÓN ACTUAL) ───────────────
   const clientes = useMemo(() => {
@@ -1049,6 +1101,7 @@ export function ViajeCreatePage() {
                 opcionesProducto={opcionesProducto}
                 getToken={getToken}
                 onProductoCreado={(p) => setProductosCatalogo((prev) => [...prev, p])}
+                paisFijo={paisFijo}
                 error={error}
                 onContinuar={() => void handleContinuar1()}
               />

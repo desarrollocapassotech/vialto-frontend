@@ -83,6 +83,12 @@ interface Props {
   paisesLoading: boolean;
   onNuevoPaisOrigen: (clienteIndex: number) => void;
   onNuevoPaisDestino: (clienteIndex: number, destinoIndex: number) => void;
+  /**
+   * Si se pasa, el país de origen/destino queda fijo a este país (config de
+   * superadmin `Tenant.paisOrigenDestinoOculto`): no se muestra el selector
+   * de país en ninguna fila, solo el buscador de ciudad.
+   */
+  paisFijo?: Pais | null;
   /** Si se pasa, agrega "+ Nuevo cliente" al selector de cada fila. */
   onNuevoCliente?: (clienteIndex: number) => void;
   opcionesProducto: OpcionProducto[];
@@ -120,6 +126,7 @@ export function ViajeClientesFieldset({
   minRows = 0,
   labelPrefix = 'Cliente adicional',
   mostrarProductos = true,
+  paisFijo = null,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
@@ -169,21 +176,27 @@ export function ViajeClientesFieldset({
               <div className="flex flex-col gap-1">
                 <span className={fieldLabelClass}>Origen</span>
                 <div className="flex flex-wrap items-start gap-2">
-                  <PaisSearchSelect
-                    paises={paises}
-                    loading={paisesLoading}
-                    value={row.paisOrigen}
-                    onChange={(p) => update(i, { paisOrigen: p, origen: '' })}
-                    aria-label={`País de origen del cliente ${i + 1}`}
-                    className="w-full sm:w-40"
-                    inputClassName={inputClass}
-                    disabled={bloqueado}
-                    onNuevo={() => onNuevoPaisOrigen(i)}
-                  />
+                  {!paisFijo && (
+                    <PaisSearchSelect
+                      paises={paises}
+                      loading={paisesLoading}
+                      value={row.paisOrigen}
+                      onChange={(p) => update(i, { paisOrigen: p, origen: '' })}
+                      aria-label={`País de origen del cliente ${i + 1}`}
+                      className="w-full sm:w-40"
+                      inputClassName={inputClass}
+                      disabled={bloqueado}
+                      onNuevo={() => onNuevoPaisOrigen(i)}
+                    />
+                  )}
                   <div className="min-w-[200px] flex-1">
                     <CiudadCombobox
-                      pais={row.paisOrigen}
-                      paisNombre={paises.find((p) => (p.codigo || p.id) === row.paisOrigen)?.nombre}
+                      pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : row.paisOrigen}
+                      paisNombre={
+                        paisFijo
+                          ? paisFijo.nombre
+                          : paises.find((p) => (p.codigo || p.id) === row.paisOrigen)?.nombre
+                      }
                       value={row.origen}
                       onChange={(next) => update(i, { origen: next })}
                       inputClassName={inputClass}
@@ -202,6 +215,7 @@ export function ViajeClientesFieldset({
                   paises={paises}
                   paisesLoading={paisesLoading}
                   onNuevoPais={(destinoIndex) => onNuevoPaisDestino(i, destinoIndex)}
+                  paisFijo={paisFijo}
                 />
               </div>
               {mostrarProductos && (

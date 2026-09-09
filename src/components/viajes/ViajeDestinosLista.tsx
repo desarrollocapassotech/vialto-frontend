@@ -18,6 +18,8 @@ type Props = {
   paisesLoading?: boolean;
   /** Dispara la creación rápida de país para la fila `index`. */
   onNuevoPais: (index: number) => void;
+  /** Si se pasa, el país queda fijo a este país: no se muestra el selector, solo el buscador de ciudad. */
+  paisFijo?: Pais | null;
 };
 
 export function ViajeDestinosLista({
@@ -29,6 +31,7 @@ export function ViajeDestinosLista({
   paises,
   paisesLoading = false,
   onNuevoPais,
+  paisFijo = null,
 }: Props) {
   function setRow(i: number, patch: Partial<ViajeDestinoRowDraft>) {
     onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -61,20 +64,26 @@ export function ViajeDestinosLista({
                   {labelDestino}
                   {esPrimero && <span className="text-red-500"> *</span>}
                 </span>
-                <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                  <PaisSearchSelect
-                    paises={paises}
-                    loading={paisesLoading}
-                    value={row.pais}
-                    onChange={(p) => setRow(i, { pais: p as PaisCodigo, etiqueta: '' })}
-                    aria-label={`País de ${labelDestino.toLowerCase()}`}
-                    className="w-full sm:w-40"
-                    inputClassName={inputClassName}
-                    onNuevo={() => onNuevoPais(i)}
-                  />
+                <div className={`grid gap-2 sm:items-end ${paisFijo ? '' : 'sm:grid-cols-[auto_1fr]'}`}>
+                  {!paisFijo && (
+                    <PaisSearchSelect
+                      paises={paises}
+                      loading={paisesLoading}
+                      value={row.pais}
+                      onChange={(p) => setRow(i, { pais: p as PaisCodigo, etiqueta: '' })}
+                      aria-label={`País de ${labelDestino.toLowerCase()}`}
+                      className="w-full sm:w-40"
+                      inputClassName={inputClassName}
+                      onNuevo={() => onNuevoPais(i)}
+                    />
+                  )}
                   <CiudadCombobox
-                    pais={row.pais}
-                    paisNombre={paises.find((p) => (p.codigo || p.id) === row.pais)?.nombre}
+                    pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : row.pais}
+                    paisNombre={
+                      paisFijo
+                        ? paisFijo.nombre
+                        : paises.find((p) => (p.codigo || p.id) === row.pais)?.nombre
+                    }
                     value={row.etiqueta}
                     onChange={(next) => setRow(i, { etiqueta: next })}
                     inputClassName={`${inputClassName} w-full`}

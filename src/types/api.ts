@@ -385,6 +385,10 @@ export interface Tenant {
    * 'manual'. Solo editable desde superadmin (panel Empresas). Ver Liquidacion.estado.
    */
   liquidacionAnulacionMetodo: string;
+  /** true = oculta el selector de país en origen/destino de Viajes (queda solo el buscador de ciudad). */
+  paisOrigenDestinoOculto?: boolean;
+  /** Id de Pais (catálogo propio del tenant) a usar cuando paisOrigenDestinoOculto=true. */
+  paisOrigenDestinoFijoId?: string | null;
   createdAt: string;
 }
 

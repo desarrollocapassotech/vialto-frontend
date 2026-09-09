@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
+import { PaisModal } from "@/components/viajes/PaisModal";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { apiJson } from "@/lib/api";
@@ -16,7 +17,7 @@ import {
   LiquidacionAnulacionMetodoRadios,
   type LiquidacionAnulacionMetodo,
 } from "@/components/superadmin/LiquidacionAnulacionMetodoFields";
-import type { Tenant } from "@/types/api";
+import type { Pais, Tenant } from "@/types/api";
 
 /**
  * Módulos de `FIELD_CATALOG` que son módulos vendibles reales (`Tenant.modules`)
@@ -175,6 +176,13 @@ export function CamposEmpresaPage() {
     useState<LiquidacionAnulacionMetodo>("nota_credito_debito");
   const [savingLiquidacionAnulacionMetodo, setSavingLiquidacionAnulacionMetodo] =
     useState(false);
+  const [empresaPaisOculto, setEmpresaPaisOculto] = useState(false);
+  const [savingPaisOculto, setSavingPaisOculto] = useState(false);
+  const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
+  const [savingPaisFijo, setSavingPaisFijo] = useState(false);
+  const [paisesEmpresa, setPaisesEmpresa] = useState<Pais[]>([]);
+  const [paisesEmpresaLoading, setPaisesEmpresaLoading] = useState(false);
+  const [mostrarPaisModal, setMostrarPaisModal] = useState(false);
   const [empresaConfigError, setEmpresaConfigError] = useState<string | null>(
     null,
   );
@@ -204,6 +212,8 @@ export function CamposEmpresaPage() {
               ? "manual"
               : "nota_credito_debito",
           );
+          setEmpresaPaisOculto(tenant.paisOrigenDestinoOculto ?? false);
+          setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -294,6 +304,70 @@ export function CamposEmpresaPage() {
       setSavingLiquidacionAnulacionMetodo(false);
     }
   }
+
+  async function togglePaisOculto() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaPaisOculto;
+    setSavingPaisOculto(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ paisOrigenDestinoOculto: nuevoValor }),
+      });
+      setEmpresaPaisOculto(nuevoValor);
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingPaisOculto(false);
+    }
+  }
+
+  async function guardarPaisFijo(id: string) {
+    if (!filtroEmpresa || id === empresaPaisFijoId) return;
+    const anterior = empresaPaisFijoId;
+    setEmpresaPaisFijoId(id);
+    setSavingPaisFijo(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ paisOrigenDestinoFijoId: id || null }),
+      });
+    } catch (e) {
+      setEmpresaPaisFijoId(anterior);
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingPaisFijo(false);
+    }
+  }
+
+  // Países cargados de la empresa elegida — para el select de "país fijo" (solo se
+  // muestra si `empresaPaisOculto` está activo).
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !filtroEmpresa) {
+      setPaisesEmpresa([]);
+      return;
+    }
+    let cancelled = false;
+    setPaisesEmpresaLoading(true);
+    (async () => {
+      try {
+        const data = await apiJson<Pais[]>(
+          `/api/platform/paises?tenantId=${encodeURIComponent(filtroEmpresa)}`,
+          () => getToken(),
+        );
+        if (!cancelled) setPaisesEmpresa(data);
+      } catch {
+        if (!cancelled) setPaisesEmpresa([]);
+      } finally {
+        if (!cancelled) setPaisesEmpresaLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn, filtroEmpresa]);
 
   // Carga del catálogo completo (módulos/formularios disponibles) al montar
   useEffect(() => {
@@ -546,6 +620,18 @@ export function CamposEmpresaPage() {
         </div>
       )}
 
+      {mostrarPaisModal && filtroEmpresa && (
+        <PaisModal
+          getToken={getToken}
+          tenantId={filtroEmpresa}
+          onClose={() => setMostrarPaisModal(false)}
+          onSaved={(p) => {
+            setPaisesEmpresa((prev) => [...prev, p].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+            setMostrarPaisModal(false);
+          }}
+        />
+      )}
+
       {filtroEmpresa && catalogo && modulo && formulario && (
         <>
           <div className="mt-6 border-b border-black/15">
@@ -789,6 +875,66 @@ export function CamposEmpresaPage() {
                         />
                       </td>
                     </tr>
+                    <tr className="border-t border-black/10">
+                      <td className="px-4 py-2.5">
+                        Ocultar país de origen/destino
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <ToggleSwitch
+                          checked={empresaPaisOculto}
+                          disabled={savingPaisOculto}
+                          onChange={() => void togglePaisOculto()}
+                          label={
+                            empresaPaisOculto
+                              ? "Mostrar selector de país"
+                              : "Ocultar selector de país"
+                          }
+                        />
+                      </td>
+                    </tr>
+                    {empresaPaisOculto && (
+                      <tr className="border-t border-black/10">
+                        <td className="px-4 py-2.5">
+                          País fijo
+                          <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                            Origen y destino quedan fijados a este país (sin
+                            selector visible para el tenant).
+                          </p>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {paisesEmpresaLoading ? (
+                            <span className="text-sm text-vialto-steel">Cargando…</span>
+                          ) : paisesEmpresa.length === 0 ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-sm text-vialto-steel">
+                                Esta empresa no tiene países cargados.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setMostrarPaisModal(true)}
+                                className="border border-black/20 bg-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-vialto-mist"
+                              >
+                                + Nuevo país
+                              </button>
+                            </div>
+                          ) : (
+                            <select
+                              value={empresaPaisFijoId}
+                              disabled={savingPaisFijo}
+                              onChange={(e) => void guardarPaisFijo(e.target.value)}
+                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                            >
+                              <option value="">Sin elegir…</option>
+                              {paisesEmpresa.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
