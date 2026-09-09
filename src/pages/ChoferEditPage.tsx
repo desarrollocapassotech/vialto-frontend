@@ -23,6 +23,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { canAccessCombustible } from "@/lib/tenantModules";
 import type { Chofer } from "@/types/api";
 
@@ -66,6 +67,10 @@ export function ChoferEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPinInput, setShowPinInput] = useState(false);
 
+  const { isVisible } = useFieldConfig("choferes");
+  const flotaPropiaVisible = isVisible("edicion_chofer", "flotaPropia");
+  const transportistaExternoVisible = isVisible("edicion_chofer", "transportistaExterno");
+
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }
@@ -74,6 +79,19 @@ export function ChoferEditPage() {
     setAsignacionModo(modo);
     if (modo === "propio") patch({ transportistaId: "" });
   }
+
+  // Si el superadmin dejó una sola opción habilitada ("Flota propia" o
+  // "Transportista externo" — ver Configuración por empresa), el modo queda
+  // forzado a esa opción sin mostrar el radio (ver TransportistaAsignacionFields).
+  // Corre después de cargar el registro (que ya setea el modo real).
+  useEffect(() => {
+    if (initialLoading) return;
+    if (!transportistaExternoVisible && asignacionModo !== "propio") {
+      applyAsignacionModo("propio");
+    } else if (!flotaPropiaVisible && asignacionModo !== "externo") {
+      applyAsignacionModo("externo");
+    }
+  }, [flotaPropiaVisible, transportistaExternoVisible, asignacionModo, initialLoading]);
 
   useEffect(() => {
     if (!id) return;
@@ -255,6 +273,8 @@ export function ChoferEditPage() {
               }}
               transportistas={transportistas}
               loadingTransportistas={loadingTransportistas}
+              mostrarFlotaPropia={flotaPropiaVisible}
+              mostrarTransportistaExterno={transportistaExternoVisible}
             />
             <CrudFieldError message={fieldErrors.transportistaId} />
             {showPinField && (
