@@ -65,6 +65,11 @@ export function ChoferCreatePage() {
   const { isVisible } = useFieldConfig("choferes");
   const flotaPropiaVisible = isVisible("alta_chofer", "flotaPropia");
   const transportistaExternoVisible = isVisible("alta_chofer", "transportistaExterno");
+  const dniVisible = isVisible("alta_chofer", "dni");
+  const cuitVisible = isVisible("alta_chofer", "cuit");
+  const telefonoVisible = isVisible("alta_chofer", "telefono");
+  const licenciaVisible = isVisible("alta_chofer", "licencia");
+  const licenciaVenceVisible = isVisible("alta_chofer", "licenciaVence");
 
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -89,7 +94,7 @@ export function ChoferCreatePage() {
   async function onSubmit() {
     const errs: Record<string, string> = {};
     if (!form.nombre.trim()) errs.nombre = "Ingresá el nombre del chofer.";
-    const dniError = validarDniForm(form.dni);
+    const dniError = dniVisible ? validarDniForm(form.dni) : null;
     if (dniError) errs.dni = dniError;
     if (asignacionModo === "externo" && !form.transportistaId.trim()) {
       errs.transportistaId = "Seleccioná un transportista o elegí flota propia.";
@@ -160,48 +165,58 @@ export function ChoferCreatePage() {
           />
           <CrudFieldError message={fieldErrors.nombre} />
         </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>DNI</CrudFieldLabel>
-          <CrudInput
-            placeholder="Ej: 30123456"
-            value={form.dni}
-            error={fieldErrors.dni}
-            onChange={(e) => patch({ dni: e.target.value })}
-          />
-          <CrudFieldError message={fieldErrors.dni} />
-        </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>CUIT</CrudFieldLabel>
-          <CrudInput
-            placeholder="Ej: 20-30123456-7"
-            value={form.cuit}
-            onChange={(e) => patch({ cuit: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>Teléfono</CrudFieldLabel>
-          <CrudInput
-            placeholder="Ej: +54 9 11 1234-5678"
-            value={form.telefono}
-            onChange={(e) => patch({ telefono: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>N.° licencia</CrudFieldLabel>
-          <CrudInput
-            placeholder="Ej: B1234567"
-            value={form.licencia}
-            onChange={(e) => patch({ licencia: e.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <CrudFieldLabel>Vencimiento de licencia</CrudFieldLabel>
-          <CrudInput
-            type="date"
-            value={form.licenciaVence}
-            onChange={(e) => patch({ licenciaVence: e.target.value })}
-          />
-        </label>
+        {dniVisible && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>DNI</CrudFieldLabel>
+            <CrudInput
+              placeholder="Ej: 30123456"
+              value={form.dni}
+              error={fieldErrors.dni}
+              onChange={(e) => patch({ dni: e.target.value })}
+            />
+            <CrudFieldError message={fieldErrors.dni} />
+          </label>
+        )}
+        {cuitVisible && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>CUIT</CrudFieldLabel>
+            <CrudInput
+              placeholder="Ej: 20-30123456-7"
+              value={form.cuit}
+              onChange={(e) => patch({ cuit: e.target.value })}
+            />
+          </label>
+        )}
+        {telefonoVisible && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>Teléfono</CrudFieldLabel>
+            <CrudInput
+              placeholder="Ej: +54 9 11 1234-5678"
+              value={form.telefono}
+              onChange={(e) => patch({ telefono: e.target.value })}
+            />
+          </label>
+        )}
+        {licenciaVisible && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>N.° licencia</CrudFieldLabel>
+            <CrudInput
+              placeholder="Ej: B1234567"
+              value={form.licencia}
+              onChange={(e) => patch({ licencia: e.target.value })}
+            />
+          </label>
+        )}
+        {licenciaVenceVisible && (
+          <label className="grid gap-1.5">
+            <CrudFieldLabel>Vencimiento de licencia</CrudFieldLabel>
+            <CrudInput
+              type="date"
+              value={form.licenciaVence}
+              onChange={(e) => patch({ licenciaVence: e.target.value })}
+            />
+          </label>
+        )}
         <TransportistaAsignacionFields
           modo={asignacionModo}
           onModoChange={applyAsignacionModo}
