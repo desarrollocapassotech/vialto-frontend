@@ -160,19 +160,23 @@ export function useImportWizard(
             campo as "origen" | "destino",
             valor,
           );
-          const idxCiudad = ciudadesNormalizadasRef.current.findIndex(
-            (c) => c.fila === Number(filaStr),
-          );
-          if (idxCiudad >= 0) {
-            ciudadesNormalizadasRef.current[idxCiudad] = {
-              ...ciudadesNormalizadasRef.current[idxCiudad],
-              [campo]: valor,
-            };
-          } else {
-            ciudadesNormalizadasRef.current.push({
-              fila: Number(filaStr),
-              [campo]: valor,
-            });
+          const prevViaje = previewResult?.viajes?.find((v) => v.fila === Number(filaStr));
+          const filasAActualizar = prevViaje?.filasAgrupadas ?? [Number(filaStr)];
+          for (const f of filasAActualizar) {
+            const idxCiudad = ciudadesNormalizadasRef.current.findIndex(
+              (c) => c.fila === f,
+            );
+            if (idxCiudad >= 0) {
+              ciudadesNormalizadasRef.current[idxCiudad] = {
+                ...ciudadesNormalizadasRef.current[idxCiudad],
+                [campo]: valor,
+              };
+            } else {
+              ciudadesNormalizadasRef.current.push({
+                fila: f,
+                [campo]: valor,
+              });
+            }
           }
         }
 
@@ -237,14 +241,19 @@ export function useImportWizard(
   ) {
     eleccionesManualesRef.current.set(`${fila}:${campo}`, valor);
 
-    const idx = ciudadesNormalizadasRef.current.findIndex((c) => c.fila === fila);
-    if (idx >= 0) {
-      ciudadesNormalizadasRef.current[idx] = {
-        ...ciudadesNormalizadasRef.current[idx],
-        [campo]: valor,
-      };
-    } else {
-      ciudadesNormalizadasRef.current.push({ fila, [campo]: valor });
+    const prevViaje = preview?.viajes?.find((v) => v.fila === fila);
+    const filasAActualizar = prevViaje?.filasAgrupadas ?? [fila];
+
+    for (const f of filasAActualizar) {
+      const idx = ciudadesNormalizadasRef.current.findIndex((c) => c.fila === f);
+      if (idx >= 0) {
+        ciudadesNormalizadasRef.current[idx] = {
+          ...ciudadesNormalizadasRef.current[idx],
+          [campo]: valor,
+        };
+      } else {
+        ciudadesNormalizadasRef.current.push({ fila: f, [campo]: valor });
+      }
     }
 
     setPreview((prev) => (prev ? aplicarEleccionCiudad(prev, fila, campo, valor) : prev));
@@ -426,9 +435,9 @@ export function useImportWizard(
       setEtapasCompletadas((prev) => [...prev, { modulo: moduloActual, log }]);
       let viajeIdsRecienCreados: string[] | undefined;
       if (moduloActual === "viajes") {
-        viajeIdsRecienCreados = log.detalles
+        viajeIdsRecienCreados = Array.from(new Set(log.detalles
           .filter((d) => d.estado === "ok" && d.id)
-          .map((d) => d.id as string);
+          .map((d) => d.id as string)));
         setViajeIdsCreados(viajeIdsRecienCreados);
       }
       await avanzarModulo(viajeIdsRecienCreados);
