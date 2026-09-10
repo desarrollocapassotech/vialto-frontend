@@ -80,6 +80,11 @@ function fmtDate(iso: string | null) {
   return `${d}/${m}/${y}`;
 }
 
+/** Valor para `<input type="date">` a partir de un ISO en medianoche UTC, sin corrimiento por zona horaria. */
+function dateInputValueFromIso(iso: string | null | undefined): string {
+  return iso?.trim() ? iso.slice(0, 10) : "";
+}
+
 function fmtMoney(n: number | null, moneda?: string | null) {
   if (n == null) return "—";
   return formatViajeImporteForListado(n, moneda);
@@ -165,19 +170,22 @@ export function CrearLiquidacionManualModal({
   const [transportistaActualizado, setTransportistaActualizado] =
     useState<Transportista | null>(null);
 
-  const [periodoDesde, setPeriodoDesde] = useState("");
-  const [periodoHasta, setPeriodoHasta] = useState("");
+  // Si viene de un viaje puntual, se precargan con su fecha de carga/descarga.
+  const [periodoDesde, setPeriodoDesde] = useState(() =>
+    dateInputValueFromIso(viajeInicial?.fechaCarga),
+  );
+  const [periodoHasta, setPeriodoHasta] = useState(() =>
+    dateInputValueFromIso(viajeInicial?.fechaDescarga ?? viajeInicial?.fechaCarga),
+  );
   /** Precargada con la comisión propia del transportista o, a falta de ésta, la de config ARCA. */
   const [comisionPct, setComisionPct] = useState("");
   const comisionEditadaManualmente = useRef(false);
-  /** Precargado con el % del viaje si hay uno; si no, config ARCA o 21%. */
-  const [ivaPct, setIvaPct] = useState(
-    String(
-      uniqueIvaPctFromViajes(viajeInicial ? [viajeInicial] : []) ??
-        configProp?.ivaGastosAdmin ??
-        21,
-    ),
-  );
+  /** Precargado con el % del viaje si hay uno; si no, con la config ARCA. Sin ninguno de los dos, queda vacío (el 21% de fallback solo aplica al confirmar, no como valor visible por defecto). */
+  const [ivaPct, setIvaPct] = useState(() => {
+    const fromViaje = uniqueIvaPctFromViajes(viajeInicial ? [viajeInicial] : []);
+    if (fromViaje != null) return String(fromViaje);
+    return configProp?.ivaGastosAdmin != null ? String(configProp.ivaGastosAdmin) : "";
+  });
   const ivaEditadaManualmente = useRef(false);
   /** Precargado con config ARCA; editable antes de emitir. Solo aplica con integración ARCA. */
   const [ptoVenta, setPtoVenta] = useState(
@@ -494,10 +502,8 @@ export function CrearLiquidacionManualModal({
       setError(conceptosCheck.message);
       return;
     }
-    const ivaResolved =
-      ivaPct.trim() !== ""
-        ? Number(ivaPct)
-        : (resolvedConfig?.ivaGastosAdmin ?? 21);
+    // Vacío = 0: no se asume ningún % por defecto (ni el de config ARCA) al confirmar.
+    const ivaResolved = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
     if (!Number.isFinite(ivaResolved) || ivaResolved < 0 || ivaResolved > 100) {
       setError("El IVA debe ser un número entre 0 y 100.");
       return;
@@ -642,10 +648,8 @@ export function CrearLiquidacionManualModal({
     0,
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
-  const ivaPctNum =
-    ivaPct.trim() !== ""
-      ? Number(ivaPct)
-      : (resolvedConfig?.ivaGastosAdmin ?? 21);
+  // Vacío = 0: no se suma IVA en el resumen en vivo (mismo criterio que al confirmar).
+  const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
   const ivaMonto =
     netoGravado !== null
       ? ivaGeneralSobreBase(bruto, comisionMonto, ivaPctNum)
@@ -1052,11 +1056,6 @@ export function CrearLiquidacionManualModal({
                     }}
                     className={inputClass}
                   />
-                  <p className="mt-1 text-[11px] leading-snug text-vialto-steel">
-                    Si el viaje tiene % de IVA, se precarga. Si no, se usa{" "}
-                    {resolvedConfig?.ivaGastosAdmin ?? 21}%. Para liquidar sin
-                    IVA ingresá 0.
-                  </p>
                 </div>
               </div>
 

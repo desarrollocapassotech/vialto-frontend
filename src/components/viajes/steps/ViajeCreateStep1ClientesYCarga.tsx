@@ -22,6 +22,7 @@ interface Props {
   opcionesProducto: OpcionProducto[];
   getToken: () => Promise<string | null>;
   onProductoCreado: (p: Producto) => void;
+  paisFijo?: Pais | null;
 
   error: string | null;
   onContinuar: () => void;
@@ -42,6 +43,7 @@ export function ViajeCreateStep1ClientesYCarga({
   opcionesProducto,
   getToken,
   onProductoCreado,
+  paisFijo = null,
   error,
   onContinuar,
 }: Props) {
@@ -66,6 +68,7 @@ export function ViajeCreateStep1ClientesYCarga({
           onProductoCreado={onProductoCreado}
           minRows={1}
           labelPrefix="Cliente"
+          paisFijo={paisFijo}
         />
         <button
           type="button"

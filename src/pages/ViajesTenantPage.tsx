@@ -4,6 +4,7 @@ import { isOrgAdmin } from "@/lib/roleLabels";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
@@ -322,6 +323,7 @@ export function ViajesTenantPage({
   const maestro = useMaestroData();
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
+  const { isVisible: isViajeFieldVisible } = useFieldConfig("viajes");
 
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
@@ -400,6 +402,8 @@ export function ViajesTenantPage({
   const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  /** Fila/card clickeada: abre el menú de acciones de ese viaje en vez del modal de detalle. */
+  const [accionesAbiertoViajeId, setAccionesAbiertoViajeId] = useState<string | null>(null);
   const [abriendoEditorViaje, setAbriendoEditorViaje] = useState(false);
   const [viajeDeleteConfirm, setViajeDeleteConfirm] = useState<Viaje | null>(
     null,
@@ -1541,7 +1545,7 @@ export function ViajesTenantPage({
           );
       }
 
-      const cols = VIAJES_EXPORT_COLUMNS.filter((c) =>
+      const cols = viajesExportColumnsDisponibles.filter((c) =>
         selectedIds.includes(c.id),
       );
       await generarViajesExcel(
@@ -1823,7 +1827,24 @@ export function ViajesTenantPage({
   }
 
   const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
-  const tableColSpanBase = 8;
+  // Si el tenant tiene ocultos tanto "Chofer (flota propia)" como "Chofer
+  // (externo)" en Configuración por empresa, no tiene sentido mostrar la
+  // columna (quedaría siempre vacía).
+  const mostrarColumnaChofer =
+    isViajeFieldVisible("edicion_viaje", "choferId") ||
+    isViajeFieldVisible("edicion_viaje", "choferExternoId");
+  const mostrarPagosTransportista = isViajeFieldVisible(
+    "edicion_viaje",
+    "pagosTransportista",
+  );
+  // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
+  // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
+  const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
+    if (c.id === "chofer") return mostrarColumnaChofer;
+    if (c.id === "estadoPago") return mostrarPagosTransportista;
+    return true;
+  });
+  const tableColSpanBase = mostrarColumnaChofer ? 8 : 7;
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
@@ -1921,6 +1942,7 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
+      {mostrarColumnaChofer && (
       <ListadoFiltroCampo label="Chofer" active={!!choferIdFiltroActivo.trim()}>
         <ChoferSearchSelect
           id="viajes-filtro-chofer"
@@ -1939,6 +1961,7 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
+      )}
       <ListadoFiltroCampo label="Etapa" active={!!estadoFiltro.trim()}>
         <select
           value={estadoFiltro}
@@ -2104,6 +2127,7 @@ export function ViajesTenantPage({
             pagoTransportistaFiltro={pagoTransportistaFiltro}
             onFiltroFacturacion={aplicarFiltroFacturacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
+            mostrarFiltroPago={mostrarPagosTransportista}
           />
         </div>
       )}
@@ -2335,6 +2359,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarColumnaChofer && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Chofer"
@@ -2360,6 +2385,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Etapa"
@@ -2543,7 +2569,7 @@ export function ViajesTenantPage({
             <tr
               key={v.id}
               className={`${listadoTablaBodyRowClass} cursor-pointer`}
-              onClick={() => setViewingViaje(v)}
+              onClick={() => setAccionesAbiertoViajeId(v.id)}
             >
               {mostrarColumnaFacturarLote && (
                 <td
@@ -2593,11 +2619,13 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
+              {mostrarColumnaChofer && (
               <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
                 <span className="block truncate" title={nombreChofer}>
                   {nombreChofer}
                 </span>
               </td>
+              )}
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex w-full flex-col gap-0.5">
                   {estadoQuickId === v.id ? (
@@ -2707,6 +2735,8 @@ export function ViajesTenantPage({
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
                   hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
+                  open={accionesAbiertoViajeId === v.id}
+                  onOpenChange={(o) => setAccionesAbiertoViajeId(o ? v.id : null)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -2830,7 +2860,7 @@ export function ViajesTenantPage({
           );
           return (
             <ListadoCard
-              onClick={() => setViewingViaje(v)}
+              onClick={() => setAccionesAbiertoViajeId(v.id)}
               primary={
                 <div className="flex items-start gap-2">
                   {mostrarColumnaFacturarLote && esElegibleFacturarLote(v) ? (
@@ -2865,7 +2895,9 @@ export function ViajesTenantPage({
                   value: v.numeroIdentificacionPersonalizado?.trim() || "—",
                 },
                 { label: "Transporte", value: transporteValue },
-                { label: "Chofer", value: nombreChofer },
+                ...(mostrarColumnaChofer
+                  ? [{ label: "Chofer", value: nombreChofer }]
+                  : []),
                 { label: "Etapa", value: estadoValue },
                 {
                   label: "Origen — Destino",
@@ -2917,6 +2949,8 @@ export function ViajesTenantPage({
                   viaje={v}
                   hasFacturasArca={hasFacturasArca}
                   hasExportacionActiva={Boolean(currentTenant?.habilitarExportacionPautMicCrt)}
+                  open={accionesAbiertoViajeId === v.id}
+                  onOpenChange={(o) => setAccionesAbiertoViajeId(o ? v.id : null)}
                   onVer={() => setViewingViaje(v)}
                   onAgregarGasto={() => setAgregarGastoViaje(v)}
                   onRegistrarPago={() => setRegistrarPagoViaje(v)}
@@ -3393,7 +3427,7 @@ export function ViajesTenantPage({
 
         {exportModalOpen && (
           <ExcelExportModal
-            columns={VIAJES_EXPORT_COLUMNS}
+            columns={viajesExportColumnsDisponibles}
             rowCount={meta?.total ?? rows?.length ?? 0}
             onExport={handleExportarExcel}
             onClose={() => !exportandoExcel && setExportModalOpen(false)}

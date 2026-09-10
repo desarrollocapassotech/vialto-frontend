@@ -84,6 +84,7 @@ import { ViajeDestinosLista } from "@/components/viajes/ViajeDestinosLista";
 import { ViajeGananciaBrutaManualFieldset } from "@/components/viajes/ViajeGananciaBrutaManualFieldset";
 import {
   textoRutaViaje,
+  destinosConPaisFijo,
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -91,7 +92,7 @@ import {
   ViajeClientesFieldset,
   ClienteCard,
 } from "@/components/viajes/ViajeClientesFieldset";
-import { emptyClienteRow, type ViajeClienteDraft } from "@/lib/viajesClientes";
+import { emptyClienteRow, conPaisFijo, type ViajeClienteDraft } from "@/lib/viajesClientes";
 
 /** A qué campo aplicar el país recién creado desde "+ Nuevo país". */
 type PaisQuickCreateTarget =
@@ -185,8 +186,13 @@ export type ViajeEditModalProps = {
   crearVehiculoHref?: string;
   getToken?: () => Promise<string | null>;
   tenantId?: string;
-  /** Tenant activo, usado para el label personalizable del ID de viaje. */
-  tenant?: Pick<Tenant, "labelIdentificacionPersonalizadaViajes"> | null;
+  /** Tenant activo, usado para el label personalizable del ID de viaje y el país fijo de origen/destino. */
+  tenant?: Pick<
+    Tenant,
+    | "labelIdentificacionPersonalizadaViajes"
+    | "paisOrigenDestinoOculto"
+    | "paisOrigenDestinoFijoId"
+  > | null;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
   hasLiquidoProductoArca?: boolean;
   /**
@@ -319,6 +325,42 @@ export function ViajeEditModal({
     ];
     return combinados.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [paises, sessionPaises]);
+
+  /** País fijo si el tenant tiene `paisOrigenDestinoOculto` — ver `Tenant.paisOrigenDestinoOculto`
+   * en el backend. Si el país fijado fue borrado del catálogo, no aplica (fallback seguro: se
+   * sigue mostrando el selector de país). */
+  const paisFijo = useMemo(() => {
+    if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoId) return null;
+    return todosPaises.find((p) => p.id === tenant.paisOrigenDestinoFijoId) ?? null;
+  }, [tenant, todosPaises]);
+
+  // El selector de país queda oculto en la UI cuando `paisFijo` está seteado (ver
+  // `PaisUbicacionSelect`/`ViajeDestinosLista`/`ViajeClientesFieldset` más abajo) — acá se
+  // garantiza que lo que se valida y se manda a la API sea siempre ese país, sin depender de
+  // qué traía el draft (dato legacy, heurística de `inferirPaisDesdeUbicacion`, etc).
+  useEffect(() => {
+    if (!paisFijo) return;
+    const codigo = paisFijo.codigo || paisFijo.id;
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const yaNormalizado =
+        prev.paisOrigen === codigo &&
+        prev.destinosRows.every((d) => d.pais === codigo) &&
+        prev.clientesRows.every(
+          (r) => r.paisOrigen === codigo && r.destinosRows.every((d) => d.pais === codigo),
+        );
+      if (yaNormalizado) return prev;
+      return {
+        ...prev,
+        paisOrigen: codigo,
+        destinosRows: destinosConPaisFijo(prev.destinosRows, codigo),
+        clientesRows: conPaisFijo(prev.clientesRows, codigo),
+      };
+    });
+    // Repite también cuando cambia el draft (ej. "+ Agregar cliente"/"+ Agregar destino"),
+    // para que una fila nueva quede normalizada antes de poder guardarse — la guarda
+    // `yaNormalizado` evita el loop (no vuelve a setear si ya está todo en el país fijo).
+  }, [paisFijo, setDraft, draft]);
 
   const datosComercialesBloqueados = useMemo(() => {
     if (!snapshotViaje) return false;
@@ -639,21 +681,23 @@ export function ViajeEditModal({
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className={labelClass}>Origen</span>
-                      <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
-                        <PaisUbicacionSelect
-                          value={draft.paisOrigen}
-                          onChange={(p) =>
-                            setDraft((prev) =>
-                              prev
-                                ? { ...prev, paisOrigen: p, origen: "" }
-                                : prev,
-                            )
-                          }
-                          aria-label="País de origen"
-                          className={`${inputClass} w-full sm:w-40`}
-                        />
+                      <div className={`grid gap-2 sm:items-end ${paisFijo ? '' : 'sm:grid-cols-[auto_1fr]'}`}>
+                        {!paisFijo && (
+                          <PaisUbicacionSelect
+                            value={draft.paisOrigen}
+                            onChange={(p) =>
+                              setDraft((prev) =>
+                                prev
+                                  ? { ...prev, paisOrigen: p, origen: "" }
+                                  : prev,
+                              )
+                            }
+                            aria-label="País de origen"
+                            className={`${inputClass} w-full sm:w-40`}
+                          />
+                        )}
                         <CiudadCombobox
-                          pais={draft.paisOrigen}
+                          pais={paisFijo ? (paisFijo.codigo || paisFijo.id) : draft.paisOrigen}
                           value={draft.origen}
                           onChange={(next) =>
                             setDraft((prev) =>
@@ -682,6 +726,7 @@ export function ViajeEditModal({
                           setPaisQuickCreateTarget({ kind: "destino", index });
                           setQuickCreate("pais");
                         }}
+                        paisFijo={paisFijo}
                       />
                       <CrudFieldError message={destinosError} />
                     </div>
@@ -776,7 +821,7 @@ export function ViajeEditModal({
                           </div>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className={labelClass}>Total a facturar</span>
+                          <span className={labelClass}>Total</span>
                           <div
                             className={`flex items-center px-3 h-9 rounded-none border border-black/15 bg-vialto-mist/40 text-vialto-steel text-right tabular-nums min-w-0`}
                           >
@@ -877,6 +922,7 @@ export function ViajeEditModal({
                   opcionesProducto={opcionesProducto}
                   getToken={getToken}
                   onProductoCreado={onProductoCreado}
+                  paisFijo={paisFijo}
                 />
                 <button
                   type="button"

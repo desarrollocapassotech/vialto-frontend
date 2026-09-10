@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import {
+  facturacionEstadoAgregado,
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
-  facturacionLifecycleEstado,
   tooltipFacturacionEstado,
-  type FacturacionEstado,
 } from '@/lib/viajesIndicadores';
 import { ViajeFacturacionDetalleModal } from '@/components/viajes/ViajeFacturacionDetalleModal';
 import { FacturaViewModal } from '@/components/facturacion/FacturaViewModal';
@@ -47,52 +46,9 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride, fu
   const [cargando, setCargando] = useState(false);
   const [facturaCompleta, setFacturaCompleta] = useState<Factura | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
-  const estado = (viaje.facturacionEstado ?? 'sin_facturar') as FacturacionEstado;
-  const lifecycle = facturacionLifecycleEstado(estado);
-
-  let displayLabel = facturacionEstadoLabel[lifecycle] ?? lifecycle;
-  let displayClass = facturacionEstadoBadgeClass[lifecycle];
-
-  if (viaje.clientesViaje && viaje.clientesViaje.length > 0) {
-    const estados = [viaje.facturacionEstado, ...viaje.clientesViaje.map(c => c.facturacionEstado)];
-    const isFacturado = (e: string | null | undefined) => e === 'facturado' || e === 'cobrado';
-
-    const todosFacturados = estados.every(isFacturado);
-    const algunoError = estados.some(e => e === 'error_afip');
-    const algunoEsperando = estados.some(e => e === 'esperando_afip');
-    const algunoFacturado = estados.some(isFacturado);
-    const todosAnulados = estados.every(e => e === 'anulado');
-    const todosSinFacturarOAnulados = estados.every(e => e === 'sin_facturar' || e === 'anulado');
-
-    if (algunoError) {
-      displayLabel = facturacionEstadoLabel.error_afip;
-      displayClass = facturacionEstadoBadgeClass.error_afip;
-    } else if (algunoEsperando) {
-      displayLabel = facturacionEstadoLabel.esperando_afip;
-      displayClass = facturacionEstadoBadgeClass.esperando_afip;
-    } else if (todosAnulados) {
-      displayLabel = facturacionEstadoLabel.anulado;
-      displayClass = facturacionEstadoBadgeClass.anulado;
-    } else if (todosSinFacturarOAnulados) {
-      displayLabel = facturacionEstadoLabel.sin_facturar;
-      displayClass = facturacionEstadoBadgeClass.sin_facturar;
-    } else if (algunoFacturado && !todosFacturados) {
-      displayLabel = facturacionEstadoLabel.facturado_parcial;
-      displayClass = facturacionEstadoBadgeClass.facturado_parcial;
-    } else if (todosFacturados) {
-      const todosCobrados = estados.every(e => e === 'cobrado');
-      if (todosCobrados) {
-        displayLabel = facturacionEstadoLabel.cobrado;
-        displayClass = facturacionEstadoBadgeClass.cobrado;
-      } else {
-        displayLabel = facturacionEstadoLabel.facturado;
-        displayClass = facturacionEstadoBadgeClass.facturado;
-      }
-    } else {
-      displayLabel = facturacionEstadoLabel.sin_facturar;
-      displayClass = facturacionEstadoBadgeClass.sin_facturar;
-    }
-  }
+  const agregado = facturacionEstadoAgregado(viaje);
+  const displayLabel = facturacionEstadoLabel[agregado] ?? agregado;
+  const displayClass = facturacionEstadoBadgeClass[agregado];
 
   async function handleClick() {
     if (onClickOverride) {

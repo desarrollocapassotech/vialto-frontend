@@ -89,7 +89,6 @@ function validateFacturaDraft(
   viajes: Viaje[],
   hasArca: boolean,
 ): string | null {
-  if (!hasArca && !draft.numero.trim()) return "Ingresá el número de factura.";
   if (!draft.fechaEmision) return "Ingresá la fecha de emisión.";
   if (monedaUnicaDeViajes(draft.viajeIds, viajes) === null) {
     return "Una factura no puede contener viajes en distintas monedas. Generá una factura por moneda.";
@@ -596,9 +595,7 @@ export function FacturaCreateModal({
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
-            <label className={compactLabelClass}>
-              Número <span className="text-red-500">*</span>
-            </label>
+            <label className={compactLabelClass}>Número (opcional)</label>
             <input
               type="text"
               value={draft.numero}
@@ -726,7 +723,7 @@ export function FacturaCreateModal({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Número <span className="text-red-500">*</span>
+            Número (opcional)
           </label>
           <input
             type="text"

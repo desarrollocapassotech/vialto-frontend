@@ -107,6 +107,8 @@ function LiquidacionAccionesMenu({
   onConfirmarAnulacionManual,
   onEliminar,
   onVerComprobante,
+  open: openProp,
+  onOpenChange,
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
@@ -124,8 +126,14 @@ function LiquidacionAccionesMenu({
   onConfirmarAnulacionManual: () => void;
   onEliminar: () => void;
   onVerComprobante: () => void;
+  /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : internalOpen;
+  const setOpen = controlado ? (onOpenChange ?? (() => {})) : setInternalOpen;
 
   const puedeEmitir =
     hasArca && (liq.estado === "borrador" || liq.estado === "error");
@@ -335,6 +343,8 @@ export function LiquidacionesTenantPage() {
   } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [verLoadingId, setVerLoadingId] = useState<string | null>(null);
+  /** Fila/card clickeada: abre el menú de acciones de esa liquidación en vez del modal de detalle. */
+  const [accionesAbiertoLiqId, setAccionesAbiertoLiqId] = useState<string | null>(null);
   const [pendingEmitir, setPendingEmitir] =
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
@@ -711,6 +721,8 @@ export function LiquidacionesTenantPage() {
       actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
       actionErrorDetalle:
         actionError?.id === liq.id ? actionError.detalle : undefined,
+      open: accionesAbiertoLiqId === liq.id,
+      onOpenChange: (o: boolean) => setAccionesAbiertoLiqId(o ? liq.id : null),
       onVer: () => {
         setVerLoadingId(liq.id);
         void (async () => {
@@ -1088,14 +1100,14 @@ export function LiquidacionesTenantPage() {
               : "Todavía no hay liquidaciones..."
         }
         loadingMessage="Cargando…"
-        onRowClick={(liq) => accionesProps(liq).onVer()}
+        onRowClick={(liq) => setAccionesAbiertoLiqId(liq.id)}
         renderActions={(liq) => (
           <LiquidacionAccionesMenu {...accionesProps(liq)} />
         )}
         actionsTdClassName={`${listadoTablaTdClass} text-right`}
         renderMobileCard={(liq) => (
           <ListadoCard
-            onClick={() => accionesProps(liq).onVer()}
+            onClick={() => setAccionesAbiertoLiqId(liq.id)}
             primary={transportistaNombre(liq)}
             fields={[
               {

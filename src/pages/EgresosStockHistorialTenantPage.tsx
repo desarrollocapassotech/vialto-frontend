@@ -22,6 +22,7 @@ import {
 } from "@/lib/stockExcelExport";
 import { etiquetaStockDocumentoExterno } from "@/lib/stockDocumentoExterno";
 import { formatMovimientoStockFechaFromIso } from "@/lib/viajeFechaHora";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import type {
   StockOperacion,
   Cliente,
@@ -47,6 +48,10 @@ export function EgresosStockHistorialTenantPage({
 }) {
   const { getToken } = useAuth();
   const platform = Boolean(tenantId);
+  const { isVisible } = useFieldConfig("stock");
+  const mostrarConductor = isVisible("alta_egreso", "choferId");
+  const mostrarDestinatario = isVisible("alta_egreso", "destinatarioId");
+  const mostrarDireccionEntrega = isVisible("alta_egreso", "direccionEntregaId");
 
   const {
     setSearchParams,
@@ -128,7 +133,12 @@ export function EgresosStockHistorialTenantPage({
     }
   }, [platform, params, tenantId, getToken]);
 
-  const excelCols = stockOperacionColumnas("egreso");
+  const excelCols = stockOperacionColumnas("egreso").filter((c) => {
+    if (c.id === "conductor") return mostrarConductor;
+    if (c.id === "destinatario") return mostrarDestinatario;
+    if (c.id === "destino") return mostrarDireccionEntrega;
+    return true;
+  });
   const excelRows = flattenStockOperaciones(exportRows);
 
   const exportButton = (
@@ -306,13 +316,17 @@ export function EgresosStockHistorialTenantPage({
               etiquetaStockDocumentoExterno(op.numeroDocumentoExterno),
             tdClassName: listadoTablaTdClass,
           },
-          {
-            id: "destinatario",
-            thClassName: `${listadoTablaThClass} align-top`,
-            header: "Destinatario",
-            cell: (op) => op.destinatario ?? "—",
-            tdClassName: listadoTablaTdClass,
-          },
+          ...(mostrarDestinatario
+            ? [
+                {
+                  id: "destinatario",
+                  thClassName: `${listadoTablaThClass} align-top`,
+                  header: "Destinatario",
+                  cell: (op: StockOperacion) => op.destinatario ?? "—",
+                  tdClassName: listadoTablaTdClass,
+                },
+              ]
+            : []),
           {
             id: "productos",
             thClassName: `${listadoTablaThClass} align-top`,

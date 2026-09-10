@@ -34,6 +34,7 @@ import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   canAccessViajes,
   canAccessStock,
@@ -86,6 +87,10 @@ export function BaseDeDatosPage() {
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isVisible: isChoferOpcionVisible } = useFieldConfig("choferes");
+  const hasAlgunaPertenenciaChofer =
+    isChoferOpcionVisible("alta_chofer", "flotaPropia") ||
+    isChoferOpcionVisible("alta_chofer", "transportistaExterno");
 
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
   const tabsLoading = !isLoaded || tenantLoading;
@@ -112,7 +117,13 @@ export function BaseDeDatosPage() {
       case "destinatarios":
         return hasStock;
       case "choferes":
-        return hasViajes || hasStock || hasCombustible;
+        // Si el superadmin deshabilitó las 2 opciones de pertenencia (Flota
+        // propia / Transportista externo — ver Configuración por empresa), no
+        // se puede crear ningún chofer: no tiene sentido dejar la pestaña.
+        return (
+          (hasViajes || hasStock || hasCombustible) &&
+          (superadmin || hasAlgunaPertenenciaChofer)
+        );
       case "productos":
         return hasViajes || hasStock;
       case "presentaciones":
@@ -122,7 +133,10 @@ export function BaseDeDatosPage() {
       case "direcciones-entrega":
         return hasStock;
       case "paises":
-        return hasViajes;
+        // Si el superadmin fijó el país (ver CamposEmpresaPage → "Ocultar país"),
+        // el tenant no elige país en ningún lado — no tiene sentido dejarle
+        // administrar su propio catálogo de países.
+        return hasViajes && !tenant?.paisOrigenDestinoOculto;
       case "usuarios":
         return isOrgAdmin;
       // Solo admin de tenant, no superadmin: éste ya tiene su propia entrada

@@ -81,10 +81,6 @@ export function useFacturaCreator(config: UseFacturaCreatorConfig) {
 
   async function handleCreate(onSuccess?: (factura: Factura) => void) {
     setError(null);
-    if (!config.hasArca && !draft.numero.trim()) {
-      setError("Ingresá el número de factura.");
-      return;
-    }
     if (!draft.fechaEmision) {
       setError("Ingresá la fecha de emisión.");
       return;

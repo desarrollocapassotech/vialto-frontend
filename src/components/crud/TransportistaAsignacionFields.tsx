@@ -15,6 +15,9 @@ type Props = {
   transportistas: Transportista[];
   loadingTransportistas?: boolean;
   disabled?: boolean;
+  /** Config por empresa (`useFieldConfig("choferes")`) — default true, ambas visibles. */
+  mostrarFlotaPropia?: boolean;
+  mostrarTransportistaExterno?: boolean;
 };
 
 export function TransportistaAsignacionFields({
@@ -25,34 +28,46 @@ export function TransportistaAsignacionFields({
   transportistas,
   loadingTransportistas,
   disabled,
+  mostrarFlotaPropia = true,
+  mostrarTransportistaExterno = true,
 }: Props) {
+  // Si el superadmin dejó una sola opción habilitada, no tiene sentido mostrar el
+  // radio (no hay nada para elegir) — el modo ya viene forzado por el caller.
+  const mostrarRadios = mostrarFlotaPropia && mostrarTransportistaExterno;
+
+  if (!mostrarFlotaPropia && !mostrarTransportistaExterno) return null;
+
   return (
     <fieldset className="grid gap-3 border-0 p-0">
-      <legend className={legendClass}>Pertenencia</legend>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-6">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="asignacion-transportista"
-            className="accent-vialto-charcoal"
-            checked={modo === 'propio'}
-            disabled={disabled}
-            onChange={() => onModoChange('propio')}
-          />
-          Flota propia
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="asignacion-transportista"
-            className="accent-vialto-charcoal"
-            checked={modo === 'externo'}
-            disabled={disabled}
-            onChange={() => onModoChange('externo')}
-          />
-          Transportista externo
-        </label>
-      </div>
+      {mostrarRadios && (
+        <>
+          <legend className={legendClass}>Pertenencia</legend>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-6">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="asignacion-transportista"
+                className="accent-vialto-charcoal"
+                checked={modo === 'propio'}
+                disabled={disabled}
+                onChange={() => onModoChange('propio')}
+              />
+              Flota propia
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="asignacion-transportista"
+                className="accent-vialto-charcoal"
+                checked={modo === 'externo'}
+                disabled={disabled}
+                onChange={() => onModoChange('externo')}
+              />
+              Transportista externo
+            </label>
+          </div>
+        </>
+      )}
       {modo === 'externo' && (
         <label className="grid gap-1.5">
           <span className={legendClass}>Transportista</span>

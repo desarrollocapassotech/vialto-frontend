@@ -23,6 +23,7 @@ import {
 import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { canAccessCombustible } from "@/lib/tenantModules";
 import type { Chofer } from "@/types/api";
 
@@ -66,6 +67,15 @@ export function ChoferEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPinInput, setShowPinInput] = useState(false);
 
+  const { isVisible } = useFieldConfig("choferes");
+  const flotaPropiaVisible = isVisible("edicion_chofer", "flotaPropia");
+  const transportistaExternoVisible = isVisible("edicion_chofer", "transportistaExterno");
+  const dniVisible = isVisible("edicion_chofer", "dni");
+  const cuitVisible = isVisible("edicion_chofer", "cuit");
+  const telefonoVisible = isVisible("edicion_chofer", "telefono");
+  const licenciaVisible = isVisible("edicion_chofer", "licencia");
+  const licenciaVenceVisible = isVisible("edicion_chofer", "licenciaVence");
+
   function patch(p: Partial<ChoferFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
   }
@@ -74,6 +84,19 @@ export function ChoferEditPage() {
     setAsignacionModo(modo);
     if (modo === "propio") patch({ transportistaId: "" });
   }
+
+  // Si el superadmin dejó una sola opción habilitada ("Flota propia" o
+  // "Transportista externo" — ver Configuración por empresa), el modo queda
+  // forzado a esa opción sin mostrar el radio (ver TransportistaAsignacionFields).
+  // Corre después de cargar el registro (que ya setea el modo real).
+  useEffect(() => {
+    if (initialLoading) return;
+    if (!transportistaExternoVisible && asignacionModo !== "propio") {
+      applyAsignacionModo("propio");
+    } else if (!flotaPropiaVisible && asignacionModo !== "externo") {
+      applyAsignacionModo("externo");
+    }
+  }, [flotaPropiaVisible, transportistaExternoVisible, asignacionModo, initialLoading]);
 
   useEffect(() => {
     if (!id) return;
@@ -106,7 +129,7 @@ export function ChoferEditPage() {
     if (!id || !form) return;
     const errs: Record<string, string> = {};
     if (!form.nombre.trim()) errs.nombre = "Ingresá el nombre del chofer.";
-    const dniError = validarDniForm(form.dni);
+    const dniError = dniVisible ? validarDniForm(form.dni) : null;
     if (dniError) errs.dni = dniError;
     if (asignacionModo === "externo" && !form.transportistaId.trim()) {
       errs.transportistaId = "Seleccioná un transportista o elegí flota propia.";
@@ -203,48 +226,58 @@ export function ChoferEditPage() {
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>DNI</CrudFieldLabel>
-              <CrudInput
-                value={form.dni}
-                placeholder="Ej: 30123456"
-                error={fieldErrors.dni}
-                onChange={(e) => patch({ dni: e.target.value })}
-              />
-              <CrudFieldError message={fieldErrors.dni} />
-            </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>CUIT</CrudFieldLabel>
-              <CrudInput
-                value={form.cuit}
-                placeholder="Ej: 20-30123456-7"
-                onChange={(e) => patch({ cuit: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>Teléfono</CrudFieldLabel>
-              <CrudInput
-                value={form.telefono}
-                placeholder="Ej: +54 9 11 1234-5678"
-                onChange={(e) => patch({ telefono: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>N.° licencia</CrudFieldLabel>
-              <CrudInput
-                value={form.licencia}
-                placeholder="Ej: B1234567"
-                onChange={(e) => patch({ licencia: e.target.value })}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <CrudFieldLabel>Vencimiento de licencia</CrudFieldLabel>
-              <CrudInput
-                type="date"
-                value={form.licenciaVence}
-                onChange={(e) => patch({ licenciaVence: e.target.value })}
-              />
-            </label>
+            {dniVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>DNI</CrudFieldLabel>
+                <CrudInput
+                  value={form.dni}
+                  placeholder="Ej: 30123456"
+                  error={fieldErrors.dni}
+                  onChange={(e) => patch({ dni: e.target.value })}
+                />
+                <CrudFieldError message={fieldErrors.dni} />
+              </label>
+            )}
+            {cuitVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>CUIT</CrudFieldLabel>
+                <CrudInput
+                  value={form.cuit}
+                  placeholder="Ej: 20-30123456-7"
+                  onChange={(e) => patch({ cuit: e.target.value })}
+                />
+              </label>
+            )}
+            {telefonoVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>Teléfono</CrudFieldLabel>
+                <CrudInput
+                  value={form.telefono}
+                  placeholder="Ej: +54 9 11 1234-5678"
+                  onChange={(e) => patch({ telefono: e.target.value })}
+                />
+              </label>
+            )}
+            {licenciaVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>N.° licencia</CrudFieldLabel>
+                <CrudInput
+                  value={form.licencia}
+                  placeholder="Ej: B1234567"
+                  onChange={(e) => patch({ licencia: e.target.value })}
+                />
+              </label>
+            )}
+            {licenciaVenceVisible && (
+              <label className="grid gap-1.5">
+                <CrudFieldLabel>Vencimiento de licencia</CrudFieldLabel>
+                <CrudInput
+                  type="date"
+                  value={form.licenciaVence}
+                  onChange={(e) => patch({ licenciaVence: e.target.value })}
+                />
+              </label>
+            )}
             <TransportistaAsignacionFields
               modo={asignacionModo}
               onModoChange={applyAsignacionModo}
@@ -255,6 +288,8 @@ export function ChoferEditPage() {
               }}
               transportistas={transportistas}
               loadingTransportistas={loadingTransportistas}
+              mostrarFlotaPropia={flotaPropiaVisible}
+              mostrarTransportistaExterno={transportistaExternoVisible}
             />
             <CrudFieldError message={fieldErrors.transportistaId} />
             {showPinField && (
