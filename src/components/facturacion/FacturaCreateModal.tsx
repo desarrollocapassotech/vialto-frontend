@@ -221,11 +221,6 @@ export function FacturaCreateModal({
     return ids;
   }, [draft.viajeIds, viajes]);
 
-  const filteredClientes = useMemo(() => {
-    if (!allowedClienteIds) return clientes;
-    return clientes.filter(c => allowedClienteIds.has(c.id));
-  }, [clientes, allowedClienteIds]);
-
   const derivedViajes = useMemo(() => {
     return viajes.map(v => {
       if (draft.clienteId && v.clientesViaje) {
@@ -278,6 +273,23 @@ export function FacturaCreateModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+
+  const filteredClientes = useMemo(() => {
+    const base = !allowedClienteIds
+      ? clientes
+      : clientes.filter(c => allowedClienteIds.has(c.id));
+
+    if (draft.clienteId && !base.some(c => c.id === draft.clienteId)) {
+      const fallback =
+        clienteDetalle && clienteDetalle.id === draft.clienteId
+          ? clienteDetalle
+          : clientes.find(c => c.id === draft.clienteId);
+      if (fallback) return [...base, fallback];
+    }
+
+    return base;
+  }, [clientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [facturaEmitida, setFacturaEmitida] = useState<Factura | null>(null);
