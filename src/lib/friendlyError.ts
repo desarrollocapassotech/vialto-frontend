@@ -19,6 +19,7 @@ export type FriendlyErrorContext =
   | "direccionesEntrega"
   | "facturacion"
   | "liquidaciones"
+  | "cuentaCorriente"
   | "stock"
   | "combustible"
   | "plataforma"
@@ -46,6 +47,8 @@ const fallback: Record<FriendlyErrorContext, string> = {
   facturacion: "No pudimos cargar las facturas. Probá de nuevo en un momento.",
   liquidaciones:
     "No pudimos completar la liquidación. Revisá los datos e intentá de nuevo.",
+  cuentaCorriente:
+    "No pudimos completar la operación de cuenta corriente. Revisá los datos e intentá de nuevo.",
   stock:
     "No pudimos cargar el catálogo de productos. Probá de nuevo en un momento.",
   combustible:

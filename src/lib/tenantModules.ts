@@ -19,6 +19,7 @@ const MODULE_DESCRIPTIONS: Record<string, string> = {
 const MODULE_ROUTES: Record<string, string> = {
   viajes: '/viajes',
   facturacion: '/facturacion',
+  'cuenta-corriente': '/cuenta-corriente',
 };
 
 export function toTenantModuleCards(modules: string[]): TenantModuleCard[] {
@@ -42,6 +43,10 @@ export function canAccessFacturacion(modules: string[]): boolean {
 
 export function canAccessLiquidaciones(modules: string[]): boolean {
   return modules.some((m) => m.toLowerCase() === 'liquidaciones');
+}
+
+export function canAccessCuentaCorriente(modules: string[]): boolean {
+  return modules.some((m) => m.toLowerCase() === 'cuenta-corriente');
 }
 
 export function canAccessStock(modules: string[]): boolean {
