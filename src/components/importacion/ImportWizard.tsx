@@ -142,6 +142,8 @@ export function ImportWizard({
   const [columnasEsperadas, setColumnasEsperadas] = useState<
     ImportColumnasEsperadasModulo[] | null
   >(null);
+  // Refrescar columnas esperadas al reiniciar la importación
+  const [refetchColumnas, setRefetchColumnas] = useState(0);
   // Paso ya completado que el usuario quiere volver a mirar (no navega el
   // wizard hacia atrás, solo abre un resumen de lo que ya pasó en esa etapa
   // — los pasos futuros o el actual no son clickeables).
@@ -165,7 +167,7 @@ export function ImportWizard({
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, refetchColumnas]);
 
   // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
   // todavía no tienen datos cargados — los que ya tienen algo se destildan
@@ -286,6 +288,7 @@ export function ImportWizard({
     setPostViajesElegido({ liquidaciones: false, facturas: false });
     setPasoRevisando(null);
     setRefetchTieneDatos((n) => n + 1);
+    setRefetchColumnas((n) => n + 1);
   }
 
   function toggleModulo(modulo: ModuloWizard) {

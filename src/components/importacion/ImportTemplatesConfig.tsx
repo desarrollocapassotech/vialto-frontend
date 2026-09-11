@@ -105,7 +105,7 @@ export function ImportTemplatesConfig({
     null,
   );
 
-  async function handleModuloChange(m: string) {
+  async function handleModuloChange(m: string, currentTemplates: typeof templates = templates) {
     setTplModulo(m);
     setTplNombre(m ? `Template ${labelModulo(m)} — ${tenantNombre ?? ""}` : "");
     setTplColumnas([]);
@@ -120,7 +120,7 @@ export function ImportTemplatesConfig({
     // valores reales en vez de resetear todo a los defaults del catálogo —
     // antes cada vez que se tocaba el selector se perdía la configuración
     // ya guardada (encabezados, obligatorios, "crear si no existe").
-    const existente = templates.find((t) => t.modulo === m);
+    const existente = currentTemplates.find((t) => t.modulo === m);
     setTplSheet(
       existente?.config.sheet != null
         ? String(existente.config.sheet)
@@ -314,9 +314,12 @@ export function ImportTemplatesConfig({
     }
     setTplValidationError(null);
     const config = buildConfig();
-    const ok = await saveTemplate(tplModulo, tplNombre.trim(), JSON.stringify(config));
-    if (ok) {
+    const res = await saveTemplate(tplModulo, tplNombre.trim(), JSON.stringify(config));
+    if (res.ok) {
       showToast("Template guardado correctamente.");
+      if (res.data) {
+        await handleModuloChange(tplModulo, res.data);
+      }
     }
   }
 
@@ -335,14 +338,14 @@ export function ImportTemplatesConfig({
   useEffect(() => {
     if (loadingTpls || tplModulo) return;
     if (initialModulo && modulosDisponibles.includes(initialModulo)) {
-      void handleModuloChange(initialModulo);
+      void handleModuloChange(initialModulo, templates);
       return;
     }
     const modulosFaltantes = modulosDisponibles.filter(
       (m) => !templates.some((t) => t.modulo === m),
     );
     if (modulosFaltantes.length > 0) {
-      void handleModuloChange(modulosFaltantes[0]);
+      void handleModuloChange(modulosFaltantes[0], templates);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingTpls, templates, tplModulo, tenantId, initialModulo]);
