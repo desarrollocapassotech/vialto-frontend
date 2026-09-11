@@ -1545,11 +1545,22 @@ function EtapaModulo({
   const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
     (c) => !decisionesCampoUnico[c.fila],
   );
+  const advertenciasViajesFusionados =
+    p?.advertenciasViajesFusionados ?? [];
+  const motivosFusionados = Array.from(
+    new Set(
+      advertenciasViajesFusionados.map((a) =>
+        a.motivo === "id"
+          ? "comparten el mismo ID Personalizado"
+          : "tienen idénticos datos operativos"
+      )
+    )
+  ).join(" o ");
   const tieneDesgloseActualizacion =
     p != null &&
     p.entidadesNuevas != null &&
     p.entidadesActualizadas != null &&
-    p.entidadesActualizadas > 0;
+    (p.entidadesActualizadas > 0 || (p.filasFusionadas ?? 0) > 0);
 
   // Si el usuario resolvió (o excluyó) la última ciudad pendiente estando
   // dentro del modal, se cierra solo.
@@ -1600,14 +1611,20 @@ function EtapaModulo({
             <StatBox
               label={
                 tieneDesgloseActualizacion
-                  ? `${labelModulo(wizard.moduloActual ?? "")} a importar`
-                  : `${labelModulo(wizard.moduloActual ?? "")} a crear`
+                  ? `Filas a importar`
+                  : p.entidadesNuevas != null
+                    ? `${labelModulo(wizard.moduloActual ?? "")} a crear`
+                    : `${labelModulo(wizard.moduloActual ?? "")} a crear`
               }
-              value={p.exitosas}
+              value={p.entidadesNuevas ?? p.exitosas}
               highlight="ok"
               caption={
                 tieneDesgloseActualizacion
-                  ? `${p.entidadesNuevas} nuevas · ${p.entidadesActualizadas} a actualizar`
+                  ? [
+                    `${p.entidadesNuevas} nuevas`,
+                    p.entidadesActualizadas! > 0 ? `${p.entidadesActualizadas} a actualizar` : null,
+                    (p.filasFusionadas ?? 0) > 0 ? `${p.filasFusionadas} fila${p.filasFusionadas! !== 1 ? 's' : ''} ignorada${p.filasFusionadas! !== 1 ? 's' : ''}` : null
+                  ].filter(Boolean).join(" · ")
                   : undefined
               }
             />
@@ -1704,12 +1721,12 @@ function EtapaModulo({
             </div>
           )}
 
-          {hasViajes && tieneDesgloseActualizacion && (
+          {hasViajes && tieneDesgloseActualizacion && p.entidadesActualizadas! > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
               <span>
                 <strong>{p.entidadesActualizadas}</strong> viaje
-                {p.entidadesActualizadas !== 1 ? "s" : ""} de este archivo ya
-                {p.entidadesActualizadas !== 1 ? "n existen" : " existe"} en
+                {p.entidadesActualizadas !== 1 ? "s" : ""} de este archivo ya{" "}
+                {p.entidadesActualizadas !== 1 ? "existen" : "existe"} en
                 el sistema y se{" "}
                 {p.entidadesActualizadas !== 1 ? "van" : "va"} a actualizar —
                 el resto ({p.entidadesNuevas}) son altas nuevas.
@@ -1894,6 +1911,31 @@ function EtapaModulo({
                 </label>
               }
             />
+          )}
+
+          {advertenciasViajesFusionados.length > 0 && (
+            <ImportAlert
+              color="amber"
+              collapsible={true}
+              title={
+                <>
+                  Hay{" "}
+                  <strong>{advertenciasViajesFusionados.length}</strong> grupo
+                  {advertenciasViajesFusionados.length !== 1 ? "s" : ""} de
+                  viajes duplicados en tu archivo porque{" "}
+                  <strong>
+                    {motivosFusionados}
+                  </strong>.
+                </>
+              }
+              subtitle="El sistema los unificará creando un único viaje por grupo usando los datos de la primera fila. Filas afectadas:"
+            >
+              <ul className="mt-2 ml-4 list-disc space-y-1">
+                {advertenciasViajesFusionados.map((d, i) => (
+                  <li key={i}>{d.identificador}</li>
+                ))}
+              </ul>
+            </ImportAlert>
           )}
 
           {advertenciasFacturasDuplicadas.length > 0 && (
@@ -2298,9 +2340,20 @@ function ViajesCambiosList({
         <div key={v.fila} className="px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-vialto-charcoal">
-              Fila {v.fila} · {fmt(v.cliente)}
+              {v.filasAgrupadas && v.filasAgrupadas.length > 1 ? (
+                <>
+                  Filas {v.filasAgrupadas.join(", ")} <span className="font-normal opacity-70">(Duplicadas)</span>
+                </>
+              ) : (
+                <>Fila {v.fila}</>
+              )} · {fmt(v.cliente)}
             </p>
             <div className="flex shrink-0 items-center gap-2">
+              {v.filasAgrupadas && v.filasAgrupadas.length > 1 && (
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-700">
+                  Unificado
+                </span>
+              )}
               {v.nuevo ? (
                 <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
                   Nuevo
@@ -2321,6 +2374,33 @@ function ViajesCambiosList({
               )}
             </div>
           </div>
+
+          {v.advertenciaSobrescritura && (
+            <div className="mt-3 border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
+              <strong className="block font-semibold uppercase tracking-wider text-[10px] mb-1">Atención: Datos distintos</strong>
+              <p className="mb-2">
+                Estas filas fueron unificadas pero tenían datos diferentes. Se conservarán los datos de la <strong>primera fila</strong> ({v.fila}). A continuación se detallan los datos o IDs que se van a perder:
+              </p>
+              {v.cambiosSobrescritura && v.cambiosSobrescritura.length > 0 && (
+                <div className="space-y-1 bg-white p-2 border border-amber-200">
+                  {v.cambiosSobrescritura.map((c, i) => (
+                    <div key={i} className="text-xs">
+                      <span className="font-medium text-vialto-charcoal">
+                        {c.campo}:
+                      </span>{" "}
+                      <span className="text-vialto-steel line-through decoration-red-400">
+                        {fmt(c.antes)}
+                      </span>
+                      <span className="mx-1 text-vialto-steel">→</span>
+                      <span className="font-medium text-vialto-charcoal">
+                        {fmt(c.despues)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
             <p className="mt-1 text-[11px] text-amber-700">
@@ -2503,8 +2583,8 @@ function FilaDetalleCard({
               type="button"
               onClick={() => onElegirDecision?.("ignorar")}
               className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "ignorar"
-                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                : "border-amber-300 text-amber-900 hover:bg-amber-100"
                 }`}
             >
               Ignorar fila
@@ -2513,8 +2593,8 @@ function FilaDetalleCard({
               type="button"
               onClick={() => onElegirDecision?.("actualizar")}
               className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "actualizar"
-                  ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                  : "border-amber-300 text-amber-900 hover:bg-amber-100"
+                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+                : "border-amber-300 text-amber-900 hover:bg-amber-100"
                 }`}
             >
               Actualizar {conflicto.entidadExistenteNombre}
