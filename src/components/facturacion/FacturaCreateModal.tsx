@@ -210,26 +210,26 @@ export function FacturaCreateModal({
 
   const allowedClienteIds = useMemo(() => {
     if (draft.viajeIds.length === 0) return null;
-    
-    const activeTrips = viajes.filter(v => draft.viajeIds.includes(v.id));
+
+    const activeTrips = viajes.filter((v) => draft.viajeIds.includes(v.id));
     const ids = new Set<string>();
-    
-    activeTrips.forEach(v => {
+
+    activeTrips.forEach((v) => {
       ids.add(v.clienteId);
-      v.clientesViaje?.forEach(cv => ids.add(cv.clienteId));
+      v.clientesViaje?.forEach((cv) => ids.add(cv.clienteId));
     });
     return ids;
   }, [draft.viajeIds, viajes]);
 
   const filteredClientes = useMemo(() => {
     if (!allowedClienteIds) return clientes;
-    return clientes.filter(c => allowedClienteIds.has(c.id));
+    return clientes.filter((c) => allowedClienteIds.has(c.id));
   }, [clientes, allowedClienteIds]);
 
   const derivedViajes = useMemo(() => {
-    return viajes.map(v => {
+    return viajes.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
-        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
         if (vc) {
           return {
             ...v,
@@ -248,9 +248,9 @@ export function FacturaCreateModal({
   }, [viajes, draft.clienteId]);
 
   const derivedViajesNueva = useMemo(() => {
-    return viajesNueva.map(v => {
+    return viajesNueva.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
-        const vc = v.clientesViaje.find(x => x.clienteId === draft.clienteId);
+        const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
         if (vc) {
           return {
             ...v,
@@ -307,16 +307,13 @@ export function FacturaCreateModal({
     return moneda != null && arcaBloqueaFacturarUsd(true, moneda);
   }, [hasArca, draft.viajeIds, viajes]);
 
-  const missingEmitFields = useMemo(
-    () => {
-      if (!clienteDetalle) return [];
-      return collectFacturaEmitMissingFields({
-        emisor: arcaConfig,
-        cliente: clienteDetalle,
-      });
-    },
-    [arcaConfig, clienteDetalle],
-  );
+  const missingEmitFields = useMemo(() => {
+    if (!clienteDetalle) return [];
+    return collectFacturaEmitMissingFields({
+      emisor: arcaConfig,
+      cliente: clienteDetalle,
+    });
+  }, [arcaConfig, clienteDetalle]);
   const missingEmitMessage = formatFacturaEmitMissingMessage(missingEmitFields);
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
