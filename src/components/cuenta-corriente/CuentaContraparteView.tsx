@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
 import {
   listadoTablaAccionClass,
@@ -25,6 +25,8 @@ type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
   | { kind: 'imputar'; cargo: MovimientoCc }
   | null;
+
+type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
 
 const badgeBase = 'inline-block rounded-full px-2 py-0.5 text-xs font-medium';
 
@@ -94,6 +96,27 @@ export function CuentaContraparteView({
     cargarDatos();
   }, [cargarDatos]);
 
+  // Saldo acumulado: se calcula acá (no lo trae el backend en este endpoint) recorriendo
+  // los movimientos en orden cronológico. Un cargo anulado (viaje reabierto/factura
+  // anulada) no suma, igual que en el cálculo de saldo del backend — ver Fase 3.
+  const movimientosConSaldo = useMemo<MovimientoConSaldo[] | null>(() => {
+    if (!movimientos) return null;
+    const ascendente = [...movimientos].sort((a, b) => {
+      const porFecha = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+      if (porFecha !== 0) return porFecha;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    let acumulado = 0;
+    const saldoPorId = new Map<string, number>();
+    for (const m of ascendente) {
+      if (!(m.tipo === 'cargo' && m.estadoDisponibilidad === 'anulado')) {
+        acumulado += m.tipo === 'cargo' ? m.importe : -m.importe;
+      }
+      saldoPorId.set(m.id, acumulado);
+    }
+    return movimientos.map((m) => ({ ...m, saldoAcumulado: saldoPorId.get(m.id) ?? 0 }));
+  }, [movimientos]);
+
   function pagosDisponiblesPara(cargo: MovimientoCc) {
     return (movimientos ?? []).filter(
       (m) => m.tipo === 'pago' && m.moneda === cargo.moneda && m.estadoImputacion !== 'imputado',
@@ -152,49 +175,71 @@ export function CuentaContraparteView({
             id: 'fecha',
             header: 'Fecha',
             primary: true,
-            cell: (m: MovimientoCc) => new Date(m.fecha).toLocaleDateString('es-AR'),
-            tdClassName: listadoTablaTdClass,
-          },
-          {
-            id: 'tipo',
-            header: 'Tipo',
-            cell: (m: MovimientoCc) => (m.tipo === 'cargo' ? 'Cargo' : 'Pago'),
+            cell: (m: MovimientoConSaldo) => new Date(m.fecha).toLocaleDateString('es-AR'),
             tdClassName: listadoTablaTdClass,
           },
           {
             id: 'concepto',
             header: 'Concepto',
-            cell: (m: MovimientoCc) => (
+            cell: (m: MovimientoConSaldo) => (
               <span>
                 {m.concepto}
-                {m.numeroComprobante ? (
-                  <span className="block text-xs text-vialto-steel">{m.numeroComprobante}</span>
-                ) : null}
+                {m.fechaVencimiento && (
+                  <span className="block text-xs text-vialto-steel">
+                    vence {new Date(m.fechaVencimiento).toLocaleDateString('es-AR')}
+                  </span>
+                )}
               </span>
             ),
             tdClassName: listadoTablaTdClass,
           },
+          ...(tipoContraparte === 'cliente'
+            ? [
+                {
+                  id: 'numeroFactura',
+                  header: 'Comprobante',
+                  cell: (m: MovimientoConSaldo) => m.numeroComprobante ?? '—',
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+                },
+              ]
+            : []),
           {
-            id: 'importe',
-            header: 'Importe',
-            cell: (m: MovimientoCc) => `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}`,
+            id: 'debe',
+            header: 'Debe',
+            cell: (m: MovimientoConSaldo) =>
+              m.tipo === 'cargo' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
             tdClassName: `${listadoTablaTdClass} tabular-nums`,
           },
           {
-            id: 'vencimiento',
-            header: 'Vencimiento',
-            cell: (m: MovimientoCc) =>
-              m.fechaVencimiento ? new Date(m.fechaVencimiento).toLocaleDateString('es-AR') : '—',
-            tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
+            id: 'haber',
+            header: 'Haber',
+            cell: (m: MovimientoConSaldo) =>
+              m.tipo === 'pago' ? `${formatCurrencyArFromNumber(m.importe)} ${m.moneda}` : '—',
+            tdClassName: `${listadoTablaTdClass} tabular-nums`,
+          },
+          {
+            id: 'saldo',
+            header: 'Saldo',
+            cell: (m: MovimientoConSaldo) =>
+              m.pendiente != null && m.pendiente > 0.005
+                ? `${formatCurrencyArFromNumber(m.pendiente)} ${m.moneda}`
+                : '—',
+            tdClassName: `${listadoTablaTdClass} tabular-nums text-vialto-steel`,
+          },
+          {
+            id: 'saldoAcumulado',
+            header: 'Saldo acumulado',
+            cell: (m: MovimientoConSaldo) => `${formatCurrencyArFromNumber(m.saldoAcumulado)} ${m.moneda}`,
+            tdClassName: `${listadoTablaTdClass} tabular-nums font-medium`,
           },
           {
             id: 'estado',
             header: 'Estado',
-            cell: (m: MovimientoCc) => <EstadoBadge movimiento={m} />,
+            cell: (m: MovimientoConSaldo) => <EstadoBadge movimiento={m} />,
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : movimientos}
+        rows={error ? [] : movimientosConSaldo}
         rowKey={(m) => m.id}
         emptyMessage={
           error
@@ -202,7 +247,7 @@ export function CuentaContraparteView({
             : 'Todavía no hay movimientos para esta cuenta.'
         }
         loadingMessage="Cargando…"
-        renderActions={(m: MovimientoCc) =>
+        renderActions={(m: MovimientoConSaldo) =>
           m.tipo === 'cargo' &&
           (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
             <button

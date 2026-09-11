@@ -22,6 +22,11 @@ export type MovimientoCc = {
   estadoDisponibilidad: string;
   estadoImputacion: string;
   createdAt: string;
+  /**
+   * Cuánto de ESTE movimiento puntual sigue sin resolverse (cargo: sin cobrar/pagar;
+   * pago: sin imputar). Solo viene poblado en `fetchMovimientos` (`GET .../movimientos`).
+   */
+  pendiente?: number;
 };
 
 export type SaldoPorMoneda = { moneda: string; saldo: number };
