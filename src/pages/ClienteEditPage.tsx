@@ -54,8 +54,8 @@ export function ClienteEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const paisFijo = useTenantPaisFijo(tenantId || undefined);
-  const paisVisible = isVisible("edicion_cliente", "pais") && !paisFijo;
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const paisVisible = isVisible("edicion_cliente", "pais") && !paisFijoLoading && !paisFijo;
   const idFiscalVisible = isVisible("edicion_cliente", "idFiscal");
   const condicionVisible = isVisible("edicion_cliente", "condicionIvaTributaria");
   const direccionVisible = isVisible("edicion_cliente", "direccion");

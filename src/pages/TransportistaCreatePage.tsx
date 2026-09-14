@@ -52,8 +52,8 @@ export function TransportistaCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("transportistas");
-  const paisFijo = useTenantPaisFijo(tenantId || undefined);
-  const paisVisible = isVisible("alta_transportista", "pais") && !paisFijo;
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const paisVisible = isVisible("alta_transportista", "pais") && !paisFijoLoading && !paisFijo;
   const idFiscalVisible = isVisible("alta_transportista", "idFiscal");
   const condicionVisible = isVisible("alta_transportista", "condicionIvaTributaria");
   const domicilioVisible = isVisible("alta_transportista", "domicilio");
