@@ -560,6 +560,43 @@ export function FacturaCreateModal({
     }
   }
 
+  async function handleManualSave() {
+    if (busy) return;
+
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setTramosIncomplete(tramosCheck.indices);
+      notifyError(tramosCheck.message);
+      return;
+    }
+    setTramosIncomplete([]);
+    setLocalError(null);
+
+    if (onSave) {
+      onSave();
+      return;
+    }
+
+    if (!getToken || !facturasCreateUrl) {
+      notifyError(
+        "No se pudo guardar la factura: falta configuración del formulario.",
+      );
+      return;
+    }
+
+    setSubmitAction("borrador");
+    try {
+      const factura = await persistFactura();
+      showToast("Factura guardada correctamente.", "success");
+      onFacturaGuardada?.(factura);
+      onClose();
+    } catch (err) {
+      notifyError(friendlyError(err, "facturacion"));
+    } finally {
+      setSubmitAction(null);
+    }
+  }
+
   async function descargarPdf() {
     if (!facturaEmitida) return;
     const pdfUrl = platform
@@ -1173,16 +1210,7 @@ export function FacturaCreateModal({
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    const tramosCheck = validateFacturaDraftTramos(draft);
-                    if (!tramosCheck.ok) {
-                      setTramosIncomplete(tramosCheck.indices);
-                      setLocalError(tramosCheck.message);
-                      return;
-                    }
-                    setTramosIncomplete([]);
-                    onSave?.();
-                  }}
+                  onClick={() => void handleManualSave()}
                   disabled={busy || monedaInvalida}
                   className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                 >

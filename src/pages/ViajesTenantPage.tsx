@@ -1889,26 +1889,7 @@ export function ViajesTenantPage({
     elegiblesEnPagina.length > 0 &&
     elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
 
-  const viajesDisponiblesParaFacturar = useMemo(() => {
-    if (!rows || !facturaDraft.clienteId) return [];
-
-    return rows.filter((v) => {
-      const esDelCliente =
-        v.clienteId === facturaDraft.clienteId ||
-        (v.clientesViaje ?? []).some(
-          (cv) => cv.clienteId === facturaDraft.clienteId,
-        );
-
-      if (!esDelCliente) return false;
-
-      if (v.etapa?.toLowerCase() === "cancelado") return false;
-      if (!viajePermiteBotonFacturar(v)) return false;
-      if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) return false;
-
-      return true;
-    });
-  }, [rows, facturaDraft.clienteId, hasFacturasArca]);
-
+  // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
       <ListadoFiltroCampo label="ID" active={!!numeroFiltroActivo.trim()}>
@@ -3654,8 +3635,8 @@ export function ViajesTenantPage({
             draft={facturaDraft}
             setDraft={setFacturaDraft}
             clientes={clientes}
-            viajes={viajesDisponiblesParaFacturar}
-            viajesNueva={viajesDisponiblesParaFacturar}
+            viajes={rows ?? []}
+            viajesNueva={rows ?? []}
             viajesLoading={listadoRefetching}
             onClose={() => setIsFacturaModalOpen(false)}
             hasArca={hasFacturasArca}
