@@ -567,7 +567,13 @@ export interface ImportPreviewViaje {
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   /** true = este viaje no existe todavía (alta nueva). false = actualiza uno existente. */
   nuevo: boolean;
-  /** Solo si `nuevo` es false: campos que cambian respecto al valor actual, con su antes/después. */
+  /** Si esta fila representa un grupo de filas fusionadas, contiene los números de fila del grupo. */
+  filasAgrupadas?: number[];
+  /** true = los datos del grupo eran distintos y se sobrescribieron con los de la última fila. */
+  advertenciaSobrescritura?: boolean;
+  /** Solo si hay sobrescritura: campos que se pierden de la primera fila. */
+  cambiosSobrescritura?: { campo: string; antes: string | number | null; despues: string | number | null }[];
+  /** Solo si `nuevo` es false: campos que cambian respecto al valor actual en base de datos. */
   cambios?: { campo: string; antes: string | number | null; despues: string | number | null }[];
 }
 
@@ -657,10 +663,14 @@ export interface ImportPreviewResult {
   /** Desglose de `exitosas` entre altas y actualizaciones (upsert por nombre/patente) — no viene para todos los módulos. */
   entidadesNuevas?: number;
   entidadesActualizadas?: number;
+  /** Cantidad de filas que se ignoran automáticamente por ser duplicados internos del mismo lote (solo viajes). */
+  filasFusionadas?: number;
   /** Solo viajes: números de factura compartidos por más de un viaje nuevo (o ya existentes) — se unifican en una sola factura, requiere confirmación explícita. */
   advertenciasFacturasDuplicadas?: { numero: string; filas: number[] }[];
   /** Clientes/Transportistas/Choferes: filas con un conflicto de campo único (ID Fiscal/DNI) — requieren elegir "ignorar" o "actualizar" por fila antes de confirmar. */
   advertenciasCampoUnicoDuplicado?: ImportCampoUnicoConflicto[];
+  /** Viajes: grupos de filas detectadas como el mismo viaje (misma entidad/fecha) que se consolidan. */
+  advertenciasViajesFusionados?: { filas: number[]; identificador: string; motivo: "id" | "datos" }[];
   /** Advertencias de ciudades no reconocidas en el catálogo (solo viajes). */
   advertenciasCiudad?: ImportCiudadAdvertencia[];
   totalAdvertenciasCiudad?: number;

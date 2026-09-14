@@ -6,11 +6,11 @@ import type { ImportTemplate } from "@/types/api";
 export function useImportTemplates(tenantId: string) {
   const { getToken } = useAuth();
   const [templates, setTemplates] = useState<ImportTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ImportTemplate[]> => {
     setLoading(true);
     setError(null);
     try {
@@ -19,8 +19,10 @@ export function useImportTemplates(tenantId: string) {
         () => getToken(),
       );
       setTemplates(data);
+      return data;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar templates");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -34,7 +36,7 @@ export function useImportTemplates(tenantId: string) {
     modulo: string,
     nombre: string,
     configJson: string,
-  ): Promise<boolean> {
+  ): Promise<{ ok: boolean; data?: ImportTemplate[] }> {
     setSaving(true);
     setError(null);
     try {
@@ -43,11 +45,11 @@ export function useImportTemplates(tenantId: string) {
         method: "POST",
         body: JSON.stringify({ tenantId, modulo, nombre, config }),
       });
-      await load();
-      return true;
+      const data = await load();
+      return { ok: true, data };
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar template");
-      return false;
+      return { ok: false };
     } finally {
       setSaving(false);
     }

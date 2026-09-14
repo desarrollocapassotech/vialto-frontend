@@ -166,9 +166,11 @@ export async function enriquecerPreviewImportacionViajes(
       }
 
       if (patch.origen !== undefined || patch.destino !== undefined) {
-        ciudadesNormalizadas.push(patch);
+        const filas = viaje.filasAgrupadas ?? [viaje.fila];
+        for (const f of filas) {
+          ciudadesNormalizadas.push({ ...patch, fila: f });
+        }
       }
-
       let cambios = viaje.cambios;
       if (patch.origen !== undefined) {
         cambios = sincronizarCambioCiudad(cambios, "Origen", origen ?? "");

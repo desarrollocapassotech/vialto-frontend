@@ -50,6 +50,7 @@ import { SuperadminUserCreatePage } from "@/pages/SuperadminUserCreatePage";
 import { SuperadminUserEditPage } from "@/pages/SuperadminUserEditPage";
 import { SuperadminArcaPage } from "@/pages/SuperadminArcaPage";
 import { LiquidacionesTenantPage } from "@/pages/LiquidacionesTenantPage";
+import { CuentaCorrienteTenantPage } from "@/pages/CuentaCorrienteTenantPage";
 import { ArcaConfigTenantPage } from "@/pages/ArcaConfigTenantPage";
 import { CombustiblePage } from "@/pages/CombustiblePage";
 import { MantenimientoTenantPage } from "@/pages/MantenimientoTenantPage";
@@ -319,6 +320,7 @@ export default function App() {
             />
             <Route path="facturacion" element={<FacturacionPage />} />
             <Route path="liquidaciones" element={<LiquidacionesTenantPage />} />
+            <Route path="cuenta-corriente" element={<CuentaCorrienteTenantPage />} />
           </Route>
           {/* rutas legacy → redirigen al tab correspondiente en /base-de-datos */}
           <Route

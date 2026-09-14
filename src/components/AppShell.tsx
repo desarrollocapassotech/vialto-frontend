@@ -27,6 +27,7 @@ import {
   Settings,
   SlidersHorizontal,
   Truck,
+  Wallet,
   Warehouse,
   Wrench,
   LogOut,
@@ -40,6 +41,7 @@ import { BreadcrumbOverrideProvider } from "@/hooks/useBreadcrumbOverride";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import {
   canAccessCombustible,
+  canAccessCuentaCorriente,
   canAccessEmisionFacturasArca,
   canAccessEmisionLiquidoProductoArca,
   canAccessFacturacion,
@@ -295,6 +297,15 @@ export function AppShell() {
         title: "Facturación",
         tooltip: "Facturación y liquidaciones",
         items: facturacionItems,
+      });
+    }
+
+    if (superadmin || canAccessCuentaCorriente(tenant?.modules ?? [])) {
+      groups.push({
+        title: "Cuenta corriente",
+        items: [
+          { to: "/cuenta-corriente", label: "Cuenta corriente", icon: Wallet, end: true },
+        ],
       });
     }
 

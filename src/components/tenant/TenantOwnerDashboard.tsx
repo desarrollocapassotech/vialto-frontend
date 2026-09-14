@@ -9,6 +9,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessCombustible,
+  canAccessCuentaCorriente,
   canAccessEmisionLiquidoProductoArca,
 } from "@/lib/tenantModules";
 import { useEffect, useId, useState } from "react";
@@ -18,6 +19,7 @@ import {
   Wallet,
   Warehouse,
   Fuel,
+  HandCoins,
   type LucideIcon,
 } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/SelectorOpcionesSheet";
 import { CombustibleDashboardSection } from "@/components/combustible/CombustibleDashboardSection";
 import { FinancieroDashboardSection } from "@/components/financiero/FinancieroDashboardSection";
+import { CuentaCorrienteDashboardSection } from "@/components/cuenta-corriente/CuentaCorrienteDashboardSection";
 import { soloCiudadDesdeEtiquetaUbicacion } from "@/lib/ciudades/soloCiudadDesdeEtiqueta";
 
 function formatMoney(n: number) {
@@ -788,7 +791,7 @@ interface TenantOwnerDashboardProps {
   loadingViajeId?: string | null;
 }
 
-type ModuloDashboardTab = "financiero" | "stock" | "combustible";
+type ModuloDashboardTab = "financiero" | "stock" | "combustible" | "cuenta-corriente";
 
 export function TenantOwnerDashboard({
   tenantId,
@@ -802,6 +805,7 @@ export function TenantOwnerDashboard({
     canAccessFacturacion(modules) || canAccessEmisionFacturasArca(modules);
   const showStock = canAccessStock(modules);
   const showCombustible = canAccessCombustible(modules);
+  const showCuentaCorriente = canAccessCuentaCorriente(modules);
   const showIntegracionArca = canAccessEmisionLiquidoProductoArca(modules);
   const showFinanciero = showViajes || showFacturacionModulo;
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
@@ -820,6 +824,9 @@ export function TenantOwnerDashboard({
       : []),
     ...(showCombustible
       ? [{ id: "combustible" as const, label: "Combustible", icon: Fuel }]
+      : []),
+    ...(showCuentaCorriente
+      ? [{ id: "cuenta-corriente" as const, label: "Cuenta corriente", icon: HandCoins }]
       : []),
   ];
   const [moduloTab, setModuloTab] = useState<ModuloDashboardTab | null>(null);
@@ -1186,6 +1193,10 @@ export function TenantOwnerDashboard({
           dash={dash}
           showViajes={showViajes}
         />
+      )}
+
+      {moduloActivo === "cuenta-corriente" && showCuentaCorriente && (
+        <CuentaCorrienteDashboardSection dash={dash} />
       )}
     </div>
   );
