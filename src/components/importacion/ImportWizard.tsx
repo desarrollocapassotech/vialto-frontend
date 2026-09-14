@@ -520,50 +520,79 @@ export function ImportWizard({
           )}
 
           {wizard.fase === "post-liquidaciones" && postViajesElegido.liquidaciones && (
-            <EtapaOpcional
-              titulo="Generar liquidaciones borrador"
-              descripcion="Se van a agrupar los viajes por transportista. Quedan en estado BORRADOR."
-              loading={wizard.loading}
-              preview={wizard.liquidacionesPreview}
-              onPedirPreview={wizard.pedirPreviewLiquidaciones}
-              onSaltear={wizard.saltearLiquidaciones}
-              onConfirmar={wizard.confirmarLiquidaciones}
-              renderTabla={(items: typeof wizard.liquidacionesPreview) =>
-                items && items.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr>
-                        <th className={th}>Transportista</th>
-                        <th className={th}>Viajes</th>
-                        <th className={th}>Período</th>
-                        <th className={th}>Bruto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((g) => (
-                        <tr key={g.transportistaId}>
-                          <td className={td}>{g.transportistaNombre}</td>
-                          <td className={td}>{g.cantidadViajes}</td>
-                          <td className={td}>
-                            {g.periodoDesde} — {g.periodoHasta}
-                          </td>
-                          <td className={td}>
-                            {g.bruto.toLocaleString("es-AR", {
-                              style: "currency",
-                              currency: "ARS",
-                            })}
-                          </td>
+            <div className="flex flex-col gap-4">
+              {wizard.liquidacionesOmitidasUsdCount > 0 && (wizard.liquidacionesPreview?.length ?? 0) > 0 && (
+                <ImportAlert
+                  color="amber"
+                  collapsible={false}
+                  title={
+                    <>
+                      Se omitió la liquidación de <strong>{wizard.liquidacionesOmitidasUsdCount}</strong> viaje(s) en USD.
+                    </>
+                  }
+                  subtitle="Líquido Producto (ARCA) solo admite comprobantes en pesos."
+                />
+              )}
+              <EtapaOpcional
+                titulo="Generar liquidaciones borrador"
+                descripcion={
+                  hasLiquidoProductoArca
+                    ? "Se van a agrupar los viajes por transportista. Quedan en estado BORRADOR."
+                    : "Se van a agrupar los viajes por transportista y moneda. Quedan en estado BORRADOR."
+                }
+                loading={wizard.loading}
+                preview={wizard.liquidacionesPreview}
+                onPedirPreview={wizard.pedirPreviewLiquidaciones}
+                onSaltear={wizard.saltearLiquidaciones}
+                onConfirmar={wizard.confirmarLiquidaciones}
+                onReiniciar={reiniciarImportacion}
+                renderTabla={(items: typeof wizard.liquidacionesPreview) =>
+                  items && items.length > 0 ? (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className={th}>Transportista</th>
+                          <th className={th}>Viajes</th>
+                          <th className={th}>Período</th>
+                          {!hasLiquidoProductoArca && <th className={th}>Moneda</th>}
+                          <th className={th}>Bruto</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-sm text-vialto-steel">
-                    No hay viajes con transportista externo para liquidar.
-                  </p>
-                )
-              }
-            />
+                      </thead>
+                      <tbody>
+                        {items.map((g) => (
+                          <tr key={`${g.transportistaId}-${g.moneda || "ARS"}`}>
+                            <td className={td}>{g.transportistaNombre}</td>
+                            <td className={td}>{g.cantidadViajes}</td>
+                            <td className={td}>
+                              {g.periodoDesde} — {g.periodoHasta}
+                            </td>
+                            {!hasLiquidoProductoArca && (
+                              <td className={td}>
+                                <span className="inline-flex items-center rounded-full bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
+                                  {g.moneda || "ARS"}
+                                </span>
+                              </td>
+                            )}
+                            <td className={td}>
+                              {g.bruto.toLocaleString("es-AR", {
+                                style: "currency",
+                                currency: g.moneda || "ARS",
+                              })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-sm text-vialto-steel">
+                      {hasLiquidoProductoArca && wizard.liquidacionesOmitidasUsdCount > 0
+                        ? "No hay viajes en pesos para liquidar. La emisión de liquidaciones por ARCA (Líquido Producto) solo admite comprobantes en ARS."
+                        : "No hay viajes con transportista externo para liquidar."}
+                    </p>
+                  )
+                }
+              />
+            </div>
           )}
           {wizard.fase === "post-liquidaciones" && !postViajesElegido.liquidaciones && (
             <AvanceSilencioso onNext={wizard.saltearLiquidaciones} />
@@ -583,9 +612,25 @@ export function ImportWizard({
                   convenga apretar "No, gracias" abajo.
                 </div>
               )}
+              {wizard.facturasOmitidasUsdCount > 0 && (wizard.facturasPreview?.length ?? 0) > 0 && (
+                <ImportAlert
+                  color="amber"
+                  collapsible={false}
+                  title={
+                    <>
+                      Se omitió la facturación de <strong>{wizard.facturasOmitidasUsdCount}</strong> viaje(s) en USD.
+                    </>
+                  }
+                  subtitle="La emisión por ARCA solo admite comprobantes en pesos."
+                />
+              )}
               <EtapaOpcional
                 titulo="Facturar a clientes"
-                descripcion="Se van a agrupar los viajes por cliente."
+                descripcion={
+                  hasFacturasArca
+                    ? "Se van a agrupar los viajes por cliente."
+                    : "Se van a agrupar los viajes por cliente y moneda."
+                }
                 loading={wizard.loading}
                 preview={wizard.facturasPreview}
                 onPedirPreview={wizard.pedirPreviewFacturas}
@@ -595,10 +640,13 @@ export function ImportWizard({
                     hasFacturasArca ? undefined : numerosPorCliente,
                   )
                 }
+                onReiniciar={reiniciarImportacion}
                 confirmDisabled={
                   !hasFacturasArca &&
                   (wizard.facturasPreview?.some(
-                    (g) => !numerosPorCliente[g.clienteId]?.trim(),
+                    (g) =>
+                      !numerosPorCliente[`${g.clienteId}|${g.moneda}`]?.trim() &&
+                      !numerosPorCliente[g.clienteId]?.trim(),
                   ) ??
                     false)
                 }
@@ -609,44 +657,62 @@ export function ImportWizard({
                         <tr>
                           <th className={th}>Cliente</th>
                           <th className={th}>Viajes</th>
+                          {!hasFacturasArca && <th className={th}>Moneda</th>}
                           <th className={th}>Importe</th>
                           {!hasFacturasArca && <th className={th}>N° de factura</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((g) => (
-                          <tr key={g.clienteId}>
-                            <td className={td}>{g.clienteNombre}</td>
-                            <td className={td}>{g.cantidadViajes}</td>
-                            <td className={td}>
-                              {g.importe.toLocaleString("es-AR", {
-                                style: "currency",
-                                currency: g.moneda,
-                              })}
-                            </td>
-                            {!hasFacturasArca && (
+                        {items.map((g) => {
+                          const key = `${g.clienteId}|${g.moneda || "ARS"}`;
+                          return (
+                            <tr key={key}>
+                              <td className={td}>{g.clienteNombre}</td>
+                              <td className={td}>{g.cantidadViajes}</td>
+                              {!hasFacturasArca && (
+                                <td className={td}>
+                                  <span className="inline-flex items-center rounded-full bg-vialto-mist border border-black/10 px-2 py-0.5 text-[11px] font-semibold text-vialto-charcoal">
+                                    {g.moneda || "ARS"}
+                                  </span>
+                                </td>
+                              )}
                               <td className={td}>
-                                <input
-                                  type="text"
-                                  value={numerosPorCliente[g.clienteId] ?? ""}
-                                  onChange={(e) =>
-                                    setNumerosPorCliente((prev) => ({
-                                      ...prev,
-                                      [g.clienteId]: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="0001-00000001"
-                                  className="h-8 w-full border border-black/20 px-2 text-sm"
-                                />
+                                {g.importe.toLocaleString("es-AR", {
+                                  style: "currency",
+                                  currency: g.moneda || "ARS",
+                                })}
                               </td>
-                            )}
-                          </tr>
-                        ))}
+                              {!hasFacturasArca && (
+                                <td className={td}>
+                                  <input
+                                    type="text"
+                                    value={
+                                      numerosPorCliente[key] ??
+                                      numerosPorCliente[g.clienteId] ??
+                                      ""
+                                    }
+                                    onChange={(e) =>
+                                      setNumerosPorCliente((prev) => ({
+                                        ...prev,
+                                        [key]: e.target.value,
+                                        [g.clienteId]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="0001-00000001"
+                                    className="w-full rounded border border-black/15 bg-white px-2 py-1 text-xs"
+                                  />
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   ) : (
                     <p className="text-sm text-vialto-steel">
-                      No hay viajes para facturar.
+                      {hasFacturasArca && wizard.facturasOmitidasUsdCount > 0
+                        ? "No hay viajes en pesos para facturar. La emisión de facturas por ARCA solo admite comprobantes en ARS."
+                        : "No hay viajes con clientes para facturar."}
                     </p>
                   )
                 }
@@ -2617,6 +2683,7 @@ function EtapaOpcional<T>({
   onPedirPreview,
   onSaltear,
   onConfirmar,
+  onReiniciar,
   renderTabla,
   confirmDisabled,
 }: {
@@ -2627,6 +2694,7 @@ function EtapaOpcional<T>({
   onPedirPreview: () => void;
   onSaltear: () => void;
   onConfirmar: () => void;
+  onReiniciar?: () => void;
   renderTabla: (items: T[] | null) => React.ReactNode;
   confirmDisabled?: boolean;
 }) {
@@ -2638,12 +2706,14 @@ function EtapaOpcional<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hasItems = preview && preview.length > 0;
+
   return (
     <div className="flex flex-col gap-4">
       <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
         {titulo}
       </h3>
-      <p className="text-sm text-vialto-steel">{descripcion}</p>
+      {hasItems && <p className="text-sm text-vialto-steel">{descripcion}</p>}
 
       {!preview && loading && (
         <p className="text-sm text-vialto-steel">Cargando…</p>
@@ -2673,22 +2743,47 @@ function EtapaOpcional<T>({
         <>
           {renderTabla(preview)}
           <div className="flex gap-3">
-            <button
-              type="button"
-              disabled={loading || preview.length === 0 || confirmDisabled}
-              onClick={onConfirmar}
-              className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
-            >
-              {loading ? "Guardando…" : "Confirmar"}
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={onSaltear}
-              className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04]"
-            >
-              Cancelar
-            </button>
+            {hasItems ? (
+              <>
+                <button
+                  type="button"
+                  disabled={loading || confirmDisabled}
+                  onClick={onConfirmar}
+                  className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+                >
+                  {loading ? "Guardando…" : "Confirmar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={onSaltear}
+                  className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04]"
+                >
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={onSaltear}
+                  className="border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black"
+                >
+                  Siguiente →
+                </button>
+                {onReiniciar && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={onReiniciar}
+                    className="border border-black/15 border-black/15 bg-white px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-charcoal hover:bg-vialto-mist"
+                  >
+                    Volver a importar
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </>
       )}
