@@ -715,6 +715,12 @@ export interface ImportLiquidacionPreviewGrupo {
   periodoDesde: string;
   periodoHasta: string;
   bruto: number;
+  moneda: string;
+}
+
+export interface ImportLiquidacionesPreviewRespuesta {
+  grupos: ImportLiquidacionPreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 /** Preview de una factura a cliente a generar (agrupada por cliente), etapa opcional posterior a Viajes. */
@@ -724,6 +730,11 @@ export interface ImportFacturaClientePreviewGrupo {
   cantidadViajes: number;
   importe: number;
   moneda: string;
+}
+
+export interface ImportFacturasClientesPreviewRespuesta {
+  grupos: ImportFacturaClientePreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 export interface ImportTemplate {
