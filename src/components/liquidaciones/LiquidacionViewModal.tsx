@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Ban, Receipt, RotateCw, Trash2 } from "lucide-react";
+import { Ban, Download, Receipt, RotateCw, Trash2 } from "lucide-react";
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -16,7 +16,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
-import { apiJson } from "@/lib/api";
+import { apiFetch, apiJson } from "@/lib/api";
+import { filenameFromContentDisposition } from "@/lib/downloadFilename";
 import { formatStoredArcaError } from "@/lib/arcaFriendlyError";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -139,6 +140,7 @@ export function LiquidacionViewModal({
   onVerComprobante,
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
+  contratoPdfUrl,
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
@@ -168,6 +170,8 @@ export function LiquidacionViewModal({
   onVerAnulacion?: () => void;
   /** Ver el comprobante pre-impreso adjunto en la anulación manual. Solo si `anulacionMetodo === 'manual'`. */
   onVerComprobanteAnulacionManual?: () => void;
+  /** PDF comercial (contrato / liquidación a proveedor). Si hay URL, se muestra "Descargar PDF". */
+  contratoPdfUrl?: string;
 }) {
   const { getToken: getAuthToken } = useAuth();
   const navigate = useNavigate();
@@ -176,6 +180,31 @@ export function LiquidacionViewModal({
   const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+  const [downloadingContrato, setDownloadingContrato] = useState(false);
+
+  async function handleDescargarContrato() {
+    if (!contratoPdfUrl || downloadingContrato) return;
+    setDownloadingContrato(true);
+    try {
+      const res = await apiFetch(contratoPdfUrl, () => getAuthToken());
+      if (!res.ok) throw new Error("Error al generar el PDF");
+      const filename = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        `liquidacion-${liq.id}.pdf`,
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast(friendlyError(e, "liquidaciones"), "error");
+    } finally {
+      setDownloadingContrato(false);
+    }
+  }
 
   async function handleVerViaje(viajeId: string) {
     setLoadingViajeId(viajeId);
@@ -399,6 +428,21 @@ export function LiquidacionViewModal({
                   aria-hidden
                 />
                 Confirmar anulación
+              </button>
+            )}
+            {contratoPdfUrl && (
+              <button
+                type="button"
+                onClick={() => void handleDescargarContrato()}
+                disabled={downloadingContrato}
+                className="inline-flex min-h-11 items-center gap-2 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-60"
+              >
+                <Download
+                  className="h-4 w-4 shrink-0"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                {downloadingContrato ? "Descargando…" : "Descargar PDF"}
               </button>
             )}
             {canEdit && (
