@@ -27,7 +27,7 @@ import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
 } from "@/lib/viajesFlota";
-import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import { viajeTieneLiquidacionActivaParaTransportista } from "@/lib/viajesComprobantes";
 import type { LiquidacionConTransportista } from "@/components/liquidaciones/LiquidacionViewModal";
 import type { Viaje } from "@/types/api";
 
@@ -280,7 +280,8 @@ export function LiquidacionEditModal({
   const viajesParaTabla = useMemo(() => {
     return viajesTransportista.filter(
       (v) =>
-        selectedViajeIds.has(v.id) || !viajeTieneLiquidacionTransportista(v),
+        selectedViajeIds.has(v.id) ||
+        !viajeTieneLiquidacionActivaParaTransportista(v, liq.transportistaId),
     );
   }, [viajesTransportista, selectedViajeIds]);
 

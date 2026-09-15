@@ -166,6 +166,7 @@ export interface Viaje {
     liquidacion: {
       id: string;
       estado: string;
+      transportistaId?: string;
       liquido: number;
       arcaError?: string | null;
       cae?: string | null;
