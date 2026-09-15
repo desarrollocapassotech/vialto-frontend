@@ -71,9 +71,9 @@ export function CompletarDatosFiscalesInline({
 
   const formKey = entidad === 'cliente' ? 'edicion_cliente' : 'edicion_transportista';
   const { isVisible } = useFieldConfig(entidad === 'cliente' ? 'clientes' : 'transportistas');
-  const paisFijo = useTenantPaisFijo(tenantId);
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
 
-  const paisVisible = (forceArcaFields || isVisible(formKey, "pais")) && !paisFijo;
+  const paisVisible = (forceArcaFields || isVisible(formKey, "pais")) && !paisFijoLoading && !paisFijo;
   const idFiscalVisible = forceArcaFields || isVisible(formKey, "idFiscal");
   const condicionVisible = forceArcaFields || isVisible(formKey, "condicionIvaTributaria");
   const direccionVisible = forceArcaFields || isVisible(formKey, "direccion");

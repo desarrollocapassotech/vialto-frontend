@@ -47,8 +47,8 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const paisFijo = useTenantPaisFijo(tenantId || undefined);
-  const paisVisible = isVisible("alta_cliente", "pais") && !paisFijo;
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const paisVisible = isVisible("alta_cliente", "pais") && !paisFijoLoading && !paisFijo;
   const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
   const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
   const direccionVisible = isVisible("alta_cliente", "direccion");

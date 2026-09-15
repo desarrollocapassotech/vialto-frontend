@@ -34,7 +34,7 @@ export function TransportistaModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const paisFijo = useTenantPaisFijo(tenantId);
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -127,7 +127,7 @@ export function TransportistaModal({
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
-            {!paisFijo && (
+            {!paisFijoLoading && !paisFijo && (
               <label className="flex flex-col gap-1">
                 <span className={L}>País <span className="text-red-500">*</span></span>
                 <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />
