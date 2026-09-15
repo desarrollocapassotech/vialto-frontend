@@ -503,7 +503,9 @@ export function nombreTransportistaExternoListadoViaje(
 }
 
 /** Id del transportista que realiza el flete (scalar API o relación incluida). */
-export function transportistaEfectivoIdDesdeViaje(v: Viaje): string {
+export function transportistaEfectivoIdDesdeViaje(
+  v: Pick<Viaje, "transportistaEfectivoId" | "transportistaEfectivo">,
+): string {
   return (
     v.transportistaEfectivoId ??
     v.transportistaEfectivo?.id ??
