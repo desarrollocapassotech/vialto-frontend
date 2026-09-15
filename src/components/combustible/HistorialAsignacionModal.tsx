@@ -67,7 +67,7 @@ export function HistorialAsignacionModal({
             id="historial-asignacion-titulo"
             className="text-lg font-semibold text-vialto-charcoal"
           >
-            Historial de vehículos — {choferNombre}
+            Historial de vehículos - {choferNombre}
           </h2>
           <button
             type="button"

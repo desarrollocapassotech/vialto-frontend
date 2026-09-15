@@ -1822,7 +1822,7 @@ function EtapaModulo({
               </p>
               <p className="text-xs text-vialto-steel">
                 No existen en el sistema todavía. Elegí el tipo de cada uno y
-                creálos — después se vuelve a previsualizar solo.
+                creálos - después se vuelve a previsualizar solo.
               </p>
               <div className="overflow-x-auto border border-black/10">
                 <table className="w-full text-xs">
