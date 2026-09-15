@@ -288,6 +288,20 @@ export interface Vehiculo {
   createdAt: string;
 }
 
+/** Vehículo asignado a un chofer, con historial (COMB). `fechaHasta: null` = asignación vigente. */
+export interface AsignacionVehiculo {
+  id: string;
+  tenantId: string;
+  choferId: string;
+  vehiculoId: string;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  createdAt: string;
+  createdBy: string;
+  chofer: { id: string; nombre: string; dni: string | null };
+  vehiculo: { id: string; patente: string; tipo: string; kmActual: number };
+}
+
 export type TipoIntervencionMantenimiento =
   // Motor y sistema de propulsión
   | 'cambio_aceite_motor'
