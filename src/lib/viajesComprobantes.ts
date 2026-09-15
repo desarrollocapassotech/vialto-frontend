@@ -1,5 +1,12 @@
 import { facturacionPermiteVincular, liquidacionPermiteVincular } from '@/lib/viajesIndicadores';
-import type { Viaje } from '@/types/api';
+import { transportistaEfectivoIdDesdeViaje } from '@/lib/viajesFlota';
+import type { Transportista, Viaje } from '@/types/api';
+
+export type TransportistaLiquidacionOpcion = {
+  id: string;
+  nombre: string;
+  rolLabel: string;
+};
 
 /** Viaje con transportista externo: puede requerir factura al cliente y liquidación al transportista. */
 export function viajeRequiereComprobanteDual(
@@ -13,6 +20,90 @@ export function viajeTieneLiquidacionTransportista(
   v: Pick<Viaje, 'liquidacionEstado'>,
 ): boolean {
   return v.liquidacionEstado != null && !liquidacionPermiteVincular(v.liquidacionEstado);
+}
+
+/** Contratante externo y quien realiza el flete son distintos → elegir beneficiario de la CVLP. */
+export function viajePermiteElegirTransportistaLiquidacion(
+  v: Pick<
+    Viaje,
+    'transportistaId' | 'transportistaEfectivoId' | 'transportistaEfectivo'
+  >,
+): boolean {
+  const contratante = String(v.transportistaId ?? '').trim();
+  const efectivo = transportistaEfectivoIdDesdeViaje(v);
+  return Boolean(contratante && efectivo && contratante !== efectivo);
+}
+
+function nombreTransportistaLiquidacion(
+  id: string,
+  stub: { nombre?: string } | null | undefined,
+  transportistas: Transportista[],
+): string {
+  const desdeStub = stub?.nombre?.trim();
+  if (desdeStub) return desdeStub;
+  const t = transportistas.find((x) => x.id === id);
+  return t?.nombre?.trim() || id;
+}
+
+/** Opciones del dropdown al liquidar un viaje (1 o 2 transportistas). */
+export function transportistasLiquidacionOpcionesDesdeViaje(
+  v: Pick<
+    Viaje,
+    | 'transportistaId'
+    | 'transportista'
+    | 'transportistaEfectivoId'
+    | 'transportistaEfectivo'
+  >,
+  transportistas: Transportista[],
+): TransportistaLiquidacionOpcion[] {
+  const contratanteId = String(v.transportistaId ?? '').trim();
+  if (!contratanteId) return [];
+
+  const opciones: TransportistaLiquidacionOpcion[] = [
+    {
+      id: contratanteId,
+      nombre: nombreTransportistaLiquidacion(
+        contratanteId,
+        v.transportista,
+        transportistas,
+      ),
+      rolLabel: 'Contratante',
+    },
+  ];
+
+  if (!viajePermiteElegirTransportistaLiquidacion(v)) {
+    return opciones;
+  }
+
+  const efectivoId = transportistaEfectivoIdDesdeViaje(v);
+  opciones.push({
+    id: efectivoId,
+    nombre: nombreTransportistaLiquidacion(
+      efectivoId,
+      v.transportistaEfectivo,
+      transportistas,
+    ),
+    rolLabel: 'Realiza el flete',
+  });
+  return opciones;
+}
+
+/** Liquidación no anulada ya emitida a este transportista en el viaje. */
+export function viajeTieneLiquidacionActivaParaTransportista(
+  v: Pick<Viaje, 'liquidacionesViaje'>,
+  transportistaId: string,
+): boolean {
+  const tid = transportistaId.trim();
+  if (!tid) return false;
+  for (const lv of v.liquidacionesViaje ?? []) {
+    const liq = lv.liquidacion;
+    if (!liq || liq.estado === 'anulado') continue;
+    const liqTid = String(
+      (liq as { transportistaId?: string }).transportistaId ?? '',
+    ).trim();
+    if (liqTid === tid) return true;
+  }
+  return false;
 }
 
 export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEstado' | 'clientesViaje'>): boolean {
