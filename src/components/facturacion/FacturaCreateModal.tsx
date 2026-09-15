@@ -221,11 +221,6 @@ export function FacturaCreateModal({
     return ids;
   }, [draft.viajeIds, viajes]);
 
-  const filteredClientes = useMemo(() => {
-    if (!allowedClienteIds) return clientes;
-    return clientes.filter((c) => allowedClienteIds.has(c.id));
-  }, [clientes, allowedClienteIds]);
-
   const derivedViajes = useMemo(() => {
     return viajes.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
@@ -278,6 +273,23 @@ export function FacturaCreateModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+
+  const filteredClientes = useMemo(() => {
+    const base = !allowedClienteIds
+      ? clientes
+      : clientes.filter(c => allowedClienteIds.has(c.id));
+
+    if (draft.clienteId && !base.some(c => c.id === draft.clienteId)) {
+      const fallback =
+        clienteDetalle && clienteDetalle.id === draft.clienteId
+          ? clienteDetalle
+          : clientes.find(c => c.id === draft.clienteId);
+      if (fallback) return [...base, fallback];
+    }
+
+    return base;
+  }, [clientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [facturaEmitida, setFacturaEmitida] = useState<Factura | null>(null);
@@ -555,6 +567,43 @@ export function FacturaCreateModal({
         setArcaConfigMissing(false);
       }
       notifyError(msg);
+    } finally {
+      setSubmitAction(null);
+    }
+  }
+
+  async function handleManualSave() {
+    if (busy) return;
+
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setTramosIncomplete(tramosCheck.indices);
+      notifyError(tramosCheck.message);
+      return;
+    }
+    setTramosIncomplete([]);
+    setLocalError(null);
+
+    if (onSave) {
+      onSave();
+      return;
+    }
+
+    if (!getToken || !facturasCreateUrl) {
+      notifyError(
+        "No se pudo guardar la factura: falta configuración del formulario.",
+      );
+      return;
+    }
+
+    setSubmitAction("borrador");
+    try {
+      const factura = await persistFactura();
+      showToast("Factura guardada correctamente.", "success");
+      onFacturaGuardada?.(factura);
+      onClose();
+    } catch (err) {
+      notifyError(friendlyError(err, "facturacion"));
     } finally {
       setSubmitAction(null);
     }
@@ -1173,16 +1222,7 @@ export function FacturaCreateModal({
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    const tramosCheck = validateFacturaDraftTramos(draft);
-                    if (!tramosCheck.ok) {
-                      setTramosIncomplete(tramosCheck.indices);
-                      setLocalError(tramosCheck.message);
-                      return;
-                    }
-                    setTramosIncomplete([]);
-                    onSave?.();
-                  }}
+                  onClick={() => void handleManualSave()}
                   disabled={busy || monedaInvalida}
                   className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                 >

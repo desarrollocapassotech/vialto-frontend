@@ -39,6 +39,7 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
+import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -1324,6 +1325,12 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           metodoAnulacion={metodoAnulacion}
           getToken={getToken}
+          contratoPdfUrl={liquidacionContratoPdfUrl(
+            detail.liq.id,
+            isSuperAdmin
+              ? { platform: true, tenantId: activeTenantId }
+              : undefined,
+          )}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
           onEmitir={() => {

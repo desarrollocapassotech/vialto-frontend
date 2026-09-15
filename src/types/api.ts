@@ -166,6 +166,7 @@ export interface Viaje {
     liquidacion: {
       id: string;
       estado: string;
+      transportistaId?: string;
       liquido: number;
       arcaError?: string | null;
       cae?: string | null;
@@ -285,6 +286,20 @@ export interface Vehiculo {
   transportistaId: string | null;
   activo: boolean;
   createdAt: string;
+}
+
+/** Vehículo asignado a un chofer, con historial (COMB). `fechaHasta: null` = asignación vigente. */
+export interface AsignacionVehiculo {
+  id: string;
+  tenantId: string;
+  choferId: string;
+  vehiculoId: string;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  createdAt: string;
+  createdBy: string;
+  chofer: { id: string; nombre: string; dni: string | null };
+  vehiculo: { id: string; patente: string; tipo: string; kmActual: number };
 }
 
 export type TipoIntervencionMantenimiento =
@@ -715,6 +730,12 @@ export interface ImportLiquidacionPreviewGrupo {
   periodoDesde: string;
   periodoHasta: string;
   bruto: number;
+  moneda: string;
+}
+
+export interface ImportLiquidacionesPreviewRespuesta {
+  grupos: ImportLiquidacionPreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 /** Preview de una factura a cliente a generar (agrupada por cliente), etapa opcional posterior a Viajes. */
@@ -724,6 +745,11 @@ export interface ImportFacturaClientePreviewGrupo {
   cantidadViajes: number;
   importe: number;
   moneda: string;
+}
+
+export interface ImportFacturasClientesPreviewRespuesta {
+  grupos: ImportFacturaClientePreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 export interface ImportTemplate {

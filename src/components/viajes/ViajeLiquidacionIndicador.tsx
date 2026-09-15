@@ -15,6 +15,7 @@ import {
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { apiFetch, apiJson } from "@/lib/api";
+import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
 import type { Viaje } from "@/types/api";
@@ -132,6 +133,10 @@ export function ViajeLiquidacionIndicador({
             liquidacionCompleta.estado,
           )}
           onClose={() => setLiquidacionCompleta(null)}
+          contratoPdfUrl={liquidacionContratoPdfUrl(
+            liquidacionCompleta.id,
+            tenantId ? { platform: true, tenantId } : undefined,
+          )}
           onEditar={() => {
             const params = tenantId
               ? `?tenantId=${encodeURIComponent(tenantId)}`

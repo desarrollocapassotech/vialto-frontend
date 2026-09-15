@@ -34,6 +34,7 @@ import {
   condicionIvaLabel,
 } from "@/lib/arcaCbteTipo";
 import { apiJson, apiFetch, ApiError } from "@/lib/api";
+import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { useToast } from "@/lib/toast";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -3588,6 +3589,12 @@ export function ViajesTenantPage({
               navigate(`/liquidaciones?${params.toString()}`);
             }}
             onClose={() => setViewingLiquidacion(null)}
+            contratoPdfUrl={liquidacionContratoPdfUrl(
+              viewingLiquidacion.id,
+              platform && tid
+                ? { platform: true, tenantId: tid }
+                : undefined,
+            )}
             onVerComprobante={
               viewingLiquidacion.cbteNro != null ||
               viewingLiquidacion.cae != null

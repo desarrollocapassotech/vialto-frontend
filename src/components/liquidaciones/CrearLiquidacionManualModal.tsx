@@ -43,8 +43,14 @@ import { useToast } from "@/lib/toast";
 import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
+  transportistaEfectivoIdDesdeViaje,
 } from "@/lib/viajesFlota";
-import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import {
+  transportistasLiquidacionOpcionesDesdeViaje,
+  viajePermiteElegirTransportistaLiquidacion,
+  viajeTieneLiquidacionActivaParaTransportista,
+  viajeTieneLiquidacionTransportista,
+} from "@/lib/viajesComprobantes";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import type {
@@ -121,7 +127,7 @@ const labelClass =
   "block font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel mb-1";
 
 interface Props {
-  /** Si se provee, la liquidación es para este viaje específico (transportista y viaje bloqueados). */
+  /** Viaje puntual: el viaje queda fijo; el transportista solo se elige si hay contratante + ejecutor distintos. */
   viajeInicial?: Viaje;
   transportistas: Transportista[];
   config?: ArcaConfig | null;
@@ -162,9 +168,26 @@ export function CrearLiquidacionManualModal({
     configProp ?? null,
   );
 
+  const transportistaOpcionesViaje = useMemo(
+    () =>
+      viajeInicial
+        ? transportistasLiquidacionOpcionesDesdeViaje(
+            viajeInicial,
+            transportistas,
+          )
+        : [],
+    [viajeInicial, transportistas],
+  );
+  const elegirTransportistaEnViaje =
+    viajeInicial != null &&
+    viajePermiteElegirTransportistaLiquidacion(viajeInicial);
+
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
-    viajeInicial?.transportistaId ?? "",
+    () =>
+      viajeInicial?.transportistaId?.trim() ??
+      transportistaOpcionesViaje[0]?.id ??
+      "",
   );
 
   const [transportistaActualizado, setTransportistaActualizado] =
@@ -289,11 +312,21 @@ export function CrearLiquidacionManualModal({
       return transportistaActualizado;
     }
     const fromList = transportistas.find((t) => t.id === transportistaId);
-    return (
-      (fromList as Partial<Transportista>) ??
-      (viajeInicial?.transportista as Partial<Transportista>) ??
-      null
-    );
+    if (fromList) return fromList as Partial<Transportista>;
+    if (
+      viajeInicial?.transportistaId === transportistaId &&
+      viajeInicial.transportista
+    ) {
+      return viajeInicial.transportista as Partial<Transportista>;
+    }
+    if (
+      viajeInicial &&
+      transportistaEfectivoIdDesdeViaje(viajeInicial) === transportistaId &&
+      viajeInicial.transportistaEfectivo
+    ) {
+      return viajeInicial.transportistaEfectivo as Partial<Transportista>;
+    }
+    return null;
   }, [viajeInicial, transportistas, transportistaId, transportistaActualizado]);
 
   const condicionIva = transportistaSeleccionado?.condicionIva ?? null;
@@ -316,11 +349,8 @@ export function CrearLiquidacionManualModal({
           () => getToken(),
         );
         if (!cancelled) {
-          setViajes(
-            (res.items ?? []).filter(
-              (v) => !viajeTieneLiquidacionTransportista(v),
-            ),
-          );
+          // El backend ya filtra por transportista (contratante o ejecutor) + sin liquidación activa de ese transportista.
+          setViajes(res.items ?? []);
         }
       } catch {
         if (!cancelled) setViajes([]);
@@ -481,11 +511,19 @@ export function CrearLiquidacionManualModal({
       setError(MSG_ARCA_NO_LIQUIDA_USD);
       return;
     }
-    if (viajeInicial && viajeTieneLiquidacionTransportista(viajeInicial)) {
-      setError(
-        `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${numeroVisibleViaje(viajeInicial)}.`,
-      );
-      return;
+    if (viajeInicial) {
+      const yaLiquidadoAEste = elegirTransportistaEnViaje
+        ? viajeTieneLiquidacionActivaParaTransportista(
+            viajeInicial,
+            transportistaId,
+          )
+        : viajeTieneLiquidacionTransportista(viajeInicial);
+      if (yaLiquidadoAEste) {
+        setError(
+          `La acción no es válida. Ya existe una liquidación previa para este transportista en el viaje #${numeroVisibleViaje(viajeInicial)}.`,
+        );
+        return;
+      }
     }
     if (!viajeInicial && selectedViajes.length > 0) {
       const monedas = new Set(selectedViajes.map((v) => monedaViaje(v)));
@@ -609,8 +647,8 @@ export function CrearLiquidacionManualModal({
   }
 
   const transportistaNombre =
+    transportistaSeleccionado?.nombre ??
     transportistas.find((t) => t.id === transportistaId)?.nombre ??
-    viajeInicial?.transportista?.nombre ??
     transportistaId;
 
   // — Resumen de montos —
@@ -760,7 +798,7 @@ export function CrearLiquidacionManualModal({
                   <label className={labelClass}>
                     Transportista <span className="text-red-500">*</span>
                   </label>
-                  {viajeInicial ? (
+                  {viajeInicial && !elegirTransportistaEnViaje ? (
                     <div className="rounded border border-black/10 bg-vialto-mist px-3 py-2 text-sm text-vialto-charcoal">
                       {transportistaNombre}
                     </div>
@@ -772,9 +810,18 @@ export function CrearLiquidacionManualModal({
                       className={selectClass}
                     >
                       <option value="">— Seleccioná un transportista —</option>
-                      {transportistas.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.nombre}
+                      {(viajeInicial
+                        ? transportistaOpcionesViaje
+                        : transportistas.map((t) => ({
+                            id: t.id,
+                            nombre: t.nombre,
+                            rolLabel: "",
+                          }))
+                      ).map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.rolLabel
+                            ? `${opt.nombre} — ${opt.rolLabel}`
+                            : opt.nombre}
                         </option>
                       ))}
                     </select>
