@@ -302,6 +302,18 @@ export interface AsignacionVehiculo {
   vehiculo: { id: string; patente: string; tipo: string; kmActual: number };
 }
 
+/** Corrección manual de km de un vehículo, con auditoría (COMB). */
+export interface VehiculoKmEdicion {
+  id: string;
+  tenantId: string;
+  vehiculoId: string;
+  kmAnterior: number;
+  kmNuevo: number;
+  fecha: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export type TipoIntervencionMantenimiento =
   // Motor y sistema de propulsión
   | 'cambio_aceite_motor'

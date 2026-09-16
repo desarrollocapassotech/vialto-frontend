@@ -35,9 +35,9 @@ export function EditarKmVehiculoModal({
     setError(null);
     try {
       await apiJson(
-        `/api/platform/vehiculos/${vehiculoId}?tenantId=${encodeURIComponent(tenantId)}`,
+        `/api/platform/combustible/vehiculos/${vehiculoId}/km?tenantId=${encodeURIComponent(tenantId)}`,
         () => getToken(),
-        { method: "PATCH", body: JSON.stringify({ kmActual: kmNumero }) },
+        { method: "POST", body: JSON.stringify({ kmNuevo: kmNumero }) },
       );
       showToast("Kilometraje actualizado correctamente", "success");
       onSuccess(kmNumero);
