@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { History, Gauge, Trash2, Truck } from "lucide-react";
+import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
 import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -13,6 +13,7 @@ import { fmtTipoVehiculo } from "@/lib/combustibleLabels";
 import { AsignarVehiculoModal } from "@/components/combustible/AsignarVehiculoModal";
 import { HistorialAsignacionModal } from "@/components/combustible/HistorialAsignacionModal";
 import { EditarKmVehiculoModal } from "@/components/combustible/EditarKmVehiculoModal";
+import { HistorialKmVehiculoModal } from "@/components/combustible/HistorialKmVehiculoModal";
 import type { AsignacionVehiculo, Chofer, ConEmpresa, Vehiculo } from "@/types/api";
 
 type FilaChofer = ConEmpresa<Chofer> & { asignacionActual: AsignacionVehiculo | null };
@@ -23,6 +24,7 @@ function FilaAccionesMenu({
   onHistorial,
   onAsignar,
   onEditarKm,
+  onHistorialKm,
   onQuitar,
 }: {
   fila: FilaChofer;
@@ -30,6 +32,7 @@ function FilaAccionesMenu({
   onHistorial: () => void;
   onAsignar: () => void;
   onEditarKm: () => void;
+  onHistorialKm: () => void;
   onQuitar: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -37,6 +40,9 @@ function FilaAccionesMenu({
   const options: AccionOpcion[] = [
     { id: "historial", label: "Historial", icon: History, onClick: onHistorial },
   ];
+  if (fila.asignacionActual) {
+    options.push({ id: "historial-km", label: "Historial de km", icon: ListOrdered, onClick: onHistorialKm });
+  }
   if (!isReadOnly) {
     options.push({
       id: "asignar",
@@ -101,6 +107,7 @@ export function AsignacionVehiculoSection({
   );
   const [historialTarget, setHistorialTarget] = useState<FilaChofer | null>(null);
   const [editarKmTarget, setEditarKmTarget] = useState<FilaChofer | null>(null);
+  const [historialKmTarget, setHistorialKmTarget] = useState<FilaChofer | null>(null);
   const [quitarTarget, setQuitarTarget] = useState<FilaChofer | null>(null);
   const [quitando, setQuitando] = useState(false);
   const [quitarError, setQuitarError] = useState<string | null>(null);
@@ -228,6 +235,7 @@ export function AsignacionVehiculoSection({
               onHistorial={() => setHistorialTarget(r)}
               onAsignar={() => setAsignarTarget(r)}
               onEditarKm={() => setEditarKmTarget(r)}
+              onHistorialKm={() => setHistorialKmTarget(r)}
               onQuitar={() => {
                 setQuitarError(null);
                 setQuitarTarget(r);
@@ -355,6 +363,16 @@ export function AsignacionVehiculoSection({
             setEditarKmTarget(null);
             setReloadKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {historialKmTarget?.asignacionActual && tenantId && (
+        <HistorialKmVehiculoModal
+          tenantId={tenantId}
+          vehiculoId={historialKmTarget.asignacionActual.vehiculo.id}
+          patente={historialKmTarget.asignacionActual.vehiculo.patente}
+          getToken={getToken}
+          onClose={() => setHistorialKmTarget(null)}
         />
       )}
 
