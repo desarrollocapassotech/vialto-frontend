@@ -18,6 +18,18 @@ import type { AsignacionVehiculo, Chofer, ConEmpresa, Vehiculo } from "@/types/a
 
 type FilaChofer = ConEmpresa<Chofer> & { asignacionActual: AsignacionVehiculo | null };
 
+function fmtVehiculoLabel(v: {
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+}): string {
+  const tipo = fmtTipoVehiculo(v.tipo);
+  const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
+  const detalle = [tipo, marcaModelo].filter(Boolean).join(" · ");
+  return detalle ? `${v.patente} — ${detalle}` : v.patente;
+}
+
 function FilaAccionesMenu({
   fila,
   isReadOnly,
@@ -161,7 +173,7 @@ export function AsignacionVehiculoSection({
     [choferes],
   );
   const vehiculoOptions = useMemo(
-    () => vehiculos.map((v) => ({ value: v.id, label: v.patente })),
+    () => vehiculos.map((v) => ({ value: v.id, label: fmtVehiculoLabel(v) })),
     [vehiculos],
   );
 
