@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { fmtTipoVehiculo } from "@/lib/combustibleLabels";
@@ -18,15 +19,14 @@ export function HistorialAsignacionModal({
   tenantId,
   choferNombre,
   choferId,
-  getToken,
   onClose,
 }: {
   tenantId: string;
   choferNombre: string;
   choferId: string;
-  getToken: () => Promise<string | null>;
   onClose: () => void;
 }) {
+  const { getToken } = useAuth();
   const [historial, setHistorial] = useState<AsignacionVehiculo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +48,9 @@ export function HistorialAsignacionModal({
     return () => {
       cancelled = true;
     };
-  }, [tenantId, choferId, getToken]);
+    // getToken se omite a propósito: Clerk lo recrea en cada render y no debe disparar un refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, choferId]);
 
   return (
     <div

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -8,7 +9,6 @@ export function EditarKmVehiculoModal({
   vehiculoId,
   patente,
   kmActual,
-  getToken,
   onClose,
   onSuccess,
 }: {
@@ -16,10 +16,10 @@ export function EditarKmVehiculoModal({
   vehiculoId: string;
   patente: string;
   kmActual: number;
-  getToken: () => Promise<string | null>;
   onClose: () => void;
   onSuccess: (kmActual: number) => void;
 }) {
+  const { getToken } = useAuth();
   const { showToast } = useToast();
   const [km, setKm] = useState(String(kmActual));
   const [loading, setLoading] = useState(false);

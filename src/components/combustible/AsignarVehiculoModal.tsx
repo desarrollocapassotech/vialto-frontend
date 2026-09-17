@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/lib/toast";
@@ -23,7 +24,6 @@ export function AsignarVehiculoModal({
   chofer,
   choferes,
   vehiculos,
-  getToken,
   onClose,
   onSuccess,
 }: {
@@ -32,10 +32,10 @@ export function AsignarVehiculoModal({
   chofer?: ConEmpresa<Chofer>;
   choferes: ConEmpresa<Chofer>[];
   vehiculos: ConEmpresa<Vehiculo>[];
-  getToken: () => Promise<string | null>;
   onClose: () => void;
   onSuccess: (asignacion: AsignacionVehiculo) => void;
 }) {
+  const { getToken } = useAuth();
   const { showToast } = useToast();
   const [choferId, setChoferId] = useState(chofer?.id ?? "");
   const [vehiculoId, setVehiculoId] = useState("");
