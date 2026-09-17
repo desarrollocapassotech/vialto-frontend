@@ -35,6 +35,7 @@ import {
 } from "@/lib/arcaUsdRestriction";
 import { Download, Landmark } from "lucide-react";
 import {
+  clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
   textoImporteMonedaFactura,
@@ -261,6 +262,19 @@ export function FacturacionTenantPage({
     if (!hasArca) return list;
     return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
   }, [viajes, draft.clienteId, hasArca]);
+
+  /**
+   * Clientes con al menos un viaje pendiente de facturar, para el select de "Nueva
+   * factura" (no aplica a filtros de listado, que deben seguir mostrando todos los
+   * clientes). Mientras los viajes todavía no se cargaron (o el tenant no tiene
+   * ninguno), se muestra la lista completa para no dejar el select vacío por un
+   * instante de carga.
+   */
+  const clientesParaNuevaFactura = useMemo(() => {
+    if (viajesLoading || viajes.length === 0) return clientes;
+    const ids = clientesConViajesPendientesFactura(viajes);
+    return clientes.filter((c) => ids.has(c.id));
+  }, [clientes, viajes, viajesLoading]);
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];
@@ -1570,7 +1584,7 @@ export function FacturacionTenantPage({
         open={creating}
         draft={draft}
         setDraft={setDraft}
-        clientes={clientes}
+        clientes={clientesParaNuevaFactura}
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
