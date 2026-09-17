@@ -36,6 +36,7 @@ type ViajeItem = Pick<
   | "id"
   | "numero"
   | "numeroIdentificacionPersonalizado"
+  | "idPropio2"
   | "fechaCarga"
   | "origen"
   | "destino"
@@ -114,6 +115,8 @@ export function LiquidacionEditModal({
   getToken,
   onClose,
   onSaved,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
@@ -121,6 +124,10 @@ export function LiquidacionEditModal({
   onClose: () => void;
   onSaved: (updated: LiquidacionConTransportista) => void;
   tenantId?: string;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
 }) {
   const { showToast } = useToast();
   const canEditDatos =
@@ -552,6 +559,8 @@ export function LiquidacionEditModal({
                   viajes={viajesParaTabla}
                   selectedIds={Array.from(selectedViajeIds)}
                   onToggle={toggleViaje}
+                  idPropio2Habilitado={idPropio2Habilitado}
+                  idPropio2Label={idPropio2Label}
                   renderMonto={(v) =>
                     fmtMontoViaje(
                       v.precioTransportistaExterno,

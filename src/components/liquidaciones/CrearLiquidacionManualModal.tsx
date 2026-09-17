@@ -66,6 +66,7 @@ type ViajeItem = Pick<
   | "id"
   | "numero"
   | "numeroIdentificacionPersonalizado"
+  | "idPropio2"
   | "fechaCarga"
   | "origen"
   | "destino"
@@ -138,6 +139,10 @@ interface Props {
   onClose: () => void;
   tenantId?: string;
   onDataSaved?: () => void;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna/línea adicional. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de "ID Propio 2". */
+  idPropio2Label?: string;
 }
 
 export function CrearLiquidacionManualModal({
@@ -150,6 +155,8 @@ export function CrearLiquidacionManualModal({
   onClose,
   tenantId,
   onDataSaved,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: Props) {
   const showComprobante = !hasLiquidoProductoArca;
   const { showToast } = useToast();
@@ -930,6 +937,16 @@ export function CrearLiquidacionManualModal({
                           "—"}
                       </span>
                     </div>
+                    {idPropio2Habilitado && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-vialto-steel">
+                          {idPropio2Label}
+                        </span>
+                        <span className="font-medium tabular-nums text-vialto-charcoal">
+                          {viajeInicial.idPropio2?.trim() || "—"}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between gap-3">
                       <span className="text-vialto-steel">Fecha de carga</span>
                       <span className="tabular-nums text-vialto-charcoal">
@@ -992,6 +1009,8 @@ export function CrearLiquidacionManualModal({
                     viajes={viajes}
                     selectedIds={Array.from(selectedViajeIds)}
                     onToggle={toggleViaje}
+                    idPropio2Habilitado={idPropio2Habilitado}
+                    idPropio2Label={idPropio2Label}
                     renderMonto={(v) =>
                       fmtMoney(
                         v.precioTransportistaExterno,

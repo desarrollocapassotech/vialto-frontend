@@ -45,6 +45,8 @@ import {
   nombreTransportistaEfectivoListadoViaje,
   numeroVisibleViaje,
   labelIdentificacionPersonalizadaViajes,
+  idPropio2Habilitado,
+  idPropio2Label,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -1873,14 +1875,17 @@ export function ViajesTenantPage({
     "edicion_viaje",
     "pagosTransportista",
   );
+  const mostrarColumnaIdPropio2 = idPropio2Habilitado(currentTenant);
   // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
     if (c.id === "chofer") return mostrarColumnaChofer;
     if (c.id === "estadoPago") return mostrarPagosTransportista;
+    if (c.id === "idPropio2") return mostrarColumnaIdPropio2;
     return true;
   });
-  const tableColSpanBase = mostrarColumnaChofer ? 8 : 7;
+  const tableColSpanBase =
+    (mostrarColumnaChofer ? 8 : 7) + (mostrarColumnaIdPropio2 ? 1 : 0);
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
@@ -2351,6 +2356,11 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarColumnaIdPropio2 && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                {idPropio2Label(currentTenant)}
+              </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Cliente"
@@ -2632,6 +2642,11 @@ export function ViajesTenantPage({
               <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
                 {v.numeroIdentificacionPersonalizado?.trim() || "—"}
               </td>
+              {mostrarColumnaIdPropio2 && (
+                <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
+                  {v.idPropio2?.trim() || "—"}
+                </td>
+              )}
               <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
                 <span
                   className="block truncate font-medium"
@@ -2937,6 +2952,14 @@ export function ViajesTenantPage({
                   label: labelIdentificacionPersonalizadaViajes(currentTenant),
                   value: v.numeroIdentificacionPersonalizado?.trim() || "—",
                 },
+                ...(mostrarColumnaIdPropio2
+                  ? [
+                      {
+                        label: idPropio2Label(currentTenant),
+                        value: v.idPropio2?.trim() || "—",
+                      },
+                    ]
+                  : []),
                 { label: "Transporte", value: transporteValue },
                 ...(mostrarColumnaChofer
                   ? [{ label: "Chofer", value: nombreChofer }]
@@ -3371,6 +3394,8 @@ export function ViajesTenantPage({
             transportistas={maestro.transportistas}
             hasLiquidoProductoArca={hasLiquidoProductoArca}
             getToken={getToken}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
             onDataSaved={() => {
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
@@ -3648,6 +3673,8 @@ export function ViajesTenantPage({
             onClose={() => setIsFacturaModalOpen(false)}
             hasArca={hasFacturasArca}
             tenantId={platform ? tid : undefined}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
             getToken={getToken}
             facturasCreateUrl={
               platform

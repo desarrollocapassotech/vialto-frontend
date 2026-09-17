@@ -141,6 +141,8 @@ export function LiquidacionViewModal({
   onVerAnulacion,
   onVerComprobanteAnulacionManual,
   contratoPdfUrl,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: {
   liq: LiquidacionConTransportista;
   ivaPct?: number;
@@ -172,6 +174,10 @@ export function LiquidacionViewModal({
   onVerComprobanteAnulacionManual?: () => void;
   /** PDF comercial (contrato / liquidación a proveedor). Si hay URL, se muestra "Descargar PDF". */
   contratoPdfUrl?: string;
+  /** true = el tenant habilitó "ID Propio 2" — se muestra junto a cada viaje incluido. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de "ID Propio 2". */
+  idPropio2Label?: string;
 }) {
   const { getToken: getAuthToken } = useAuth();
   const navigate = useNavigate();
@@ -540,6 +546,11 @@ export function LiquidacionViewModal({
                       {(v?.origen || v?.destino) && (
                         <p className="text-[11px] text-vialto-steel truncate">
                           {v?.origen ?? "—"} → {v?.destino ?? "—"}
+                        </p>
+                      )}
+                      {idPropio2Habilitado && v?.idPropio2?.trim() && (
+                        <p className="text-[11px] text-vialto-steel">
+                          {idPropio2Label}: {v.idPropio2.trim()}
                         </p>
                       )}
                       <p className="text-[11px] text-vialto-charcoal tabular-nums">

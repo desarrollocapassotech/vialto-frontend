@@ -21,6 +21,7 @@ import { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useFacturaCreator } from "@/hooks/useFacturaCreator";
+import { idPropio2Habilitado, idPropio2Label } from "@/lib/viajesFlota";
 import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
 import {
@@ -297,6 +298,8 @@ export function TenantHomePage() {
           transportistas={maestro.transportistas}
           hasLiquidoProductoArca={hasLiquidoProductoArca}
           getToken={getToken}
+          idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
+          idPropio2Label={idPropio2Label(maestro.tenant)}
           onDataSaved={() => {
             void maestro.refreshTransportistas();
             void maestro.refreshClientes();
@@ -324,6 +327,8 @@ export function TenantHomePage() {
         error={hasFacturasArca ? null : facturaCreator.error}
         showComprobanteAdjunto={!hasFacturasArca}
         hasArca={hasFacturasArca}
+        idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
+        idPropio2Label={idPropio2Label(maestro.tenant)}
         getToken={getToken}
         facturasCreateUrl="/api/facturacion/facturas"
       />
@@ -367,6 +372,7 @@ export function TenantHomePage() {
             saving={viajeEditor.saving}
             error={viajeEditor.error}
             getToken={getToken}
+            tenant={maestro.tenant}
             hasLiquidoProductoArca={hasLiquidoProductoArca}
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>

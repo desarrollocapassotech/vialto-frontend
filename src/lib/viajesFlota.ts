@@ -40,6 +40,20 @@ export function labelIdentificacionPersonalizadaViajes(
   );
 }
 
+/** `true` si el tenant habilitó el campo "ID Propio 2" (deshabilitado por defecto). */
+export function idPropio2Habilitado(
+  tenant: Pick<Tenant, "idPropio2Habilitado"> | null | undefined,
+): boolean {
+  return !!tenant?.idPropio2Habilitado;
+}
+
+/** Label configurable del campo "ID Propio 2" (default: "ID Propio 2"). */
+export function idPropio2Label(
+  tenant: Pick<Tenant, "idPropio2Label"> | null | undefined,
+): string {
+  return tenant?.idPropio2Label?.trim() || "ID Propio 2";
+}
+
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
   return choferes.filter((c) => !c.transportistaId?.trim());

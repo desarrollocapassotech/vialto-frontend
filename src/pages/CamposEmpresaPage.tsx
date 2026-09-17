@@ -170,6 +170,11 @@ export function CamposEmpresaPage() {
   const { showToast } = useToast();
   const [empresaLabel, setEmpresaLabel] = useState("");
   const [empresaLabelGuardado, setEmpresaLabelGuardado] = useState("");
+  const [empresaIdPropio2Habilitado, setEmpresaIdPropio2Habilitado] = useState(false);
+  const [savingIdPropio2Habilitado, setSavingIdPropio2Habilitado] = useState(false);
+  const [empresaIdPropio2Label, setEmpresaIdPropio2Label] = useState("");
+  const [empresaIdPropio2LabelGuardado, setEmpresaIdPropio2LabelGuardado] = useState("");
+  const [savingIdPropio2Label, setSavingIdPropio2Label] = useState(false);
   const [empresaImportOculto, setEmpresaImportOculto] = useState(false);
   const [loadingEmpresaConfig, setLoadingEmpresaConfig] = useState(false);
   const [savingLabel, setSavingLabel] = useState(false);
@@ -209,6 +214,10 @@ export function CamposEmpresaPage() {
           const label = tenant.labelIdentificacionPersonalizadaViajes ?? "";
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
+          setEmpresaIdPropio2Habilitado(tenant.idPropio2Habilitado ?? false);
+          const idPropio2Label = tenant.idPropio2Label ?? "";
+          setEmpresaIdPropio2Label(idPropio2Label);
+          setEmpresaIdPropio2LabelGuardado(idPropio2Label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
           setEmpresaExportacionPautMicCrt(tenant.habilitarExportacionPautMicCrt ?? false);
           setEmpresaLiquidacionAnulacionMetodo(
@@ -248,6 +257,47 @@ export function CamposEmpresaPage() {
       setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
     } finally {
       setSavingLabel(false);
+    }
+  }
+
+  async function toggleIdPropio2Habilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaIdPropio2Habilitado;
+    setSavingIdPropio2Habilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ idPropio2Habilitado: nuevoValor }),
+      });
+      setEmpresaIdPropio2Habilitado(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingIdPropio2Habilitado(false);
+    }
+  }
+
+  async function guardarIdPropio2Label() {
+    if (!filtroEmpresa || empresaIdPropio2Label === empresaIdPropio2LabelGuardado) return;
+    setSavingIdPropio2Label(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({
+          idPropio2Label: empresaIdPropio2Label.trim() || null,
+        }),
+      });
+      setEmpresaIdPropio2LabelGuardado(empresaIdPropio2Label);
+      showToast("Label actualizado", "success");
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingIdPropio2Label(false);
     }
   }
 
@@ -705,6 +755,40 @@ export function CamposEmpresaPage() {
                             />
                           </td>
                         </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Habilitar ID Propio 2 (módulo Viajes)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaIdPropio2Habilitado}
+                              disabled={savingIdPropio2Habilitado}
+                              onChange={() => void toggleIdPropio2Habilitado()}
+                              label={
+                                empresaIdPropio2Habilitado
+                                  ? "Deshabilitar ID Propio 2"
+                                  : "Habilitar ID Propio 2"
+                              }
+                            />
+                          </td>
+                        </tr>
+                        {empresaIdPropio2Habilitado && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              Label del ID Propio 2
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <input
+                                value={empresaIdPropio2Label}
+                                onChange={(e) => setEmpresaIdPropio2Label(e.target.value)}
+                                onBlur={() => void guardarIdPropio2Label()}
+                                disabled={savingIdPropio2Label}
+                                placeholder="ID Propio 2"
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                              />
+                            </td>
+                          </tr>
+                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Ocultar importación masiva de Excel para el admin

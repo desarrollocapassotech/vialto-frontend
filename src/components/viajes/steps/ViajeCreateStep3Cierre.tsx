@@ -18,6 +18,11 @@ interface Props {
   numeroIdentificacionPersonalizado: string;
   onNumeroIdentificacionChange: (v: string) => void;
 
+  mostrarIdPropio2: boolean;
+  labelIdPropio2: string;
+  idPropio2: string;
+  onIdPropio2Change: (v: string) => void;
+
   fechaCarga: string;
   horaCarga: string;
   fechaDescarga: string;
@@ -62,6 +67,10 @@ export function ViajeCreateStep3Cierre({
   labelIdentificacion,
   numeroIdentificacionPersonalizado,
   onNumeroIdentificacionChange,
+  mostrarIdPropio2,
+  labelIdPropio2,
+  idPropio2,
+  onIdPropio2Change,
   fechaCarga,
   horaCarga,
   fechaDescarga,
@@ -105,6 +114,19 @@ export function ViajeCreateStep3Cierre({
           className={inputClass}
         />
       </div>
+
+      {mostrarIdPropio2 && (
+        <div className="flex flex-col gap-1">
+          <span className={fieldLabelClass}>{labelIdPropio2}</span>
+          <input
+            type="text"
+            value={idPropio2}
+            onChange={(e) => onIdPropio2Change(e.target.value)}
+            placeholder="Opcional"
+            className={inputClass}
+          />
+        </div>
+      )}
 
       <ViajeFechaHoraFields
         fechaCarga={fechaCarga}

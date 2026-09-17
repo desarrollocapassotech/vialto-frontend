@@ -284,6 +284,8 @@ export function ViajesVinculadosEditor({
   loading,
   clienteId,
   viajesTablaFillHeight = false,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: {
   viajes: Viaje[];
   disponibles: Viaje[];
@@ -292,6 +294,10 @@ export function ViajesVinculadosEditor({
   loading?: boolean;
   clienteId: string;
   viajesTablaFillHeight?: boolean;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional en la tabla de selección. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
 }) {
   const showContraparteHint = !clienteId.trim();
 
@@ -335,6 +341,8 @@ export function ViajesVinculadosEditor({
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
+          idPropio2Habilitado={idPropio2Habilitado}
+          idPropio2Label={idPropio2Label}
         />
       </div>
     );
@@ -349,6 +357,8 @@ export function ViajesVinculadosEditor({
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."
+      idPropio2Habilitado={idPropio2Habilitado}
+      idPropio2Label={idPropio2Label}
     />
   );
 }
@@ -392,6 +402,10 @@ export type FacturaEditModalProps = {
   saving: boolean;
   error: string | null;
   showComprobanteAdjunto?: boolean;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
 };
 
 export function FacturaEditModal({
@@ -408,6 +422,8 @@ export function FacturaEditModal({
   saving,
   error,
   showComprobanteAdjunto = false,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: FacturaEditModalProps) {
   useEscapeKey(open, saving, onClose);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
@@ -692,6 +708,8 @@ export function FacturaEditModal({
                 onChange={patchViajeIds}
                 loading={viajesLoading}
                 clienteId={draft.clienteId}
+                idPropio2Habilitado={idPropio2Habilitado}
+                idPropio2Label={idPropio2Label}
               />
             </div>
 

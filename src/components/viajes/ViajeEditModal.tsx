@@ -62,6 +62,8 @@ import {
   numeroVisibleViaje,
   viajeUsaNumeroInterno,
   labelIdentificacionPersonalizadaViajes,
+  idPropio2Habilitado,
+  idPropio2Label,
 } from "@/lib/viajesFlota";
 import {
   viajeRequierePagosTransportista,
@@ -104,6 +106,7 @@ type PaisQuickCreateTarget =
 export type ViajeInlineDraft = {
   numero: string;
   numeroIdentificacionPersonalizado: string;
+  idPropio2: string;
   estado: string;
   clienteId: string;
   operacionModo: ViajeOperacionModo | null;
@@ -192,6 +195,8 @@ export type ViajeEditModalProps = {
     | "labelIdentificacionPersonalizadaViajes"
     | "paisOrigenDestinoOculto"
     | "paisOrigenDestinoFijoId"
+    | "idPropio2Habilitado"
+    | "idPropio2Label"
   > | null;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
   hasLiquidoProductoArca?: boolean;
@@ -620,6 +625,28 @@ export function ViajeEditModal({
                 toda la app en vez del número interno del sistema.
               </p>
             </div>
+
+            {idPropio2Habilitado(tenant) && (
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClass}>{idPropio2Label(tenant)}</span>
+                <input
+                  type="text"
+                  value={draft.idPropio2}
+                  onChange={(e) =>
+                    setDraft((p) =>
+                      p
+                        ? {
+                            ...p,
+                            idPropio2: e.target.value,
+                          }
+                        : p,
+                    )
+                  }
+                  placeholder="Opcional"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">

@@ -40,6 +40,8 @@ import {
   textoImporteFacturaListado,
   textoImporteMonedaFactura,
   viajesFiltradosParaFactura,
+  idPropio2Habilitado,
+  idPropio2Label,
 } from "@/lib/viajesFlota";
 import {
   metaPaginacionCliente,
@@ -146,6 +148,7 @@ export function FacturacionTenantPage({
   const hasArca = canAccessEmisionFacturasArca(tenantModules);
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
+  const tenantParaIdPropio2 = platform ? platformTenant : maestro.tenant;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
 
@@ -1603,6 +1606,8 @@ export function FacturacionTenantPage({
         showComprobanteAdjunto={showComprobanteAdjunto}
         hasArca={hasArca}
         tenantId={platform ? tid : undefined}
+        idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
+        idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         getToken={getToken}
         facturasCreateUrl={facturasCreateUrl()}
         onFacturaGuardada={() => {
@@ -1693,6 +1698,8 @@ export function FacturacionTenantPage({
           saving={savingEditId === editingId}
           error={editError}
           showComprobanteAdjunto={showComprobanteAdjunto}
+          idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
+          idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         />
       )}
 
