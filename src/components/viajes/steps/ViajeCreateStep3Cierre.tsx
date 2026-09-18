@@ -15,6 +15,8 @@ const textareaLongClass =
 
 interface Props {
   mostrarIdPropio1: boolean;
+  /** true = el tenant tiene deshabilitado "ID Sistema" — este campo pasa a ser obligatorio. */
+  idPropio1Requerido: boolean;
   labelIdentificacion: string;
   numeroIdentificacionPersonalizado: string;
   onNumeroIdentificacionChange: (v: string) => void;
@@ -66,6 +68,7 @@ interface Props {
 
 export function ViajeCreateStep3Cierre({
   mostrarIdPropio1,
+  idPropio1Requerido,
   labelIdentificacion,
   numeroIdentificacionPersonalizado,
   onNumeroIdentificacionChange,
@@ -108,6 +111,7 @@ export function ViajeCreateStep3Cierre({
         <div className="flex flex-col gap-1">
           <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
             {labelIdentificacion}{" "}
+            {idPropio1Requerido && <span className="text-red-500">*</span>}
           </span>
           <input
             type="text"

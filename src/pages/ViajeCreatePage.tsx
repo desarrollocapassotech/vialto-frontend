@@ -79,6 +79,7 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   labelIdentificacionPersonalizadaViajes,
+  idSistemaHabilitado,
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
@@ -895,6 +896,13 @@ export function ViajeCreatePage() {
         ? Number(litrosConsumidos.replace(",", "."))
         : undefined;
 
+    if (!idSistemaHabilitado(maestro.tenant) && !numeroIdentificacionPersonalizado.trim()) {
+      setError(
+        `${labelIdentificacionPersonalizadaViajes(maestro.tenant)} es obligatorio: tu empresa tiene deshabilitado el ID Sistema.`,
+      );
+      return;
+    }
+
     // 8. EJECUCIÓN DE LA API (POST)
     setError(null);
     try {
@@ -1227,6 +1235,7 @@ export function ViajeCreatePage() {
             {step === 3 && (
               <ViajeCreateStep3Cierre
                 mostrarIdPropio1={idPropio1Habilitado(maestro.tenant)}
+                idPropio1Requerido={!idSistemaHabilitado(maestro.tenant)}
                 labelIdentificacion={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
                 numeroIdentificacionPersonalizado={numeroIdentificacionPersonalizado}
                 onNumeroIdentificacionChange={setNumeroIdentificacionPersonalizado}
