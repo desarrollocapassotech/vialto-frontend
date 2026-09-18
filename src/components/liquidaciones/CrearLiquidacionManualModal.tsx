@@ -200,6 +200,10 @@ export function CrearLiquidacionManualModal({
   const [transportistaActualizado, setTransportistaActualizado] =
     useState<Transportista | null>(null);
 
+  const { isVisible } = useFieldConfig("liquidaciones");
+  const showFechaDesde = isVisible("alta_liquidacion", "fechaDesde");
+  const showFechaHasta = isVisible("alta_liquidacion", "fechaHasta");
+
   // Si viene de un viaje puntual, se precargan con su fecha de carga/descarga.
   const [periodoDesde, setPeriodoDesde] = useState(() =>
     dateInputValueFromIso(viajeInicial?.fechaCarga),
@@ -497,8 +501,20 @@ export function CrearLiquidacionManualModal({
     action: "borrador" | "emitir" = "borrador",
   ) {
     e.preventDefault();
-    if (!periodoDesde || !periodoHasta) return;
-    if (periodoHasta < periodoDesde) {
+    const effectivePeriodoDesde = showFechaDesde
+      ? periodoDesde
+      : (periodoDesde || new Date().toISOString().slice(0, 10));
+    const effectivePeriodoHasta = showFechaHasta
+      ? periodoHasta
+      : (periodoHasta || effectivePeriodoDesde || new Date().toISOString().slice(0, 10));
+
+    if (showFechaDesde && !periodoDesde) return;
+    if (showFechaHasta && !periodoHasta) return;
+    if (
+      showFechaDesde &&
+      showFechaHasta &&
+      effectivePeriodoHasta < effectivePeriodoDesde
+    ) {
       setError("La fecha Hasta no puede ser anterior a Desde.");
       return;
     }
@@ -590,8 +606,8 @@ export function CrearLiquidacionManualModal({
       }
       const body: Record<string, unknown> = {
         transportistaId,
-        periodoDesde,
-        periodoHasta,
+        periodoDesde: effectivePeriodoDesde,
+        periodoHasta: effectivePeriodoHasta,
         viajeIds,
       };
       if (comisionPct.trim() !== "") body.comisionPct = Number(comisionPct);
@@ -876,46 +892,52 @@ export function CrearLiquidacionManualModal({
               )}
 
               {/* Período */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="periodoDesde" className={labelClass}>
-                    Desde <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="periodoDesde"
-                    type="date"
-                    required
-                    value={periodoDesde}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setPeriodoDesde(next);
-                      if (periodoHasta && next && periodoHasta < next) {
-                        setPeriodoHasta("");
-                      }
-                    }}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="periodoHasta" className={labelClass}>
-                    Hasta <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="periodoHasta"
-                    type="date"
-                    required
-                    min={periodoDesde || undefined}
-                    value={periodoHasta}
-                    onChange={(e) => setPeriodoHasta(e.target.value)}
-                    className={`${inputClass} ${periodoInvalido ? "border-red-400" : ""}`}
-                  />
-                  {periodoInvalido && (
-                    <p className="mt-1 text-xs font-medium text-red-600">
-                      Hasta no puede ser anterior a Desde.
-                    </p>
+              {(showFechaDesde || showFechaHasta) && (
+                <div className={`grid ${showFechaDesde && showFechaHasta ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+                  {showFechaDesde && (
+                    <div>
+                      <label htmlFor="periodoDesde" className={labelClass}>
+                        Desde <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="periodoDesde"
+                        type="date"
+                        required
+                        value={periodoDesde}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setPeriodoDesde(next);
+                          if (periodoHasta && next && periodoHasta < next) {
+                            setPeriodoHasta("");
+                          }
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
+                  {showFechaHasta && (
+                    <div>
+                      <label htmlFor="periodoHasta" className={labelClass}>
+                        Hasta <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="periodoHasta"
+                        type="date"
+                        required
+                        min={periodoDesde || undefined}
+                        value={periodoHasta}
+                        onChange={(e) => setPeriodoHasta(e.target.value)}
+                        className={`${inputClass} ${periodoInvalido ? "border-red-400" : ""}`}
+                      />
+                      {periodoInvalido && (
+                        <p className="mt-1 text-xs font-medium text-red-600">
+                          Hasta no puede ser anterior a Desde.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
 
               {/* Viaje pre-fijado (entrada desde un viaje puntual) */}
               {viajeInicial && (
