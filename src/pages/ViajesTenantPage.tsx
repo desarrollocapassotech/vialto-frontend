@@ -1936,6 +1936,10 @@ export function ViajesTenantPage({
   const mostrarColumnaChofer =
     isViajeFieldVisible("edicion_viaje", "choferId") ||
     isViajeFieldVisible("edicion_viaje", "choferExternoId");
+  const mostrarColumnaEtapa =
+    isViajeFieldVisible("detalle_viaje", "etapa") ||
+    isViajeFieldVisible("detalle_viaje", "facturacionEstado") ||
+    isViajeFieldVisible("detalle_viaje", "liquidacionEstado");
   const mostrarPagosTransportista = isViajeFieldVisible(
     "edicion_viaje",
     "pagosTransportista",
@@ -2562,41 +2566,43 @@ export function ViajesTenantPage({
                 </ViajesListadoHeaderFiltro>
               </th>
             )}
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="Etapa"
-                filterActive={!!estadoFiltro.trim()}
-                filterSignature={estadoFiltro}
-                minWidthClass="min-w-0"
-                titleNoWrap
-              >
-                <select
-                  value={estadoFiltro}
-                  onChange={(e) => aplicarFiltroEstado(e.target.value)}
-                  disabled={listadoRefetching}
-                  className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                    estadoFiltro.trim()
-                      ? "text-vialto-fire"
-                      : "text-vialto-charcoal"
-                  }`}
-                  aria-label="Filtrar listado por etapa"
+            {mostrarColumnaEtapa && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Etapa"
+                  filterActive={!!estadoFiltro.trim()}
+                  filterSignature={estadoFiltro}
+                  minWidthClass="min-w-0"
+                  titleNoWrap
                 >
-                  <option value="">TODOS</option>
-                  <option value="cancelado">CANCELADO</option>
-                  {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
-                    (est) => (
-                      <option
-                        key={est}
-                        value={est}
-                        title={tooltipEtapaViaje(est)}
-                      >
-                        {etapaViajeLabel[est] ?? est}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </ViajesListadoHeaderFiltro>
-            </th>
+                  <select
+                    value={estadoFiltro}
+                    onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                    disabled={listadoRefetching}
+                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+                      estadoFiltro.trim()
+                        ? "text-vialto-fire"
+                        : "text-vialto-charcoal"
+                    }`}
+                    aria-label="Filtrar listado por etapa"
+                  >
+                    <option value="">TODOS</option>
+                    <option value="cancelado">CANCELADO</option>
+                    {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
+                      (est) => (
+                        <option
+                          key={est}
+                          value={est}
+                          title={tooltipEtapaViaje(est)}
+                        >
+                          {etapaViajeLabel[est] ?? est}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Origen — Destino"
@@ -2811,75 +2817,83 @@ export function ViajesTenantPage({
                   </span>
                 </td>
               )}
-              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <div className="flex w-full flex-col gap-0.5">
-                  {estadoQuickId === v.id ? (
-                    <select
-                      autoFocus
-                      value={v.etapa}
-                      disabled={savingEstadoId === v.id}
-                      onChange={(e) =>
-                        void patchEstadoDesdeListado(v, e.target.value)
-                      }
-                      onBlur={() => setEstadoQuickId(null)}
-                      className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
-                      aria-label="Cambiar etapa del viaje"
-                    >
-                      {VIAJE_ETAPAS_TODAS.map((x) => (
-                        <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                          {etapaViajeLabel[x] ?? x}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <button
-                      type="button"
-                      title={tooltipEtapaViaje(v.etapa)}
-                      aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
-                      disabled={savingEstadoId === v.id}
-                      onClick={() => {
-                        if (savingEstadoId) return;
-                        setEstadoQuickId(v.id);
-                      }}
-                      className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-                        etapaViajeBadgeClass[v.etapa] ??
-                        etapaViajeBadgeClassDefault
-                      }`}
-                    >
-                      {savingEstadoId === v.id
-                        ? "…"
-                        : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
-                    </button>
-                  )}
-                  {v.etapa?.toLowerCase() !== "cancelado" && (
-                    <>
-                      <ViajeFacturacionIndicador
-                        viaje={v}
-                        tenantId={platform ? tid : undefined}
-                        fullWidth
-                        onClickOverride={
-                          (v.clientesViaje ?? []).length > 0
-                            ? () => openVerFacturaFlow(v)
-                            : undefined
-                        }
-                      />
-                      {hasLiquidacionesResuelto ? (
-                        <ViajeLiquidacionIndicador
-                          viaje={v}
-                          tenantId={platform ? tid : undefined}
-                          hasArca={hasLiquidoProductoArcaResuelto}
-                          onRegistrarPago={() => setRegistrarPagoViaje(v)}
-                        />
+              {mostrarColumnaEtapa && (
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex w-full flex-col gap-0.5">
+                    {isViajeFieldVisible("detalle_viaje", "etapa") && (
+                      estadoQuickId === v.id ? (
+                        <select
+                          autoFocus
+                          value={v.etapa}
+                          disabled={savingEstadoId === v.id}
+                          onChange={(e) =>
+                            void patchEstadoDesdeListado(v, e.target.value)
+                          }
+                          onBlur={() => setEstadoQuickId(null)}
+                          className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
+                          aria-label="Cambiar etapa del viaje"
+                        >
+                          {VIAJE_ETAPAS_TODAS.map((x) => (
+                            <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                              {etapaViajeLabel[x] ?? x}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <ViajePagoTransportistaIndicador
-                          viaje={v}
-                          onClick={() => setRegistrarPagoViaje(v)}
-                        />
-                      )}
-                    </>
-                  )}
-                </div>
-              </td>
+                        <button
+                          type="button"
+                          title={tooltipEtapaViaje(v.etapa)}
+                          aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
+                          disabled={savingEstadoId === v.id}
+                          onClick={() => {
+                            if (savingEstadoId) return;
+                            setEstadoQuickId(v.id);
+                          }}
+                          className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                            etapaViajeBadgeClass[v.etapa] ??
+                            etapaViajeBadgeClassDefault
+                          }`}
+                        >
+                          {savingEstadoId === v.id
+                            ? "…"
+                            : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
+                        </button>
+                      )
+                    )}
+                    {v.etapa?.toLowerCase() !== "cancelado" && (
+                      <>
+                        {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
+                          <ViajeFacturacionIndicador
+                            viaje={v}
+                            tenantId={platform ? tid : undefined}
+                            fullWidth
+                            onClickOverride={
+                              (v.clientesViaje ?? []).length > 0
+                                ? () => openVerFacturaFlow(v)
+                                : undefined
+                            }
+                          />
+                        )}
+                        {isViajeFieldVisible("detalle_viaje", "liquidacionEstado") && (
+                          hasLiquidacionesResuelto ? (
+                            <ViajeLiquidacionIndicador
+                              viaje={v}
+                              tenantId={platform ? tid : undefined}
+                              hasArca={hasLiquidoProductoArcaResuelto}
+                              onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                            />
+                          ) : (
+                            <ViajePagoTransportistaIndicador
+                              viaje={v}
+                              onClick={() => setRegistrarPagoViaje(v)}
+                            />
+                          )
+                        )}
+                      </>
+                    )}
+                  </div>
+                </td>
+              )}
               <td className="px-4 py-3 align-top text-vialto-steel min-w-0 max-w-[7rem]">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
@@ -2981,67 +2995,73 @@ export function ViajesTenantPage({
               className="flex w-full flex-col gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
-              {estadoQuickId === v.id ? (
-                <select
-                  autoFocus
-                  value={v.etapa}
-                  disabled={savingEstadoId === v.id}
-                  onChange={(e) =>
-                    void patchEstadoDesdeListado(v, e.target.value)
-                  }
-                  onBlur={() => setEstadoQuickId(null)}
-                  className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
-                  aria-label="Cambiar etapa del viaje"
-                >
-                  {VIAJE_ETAPAS_TODAS.map((x) => (
-                    <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                      {etapaViajeLabel[x] ?? x}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <button
-                  type="button"
-                  title={tooltipEtapaViaje(v.etapa)}
-                  aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
-                  disabled={savingEstadoId === v.id}
-                  onClick={() => {
-                    if (savingEstadoId) return;
-                    setEstadoQuickId(v.id);
-                  }}
-                  className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-                    etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
-                  }`}
-                >
-                  {savingEstadoId === v.id
-                    ? "…"
-                    : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
-                </button>
+              {isViajeFieldVisible("detalle_viaje", "etapa") && (
+                estadoQuickId === v.id ? (
+                  <select
+                    autoFocus
+                    value={v.etapa}
+                    disabled={savingEstadoId === v.id}
+                    onChange={(e) =>
+                      void patchEstadoDesdeListado(v, e.target.value)
+                    }
+                    onBlur={() => setEstadoQuickId(null)}
+                    className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
+                    aria-label="Cambiar etapa del viaje"
+                  >
+                    {VIAJE_ETAPAS_TODAS.map((x) => (
+                      <option key={x} value={x} title={tooltipEtapaViaje(x)}>
+                        {etapaViajeLabel[x] ?? x}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    type="button"
+                    title={tooltipEtapaViaje(v.etapa)}
+                    aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
+                    disabled={savingEstadoId === v.id}
+                    onClick={() => {
+                      if (savingEstadoId) return;
+                      setEstadoQuickId(v.id);
+                    }}
+                    className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
+                      etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
+                    }`}
+                  >
+                    {savingEstadoId === v.id
+                      ? "…"
+                      : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
+                  </button>
+                )
               )}
               {v.etapa?.toLowerCase() !== "cancelado" && (
                 <>
-                  <ViajeFacturacionIndicador
-                    viaje={v}
-                    tenantId={platform ? tid : undefined}
-                    fullWidth
-                    onClickOverride={
-                      (v.clientesViaje ?? []).length > 0
-                        ? () => openVerFacturaFlow(v)
-                        : undefined
-                    }
-                  />
-                  {hasLiquidacionesResuelto ? (
-                    <ViajeLiquidacionIndicador
+                  {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
+                    <ViajeFacturacionIndicador
                       viaje={v}
                       tenantId={platform ? tid : undefined}
-                      hasArca={hasLiquidoProductoArcaResuelto}
-                      onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                      fullWidth
+                      onClickOverride={
+                        (v.clientesViaje ?? []).length > 0
+                          ? () => openVerFacturaFlow(v)
+                          : undefined
+                      }
                     />
-                  ) : (
-                    <ViajePagoTransportistaIndicador
-                      viaje={v}
-                      onClick={() => setRegistrarPagoViaje(v)}
-                    />
+                  )}
+                  {isViajeFieldVisible("detalle_viaje", "liquidacionEstado") && (
+                    hasLiquidacionesResuelto ? (
+                      <ViajeLiquidacionIndicador
+                        viaje={v}
+                        tenantId={platform ? tid : undefined}
+                        hasArca={hasLiquidoProductoArcaResuelto}
+                        onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                      />
+                    ) : (
+                      <ViajePagoTransportistaIndicador
+                        viaje={v}
+                        onClick={() => setRegistrarPagoViaje(v)}
+                      />
+                    )
                   )}
                 </>
               )}
@@ -3101,7 +3121,9 @@ export function ViajesTenantPage({
                 ...(mostrarColumnaChofer
                   ? [{ label: "Chofer", value: nombreChofer }]
                   : []),
-                { label: "Etapa", value: estadoValue },
+                ...(mostrarColumnaEtapa
+                  ? [{ label: "Etapa", value: estadoValue }]
+                  : []),
                 {
                   label: "Origen — Destino",
                   value: (
