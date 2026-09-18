@@ -12,6 +12,7 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessEmisionLiquidoProductoArca,
+  canAccessEmisionFacturasArca,
 } from "@/lib/tenantModules";
 import {
   LiquidacionAnulacionMetodoRadios,
@@ -189,6 +190,9 @@ export function CamposEmpresaPage() {
     useState<LiquidacionAnulacionMetodo>("nota_credito_debito");
   const [savingLiquidacionAnulacionMetodo, setSavingLiquidacionAnulacionMetodo] =
     useState(false);
+  const [empresaFacturaCantidadUnidad, setEmpresaFacturaCantidadUnidad] =
+    useState<"TN" | "UD">("TN");
+  const [savingFacturaCantidadUnidad, setSavingFacturaCantidadUnidad] = useState(false);
   const [empresaPaisOculto, setEmpresaPaisOculto] = useState(false);
   const [savingPaisOculto, setSavingPaisOculto] = useState(false);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
@@ -230,6 +234,9 @@ export function CamposEmpresaPage() {
             tenant.liquidacionAnulacionMetodo === "manual"
               ? "manual"
               : "nota_credito_debito",
+          );
+          setEmpresaFacturaCantidadUnidad(
+            tenant.facturaCantidadUnidad === "UD" ? "UD" : "TN",
           );
           setEmpresaPaisOculto(tenant.paisOrigenDestinoOculto ?? false);
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
@@ -422,6 +429,28 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingLiquidacionAnulacionMetodo(false);
+    }
+  }
+
+  async function guardarFacturaCantidadUnidad(valor: "TN" | "UD") {
+    if (!filtroEmpresa || valor === empresaFacturaCantidadUnidad) return;
+    const anterior = empresaFacturaCantidadUnidad;
+    setEmpresaFacturaCantidadUnidad(valor);
+    setSavingFacturaCantidadUnidad(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ facturaCantidadUnidad: valor }),
+      });
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      setEmpresaFacturaCantidadUnidad(anterior);
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingFacturaCantidadUnidad(false);
     }
   }
 
@@ -893,6 +922,33 @@ export function CamposEmpresaPage() {
                             )}
                           </td>
                         </tr>
+                        {!!empresaTenant &&
+                          canAccessEmisionFacturasArca(empresaTenant.modules) && (
+                          <tr className="border-t border-black/10">
+                            <td className="px-4 py-2.5">
+                              Unidad de "Cantidad" en PDF de factura (ARCA)
+                              <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                                Se muestra junto al número en la columna "Cantidad" del
+                                comprobante de factura A/B.
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <select
+                                value={empresaFacturaCantidadUnidad}
+                                disabled={savingFacturaCantidadUnidad}
+                                onChange={(e) =>
+                                  void guardarFacturaCantidadUnidad(
+                                    e.target.value === "UD" ? "UD" : "TN",
+                                  )
+                                }
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                              >
+                                <option value="TN">Toneladas (TN)</option>
+                                <option value="UD">Unidades (Ud)</option>
+                              </select>
+                            </td>
+                          </tr>
+                        )}
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Mostrar importación masiva de Excel para el admin

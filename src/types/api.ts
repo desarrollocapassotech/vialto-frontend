@@ -432,6 +432,8 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /** Unidad de la columna "Cantidad" en el PDF de factura A/B (ARCA) — 'TN' (default) | 'UD'. */
+  facturaCantidadUnidad?: string;
   createdAt: string;
 }
 
