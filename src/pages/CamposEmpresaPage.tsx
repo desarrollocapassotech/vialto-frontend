@@ -170,6 +170,15 @@ export function CamposEmpresaPage() {
   const { showToast } = useToast();
   const [empresaLabel, setEmpresaLabel] = useState("");
   const [empresaLabelGuardado, setEmpresaLabelGuardado] = useState("");
+  const [empresaIdSistemaHabilitado, setEmpresaIdSistemaHabilitado] = useState(true);
+  const [savingIdSistemaHabilitado, setSavingIdSistemaHabilitado] = useState(false);
+  const [empresaIdPropio1Habilitado, setEmpresaIdPropio1Habilitado] = useState(true);
+  const [savingIdPropio1Habilitado, setSavingIdPropio1Habilitado] = useState(false);
+  const [empresaIdPropio2Habilitado, setEmpresaIdPropio2Habilitado] = useState(false);
+  const [savingIdPropio2Habilitado, setSavingIdPropio2Habilitado] = useState(false);
+  const [empresaIdPropio2Label, setEmpresaIdPropio2Label] = useState("");
+  const [empresaIdPropio2LabelGuardado, setEmpresaIdPropio2LabelGuardado] = useState("");
+  const [savingIdPropio2Label, setSavingIdPropio2Label] = useState(false);
   const [empresaImportOculto, setEmpresaImportOculto] = useState(false);
   const [loadingEmpresaConfig, setLoadingEmpresaConfig] = useState(false);
   const [savingLabel, setSavingLabel] = useState(false);
@@ -209,6 +218,12 @@ export function CamposEmpresaPage() {
           const label = tenant.labelIdentificacionPersonalizadaViajes ?? "";
           setEmpresaLabel(label);
           setEmpresaLabelGuardado(label);
+          setEmpresaIdSistemaHabilitado(tenant.idSistemaHabilitado ?? true);
+          setEmpresaIdPropio1Habilitado(tenant.idPropio1Habilitado ?? true);
+          setEmpresaIdPropio2Habilitado(tenant.idPropio2Habilitado ?? false);
+          const idPropio2Label = tenant.idPropio2Label ?? "";
+          setEmpresaIdPropio2Label(idPropio2Label);
+          setEmpresaIdPropio2LabelGuardado(idPropio2Label);
           setEmpresaImportOculto(tenant.importacionesOcultas ?? false);
           setEmpresaExportacionPautMicCrt(tenant.habilitarExportacionPautMicCrt ?? false);
           setEmpresaLiquidacionAnulacionMetodo(
@@ -248,6 +263,99 @@ export function CamposEmpresaPage() {
       setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
     } finally {
       setSavingLabel(false);
+    }
+  }
+
+  async function toggleIdSistemaHabilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaIdSistemaHabilitado;
+    // Nunca pueden quedar ID Sistema e ID Propio 1 apagados a la vez.
+    if (!nuevoValor && !empresaIdPropio1Habilitado) return;
+    setSavingIdSistemaHabilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ idSistemaHabilitado: nuevoValor }),
+      });
+      setEmpresaIdSistemaHabilitado(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingIdSistemaHabilitado(false);
+    }
+  }
+
+  async function toggleIdPropio1Habilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaIdPropio1Habilitado;
+    // Nunca pueden quedar ID Sistema e ID Propio 1 apagados a la vez.
+    if (!nuevoValor && !empresaIdSistemaHabilitado) return;
+    setSavingIdPropio1Habilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ idPropio1Habilitado: nuevoValor }),
+      });
+      setEmpresaIdPropio1Habilitado(nuevoValor);
+      // Refleja en pantalla, sin esperar un refetch, la cascada que ya aplica el backend.
+      if (!nuevoValor && empresaIdPropio2Habilitado) {
+        setEmpresaIdPropio2Habilitado(false);
+      }
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingIdPropio1Habilitado(false);
+    }
+  }
+
+  async function toggleIdPropio2Habilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaIdPropio2Habilitado;
+    // ID Propio 2 requiere que ID Propio 1 esté habilitado.
+    if (nuevoValor && !empresaIdPropio1Habilitado) return;
+    setSavingIdPropio2Habilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ idPropio2Habilitado: nuevoValor }),
+      });
+      setEmpresaIdPropio2Habilitado(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingIdPropio2Habilitado(false);
+    }
+  }
+
+  async function guardarIdPropio2Label() {
+    if (!filtroEmpresa || empresaIdPropio2Label === empresaIdPropio2LabelGuardado) return;
+    setSavingIdPropio2Label(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({
+          idPropio2Label: empresaIdPropio2Label.trim() || null,
+        }),
+      });
+      setEmpresaIdPropio2LabelGuardado(empresaIdPropio2Label);
+      showToast("Label actualizado", "success");
+    } catch (e) {
+      setEmpresaConfigError(friendlyError(e, "camposEmpresa"));
+    } finally {
+      setSavingIdPropio2Label(false);
     }
   }
 
@@ -692,26 +800,106 @@ export function CamposEmpresaPage() {
                       <>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
-                            Label del ID propio (módulo Viajes)
+                            Habilitar ID Sistema (módulo Viajes)
                           </td>
                           <td className="px-4 py-2.5 text-right">
-                            <input
-                              value={empresaLabel}
-                              onChange={(e) => setEmpresaLabel(e.target.value)}
-                              onBlur={() => void guardarEmpresaLabel()}
-                              disabled={savingLabel}
-                              placeholder="ID propio"
-                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                            <ToggleSwitch
+                              checked={empresaIdSistemaHabilitado}
+                              disabled={
+                                savingIdSistemaHabilitado ||
+                                (empresaIdSistemaHabilitado && !empresaIdPropio1Habilitado)
+                              }
+                              onChange={() => void toggleIdSistemaHabilitado()}
+                              label={
+                                empresaIdSistemaHabilitado
+                                  ? "Deshabilitar ID Sistema"
+                                  : "Habilitar ID Sistema"
+                              }
                             />
+                            {empresaIdSistemaHabilitado && !empresaIdPropio1Habilitado && (
+                              <p className="mt-1 text-xs font-normal text-vialto-steel">
+                                No se puede deshabilitar: ID Propio 1 está apagado.
+                              </p>
+                            )}
                           </td>
                         </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
-                            Ocultar importación masiva de Excel para el admin
+                            ID Propio 1 (módulo Viajes)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              <input
+                                value={empresaLabel}
+                                onChange={(e) => setEmpresaLabel(e.target.value)}
+                                onBlur={() => void guardarEmpresaLabel()}
+                                disabled={savingLabel}
+                                placeholder="ID propio"
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                              />
+                              <ToggleSwitch
+                                checked={empresaIdPropio1Habilitado}
+                                disabled={
+                                  savingIdPropio1Habilitado ||
+                                  (empresaIdPropio1Habilitado && !empresaIdSistemaHabilitado)
+                                }
+                                onChange={() => void toggleIdPropio1Habilitado()}
+                                label={
+                                  empresaIdPropio1Habilitado
+                                    ? "Deshabilitar ID Propio 1"
+                                    : "Habilitar ID Propio 1"
+                                }
+                              />
+                            </div>
+                            {empresaIdPropio1Habilitado && !empresaIdSistemaHabilitado && (
+                              <p className="mt-1 text-xs font-normal text-vialto-steel">
+                                No se puede deshabilitar: ID Sistema está apagado.
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            ID Propio 2 (módulo Viajes)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              <input
+                                value={empresaIdPropio2Label}
+                                onChange={(e) => setEmpresaIdPropio2Label(e.target.value)}
+                                onBlur={() => void guardarIdPropio2Label()}
+                                disabled={savingIdPropio2Label}
+                                placeholder="ID Propio 2"
+                                className="h-9 w-full max-w-xs border border-black/15 bg-white px-3 text-sm text-left disabled:opacity-50"
+                              />
+                              <ToggleSwitch
+                                checked={empresaIdPropio2Habilitado}
+                                disabled={
+                                  savingIdPropio2Habilitado ||
+                                  (!empresaIdPropio2Habilitado && !empresaIdPropio1Habilitado)
+                                }
+                                onChange={() => void toggleIdPropio2Habilitado()}
+                                label={
+                                  empresaIdPropio2Habilitado
+                                    ? "Deshabilitar ID Propio 2"
+                                    : "Habilitar ID Propio 2"
+                                }
+                              />
+                            </div>
+                            {!empresaIdPropio2Habilitado && !empresaIdPropio1Habilitado && (
+                              <p className="mt-1 text-xs font-normal text-vialto-steel">
+                                Para habilitarlo, primero habilitá ID Propio 1.
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Mostrar importación masiva de Excel para el admin
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <ToggleSwitch
-                              checked={empresaImportOculto}
+                              checked={!empresaImportOculto}
                               disabled={savingImportToggle}
                               onChange={() => void toggleImportOculto()}
                               label={
@@ -724,11 +912,11 @@ export function CamposEmpresaPage() {
                         </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
-                            Ocultar país (Viajes, Clientes y Transportistas)
+                            Mostrar selector de país (Viajes, Clientes y Transportistas)
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <ToggleSwitch
-                              checked={empresaPaisOculto}
+                              checked={!empresaPaisOculto}
                               disabled={savingPaisOculto}
                               onChange={() => void togglePaisOculto()}
                               label={

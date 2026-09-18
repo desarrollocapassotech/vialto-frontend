@@ -21,6 +21,7 @@ const ESTADO_LIQUIDACION_LABEL: Record<string, string> = {
 export const VIAJES_EXPORT_COLUMNS: ExcelExportColOption[] = [
   { id: "numero", label: "ID Sistema", required: true },
   { id: "id", label: "ID Propio" },
+  { id: "idPropio2", label: "ID Propio 2" },
   { id: "cliente", label: "Cliente", required: true },
   { id: "transportista", label: "Transporte" },
   { id: "chofer", label: "Chofer" },
@@ -52,6 +53,9 @@ export async function generarViajesExcel(
           break;
         case "id":
           row[col.label] = v.numeroIdentificacionPersonalizado || "";
+          break;
+        case "idPropio2":
+          row[col.label] = v.idPropio2 || "";
           break;
         case "cliente":
           const cRuta = clientesRutaListadoViaje(v, clientes) as any[];

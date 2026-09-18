@@ -8,6 +8,7 @@ import type { ViajeProductoItem } from '@/lib/productosViaje';
 export type ViajeInlineDraft = {
   numero: string;
   numeroIdentificacionPersonalizado: string;
+  idPropio2: string;
   estado: string;
   clienteId: string;
   operacionModo: ViajeOperacionModo;

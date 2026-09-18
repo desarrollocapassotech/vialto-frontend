@@ -77,7 +77,13 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
-import { labelIdentificacionPersonalizadaViajes } from "@/lib/viajesFlota";
+import {
+  labelIdentificacionPersonalizadaViajes,
+  idSistemaHabilitado,
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idPropio2Label,
+} from "@/lib/viajesFlota";
 import { roundMoney2 } from "@/lib/facturaTotales";
 import { type OpcionProducto } from "@/lib/productosViaje";
 import { ViajeCreateResumenClientes } from "@/components/viajes/steps/ViajeCreateResumenClientes";
@@ -159,6 +165,7 @@ export function ViajeCreatePage() {
   const [observaciones, setObservaciones] = useState("");
   const [numeroIdentificacionPersonalizado, setNumeroIdentificacionPersonalizado] =
     useState("");
+  const [idPropio2, setIdPropio2] = useState("");
   const [kmRecorridos, setKmRecorridos] = useState("");
   const [litrosConsumidos, setLitrosConsumidos] = useState("");
 
@@ -889,6 +896,13 @@ export function ViajeCreatePage() {
         ? Number(litrosConsumidos.replace(",", "."))
         : undefined;
 
+    if (!idSistemaHabilitado(maestro.tenant) && !numeroIdentificacionPersonalizado.trim()) {
+      setError(
+        `${labelIdentificacionPersonalizadaViajes(maestro.tenant)} es obligatorio: tu empresa tiene deshabilitado el ID Sistema.`,
+      );
+      return;
+    }
+
     // 8. EJECUCIÓN DE LA API (POST)
     setError(null);
     try {
@@ -925,6 +939,7 @@ export function ViajeCreatePage() {
           observaciones: observaciones.trim() || undefined,
           numeroIdentificacionPersonalizado:
             numeroIdentificacionPersonalizado.trim() || undefined,
+          idPropio2: idPropio2.trim() || undefined,
           kmRecorridos:
             kmNum !== undefined && Number.isFinite(kmNum) ? kmNum : undefined,
           litrosConsumidos:
@@ -1219,9 +1234,15 @@ export function ViajeCreatePage() {
 
             {step === 3 && (
               <ViajeCreateStep3Cierre
+                mostrarIdPropio1={idPropio1Habilitado(maestro.tenant)}
+                idPropio1Requerido={!idSistemaHabilitado(maestro.tenant)}
                 labelIdentificacion={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
                 numeroIdentificacionPersonalizado={numeroIdentificacionPersonalizado}
                 onNumeroIdentificacionChange={setNumeroIdentificacionPersonalizado}
+                mostrarIdPropio2={idPropio2Habilitado(maestro.tenant)}
+                labelIdPropio2={idPropio2Label(maestro.tenant)}
+                idPropio2={idPropio2}
+                onIdPropio2Change={setIdPropio2}
                 fechaCarga={fechaCarga}
                 horaCarga={horaCarga}
                 fechaDescarga={fechaDescarga}

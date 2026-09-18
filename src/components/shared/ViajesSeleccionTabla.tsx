@@ -7,6 +7,7 @@ export type ViajeSeleccionable = {
   id: string;
   numero: string;
   numeroIdentificacionPersonalizado?: string | null;
+  idPropio2?: string | null;
   fechaCarga: string | null;
   origen: string | null;
   destino: string | null;
@@ -46,6 +47,10 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   maxHeightClass = "max-h-72",
   fillHeight = false,
   emptyMessage = "No hay viajes disponibles.",
+  idSistemaHabilitado = true,
+  idPropio1Habilitado = true,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: {
   viajes: T[];
   selectedIds: string[];
@@ -58,6 +63,14 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   /** Ocupa el alto disponible del contenedor padre (flex) en lugar de un max-height fijo. */
   fillHeight?: boolean;
   emptyMessage?: string;
+  /** true = el tenant muestra la columna dedicada "ID Sistema" (default true). */
+  idSistemaHabilitado?: boolean;
+  /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
+  idPropio1Habilitado?: boolean;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -178,8 +191,15 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
             <thead className="sticky top-0 bg-vialto-mist text-[10px] uppercase tracking-wider text-vialto-steel">
               <tr>
                 <th className="w-8 px-2 py-2 text-left" />
-                <th className="px-2 py-2 text-left">ID sistema</th>
-                <th className="px-2 py-2 text-left">ID personalizado</th>
+                {idSistemaHabilitado && (
+                  <th className="px-2 py-2 text-left">ID sistema</th>
+                )}
+                {idPropio1Habilitado && (
+                  <th className="px-2 py-2 text-left">ID personalizado</th>
+                )}
+                {idPropio2Habilitado && (
+                  <th className="px-2 py-2 text-left">{idPropio2Label}</th>
+                )}
                 <th className="px-2 py-2 text-left">Fecha</th>
                 <th className="px-2 py-2 text-left">Origen → Destino</th>
                 {mostrarProducto && (
@@ -217,12 +237,21 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                         onChange={() => onToggle(v.id)}
                       />
                     </td>
-                    <td className="px-2 py-1.5 font-medium text-vialto-charcoal">
-                      {v.numero}
-                    </td>
-                    <td className="px-2 py-1.5 text-vialto-charcoal">
-                      {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-                    </td>
+                    {idSistemaHabilitado && (
+                      <td className="px-2 py-1.5 font-medium text-vialto-charcoal">
+                        {v.numero}
+                      </td>
+                    )}
+                    {idPropio1Habilitado && (
+                      <td className="px-2 py-1.5 text-vialto-charcoal">
+                        {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                      </td>
+                    )}
+                    {idPropio2Habilitado && (
+                      <td className="px-2 py-1.5 text-vialto-charcoal">
+                        {v.idPropio2?.trim() || "—"}
+                      </td>
+                    )}
                     <td className="whitespace-nowrap px-2 py-1.5 text-vialto-steel">
                       {fmtDate(v.fechaCarga)}
                     </td>
