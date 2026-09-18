@@ -800,7 +800,7 @@ export function CamposEmpresaPage() {
                       <>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
-                            Habilitar ID Sistema (módulo Viajes)
+                            ID Sistema (módulo Viajes)
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <ToggleSwitch
