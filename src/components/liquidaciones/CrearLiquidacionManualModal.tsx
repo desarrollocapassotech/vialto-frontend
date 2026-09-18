@@ -139,6 +139,10 @@ interface Props {
   onClose: () => void;
   tenantId?: string;
   onDataSaved?: () => void;
+  /** true = el tenant muestra la columna/línea dedicada "ID Sistema" (default true). */
+  idSistemaHabilitado?: boolean;
+  /** true = el tenant muestra la columna/línea dedicada "ID Propio 1" (default true). */
+  idPropio1Habilitado?: boolean;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna/línea adicional. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de "ID Propio 2". */
@@ -155,6 +159,8 @@ export function CrearLiquidacionManualModal({
   onClose,
   tenantId,
   onDataSaved,
+  idSistemaHabilitado = true,
+  idPropio1Habilitado = true,
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: Props) {
@@ -922,21 +928,25 @@ export function CrearLiquidacionManualModal({
                 <div>
                   <p className={labelClass}>Detalle del viaje</p>
                   <div className="space-y-1 rounded border border-black/10 bg-vialto-mist/50 px-3 py-2 text-xs">
-                    <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">ID sistema</span>
-                      <span className="font-medium tabular-nums text-vialto-charcoal">
-                        #{viajeInicial.numero}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-vialto-steel">
-                        ID personalizado
-                      </span>
-                      <span className="font-medium tabular-nums text-vialto-charcoal">
-                        {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
-                          "—"}
-                      </span>
-                    </div>
+                    {idSistemaHabilitado && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-vialto-steel">ID sistema</span>
+                        <span className="font-medium tabular-nums text-vialto-charcoal">
+                          #{viajeInicial.numero}
+                        </span>
+                      </div>
+                    )}
+                    {idPropio1Habilitado && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-vialto-steel">
+                          ID personalizado
+                        </span>
+                        <span className="font-medium tabular-nums text-vialto-charcoal">
+                          {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
+                            "—"}
+                        </span>
+                      </div>
+                    )}
                     {idPropio2Habilitado && (
                       <div className="flex justify-between gap-3">
                         <span className="text-vialto-steel">
@@ -1009,6 +1019,8 @@ export function CrearLiquidacionManualModal({
                     viajes={viajes}
                     selectedIds={Array.from(selectedViajeIds)}
                     onToggle={toggleViaje}
+                    idSistemaHabilitado={idSistemaHabilitado}
+                    idPropio1Habilitado={idPropio1Habilitado}
                     idPropio2Habilitado={idPropio2Habilitado}
                     idPropio2Label={idPropio2Label}
                     renderMonto={(v) =>

@@ -40,6 +40,20 @@ export function labelIdentificacionPersonalizadaViajes(
   );
 }
 
+/** `true` si el tenant muestra la columna/campo dedicado "ID Sistema" (default: true). */
+export function idSistemaHabilitado(
+  tenant: Pick<Tenant, "idSistemaHabilitado"> | null | undefined,
+): boolean {
+  return tenant?.idSistemaHabilitado ?? true;
+}
+
+/** `true` si el tenant muestra el campo/columna dedicado "ID Propio 1" (default: true). */
+export function idPropio1Habilitado(
+  tenant: Pick<Tenant, "idPropio1Habilitado"> | null | undefined,
+): boolean {
+  return tenant?.idPropio1Habilitado ?? true;
+}
+
 /** `true` si el tenant habilitó el campo "ID Propio 2" (deshabilitado por defecto). */
 export function idPropio2Habilitado(
   tenant: Pick<Tenant, "idPropio2Habilitado"> | null | undefined,

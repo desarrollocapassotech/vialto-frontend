@@ -62,6 +62,7 @@ import {
   numeroVisibleViaje,
   viajeUsaNumeroInterno,
   labelIdentificacionPersonalizadaViajes,
+  idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
 } from "@/lib/viajesFlota";
@@ -195,6 +196,7 @@ export type ViajeEditModalProps = {
     | "labelIdentificacionPersonalizadaViajes"
     | "paisOrigenDestinoOculto"
     | "paisOrigenDestinoFijoId"
+    | "idPropio1Habilitado"
     | "idPropio2Habilitado"
     | "idPropio2Label"
   > | null;
@@ -600,31 +602,33 @@ export function ViajeEditModal({
               </div>
             )}
 
-            <div className="mb-4 flex flex-col gap-1.5 rounded border-2 border-vialto-fire/60 bg-vialto-mist/50 p-3">
-              <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.08em] text-vialto-charcoal">
-                {labelIdentificacionPersonalizadaViajes(tenant)}
-              </span>
-              <input
-                type="text"
-                value={draft.numeroIdentificacionPersonalizado}
-                onChange={(e) =>
-                  setDraft((p) =>
-                    p
-                      ? {
-                          ...p,
-                          numeroIdentificacionPersonalizado: e.target.value,
-                        }
-                      : p,
-                  )
-                }
-                placeholder="Ej: número de CTG"
-                className="h-11 w-full border border-black/15 bg-white px-3 text-base font-medium text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/40"
-              />
-              <p className="text-xs text-vialto-steel">
-                Si lo cargás, este número se usa para identificar el viaje en
-                toda la app en vez del número interno del sistema.
-              </p>
-            </div>
+            {idPropio1Habilitado(tenant) && (
+              <div className="mb-4 flex flex-col gap-1.5 rounded border-2 border-vialto-fire/60 bg-vialto-mist/50 p-3">
+                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-[0.08em] text-vialto-charcoal">
+                  {labelIdentificacionPersonalizadaViajes(tenant)}
+                </span>
+                <input
+                  type="text"
+                  value={draft.numeroIdentificacionPersonalizado}
+                  onChange={(e) =>
+                    setDraft((p) =>
+                      p
+                        ? {
+                            ...p,
+                            numeroIdentificacionPersonalizado: e.target.value,
+                          }
+                        : p,
+                    )
+                  }
+                  placeholder="Ej: número de CTG"
+                  className="h-11 w-full border border-black/15 bg-white px-3 text-base font-medium text-vialto-charcoal focus:outline-none focus:ring-2 focus:ring-vialto-fire/40"
+                />
+                <p className="text-xs text-vialto-steel">
+                  Si lo cargás, este número se usa para identificar el viaje en
+                  toda la app en vez del número interno del sistema.
+                </p>
+              </div>
+            )}
 
             {idPropio2Habilitado(tenant) && (
               <div className="flex flex-col gap-1.5">

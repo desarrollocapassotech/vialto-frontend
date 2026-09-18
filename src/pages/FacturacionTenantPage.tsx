@@ -40,6 +40,8 @@ import {
   textoImporteFacturaListado,
   textoImporteMonedaFactura,
   viajesFiltradosParaFactura,
+  idSistemaHabilitado,
+  idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
 } from "@/lib/viajesFlota";
@@ -1606,6 +1608,8 @@ export function FacturacionTenantPage({
         showComprobanteAdjunto={showComprobanteAdjunto}
         hasArca={hasArca}
         tenantId={platform ? tid : undefined}
+        idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
+        idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
         idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
         idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         getToken={getToken}
@@ -1698,6 +1702,8 @@ export function FacturacionTenantPage({
           saving={savingEditId === editingId}
           error={editError}
           showComprobanteAdjunto={showComprobanteAdjunto}
+          idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
+          idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
           idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
           idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         />

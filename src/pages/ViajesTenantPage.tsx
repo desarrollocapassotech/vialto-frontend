@@ -45,6 +45,8 @@ import {
   nombreTransportistaEfectivoListadoViaje,
   numeroVisibleViaje,
   labelIdentificacionPersonalizadaViajes,
+  idSistemaHabilitado,
+  idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
   type MaestroListasViaje,
@@ -458,6 +460,7 @@ export function ViajesTenantPage({
   const filtrosAplicadosRef = useRef({
     numero: "",
     ctg: "",
+    idPropio2: "",
     clienteId: "",
     transportistaId: "",
     choferId: "",
@@ -475,6 +478,7 @@ export function ViajesTenantPage({
 
   const [numeroFiltroActivo, setNumeroFiltroActivo] = useState("");
   const [ctgFiltroActivo, setCtgFiltroActivo] = useState("");
+  const [idPropio2FiltroActivo, setIdPropio2FiltroActivo] = useState("");
   const [clienteIdFiltroActivo, setClienteIdFiltroActivo] = useState("");
   const [transportistaIdFiltroActivo, setTransportistaIdFiltroActivo] =
     useState("");
@@ -594,6 +598,38 @@ export function ViajesTenantPage({
         // Filtro local estricto
         const matches = res.items
           .map((v) => v.numeroIdentificacionPersonalizado?.trim() || "")
+          .filter((x) => x.toLowerCase().includes(qClean));
+
+        return Array.from(new Set(matches));
+      } catch {
+        return [];
+      }
+    },
+    [platform, tid],
+  );
+
+  const searchIdPropio2 = useCallback(
+    async (q: string) => {
+      const qClean = q.trim().toLowerCase();
+      if (!qClean) return [];
+
+      const params = new URLSearchParams();
+      if (platform && tid) params.set("tenantId", tid);
+      params.set("page", "1");
+      params.set("pageSize", "1000");
+
+      const url = platform
+        ? `/api/platform/viajes/paginated?${params.toString()}`
+        : `/api/viajes/paginated?${params.toString()}`;
+
+      try {
+        const res = await apiJson<ViajesPaginatedResponse>(url, () =>
+          getTokenRef.current(),
+        );
+
+        // Filtro local estricto
+        const matches = res.items
+          .map((v) => v.idPropio2?.trim() || "")
           .filter((x) => x.toLowerCase().includes(qClean));
 
         return Array.from(new Set(matches));
@@ -788,6 +824,7 @@ export function ViajesTenantPage({
         const {
           numero: numF,
           ctg: ctgF,
+          idPropio2: idp2F,
           clienteId: cid,
           transportistaId: transpFiltro,
           choferId: choferFiltro,
@@ -814,6 +851,11 @@ export function ViajesTenantPage({
           filtros.set("numeroIdentificacionPersonalizado", ctgF.trim());
           filtros.set("q", ctgF.trim());
           filtros.set("busqueda", ctgF.trim());
+        }
+        if (idp2F.trim()) {
+          filtros.set("idPropio2", idp2F.trim());
+          filtros.set("q", idp2F.trim());
+          filtros.set("busqueda", idp2F.trim());
         }
 
         if (cid) filtros.set("clienteId", cid);
@@ -848,7 +890,7 @@ export function ViajesTenantPage({
           ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}${filtrosQs ? `&${filtrosQs}&` : "&"}`
           : `/api/viajes/paginated${filtrosQs ? `?${filtrosQs}&` : "?"}`;
 
-        const isLocalSearch = !!numF.trim() || !!ctgF.trim();
+        const isLocalSearch = !!numF.trim() || !!ctgF.trim() || !!idp2F.trim();
         const pageApi = isLocalSearch ? 1 : Math.max(1, Math.floor(page));
         // Traemos de a muchos si es búsqueda local para garantizar encontrarlo
         const pageSizeApi = isLocalSearch ? 1000 : pageSizeApiValido(pageSize);
@@ -905,6 +947,7 @@ export function ViajesTenantPage({
         if (isLocalSearch) {
           const qNum = numF.replace(/#/g, "").trim().toLowerCase();
           const qCtg = ctgF.trim().toLowerCase();
+          const qIdPropio2 = idp2F.trim().toLowerCase();
 
           let filteredItems = items;
           if (qNum) {
@@ -917,6 +960,11 @@ export function ViajesTenantPage({
               (v.numeroIdentificacionPersonalizado || "")
                 .toLowerCase()
                 .includes(qCtg),
+            );
+          }
+          if (qIdPropio2) {
+            filteredItems = filteredItems.filter((v) =>
+              (v.idPropio2 || "").toLowerCase().includes(qIdPropio2),
             );
           }
 
@@ -996,6 +1044,18 @@ export function ViajesTenantPage({
     };
     setListadoRefetching(true);
     setCtgFiltroActivo(ctg);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  function aplicarFiltroColumnaIdPropio2(val: string) {
+    const idp2 = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      idPropio2: idp2,
+    };
+    setListadoRefetching(true);
+    setIdPropio2FiltroActivo(idp2);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
   }
@@ -1235,6 +1295,7 @@ export function ViajesTenantPage({
     filtrosAplicadosRef.current = {
       numero: "",
       ctg: "",
+      idPropio2: "",
       clienteId: "",
       transportistaId: "",
       choferId: "",
@@ -1251,6 +1312,7 @@ export function ViajesTenantPage({
     setListadoRefetching(true);
     setNumeroFiltroActivo("");
     setCtgFiltroActivo("");
+    setIdPropio2FiltroActivo("");
     setClienteIdFiltroActivo("");
     setTransportistaIdFiltroActivo("");
     setChoferIdFiltroActivo("");
@@ -1275,6 +1337,7 @@ export function ViajesTenantPage({
   const hayFiltrosColumnasActivos =
     !!numeroFiltroActivo.trim() ||
     !!ctgFiltroActivo.trim() ||
+    !!idPropio2FiltroActivo.trim() ||
     !!clienteIdFiltroActivo.trim() ||
     !!transportistaIdFiltroActivo.trim() ||
     !!choferIdFiltroActivo.trim() ||
@@ -1290,6 +1353,7 @@ export function ViajesTenantPage({
     let n = 0;
     if (numeroFiltroActivo.trim()) n += 1;
     if (ctgFiltroActivo.trim()) n += 1;
+    if (idPropio2FiltroActivo.trim()) n += 1;
     if (clienteIdFiltroActivo.trim()) n += 1;
     if (transportistaIdFiltroActivo.trim()) n += 1;
     if (choferIdFiltroActivo.trim()) n += 1;
@@ -1303,6 +1367,7 @@ export function ViajesTenantPage({
   }, [
     numeroFiltroActivo,
     ctgFiltroActivo,
+    idPropio2FiltroActivo,
     clienteIdFiltroActivo,
     transportistaIdFiltroActivo,
     choferIdFiltroActivo,
@@ -1875,6 +1940,8 @@ export function ViajesTenantPage({
     "edicion_viaje",
     "pagosTransportista",
   );
+  const mostrarColumnaIdSistema = idSistemaHabilitado(currentTenant);
+  const mostrarColumnaIdPropio1 = idPropio1Habilitado(currentTenant);
   const mostrarColumnaIdPropio2 = idPropio2Habilitado(currentTenant);
   // Mismo criterio que la columna/badge de la grilla: si el tenant tiene el
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
@@ -1882,13 +1949,38 @@ export function ViajesTenantPage({
     if (c.id === "chofer") return mostrarColumnaChofer;
     if (c.id === "estadoPago") return mostrarPagosTransportista;
     if (c.id === "idPropio2") return mostrarColumnaIdPropio2;
+    if (c.id === "numero") return mostrarColumnaIdSistema;
+    if (c.id === "id") return mostrarColumnaIdPropio1;
     return true;
   });
   const tableColSpanBase =
-    (mostrarColumnaChofer ? 8 : 7) + (mostrarColumnaIdPropio2 ? 1 : 0);
+    (mostrarColumnaChofer ? 8 : 7) +
+    (mostrarColumnaIdPropio2 ? 1 : 0) +
+    (mostrarColumnaIdSistema ? 0 : -1) +
+    (mostrarColumnaIdPropio1 ? 0 : -1);
   const tableColSpan = mostrarColumnaFacturarLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
+
+  // Si el superadmin oculta la columna mientras el usuario tenía un filtro
+  // activo sobre ella, el filtro queda invisible pero sigue acotando
+  // resultados — se limpia solo al detectar que la columna se ocultó.
+  useEffect(() => {
+    if (!mostrarColumnaIdSistema && numeroFiltroActivo.trim()) {
+      aplicarFiltroColumnaNumero("");
+    }
+  }, [mostrarColumnaIdSistema]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mostrarColumnaIdPropio1 && ctgFiltroActivo.trim()) {
+      aplicarFiltroColumnaCTG("");
+    }
+  }, [mostrarColumnaIdPropio1]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mostrarColumnaIdPropio2 && idPropio2FiltroActivo.trim()) {
+      aplicarFiltroColumnaIdPropio2("");
+    }
+  }, [mostrarColumnaIdPropio2]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
   const todosElegiblesMarcados =
@@ -1898,28 +1990,46 @@ export function ViajesTenantPage({
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
     <>
-      <ListadoFiltroCampo label="ID" active={!!numeroFiltroActivo.trim()}>
-        <AutocompleteInput
-          value={numeroFiltroActivo}
-          onChange={(val) => aplicarFiltroColumnaNumero(val)}
-          onSearch={searchNumero}
-          disabled={listadoRefetching}
-          placeholder="Buscar ID..."
-          prefix="#"
-        />
-      </ListadoFiltroCampo>
-      <ListadoFiltroCampo
-        label={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
-        active={!!ctgFiltroActivo.trim()}
-      >
-        <AutocompleteInput
-          value={ctgFiltroActivo}
-          onChange={(val) => aplicarFiltroColumnaCTG(val)}
-          onSearch={searchCtg}
-          disabled={listadoRefetching}
-          placeholder="Buscar valor..."
-        />
-      </ListadoFiltroCampo>
+      {mostrarColumnaIdSistema && (
+        <ListadoFiltroCampo label="ID" active={!!numeroFiltroActivo.trim()}>
+          <AutocompleteInput
+            value={numeroFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaNumero(val)}
+            onSearch={searchNumero}
+            disabled={listadoRefetching}
+            placeholder="Buscar ID..."
+            prefix="#"
+          />
+        </ListadoFiltroCampo>
+      )}
+      {mostrarColumnaIdPropio1 && (
+        <ListadoFiltroCampo
+          label={labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"}
+          active={!!ctgFiltroActivo.trim()}
+        >
+          <AutocompleteInput
+            value={ctgFiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaCTG(val)}
+            onSearch={searchCtg}
+            disabled={listadoRefetching}
+            placeholder="Buscar valor..."
+          />
+        </ListadoFiltroCampo>
+      )}
+      {mostrarColumnaIdPropio2 && (
+        <ListadoFiltroCampo
+          label={idPropio2Label(currentTenant)}
+          active={!!idPropio2FiltroActivo.trim()}
+        >
+          <AutocompleteInput
+            value={idPropio2FiltroActivo}
+            onChange={(val) => aplicarFiltroColumnaIdPropio2(val)}
+            onSearch={searchIdPropio2}
+            disabled={listadoRefetching}
+            placeholder="Buscar valor..."
+          />
+        </ListadoFiltroCampo>
+      )}
       <ListadoFiltroCampo label="Período" active={periodoFiltro !== "todos"}>
         <select
           value={periodoFiltro}
@@ -2321,44 +2431,61 @@ export function ViajesTenantPage({
                 ) : null}
               </th>
             )}
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title="ID"
-                filterActive={!!numeroFiltroActivo.trim()}
-                filterSignature={numeroFiltroActivo}
-                minWidthClass="min-w-0"
-              >
-                <AutocompleteInput
-                  value={numeroFiltroActivo}
-                  onChange={(val) => aplicarFiltroColumnaNumero(val)}
-                  onSearch={searchNumero}
-                  disabled={listadoRefetching}
-                  placeholder="Buscar ID..."
-                  prefix="#"
-                />
-              </ViajesListadoHeaderFiltro>
-            </th>
-            <th scope="col" className={`${listadoTablaThClass} align-top`}>
-              <ViajesListadoHeaderFiltro
-                title={
-                  labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
-                }
-                filterActive={!!ctgFiltroActivo.trim()}
-                filterSignature={ctgFiltroActivo}
-                minWidthClass="min-w-0"
-              >
-                <AutocompleteInput
-                  value={ctgFiltroActivo}
-                  onChange={(val) => aplicarFiltroColumnaCTG(val)}
-                  onSearch={searchCtg}
-                  disabled={listadoRefetching}
-                  placeholder="Buscar valor..."
-                />
-              </ViajesListadoHeaderFiltro>
-            </th>
+            {mostrarColumnaIdSistema && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="ID"
+                  filterActive={!!numeroFiltroActivo.trim()}
+                  filterSignature={numeroFiltroActivo}
+                  minWidthClass="min-w-0"
+                >
+                  <AutocompleteInput
+                    value={numeroFiltroActivo}
+                    onChange={(val) => aplicarFiltroColumnaNumero(val)}
+                    onSearch={searchNumero}
+                    disabled={listadoRefetching}
+                    placeholder="Buscar ID..."
+                    prefix="#"
+                  />
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            {mostrarColumnaIdPropio1 && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title={
+                    labelIdentificacionPersonalizadaViajes(currentTenant) ?? "CTG"
+                  }
+                  filterActive={!!ctgFiltroActivo.trim()}
+                  filterSignature={ctgFiltroActivo}
+                  minWidthClass="min-w-0"
+                >
+                  <AutocompleteInput
+                    value={ctgFiltroActivo}
+                    onChange={(val) => aplicarFiltroColumnaCTG(val)}
+                    onSearch={searchCtg}
+                    disabled={listadoRefetching}
+                    placeholder="Buscar valor..."
+                  />
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
             {mostrarColumnaIdPropio2 && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
-                {idPropio2Label(currentTenant)}
+                <ViajesListadoHeaderFiltro
+                  title={idPropio2Label(currentTenant)}
+                  filterActive={!!idPropio2FiltroActivo.trim()}
+                  filterSignature={idPropio2FiltroActivo}
+                  minWidthClass="min-w-0"
+                >
+                  <AutocompleteInput
+                    value={idPropio2FiltroActivo}
+                    onChange={(val) => aplicarFiltroColumnaIdPropio2(val)}
+                    onSearch={searchIdPropio2}
+                    disabled={listadoRefetching}
+                    placeholder="Buscar valor..."
+                  />
+                </ViajesListadoHeaderFiltro>
               </th>
             )}
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -2636,12 +2763,16 @@ export function ViajesTenantPage({
                   ) : null}
                 </td>
               )}
-              <td className="px-4 py-3 max-w-24 break-words text-vialto-steel tabular-nums">
-                #{v.numero}
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
-                {v.numeroIdentificacionPersonalizado?.trim() || "—"}
-              </td>
+              {mostrarColumnaIdSistema && (
+                <td className="px-4 py-3 max-w-24 break-words text-vialto-steel tabular-nums">
+                  #{v.numero}
+                </td>
+              )}
+              {mostrarColumnaIdPropio1 && (
+                <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
+                  {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                </td>
+              )}
               {mostrarColumnaIdPropio2 && (
                 <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
                   {v.idPropio2?.trim() || "—"}
@@ -2947,11 +3078,17 @@ export function ViajesTenantPage({
                 </div>
               }
               fields={[
-                { label: "ID sistema", value: `#${v.numero}` },
-                {
-                  label: labelIdentificacionPersonalizadaViajes(currentTenant),
-                  value: v.numeroIdentificacionPersonalizado?.trim() || "—",
-                },
+                ...(mostrarColumnaIdSistema
+                  ? [{ label: "ID sistema", value: `#${v.numero}` }]
+                  : []),
+                ...(mostrarColumnaIdPropio1
+                  ? [
+                      {
+                        label: labelIdentificacionPersonalizadaViajes(currentTenant),
+                        value: v.numeroIdentificacionPersonalizado?.trim() || "—",
+                      },
+                    ]
+                  : []),
                 ...(mostrarColumnaIdPropio2
                   ? [
                       {
@@ -3394,6 +3531,8 @@ export function ViajesTenantPage({
             transportistas={maestro.transportistas}
             hasLiquidoProductoArca={hasLiquidoProductoArca}
             getToken={getToken}
+            idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
+            idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             onDataSaved={() => {
@@ -3673,6 +3812,8 @@ export function ViajesTenantPage({
             onClose={() => setIsFacturaModalOpen(false)}
             hasArca={hasFacturasArca}
             tenantId={platform ? tid : undefined}
+            idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
+            idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             getToken={getToken}

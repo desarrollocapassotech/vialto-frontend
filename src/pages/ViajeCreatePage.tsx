@@ -79,6 +79,7 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   labelIdentificacionPersonalizadaViajes,
+  idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
 } from "@/lib/viajesFlota";
@@ -1225,6 +1226,7 @@ export function ViajeCreatePage() {
 
             {step === 3 && (
               <ViajeCreateStep3Cierre
+                mostrarIdPropio1={idPropio1Habilitado(maestro.tenant)}
                 labelIdentificacion={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
                 numeroIdentificacionPersonalizado={numeroIdentificacionPersonalizado}
                 onNumeroIdentificacionChange={setNumeroIdentificacionPersonalizado}
