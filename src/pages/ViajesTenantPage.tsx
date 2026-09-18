@@ -3539,6 +3539,9 @@ export function ViajesTenantPage({
               void maestro.refreshTransportistas();
               void maestro.refreshClientes();
             }}
+            onLiquidacionEmitida={() => {
+              setListadoQueryVersion((v) => v + 1);
+            }}
             onSuccess={() => {
               setCrearLiqViaje(null);
               setListadoQueryVersion((v) => v + 1);
@@ -3755,9 +3758,7 @@ export function ViajesTenantPage({
             onClose={() => setViewingLiquidacion(null)}
             contratoPdfUrl={liquidacionContratoPdfUrl(
               viewingLiquidacion.id,
-              platform && tid
-                ? { platform: true, tenantId: tid }
-                : undefined,
+              platform && tid ? { platform: true, tenantId: tid } : undefined,
             )}
             onVerComprobante={
               viewingLiquidacion.cbteNro != null ||
