@@ -68,6 +68,18 @@ export function idPropio2Label(
   return tenant?.idPropio2Label?.trim() || "ID Propio 2";
 }
 
+/**
+ * Label del campo/columna "Cantidad" (cantidadFactura/cantidadTransportista) según la
+ * unidad de cantidad de flete del tenant: "Toneladas" si factura por TN (default),
+ * "Cantidad" si factura por unidades. Mismo criterio que el backend (`headerCantidad`
+ * en `cantidad-unidad.util.ts`) — usado en PDFs de Factura/Liquidación/Contrato.
+ */
+export function labelCantidadViajes(
+  tenant: Pick<Tenant, "unidadCantidadViajes"> | null | undefined,
+): string {
+  return tenant?.unidadCantidadViajes === "UD" ? "Cantidad" : "Toneladas";
+}
+
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
   return choferes.filter((c) => !c.transportistaId?.trim());

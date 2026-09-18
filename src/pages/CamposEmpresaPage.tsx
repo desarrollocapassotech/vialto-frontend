@@ -12,7 +12,6 @@ import {
   canAccessViajes,
   canAccessStock,
   canAccessEmisionLiquidoProductoArca,
-  canAccessEmisionFacturasArca,
 } from "@/lib/tenantModules";
 import {
   LiquidacionAnulacionMetodoRadios,
@@ -190,9 +189,9 @@ export function CamposEmpresaPage() {
     useState<LiquidacionAnulacionMetodo>("nota_credito_debito");
   const [savingLiquidacionAnulacionMetodo, setSavingLiquidacionAnulacionMetodo] =
     useState(false);
-  const [empresaFacturaCantidadUnidad, setEmpresaFacturaCantidadUnidad] =
+  const [empresaUnidadCantidadViajes, setEmpresaUnidadCantidadViajes] =
     useState<"TN" | "UD">("TN");
-  const [savingFacturaCantidadUnidad, setSavingFacturaCantidadUnidad] = useState(false);
+  const [savingUnidadCantidadViajes, setSavingUnidadCantidadViajes] = useState(false);
   const [empresaPaisOculto, setEmpresaPaisOculto] = useState(false);
   const [savingPaisOculto, setSavingPaisOculto] = useState(false);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
@@ -235,8 +234,8 @@ export function CamposEmpresaPage() {
               ? "manual"
               : "nota_credito_debito",
           );
-          setEmpresaFacturaCantidadUnidad(
-            tenant.facturaCantidadUnidad === "UD" ? "UD" : "TN",
+          setEmpresaUnidadCantidadViajes(
+            tenant.unidadCantidadViajes === "UD" ? "UD" : "TN",
           );
           setEmpresaPaisOculto(tenant.paisOrigenDestinoOculto ?? false);
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
@@ -432,25 +431,25 @@ export function CamposEmpresaPage() {
     }
   }
 
-  async function guardarFacturaCantidadUnidad(valor: "TN" | "UD") {
-    if (!filtroEmpresa || valor === empresaFacturaCantidadUnidad) return;
-    const anterior = empresaFacturaCantidadUnidad;
-    setEmpresaFacturaCantidadUnidad(valor);
-    setSavingFacturaCantidadUnidad(true);
+  async function guardarUnidadCantidadViajes(valor: "TN" | "UD") {
+    if (!filtroEmpresa || valor === empresaUnidadCantidadViajes) return;
+    const anterior = empresaUnidadCantidadViajes;
+    setEmpresaUnidadCantidadViajes(valor);
+    setSavingUnidadCantidadViajes(true);
     setEmpresaConfigError(null);
     try {
       await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
         method: "PATCH",
-        body: JSON.stringify({ facturaCantidadUnidad: valor }),
+        body: JSON.stringify({ unidadCantidadViajes: valor }),
       });
       showToast("Cambios guardados", "success");
     } catch (e) {
-      setEmpresaFacturaCantidadUnidad(anterior);
+      setEmpresaUnidadCantidadViajes(anterior);
       const msg = friendlyError(e, "camposEmpresa");
       setEmpresaConfigError(msg);
       showToast(msg, "error");
     } finally {
-      setSavingFacturaCantidadUnidad(false);
+      setSavingUnidadCantidadViajes(false);
     }
   }
 
@@ -923,21 +922,21 @@ export function CamposEmpresaPage() {
                           </td>
                         </tr>
                         {!!empresaTenant &&
-                          canAccessEmisionFacturasArca(empresaTenant.modules) && (
+                          canAccessViajes(empresaTenant.modules) && (
                           <tr className="border-t border-black/10">
                             <td className="px-4 py-2.5">
-                              Unidad de "Cantidad" en PDF de factura (ARCA)
+                              Unidad de cantidad de flete (Viajes / Factura / Liquidación)
                               <p className="mt-0.5 text-xs font-normal text-vialto-steel">
-                                Se muestra junto al número en la columna "Cantidad" del
-                                comprobante de factura A/B.
+                                Se usa en el campo "Cantidad" de Viajes y en los PDFs de
+                                Factura A/B, Liquidación (CVLP) y Contrato de liquidación.
                               </p>
                             </td>
                             <td className="px-4 py-2.5 text-right">
                               <select
-                                value={empresaFacturaCantidadUnidad}
-                                disabled={savingFacturaCantidadUnidad}
+                                value={empresaUnidadCantidadViajes}
+                                disabled={savingUnidadCantidadViajes}
                                 onChange={(e) =>
-                                  void guardarFacturaCantidadUnidad(
+                                  void guardarUnidadCantidadViajes(
                                     e.target.value === "UD" ? "UD" : "TN",
                                   )
                                 }
