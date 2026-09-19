@@ -55,7 +55,7 @@ export function ClienteEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
-  const paisVisible = isVisible("edicion_cliente", "pais") && !paisFijoLoading && !paisFijo;
+  const paisVisible = isVisible("edicion_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("edicion_cliente", "idFiscal");
   const condicionVisible = isVisible("edicion_cliente", "condicionIvaTributaria");
   const direccionVisible = isVisible("edicion_cliente", "direccion");
@@ -208,7 +208,7 @@ export function ClienteEditPage() {
     <CrudPageLayout
       title="Editar cliente"
     >
-      {initialLoading ? (
+      {initialLoading || paisFijoLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
         <>
