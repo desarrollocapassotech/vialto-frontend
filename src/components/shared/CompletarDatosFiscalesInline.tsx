@@ -73,7 +73,7 @@ export function CompletarDatosFiscalesInline({
   const { isVisible } = useFieldConfig(entidad === 'cliente' ? 'clientes' : 'transportistas');
   const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
 
-  const paisVisible = (forceArcaFields || isVisible(formKey, "pais")) && !paisFijoLoading && !paisFijo;
+  const paisVisible = (forceArcaFields || isVisible(formKey, "pais")) && !paisFijo;
   const idFiscalVisible = forceArcaFields || isVisible(formKey, "idFiscal");
   const condicionVisible = forceArcaFields || isVisible(formKey, "condicionIvaTributaria");
   const direccionVisible = forceArcaFields || isVisible(formKey, "direccion");
@@ -148,6 +148,14 @@ export function CompletarDatosFiscalesInline({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (paisFijoLoading) {
+    return (
+      <div className="rounded border border-black/10 bg-white px-4 py-4">
+        <div className="h-24 animate-pulse rounded bg-vialto-mist/60" />
+      </div>
+    );
   }
 
   return (
