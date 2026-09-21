@@ -671,7 +671,6 @@ export function CombustibleTenantPage({
           choferes={choferes}
           vehiculos={vehiculos}
           isReadOnly={isReadOnly}
-          getToken={() => getToken()}
         />
       )}
 

@@ -217,6 +217,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
       numero: v.numero ?? "",
       numeroIdentificacionPersonalizado:
         v.numeroIdentificacionPersonalizado ?? "",
+      idPropio2: v.idPropio2 ?? "",
       estado: v.etapa ?? "pendiente",
       operacionModo: esExterno ? "externo" : esPropio ? "propio" : null,
       choferId: mantenerIdSiEnLista(v.choferId, choferesPropiosEdit),
@@ -621,6 +622,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
             numero: draft.numero.trim(),
             numeroIdentificacionPersonalizado:
               draft.numeroIdentificacionPersonalizado.trim() || undefined,
+            idPropio2: draft.idPropio2.trim() || undefined,
             etapa: draft.estado,
             clienteId: bloqueado ? undefined : draft.clienteId || undefined,
             ...(externo

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import type { VehiculoKmEdicion } from "@/types/api";
@@ -17,15 +18,14 @@ export function HistorialKmVehiculoModal({
   tenantId,
   vehiculoId,
   patente,
-  getToken,
   onClose,
 }: {
   tenantId: string;
   vehiculoId: string;
   patente: string;
-  getToken: () => Promise<string | null>;
   onClose: () => void;
 }) {
+  const { getToken } = useAuth();
   const [historial, setHistorial] = useState<VehiculoKmEdicion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,9 @@ export function HistorialKmVehiculoModal({
     return () => {
       cancelled = true;
     };
-  }, [tenantId, vehiculoId, getToken]);
+    // getToken se omite a propósito: Clerk lo recrea en cada render y no debe disparar un refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, vehiculoId]);
 
   return (
     <div

@@ -61,6 +61,8 @@ export interface Viaje {
   numero: string;
   /** ID propio del cliente para identificar el viaje (ej. CTG). Si está cargado, reemplaza a `numero` en toda vista/documento humano. */
   numeroIdentificacionPersonalizado: string | null;
+  /** Segundo ID propio, opcional y no único (ej. CPE, Referencia Cliente). Visible solo si el tenant tiene idPropio2Habilitado. */
+  idPropio2: string | null;
   /** @deprecated Reemplazado por `etapa` + `facturacionEstado` + `liquidacionEstado`. */
   estado: string;
   /** Etapa operativa del viaje: pendiente | en_curso | finalizado | cancelado. */
@@ -406,6 +408,14 @@ export interface Tenant {
   billingRenewsAt: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
+  /** true = muestra la columna/campo dedicado "ID Sistema" en Viajes. Default true. */
+  idSistemaHabilitado?: boolean;
+  /** true = muestra el campo/columna dedicado "ID Propio 1" en Viajes. Default true. */
+  idPropio1Habilitado?: boolean;
+  /** true = habilita el campo "ID Propio 2" (texto libre, no único) en Viajes. Deshabilitado por defecto. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable del campo "ID Propio 2" (ej. "CPE", "Referencia Cliente"). */
+  idPropio2Label?: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
   importacionesOcultas: boolean;
   habilitarExportacionPautMicCrt?: boolean;
@@ -422,6 +432,12 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /**
+   * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
+   * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
+   * formularios de alta/edición de Viajes.
+   */
+  unidadCantidadViajes?: string;
   createdAt: string;
 }
 
@@ -935,6 +951,7 @@ export interface LiquidacionViajeItem {
     id: string;
     numero: string | number | null;
     numeroIdentificacionPersonalizado?: string | null;
+    idPropio2?: string | null;
     fechaCarga: string | null;
     origen: string | null;
     destino: string | null;

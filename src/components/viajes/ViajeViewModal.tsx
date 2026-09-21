@@ -278,27 +278,33 @@ export function ViajeViewModal({
               (número interno generado automáticamente)
             </span>
           )}
-          <span
-            className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${
-              etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
-            }`}
-          >
-            {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
-          </span>
+          {isVisible("detalle_viaje", "etapa") && (
+            <span
+              className={`text-xs uppercase tracking-[0.1em] border rounded-sm px-2 py-0.5 ${
+                etapaViajeBadgeClass[viaje.etapa] ?? etapaViajeBadgeClassDefault
+              }`}
+            >
+              {etapaViajeLabel[viaje.etapa] ?? viaje.etapa}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1.5">
-            <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
-            {hasLiquidoProductoArca ? (
-              <ViajeLiquidacionIndicador
-                viaje={viaje}
-                tenantId={tenantId}
-                hasArca={hasLiquidoProductoArca}
-                onRegistrarPago={onRegistrarPago}
-              />
-            ) : (
-              <ViajePagoTransportistaIndicador
-                viaje={viaje}
-                onClick={onRegistrarPago}
-              />
+            {isVisible("detalle_viaje", "facturacionEstado") && (
+              <ViajeFacturacionIndicador viaje={viaje} tenantId={tenantId} onClickOverride={onVerFactura} />
+            )}
+            {isVisible("detalle_viaje", "liquidacionEstado") && (
+              hasLiquidoProductoArca ? (
+                <ViajeLiquidacionIndicador
+                  viaje={viaje}
+                  tenantId={tenantId}
+                  hasArca={hasLiquidoProductoArca}
+                  onRegistrarPago={onRegistrarPago}
+                />
+              ) : (
+                <ViajePagoTransportistaIndicador
+                  viaje={viaje}
+                  onClick={onRegistrarPago}
+                />
+              )
             )}
           </span>
         </span>

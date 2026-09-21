@@ -40,6 +40,46 @@ export function labelIdentificacionPersonalizadaViajes(
   );
 }
 
+/** `true` si el tenant muestra la columna/campo dedicado "ID Sistema" (default: true). */
+export function idSistemaHabilitado(
+  tenant: Pick<Tenant, "idSistemaHabilitado"> | null | undefined,
+): boolean {
+  return tenant?.idSistemaHabilitado ?? true;
+}
+
+/** `true` si el tenant muestra el campo/columna dedicado "ID Propio 1" (default: true). */
+export function idPropio1Habilitado(
+  tenant: Pick<Tenant, "idPropio1Habilitado"> | null | undefined,
+): boolean {
+  return tenant?.idPropio1Habilitado ?? true;
+}
+
+/** `true` si el tenant habilitó el campo "ID Propio 2" (deshabilitado por defecto). */
+export function idPropio2Habilitado(
+  tenant: Pick<Tenant, "idPropio2Habilitado"> | null | undefined,
+): boolean {
+  return !!tenant?.idPropio2Habilitado;
+}
+
+/** Label configurable del campo "ID Propio 2" (default: "ID Propio 2"). */
+export function idPropio2Label(
+  tenant: Pick<Tenant, "idPropio2Label"> | null | undefined,
+): string {
+  return tenant?.idPropio2Label?.trim() || "ID Propio 2";
+}
+
+/**
+ * Label del campo/columna "Cantidad" (cantidadFactura/cantidadTransportista) según la
+ * unidad de cantidad de flete del tenant: "Toneladas" si factura por TN (default),
+ * "Cantidad" si factura por unidades. Mismo criterio que el backend (`headerCantidad`
+ * en `cantidad-unidad.util.ts`) — usado en PDFs de Factura/Liquidación/Contrato.
+ */
+export function labelCantidadViajes(
+  tenant: Pick<Tenant, "unidadCantidadViajes"> | null | undefined,
+): string {
+  return tenant?.unidadCantidadViajes === "UD" ? "Cantidad" : "Toneladas";
+}
+
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */
 export function choferesFlotaPropia(choferes: Chofer[]): Chofer[] {
   return choferes.filter((c) => !c.transportistaId?.trim());
@@ -384,6 +424,31 @@ export function viajesFiltradosParaFactura(
     extra.push(v);
   }
   return [...base, ...extra];
+}
+
+/**
+ * IDs de clientes con al menos un viaje disponible para vincular a una factura nueva
+ * (mismo criterio de disponibilidad que `viajesFiltradosParaFactura`, pero sin acotar a
+ * un cliente puntual). Contempla tanto el cliente principal del viaje (`clienteId`) como
+ * los clientes adicionales de un viaje multi-cliente (`clientesViaje`), cada uno con su
+ * propio `facturacionEstado`. Usado para no listar en el select de "Nueva factura"
+ * clientes que no tienen nada pendiente de facturar.
+ */
+export function clientesConViajesPendientesFactura(todos: Viaje[]): Set<string> {
+  const ids = new Set<string>();
+  for (const v of todos) {
+    if (v.etapa === "cancelado") continue;
+
+    if (v.clienteId && facturacionPermiteVincular(v.facturacionEstado)) {
+      ids.add(v.clienteId);
+    }
+    for (const vc of v.clientesViaje ?? []) {
+      if (vc.clienteId && facturacionPermiteVincular(vc.facturacionEstado)) {
+        ids.add(vc.clienteId);
+      }
+    }
+  }
+  return ids;
 }
 
 /** Formato de importe de viaje alineado con listados (ARS / USD). */

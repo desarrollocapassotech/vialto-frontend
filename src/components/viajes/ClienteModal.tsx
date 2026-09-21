@@ -95,6 +95,16 @@ export function ClienteModal({
     }
   }
 
+  if (paisFijoLoading) {
+    return (
+      <div className={modalQuickCreateOverlayClass(stacked)}>
+        <div className="flex w-full max-w-md flex-col rounded border border-black/10 bg-white p-5 shadow-xl">
+          <div className="h-40 animate-pulse rounded bg-vialto-mist/60" />
+        </div>
+      </div>
+    );
+  }
+
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';
   const I = 'h-9 w-full border px-2 text-sm';
 
@@ -128,7 +138,7 @@ export function ClienteModal({
               />
               <CrudFieldError message={fieldErrors.nombre} />
             </label>
-            {!paisFijoLoading && !paisFijo && (
+            {!paisFijo && (
               <label className="flex flex-col gap-1">
                 <span className={L}>País <span className="text-red-500">*</span></span>
                 <PaisUbicacionSelect value={pais} onChange={handlePaisChange} placeholder="Seleccioná un país" />

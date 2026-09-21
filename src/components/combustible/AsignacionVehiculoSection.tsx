@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
 import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
@@ -17,6 +18,18 @@ import { HistorialKmVehiculoModal } from "@/components/combustible/HistorialKmVe
 import type { AsignacionVehiculo, Chofer, ConEmpresa, Vehiculo } from "@/types/api";
 
 type FilaChofer = ConEmpresa<Chofer> & { asignacionActual: AsignacionVehiculo | null };
+
+function fmtVehiculoLabel(v: {
+  patente: string;
+  tipo: string;
+  marca: string | null;
+  modelo: string | null;
+}): string {
+  const tipo = fmtTipoVehiculo(v.tipo);
+  const marcaModelo = [v.marca, v.modelo].filter(Boolean).join(" ");
+  const detalle = [tipo, marcaModelo].filter(Boolean).join(" · ");
+  return detalle ? `${v.patente} — ${detalle}` : v.patente;
+}
 
 function FilaAccionesMenu({
   fila,
@@ -89,14 +102,13 @@ export function AsignacionVehiculoSection({
   choferes,
   vehiculos,
   isReadOnly,
-  getToken,
 }: {
   tenantId: string;
   choferes: ConEmpresa<Chofer>[];
   vehiculos: ConEmpresa<Vehiculo>[];
   isReadOnly: boolean;
-  getToken: () => Promise<string | null>;
 }) {
+  const { getToken } = useAuth();
   const { showToast } = useToast();
   const [asignaciones, setAsignaciones] = useState<AsignacionVehiculo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +151,9 @@ export function AsignacionVehiculoSection({
     return () => {
       cancelled = true;
     };
-  }, [tenantId, reloadKey, getToken]);
+    // getToken se omite a propósito: Clerk lo recrea en cada render y no debe disparar un refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, reloadKey]);
 
   const filas = useMemo<FilaChofer[]>(() => {
     const porChofer = new Map((asignaciones ?? []).map((a) => [a.choferId, a]));
@@ -161,7 +175,7 @@ export function AsignacionVehiculoSection({
     [choferes],
   );
   const vehiculoOptions = useMemo(
-    () => vehiculos.map((v) => ({ value: v.id, label: v.patente })),
+    () => vehiculos.map((v) => ({ value: v.id, label: fmtVehiculoLabel(v) })),
     [vehiculos],
   );
 
@@ -332,7 +346,6 @@ export function AsignacionVehiculoSection({
           chofer={asignarTarget === "nuevo" ? undefined : asignarTarget}
           choferes={choferes}
           vehiculos={vehiculos}
-          getToken={getToken}
           onClose={() => setAsignarTarget(null)}
           onSuccess={() => {
             setAsignarTarget(null);
@@ -346,7 +359,6 @@ export function AsignacionVehiculoSection({
           tenantId={tenantId}
           choferId={historialTarget.id}
           choferNombre={historialTarget.nombre}
-          getToken={getToken}
           onClose={() => setHistorialTarget(null)}
         />
       )}
@@ -357,7 +369,6 @@ export function AsignacionVehiculoSection({
           vehiculoId={editarKmTarget.asignacionActual.vehiculo.id}
           patente={editarKmTarget.asignacionActual.vehiculo.patente}
           kmActual={editarKmTarget.asignacionActual.vehiculo.kmActual}
-          getToken={getToken}
           onClose={() => setEditarKmTarget(null)}
           onSuccess={() => {
             setEditarKmTarget(null);
@@ -371,7 +382,6 @@ export function AsignacionVehiculoSection({
           tenantId={tenantId}
           vehiculoId={historialKmTarget.asignacionActual.vehiculo.id}
           patente={historialKmTarget.asignacionActual.vehiculo.patente}
-          getToken={getToken}
           onClose={() => setHistorialKmTarget(null)}
         />
       )}
