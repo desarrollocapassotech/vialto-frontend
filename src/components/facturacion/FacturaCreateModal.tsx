@@ -255,7 +255,23 @@ export function FacturaCreateModal({
   }, [viajes, draft.clienteId]);
 
   const derivedViajesNueva = useMemo(() => {
-    return viajesNueva.map((v) => {
+    const viajesValidos = viajesNueva.filter((v) => {
+      if (!draft.clienteId) return false;
+
+      const perteneceAlCliente =
+        v.clienteId === draft.clienteId ||
+        (v.clientesViaje ?? []).some((cv) => cv.clienteId === draft.clienteId);
+      if (!perteneceAlCliente) return false;
+
+      if (v.etapa?.toLowerCase() === "cancelado") return false;
+      if (v.facturacionEstado === "facturado") return false;
+
+      if (hasArca && arcaBloqueaFacturarUsd(true, v.monedaMonto)) return false;
+
+      return true;
+    });
+
+    return viajesValidos.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
         const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
         if (vc) {
@@ -273,7 +289,7 @@ export function FacturaCreateModal({
       }
       return v;
     });
-  }, [viajesNueva, draft.clienteId]);
+  }, [viajesNueva, draft.clienteId, hasArca]);
 
   // Las líneas ahora son derivadas y estrictamente de solo lectura
   const lineas = useMemo(
@@ -289,13 +305,13 @@ export function FacturaCreateModal({
   const filteredClientes = useMemo(() => {
     const base = !allowedClienteIds
       ? clientes
-      : clientes.filter(c => allowedClienteIds.has(c.id));
+      : clientes.filter((c) => allowedClienteIds.has(c.id));
 
-    if (draft.clienteId && !base.some(c => c.id === draft.clienteId)) {
+    if (draft.clienteId && !base.some((c) => c.id === draft.clienteId)) {
       const fallback =
         clienteDetalle && clienteDetalle.id === draft.clienteId
           ? clienteDetalle
-          : clientes.find(c => c.id === draft.clienteId);
+          : clientes.find((c) => c.id === draft.clienteId);
       if (fallback) return [...base, fallback];
     }
 
