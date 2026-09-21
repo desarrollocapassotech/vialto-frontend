@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { ImportTemplatesConfig } from "@/components/importacion/ImportTemplatesConfig";
@@ -147,11 +147,8 @@ export function CamposEmpresaPage() {
   const [loading, setLoading] = useState(false);
   const [savingCampo, setSavingCampo] = useState<string | null>(null);
   const [aplicarATodos, setAplicarATodos] = useState(false);
-  // Pestañas "Templates de importación" y "Liquidaciones" — viven en la misma
-  // barra de tabs que los módulos (Viajes/Stock/...), no como sección aparte
-  // apilada.
+  // Pestaña "Templates de importación" — vive en la misma barra de tabs que los módulos
   const [mostrarTemplates, setMostrarTemplates] = useState(false);
-  const [mostrarLiquidaciones, setMostrarLiquidaciones] = useState(false);
   // Pestaña "General" — primera de la barra, agrupa la configuración general
   // de la empresa (antes se mostraba siempre arriba de los tabs).
   const [mostrarGeneral, setMostrarGeneral] = useState(true);
@@ -613,6 +610,9 @@ export function CamposEmpresaPage() {
           )
           : prev,
       );
+      if (modulo === "liquidaciones") {
+        void fetchLiquidacionesState();
+      }
       showToast("Cambios guardados", "success");
     } catch (e) {
       const msg = friendlyError(e, "camposEmpresa");
@@ -664,12 +664,96 @@ export function CamposEmpresaPage() {
       siguiente ? (Object.keys(catalogo[siguiente].formularios)[0] ?? null) : null,
     );
     setMostrarTemplates(false);
-    setMostrarLiquidaciones(false);
   }, [catalogo, empresaTenant, modulo, filtroEmpresa]);
 
-  const mostrarTabLiquidaciones =
-    !!empresaTenant &&
-    canAccessEmisionLiquidoProductoArca(empresaTenant.modules);
+  const [liquidacionesState, setLiquidacionesState] = useState<{
+    altaFechaDesde: boolean;
+    altaFechaHasta: boolean;
+    edicionFechaDesde: boolean;
+    edicionFechaHasta: boolean;
+  } | null>(null);
+
+  const fetchLiquidacionesState = useCallback(async () => {
+    if (!filtroEmpresa || modulo !== "liquidaciones") {
+      setLiquidacionesState(null);
+      return;
+    }
+    try {
+      const [alta, edicion] = await Promise.all([
+        apiJson<CampoConfig[]>(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}?modulo=liquidaciones&formulario=alta_liquidacion`,
+          () => getToken(),
+        ),
+        apiJson<CampoConfig[]>(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}?modulo=liquidaciones&formulario=edicion_liquidacion`,
+          () => getToken(),
+        ),
+      ]);
+      setLiquidacionesState({
+        altaFechaDesde: alta.find((c) => c.campo === "fechaDesde")?.visible ?? true,
+        altaFechaHasta: alta.find((c) => c.campo === "fechaHasta")?.visible ?? true,
+        edicionFechaDesde: edicion.find((c) => c.campo === "fechaDesde")?.visible ?? true,
+        edicionFechaHasta: edicion.find((c) => c.campo === "fechaHasta")?.visible ?? true,
+      });
+    } catch {
+      // ignore
+    }
+  }, [filtroEmpresa, modulo, getToken]);
+
+  useEffect(() => {
+    void fetchLiquidacionesState();
+  }, [fetchLiquidacionesState]);
+
+  const liquidacionesVisibleCount = liquidacionesState
+    ? (liquidacionesState.altaFechaDesde ? 1 : 0) +
+      (liquidacionesState.altaFechaHasta ? 1 : 0) +
+      (liquidacionesState.edicionFechaDesde ? 1 : 0) +
+      (liquidacionesState.edicionFechaHasta ? 1 : 0)
+    : null;
+
+  const allLiquidacionesEnabled = liquidacionesVisibleCount === 4;
+  const allLiquidacionesDisabled = liquidacionesVisibleCount === 0;
+
+  async function masterToggleLiquidaciones(visible: boolean) {
+    if (!filtroEmpresa) return;
+    setLoading(true);
+    try {
+      for (const f of ["alta_liquidacion", "edicion_liquidacion"]) {
+        for (const c of ["fechaDesde", "fechaHasta"]) {
+          await apiJson(
+            `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
+            () => getToken(),
+            {
+              method: "POST",
+              body: JSON.stringify({
+                modulo: "liquidaciones",
+                formulario: f,
+                campo: c,
+                visible,
+                aplicarATodosLosFormularios: true,
+              }),
+            },
+          );
+        }
+      }
+      if (modulo && formulario) {
+        const resp = await apiJson<CampoConfig[]>(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}?modulo=${modulo}&formulario=${formulario}`,
+          () => getToken(),
+        );
+        setCampos(resp);
+      }
+      await fetchLiquidacionesState();
+      showToast(
+        `Campos de liquidación ${visible ? "visibles" : "ocultos"} en creación y edición`,
+        "success",
+      );
+    } catch (e) {
+      showToast(friendlyError(e, "camposEmpresa"), "error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const modulosDisponibles = calcularModulosDisponibles(catalogo, empresaTenant);
   const formulariosDelModulo =
@@ -726,7 +810,6 @@ export function CamposEmpresaPage() {
                 type="button"
                 onClick={() => {
                   setMostrarTemplates(false);
-                  setMostrarLiquidaciones(false);
                   setMostrarGeneral(true);
                 }}
                 className={[
@@ -744,7 +827,6 @@ export function CamposEmpresaPage() {
                   type="button"
                   onClick={() => {
                     setMostrarTemplates(false);
-                    setMostrarLiquidaciones(false);
                     setMostrarGeneral(false);
                     setModulo(m);
                     setFormulario(
@@ -753,7 +835,7 @@ export function CamposEmpresaPage() {
                   }}
                   className={[
                     "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    !mostrarGeneral && !mostrarTemplates && !mostrarLiquidaciones && modulo === m
+                    !mostrarGeneral && !mostrarTemplates && modulo === m
                       ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
                       : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
                   ].join(" ")}
@@ -761,28 +843,9 @@ export function CamposEmpresaPage() {
                   {catalogo[m].label}
                 </button>
               ))}
-              {mostrarTabLiquidaciones && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMostrarTemplates(false);
-                    setMostrarGeneral(false);
-                    setMostrarLiquidaciones(true);
-                  }}
-                  className={[
-                    "flex shrink-0 items-center gap-2 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] rounded-t-sm transition-colors border",
-                    mostrarLiquidaciones
-                      ? "border-black/15 border-t-2 border-t-vialto-fire border-b-vialto-mist bg-vialto-mist text-vialto-charcoal"
-                      : "border-transparent text-vialto-steel hover:text-vialto-charcoal hover:bg-black/[0.04]",
-                  ].join(" ")}
-                >
-                  Liquidaciones
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => {
-                  setMostrarLiquidaciones(false);
                   setMostrarGeneral(false);
                   setMostrarTemplates(true);
                 }}
@@ -1045,179 +1108,205 @@ export function CamposEmpresaPage() {
             </div>
           )}
 
-          {mostrarLiquidaciones && mostrarTabLiquidaciones && (
+          {!mostrarGeneral && !mostrarTemplates && (
             <div className="border border-t-0 border-black/15 bg-white p-6">
-              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
-                Anulación de liquidaciones (CVLP 060)
-              </h2>
-              <p className="mt-1 mb-4 text-sm text-vialto-steel">
-                Cómo se anula un comprobante 060 ya emitido para esta empresa
-                — lo mismo que se configura desde "Editar empresa".
-              </p>
-              <LiquidacionAnulacionMetodoRadios
-                value={empresaLiquidacionAnulacionMetodo}
-                disabled={savingLiquidacionAnulacionMetodo}
-                onChange={(v) => void guardarLiquidacionAnulacionMetodo(v)}
-              />
-            </div>
-          )}
+              <div className="flex flex-wrap items-end gap-6">
+                {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+                      Formulario
+                    </span>
+                    <select
+                      value={formulario}
+                      onChange={(e) => setFormulario(e.target.value)}
+                      className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
+                    >
+                      {formulariosDelModulo.map((f) => (
+                        <option key={f} value={f}>
+                          {catalogo[modulo].formularios[f].label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
-          {!mostrarGeneral && !mostrarTemplates && !mostrarLiquidaciones && (
-          <div className="border border-t-0 border-black/15 bg-white p-6">
-          <div className="flex flex-wrap items-end gap-6">
-            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-                  Formulario
-                </span>
-                <select
-                  value={formulario}
-                  onChange={(e) => setFormulario(e.target.value)}
-                  className="h-9 w-56 border border-black/15 bg-white px-2 text-sm"
-                >
-                  {formulariosDelModulo.map((f) => (
-                    <option key={f} value={f}>
-                      {catalogo[modulo].formularios[f].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
-              <div className="flex items-center gap-3">
-                <ToggleSwitch
-                  checked={aplicarATodos}
-                  onChange={() => setAplicarATodos((v) => !v)}
-                  label="Aplicar cambios a todos los formularios del módulo"
-                />
-                <span className="max-w-xs text-sm text-vialto-steel">
-                  Aplicar cambios a todos los formularios del módulo
-                </span>
+                {!MODULOS_CAMPOS_COMPARTIDOS.has(modulo) && (
+                  <div className="flex items-center gap-3">
+                    <ToggleSwitch
+                      checked={aplicarATodos}
+                      onChange={() => setAplicarATodos((v) => !v)}
+                      label="Aplicar cambios a todos los formularios del módulo"
+                    />
+                    <span className="max-w-xs text-sm text-vialto-steel">
+                      Aplicar cambios a todos los formularios del módulo
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {filtroEmpresa && (
-            <div className="mt-6">
-              <button
-                onClick={() => setShowAuditModal(true)}
-                className="flex w-max items-center gap-2 rounded border border-black/15 bg-white px-4 py-2 text-sm font-medium text-vialto-charcoal shadow-sm transition hover:bg-black/5"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Ver Historial
-              </button>
-            </div>
-          )}
-          {error && (
-            <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
-              {error}
-            </p>
-          )}
+              {modulo === "liquidaciones" && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded bg-vialto-mist/60 p-3.5 border border-black/10">
+                  <span className="text-xs font-semibold uppercase tracking-[0.10em] text-vialto-charcoal">
+                    Switch de Control Global (Liquidaciones):
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={loading || allLiquidacionesDisabled}
+                      onClick={() => void masterToggleLiquidaciones(false)}
+                      className="border border-red-300 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      Deshabilitar campos (Creación y Edición)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading || allLiquidacionesEnabled}
+                      onClick={() => void masterToggleLiquidaciones(true)}
+                      className="border border-black/20 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      Habilitar campos (Creación y Edición)
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          <div className="mt-6 overflow-hidden border border-black/15">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-vialto-mist text-left">
-                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
-                    Campo
-                  </th>
-                  <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
-                    Visible
-                  </th>
-                </tr>
-              </thead>
-              <tbody className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
-                {loading && (!camposConfigurables || camposConfigurables.length === 0) && (
-                  <tr>
-                    <td
-                      colSpan={2}
-                      className="px-4 py-6 text-center text-vialto-steel"
+              {filtroEmpresa && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => setShowAuditModal(true)}
+                    className="flex w-max items-center gap-2 rounded border border-black/15 bg-white px-4 py-2 text-sm font-medium text-vialto-charcoal shadow-sm transition hover:bg-black/5"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
-                      Cargando…
-                    </td>
-                  </tr>
-                )}
-                {!loading && camposConfigurables && camposConfigurables.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={2}
-                      className="px-4 py-6 text-center text-vialto-steel"
-                    >
-                      No hay campos configurables para este formulario.
-                    </td>
-                  </tr>
-                )}
-                {camposConfigurables?.map((c) => (
-                  <tr key={c.campo} className="border-t border-black/10">
-                    <td className="px-4 py-2.5">{c.label}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <ToggleSwitch
-                        checked={c.visible}
-                        disabled={savingCampo === c.campo}
-                        onChange={() => toggleCampo(c.campo, c.visible)}
-                        label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </svg>
+                    Ver Historial
+                  </button>
+                </div>
+              )}
+              {error && (
+                <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+                  {error}
+                </p>
+              )}
 
-          {modulo === "viajes" && (
-            <div className="mt-8">
-              <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
-                Acciones del módulo
-              </h2>
-              <div className="mt-2 overflow-hidden border border-black/15">
+              <div className="mt-6 overflow-hidden border border-black/15">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-vialto-mist text-left">
                       <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
-                        Acción
+                        Campo
                       </th>
                       <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
-                        Habilitada
+                        Visible
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr className="border-t border-black/10">
-                      <td className="px-4 py-2.5">
-                        Exportación de Reporte PAUT / MIC CRT
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <ToggleSwitch
-                          checked={empresaExportacionPautMicCrt}
-                          disabled={savingExportacionPautMicCrt}
-                          onChange={() => void toggleExportacionPautMicCrt()}
-                          label={
-                            empresaExportacionPautMicCrt
-                              ? "Deshabilitar exportación"
-                              : "Habilitar exportación"
-                          }
-                        />
-                      </td>
-                    </tr>
+                  <tbody className={loading ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                    {loading && (!camposConfigurables || camposConfigurables.length === 0) && (
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-4 py-6 text-center text-vialto-steel"
+                        >
+                          Cargando…
+                        </td>
+                      </tr>
+                    )}
+                    {!loading && camposConfigurables && camposConfigurables.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-4 py-6 text-center text-vialto-steel"
+                        >
+                          No hay campos configurables para este formulario.
+                        </td>
+                      </tr>
+                    )}
+                    {camposConfigurables?.map((c) => (
+                      <tr key={c.campo} className="border-t border-black/10">
+                        <td className="px-4 py-2.5">{c.label}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <ToggleSwitch
+                            checked={c.visible}
+                            disabled={savingCampo === c.campo}
+                            onChange={() => toggleCampo(c.campo, c.visible)}
+                            label={`${c.visible ? "Ocultar" : "Mostrar"} ${c.label}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
+
+              {modulo === "viajes" && (
+                <div className="mt-8">
+                  <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+                    Acciones del módulo
+                  </h2>
+                  <div className="mt-2 overflow-hidden border border-black/15">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-vialto-mist text-left">
+                          <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel">
+                            Acción
+                          </th>
+                          <th className="px-4 py-2 font-[family-name:var(--font-ui)] text-xs uppercase tracking-wider text-vialto-steel text-right">
+                            Habilitada
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Exportación de Reporte PAUT / MIC CRT
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaExportacionPautMicCrt}
+                              disabled={savingExportacionPautMicCrt}
+                              onChange={() => void toggleExportacionPautMicCrt()}
+                              label={
+                                empresaExportacionPautMicCrt
+                                  ? "Deshabilitar exportación"
+                                  : "Habilitar exportación"
+                              }
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {modulo === "liquidaciones" && !!empresaTenant && canAccessEmisionLiquidoProductoArca(empresaTenant.modules) && (
+                <div className="mt-8 border-t border-black/15 pt-6">
+                  <h2 className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel">
+                    Anulación de liquidaciones (CVLP 060)
+                  </h2>
+                  <p className="mt-1 mb-4 text-sm text-vialto-steel">
+                    Cómo se anula un comprobante 060 ya emitido para esta empresa
+                    — lo mismo que se configura desde "Editar empresa".
+                  </p>
+                  <LiquidacionAnulacionMetodoRadios
+                    value={empresaLiquidacionAnulacionMetodo}
+                    disabled={savingLiquidacionAnulacionMetodo}
+                    onChange={(v) => void guardarLiquidacionAnulacionMetodo(v)}
+                  />
+                </div>
+              )}
             </div>
-          )}
-          </div>
           )}
         </>
       )}
