@@ -76,10 +76,19 @@ export function MovimientoCcFormModal({
   }
 
   const esCargo = tipo === 'cargo';
+  const esCliente = tipoContraparte === 'cliente';
 
   return (
     <ViewModalShell
-      title={`${esCargo ? 'Nuevo cargo' : 'Registrar pago'} — ${contraparteNombre}`}
+      title={`${
+        esCargo
+          ? esCliente
+            ? 'Nueva venta'
+            : 'Nueva compra'
+          : esCliente
+            ? 'Registrar cobro'
+            : 'Registrar pago'
+      } — ${contraparteNombre}`}
       onClose={onClose}
       footer={
         <>
@@ -108,7 +117,7 @@ export function MovimientoCcFormModal({
                 : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
             }`}
           >
-            Cargo (deuda)
+            {esCliente ? 'Venta' : 'Compra'}
           </button>
           <button
             type="button"
@@ -119,7 +128,7 @@ export function MovimientoCcFormModal({
                 : 'border-black/20 text-vialto-steel hover:bg-vialto-mist'
             }`}
           >
-            {tipoContraparte === 'cliente' ? 'Cobranza' : 'Pago'}
+            {esCliente ? 'Cobro' : 'Pago'}
           </button>
         </div>
 
