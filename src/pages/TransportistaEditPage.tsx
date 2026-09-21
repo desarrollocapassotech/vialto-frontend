@@ -60,7 +60,7 @@ export function TransportistaEditPage() {
 
   const { isVisible } = useFieldConfig("transportistas");
   const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
-  const paisVisible = isVisible("edicion_transportista", "pais") && !paisFijoLoading && !paisFijo;
+  const paisVisible = isVisible("edicion_transportista", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("edicion_transportista", "idFiscal");
   const condicionVisible = isVisible("edicion_transportista", "condicionIvaTributaria");
   const domicilioVisible = isVisible("edicion_transportista", "domicilio");
@@ -248,7 +248,7 @@ export function TransportistaEditPage() {
 
   return (
     <CrudPageLayout title="Editar transportista">
-      {initialLoading ? (
+      {initialLoading || paisFijoLoading ? (
         <p className="mt-6 text-vialto-steel">Cargando…</p>
       ) : (
         <>
