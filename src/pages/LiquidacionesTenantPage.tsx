@@ -51,7 +51,12 @@ import {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
-import { idPropio2Habilitado, idPropio2Label } from "@/lib/viajesFlota";
+import {
+  idSistemaHabilitado,
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idPropio2Label,
+} from "@/lib/viajesFlota";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   LIQUIDACIONES_EXPORT_COLUMNS,
@@ -1235,6 +1240,8 @@ export function LiquidacionesTenantPage() {
           hasLiquidoProductoArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
+          idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onDataSaved={() => {
@@ -1450,6 +1457,8 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           getToken={getToken}
           tenantId={activeTenantId}
+          idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
+          idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}

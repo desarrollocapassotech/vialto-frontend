@@ -116,6 +116,8 @@ export function LiquidacionEditModal({
   getToken,
   onClose,
   onSaved,
+  idSistemaHabilitado = true,
+  idPropio1Habilitado = true,
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: {
@@ -125,6 +127,10 @@ export function LiquidacionEditModal({
   onClose: () => void;
   onSaved: (updated: LiquidacionConTransportista) => void;
   tenantId?: string;
+  /** true = el tenant muestra la columna dedicada "ID Sistema" (default true). */
+  idSistemaHabilitado?: boolean;
+  /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
+  idPropio1Habilitado?: boolean;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -570,6 +576,8 @@ export function LiquidacionEditModal({
                   viajes={viajesParaTabla}
                   selectedIds={Array.from(selectedViajeIds)}
                   onToggle={toggleViaje}
+                  idSistemaHabilitado={idSistemaHabilitado}
+                  idPropio1Habilitado={idPropio1Habilitado}
                   idPropio2Habilitado={idPropio2Habilitado}
                   idPropio2Label={idPropio2Label}
                   renderMonto={(v) =>

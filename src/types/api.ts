@@ -408,6 +408,10 @@ export interface Tenant {
   billingRenewsAt: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
+  /** true = muestra la columna/campo dedicado "ID Sistema" en Viajes. Default true. */
+  idSistemaHabilitado?: boolean;
+  /** true = muestra el campo/columna dedicado "ID Propio 1" en Viajes. Default true. */
+  idPropio1Habilitado?: boolean;
   /** true = habilita el campo "ID Propio 2" (texto libre, no único) en Viajes. Deshabilitado por defecto. */
   idPropio2Habilitado?: boolean;
   /** Label configurable del campo "ID Propio 2" (ej. "CPE", "Referencia Cliente"). */
@@ -428,6 +432,12 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /**
+   * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
+   * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
+   * formularios de alta/edición de Viajes.
+   */
+  unidadCantidadViajes?: string;
   createdAt: string;
 }
 

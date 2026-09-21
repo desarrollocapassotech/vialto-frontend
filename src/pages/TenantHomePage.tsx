@@ -21,7 +21,12 @@ import { useTenantOwnerDashboard } from "@/hooks/useTenantOwnerDashboard";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useFacturaCreator } from "@/hooks/useFacturaCreator";
-import { idPropio2Habilitado, idPropio2Label } from "@/lib/viajesFlota";
+import {
+  idSistemaHabilitado,
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idPropio2Label,
+} from "@/lib/viajesFlota";
 import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
 import {
@@ -298,6 +303,8 @@ export function TenantHomePage() {
           transportistas={maestro.transportistas}
           hasLiquidoProductoArca={hasLiquidoProductoArca}
           getToken={getToken}
+          idSistemaHabilitado={idSistemaHabilitado(maestro.tenant)}
+          idPropio1Habilitado={idPropio1Habilitado(maestro.tenant)}
           idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
           idPropio2Label={idPropio2Label(maestro.tenant)}
           onDataSaved={() => {
@@ -327,6 +334,8 @@ export function TenantHomePage() {
         error={hasFacturasArca ? null : facturaCreator.error}
         showComprobanteAdjunto={!hasFacturasArca}
         hasArca={hasFacturasArca}
+        idSistemaHabilitado={idSistemaHabilitado(maestro.tenant)}
+        idPropio1Habilitado={idPropio1Habilitado(maestro.tenant)}
         idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
         idPropio2Label={idPropio2Label(maestro.tenant)}
         getToken={getToken}

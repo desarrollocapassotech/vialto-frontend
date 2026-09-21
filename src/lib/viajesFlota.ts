@@ -40,6 +40,20 @@ export function labelIdentificacionPersonalizadaViajes(
   );
 }
 
+/** `true` si el tenant muestra la columna/campo dedicado "ID Sistema" (default: true). */
+export function idSistemaHabilitado(
+  tenant: Pick<Tenant, "idSistemaHabilitado"> | null | undefined,
+): boolean {
+  return tenant?.idSistemaHabilitado ?? true;
+}
+
+/** `true` si el tenant muestra el campo/columna dedicado "ID Propio 1" (default: true). */
+export function idPropio1Habilitado(
+  tenant: Pick<Tenant, "idPropio1Habilitado"> | null | undefined,
+): boolean {
+  return tenant?.idPropio1Habilitado ?? true;
+}
+
 /** `true` si el tenant habilitó el campo "ID Propio 2" (deshabilitado por defecto). */
 export function idPropio2Habilitado(
   tenant: Pick<Tenant, "idPropio2Habilitado"> | null | undefined,
@@ -52,6 +66,18 @@ export function idPropio2Label(
   tenant: Pick<Tenant, "idPropio2Label"> | null | undefined,
 ): string {
   return tenant?.idPropio2Label?.trim() || "ID Propio 2";
+}
+
+/**
+ * Label del campo/columna "Cantidad" (cantidadFactura/cantidadTransportista) según la
+ * unidad de cantidad de flete del tenant: "Toneladas" si factura por TN (default),
+ * "Cantidad" si factura por unidades. Mismo criterio que el backend (`headerCantidad`
+ * en `cantidad-unidad.util.ts`) — usado en PDFs de Factura/Liquidación/Contrato.
+ */
+export function labelCantidadViajes(
+  tenant: Pick<Tenant, "unidadCantidadViajes"> | null | undefined,
+): string {
+  return tenant?.unidadCantidadViajes === "UD" ? "Cantidad" : "Toneladas";
 }
 
 /** Choferes con flota propia (`transportistaId` vacío en maestro). */

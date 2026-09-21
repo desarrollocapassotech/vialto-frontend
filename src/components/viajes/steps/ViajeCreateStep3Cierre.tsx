@@ -14,6 +14,9 @@ const textareaLongClass =
   "min-h-20 w-full border border-black/15 bg-white px-2 py-2 text-sm";
 
 interface Props {
+  mostrarIdPropio1: boolean;
+  /** true = el tenant tiene deshabilitado "ID Sistema" — este campo pasa a ser obligatorio. */
+  idPropio1Requerido: boolean;
   labelIdentificacion: string;
   numeroIdentificacionPersonalizado: string;
   onNumeroIdentificacionChange: (v: string) => void;
@@ -64,6 +67,8 @@ interface Props {
 }
 
 export function ViajeCreateStep3Cierre({
+  mostrarIdPropio1,
+  idPropio1Requerido,
   labelIdentificacion,
   numeroIdentificacionPersonalizado,
   onNumeroIdentificacionChange,
@@ -102,18 +107,21 @@ export function ViajeCreateStep3Cierre({
 }: Props) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
-          {labelIdentificacion}{" "}
-        </span>
-        <input
-          type="text"
-          value={numeroIdentificacionPersonalizado}
-          onChange={(e) => onNumeroIdentificacionChange(e.target.value)}
-          placeholder="Ej: CTG-01452301"
-          className={inputClass}
-        />
-      </div>
+      {mostrarIdPropio1 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel/70">
+            {labelIdentificacion}{" "}
+            {idPropio1Requerido && <span className="text-red-500">*</span>}
+          </span>
+          <input
+            type="text"
+            value={numeroIdentificacionPersonalizado}
+            onChange={(e) => onNumeroIdentificacionChange(e.target.value)}
+            placeholder="Ej: CTG-01452301"
+            className={inputClass}
+          />
+        </div>
+      )}
 
       {mostrarIdPropio2 && (
         <div className="flex flex-col gap-1">
