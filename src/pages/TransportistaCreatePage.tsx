@@ -52,7 +52,7 @@ export function TransportistaCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("transportistas");
-  const paisFijo = useTenantPaisFijo(tenantId || undefined);
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
   const paisVisible = isVisible("alta_transportista", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("alta_transportista", "idFiscal");
   const condicionVisible = isVisible("alta_transportista", "condicionIvaTributaria");
@@ -164,6 +164,14 @@ export function TransportistaCreatePage() {
   if (faltanPais) warningParts.push("país");
   if (faltanIdFiscal) warningParts.push(idFiscalPorPais(pais).label.toLowerCase());
   const warningText = warningParts.join(" y/o ");
+
+  if (paisFijoLoading) {
+    return (
+      <CrudPageLayout title="Crear transportista">
+        <div className="mt-6 h-64 animate-pulse rounded bg-vialto-mist/60" />
+      </CrudPageLayout>
+    );
+  }
 
   return (
     <CrudPageLayout

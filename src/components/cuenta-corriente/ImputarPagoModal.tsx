@@ -57,9 +57,11 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
     }
   }
 
+  const esCliente = !!cargo.clienteId;
+
   return (
     <ViewModalShell
-      title={`Imputar pago — ${cargo.concepto}`}
+      title={`${esCliente ? 'Imputar cobro' : 'Imputar pago'} — ${cargo.concepto}`}
       onClose={onClose}
       footer={
         <>
@@ -79,7 +81,8 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
     >
       <form id="imputar-pago-form" onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-vialto-steel">
-          Cargo por <strong>{formatCurrencyArFromNumber(cargo.importe)} {cargo.moneda}</strong>,
+          {esCliente ? 'Venta' : 'Compra'} por{' '}
+          <strong>{formatCurrencyArFromNumber(cargo.importe)} {cargo.moneda}</strong>,
           vence{' '}
           {cargo.fechaVencimiento
             ? new Date(cargo.fechaVencimiento).toLocaleDateString('es-AR')
@@ -130,7 +133,7 @@ export function ImputarPagoModal({ cargo, pagosDisponibles, onClose, onDone }: P
                 <p className="mt-1 text-xs text-vialto-steel">
                   El pago es de {formatCurrencyArFromNumber(pagoSeleccionado.importe)} {pagoSeleccionado.moneda}
                   {pagoSeleccionado.moneda !== cargo.moneda &&
-                    ' — atención, distinta moneda que el cargo, el servidor lo va a rechazar.'}
+                    ` — atención, distinta moneda que ${esCliente ? 'la venta' : 'la compra'}, el servidor lo va a rechazar.`}
                 </p>
               )}
             </div>

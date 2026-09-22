@@ -166,6 +166,14 @@ export type FacturaCreateModalProps = {
   showComprobanteAdjunto?: boolean;
   hasArca?: boolean;
   tenantId?: string;
+  /** true = el tenant muestra la columna dedicada "ID Sistema" (default true). */
+  idSistemaHabilitado?: boolean;
+  /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
+  idPropio1Habilitado?: boolean;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
   getToken?: () => Promise<string | null>;
   facturasCreateUrl?: string;
   onFacturaGuardada?: (factura: Factura) => void;
@@ -188,6 +196,10 @@ export function FacturaCreateModal({
   showComprobanteAdjunto = false,
   hasArca = false,
   tenantId,
+  idSistemaHabilitado = true,
+  idPropio1Habilitado = true,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
   getToken: getTokenProp,
   facturasCreateUrl,
   onFacturaGuardada,
@@ -264,7 +276,23 @@ export function FacturaCreateModal({
   }, [viajes, draft.clienteId]);
 
   const derivedViajesNueva = useMemo(() => {
-    return viajesNueva.map((v) => {
+    const viajesValidos = viajesNueva.filter((v) => {
+      if (!draft.clienteId) return false;
+
+      const perteneceAlCliente =
+        v.clienteId === draft.clienteId ||
+        (v.clientesViaje ?? []).some((cv) => cv.clienteId === draft.clienteId);
+      if (!perteneceAlCliente) return false;
+
+      if (v.etapa?.toLowerCase() === "cancelado") return false;
+      if (v.facturacionEstado === "facturado") return false;
+
+      if (hasArca && arcaBloqueaFacturarUsd(true, v.monedaMonto)) return false;
+
+      return true;
+    });
+
+    return viajesValidos.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
         const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
         if (vc) {
@@ -282,7 +310,7 @@ export function FacturaCreateModal({
       }
       return v;
     });
-  }, [viajesNueva, draft.clienteId]);
+  }, [viajesNueva, draft.clienteId, hasArca]);
 
   // Las líneas ahora son derivadas y estrictamente de solo lectura
   const lineas = useMemo(
@@ -598,6 +626,43 @@ export function FacturaCreateModal({
     }
   }
 
+  async function handleManualSave() {
+    if (busy) return;
+
+    const tramosCheck = validateFacturaDraftTramos(draft);
+    if (!tramosCheck.ok) {
+      setTramosIncomplete(tramosCheck.indices);
+      notifyError(tramosCheck.message);
+      return;
+    }
+    setTramosIncomplete([]);
+    setLocalError(null);
+
+    if (onSave) {
+      onSave();
+      return;
+    }
+
+    if (!getToken || !facturasCreateUrl) {
+      notifyError(
+        "No se pudo guardar la factura: falta configuración del formulario.",
+      );
+      return;
+    }
+
+    setSubmitAction("borrador");
+    try {
+      const factura = await persistFactura();
+      showToast("Factura guardada correctamente.", "success");
+      onFacturaGuardada?.(factura);
+      onClose();
+    } catch (err) {
+      notifyError(friendlyError(err, "facturacion"));
+    } finally {
+      setSubmitAction(null);
+    }
+  }
+
   async function descargarPdf() {
     if (!facturaEmitida) return;
     const pdfUrl = platform
@@ -712,6 +777,10 @@ export function FacturaCreateModal({
             loading={viajesLoading}
             clienteId={draft.clienteId}
             viajesTablaFillHeight
+            idSistemaHabilitado={idSistemaHabilitado}
+            idPropio1Habilitado={idPropio1Habilitado}
+            idPropio2Habilitado={idPropio2Habilitado}
+            idPropio2Label={idPropio2Label}
           />
         </div>
       </div>
@@ -836,6 +905,10 @@ export function FacturaCreateModal({
             onChange={patchViajeIds}
             loading={viajesLoading}
             clienteId={draft.clienteId}
+            idSistemaHabilitado={idSistemaHabilitado}
+            idPropio1Habilitado={idPropio1Habilitado}
+            idPropio2Habilitado={idPropio2Habilitado}
+            idPropio2Label={idPropio2Label}
           />
         </div>
         {draft.viajeIds.length > 0 && (
@@ -1211,16 +1284,7 @@ export function FacturaCreateModal({
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    const tramosCheck = validateFacturaDraftTramos(draft);
-                    if (!tramosCheck.ok) {
-                      setTramosIncomplete(tramosCheck.indices);
-                      setLocalError(tramosCheck.message);
-                      return;
-                    }
-                    setTramosIncomplete([]);
-                    onSave?.();
-                  }}
+                  onClick={() => void handleManualSave()}
                   disabled={busy || monedaInvalida}
                   className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
                 >

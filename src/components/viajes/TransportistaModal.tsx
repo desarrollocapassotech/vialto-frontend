@@ -34,7 +34,7 @@ export function TransportistaModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const paisFijo = useTenantPaisFijo(tenantId);
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -92,6 +92,16 @@ export function TransportistaModal({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (paisFijoLoading) {
+    return (
+      <div className={modalQuickCreateOverlayClass(stacked)}>
+        <div className="flex w-full max-w-md flex-col rounded border border-black/10 bg-white p-5 shadow-xl">
+          <div className="h-40 animate-pulse rounded bg-vialto-mist/60" />
+        </div>
+      </div>
+    );
   }
 
   const L = 'text-xs uppercase tracking-[0.08em] text-vialto-steel';

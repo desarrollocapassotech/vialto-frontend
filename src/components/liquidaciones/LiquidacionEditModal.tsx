@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { HelpCircle } from "lucide-react"; // <-- Importamos HelpCircle
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   ConceptosLiquidacionLineasEditor,
   toConceptosLineasPayload,
@@ -27,7 +28,7 @@ import {
   formatViajeImporteForListado,
   numeroVisibleViaje,
 } from "@/lib/viajesFlota";
-import { viajeTieneLiquidacionTransportista } from "@/lib/viajesComprobantes";
+import { viajeTieneLiquidacionActivaParaTransportista } from "@/lib/viajesComprobantes";
 import type { LiquidacionConTransportista } from "@/components/liquidaciones/LiquidacionViewModal";
 import type { Viaje } from "@/types/api";
 
@@ -36,6 +37,7 @@ type ViajeItem = Pick<
   | "id"
   | "numero"
   | "numeroIdentificacionPersonalizado"
+  | "idPropio2"
   | "fechaCarga"
   | "origen"
   | "destino"
@@ -114,6 +116,10 @@ export function LiquidacionEditModal({
   getToken,
   onClose,
   onSaved,
+  idSistemaHabilitado = true,
+  idPropio1Habilitado = true,
+  idPropio2Habilitado = false,
+  idPropio2Label = "ID Propio 2",
 }: {
   liq: LiquidacionConTransportista;
   hasArca: boolean;
@@ -121,6 +127,14 @@ export function LiquidacionEditModal({
   onClose: () => void;
   onSaved: (updated: LiquidacionConTransportista) => void;
   tenantId?: string;
+  /** true = el tenant muestra la columna dedicada "ID Sistema" (default true). */
+  idSistemaHabilitado?: boolean;
+  /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
+  idPropio1Habilitado?: boolean;
+  /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 2". */
+  idPropio2Label?: string;
 }) {
   const { showToast } = useToast();
   const canEditDatos =
@@ -131,6 +145,10 @@ export function LiquidacionEditModal({
   // entra al circuito de emisión, el conjunto de viajes ya se comunicó a ARCA.
   const canEditViajes = liq.estado === "borrador";
   const showComprobante = !hasArca;
+
+  const { isVisible } = useFieldConfig("liquidaciones");
+  const showFechaDesde = isVisible("edicion_liquidacion", "fechaDesde");
+  const showFechaHasta = isVisible("edicion_liquidacion", "fechaHasta");
 
   const [periodoDesde, setPeriodoDesde] = useState(
     toDateInput(liq.periodoDesde),
@@ -280,7 +298,8 @@ export function LiquidacionEditModal({
   const viajesParaTabla = useMemo(() => {
     return viajesTransportista.filter(
       (v) =>
-        selectedViajeIds.has(v.id) || !viajeTieneLiquidacionTransportista(v),
+        selectedViajeIds.has(v.id) ||
+        !viajeTieneLiquidacionActivaParaTransportista(v, liq.transportistaId),
     );
   }, [viajesTransportista, selectedViajeIds]);
 
@@ -331,9 +350,9 @@ export function LiquidacionEditModal({
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (canEditDatos) {
-      if (!periodoDesde) errs.periodoDesde = "Ingresá la fecha desde.";
-      if (!periodoHasta) errs.periodoHasta = "Ingresá la fecha hasta.";
-      if (periodoDesde && periodoHasta && periodoHasta < periodoDesde) {
+      if (showFechaDesde && !periodoDesde) errs.periodoDesde = "Ingresá la fecha desde.";
+      if (showFechaHasta && !periodoHasta) errs.periodoHasta = "Ingresá la fecha hasta.";
+      if (showFechaDesde && showFechaHasta && periodoDesde && periodoHasta && periodoHasta < periodoDesde) {
         errs.periodoHasta =
           "La fecha hasta debe ser posterior o igual a desde.";
       }
@@ -486,45 +505,51 @@ export function LiquidacionEditModal({
 
         {canEditDatos ? (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="liq-periodo-desde" className={LABEL}>
-                  Desde <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="liq-periodo-desde"
-                  type="date"
-                  value={periodoDesde}
-                  onChange={(e) => setPeriodoDesde(e.target.value)}
-                  disabled={saving}
-                  className={`${INPUT} ${fieldErrors.periodoDesde ? "border-red-400" : ""}`}
-                />
-                {fieldErrors.periodoDesde && (
-                  <p className="mt-1 text-xs font-medium text-red-600">
-                    {fieldErrors.periodoDesde}
-                  </p>
+            {(showFechaDesde || showFechaHasta) && (
+              <div className={`grid grid-cols-1 gap-4 ${showFechaDesde && showFechaHasta ? "sm:grid-cols-2" : ""}`}>
+                {showFechaDesde && (
+                  <div>
+                    <label htmlFor="liq-periodo-desde" className={LABEL}>
+                      Desde <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="liq-periodo-desde"
+                      type="date"
+                      value={periodoDesde}
+                      onChange={(e) => setPeriodoDesde(e.target.value)}
+                      disabled={saving}
+                      className={`${INPUT} ${fieldErrors.periodoDesde ? "border-red-400" : ""}`}
+                    />
+                    {fieldErrors.periodoDesde && (
+                      <p className="mt-1 text-xs font-medium text-red-600">
+                        {fieldErrors.periodoDesde}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {showFechaHasta && (
+                  <div>
+                    <label htmlFor="liq-periodo-hasta" className={LABEL}>
+                      Hasta <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="liq-periodo-hasta"
+                      type="date"
+                      value={periodoHasta}
+                      min={periodoDesde || undefined}
+                      onChange={(e) => setPeriodoHasta(e.target.value)}
+                      disabled={saving}
+                      className={`${INPUT} ${fieldErrors.periodoHasta ? "border-red-400" : ""}`}
+                    />
+                    {fieldErrors.periodoHasta && (
+                      <p className="mt-1 text-xs font-medium text-red-600">
+                        {fieldErrors.periodoHasta}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-              <div>
-                <label htmlFor="liq-periodo-hasta" className={LABEL}>
-                  Hasta <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="liq-periodo-hasta"
-                  type="date"
-                  value={periodoHasta}
-                  min={periodoDesde || undefined}
-                  onChange={(e) => setPeriodoHasta(e.target.value)}
-                  disabled={saving}
-                  className={`${INPUT} ${fieldErrors.periodoHasta ? "border-red-400" : ""}`}
-                />
-                {fieldErrors.periodoHasta && (
-                  <p className="mt-1 text-xs font-medium text-red-600">
-                    {fieldErrors.periodoHasta}
-                  </p>
-                )}
-              </div>
-            </div>
+            )}
 
             {canEditViajes && (
               <div>
@@ -551,6 +576,10 @@ export function LiquidacionEditModal({
                   viajes={viajesParaTabla}
                   selectedIds={Array.from(selectedViajeIds)}
                   onToggle={toggleViaje}
+                  idSistemaHabilitado={idSistemaHabilitado}
+                  idPropio1Habilitado={idPropio1Habilitado}
+                  idPropio2Habilitado={idPropio2Habilitado}
+                  idPropio2Label={idPropio2Label}
                   renderMonto={(v) =>
                     fmtMontoViaje(
                       v.precioTransportistaExterno,

@@ -9,7 +9,9 @@ import type {
   ImportPreviewResult,
   ImportLog,
   ImportLiquidacionPreviewGrupo,
+  ImportLiquidacionesPreviewRespuesta,
   ImportFacturaClientePreviewGrupo,
+  ImportFacturasClientesPreviewRespuesta,
 } from "@/types/api";
 
 /** Orden fijo de dependencia: cada módulo puede referenciar a los anteriores. */
@@ -71,12 +73,16 @@ export function useImportWizard(
   const [liquidacionesPreview, setLiquidacionesPreview] = useState<
     ImportLiquidacionPreviewGrupo[] | null
   >(null);
+  const [liquidacionesOmitidasUsdCount, setLiquidacionesOmitidasUsdCount] =
+    useState<number>(0);
   const [liquidacionesCreadas, setLiquidacionesCreadas] = useState<
     unknown[] | null
   >(null);
   const [facturasPreview, setFacturasPreview] = useState<
     ImportFacturaClientePreviewGrupo[] | null
   >(null);
+  const [facturasOmitidasUsdCount, setFacturasOmitidasUsdCount] =
+    useState<number>(0);
   const [facturasCreadas, setFacturasCreadas] = useState<unknown[] | null>(
     null,
   );
@@ -456,7 +462,9 @@ export function useImportWizard(
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<ImportLiquidacionPreviewGrupo[]>(
+      const data = await apiJson<
+        ImportLiquidacionesPreviewRespuesta | ImportLiquidacionPreviewGrupo[]
+      >(
         "/api/importaciones/liquidaciones/preview",
         getToken,
         {
@@ -464,7 +472,13 @@ export function useImportWizard(
           body: JSON.stringify({ viajeIds: viajeIdsCreados, tenantId }),
         },
       );
-      setLiquidacionesPreview(data);
+      if (Array.isArray(data)) {
+        setLiquidacionesPreview(data);
+        setLiquidacionesOmitidasUsdCount(0);
+      } else {
+        setLiquidacionesPreview(data.grupos ?? []);
+        setLiquidacionesOmitidasUsdCount(data.viajesOmitidosUsdCount ?? 0);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al previsualizar");
     } finally {
@@ -504,7 +518,9 @@ export function useImportWizard(
     setLoading(true);
     setError(null);
     try {
-      const data = await apiJson<ImportFacturaClientePreviewGrupo[]>(
+      const data = await apiJson<
+        ImportFacturasClientesPreviewRespuesta | ImportFacturaClientePreviewGrupo[]
+      >(
         "/api/importaciones/facturas-clientes/preview",
         getToken,
         {
@@ -512,7 +528,13 @@ export function useImportWizard(
           body: JSON.stringify({ viajeIds: viajeIdsCreados, tenantId }),
         },
       );
-      setFacturasPreview(data);
+      if (Array.isArray(data)) {
+        setFacturasPreview(data);
+        setFacturasOmitidasUsdCount(0);
+      } else {
+        setFacturasPreview(data.grupos ?? []);
+        setFacturasOmitidasUsdCount(data.viajesOmitidosUsdCount ?? 0);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al previsualizar");
     } finally {
@@ -535,7 +557,7 @@ export function useImportWizard(
       setFacturasCreadas(data);
       setFase("terminado");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al facturar");
+      setError(e instanceof Error ? e.message : "Error al facturar a clientes");
     } finally {
       setLoading(false);
     }
@@ -550,7 +572,7 @@ export function useImportWizard(
     ciudadesAbortRef.current?.abort();
     ciudadesNormalizadasRef.current = [];
     filasExcluidasRef.current = new Set();
-    eleccionesManualesRef.current = new Map();
+    eleccionesManualesRef.current.clear();
     setFase("upload");
     setFile(null);
     setModuloIndex(0);
@@ -560,12 +582,15 @@ export function useImportWizard(
     setEtapasCompletadas([]);
     setViajeIdsCreados([]);
     setLiquidacionesPreview(null);
+    setLiquidacionesOmitidasUsdCount(0);
     setLiquidacionesCreadas(null);
     setFacturasPreview(null);
+    setFacturasOmitidasUsdCount(0);
     setFacturasCreadas(null);
   }
 
   return {
+    file,
     fase,
     secuencia,
     moduloActual,
@@ -579,8 +604,10 @@ export function useImportWizard(
     etapasCompletadas,
     viajeIdsCreados,
     liquidacionesPreview,
+    liquidacionesOmitidasUsdCount,
     liquidacionesCreadas,
     facturasPreview,
+    facturasOmitidasUsdCount,
     facturasCreadas,
     startFile,
     confirmarModuloActual,

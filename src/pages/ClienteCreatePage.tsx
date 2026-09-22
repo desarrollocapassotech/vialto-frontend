@@ -47,7 +47,7 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const paisFijo = useTenantPaisFijo(tenantId || undefined);
+  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
   const paisVisible = isVisible("alta_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
   const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
@@ -141,6 +141,14 @@ export function ClienteCreatePage() {
     ? validarIdFiscal(pais, idFiscal.trim())
     : null;
   const idFiscalError = fieldErrors.idFiscal ?? errorFiscal;
+
+  if (paisFijoLoading) {
+    return (
+      <CrudPageLayout title="Crear cliente">
+        <div className="mt-6 h-64 animate-pulse rounded bg-vialto-mist/60" />
+      </CrudPageLayout>
+    );
+  }
 
   return (
     <CrudPageLayout

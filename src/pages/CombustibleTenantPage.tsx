@@ -9,6 +9,7 @@ import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
+import { AsignacionVehiculoSection } from "@/components/combustible/AsignacionVehiculoSection";
 import { CombustiblesOrdenamientoMenu } from "@/components/combustible/CombustibleOrdenamientoMenu";
 import {
   COMBUSTIBLE_SORT_DEFAULT,
@@ -126,6 +127,8 @@ export function CombustibleTenantPage({
   const isReadOnly = useMemo(() => {
     return isOrgMember({ orgRole, publicMetadata: user?.publicMetadata });
   }, [orgRole, user?.publicMetadata]);
+
+  const [tab, setTab] = useState<"cargas" | "asignaciones">("cargas");
 
   const [rows, setRows] = useState<CargaCombustible[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -634,6 +637,45 @@ export function CombustibleTenantPage({
         </>
       )}
 
+      <div
+        className="mt-4 flex flex-wrap gap-2"
+        role="tablist"
+        aria-label="Vista de combustible"
+      >
+        {(
+          [
+            { id: "cargas", label: "Cargas" },
+            { id: "asignaciones", label: "Asignación de vehículos" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-[family-name:var(--font-ui)] uppercase tracking-wider transition-colors ${
+              tab === t.id
+                ? "border-vialto-fire bg-vialto-charcoal text-vialto-fire"
+                : "border-vialto-steel/40 bg-white text-vialto-steel hover:border-vialto-fire/50"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "asignaciones" && (
+        <AsignacionVehiculoSection
+          tenantId={activeTenantId}
+          choferes={choferes}
+          vehiculos={vehiculos}
+          isReadOnly={isReadOnly}
+        />
+      )}
+
+      {tab === "cargas" && (
+      <>
       <div className="mt-4 flex justify-between items-center flex-wrap gap-4">
         <div className="flex items-center gap-3">
           {activeTenantId && (
@@ -1020,6 +1062,8 @@ export function CombustibleTenantPage({
           onClose={() => setViewTargetId(null)}
           onUpdate={() => setReloadKey((k) => k + 1)}
         />
+      )}
+      </>
       )}
     </div>
   );

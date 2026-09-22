@@ -61,6 +61,8 @@ export interface Viaje {
   numero: string;
   /** ID propio del cliente para identificar el viaje (ej. CTG). Si está cargado, reemplaza a `numero` en toda vista/documento humano. */
   numeroIdentificacionPersonalizado: string | null;
+  /** Segundo ID propio, opcional y no único (ej. CPE, Referencia Cliente). Visible solo si el tenant tiene idPropio2Habilitado. */
+  idPropio2: string | null;
   /** @deprecated Reemplazado por `etapa` + `facturacionEstado` + `liquidacionEstado`. */
   estado: string;
   /** Etapa operativa del viaje: pendiente | en_curso | finalizado | cancelado. */
@@ -166,6 +168,7 @@ export interface Viaje {
     liquidacion: {
       id: string;
       estado: string;
+      transportistaId?: string;
       liquido: number;
       arcaError?: string | null;
       cae?: string | null;
@@ -287,6 +290,32 @@ export interface Vehiculo {
   createdAt: string;
 }
 
+/** Vehículo asignado a un chofer, con historial (COMB). `fechaHasta: null` = asignación vigente. */
+export interface AsignacionVehiculo {
+  id: string;
+  tenantId: string;
+  choferId: string;
+  vehiculoId: string;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  createdAt: string;
+  createdBy: string;
+  chofer: { id: string; nombre: string; dni: string | null };
+  vehiculo: { id: string; patente: string; tipo: string; kmActual: number };
+}
+
+/** Corrección manual de km de un vehículo, con auditoría (COMB). */
+export interface VehiculoKmEdicion {
+  id: string;
+  tenantId: string;
+  vehiculoId: string;
+  kmAnterior: number;
+  kmNuevo: number;
+  fecha: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export type TipoIntervencionMantenimiento =
   // Motor y sistema de propulsión
   | 'cambio_aceite_motor'
@@ -379,6 +408,14 @@ export interface Tenant {
   billingRenewsAt: string | null;
   /** Label del campo "ID propio" en el módulo de viajes, personalizable por tenant (ej. "Nro de CTG"). */
   labelIdentificacionPersonalizadaViajes: string | null;
+  /** true = muestra la columna/campo dedicado "ID Sistema" en Viajes. Default true. */
+  idSistemaHabilitado?: boolean;
+  /** true = muestra el campo/columna dedicado "ID Propio 1" en Viajes. Default true. */
+  idPropio1Habilitado?: boolean;
+  /** true = habilita el campo "ID Propio 2" (texto libre, no único) en Viajes. Deshabilitado por defecto. */
+  idPropio2Habilitado?: boolean;
+  /** Label configurable del campo "ID Propio 2" (ej. "CPE", "Referencia Cliente"). */
+  idPropio2Label?: string | null;
   /** true = el admin del tenant no ve la pantalla de import masivo (superadmin sigue pudiendo usarla). */
   importacionesOcultas: boolean;
   habilitarExportacionPautMicCrt?: boolean;
@@ -395,6 +432,12 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /**
+   * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
+   * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
+   * formularios de alta/edición de Viajes.
+   */
+  unidadCantidadViajes?: string;
   createdAt: string;
 }
 
@@ -715,6 +758,12 @@ export interface ImportLiquidacionPreviewGrupo {
   periodoDesde: string;
   periodoHasta: string;
   bruto: number;
+  moneda: string;
+}
+
+export interface ImportLiquidacionesPreviewRespuesta {
+  grupos: ImportLiquidacionPreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 /** Preview de una factura a cliente a generar (agrupada por cliente), etapa opcional posterior a Viajes. */
@@ -724,6 +773,11 @@ export interface ImportFacturaClientePreviewGrupo {
   cantidadViajes: number;
   importe: number;
   moneda: string;
+}
+
+export interface ImportFacturasClientesPreviewRespuesta {
+  grupos: ImportFacturaClientePreviewGrupo[];
+  viajesOmitidosUsdCount: number;
 }
 
 export interface ImportTemplate {
@@ -897,6 +951,7 @@ export interface LiquidacionViajeItem {
     id: string;
     numero: string | number | null;
     numeroIdentificacionPersonalizado?: string | null;
+    idPropio2?: string | null;
     fechaCarga: string | null;
     origen: string | null;
     destino: string | null;

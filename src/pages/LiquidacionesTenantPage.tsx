@@ -1,5 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Ban,
@@ -39,6 +39,7 @@ import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useToast } from "@/lib/toast";
 import { apiFetch, apiJson } from "@/lib/api";
 import { filenameFromContentDisposition } from "@/lib/downloadFilename";
+import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
@@ -50,12 +51,22 @@ import {
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
+import {
+  idSistemaHabilitado,
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idPropio2Label,
+} from "@/lib/viajesFlota";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   LIQUIDACIONES_EXPORT_COLUMNS,
   generarLiquidacionesExcel,
 } from "@/lib/liquidacionesExcelExport";
-import type { ArcaConfig, LiquidacionEstado } from "@/types/api";
+import {
+  transportistasLiquidacionOpcionesDesdeViaje,
+  viajePendienteComprobanteTransportista,
+} from "@/lib/viajesComprobantes";
+import type { ArcaConfig, LiquidacionEstado, Viaje } from "@/types/api";
 
 const ESTADO_LABEL: Record<LiquidacionEstado, string> = {
   borrador: "BORRADOR",
@@ -348,6 +359,8 @@ export function LiquidacionesTenantPage() {
   const [pendingEmitir, setPendingEmitir] =
     useState<LiquidacionConTransportista | null>(null);
   const [showCrear, setShowCrear] = useState(false);
+  const [viajesTodos, setViajesTodos] = useState<Viaje[]>([]);
+  const [viajesTodosLoading, setViajesTodosLoading] = useState(false);
   const [anularConfirm, setAnularConfirm] =
     useState<LiquidacionConTransportista | null>(null);
   const [pendienteAnulacionConfirm, setPendienteAnulacionConfirm] =
@@ -376,6 +389,45 @@ export function LiquidacionesTenantPage() {
       liq.estado === "pendiente_cae"
     );
   }
+
+  async function ensureViajesTodosLoaded() {
+    if (viajesTodos.length > 0 || viajesTodosLoading || !activeTenantId) return;
+    setViajesTodosLoading(true);
+    try {
+      const url = isSuperAdmin
+        ? `/api/platform/viajes?tenantId=${encodeURIComponent(activeTenantId)}`
+        : "/api/viajes";
+      const data = await apiJson<Viaje[]>(url, () => getToken());
+      setViajesTodos(data);
+    } catch {
+      // best-effort: si falla, el select de "Nueva liquidación" muestra todos los transportistas
+    } finally {
+      setViajesTodosLoading(false);
+    }
+  }
+
+  /**
+   * Transportistas con al menos un viaje pendiente de liquidar, para el select de
+   * "Nueva liquidación" (no aplica al filtro del listado, que debe seguir mostrando
+   * todos los transportistas). Mientras los viajes todavía no se cargaron (o el
+   * tenant no tiene ninguno), se muestra la lista completa para no dejar el select
+   * vacío por un instante de carga.
+   */
+  const transportistasParaNuevaLiquidacion = useMemo(() => {
+    if (viajesTodosLoading || viajesTodos.length === 0) return transportistas;
+    const ids = new Set<string>();
+    for (const v of viajesTodos) {
+      if (v.etapa === "cancelado") continue;
+      if (!viajePendienteComprobanteTransportista(v)) continue;
+      for (const opt of transportistasLiquidacionOpcionesDesdeViaje(
+        v,
+        transportistas,
+      )) {
+        ids.add(opt.id);
+      }
+    }
+    return transportistas.filter((t) => ids.has(t.id));
+  }, [transportistas, viajesTodos, viajesTodosLoading]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -898,7 +950,10 @@ export function LiquidacionesTenantPage() {
 
               <button
                 type="button"
-                onClick={() => setShowCrear(true)}
+                onClick={() => {
+                  setShowCrear(true);
+                  void ensureViajesTodosLoaded();
+                }}
                 className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
               >
                 Nueva liquidación
@@ -1180,11 +1235,15 @@ export function LiquidacionesTenantPage() {
       )}
       {showCrear && activeTenantId && (
         <CrearLiquidacionManualModal
-          transportistas={transportistas}
+          transportistas={transportistasParaNuevaLiquidacion}
           config={config}
           hasLiquidoProductoArca={hasArca}
           getToken={getToken}
           tenantId={isSuperAdmin ? activeTenantId : undefined}
+          idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
+          idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
+          idPropio2Label={idPropio2Label(empresaTenant)}
           onDataSaved={() => {
             void refreshTransportistas();
             void refreshClientes();
@@ -1324,6 +1383,14 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           metodoAnulacion={metodoAnulacion}
           getToken={getToken}
+          idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
+          idPropio2Label={idPropio2Label(empresaTenant)}
+          contratoPdfUrl={liquidacionContratoPdfUrl(
+            detail.liq.id,
+            isSuperAdmin
+              ? { platform: true, tenantId: activeTenantId }
+              : undefined,
+          )}
           onClose={() => setDetail(null)}
           onEditar={() => setDetail({ mode: "edit", liq: detail.liq })}
           onEmitir={() => {
@@ -1390,6 +1457,10 @@ export function LiquidacionesTenantPage() {
           hasArca={hasArca}
           getToken={getToken}
           tenantId={activeTenantId}
+          idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
+          idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
+          idPropio2Label={idPropio2Label(empresaTenant)}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
           onSaved={(updated) => {
             const withLineas = {

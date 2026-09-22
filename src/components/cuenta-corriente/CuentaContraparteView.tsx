@@ -151,14 +151,14 @@ export function CuentaContraparteView({
             onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
             className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
           >
-            Nuevo cargo
+            {tipoContraparte === 'cliente' ? 'Nueva venta' : 'Nueva compra'}
           </button>
           <button
             type="button"
             onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'pago' })}
             className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
-            {tipoContraparte === 'cliente' ? 'Registrar cobranza' : 'Registrar pago'}
+            {tipoContraparte === 'cliente' ? 'Registrar cobro' : 'Registrar pago'}
           </button>
         </div>
       </div>

@@ -35,10 +35,15 @@ import {
 } from "@/lib/arcaUsdRestriction";
 import { Download, Landmark } from "lucide-react";
 import {
+  clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
   textoImporteFacturaListado,
   textoImporteMonedaFactura,
   viajesFiltradosParaFactura,
+  idSistemaHabilitado,
+  idPropio1Habilitado,
+  idPropio2Habilitado,
+  idPropio2Label,
 } from "@/lib/viajesFlota";
 import {
   metaPaginacionCliente,
@@ -145,6 +150,7 @@ export function FacturacionTenantPage({
   const hasArca = canAccessEmisionFacturasArca(tenantModules);
   /** Adjunto manual solo para tenants sin integración ARCA (vista org, no plataforma). */
   const showComprobanteAdjunto = !platform && !hasArca;
+  const tenantParaIdPropio2 = platform ? platformTenant : maestro.tenant;
   const [clientesPlatform, setClientesPlatform] = useState<Cliente[]>([]);
   const clientes = platform ? clientesPlatform : maestro.clientes;
 
@@ -261,6 +267,19 @@ export function FacturacionTenantPage({
     if (!hasArca) return list;
     return list.filter((v) => !arcaBloqueaFacturarUsd(true, v.monedaMonto));
   }, [viajes, draft.clienteId, hasArca]);
+
+  /**
+   * Clientes con al menos un viaje pendiente de facturar, para el select de "Nueva
+   * factura" (no aplica a filtros de listado, que deben seguir mostrando todos los
+   * clientes). Mientras los viajes todavía no se cargaron (o el tenant no tiene
+   * ninguno), se muestra la lista completa para no dejar el select vacío por un
+   * instante de carga.
+   */
+  const clientesParaNuevaFactura = useMemo(() => {
+    if (viajesLoading || viajes.length === 0) return clientes;
+    const ids = clientesConViajesPendientesFactura(viajes);
+    return clientes.filter((c) => ids.has(c.id));
+  }, [clientes, viajes, viajesLoading]);
 
   const viajesEdicionFactura = useMemo(() => {
     if (!editDraft || !editingId) return [];
@@ -1570,7 +1589,7 @@ export function FacturacionTenantPage({
         open={creating}
         draft={draft}
         setDraft={setDraft}
-        clientes={clientes}
+        clientes={clientesParaNuevaFactura}
         viajes={viajes}
         viajesNueva={viajesNuevaFactura}
         viajesLoading={viajesLoading}
@@ -1589,6 +1608,10 @@ export function FacturacionTenantPage({
         showComprobanteAdjunto={showComprobanteAdjunto}
         hasArca={hasArca}
         tenantId={platform ? tid : undefined}
+        idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
+        idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
+        idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
+        idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         getToken={getToken}
         facturasCreateUrl={facturasCreateUrl()}
         onFacturaGuardada={() => {
@@ -1679,6 +1702,10 @@ export function FacturacionTenantPage({
           saving={savingEditId === editingId}
           error={editError}
           showComprobanteAdjunto={showComprobanteAdjunto}
+          idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
+          idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
+          idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
+          idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         />
       )}
 
