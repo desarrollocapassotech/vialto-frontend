@@ -146,7 +146,7 @@ export function LiquidacionEditModal({
   const canEditViajes = liq.estado === "borrador";
   const showComprobante = !hasArca;
 
-  const { isVisible } = useFieldConfig("liquidaciones");
+  const { isVisible, isLoading: isFieldConfigLoading } = useFieldConfig("liquidaciones");
   const showFechaDesde = isVisible("edicion_liquidacion", "fechaDesde");
   const showFechaHasta = isVisible("edicion_liquidacion", "fechaHasta");
 
@@ -447,7 +447,7 @@ export function LiquidacionEditModal({
 
   const transportistaNombre = liq.transportista?.nombre ?? liq.transportistaId;
   const cargandoDependencias =
-    lineasLoading || (canEditViajes && viajesTransportistaLoading);
+    lineasLoading || (canEditViajes && viajesTransportistaLoading) || isFieldConfigLoading;
 
   return (
     <ViewModalShell
