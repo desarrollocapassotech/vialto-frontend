@@ -207,6 +207,25 @@ export function FacturaCreateModal({
   >(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "autorizada">("form");
+  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+
+  const allAvailableClientes = useMemo(() => {
+    const map = new Map<string, Cliente>();
+    for (const c of clientes ?? []) {
+      if (c && c.id) map.set(c.id, c);
+    }
+    for (const v of viajes ?? []) {
+      if (v.cliente && v.cliente.id && !map.has(v.cliente.id)) {
+        map.set(v.cliente.id, v.cliente as Cliente);
+      }
+      for (const cv of v.clientesViaje ?? []) {
+        if (cv.cliente && cv.cliente.id && !map.has(cv.cliente.id)) {
+          map.set(cv.cliente.id, cv.cliente as Cliente);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [clientes, viajes]);
 
   const allowedClienteIds = useMemo(() => {
     if (draft.viajeIds.length === 0) return null;
@@ -215,8 +234,10 @@ export function FacturaCreateModal({
     const ids = new Set<string>();
 
     activeTrips.forEach((v) => {
-      ids.add(v.clienteId);
-      v.clientesViaje?.forEach((cv) => ids.add(cv.clienteId));
+      if (v.clienteId) ids.add(v.clienteId);
+      v.clientesViaje?.forEach((cv) => {
+        if (cv.clienteId) ids.add(cv.clienteId);
+      });
     });
     return ids;
   }, [draft.viajeIds, viajes]);
@@ -272,23 +293,22 @@ export function FacturaCreateModal({
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
-  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
   const filteredClientes = useMemo(() => {
     const base = !allowedClienteIds
-      ? clientes
-      : clientes.filter(c => allowedClienteIds.has(c.id));
+      ? allAvailableClientes
+      : allAvailableClientes.filter((c) => allowedClienteIds.has(c.id));
 
-    if (draft.clienteId && !base.some(c => c.id === draft.clienteId)) {
+    if (draft.clienteId && !base.some((c) => c.id === draft.clienteId)) {
       const fallback =
-        clienteDetalle && clienteDetalle.id === draft.clienteId
+        (clienteDetalle && clienteDetalle.id === draft.clienteId
           ? clienteDetalle
-          : clientes.find(c => c.id === draft.clienteId);
+          : null) ?? allAvailableClientes.find((c) => c.id === draft.clienteId);
       if (fallback) return [...base, fallback];
     }
 
     return base;
-  }, [clientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+  }, [allAvailableClientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
 
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
@@ -348,17 +368,25 @@ export function FacturaCreateModal({
       setArcaConfigMissing(false);
       setFacturaEmitida(null);
       setPreviewComprobanteUrl(null);
+      setDatosReady(false);
       return;
     }
-    if (!unifiedArca) return;
+
+    if (draft.clienteId) {
+      const known =
+        allAvailableClientes.find((c) => c.id === draft.clienteId) ?? null;
+      setClienteDetalle((prev) => (prev?.id === draft.clienteId ? prev : known));
+    } else {
+      setClienteDetalle(null);
+    }
+
+    if (!unifiedArca) {
+      setDatosReady(true);
+      return;
+    }
 
     let cancelled = false;
     setDatosReady(false);
-    setClienteDetalle(
-      draft.clienteId
-        ? (clientes.find((c) => c.id === draft.clienteId) ?? null)
-        : null,
-    );
 
     void (async () => {
       try {
@@ -380,8 +408,6 @@ export function FacturaCreateModal({
         } catch {
           /* se valida con lo disponible */
         }
-      } else if (!cancelled) {
-        setClienteDetalle(null);
       }
 
       if (!cancelled) setDatosReady(true);
@@ -395,7 +421,7 @@ export function FacturaCreateModal({
     unifiedArca,
     configUrl,
     draft.clienteId,
-    clientes,
+    allAvailableClientes,
     getToken,
     platform,
     tenantId,

@@ -13,6 +13,7 @@ import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
+import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -86,6 +87,15 @@ export function FacturaArcaPreviewPanel({
 
   const missingHiddenFields = useHiddenFiscalFields(missingClienteFields);
 
+  const paisCodigo = clienteDetalle?.pais ? paisCodigoDesdeTexto(clienteDetalle.pais) : "AR";
+  const esExterior = Boolean(paisCodigo && paisCodigo !== "AR");
+
+  const condicionLabel = esExterior
+    ? clienteDetalle?.condicionTributaria?.trim() || "Cliente del Exterior"
+    : condicionIvaLabel(condicionIva);
+
+  const idFiscalLabel = idFiscalPorPais(paisCodigo).label;
+
   return (
     <div className="space-y-4">
       <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
@@ -100,7 +110,7 @@ export function FacturaArcaPreviewPanel({
           {facturaLetraLabel(letra)}
         </span>
         <span className="text-xs text-vialto-steel">
-          ({condicionIvaLabel(condicionIva)})
+          ({condicionLabel})
         </span>
       </div>
 
@@ -134,8 +144,8 @@ export function FacturaArcaPreviewPanel({
           {clienteDetalle?.nombre ?? "—"}
         </p>
         <p className="text-xs text-vialto-steel">
-          {condicionIvaLabel(condicionIva)}
-          {clienteDetalle?.idFiscal ? ` · CUIT ${clienteDetalle.idFiscal}` : ""}
+          {condicionLabel}
+          {clienteDetalle?.idFiscal ? ` · ${idFiscalLabel} ${clienteDetalle.idFiscal}` : ""}
         </p>
         {clienteDetalle?.direccion && (
           <p className="text-xs text-vialto-steel">
@@ -147,7 +157,7 @@ export function FacturaArcaPreviewPanel({
             País: {clienteDetalle.pais}
           </p>
         )}
-        {missingHiddenFields.length > 0 ? (
+        {datosEmitIncompletos && missingHiddenFields.length > 0 ? (
           <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
             <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
             <p className="mt-1">
@@ -155,7 +165,7 @@ export function FacturaArcaPreviewPanel({
               <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
             </p>
           </div>
-        ) : missingHiddenFields.length === 0 && missingClienteFields.length > 0 && clienteDetalle && (
+        ) : datosEmitIncompletos && missingHiddenFields.length === 0 && missingClienteFields.length > 0 && clienteDetalle && (
           <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
             <p className="font-medium">
               Faltan datos del cliente: {missingClienteFields.map(formatMissingFiscalField).join(", ")}.
