@@ -333,6 +333,7 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
   const { isVisible: isViajeFieldVisible } = useFieldConfig("viajes");
+  useFieldConfig("liquidaciones");
 
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(

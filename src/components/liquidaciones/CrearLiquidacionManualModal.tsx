@@ -208,7 +208,7 @@ export function CrearLiquidacionManualModal({
   const [transportistaActualizado, setTransportistaActualizado] =
     useState<Transportista | null>(null);
 
-  const { isVisible } = useFieldConfig("liquidaciones");
+  const { isVisible, isLoading: isFieldConfigLoading } = useFieldConfig("liquidaciones");
   const showFechaDesde = isVisible("alta_liquidacion", "fechaDesde");
   const showFechaHasta = isVisible("alta_liquidacion", "fechaHasta");
 
@@ -979,7 +979,12 @@ export function CrearLiquidacionManualModal({
               onSubmit={(e) => void handleSubmit(e)}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+              {isFieldConfigLoading ? (
+                <div className="flex h-64 items-center justify-center">
+                  <Spinner className="h-6 w-6 text-vialto-fire" />
+                </div>
+              ) : (
+                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
                 <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
                   {hasLiquidoProductoArca && (
                     <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
@@ -1552,6 +1557,7 @@ export function CrearLiquidacionManualModal({
                   </div>
                 </aside>
               </div>
+              )}
             </form>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">

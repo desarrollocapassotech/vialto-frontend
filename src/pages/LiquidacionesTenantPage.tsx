@@ -43,12 +43,9 @@ import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
-import {
-  listadoTablaHeadRowClass,
-  listadoTablaTdClass,
-  listadoTablaThClass,
-} from "@/lib/listadoTabla";
+import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
 import {
@@ -299,6 +296,8 @@ export function LiquidacionesTenantPage() {
     empresaTenant?.liquidacionAnulacionMetodo === "manual"
       ? "manual"
       : "nota_credito_debito";
+
+  useFieldConfig("liquidaciones");
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
