@@ -51,6 +51,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
   monedaUnicaDeViajes,
@@ -106,12 +107,7 @@ function validateFacturaDraft(
 }
 
 function fmtPreviewDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDateUtc(iso);
 }
 
 function fmtPreviewMoney(n: number) {

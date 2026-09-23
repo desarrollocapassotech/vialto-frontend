@@ -29,6 +29,7 @@ import {
   facturaNcLabel,
 } from "@/lib/arcaCbteTipo";
 import { friendlyError } from "@/lib/friendlyError";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import {
   isAfipInfrastructureError,
   MSG_AFIP_INFRA,
@@ -56,12 +57,7 @@ function fmtMoney(n: number) {
 }
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDateUtc(iso);
 }
 
 interface Props {
