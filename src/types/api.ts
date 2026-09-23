@@ -723,8 +723,9 @@ export interface ImportPreviewResult {
   entidadesActualizadas?: number;
   /** Cantidad de filas que se ignoran automáticamente por ser duplicados internos del mismo lote (solo viajes). */
   filasFusionadas?: number;
-  /** Solo viajes: números de factura compartidos por más de un viaje nuevo (o ya existentes) — se unifican en una sola factura, requiere confirmación explícita. */
-  advertenciasFacturasDuplicadas?: { numero: string; filas: number[] }[];
+
+  /** Solo viajes: facturas que están asignadas a múltiples clientes distintos (inconsistencia que bloquea la importación). */
+  erroresConsistenciaFacturas?: { numero: string; clientes: string[] }[];
   /** Clientes/Transportistas/Choferes: filas con un conflicto de campo único (ID Fiscal/DNI) — requieren elegir "ignorar" o "actualizar" por fila antes de confirmar. */
   advertenciasCampoUnicoDuplicado?: ImportCampoUnicoConflicto[];
   /** Viajes: grupos de filas detectadas como el mismo viaje (misma entidad/fecha) que se consolidan. */

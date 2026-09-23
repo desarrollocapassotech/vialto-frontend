@@ -1,4 +1,4 @@
-/** Validación client-side para emisión de Factura A/B vía ARCA. */
+import { paisCodigoDesdeTexto } from "@/lib/ciudades/paises";
 
 export type FacturaEmitEmisor = {
   cuitEmisor?: string | null;
@@ -13,6 +13,8 @@ export type FacturaEmitCliente = {
   direccion?: string | null;
   idFiscal?: string | null;
   condicionIva?: number | null;
+  pais?: string | null;
+  condicionTributaria?: string | null;
 };
 
 function blank(v: string | null | undefined): boolean {
@@ -46,8 +48,18 @@ export function collectFacturaEmitMissingFields(args: {
   if (!c || blank(c.nombre)) missing.push("Cliente: nombre");
   if (!c || blank(c.direccion)) missing.push("Cliente: domicilio");
   if (!c || blank(c.idFiscal)) missing.push("Cliente: CUIT");
-  if (normalizeCondicionIva(c?.condicionIva) == null) {
-    missing.push("Cliente: condición de IVA (país Argentina + campo AFIP)");
+
+  const pais = c?.pais ? paisCodigoDesdeTexto(c.pais) : "AR";
+  const esArgentina = !pais || pais === "AR";
+
+  if (esArgentina) {
+    if (normalizeCondicionIva(c?.condicionIva) == null) {
+      missing.push("Cliente: condición de IVA (país Argentina + campo AFIP)");
+    }
+  } else {
+    if (blank(c?.condicionTributaria)) {
+      missing.push("Cliente: condición tributaria");
+    }
   }
 
   return missing;

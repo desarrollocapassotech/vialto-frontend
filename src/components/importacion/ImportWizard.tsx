@@ -1511,8 +1511,6 @@ function EtapaModulo({
   const TABLA_PAGE_SIZE = tab === "viajes" ? 5 : 10;
   const [confirmarCamposFaltantes, setConfirmarCamposFaltantes] =
     useState(false);
-  const [confirmarFacturasDuplicadas, setConfirmarFacturasDuplicadas] =
-    useState(false);
   const [decisionesCampoUnico, setDecisionesCampoUnico] = useState<
     Record<number, "ignorar" | "actualizar">
   >({});
@@ -1522,7 +1520,6 @@ function EtapaModulo({
   // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
-    setConfirmarFacturasDuplicadas(false);
     setDecisionesCampoUnico({});
   }, [p?.sessionId]);
 
@@ -1605,10 +1602,10 @@ function EtapaModulo({
   const requiereConfirmarCamposFaltantes =
     advertenciasCamposFaltantes.length > 0 && !confirmarCamposFaltantes;
   const requiereResolverCiudades = advertenciasCiudad.length > 0;
-  const advertenciasFacturasDuplicadas =
-    p?.advertenciasFacturasDuplicadas ?? [];
-  const requiereConfirmarFacturasDuplicadas =
-    advertenciasFacturasDuplicadas.length > 0 && !confirmarFacturasDuplicadas;
+  
+  const erroresConsistenciaFacturas = p?.erroresConsistenciaFacturas ?? [];
+  const requiereResolverConsistenciaFacturas = erroresConsistenciaFacturas.length > 0;
+
   const advertenciasCampoUnicoDuplicado =
     p?.advertenciasCampoUnicoDuplicado ?? [];
   const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
@@ -2007,38 +2004,21 @@ function EtapaModulo({
             </ImportAlert>
           )}
 
-          {advertenciasFacturasDuplicadas.length > 0 && (
+          {erroresConsistenciaFacturas.length > 0 && (
             <ImportAlert
-              color="amber"
+              color="red"
               collapsible={false}
               title={
                 <>
-                  <strong>{advertenciasFacturasDuplicadas.length}</strong>{" "}
-                  número{advertenciasFacturasDuplicadas.length !== 1 ? "s" : ""}{" "}
-                  de factura repetido
-                  {advertenciasFacturasDuplicadas.length !== 1 ? "s" : ""} entre
-                  varios viajes nuevos:{" "}
+                  <strong>{erroresConsistenciaFacturas.length}</strong>{" "}
+                  número{erroresConsistenciaFacturas.length !== 1 ? "s" : ""}{" "}
+                  de factura inconsistente{erroresConsistenciaFacturas.length !== 1 ? "s" : ""}:{" "}
                   <strong>
-                    {advertenciasFacturasDuplicadas
-                      .map((d) => d.numero)
-                      .join(", ")}
+                    {erroresConsistenciaFacturas.map((e) => e.numero).join(", ")}
                   </strong>
                 </>
               }
-              subtitle=". Se van a unificar en una sola factura por número (sumando el importe), en vez de crear una factura duplicada por cada viaje."
-              action={
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-amber-900">
-                  <input
-                    type="checkbox"
-                    checked={confirmarFacturasDuplicadas}
-                    onChange={(e) =>
-                      setConfirmarFacturasDuplicadas(e.target.checked)
-                    }
-                    className="h-5 w-5 accent-vialto-charcoal"
-                  />
-                  Entiendo, unificar estas facturas
-                </label>
-              }
+              subtitle=" — Estos números de factura están asignados a clientes diferentes en la base de datos o en el archivo. Revisá el excel y asegurate de usar un número único por cliente."
             />
           )}
 
@@ -2100,13 +2080,12 @@ function EtapaModulo({
               p.exitosas === 0 ||
               requiereConfirmarCamposFaltantes ||
               requiereResolverCiudades ||
-              requiereConfirmarFacturasDuplicadas ||
+              requiereResolverConsistenciaFacturas ||
               requiereResolverCampoUnicoDuplicado
             }
             onClick={() =>
               void wizard.confirmarModuloActual(
                 confirmarCamposFaltantes,
-                confirmarFacturasDuplicadas,
                 Object.entries(decisionesCampoUnico).map(([fila, accion]) => ({
                   fila: Number(fila),
                   accion,
@@ -2116,12 +2095,13 @@ function EtapaModulo({
             title={
               requiereResolverCiudades
                 ? "Resolvé las ciudades pendientes para continuar"
-                : requiereResolverCampoUnicoDuplicado
-                  ? "Elegí ignorar o actualizar para cada fila duplicada"
-                  : requiereConfirmarCamposFaltantes ||
-                    requiereConfirmarFacturasDuplicadas
-                    ? "Marcá la casilla de arriba para confirmar"
-                    : undefined
+                : requiereResolverConsistenciaFacturas
+                  ? "Resolvé las inconsistencias de facturación en el archivo"
+                  : requiereResolverCampoUnicoDuplicado
+                    ? "Elegí ignorar o actualizar para cada fila duplicada"
+                    : requiereConfirmarCamposFaltantes
+                      ? "Marcá la casilla de arriba para confirmar"
+                      : undefined
             }
             className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
           >
