@@ -368,6 +368,29 @@ function viajePerteneceAFacturaEnEdicion(
 }
 
 /**
+ * Disponibilidad real de un viaje para UN cliente puntual (principal o adicional vía
+ * `clientesViaje`): no cancelado, sin factura vigente (`tramoDisponibleParaFacturaNueva`,
+ * que a diferencia de `facturacionPermiteVincular` no cuenta un borrador ARCA sin emitir
+ * como disponible) y no cobrado. `pertenece` indica si el viaje corresponde a ese cliente
+ * (como principal o adicional), independiente de si está facturable ahora mismo.
+ */
+function tramoFacturableParaCliente(
+  v: Viaje,
+  clienteId: string,
+): { pertenece: boolean; facturable: boolean } {
+  const tramo: { facturacionEstado: string; facturaId?: string | null; factura?: { arcaEstado?: string | null } | null } | undefined =
+    v.clienteId === clienteId ? v : v.clientesViaje?.find((vc) => vc.clienteId === clienteId);
+  if (!tramo) return { pertenece: false, facturable: false };
+  if (v.etapa === "cancelado") return { pertenece: true, facturable: false };
+
+  const facturable =
+    tramoDisponibleParaFacturaNueva(tramo) &&
+    facturacionPermiteVincular(tramo.facturacionEstado) &&
+    tramo.facturacionEstado !== "cobrado";
+  return { pertenece: true, facturable };
+}
+
+/**
  * Viajes que se pueden vincular a una factura de cliente: viajes del
  * `clienteId` elegido. Excluye viajes que ya tienen factura asignada,
  * cobrados y cancelados. Con `opciones` de edición, mantiene visibles los
@@ -380,11 +403,7 @@ export function viajesFiltradosParaFactura(
 ): Viaje[] {
   const cid = clienteId.trim();
   if (!cid) return [];
-  const list = todos.filter(
-    (v) =>
-      v.clienteId === cid ||
-      (v.clientesViaje ?? []).some((vc) => vc.clienteId === cid),
-  );
+  const list = todos.filter((v) => tramoFacturableParaCliente(v, cid).pertenece);
 
   const fid = opciones?.facturaEdicionId?.trim() || null;
   const idsFactura = opciones?.viajeIdsFacturaEdicion;
@@ -393,22 +412,8 @@ export function viajesFiltradosParaFactura(
     const enEstaFactura = Boolean(
       fid && viajePerteneceAFacturaEnEdicion(v, fid, idsFactura),
     );
-
-    let estadoFacturacionCliente = v.facturacionEstado;
-    let disponible = tramoDisponibleParaFacturaNueva(v);
-    if (v.clienteId !== cid && v.clientesViaje) {
-      const vc = v.clientesViaje.find(x => x.clienteId === cid);
-      if (vc) {
-        estadoFacturacionCliente = vc.facturacionEstado;
-        disponible = tramoDisponibleParaFacturaNueva(vc);
-      }
-    }
-
-    if (!disponible && !enEstaFactura) return false;
-    if (!facturacionPermiteVincular(estadoFacturacionCliente) && !enEstaFactura) return false;
-    if (estadoFacturacionCliente === "cobrado" && !enEstaFactura) return false;
-    if (v.etapa === "cancelado" && !enEstaFactura) return false;
-    return true;
+    if (enEstaFactura) return true;
+    return tramoFacturableParaCliente(v, cid).facturable;
   });
 
   if (!fid || !idsFactura?.length) return base;
@@ -440,13 +445,11 @@ export function viajesFiltradosParaFactura(
 export function clientesConViajesPendientesFactura(todos: Viaje[]): Set<string> {
   const ids = new Set<string>();
   for (const v of todos) {
-    if (v.etapa === "cancelado") continue;
-
-    if (v.clienteId && facturacionPermiteVincular(v.facturacionEstado)) {
+    if (v.clienteId && tramoFacturableParaCliente(v, v.clienteId).facturable) {
       ids.add(v.clienteId);
     }
     for (const vc of v.clientesViaje ?? []) {
-      if (vc.clienteId && facturacionPermiteVincular(vc.facturacionEstado)) {
+      if (vc.clienteId && tramoFacturableParaCliente(v, vc.clienteId).facturable) {
         ids.add(vc.clienteId);
       }
     }

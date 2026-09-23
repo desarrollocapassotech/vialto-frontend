@@ -54,6 +54,7 @@ import {
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
+  clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
 } from "@/lib/viajesFlota";
@@ -217,23 +218,41 @@ export function FacturaCreateModal({
   const [step, setStep] = useState<"form" | "autorizada">("form");
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
+  // Clientes con al menos un viaje disponible para vincular a esta factura nueva —
+  // mientras los viajes no cargaron (o el tenant no tiene ninguno) no se filtra, para no
+  // dejar el select vacío por un instante de carga (mismo criterio que
+  // `clientesParaNuevaFactura` en FacturacionTenantPage.tsx). Sin este filtro acá, un
+  // `clientes` prop ya filtrado por el caller quedaba pisado igual: este memo volvía a
+  // sumar cualquier cliente referenciado por `viajes` sin chequear disponibilidad.
   const allAvailableClientes = useMemo(() => {
+    const sinFiltrar = viajesLoading || viajes.length === 0;
+    const facturables = sinFiltrar ? null : clientesConViajesPendientesFactura(viajes);
     const map = new Map<string, Cliente>();
     for (const c of clientes ?? []) {
-      if (c && c.id) map.set(c.id, c);
+      if (c && c.id && (!facturables || facturables.has(c.id))) map.set(c.id, c);
     }
     for (const v of viajes ?? []) {
-      if (v.cliente && v.cliente.id && !map.has(v.cliente.id)) {
+      if (
+        v.cliente &&
+        v.cliente.id &&
+        (!facturables || facturables.has(v.cliente.id)) &&
+        !map.has(v.cliente.id)
+      ) {
         map.set(v.cliente.id, v.cliente as Cliente);
       }
       for (const cv of v.clientesViaje ?? []) {
-        if (cv.cliente && cv.cliente.id && !map.has(cv.cliente.id)) {
+        if (
+          cv.cliente &&
+          cv.cliente.id &&
+          (!facturables || facturables.has(cv.cliente.id)) &&
+          !map.has(cv.cliente.id)
+        ) {
           map.set(cv.cliente.id, cv.cliente as Cliente);
         }
       }
     }
     return Array.from(map.values());
-  }, [clientes, viajes]);
+  }, [clientes, viajes, viajesLoading]);
 
   const allowedClienteIds = useMemo(() => {
     if (draft.viajeIds.length === 0) return null;
