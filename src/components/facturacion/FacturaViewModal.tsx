@@ -24,10 +24,10 @@ import {
   facturaNcLabel,
 } from '@/lib/arcaCbteTipo';
 import type { Cliente, Factura } from '@/types/api';
+import { fmtDateUtc } from '@/lib/fmtDateUtc';
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return fmtDateUtc(iso);
 }
 
 function fmtDateTime(iso: string | null | undefined) {

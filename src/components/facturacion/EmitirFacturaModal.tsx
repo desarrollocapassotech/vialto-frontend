@@ -29,6 +29,7 @@ import {
   formatFacturaEmitMissingMessage,
 } from "@/lib/facturaEmitValidation";
 import { friendlyError } from "@/lib/friendlyError";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { ArcaEmitErrorAlert } from "@/components/ui/ArcaErrorMessage";
 import { modalOverlayClass } from "@/lib/modalLayers";
@@ -215,12 +216,7 @@ export function EmitirFacturaModal({
   }
 
   function fmtDate(iso: string) {
-    if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return fmtDateUtc(iso);
   }
 
   async function handleEmitirArca() {
