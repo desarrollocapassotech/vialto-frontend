@@ -1,5 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Ban, Banknote, Receipt } from 'lucide-react';
+import { apiJson } from '@/lib/api';
+import { friendlyError } from '@/lib/friendlyError';
+import { useToast } from '@/lib/toast';
+import { Spinner } from '@/components/ui/Spinner';
+import { ViajeViewModal } from '@/components/viajes/ViajeViewModal';
 import {
   ViewModalShell,
   viewModalBtnGhost,
@@ -23,7 +29,7 @@ import {
   facturaNcCbteTipoFromFactura,
   facturaNcLabel,
 } from '@/lib/arcaCbteTipo';
-import type { Cliente, Factura } from '@/types/api';
+import type { Cliente, Factura, Viaje } from '@/types/api';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -76,6 +82,7 @@ export function FacturaViewModal({
   clienteNombre,
   cliente,
   hasArca = false,
+  getToken,
   onClose,
   onEditar,
   onVerComprobante,
@@ -88,6 +95,7 @@ export function FacturaViewModal({
   clienteNombre?: string;
   cliente?: Cliente | null;
   hasArca?: boolean;
+  getToken?: () => Promise<string | null>;
   onClose: () => void;
   onEditar: () => void;
   onVerComprobante?: () => void;
@@ -97,6 +105,28 @@ export function FacturaViewModal({
   /** Solo facturas a cliente, no anuladas y no ya cobradas. */
   onMarcarCobrada?: () => void;
 }) {
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+  const [detail, setDetail] = useState<Factura>(factura);
+  const [loadingDetail, setLoadingDetail] = useState(Boolean(getToken));
+  const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
+  const [loadingViajeId, setLoadingViajeId] = useState<string | null>(null);
+
+  async function handleVerViaje(viajeId: string) {
+    if (!getToken) return;
+    setLoadingViajeId(viajeId);
+    try {
+      const viaje = await apiJson<Viaje>(
+        `/api/viajes/${encodeURIComponent(viajeId)}`,
+        () => getToken(),
+      );
+      setViewingViaje(viaje);
+    } catch (e) {
+      showToast(friendlyError(e, 'viajes'), 'error');
+    } finally {
+      setLoadingViajeId(null);
+    }
+  }
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -105,9 +135,48 @@ export function FacturaViewModal({
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const importeFormato = fmtImporte(factura.moneda, factura.importe);
-  const ivaN = factura.ivaPct ?? 0;
-  const tramos = factura.tramos ?? [];
+  useEffect(() => {
+    if (!getToken || !factura.id) {
+      setDetail((prev) => ({
+        ...prev,
+        ...factura,
+        viajes: factura.viajes ?? prev.viajes,
+      }));
+      setLoadingDetail(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDetail(true);
+    void (async () => {
+      try {
+        const full = await apiJson<Factura>(
+          `/api/facturacion/facturas/${encodeURIComponent(factura.id)}`,
+          () => getToken(),
+        );
+        if (!cancelled) setDetail({ ...full, viajes: full.viajes ?? factura.viajes });
+      } catch {
+        if (!cancelled) setDetail(factura);
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, factura.id]);
+
+  useEffect(() => {
+    setDetail((prev) => ({
+      ...prev,
+      ...factura,
+      viajes: factura.viajes?.length ? factura.viajes : prev.viajes,
+    }));
+  }, [factura]);
+
+  const source = detail;
+  const importeFormato = fmtImporte(source.moneda, source.importe);
+  const ivaN = source.ivaPct ?? 0;
+  const tramos = source.tramos ?? [];
   const porTramo = Boolean(factura.facturarPorTramo) && tramos.length > 0;
 
   let muestraIva = false;
@@ -218,7 +287,8 @@ export function FacturaViewModal({
   );
 
   return (
-    <ViewModalShell
+    <>
+      <ViewModalShell
       title={
         <span className="inline-flex items-center gap-3 flex-wrap">
           <span>Factura {factura.numero}</span>
@@ -318,6 +388,63 @@ export function FacturaViewModal({
           )}
         </div>
       )}
+
+      <div className="mt-6 border-t border-black/10 pt-4">
+        <p className="mb-2 text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.2em] text-vialto-steel">
+          Viajes ({source.viajes?.length || source.viajeIds.length})
+        </p>
+        {loadingDetail ? (
+          <div className="flex justify-center rounded border border-black/10 py-6">
+            <Spinner className="h-5 w-5" />
+          </div>
+        ) : !source.viajes?.length ? (
+          <p className="rounded border border-black/10 bg-white px-4 py-3 text-sm text-vialto-steel">
+            {source.viajeIds.length > 0
+              ? `${source.viajeIds.length} viaje${source.viajeIds.length === 1 ? '' : 's'} (sin detalle disponible).`
+              : 'Sin viajes asociados.'}
+          </p>
+        ) : (
+          <div className="max-h-52 overflow-y-auto rounded border border-black/10 divide-y divide-black/5 bg-white">
+            {source.viajes.map((v) => {
+              const numero =
+                v.numeroIdentificacionPersonalizado?.trim() ||
+                v.numero ||
+                '—';
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  disabled={loadingViajeId === v.id}
+                  onClick={() => void handleVerViaje(v.id)}
+                  className="block w-full text-left px-3 py-2.5 hover:bg-vialto-mist/60 focus:outline-none focus-visible:bg-vialto-mist disabled:opacity-60 disabled:cursor-wait"
+                >
+                  <p className="text-xs font-medium text-vialto-charcoal">
+                    Viaje #{numero}
+                    {v.fechaCarga && (
+                      <span className="ml-1.5 font-normal text-vialto-steel">
+                        {fmtDate(v.fechaCarga)}
+                      </span>
+                    )}
+                  </p>
+                  {(v.origen || v.destino) && (
+                    <p className="text-[11px] text-vialto-steel truncate">
+                      {v.origen ?? '—'} → {v.destino ?? '—'}
+                    </p>
+                  )}
+                  {v.idPropio2?.trim() && (
+                    <p className="text-[11px] text-vialto-steel">
+                      ID Propio 2: {v.idPropio2.trim()}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-vialto-charcoal tabular-nums">
+                    {fmtImporte(v.monedaMonto, Number(v.monto) || 0)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {porTramo && (
         <div className="mt-6 border-t border-black/10 pt-4 space-y-3">
@@ -428,6 +555,19 @@ export function FacturaViewModal({
           </button>
         </div>
       )}
-    </ViewModalShell>
+      </ViewModalShell>
+      {viewingViaje && (
+        <ViajeViewModal
+          viaje={viewingViaje}
+          onClose={() => setViewingViaje(null)}
+          onEditar={() => {
+            const viajeId = viewingViaje.id;
+            setViewingViaje(null);
+            onClose();
+            navigate(`/viajes?viaje=${encodeURIComponent(viajeId)}`);
+          }}
+        />
+      )}
+    </>
   );
 }

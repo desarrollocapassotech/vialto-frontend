@@ -1629,6 +1629,7 @@ export function FacturacionTenantPage({
 
       {viewingFactura && (
         <FacturaViewModal
+          getToken={getToken}
           factura={viewingFactura}
           clienteNombre={nombreCliente(viewingFactura.clienteId)}
           cliente={clienteById(viewingFactura.clienteId)}

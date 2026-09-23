@@ -3672,6 +3672,7 @@ export function ViajesTenantPage({
 
         {viewingFactura && (
           <FacturaViewModal
+            getToken={getToken}
             factura={viewingFactura}
             cliente={
               clientes.find((c) => c.id === viewingFactura.clienteId) ??

@@ -501,6 +501,20 @@ export interface FacturaTramo {
   orden: number;
 }
 
+export interface ViajeFacturacionItem {
+  id: string;
+  numero: string;
+  numeroIdentificacionPersonalizado: string | null;
+  idPropio2: string | null;
+  fechaCarga: string | null;
+  origen: string | null;
+  destino: string | null;
+  monto: number | null;
+  monedaMonto: string;
+  cantidadFactura: number | null;
+  precioUnitarioFactura: number | null;
+}
+
 export interface Factura {
   id: string;
   tenantId: string;
@@ -511,6 +525,7 @@ export interface Factura {
   clienteId: string | null;
   transportistaId: string | null;
   viajeIds: string[];
+  viajes?: ViajeFacturacionItem[];
   /** Neto: suma completa de los viajes, sin IVA. */
   importe: number;
   /**
