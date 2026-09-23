@@ -120,11 +120,16 @@ function FacturaContraparteField({
   clientes,
   onClienteChange,
   compact = false,
+  loading = false,
 }: {
   clienteId: string;
   clientes: Cliente[];
   onClienteChange: (id: string) => void;
   compact?: boolean;
+  /** Deshabilita el select mientras los viajes todavía no cargaron — evita que se
+   * pueda elegir un cliente de la lista sin filtrar (ver `allAvailableClientes`) que
+   * un instante después queda excluido por no tener nada disponible para facturar. */
+  loading?: boolean;
 }) {
   const labelClass = compact
     ? compactLabelClass
@@ -142,6 +147,7 @@ function FacturaContraparteField({
         allowEmptyValue
         emptyListChoiceLabel="— Sin cliente —"
         placeholderCerrado="— Sin cliente —"
+        loading={loading}
         aria-label="Cliente"
       />
     </div>
@@ -290,24 +296,18 @@ export function FacturaCreateModal({
     });
   }, [viajes, draft.clienteId]);
 
+  // `viajesNueva` (prop) ya viene filtrado por cliente/disponibilidad/ARCA-USD —
+  // ver `viajesFiltradosParaFactura` (lib/viajesFlota.ts), que evalúa el tramo
+  // correcto (principal o adicional) para `draft.clienteId`. Re-filtrar acá por
+  // `v.facturacionEstado` (el estado de la CABECERA/cliente principal, no el del
+  // tramo elegido) rompía un viaje multi-cliente ya facturado a un cliente pero no
+  // al otro: el tramo pendiente del segundo cliente desaparecía igual del listado
+  // ("no hay viajes disponibles") aunque el backend sí lo aceptaba — bug real
+  // detectado en QA. Este memo solo remapea monto/destino al tramo del cliente
+  // elegido; no vuelve a decidir disponibilidad.
   const derivedViajesNueva = useMemo(() => {
-    const viajesValidos = viajesNueva.filter((v) => {
-      if (!draft.clienteId) return false;
-
-      const perteneceAlCliente =
-        v.clienteId === draft.clienteId ||
-        (v.clientesViaje ?? []).some((cv) => cv.clienteId === draft.clienteId);
-      if (!perteneceAlCliente) return false;
-
-      if (v.etapa?.toLowerCase() === "cancelado") return false;
-      if (v.facturacionEstado === "facturado") return false;
-
-      if (hasArca && arcaBloqueaFacturarUsd(true, v.monedaMonto)) return false;
-
-      return true;
-    });
-
-    return viajesValidos.map((v) => {
+    if (!draft.clienteId) return [];
+    return viajesNueva.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
         const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
         if (vc) {
@@ -325,7 +325,7 @@ export function FacturaCreateModal({
       }
       return v;
     });
-  }, [viajesNueva, draft.clienteId, hasArca]);
+  }, [viajesNueva, draft.clienteId]);
 
   // Las líneas ahora son derivadas y estrictamente de solo lectura
   const lineas = useMemo(
@@ -352,6 +352,22 @@ export function FacturaCreateModal({
 
     return base;
   }, [allAvailableClientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+
+  // Si el cliente elegido queda sin ningún viaje disponible una vez que `viajes` ya
+  // terminó de cargar (p. ej. se lo seleccionó durante la ventana de carga inicial, o el
+  // draft quedó de una sesión anterior con datos que después se facturaron), se limpia la
+  // selección en vez de dejarlo "pegado" por el fallback de `filteredClientes` — ese
+  // fallback existe para no perder la selección mientras `clienteDetalle` todavía no
+  // resolvió o mientras `viajes` sigue cargando, no para sostener indefinidamente un
+  // cliente sin nada para facturar.
+  useEffect(() => {
+    if (viajesLoading || viajes.length === 0) return;
+    if (!draft.clienteId) return;
+    if (allAvailableClientes.some((c) => c.id === draft.clienteId)) return;
+    setDraft((d) =>
+      d.clienteId ? { ...d, clienteId: "", viajeIds: [] } : d,
+    );
+  }, [viajesLoading, viajes.length, allAvailableClientes, draft.clienteId, setDraft]);
 
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
@@ -723,6 +739,7 @@ export function FacturaCreateModal({
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}
+          loading={viajesLoading}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
@@ -855,6 +872,7 @@ export function FacturaCreateModal({
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}
+          loading={viajesLoading}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
