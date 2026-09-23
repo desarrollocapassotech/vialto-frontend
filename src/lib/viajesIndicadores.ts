@@ -107,6 +107,28 @@ export function facturacionPermiteVincular(facturacionEstado: string): boolean {
   return FACTURACION_ESTADOS_DISPONIBLES.has(facturacionEstado);
 }
 
+/**
+ * Disponibilidad REAL para vincular una factura NUEVA — más estricta que
+ * `facturacionPermiteVincular`. Esa función cuenta "borrador" (y el "sin_facturar" que
+ * devuelve el backend mientras una factura ARCA no se emitió todavía, ver
+ * `mapFacturacionEstado` en `vialto-backend/viaje-estado-financiero.ts`) como
+ * disponible — correcto para no bloquear la edición de campos fiscales del viaje
+ * mientras ese comprobante no se mandó a AFIP, pero incorrecto para decidir qué viajes
+ * mostrar en el selector de una factura nueva: el backend rechaza vincular un viaje que
+ * ya tiene una factura borrador vigente (ver `facturaDisponibleWhere` en
+ * `facturacion.service.ts`), así que mostrarlo ahí solo lleva a un error al guardar.
+ * Disponible = sin `facturaId`, o con uno pero la factura vinculada fue anulada en ARCA
+ * (mismo criterio que el backend; no hay equivalente de "anulado" para tenants sin ARCA,
+ * ahí liberar un viaje es `removeFactura`, que ya deja `facturaId` en null).
+ */
+export function tramoDisponibleParaFacturaNueva(t: {
+  facturaId?: string | null;
+  factura?: { arcaEstado?: string | null } | null;
+}): boolean {
+  if (!t.facturaId) return true;
+  return t.factura?.arcaEstado === 'anulado';
+}
+
 export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
   sin_facturar: 'Sin facturar',
   borrador: 'Borrador',

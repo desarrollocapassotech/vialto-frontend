@@ -1,5 +1,5 @@
 import { normalizeViajeMoneda } from "@/lib/currencyMask";
-import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
+import { facturacionPermiteVincular, tramoDisponibleParaFacturaNueva } from "@/lib/viajesIndicadores";
 import {
   importeACobrarFactura,
   importeNetoViajeParaFactura,
@@ -395,13 +395,16 @@ export function viajesFiltradosParaFactura(
     );
 
     let estadoFacturacionCliente = v.facturacionEstado;
+    let disponible = tramoDisponibleParaFacturaNueva(v);
     if (v.clienteId !== cid && v.clientesViaje) {
       const vc = v.clientesViaje.find(x => x.clienteId === cid);
       if (vc) {
         estadoFacturacionCliente = vc.facturacionEstado;
+        disponible = tramoDisponibleParaFacturaNueva(vc);
       }
     }
 
+    if (!disponible && !enEstaFactura) return false;
     if (!facturacionPermiteVincular(estadoFacturacionCliente) && !enEstaFactura) return false;
     if (estadoFacturacionCliente === "cobrado" && !enEstaFactura) return false;
     if (v.etapa === "cancelado" && !enEstaFactura) return false;

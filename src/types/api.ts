@@ -52,7 +52,7 @@ export interface ViajeCliente {
   precioUnitario: number | null;
   facturaId?: string | null;
   facturacionEstado: string;
-  factura?: { ivaPct: number | null } | null;
+  factura?: { ivaPct: number | null; arcaEstado?: string | null } | null;
 }
 
 export interface Viaje {

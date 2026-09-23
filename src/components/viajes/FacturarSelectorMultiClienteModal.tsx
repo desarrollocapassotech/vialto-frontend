@@ -37,7 +37,7 @@ function FacturacionBadge({ estado }: { estado: FacturacionEstado }) {
   );
 }
 
-import { facturacionPermiteVincular } from "@/lib/viajesIndicadores";
+import { facturacionPermiteVincular, tramoDisponibleParaFacturaNueva } from "@/lib/viajesIndicadores";
 
 export function FacturarSelectorMultiClienteModal({
   viaje,
@@ -58,7 +58,9 @@ export function FacturarSelectorMultiClienteModal({
     clientes?.find((x) => x.id === viaje.clienteId)?.nombre?.trim() ||
     "—";
     
-  const principalFacturado = !facturacionPermiteVincular(viaje.facturacionEstado || 'sin_facturar');
+  const principalFacturado =
+    !facturacionPermiteVincular(viaje.facturacionEstado || 'sin_facturar') ||
+    !tramoDisponibleParaFacturaNueva(viaje);
 
   const principalDestino = viaje.destinosViaje?.length 
     ? viaje.destinosViaje[viaje.destinosViaje.length - 1].etiqueta 
@@ -94,7 +96,9 @@ export function FacturarSelectorMultiClienteModal({
       ? c.destinosCliente[c.destinosCliente.length - 1].etiqueta
       : (c.destino || "—");
       
-    const vcFacturado = !facturacionPermiteVincular(c.facturacionEstado || 'sin_facturar');
+    const vcFacturado =
+      !facturacionPermiteVincular(c.facturacionEstado || 'sin_facturar') ||
+      !tramoDisponibleParaFacturaNueva(c);
 
     rows.push({
       clienteId: c.clienteId,
