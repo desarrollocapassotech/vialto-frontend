@@ -797,12 +797,12 @@ export function CrearLiquidacionManualModal({
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
   const periodoInvalido = Boolean(
-    periodoDesde && periodoHasta && periodoHasta < periodoDesde,
+    showFechaDesde && showFechaHasta && periodoDesde && periodoHasta && periodoHasta < periodoDesde,
   );
   const canSubmit =
     Boolean(transportistaId) &&
-    Boolean(periodoDesde) &&
-    Boolean(periodoHasta) &&
+    (showFechaDesde ? Boolean(periodoDesde) : true) &&
+    (showFechaHasta ? Boolean(periodoHasta) : true) &&
     !periodoInvalido &&
     !bloqueadoUsd &&
     missingHiddenFields.length === 0 &&
