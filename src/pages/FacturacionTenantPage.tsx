@@ -44,6 +44,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelIdentificacionPersonalizadaViajes,
 } from "@/lib/viajesFlota";
 import {
   metaPaginacionCliente,
@@ -1610,6 +1611,7 @@ export function FacturacionTenantPage({
         tenantId={platform ? tid : undefined}
         idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
         idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
+        idPropio1Label={labelIdentificacionPersonalizadaViajes(tenantParaIdPropio2)}
         idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
         idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         getToken={getToken}
@@ -1704,6 +1706,7 @@ export function FacturacionTenantPage({
           showComprobanteAdjunto={showComprobanteAdjunto}
           idSistemaHabilitado={idSistemaHabilitado(tenantParaIdPropio2)}
           idPropio1Habilitado={idPropio1Habilitado(tenantParaIdPropio2)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(tenantParaIdPropio2)}
           idPropio2Habilitado={idPropio2Habilitado(tenantParaIdPropio2)}
           idPropio2Label={idPropio2Label(tenantParaIdPropio2)}
         />
