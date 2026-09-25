@@ -571,6 +571,24 @@ export function FacturacionTenantPage({
     }
   }
 
+  /**
+   * `viajes` se carga una sola vez (guardado por `ensureViajesLoaded`) y de ahí salen
+   * `clientesParaNuevaFactura`/`viajesNuevaFactura` — el selector de "Nueva factura".
+   * Sin refetch acá, después de crear un borrador o emitir una factura ese estado queda
+   * desactualizado: el viaje recién facturado sigue viéndose "disponible" hasta que el
+   * usuario recarga la página entera a mano (bug real reportado por QA). Se llama tras
+   * `onFacturaGuardada`/`onFacturaEmitida`, saltea el guard de `ensureViajesLoaded` y
+   * refetchea siempre.
+   */
+  async function refetchViajesParaFacturar() {
+    try {
+      const data = await apiJson<Viaje[]>(viajesListUrl, () => getToken());
+      setViajes(data);
+    } catch {
+      // best-effort: si falla, el selector queda con los datos previos
+    }
+  }
+
   useEffect(() => {
     const state = location.state as FacturaNuevaNavState | null;
     if (!state) return;
@@ -792,6 +810,8 @@ export function FacturacionTenantPage({
       }
       if (editingId === f.id) cancelEdit();
       setFacturaDeleteConfirm(null);
+      // Igual que anular: eliminar la factura libera los viajes que tenía vinculados.
+      void refetchViajesParaFacturar();
     } catch {
       showToast("Ocurrió un error al intentar eliminar", "error");
     } finally {
@@ -924,6 +944,10 @@ export function FacturacionTenantPage({
     );
     if (viewingFactura?.id === f.id) setViewingFactura(f);
     setAnularFactura(f);
+    // Anular libera los viajes que tenía vinculados (vuelven a estar disponibles para
+    // una factura nueva) — mismo motivo que el refetch en onFacturaGuardada/onFacturaEmitida.
+    void refetchFacturas();
+    void refetchViajesParaFacturar();
   }
 
   function verComprobanteUrl(url: string | null | undefined) {
@@ -1618,6 +1642,7 @@ export function FacturacionTenantPage({
         facturasCreateUrl={facturasCreateUrl()}
         onFacturaGuardada={() => {
           void refetchFacturas();
+          void refetchViajesParaFacturar();
         }}
         onFacturaEmitida={(f) => {
           setFacturas((prev) =>
@@ -1626,6 +1651,7 @@ export function FacturacionTenantPage({
               : prev,
           );
           void refetchFacturas();
+          void refetchViajesParaFacturar();
         }}
       />
 

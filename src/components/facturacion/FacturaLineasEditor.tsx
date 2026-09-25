@@ -203,6 +203,10 @@ export function defaultFacturaLineas(
   viajes: Viaje[],
 ): FacturaLineaDraft[] {
   const ivaPct = factura.ivaPct ?? 21;
+  // `viajeIds` es requerido en el tipo, pero algunas respuestas de ARCA (anular/emitir
+  // con fallback "pendiente_cae") no siempre lo traían — defensivo para no crashear la
+  // pantalla entera si algún endpoint vuelve a omitirlo.
+  const viajeIds = factura.viajeIds ?? [];
   if (factura.facturarPorTramo && (factura.tramos?.length ?? 0) > 0) {
     const tramosDraft: FacturaTramoDraft[] = (factura.tramos ?? []).map((t) => ({
       viajeId: t.viajeId,
@@ -211,7 +215,7 @@ export function defaultFacturaLineas(
       ivaPct: t.ivaPct,
     }));
     const fromTramos = lineasFromTramos(
-      factura.viajeIds,
+      viajeIds,
       viajes,
       tramosDraft,
       ivaPct,
@@ -233,7 +237,7 @@ export function defaultFacturaLineas(
     }
   }
 
-  const linked = viajes.filter((v) => factura.viajeIds.includes(v.id));
+  const linked = viajes.filter((v) => viajeIds.includes(v.id));
   if (linked.length > 0) {
     const lineas = linked.map((v) => {
       const ruta = v.origen && v.destino ? ` ${v.origen} — ${v.destino}` : '';
