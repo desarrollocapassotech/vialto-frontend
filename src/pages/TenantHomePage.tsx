@@ -212,6 +212,7 @@ export function TenantHomePage() {
 
       {viewingFactura && (
         <FacturaViewModal
+          getToken={getToken}
           factura={viewingFactura}
           onClose={() => setViewingFactura(null)}
           onEditar={() => {

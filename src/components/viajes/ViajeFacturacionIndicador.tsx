@@ -94,6 +94,7 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride, fu
       )}
       {facturaCompleta && (
         <FacturaViewModal
+          getToken={getToken}
           factura={facturaCompleta}
           clienteNombre={viaje.cliente?.nombre}
           onClose={() => setFacturaCompleta(null)}
