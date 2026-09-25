@@ -49,6 +49,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   emptyMessage = "No hay viajes disponibles.",
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: {
@@ -67,6 +68,8 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 1". */
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -195,7 +198,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                   <th className="px-2 py-2 text-left">ID sistema</th>
                 )}
                 {idPropio1Habilitado && (
-                  <th className="px-2 py-2 text-left">ID personalizado</th>
+                  <th className="px-2 py-2 text-left">{idPropio1Label}</th>
                 )}
                 {idPropio2Habilitado && (
                   <th className="px-2 py-2 text-left">{idPropio2Label}</th>

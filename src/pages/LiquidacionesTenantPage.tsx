@@ -43,12 +43,9 @@ import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
-import {
-  listadoTablaHeadRowClass,
-  listadoTablaTdClass,
-  listadoTablaThClass,
-} from "@/lib/listadoTabla";
+import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { anulacionComprobanteLabel } from "@/lib/arcaCbteTipo";
 import { canAccessEmisionLiquidoProductoArca } from "@/lib/tenantModules";
 import {
@@ -56,6 +53,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelIdentificacionPersonalizadaViajes,
 } from "@/lib/viajesFlota";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
@@ -299,6 +297,8 @@ export function LiquidacionesTenantPage() {
     empresaTenant?.liquidacionAnulacionMetodo === "manual"
       ? "manual"
       : "nota_credito_debito";
+
+  useFieldConfig("liquidaciones");
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -1242,6 +1242,7 @@ export function LiquidacionesTenantPage() {
           tenantId={isSuperAdmin ? activeTenantId : undefined}
           idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
           idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onDataSaved={() => {
@@ -1459,6 +1460,7 @@ export function LiquidacionesTenantPage() {
           tenantId={activeTenantId}
           idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
           idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}

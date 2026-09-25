@@ -286,6 +286,7 @@ export function ViajesVinculadosEditor({
   viajesTablaFillHeight = false,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: {
@@ -298,8 +299,9 @@ export function ViajesVinculadosEditor({
   viajesTablaFillHeight?: boolean;
   /** true = el tenant muestra la columna dedicada "ID Sistema" (default true). */
   idSistemaHabilitado?: boolean;
-  /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 1". */
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional en la tabla de selección. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -349,6 +351,7 @@ export function ViajesVinculadosEditor({
           emptyMessage="No hay viajes disponibles para vincular."
           idSistemaHabilitado={idSistemaHabilitado}
           idPropio1Habilitado={idPropio1Habilitado}
+          idPropio1Label={idPropio1Label}
           idPropio2Habilitado={idPropio2Habilitado}
           idPropio2Label={idPropio2Label}
         />
@@ -367,6 +370,7 @@ export function ViajesVinculadosEditor({
       emptyMessage="No hay viajes disponibles para vincular."
       idSistemaHabilitado={idSistemaHabilitado}
       idPropio1Habilitado={idPropio1Habilitado}
+      idPropio1Label={idPropio1Label}
       idPropio2Habilitado={idPropio2Habilitado}
       idPropio2Label={idPropio2Label}
     />
@@ -416,6 +420,8 @@ export type FacturaEditModalProps = {
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 1". */
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -438,6 +444,7 @@ export function FacturaEditModal({
   showComprobanteAdjunto = false,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: FacturaEditModalProps) {
@@ -726,6 +733,7 @@ export function FacturaEditModal({
                 clienteId={draft.clienteId}
                 idSistemaHabilitado={idSistemaHabilitado}
                 idPropio1Habilitado={idPropio1Habilitado}
+                idPropio1Label={idPropio1Label}
                 idPropio2Habilitado={idPropio2Habilitado}
                 idPropio2Label={idPropio2Label}
               />

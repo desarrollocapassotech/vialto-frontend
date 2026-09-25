@@ -184,7 +184,7 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
       </div>
 
       {listo && vacio ? (
-        <EmptyState text="No hay cargos pendientes de cobro ni de pago." />
+        <EmptyState text="No hay comprobantes pendientes de cobro ni de pago." />
       ) : listo ? (
         <>
           <SeccionGrupo titulo="Vencidos" grupo={data!.vencidos} onClick={onSeleccionarContraparte} />

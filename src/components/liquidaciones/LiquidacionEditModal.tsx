@@ -118,6 +118,7 @@ export function LiquidacionEditModal({
   onSaved,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: {
@@ -131,6 +132,8 @@ export function LiquidacionEditModal({
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 1". */
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -146,7 +149,7 @@ export function LiquidacionEditModal({
   const canEditViajes = liq.estado === "borrador";
   const showComprobante = !hasArca;
 
-  const { isVisible } = useFieldConfig("liquidaciones");
+  const { isVisible, isLoading: isFieldConfigLoading } = useFieldConfig("liquidaciones");
   const showFechaDesde = isVisible("edicion_liquidacion", "fechaDesde");
   const showFechaHasta = isVisible("edicion_liquidacion", "fechaHasta");
 
@@ -447,7 +450,7 @@ export function LiquidacionEditModal({
 
   const transportistaNombre = liq.transportista?.nombre ?? liq.transportistaId;
   const cargandoDependencias =
-    lineasLoading || (canEditViajes && viajesTransportistaLoading);
+    lineasLoading || (canEditViajes && viajesTransportistaLoading) || isFieldConfigLoading;
 
   return (
     <ViewModalShell
@@ -578,6 +581,7 @@ export function LiquidacionEditModal({
                   onToggle={toggleViaje}
                   idSistemaHabilitado={idSistemaHabilitado}
                   idPropio1Habilitado={idPropio1Habilitado}
+                  idPropio1Label={idPropio1Label}
                   idPropio2Habilitado={idPropio2Habilitado}
                   idPropio2Label={idPropio2Label}
                   renderMonto={(v) =>

@@ -51,8 +51,10 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { useToast } from "@/lib/toast";
 import {
+  clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
   textoImporteFacturaSeleccion,
 } from "@/lib/viajesFlota";
@@ -106,12 +108,7 @@ function validateFacturaDraft(
 }
 
 function fmtPreviewDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDateUtc(iso);
 }
 
 function fmtPreviewMoney(n: number) {
@@ -123,11 +120,16 @@ function FacturaContraparteField({
   clientes,
   onClienteChange,
   compact = false,
+  loading = false,
 }: {
   clienteId: string;
   clientes: Cliente[];
   onClienteChange: (id: string) => void;
   compact?: boolean;
+  /** Deshabilita el select mientras los viajes todavía no cargaron — evita que se
+   * pueda elegir un cliente de la lista sin filtrar (ver `allAvailableClientes`) que
+   * un instante después queda excluido por no tener nada disponible para facturar. */
+  loading?: boolean;
 }) {
   const labelClass = compact
     ? compactLabelClass
@@ -145,6 +147,7 @@ function FacturaContraparteField({
         allowEmptyValue
         emptyListChoiceLabel="— Sin cliente —"
         placeholderCerrado="— Sin cliente —"
+        loading={loading}
         aria-label="Cliente"
       />
     </div>
@@ -170,6 +173,8 @@ export type FacturaCreateModalProps = {
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  /** Label configurable de la columna "ID Propio 1". */
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna adicional al elegir viajes. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
@@ -198,6 +203,7 @@ export function FacturaCreateModal({
   tenantId,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
   getToken: getTokenProp,
@@ -219,6 +225,43 @@ export function FacturaCreateModal({
   >(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "autorizada">("form");
+  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
+
+  // Clientes con al menos un viaje disponible para vincular a esta factura nueva —
+  // mientras los viajes no cargaron (o el tenant no tiene ninguno) no se filtra, para no
+  // dejar el select vacío por un instante de carga (mismo criterio que
+  // `clientesParaNuevaFactura` en FacturacionTenantPage.tsx). Sin este filtro acá, un
+  // `clientes` prop ya filtrado por el caller quedaba pisado igual: este memo volvía a
+  // sumar cualquier cliente referenciado por `viajes` sin chequear disponibilidad.
+  const allAvailableClientes = useMemo(() => {
+    const sinFiltrar = viajesLoading || viajes.length === 0;
+    const facturables = sinFiltrar ? null : clientesConViajesPendientesFactura(viajes);
+    const map = new Map<string, Cliente>();
+    for (const c of clientes ?? []) {
+      if (c && c.id && (!facturables || facturables.has(c.id))) map.set(c.id, c);
+    }
+    for (const v of viajes ?? []) {
+      if (
+        v.cliente &&
+        v.cliente.id &&
+        (!facturables || facturables.has(v.cliente.id)) &&
+        !map.has(v.cliente.id)
+      ) {
+        map.set(v.cliente.id, v.cliente as Cliente);
+      }
+      for (const cv of v.clientesViaje ?? []) {
+        if (
+          cv.cliente &&
+          cv.cliente.id &&
+          (!facturables || facturables.has(cv.cliente.id)) &&
+          !map.has(cv.cliente.id)
+        ) {
+          map.set(cv.cliente.id, cv.cliente as Cliente);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [clientes, viajes, viajesLoading]);
 
   const allowedClienteIds = useMemo(() => {
     if (draft.viajeIds.length === 0) return null;
@@ -227,8 +270,10 @@ export function FacturaCreateModal({
     const ids = new Set<string>();
 
     activeTrips.forEach((v) => {
-      ids.add(v.clienteId);
-      v.clientesViaje?.forEach((cv) => ids.add(cv.clienteId));
+      if (v.clienteId) ids.add(v.clienteId);
+      v.clientesViaje?.forEach((cv) => {
+        if (cv.clienteId) ids.add(cv.clienteId);
+      });
     });
     return ids;
   }, [draft.viajeIds, viajes]);
@@ -254,7 +299,17 @@ export function FacturaCreateModal({
     });
   }, [viajes, draft.clienteId]);
 
+  // `viajesNueva` (prop) ya viene filtrado por cliente/disponibilidad/ARCA-USD —
+  // ver `viajesFiltradosParaFactura` (lib/viajesFlota.ts), que evalúa el tramo
+  // correcto (principal o adicional) para `draft.clienteId`. Re-filtrar acá por
+  // `v.facturacionEstado` (el estado de la CABECERA/cliente principal, no el del
+  // tramo elegido) rompía un viaje multi-cliente ya facturado a un cliente pero no
+  // al otro: el tramo pendiente del segundo cliente desaparecía igual del listado
+  // ("no hay viajes disponibles") aunque el backend sí lo aceptaba — bug real
+  // detectado en QA. Este memo solo remapea monto/destino al tramo del cliente
+  // elegido; no vuelve a decidir disponibilidad.
   const derivedViajesNueva = useMemo(() => {
+    if (!draft.clienteId) return [];
     return viajesNueva.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
         const vc = v.clientesViaje.find((x) => x.clienteId === draft.clienteId);
@@ -284,23 +339,38 @@ export function FacturaCreateModal({
   const [lineasIncomplete, setLineasIncomplete] = useState<number[]>([]);
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
-  const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
   const filteredClientes = useMemo(() => {
     const base = !allowedClienteIds
-      ? clientes
-      : clientes.filter(c => allowedClienteIds.has(c.id));
+      ? allAvailableClientes
+      : allAvailableClientes.filter((c) => allowedClienteIds.has(c.id));
 
-    if (draft.clienteId && !base.some(c => c.id === draft.clienteId)) {
+    if (draft.clienteId && !base.some((c) => c.id === draft.clienteId)) {
       const fallback =
-        clienteDetalle && clienteDetalle.id === draft.clienteId
+        (clienteDetalle && clienteDetalle.id === draft.clienteId
           ? clienteDetalle
-          : clientes.find(c => c.id === draft.clienteId);
+          : null) ?? allAvailableClientes.find((c) => c.id === draft.clienteId);
       if (fallback) return [...base, fallback];
     }
 
     return base;
-  }, [clientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+  }, [allAvailableClientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+
+  // Si el cliente elegido queda sin ningún viaje disponible una vez que `viajes` ya
+  // terminó de cargar (p. ej. se lo seleccionó durante la ventana de carga inicial, o el
+  // draft quedó de una sesión anterior con datos que después se facturaron), se limpia la
+  // selección en vez de dejarlo "pegado" por el fallback de `filteredClientes` — ese
+  // fallback existe para no perder la selección mientras `clienteDetalle` todavía no
+  // resolvió o mientras `viajes` sigue cargando, no para sostener indefinidamente un
+  // cliente sin nada para facturar.
+  useEffect(() => {
+    if (viajesLoading || viajes.length === 0) return;
+    if (!draft.clienteId) return;
+    if (allAvailableClientes.some((c) => c.id === draft.clienteId)) return;
+    setDraft((d) =>
+      d.clienteId ? { ...d, clienteId: "", viajeIds: [] } : d,
+    );
+  }, [viajesLoading, viajes.length, allAvailableClientes, draft.clienteId, setDraft]);
 
   const [datosReady, setDatosReady] = useState(false);
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
@@ -360,17 +430,25 @@ export function FacturaCreateModal({
       setArcaConfigMissing(false);
       setFacturaEmitida(null);
       setPreviewComprobanteUrl(null);
+      setDatosReady(false);
       return;
     }
-    if (!unifiedArca) return;
+
+    if (draft.clienteId) {
+      const known =
+        allAvailableClientes.find((c) => c.id === draft.clienteId) ?? null;
+      setClienteDetalle((prev) => (prev?.id === draft.clienteId ? prev : known));
+    } else {
+      setClienteDetalle(null);
+    }
+
+    if (!unifiedArca) {
+      setDatosReady(true);
+      return;
+    }
 
     let cancelled = false;
     setDatosReady(false);
-    setClienteDetalle(
-      draft.clienteId
-        ? (clientes.find((c) => c.id === draft.clienteId) ?? null)
-        : null,
-    );
 
     void (async () => {
       try {
@@ -392,8 +470,6 @@ export function FacturaCreateModal({
         } catch {
           /* se valida con lo disponible */
         }
-      } else if (!cancelled) {
-        setClienteDetalle(null);
       }
 
       if (!cancelled) setDatosReady(true);
@@ -407,7 +483,7 @@ export function FacturaCreateModal({
     unifiedArca,
     configUrl,
     draft.clienteId,
-    clientes,
+    allAvailableClientes,
     getToken,
     platform,
     tenantId,
@@ -666,6 +742,7 @@ export function FacturaCreateModal({
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}
+          loading={viajesLoading}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
@@ -737,6 +814,7 @@ export function FacturaCreateModal({
             viajesTablaFillHeight
             idSistemaHabilitado={idSistemaHabilitado}
             idPropio1Habilitado={idPropio1Habilitado}
+            idPropio1Label={idPropio1Label}
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
           />
@@ -798,6 +876,7 @@ export function FacturaCreateModal({
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}
+          loading={viajesLoading}
           onClienteChange={(id) =>
             patch({
               clienteId: id,
@@ -865,6 +944,7 @@ export function FacturaCreateModal({
             clienteId={draft.clienteId}
             idSistemaHabilitado={idSistemaHabilitado}
             idPropio1Habilitado={idPropio1Habilitado}
+            idPropio1Label={idPropio1Label}
             idPropio2Habilitado={idPropio2Habilitado}
             idPropio2Label={idPropio2Label}
           />

@@ -1,3 +1,5 @@
+import { paisCodigoDesdeTexto } from "@/lib/ciudades/paises";
+
 /** Datos mínimos del emisor (config ARCA) para emitir CVLP con PDF completo. */
 export type CvlpEmitEmisor = {
   cuitEmisor?: string | null;
@@ -10,6 +12,8 @@ export type CvlpEmitTransportista = {
   domicilio?: string | null;
   idFiscal?: string | null;
   condicionIva?: number | null;
+  pais?: string | null;
+  condicionTributaria?: string | null;
 };
 
 export type CvlpEmitCliente = {
@@ -17,6 +21,8 @@ export type CvlpEmitCliente = {
   direccion?: string | null;
   idFiscal?: string | null;
   condicionIva?: number | null;
+  pais?: string | null;
+  condicionTributaria?: string | null;
 };
 
 function blank(v: string | null | undefined): boolean {
@@ -39,16 +45,30 @@ export function collectCvlpEmitMissingFields(args: {
   const t = args.transportista;
   if (!t || blank(t.domicilio)) missing.push("Transportista: domicilio");
   if (!t || blank(t.idFiscal)) missing.push("Transportista: CUIT");
-  if (t?.condicionIva == null || !Number.isFinite(t.condicionIva)) {
-    missing.push("Transportista: condición de IVA (país Argentina + campo AFIP)");
+  const tPais = t?.pais ? paisCodigoDesdeTexto(t.pais) : "AR";
+  if (!tPais || tPais === "AR") {
+    if (t?.condicionIva == null || !Number.isFinite(t.condicionIva)) {
+      missing.push("Transportista: condición de IVA (país Argentina + campo AFIP)");
+    }
+  } else {
+    if (blank(t?.condicionTributaria)) {
+      missing.push("Transportista: condición tributaria");
+    }
   }
 
   const c = args.cliente;
   if (!c || blank(c.nombre)) missing.push("Cliente: nombre");
   if (!c || blank(c.direccion)) missing.push("Cliente: domicilio");
   if (!c || blank(c.idFiscal)) missing.push("Cliente: CUIT");
-  if (c?.condicionIva == null || !Number.isFinite(c.condicionIva)) {
-    missing.push("Cliente: condición de IVA (país Argentina + campo AFIP)");
+  const cPais = c?.pais ? paisCodigoDesdeTexto(c.pais) : "AR";
+  if (!cPais || cPais === "AR") {
+    if (c?.condicionIva == null || !Number.isFinite(c.condicionIva)) {
+      missing.push("Cliente: condición de IVA (país Argentina + campo AFIP)");
+    }
+  } else {
+    if (blank(c?.condicionTributaria)) {
+      missing.push("Cliente: condición tributaria");
+    }
   }
 
   return missing;

@@ -62,6 +62,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
 import { pagoTransportistaDraftFromApi } from "@/components/viajes/PagosTransportistaFieldset";
 import { type PaisCodigo } from "@/lib/ciudades";
+import { paisCodigoDesdeTexto } from "@/lib/ciudades/paises";
 import { formatIsoFechaHoraListadoEsAr } from "@/lib/viajeFechaHora";
 import {
   viajePermiteBotonFacturar,
@@ -333,6 +334,7 @@ export function ViajesTenantPage({
   const { tenant: currentTenant } = useCurrentTenant();
   const { showToast } = useToast();
   const { isVisible: isViajeFieldVisible } = useFieldConfig("viajes");
+  useFieldConfig("liquidaciones");
 
   const [viewingFactura, setViewingFactura] = useState<Factura | null>(null);
   const [viewingLiquidacion, setViewingLiquidacion] = useState<any | null>(
@@ -1794,12 +1796,21 @@ export function ViajesTenantPage({
 
   function proceedAfterMultiClientSelector(v: Viaje, targetClienteId?: string) {
     if (hasFacturasArca) {
-      const cliente = clientes?.find(
-        (c) => c.id === (targetClienteId ?? v.clienteId),
-      );
-      const letra = facturaLetraFromCondicionIva(cliente?.condicionIva ?? null);
+      const cid = targetClienteId ?? v.clienteId;
+      const cliente =
+        clientes?.find((c) => c.id === cid) ??
+        (v.clienteId === cid ? v.cliente : undefined) ??
+        v.clientesViaje?.find((cv) => cv.clienteId === cid)?.cliente;
+      const clienteFull = cliente as Partial<Cliente> | undefined;
+      const letra = facturaLetraFromCondicionIva(clienteFull?.condicionIva ?? null);
+      const paisCodigo = clienteFull?.pais ? paisCodigoDesdeTexto(clienteFull.pais) : "AR";
+      const esExterior = Boolean(paisCodigo && paisCodigo !== "AR");
+      const condTexto = esExterior
+        ? clienteFull?.condicionTributaria?.trim() || "Cliente del Exterior"
+        : condicionIvaLabel(clienteFull?.condicionIva ?? null);
+
       showToast(
-        `Se emitirá ${facturaLetraLabel(letra)} — ${condicionIvaLabel(cliente?.condicionIva ?? null)}`,
+        `Se emitirá ${facturaLetraLabel(letra)} — ${condTexto}`,
         "success",
       );
       void navigateToFacturacion(v, letra, targetClienteId);
@@ -3555,6 +3566,7 @@ export function ViajesTenantPage({
             getToken={getToken}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             onDataSaved={() => {
@@ -3672,6 +3684,7 @@ export function ViajesTenantPage({
 
         {viewingFactura && (
           <FacturaViewModal
+            getToken={getToken}
             factura={viewingFactura}
             cliente={
               clientes.find((c) => c.id === viewingFactura.clienteId) ??
@@ -3837,6 +3850,7 @@ export function ViajesTenantPage({
             tenantId={platform ? tid : undefined}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             getToken={getToken}

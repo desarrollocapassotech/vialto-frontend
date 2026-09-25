@@ -36,7 +36,6 @@ import {
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  ivaGeneralSobreBase,
   signedMontoConIvaConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
@@ -147,6 +146,7 @@ interface Props {
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna/línea dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna/línea adicional. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de "ID Propio 2". */
@@ -166,6 +166,7 @@ export function CrearLiquidacionManualModal({
   onDataSaved,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: Props) {
@@ -208,7 +209,7 @@ export function CrearLiquidacionManualModal({
   const [transportistaActualizado, setTransportistaActualizado] =
     useState<Transportista | null>(null);
 
-  const { isVisible } = useFieldConfig("liquidaciones");
+  const { isVisible, isLoading: isFieldConfigLoading } = useFieldConfig("liquidaciones");
   const showFechaDesde = isVisible("alta_liquidacion", "fechaDesde");
   const showFechaHasta = isVisible("alta_liquidacion", "fechaHasta");
 
@@ -783,10 +784,21 @@ export function CrearLiquidacionManualModal({
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
-  const ivaMonto =
-    netoGravado !== null
-      ? ivaGeneralSobreBase(bruto, comisionMonto, ivaPctNum)
-      : null;
+  let ivaGeneral = 0;
+  if (selectedViajes.length > 0) {
+    for (const v of selectedViajes) {
+      const vIva = v.precioTransportistaIvaIncluidoPct ?? ivaPctNum;
+      const vSubtotal = v.precioTransportistaExterno ?? 0;
+      const vComision = (vSubtotal * comisionNum) / 100;
+      const vBase = vSubtotal - vComision;
+      if (vIva > 0) {
+        ivaGeneral += (vBase * vIva) / 100;
+      }
+    }
+  } else {
+    ivaGeneral = ((bruto - comisionMonto) * ivaPctNum) / 100;
+  }
+  const ivaMonto = netoGravado !== null ? ivaGeneral : null;
   const totalALiquidar =
     netoGravado !== null && ivaMonto !== null
       ? netoGravado + ivaMonto + conceptosEfecto
@@ -795,12 +807,12 @@ export function CrearLiquidacionManualModal({
     anyHasPrice && (viajeInicial != null || selectedViajeIds.size > 0);
 
   const periodoInvalido = Boolean(
-    periodoDesde && periodoHasta && periodoHasta < periodoDesde,
+    showFechaDesde && showFechaHasta && periodoDesde && periodoHasta && periodoHasta < periodoDesde,
   );
   const canSubmit =
     Boolean(transportistaId) &&
-    Boolean(periodoDesde) &&
-    Boolean(periodoHasta) &&
+    (showFechaDesde ? Boolean(periodoDesde) : true) &&
+    (showFechaHasta ? Boolean(periodoHasta) : true) &&
     !periodoInvalido &&
     !bloqueadoUsd &&
     missingHiddenFields.length === 0 &&
@@ -979,7 +991,12 @@ export function CrearLiquidacionManualModal({
               onSubmit={(e) => void handleSubmit(e)}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+              {isFieldConfigLoading ? (
+                <div className="flex h-64 items-center justify-center">
+                  <Spinner className="h-6 w-6 text-vialto-fire" />
+                </div>
+              ) : (
+                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
                 <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4 lg:border-r lg:border-black/10">
                   {hasLiquidoProductoArca && (
                     <div className="flex items-center justify-between rounded border border-black/10 bg-white px-4 py-2.5">
@@ -1158,7 +1175,7 @@ export function CrearLiquidacionManualModal({
                         {idPropio1Habilitado && (
                           <div className="flex justify-between gap-3">
                             <span className="text-vialto-steel">
-                              ID personalizado
+                              {idPropio1Label}
                             </span>
                             <span className="font-medium tabular-nums text-vialto-charcoal">
                               {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
@@ -1244,6 +1261,7 @@ export function CrearLiquidacionManualModal({
                         onToggle={toggleViaje}
                         idSistemaHabilitado={idSistemaHabilitado}
                         idPropio1Habilitado={idPropio1Habilitado}
+                        idPropio1Label={idPropio1Label}
                         idPropio2Habilitado={idPropio2Habilitado}
                         idPropio2Label={idPropio2Label}
                         renderMonto={(v) =>
@@ -1552,6 +1570,7 @@ export function CrearLiquidacionManualModal({
                   </div>
                 </aside>
               </div>
+              )}
             </form>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-black/10 px-6 py-4 shrink-0">

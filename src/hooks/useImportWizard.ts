@@ -400,7 +400,6 @@ export function useImportWizard(
 
   async function confirmarModuloActual(
     confirmarCamposFaltantes?: boolean,
-    confirmarFacturasDuplicadas?: boolean,
     decisionesCampoUnicoDuplicado?: { fila: number; accion: "ignorar" | "actualizar" }[],
   ) {
     if (!preview || !moduloActual) return;
@@ -413,7 +412,6 @@ export function useImportWizard(
         ciudadesNormalizadas?: CiudadNormalizadaConfirm[];
         filasExcluidas?: number[];
         confirmarCamposFaltantes?: boolean;
-        confirmarFacturasDuplicadas?: boolean;
         decisionesCampoUnicoDuplicado?: { fila: number; accion: "ignorar" | "actualizar" }[];
       } = {
         sessionId: preview.sessionId,
@@ -427,9 +425,6 @@ export function useImportWizard(
       }
       if (confirmarCamposFaltantes) {
         body.confirmarCamposFaltantes = true;
-      }
-      if (confirmarFacturasDuplicadas) {
-        body.confirmarFacturasDuplicadas = true;
       }
       if (decisionesCampoUnicoDuplicado?.length) {
         body.decisionesCampoUnicoDuplicado = decisionesCampoUnicoDuplicado;

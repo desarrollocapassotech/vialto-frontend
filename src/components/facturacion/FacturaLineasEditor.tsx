@@ -17,6 +17,16 @@ export type FacturaLineaDraft = {
   importe: number;
   importeStr?: string;
   ivaPct?: number;
+  /**
+   * Presentes solo en líneas 1:1 con un viaje vinculado (no en líneas por tramo ni en
+   * la línea única de fallback que consolida varios viajes) — permiten reconstruir el
+   * "Detalle" enriquecido del PDF de factura ARCA al emitir. Ver `matchViajeItem` en
+   * `vialto-backend/factura-pdf.service.ts`: `producto` tiene que ser exactamente
+   * `numeroIdentificacionPersonalizado?.trim() || '#'+numero`.
+   */
+  producto?: string;
+  cantidad?: number;
+  precioUnitario?: number;
 };
 
 const inputClass =
@@ -67,7 +77,18 @@ export function toFacturaLineasPayload(lineas: FacturaLineaDraft[]) {
       descripcion: l.descripcion.trim(),
       importe: l.importe,
       ...(l.ivaPct != null ? { ivaPct: l.ivaPct } : {}),
+      ...(l.producto ? { producto: l.producto } : {}),
+      ...(l.cantidad != null ? { cantidad: l.cantidad } : {}),
+      ...(l.precioUnitario != null ? { precioUnitario: l.precioUnitario } : {}),
     }));
+}
+
+/**
+ * Clave de matching contra el backend (`matchViajeItem` en `factura-pdf.service.ts`):
+ * tiene que ser exactamente `numeroIdentificacionPersonalizado?.trim() || '#'+numero`.
+ */
+function productoKeyViaje(v: Viaje): string {
+  return v.numeroIdentificacionPersonalizado?.trim() || `#${v.numero}`;
 }
 
 function lineasFromTramos(
@@ -146,6 +167,9 @@ export function defaultFacturaLineasFromDraft(
         descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
         ivaPct,
+        producto: productoKeyViaje(v),
+        cantidad: v.cantidadFactura ?? undefined,
+        precioUnitario: v.precioUnitarioFactura ?? undefined,
       };
     });
     const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
@@ -218,6 +242,9 @@ export function defaultFacturaLineas(
         descripcion: `Viaje #${numeroVisibleViaje(v)}${ruta}`,
         importe: monto,
         ivaPct,
+        producto: productoKeyViaje(v),
+        cantidad: v.cantidadFactura ?? undefined,
+        precioUnitario: v.precioUnitarioFactura ?? undefined,
       };
     });
     const netoLineas = lineas.reduce((s, l) => s + l.importe, 0);
