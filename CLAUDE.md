@@ -82,7 +82,7 @@ src/
     tenant/                  # TenantOwnerDashboard.tsx — dashboard real del tenant, montado en TenantHomePage
     combustible/             # CombustibleDashboardSection.tsx, CombustibleDashboardPanels.tsx
     stock/, viajes/, facturacion/, liquidaciones/, choferes/, clientes/,
-    transportistas/, vehiculos/, destinatarios/, direcciones-entrega/
+    transportistas/, vehiculos/, destinatarios/, direcciones-entrega/, cuenta-corriente/
     crud/                    # CrudFieldLabel, CrudInput, CrudSelect, CrudFieldError, CrudFormErrorAlert
     forms/, listado/, shared/
     AppShell.tsx
@@ -105,6 +105,7 @@ src/
     CombustiblePage.tsx / CombustibleTenantPage.tsx
     LiquidacionesTenantPage.tsx, ArcaConfigTenantPage.tsx, SuperadminArcaPage.tsx
     FacturacionPage.tsx / *SuperadminPage.tsx / *TenantPage.tsx
+    CuentaCorrienteTenantPage.tsx  # sin *SuperadminPage.tsx todavía — pendiente, a pedido del cliente cuando valide el resto del módulo
     SuperadminEmpresasPage.tsx, SuperadminUsersPage.tsx, UsuariosTenantPage.tsx, BaseDeDatosPage.tsx
   types/
     api.ts, ownerDashboard.ts, combustibleDashboard.ts, micCrtDocumento.ts
@@ -394,7 +395,7 @@ Aplicar la clase `border-red-400` de forma condicional:
 
 **Regla global para toda sección nueva del dashboard de tenant (`src/components/tenant/TenantOwnerDashboard.tsx`).**
 
-Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
+Cuando el tenant tiene contratado más de un módulo con contenido propio en el dashboard (hoy: Financiero, Stock, Combustible, Cuenta corriente), esas secciones **no se apilan una debajo de la otra**. Se organizan con una barra de pestañas de subrayado, ubicada debajo del selector de período, con el mismo estilo visual que usa `BaseDeDatosPage.tsx` para Clientes/Transportistas/Choferes/etc.
 
 - Si el tenant solo tiene **un** módulo con sección de dashboard, no se muestra la barra de pestañas: esa sección se renderiza directo (sin tab nav de por medio).
 - Si tiene **más de uno**, se arma `moduloTabs: { id, label, icon }[]` agregando una entrada por módulo, condicionada por su respectivo `canAccessX(modules)` de `lib/tenantModules.ts`.

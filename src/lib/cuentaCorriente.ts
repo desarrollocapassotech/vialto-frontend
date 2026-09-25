@@ -1,4 +1,5 @@
-import { apiJson } from '@/lib/api';
+import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
+import { filenameFromContentDisposition } from '@/lib/downloadFilename';
 
 export type TipoMovimientoCc = 'cargo' | 'pago';
 export type TipoContraparte = 'cliente' | 'proveedor';
@@ -119,6 +120,46 @@ export function fetchSaldoProveedor(getToken: GetToken, proveedorId: string) {
   );
 }
 
+export type MovimientoExport = {
+  id: string;
+  fecha: string;
+  tipo: TipoMovimientoCc;
+  origen: string;
+  concepto: string;
+  referencia: string | null;
+  numeroComprobante: string | null;
+  moneda: string;
+  importe: number;
+  estadoDisponibilidad: string;
+  estadoImputacion: string;
+  saldoAcumulado: number;
+};
+
+export type ExportarMovimientosResponse = {
+  clienteId: string | null;
+  proveedorId: string | null;
+  periodo: { desde: string; hasta: string };
+  saldoInicial: number;
+  saldoFinal: number;
+  movimientos: MovimientoExport[];
+};
+
+/** Movimientos de un período con saldo acumulado ya calculado — usado para el export a Excel. */
+export function fetchExportarMovimientos(
+  getToken: GetToken,
+  params: { clienteId?: string; proveedorId?: string; desde: string; hasta: string },
+) {
+  const qs = new URLSearchParams();
+  if (params.clienteId) qs.set('clienteId', params.clienteId);
+  if (params.proveedorId) qs.set('proveedorId', params.proveedorId);
+  qs.set('desde', params.desde);
+  qs.set('hasta', params.hasta);
+  return apiJson<ExportarMovimientosResponse>(
+    `/api/cuenta-corriente/movimientos/exportar?${qs.toString()}`,
+    getToken,
+  );
+}
+
 export type CreateMovimientoCcInput = {
   clienteId?: string;
   proveedorId?: string;
@@ -176,3 +217,44 @@ export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   imputado_parcial: 'Imputado parcial',
   imputado: 'Imputado',
 };
+
+/** Descarga el blob de una respuesta exitosa, o levanta un `ApiError` legible si falló. */
+async function descargarBlobODescartarError(res: Response, fallbackFilename: string) {
+  if (!res.ok) {
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      data = undefined;
+    }
+    throw new ApiError(extractApiErrorMessage(data, res.statusText), res.status, data);
+  }
+  const filename = filenameFromContentDisposition(res.headers.get('Content-Disposition'), fallbackFilename);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Descarga el PDF del estado de cuenta de una contraparte, por período (dispara el download del navegador). */
+export async function descargarEstadoCuentaPdf(
+  getToken: GetToken,
+  params: { clienteId?: string; proveedorId?: string; desde: string; hasta: string },
+) {
+  const qs = new URLSearchParams();
+  if (params.clienteId) qs.set('clienteId', params.clienteId);
+  if (params.proveedorId) qs.set('proveedorId', params.proveedorId);
+  qs.set('desde', params.desde);
+  qs.set('hasta', params.hasta);
+  const res = await apiFetch(`/api/cuenta-corriente/estado-cuenta/pdf?${qs.toString()}`, getToken);
+  await descargarBlobODescartarError(res, 'estado-cuenta.pdf');
+}
+
+/** Descarga el PDF del listado completo de deudores (todos los pendientes de cobro y de pago). */
+export async function descargarListadoDeudoresPdf(getToken: GetToken) {
+  const res = await apiFetch('/api/cuenta-corriente/listado-deudores/pdf', getToken);
+  await descargarBlobODescartarError(res, 'listado-deudores.pdf');
+}

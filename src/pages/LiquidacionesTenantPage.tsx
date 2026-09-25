@@ -1236,6 +1236,7 @@ export function LiquidacionesTenantPage() {
       {showCrear && activeTenantId && (
         <CrearLiquidacionManualModal
           transportistas={transportistasParaNuevaLiquidacion}
+          transportistasLoading={viajesTodosLoading}
           config={config}
           hasLiquidoProductoArca={hasArca}
           getToken={getToken}

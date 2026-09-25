@@ -14,6 +14,7 @@ export type ViajeSeleccionable = {
   choferId?: string | null;
   chofer?: { nombre: string } | null;
   productosViaje?: Array<{ producto: { nombre: string } }>;
+  transportista?: { nombre: string } | null;
 };
 
 function fmtDate(iso: string | null) {
@@ -97,12 +98,14 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
         const productos = mostrarProducto
           ? nombresProductosSeleccion(v).toLowerCase()
           : "";
+        const transporte = (v.transportista?.nombre ?? "").toLowerCase();
         if (
           !numero.includes(q) &&
           !origen.includes(q) &&
           !destino.includes(q) &&
           !chofer.includes(q) &&
-          !productos.includes(q)
+          !productos.includes(q) &&
+          !transporte.includes(q)
         )
           return false;
       }
@@ -135,7 +138,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Número, origen, destino, chofer o producto…"
+            placeholder="Número, origen, destino, chofer, producto o transporte…"
             className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
           />
         </label>
@@ -211,6 +214,7 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                 {mostrarChofer && (
                   <th className="px-2 py-2 text-left">Chofer</th>
                 )}
+                <th className="px-2 py-2 text-left">Transporte</th>
                 <th className="px-2 py-2 text-right">Monto</th>
               </tr>
             </thead>
@@ -271,6 +275,9 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                         {nombreChoferSeleccion(v)}
                       </td>
                     )}
+                    <td className="px-2 py-1.5 text-vialto-steel">
+                      {v.transportista?.nombre ?? "—"}
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-vialto-steel">
                       {renderMonto(v)}
                     </td>
