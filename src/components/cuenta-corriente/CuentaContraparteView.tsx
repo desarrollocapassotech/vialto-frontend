@@ -1,10 +1,14 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
-import {
-  listadoTablaAccionClass,
-  listadoTablaTdClass,
-} from '@/lib/listadoTabla';
+import { listadoTablaAccionClass } from '@/lib/listadoTabla';
+
+/**
+ * Más compacto que `listadoTablaTdClass` (py-3) a propósito: el historial de una
+ * cuenta suele tener decenas/cientos de filas — con el padding default del resto
+ * de los listados quedaba con demasiado espacio en blanco entre fila y fila.
+ */
+const listadoTablaTdClass = 'px-3 py-1.5 text-vialto-charcoal md:px-4';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
 import {
@@ -264,7 +268,7 @@ export function CuentaContraparteView({
               onClick={() => setModal({ kind: 'imputar', cargo: m })}
               className={listadoTablaAccionClass}
             >
-              Imputar pago
+              {m.clienteId ? 'Imputar cobro' : 'Imputar pago'}
             </button>
           ) : null
         }

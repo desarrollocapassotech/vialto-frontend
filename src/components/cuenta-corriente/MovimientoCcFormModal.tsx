@@ -217,7 +217,7 @@ export function MovimientoCcFormModal({
         ) : (
           <div>
             <label className={labelClass} htmlFor="cc-forma-pago">
-              Medio de pago / referencia (opcional)
+              Medio de {esCliente ? 'cobro' : 'pago'} / referencia (opcional)
             </label>
             <input
               id="cc-forma-pago"
