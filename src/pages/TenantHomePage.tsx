@@ -26,6 +26,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelIdentificacionPersonalizadaViajes,
 } from "@/lib/viajesFlota";
 import { useToast } from "@/lib/toast";
 import { apiJson } from "@/lib/api";
@@ -306,6 +307,7 @@ export function TenantHomePage() {
           getToken={getToken}
           idSistemaHabilitado={idSistemaHabilitado(maestro.tenant)}
           idPropio1Habilitado={idPropio1Habilitado(maestro.tenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
           idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
           idPropio2Label={idPropio2Label(maestro.tenant)}
           onDataSaved={() => {
@@ -337,6 +339,7 @@ export function TenantHomePage() {
         hasArca={hasFacturasArca}
         idSistemaHabilitado={idSistemaHabilitado(maestro.tenant)}
         idPropio1Habilitado={idPropio1Habilitado(maestro.tenant)}
+        idPropio1Label={labelIdentificacionPersonalizadaViajes(maestro.tenant)}
         idPropio2Habilitado={idPropio2Habilitado(maestro.tenant)}
         idPropio2Label={idPropio2Label(maestro.tenant)}
         getToken={getToken}

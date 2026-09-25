@@ -146,6 +146,7 @@ interface Props {
   idSistemaHabilitado?: boolean;
   /** true = el tenant muestra la columna/línea dedicada "ID Propio 1" (default true). */
   idPropio1Habilitado?: boolean;
+  idPropio1Label?: string;
   /** true = el tenant habilitó "ID Propio 2" — muestra una columna/línea adicional. */
   idPropio2Habilitado?: boolean;
   /** Label configurable de "ID Propio 2". */
@@ -165,6 +166,7 @@ export function CrearLiquidacionManualModal({
   onDataSaved,
   idSistemaHabilitado = true,
   idPropio1Habilitado = true,
+  idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
 }: Props) {
@@ -1173,7 +1175,7 @@ export function CrearLiquidacionManualModal({
                         {idPropio1Habilitado && (
                           <div className="flex justify-between gap-3">
                             <span className="text-vialto-steel">
-                              ID personalizado
+                              {idPropio1Label}
                             </span>
                             <span className="font-medium tabular-nums text-vialto-charcoal">
                               {viajeInicial.numeroIdentificacionPersonalizado?.trim() ||
@@ -1259,6 +1261,7 @@ export function CrearLiquidacionManualModal({
                         onToggle={toggleViaje}
                         idSistemaHabilitado={idSistemaHabilitado}
                         idPropio1Habilitado={idPropio1Habilitado}
+                        idPropio1Label={idPropio1Label}
                         idPropio2Habilitado={idPropio2Habilitado}
                         idPropio2Label={idPropio2Label}
                         renderMonto={(v) =>

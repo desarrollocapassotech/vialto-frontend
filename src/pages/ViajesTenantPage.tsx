@@ -3566,6 +3566,7 @@ export function ViajesTenantPage({
             getToken={getToken}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             onDataSaved={() => {
@@ -3849,6 +3850,7 @@ export function ViajesTenantPage({
             tenantId={platform ? tid : undefined}
             idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
             idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
             idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
             idPropio2Label={idPropio2Label(currentTenant)}
             getToken={getToken}

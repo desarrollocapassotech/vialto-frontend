@@ -53,6 +53,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  labelIdentificacionPersonalizadaViajes,
 } from "@/lib/viajesFlota";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
@@ -1241,6 +1242,7 @@ export function LiquidacionesTenantPage() {
           tenantId={isSuperAdmin ? activeTenantId : undefined}
           idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
           idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onDataSaved={() => {
@@ -1458,6 +1460,7 @@ export function LiquidacionesTenantPage() {
           tenantId={activeTenantId}
           idSistemaHabilitado={idSistemaHabilitado(empresaTenant)}
           idPropio1Habilitado={idPropio1Habilitado(empresaTenant)}
+          idPropio1Label={labelIdentificacionPersonalizadaViajes(empresaTenant)}
           idPropio2Habilitado={idPropio2Habilitado(empresaTenant)}
           idPropio2Label={idPropio2Label(empresaTenant)}
           onClose={() => setDetail({ mode: "view", liq: detail.liq })}
