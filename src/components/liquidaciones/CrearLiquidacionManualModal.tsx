@@ -204,8 +204,7 @@ export function CrearLiquidacionManualModal({
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
     () =>
-      viajeInicial?.transportistaId?.trim() ??
-      transportistaOpcionesViaje[0]?.id ??
+      (viajeInicial ? transportistaOpcionesViaje[0]?.id : "") ??
       "",
   );
 

@@ -53,14 +53,17 @@ export function transportistasLiquidacionOpcionesDesdeViaje(
     | 'transportista'
     | 'transportistaEfectivoId'
     | 'transportistaEfectivo'
+    | 'liquidacionesViaje'
   >,
   transportistas: Transportista[],
 ): TransportistaLiquidacionOpcion[] {
   const contratanteId = String(v.transportistaId ?? '').trim();
   if (!contratanteId) return [];
 
-  const opciones: TransportistaLiquidacionOpcion[] = [
-    {
+  const opciones: TransportistaLiquidacionOpcion[] = [];
+
+  if (!viajeTieneLiquidacionActivaParaTransportista(v, contratanteId)) {
+    opciones.push({
       id: contratanteId,
       nombre: nombreTransportistaLiquidacion(
         contratanteId,
@@ -68,23 +71,24 @@ export function transportistasLiquidacionOpcionesDesdeViaje(
         transportistas,
       ),
       rolLabel: 'Contratante',
-    },
-  ];
-
-  if (!viajePermiteElegirTransportistaLiquidacion(v)) {
-    return opciones;
+    });
   }
 
-  const efectivoId = transportistaEfectivoIdDesdeViaje(v);
-  opciones.push({
-    id: efectivoId,
-    nombre: nombreTransportistaLiquidacion(
-      efectivoId,
-      v.transportistaEfectivo,
-      transportistas,
-    ),
-    rolLabel: 'Realiza el flete',
-  });
+  if (viajePermiteElegirTransportistaLiquidacion(v)) {
+    const efectivoId = transportistaEfectivoIdDesdeViaje(v);
+    if (!viajeTieneLiquidacionActivaParaTransportista(v, efectivoId)) {
+      opciones.push({
+        id: efectivoId,
+        nombre: nombreTransportistaLiquidacion(
+          efectivoId,
+          v.transportistaEfectivo,
+          transportistas,
+        ),
+        rolLabel: 'Realiza el flete',
+      });
+    }
+  }
+
   return opciones;
 }
 
@@ -117,9 +121,28 @@ export function viajePendienteComprobanteCliente(v: Pick<Viaje, 'facturacionEsta
 }
 
 export function viajePendienteComprobanteTransportista(
-  v: Pick<Viaje, 'liquidacionEstado'>,
+  v: Pick<
+    Viaje,
+    | 'liquidacionEstado'
+    | 'transportistaId'
+    | 'transportistaEfectivoId'
+    | 'transportistaEfectivo'
+    | 'liquidacionesViaje'
+  >,
 ): boolean {
-  return v.liquidacionEstado != null && liquidacionPermiteVincular(v.liquidacionEstado);
+  if (v.liquidacionEstado == null) return false;
+
+  if (viajePermiteElegirTransportistaLiquidacion(v)) {
+    const contratante = String(v.transportistaId ?? '').trim();
+    const efectivo = transportistaEfectivoIdDesdeViaje(v);
+
+    const contratanteLiq = viajeTieneLiquidacionActivaParaTransportista(v, contratante);
+    const efectivoLiq = viajeTieneLiquidacionActivaParaTransportista(v, efectivo);
+
+    return !contratanteLiq || !efectivoLiq;
+  }
+
+  return liquidacionPermiteVincular(v.liquidacionEstado);
 }
 
 /**
