@@ -178,7 +178,28 @@ export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   imputado: 'Imputado',
 };
 
-/** Descarga el PDF del estado de cuenta (dispara el download del navegador). */
+/** Descarga el blob de una respuesta exitosa, o levanta un `ApiError` legible si falló. */
+async function descargarBlobODescartarError(res: Response, fallbackFilename: string) {
+  if (!res.ok) {
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      data = undefined;
+    }
+    throw new ApiError(extractApiErrorMessage(data, res.statusText), res.status, data);
+  }
+  const filename = filenameFromContentDisposition(res.headers.get('Content-Disposition'), fallbackFilename);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Descarga el PDF del estado de cuenta de una contraparte, por período (dispara el download del navegador). */
 export async function descargarEstadoCuentaPdf(
   getToken: GetToken,
   params: { clienteId?: string; proveedorId?: string; desde: string; hasta: string },
@@ -189,24 +210,11 @@ export async function descargarEstadoCuentaPdf(
   qs.set('desde', params.desde);
   qs.set('hasta', params.hasta);
   const res = await apiFetch(`/api/cuenta-corriente/estado-cuenta/pdf?${qs.toString()}`, getToken);
-  if (!res.ok) {
-    let data: unknown;
-    try {
-      data = await res.json();
-    } catch {
-      data = undefined;
-    }
-    throw new ApiError(extractApiErrorMessage(data, res.statusText), res.status, data);
-  }
-  const filename = filenameFromContentDisposition(
-    res.headers.get('Content-Disposition'),
-    'estado-cuenta.pdf',
-  );
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  await descargarBlobODescartarError(res, 'estado-cuenta.pdf');
+}
+
+/** Descarga el PDF del listado completo de deudores (todos los pendientes de cobro y de pago). */
+export async function descargarListadoDeudoresPdf(getToken: GetToken) {
+  const res = await apiFetch('/api/cuenta-corriente/listado-deudores/pdf', getToken);
+  await descargarBlobODescartarError(res, 'listado-deudores.pdf');
 }

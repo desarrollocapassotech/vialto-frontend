@@ -1,8 +1,15 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
+import { FileDown } from 'lucide-react';
 import { formatCurrencyArFromNumber } from '@/lib/currencyMask';
 import { friendlyError } from '@/lib/friendlyError';
-import { fetchTablero, type TableroCcResponse, type TableroItem, type TipoContraparte } from '@/lib/cuentaCorriente';
+import {
+  descargarListadoDeudoresPdf,
+  fetchTablero,
+  type TableroCcResponse,
+  type TableroItem,
+  type TipoContraparte,
+} from '@/lib/cuentaCorriente';
 
 type Props = {
   onSeleccionarContraparte: (tipo: TipoContraparte, id: string, nombre: string | null) => void;
@@ -119,6 +126,8 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
   const [data, setData] = useState<TableroCcResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -144,6 +153,18 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
     };
   }, [getToken, isLoaded, isSignedIn, desde, hasta]);
 
+  async function handleDescargarListado() {
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      await descargarListadoDeudoresPdf(() => getToken());
+    } catch (e) {
+      setErrorDescarga(friendlyError(e, 'cuentaCorriente'));
+    } finally {
+      setDescargando(false);
+    }
+  }
+
   if (error) {
     return (
       <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -165,10 +186,29 @@ export function TableroCuentaCorriente({ onSeleccionarContraparte, desde, hasta 
 
   return (
     <div className="flex flex-col gap-4">
-      {loading && (
-        <p className="flex items-center gap-1.5 text-xs text-vialto-steel">
-          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-vialto-steel border-t-transparent" />
-          Actualizando…
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {loading ? (
+          <p className="flex items-center gap-1.5 text-xs text-vialto-steel">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-vialto-steel border-t-transparent" />
+            Actualizando…
+          </p>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={handleDescargarListado}
+          disabled={descargando}
+          className="inline-flex h-9 items-center gap-2 px-3 border border-black/20 text-vialto-steel text-xs uppercase tracking-wider hover:bg-vialto-mist disabled:opacity-50"
+        >
+          <FileDown className="h-4 w-4" />
+          {descargando ? 'Generando…' : 'Descargar listado de deudores'}
+        </button>
+      </div>
+
+      {errorDescarga && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {errorDescarga}
         </p>
       )}
 
