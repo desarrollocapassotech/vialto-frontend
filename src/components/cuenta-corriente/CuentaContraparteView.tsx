@@ -1,6 +1,8 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FileSpreadsheet, FileText } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { AccionesOpcionesSheet } from '@/components/ui/AccionesOpcionesSheet';
 import { listadoTablaAccionClass } from '@/lib/listadoTabla';
 
 /**
@@ -29,7 +31,7 @@ import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
   | { kind: 'imputar'; cargo: MovimientoCc }
-  | { kind: 'exportar' }
+  | { kind: 'exportar'; formato: 'pdf' | 'excel' }
   | null;
 
 type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
@@ -75,6 +77,7 @@ export function CuentaContraparteView({
   const [saldos, setSaldos] = useState<SaldoPorMoneda[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
@@ -154,10 +157,20 @@ export function CuentaContraparteView({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setModal({ kind: 'exportar' })}
-            className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            onClick={() => setExportMenuOpen(true)}
+            className="inline-flex h-10 items-center gap-1.5 px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
           >
-            Exportar PDF
+            Exportar
+            <svg aria-hidden viewBox="0 0 12 12" className="h-3 w-3 shrink-0">
+              <path
+                d="M2.5 4.5 6 8l3.5-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
           <button
             type="button"
@@ -297,9 +310,30 @@ export function CuentaContraparteView({
           tipoContraparte={tipoContraparte}
           contraparteId={contraparteId}
           contraparteNombre={contraparteNombre}
+          formato={modal.formato}
           onClose={() => setModal(null)}
         />
       )}
+
+      <AccionesOpcionesSheet
+        open={exportMenuOpen}
+        onClose={() => setExportMenuOpen(false)}
+        title="Exportar estado de cuenta"
+        options={[
+          {
+            id: 'pdf',
+            label: 'Exportar PDF',
+            icon: FileText,
+            onClick: () => setModal({ kind: 'exportar', formato: 'pdf' }),
+          },
+          {
+            id: 'excel',
+            label: 'Exportar Excel',
+            icon: FileSpreadsheet,
+            onClick: () => setModal({ kind: 'exportar', formato: 'excel' }),
+          },
+        ]}
+      />
     </div>
   );
 }

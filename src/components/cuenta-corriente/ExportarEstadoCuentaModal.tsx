@@ -6,7 +6,12 @@ import {
   viewModalBtnPrimary,
 } from '@/components/ui/ViewModalShell';
 import { friendlyError } from '@/lib/friendlyError';
-import { descargarEstadoCuentaPdf, type TipoContraparte } from '@/lib/cuentaCorriente';
+import {
+  descargarEstadoCuentaPdf,
+  fetchExportarMovimientos,
+  type TipoContraparte,
+} from '@/lib/cuentaCorriente';
+import { generarEstadoCuentaExcel } from '@/lib/cuentaCorrienteExcelExport';
 
 const inputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
 const labelClass = 'block text-xs uppercase tracking-wider text-vialto-steel mb-1';
@@ -25,6 +30,7 @@ type Props = {
   tipoContraparte: TipoContraparte;
   contraparteId: string;
   contraparteNombre: string;
+  formato: 'pdf' | 'excel';
   onClose: () => void;
 };
 
@@ -32,6 +38,7 @@ export function ExportarEstadoCuentaModal({
   tipoContraparte,
   contraparteId,
   contraparteNombre,
+  formato,
   onClose,
 }: Props) {
   const { getToken } = useAuth();
@@ -49,11 +56,14 @@ export function ExportarEstadoCuentaModal({
     setSaving(true);
     setError(null);
     try {
-      await descargarEstadoCuentaPdf(() => getToken(), {
-        ...(tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId }),
-        desde,
-        hasta,
-      });
+      const contraparteParams =
+        tipoContraparte === 'cliente' ? { clienteId: contraparteId } : { proveedorId: contraparteId };
+      if (formato === 'pdf') {
+        await descargarEstadoCuentaPdf(() => getToken(), { ...contraparteParams, desde, hasta });
+      } else {
+        const data = await fetchExportarMovimientos(() => getToken(), { ...contraparteParams, desde, hasta });
+        generarEstadoCuentaExcel(data, tipoContraparte, contraparteNombre);
+      }
       onClose();
     } catch (err) {
       setError(friendlyError(err, 'cuentaCorriente'));
@@ -77,14 +87,14 @@ export function ExportarEstadoCuentaModal({
             className={viewModalBtnPrimary}
             disabled={saving}
           >
-            {saving ? 'Generando…' : 'Descargar PDF'}
+            {saving ? 'Generando…' : formato === 'pdf' ? 'Descargar PDF' : 'Descargar Excel'}
           </button>
         </>
       }
     >
       <form id="exportar-estado-cuenta-form" onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-vialto-steel">
-          Elegí el período a incluir en el PDF (detalle de movimientos y saldo).
+          Elegí el período a incluir en el {formato === 'pdf' ? 'PDF' : 'Excel'} (detalle de movimientos y saldo).
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -120,6 +120,46 @@ export function fetchSaldoProveedor(getToken: GetToken, proveedorId: string) {
   );
 }
 
+export type MovimientoExport = {
+  id: string;
+  fecha: string;
+  tipo: TipoMovimientoCc;
+  origen: string;
+  concepto: string;
+  referencia: string | null;
+  numeroComprobante: string | null;
+  moneda: string;
+  importe: number;
+  estadoDisponibilidad: string;
+  estadoImputacion: string;
+  saldoAcumulado: number;
+};
+
+export type ExportarMovimientosResponse = {
+  clienteId: string | null;
+  proveedorId: string | null;
+  periodo: { desde: string; hasta: string };
+  saldoInicial: number;
+  saldoFinal: number;
+  movimientos: MovimientoExport[];
+};
+
+/** Movimientos de un período con saldo acumulado ya calculado — usado para el export a Excel. */
+export function fetchExportarMovimientos(
+  getToken: GetToken,
+  params: { clienteId?: string; proveedorId?: string; desde: string; hasta: string },
+) {
+  const qs = new URLSearchParams();
+  if (params.clienteId) qs.set('clienteId', params.clienteId);
+  if (params.proveedorId) qs.set('proveedorId', params.proveedorId);
+  qs.set('desde', params.desde);
+  qs.set('hasta', params.hasta);
+  return apiJson<ExportarMovimientosResponse>(
+    `/api/cuenta-corriente/movimientos/exportar?${qs.toString()}`,
+    getToken,
+  );
+}
+
 export type CreateMovimientoCcInput = {
   clienteId?: string;
   proveedorId?: string;
