@@ -1,4 +1,5 @@
-import { apiJson } from '@/lib/api';
+import { apiFetch, apiJson, ApiError, extractApiErrorMessage } from '@/lib/api';
+import { filenameFromContentDisposition } from '@/lib/downloadFilename';
 
 export type TipoMovimientoCc = 'cargo' | 'pago';
 export type TipoContraparte = 'cliente' | 'proveedor';
@@ -176,3 +177,36 @@ export const ESTADO_IMPUTACION_LABEL: Record<string, string> = {
   imputado_parcial: 'Imputado parcial',
   imputado: 'Imputado',
 };
+
+/** Descarga el PDF del estado de cuenta (dispara el download del navegador). */
+export async function descargarEstadoCuentaPdf(
+  getToken: GetToken,
+  params: { clienteId?: string; proveedorId?: string; desde: string; hasta: string },
+) {
+  const qs = new URLSearchParams();
+  if (params.clienteId) qs.set('clienteId', params.clienteId);
+  if (params.proveedorId) qs.set('proveedorId', params.proveedorId);
+  qs.set('desde', params.desde);
+  qs.set('hasta', params.hasta);
+  const res = await apiFetch(`/api/cuenta-corriente/estado-cuenta/pdf?${qs.toString()}`, getToken);
+  if (!res.ok) {
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      data = undefined;
+    }
+    throw new ApiError(extractApiErrorMessage(data, res.statusText), res.status, data);
+  }
+  const filename = filenameFromContentDisposition(
+    res.headers.get('Content-Disposition'),
+    'estado-cuenta.pdf',
+  );
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

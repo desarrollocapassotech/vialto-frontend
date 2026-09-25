@@ -20,10 +20,12 @@ import {
 } from '@/lib/cuentaCorriente';
 import { MovimientoCcFormModal } from './MovimientoCcFormModal';
 import { ImputarPagoModal } from './ImputarPagoModal';
+import { ExportarEstadoCuentaModal } from './ExportarEstadoCuentaModal';
 
 type ModalState =
   | { kind: 'nuevo'; tipoInicial: TipoMovimientoCc }
   | { kind: 'imputar'; cargo: MovimientoCc }
+  | { kind: 'exportar' }
   | null;
 
 type MovimientoConSaldo = MovimientoCc & { saldoAcumulado: number };
@@ -146,6 +148,13 @@ export function CuentaContraparteView({
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setModal({ kind: 'exportar' })}
+            className="inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+          >
+            Exportar PDF
+          </button>
           <button
             type="button"
             onClick={() => setModal({ kind: 'nuevo', tipoInicial: 'cargo' })}
@@ -277,6 +286,14 @@ export function CuentaContraparteView({
           pagosDisponibles={pagosDisponiblesPara(modal.cargo)}
           onClose={() => setModal(null)}
           onDone={cargarDatos}
+        />
+      )}
+      {modal?.kind === 'exportar' && (
+        <ExportarEstadoCuentaModal
+          tipoContraparte={tipoContraparte}
+          contraparteId={contraparteId}
+          contraparteNombre={contraparteNombre}
+          onClose={() => setModal(null)}
         />
       )}
     </div>
