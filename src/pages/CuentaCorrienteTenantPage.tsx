@@ -1,13 +1,18 @@
 import { useAuth } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileDown } from 'lucide-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
+import { ClienteModal } from '@/components/viajes/ClienteModal';
+import { TransportistaModal } from '@/components/viajes/TransportistaModal';
 import { CuentaContraparteView } from '@/components/cuenta-corriente/CuentaContraparteView';
 import { pageTitleClass } from '@/lib/listadoTabla';
 import { friendlyError } from '@/lib/friendlyError';
 import { descargarListadoDeudoresPdf, type TipoContraparte } from '@/lib/cuentaCorriente';
+import type { Cliente, Transportista } from '@/types/api';
+
+type QuickCreate = 'cliente' | 'transportista' | null;
 
 function toggleButtonClass(active: boolean): string {
   return `h-10 px-4 text-sm uppercase tracking-wider border ${
@@ -25,7 +30,24 @@ export function CuentaCorrienteTenantPage() {
   const [contraparteNombre, setContraparteNombre] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
-  const { clientes, transportistas, loading: maestroLoading } = useMaestroData();
+  const maestro = useMaestroData();
+  const maestroLoading = maestro.loading;
+
+  // Se muestran de inmediato tras crearlos desde el select (antes de que termine el
+  // refetch de `useMaestroData`), igual que en la creación de un viaje.
+  const [sessionClientes, setSessionClientes] = useState<Cliente[]>([]);
+  const clientes = useMemo(() => {
+    const ids = new Set(maestro.clientes.map((c) => c.id));
+    return [...maestro.clientes, ...sessionClientes.filter((c) => !ids.has(c.id))];
+  }, [maestro.clientes, sessionClientes]);
+
+  const [sessionTransportistas, setSessionTransportistas] = useState<Transportista[]>([]);
+  const transportistas = useMemo(() => {
+    const ids = new Set(maestro.transportistas.map((t) => t.id));
+    return [...maestro.transportistas, ...sessionTransportistas.filter((t) => !ids.has(t.id))];
+  }, [maestro.transportistas, sessionTransportistas]);
+
+  const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
 
   async function handleDescargarListado() {
     setDescargando(true);
@@ -119,12 +141,14 @@ export function CuentaCorrienteTenantPage() {
                 value={contraparteId}
                 onChange={setContraparteId}
                 loading={maestroLoading}
+                onNuevo={() => setQuickCreate('cliente')}
               />
             ) : (
               <TransportistaSearchSelect
                 transportistas={transportistas}
                 value={contraparteId}
                 onChange={setContraparteId}
+                onNuevo={() => setQuickCreate('transportista')}
               />
             )}
           </div>
@@ -143,6 +167,31 @@ export function CuentaCorrienteTenantPage() {
           </p>
         )}
       </div>
+
+      {quickCreate === 'cliente' && (
+        <ClienteModal
+          getToken={getToken}
+          onClose={() => setQuickCreate(null)}
+          onSaved={(c) => {
+            setSessionClientes((prev) => [...prev, c]);
+            setContraparteId(c.id);
+            setQuickCreate(null);
+            void maestro.refreshClientes();
+          }}
+        />
+      )}
+      {quickCreate === 'transportista' && (
+        <TransportistaModal
+          getToken={getToken}
+          onClose={() => setQuickCreate(null)}
+          onSaved={(t) => {
+            setSessionTransportistas((prev) => [...prev, t]);
+            setContraparteId(t.id);
+            setQuickCreate(null);
+            void maestro.refreshTransportistas();
+          }}
+        />
+      )}
     </div>
   );
 }
