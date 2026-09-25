@@ -133,6 +133,8 @@ interface Props {
   /** Viaje puntual: el viaje queda fijo; el transportista solo se elige si hay contratante + ejecutor distintos. */
   viajeInicial?: Viaje;
   transportistas: Transportista[];
+  /** true = el host todavía está armando la lista de transportistas: bloquea el modal con un loader. */
+  transportistasLoading?: boolean;
   config?: ArcaConfig | null;
   /** Tenants con ARCA: tipo CVLP, pto venta y emisión electrónica. Sin ARCA: adjunto manual. */
   hasLiquidoProductoArca: boolean;
@@ -156,6 +158,7 @@ interface Props {
 export function CrearLiquidacionManualModal({
   viajeInicial,
   transportistas,
+  transportistasLoading = false,
   config: configProp,
   hasLiquidoProductoArca,
   getToken,
@@ -862,12 +865,24 @@ export function CrearLiquidacionManualModal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`flex w-full flex-col border border-black/10 bg-white shadow-xl overflow-hidden ${
+        className={`relative flex w-full flex-col border border-black/10 bg-white shadow-xl overflow-hidden ${
           step === "autorizada"
             ? "h-auto max-w-lg rounded-lg"
             : "h-[min(92dvh,920px)] max-w-6xl"
         }`}
       >
+        {step !== "autorizada" && transportistasLoading ? (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
+            role="status"
+            aria-live="polite"
+          >
+            <Spinner className="h-8 w-8 text-vialto-charcoal" />
+            <p className="text-sm font-medium text-vialto-charcoal">
+              Cargando transportistas…
+            </p>
+          </div>
+        ) : null}
         {step === "autorizada" ? (
           <>
             <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
