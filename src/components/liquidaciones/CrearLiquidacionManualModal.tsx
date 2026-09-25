@@ -36,7 +36,6 @@ import {
 } from "@/lib/currencyMask";
 import { friendlyError } from "@/lib/friendlyError";
 import {
-  ivaGeneralSobreBase,
   signedMontoConIvaConcepto,
 } from "@/lib/liquidacionConceptosIva";
 import { useToast } from "@/lib/toast";
@@ -783,10 +782,21 @@ export function CrearLiquidacionManualModal({
   );
   const netoGravado = anyHasPrice ? bruto - comisionMonto : null;
   const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
-  const ivaMonto =
-    netoGravado !== null
-      ? ivaGeneralSobreBase(bruto, comisionMonto, ivaPctNum)
-      : null;
+  let ivaGeneral = 0;
+  if (selectedViajes.length > 0) {
+    for (const v of selectedViajes) {
+      const vIva = v.precioTransportistaIvaIncluidoPct ?? ivaPctNum;
+      const vSubtotal = v.precioTransportistaExterno ?? 0;
+      const vComision = (vSubtotal * comisionNum) / 100;
+      const vBase = vSubtotal - vComision;
+      if (vIva > 0) {
+        ivaGeneral += (vBase * vIva) / 100;
+      }
+    }
+  } else {
+    ivaGeneral = ((bruto - comisionMonto) * ivaPctNum) / 100;
+  }
+  const ivaMonto = netoGravado !== null ? ivaGeneral : null;
   const totalALiquidar =
     netoGravado !== null && ivaMonto !== null
       ? netoGravado + ivaMonto + conceptosEfecto
