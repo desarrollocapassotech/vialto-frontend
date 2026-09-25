@@ -2,8 +2,10 @@ import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet, FileText } from 'lucide-react';
 import { ListadoDatos } from '@/components/listado/ListadoDatos';
+import { ListadoFiltroCampo } from '@/components/listado/ListadoFiltroCampo';
+import { ViajesListadoHeaderFiltro } from '@/components/viajes/ViajesListadoHeaderFiltro';
 import { AccionesOpcionesSheet } from '@/components/ui/AccionesOpcionesSheet';
-import { listadoTablaAccionClass } from '@/lib/listadoTabla';
+import { listadoTablaAccionClass, listadoTablaHeadRowClass, listadoTablaThClass } from '@/lib/listadoTabla';
 
 /**
  * Más compacto que `listadoTablaTdClass` (py-3) a propósito: el historial de una
@@ -126,11 +128,131 @@ export function CuentaContraparteView({
     return movimientos.map((m) => ({ ...m, saldoAcumulado: saldoPorId.get(m.id) ?? 0 }));
   }, [movimientos]);
 
+  const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [desdeFiltro, setDesdeFiltro] = useState('');
+  const [hastaFiltro, setHastaFiltro] = useState('');
+  const [conceptoFiltro, setConceptoFiltro] = useState('');
+  const [comprobanteFiltro, setComprobanteFiltro] = useState('');
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (estadoFiltro) n += 1;
+    if (desdeFiltro || hastaFiltro) n += 1;
+    if (conceptoFiltro.trim()) n += 1;
+    if (comprobanteFiltro.trim()) n += 1;
+    return n;
+  }, [estadoFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
+  const anyFiltroActivo = activeFilterCount > 0;
+
+  // Filtro solo de despliegue: se aplica sobre `movimientosConSaldo` (ya calculado con
+  // TODO el historial) para que el saldo acumulado de cada fila siga siendo el real,
+  // en vez de recalcularse desde cero con el subconjunto filtrado.
+  const movimientosFiltrados = useMemo<MovimientoConSaldo[] | null>(() => {
+    if (!movimientosConSaldo) return null;
+    return movimientosConSaldo.filter((m) => {
+      if (estadoFiltro) {
+        const estadoActual = m.tipo === 'cargo' ? m.estadoDisponibilidad : m.estadoImputacion;
+        if (estadoActual !== estadoFiltro) return false;
+      }
+      const fecha = m.fecha.slice(0, 10);
+      if (desdeFiltro && fecha < desdeFiltro) return false;
+      if (hastaFiltro && fecha > hastaFiltro) return false;
+      if (conceptoFiltro.trim() && !m.concepto.toLowerCase().includes(conceptoFiltro.trim().toLowerCase()))
+        return false;
+      if (
+        comprobanteFiltro.trim() &&
+        !(m.numeroComprobante ?? '').toLowerCase().includes(comprobanteFiltro.trim().toLowerCase())
+      )
+        return false;
+      return true;
+    });
+  }, [movimientosConSaldo, estadoFiltro, desdeFiltro, hastaFiltro, conceptoFiltro, comprobanteFiltro]);
+
+  function limpiarFiltros() {
+    setEstadoFiltro('');
+    setDesdeFiltro('');
+    setHastaFiltro('');
+    setConceptoFiltro('');
+    setComprobanteFiltro('');
+  }
+
   function pagosDisponiblesPara(cargo: MovimientoCc) {
     return (movimientos ?? []).filter(
       (m) => m.tipo === 'pago' && m.moneda === cargo.moneda && m.estadoImputacion !== 'imputado',
     );
   }
+
+  const filtroInputClass = 'h-9 w-full border border-black/15 bg-white px-2 text-sm';
+
+  const estadoFiltroSelect = (
+    <select
+      value={estadoFiltro}
+      onChange={(e) => setEstadoFiltro(e.target.value)}
+      className={`${filtroInputClass} ${estadoFiltro ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por estado"
+    >
+      <option value="">Todos</option>
+      <optgroup label={tipoContraparte === 'cliente' ? 'Ventas' : 'Compras'}>
+        {Object.entries(ESTADO_DISPONIBILIDAD_LABEL).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </optgroup>
+      <optgroup label={tipoContraparte === 'cliente' ? 'Cobros' : 'Pagos'}>
+        {Object.entries(ESTADO_IMPUTACION_LABEL).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </optgroup>
+    </select>
+  );
+
+  const fechaFiltroCampos = (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+        Desde
+        <input
+          type="date"
+          value={desdeFiltro}
+          onChange={(e) => setDesdeFiltro(e.target.value)}
+          className={filtroInputClass}
+        />
+      </label>
+      <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
+        Hasta
+        <input
+          type="date"
+          value={hastaFiltro}
+          onChange={(e) => setHastaFiltro(e.target.value)}
+          className={filtroInputClass}
+        />
+      </label>
+    </div>
+  );
+
+  const conceptoFiltroInput = (
+    <input
+      type="text"
+      value={conceptoFiltro}
+      onChange={(e) => setConceptoFiltro(e.target.value)}
+      placeholder="Buscar…"
+      className={`${filtroInputClass} ${conceptoFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por concepto"
+    />
+  );
+
+  const comprobanteFiltroInput = (
+    <input
+      type="text"
+      value={comprobanteFiltro}
+      onChange={(e) => setComprobanteFiltro(e.target.value)}
+      placeholder="Buscar…"
+      className={`${filtroInputClass} ${comprobanteFiltro.trim() ? 'text-vialto-fire' : 'text-vialto-charcoal'}`}
+      aria-label="Filtrar por comprobante"
+    />
+  );
 
   return (
     <div>
@@ -265,14 +387,94 @@ export function CuentaContraparteView({
             tdClassName: listadoTablaTdClass,
           },
         ]}
-        rows={error ? [] : movimientosConSaldo}
+        rows={error ? [] : movimientosFiltrados}
         rowKey={(m) => m.id}
         emptyMessage={
           error
             ? 'No se pudieron cargar los movimientos.'
-            : 'Todavía no hay movimientos para esta cuenta.'
+            : anyFiltroActivo
+              ? 'No hay movimientos que coincidan con los filtros aplicados.'
+              : 'Todavía no hay movimientos para esta cuenta.'
         }
         loadingMessage="Cargando…"
+        activeFilterCount={activeFilterCount}
+        onClearFilters={limpiarFiltros}
+        filters={
+          <>
+            <ListadoFiltroCampo label="Fecha" active={!!desdeFiltro || !!hastaFiltro}>
+              {fechaFiltroCampos}
+            </ListadoFiltroCampo>
+            <ListadoFiltroCampo label="Concepto" active={!!conceptoFiltro.trim()}>
+              {conceptoFiltroInput}
+            </ListadoFiltroCampo>
+            {tipoContraparte === 'cliente' && (
+              <ListadoFiltroCampo label="Comprobante" active={!!comprobanteFiltro.trim()}>
+                {comprobanteFiltroInput}
+              </ListadoFiltroCampo>
+            )}
+            <ListadoFiltroCampo label="Estado" active={!!estadoFiltro}>
+              {estadoFiltroSelect}
+            </ListadoFiltroCampo>
+          </>
+        }
+        tableHead={
+          <tr className={listadoTablaHeadRowClass}>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Fecha"
+                filterActive={!!desdeFiltro || !!hastaFiltro}
+                filterSignature={`${desdeFiltro}|${hastaFiltro}`}
+              >
+                {fechaFiltroCampos}
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Concepto"
+                filterActive={!!conceptoFiltro.trim()}
+                filterSignature={conceptoFiltro}
+              >
+                {conceptoFiltroInput}
+              </ViajesListadoHeaderFiltro>
+            </th>
+            {tipoContraparte === 'cliente' && (
+              <th scope="col" className={`${listadoTablaThClass} align-top`}>
+                <ViajesListadoHeaderFiltro
+                  title="Comprobante"
+                  filterActive={!!comprobanteFiltro.trim()}
+                  filterSignature={comprobanteFiltro}
+                >
+                  {comprobanteFiltroInput}
+                </ViajesListadoHeaderFiltro>
+              </th>
+            )}
+            <th scope="col" className={listadoTablaThClass}>
+              Debe
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Haber
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Saldo
+            </th>
+            <th scope="col" className={listadoTablaThClass}>
+              Saldo acumulado
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} align-top`}>
+              <ViajesListadoHeaderFiltro
+                title="Estado"
+                filterActive={!!estadoFiltro}
+                filterSignature={estadoFiltro}
+              >
+                {estadoFiltroSelect}
+              </ViajesListadoHeaderFiltro>
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              Acciones
+            </th>
+          </tr>
+        }
+        tableColSpan={tipoContraparte === 'cliente' ? 9 : 8}
         renderActions={(m: MovimientoConSaldo) =>
           m.tipo === 'cargo' &&
           (m.estadoDisponibilidad === 'pendiente' || m.estadoDisponibilidad === 'parcial') ? (
