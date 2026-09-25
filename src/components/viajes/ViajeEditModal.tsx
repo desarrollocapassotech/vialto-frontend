@@ -204,6 +204,7 @@ export type ViajeEditModalProps = {
   > | null;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
   hasLiquidoProductoArca?: boolean;
+  hasFacturasArca?: boolean;
   /**
    * Abre el modal de registrar pago (`RegistrarPagoTransportistaModal`, mantenido
    * por la página que hostea este modal). Si no se pasa, el resumen de solo lectura
@@ -258,6 +259,7 @@ export function ViajeEditModal({
   tenantId,
   tenant,
   hasLiquidoProductoArca = false,
+  hasFacturasArca = false,
   onRegistrarPago,
   onProductoCreado,
   onClienteCreado,
@@ -371,8 +373,8 @@ export function ViajeEditModal({
     // `yaNormalizado` evita el loop (no vuelve a setear si ya está todo en el país fijo).
   }, [paisFijo, setDraft, draft]);
 
-  const datosComercialesBloqueados = useMemo(() => {
-    if (!snapshotViaje) return false;
+  const { datosClienteBloqueados, datosTransporteBloqueados } = useMemo(() => {
+    if (!snapshotViaje) return { datosClienteBloqueados: false, datosTransporteBloqueados: false };
     const facturado =
       snapshotViaje.facturacionEstado === "facturado" ||
       snapshotViaje.facturacionEstado === "cobrado";
@@ -382,8 +384,18 @@ export function ViajeEditModal({
       (snapshotViaje as any).liquidacionEstado === "liquidado" ||
       (snapshotViaje as any).liquidacionEstado === "pagado";
 
-    return facturado || liquidado;
-  }, [snapshotViaje]);
+    const hasArca = Boolean(hasFacturasArca || hasLiquidoProductoArca);
+
+    if (hasArca) {
+      const bloqueado = facturado || liquidado;
+      return { datosClienteBloqueados: bloqueado, datosTransporteBloqueados: bloqueado };
+    }
+
+    return {
+      datosClienteBloqueados: facturado,
+      datosTransporteBloqueados: liquidado,
+    };
+  }, [snapshotViaje, hasFacturasArca, hasLiquidoProductoArca]);
 
   // true si el viaje tiene una liquidación vigente (no disponible para vincular
   // una nueva). Se usa para: (1) bloquear "% de IVA que suma el transportista" — mismo
@@ -590,16 +602,17 @@ export function ViajeEditModal({
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-            {datosComercialesBloqueados && (
+            {(datosClienteBloqueados || datosTransporteBloqueados) && (
               <div className="mb-4 flex flex-col gap-1 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                 <strong className="font-semibold">
                   Campos comerciales bloqueados
                 </strong>
                 <p className="text-xs leading-relaxed">
-                  Este viaje tiene un comprobante emitido (factura o
-                  liquidación). Los campos de cliente, transportista y montos
-                  están bloqueados para evitar discrepancias. Si necesitás
-                  modificarlos, primero deberás anular el comprobante.
+                  {datosClienteBloqueados && datosTransporteBloqueados
+                    ? "Este viaje tiene comprobantes emitidos (factura y liquidación). Los campos de cliente, transportista y montos están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular los comprobantes."
+                    : datosClienteBloqueados
+                      ? "Este viaje tiene una factura emitida. Los datos del cliente y los montos a cobrar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la factura."
+                      : "Este viaje tiene una liquidación emitida. Los datos del transportista y los montos a pagar están bloqueados para evitar discrepancias. Si necesitás modificarlos, primero deberás anular la liquidación."}
                 </p>
               </div>
             )}
@@ -708,9 +721,9 @@ export function ViajeEditModal({
                         }
                         inputClassName={inputClass}
                         aria-label="Cliente"
-                        disabled={datosComercialesBloqueados || saving}
+                        disabled={datosClienteBloqueados || saving}
                         onNuevo={
-                          getToken && !datosComercialesBloqueados
+                          getToken && !datosClienteBloqueados
                             ? () => setQuickCreate("cliente")
                             : undefined
                         }
@@ -795,7 +808,7 @@ export function ViajeEditModal({
                             type="text"
                             inputMode="decimal"
                             autoComplete="off"
-                            disabled={datosComercialesBloqueados}
+                            disabled={datosClienteBloqueados}
                             value={draft.cantidadFactura}
                             onChange={(e) =>
                               setDraft((p) =>
@@ -815,7 +828,7 @@ export function ViajeEditModal({
                               type="text"
                               inputMode="decimal"
                               autoComplete="off"
-                              disabled={datosComercialesBloqueados}
+                              disabled={datosClienteBloqueados}
                               value={draft.precioUnitarioFactura}
                               onChange={(e) =>
                                 setDraft((p) =>
@@ -836,7 +849,7 @@ export function ViajeEditModal({
                             />
                             <MonedaSelect
                               value={draft.monedaMonto}
-                              disabled={datosComercialesBloqueados}
+                              disabled={datosClienteBloqueados}
                               onChange={(m) =>
                                 setDraft((p) =>
                                   p
@@ -887,7 +900,7 @@ export function ViajeEditModal({
                             type="text"
                             inputMode="decimal"
                             autoComplete="off"
-                            disabled={datosComercialesBloqueados}
+                            disabled={datosTransporteBloqueados}
                             value={draft.monto}
                             onChange={(e) =>
                               setDraft((p) =>
@@ -907,7 +920,7 @@ export function ViajeEditModal({
                           />
                           <MonedaSelect
                             value={draft.monedaMonto}
-                            disabled={datosComercialesBloqueados}
+                            disabled={datosTransporteBloqueados}
                             onChange={(m: ViajeMonedaCodigo) =>
                               setDraft((p) =>
                                 p
@@ -1008,10 +1021,10 @@ export function ViajeEditModal({
                           )
                         }
                         inputClassName={inputClass}
-                        disabled={datosComercialesBloqueados || saving}
+                        disabled={datosTransporteBloqueados || saving}
                         aria-label="Transportista externo"
                         onNuevo={
-                          getToken && !datosComercialesBloqueados
+                          getToken && !datosTransporteBloqueados
                             ? () => setQuickCreate("transportista")
                             : undefined
                         }
@@ -1028,7 +1041,7 @@ export function ViajeEditModal({
                               type="text"
                               inputMode="decimal"
                               autoComplete="off"
-                              disabled={datosComercialesBloqueados}
+                              disabled={datosTransporteBloqueados}
                               value={draft.cantidadTransportista}
                               onChange={(e) =>
                                 setDraft((p) =>
@@ -1051,7 +1064,7 @@ export function ViajeEditModal({
                                 type="text"
                                 inputMode="decimal"
                                 autoComplete="off"
-                                disabled={datosComercialesBloqueados}
+                                disabled={datosTransporteBloqueados}
                                 value={draft.precioUnitarioTransportista}
                                 onChange={(e) =>
                                   setDraft((p) =>
@@ -1072,7 +1085,7 @@ export function ViajeEditModal({
                               />
                               <MonedaSelect
                                 value={draft.monedaPrecioTransportistaExterno}
-                                disabled={datosComercialesBloqueados}
+                                disabled={datosTransporteBloqueados}
                                 onChange={(m) =>
                                   setDraft((p) =>
                                     p
@@ -1175,7 +1188,7 @@ export function ViajeEditModal({
                                 type="text"
                                 inputMode="decimal"
                                 autoComplete="off"
-                                disabled={datosComercialesBloqueados}
+                                disabled={datosTransporteBloqueados}
                                 value={draft.precioTransportistaExterno}
                                 onChange={(e) =>
                                   setDraft((p) =>
@@ -1196,7 +1209,7 @@ export function ViajeEditModal({
                               />
                               <MonedaSelect
                                 value={draft.monedaPrecioTransportistaExterno}
-                                disabled={datosComercialesBloqueados}
+                                disabled={datosTransporteBloqueados}
                                 onChange={(m: ViajeMonedaCodigo) =>
                                   setDraft((p) =>
                                     p
@@ -1284,11 +1297,11 @@ export function ViajeEditModal({
                         </span>
                         <div className="flex gap-5">
                           <label
-                            className={`flex items-center gap-2 text-sm ${datosComercialesBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
+                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
-                              disabled={datosComercialesBloqueados}
+                              disabled={datosTransporteBloqueados}
                               name={`realiza-flete-edit-${draft.numero || "e"}`}
                               checked={draft.realizaFlete}
                               onChange={() => {
@@ -1308,11 +1321,11 @@ export function ViajeEditModal({
                             Sí
                           </label>
                           <label
-                            className={`flex items-center gap-2 text-sm ${datosComercialesBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
+                            className={`flex items-center gap-2 text-sm ${datosTransporteBloqueados ? "cursor-not-allowed text-vialto-steel/70" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
-                              disabled={datosComercialesBloqueados}
+                              disabled={datosTransporteBloqueados}
                               name={`realiza-flete-edit-${draft.numero || "e"}`}
                               checked={!draft.realizaFlete}
                               onChange={() => {
@@ -1343,7 +1356,7 @@ export function ViajeEditModal({
                                   p ? { ...p, transportistaEfectivoId: id } : p,
                                 );
                               }}
-                              disabled={datosComercialesBloqueados || saving}
+                              disabled={datosTransporteBloqueados || saving}
                               inputClassName={`${inputClass}${
                                 transportistaEfectivoError
                                   ? " border-red-400"
@@ -1351,7 +1364,7 @@ export function ViajeEditModal({
                               }`}
                               aria-label="Transportista que realiza el flete"
                               onNuevo={
-                                getToken && !datosComercialesBloqueados
+                                getToken && !datosTransporteBloqueados
                                   ? () => setQuickCreate("transportista")
                                   : undefined
                               }
@@ -1477,7 +1490,7 @@ export function ViajeEditModal({
                   }
                   labelClassName={labelClass}
                   inputClassName={inputClass}
-                  disabled={datosComercialesBloqueados}
+                  disabled={datosTransporteBloqueados}
                 />
               )}
 
