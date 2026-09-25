@@ -1051,6 +1051,18 @@ export function FacturaCreateModal({
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
+          {step === "form" && viajesLoading ? (
+            <div
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-[1px]"
+              role="status"
+              aria-live="polite"
+            >
+              <Spinner className="h-8 w-8 text-vialto-charcoal" />
+              <p className="text-sm font-medium text-vialto-charcoal">
+                Cargando clientes…
+              </p>
+            </div>
+          ) : null}
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
             <div className="min-w-0">
               <h2
