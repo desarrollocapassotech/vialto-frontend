@@ -83,6 +83,7 @@ export function TenantHomePage() {
     choferes: maestro.choferes,
     transportistas: maestro.transportistas,
     vehiculos: maestro.vehiculos,
+    hasFacturasArca: hasFacturasArca,
     refreshMaestroListas: async () => {
       const [clientes, choferes, transportistas, vehiculos] = await Promise.all(
         [
@@ -383,6 +384,7 @@ export function TenantHomePage() {
             getToken={getToken}
             tenant={maestro.tenant}
             hasLiquidoProductoArca={hasLiquidoProductoArca}
+            hasFacturasArca={hasFacturasArca}
             onProductoCreado={viajeEditor.onProductoCreado}
             onClienteCreado={(c) =>
               viajeEditor.upsertMaestroEdicion("clientes", c)

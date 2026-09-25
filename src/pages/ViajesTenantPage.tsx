@@ -683,6 +683,7 @@ export function ViajesTenantPage({
     choferes,
     transportistas,
     vehiculos,
+    hasFacturasArca: hasFacturasArca,
     refreshMaestroListas: fetchMaestroListasFresh,
     onEntityCreated: (key, item) => {
       if (!platform) return;
@@ -3356,6 +3357,7 @@ export function ViajesTenantPage({
               tenantId={platform ? tid : undefined}
               tenant={!platform ? currentTenant : undefined}
               hasLiquidoProductoArca={hasLiquidoProductoArca}
+              hasFacturasArca={hasFacturasArca}
               onRegistrarPago={() =>
                 setRegistrarPagoViaje(viajeEditor.viajeSnapshot)
               }
