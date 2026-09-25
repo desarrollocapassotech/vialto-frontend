@@ -505,10 +505,12 @@ export function ViajeCreatePage() {
     () => choferesFlotaPropia(todosChoferes),
     [todosChoferes],
   );
-  const choferesExterno = useMemo(
-    () => choferesParaTransportistaExterno(todosChoferes, transportistaId),
-    [todosChoferes, transportistaId],
-  );
+  const choferesExterno = useMemo(() => {
+    const tid = !realizaFlete && transportistaEfectivoId.trim()
+      ? transportistaEfectivoId
+      : transportistaId;
+    return choferesParaTransportistaExterno(todosChoferes, tid);
+  }, [todosChoferes, transportistaId, transportistaEfectivoId, realizaFlete]);
   const vehiculosPropios = useMemo(
     () => vehiculosFlotaPropia(vehiculos),
     [vehiculos],

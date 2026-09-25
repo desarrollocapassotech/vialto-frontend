@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { roundMoney2 } from "@/lib/facturaTotales";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/currencyMask";
 import {
   choferesFlotaPropia,
+  choferesParaTransportistaExterno,
   flotaPropiaVehiculosListaValida,
   entidadesMaestroStubsDesdeViaje,
   maestroListasParaEdicionViaje,
@@ -138,6 +139,14 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
   const vehiculosPropios = vehiculosFlotaPropia(
     edicionMaestro?.vehiculos ?? vehiculos,
   );
+  const choferesExterno = useMemo(() => {
+  const base = edicionMaestro?.choferes ?? choferes;
+  if (!draft || draft.operacionModo !== "externo") return base;
+  const tid = !draft.realizaFlete && draft.transportistaEfectivoId.trim()
+    ? draft.transportistaEfectivoId
+    : draft.transportistaId;
+  return choferesParaTransportistaExterno(base, tid);
+  }, [edicionMaestro, choferes, draft?.operacionModo, draft?.transportistaId, draft?.transportistaEfectivoId, draft?.realizaFlete]);
   const ayudaFlota = edicionMaestro
     ? mensajesAyudaFlotaPropia(edicionMaestro.choferes, edicionMaestro.vehiculos)
     : mensajesAyudaFlotaPropia(choferes, vehiculos);
@@ -749,6 +758,7 @@ export function useViajeEditor(config: UseViajeEditorConfig) {
     edicionMaestro,
     viajeSnapshot,
     choferesPropios,
+    choferesExterno,
     vehiculosPropios,
     ayudaFlota,
     opcionesProducto,
