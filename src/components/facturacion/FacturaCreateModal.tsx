@@ -1047,7 +1047,7 @@ export function FacturaCreateModal({
               ? "max-w-[min(34rem,calc(100vw-1rem))]"
               : unifiedArca
                 ? "max-w-[min(90rem,calc(100vw-1rem))]"
-                : "max-w-[min(72rem,calc(100vw-1rem))]",
+                : "max-w-[min(90rem,calc(100vw-1rem))]",
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1119,10 +1119,10 @@ export function FacturaCreateModal({
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[60%] lg:max-w-[60%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
-                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[40%] lg:max-w-[40%] lg:shrink-0 lg:min-w-0">
+                  <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[35%] lg:max-w-[35%] lg:shrink-0 lg:min-w-0">
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
