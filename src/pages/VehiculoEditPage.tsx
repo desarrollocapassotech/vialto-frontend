@@ -28,9 +28,11 @@ const TIPOS = [
   "tractor",
   "semirremolque",
   "camion",
+  "acoplado",
   "utilitario",
   "otro",
 ] as const;
+
 const LABEL =
   "font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.08em] text-vialto-steel";
 
