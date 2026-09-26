@@ -28,6 +28,7 @@ const TIPOS = [
   "tractor",
   "semirremolque",
   "camion",
+  "acoplado",
   "utilitario",
   "otro",
 ] as const;
