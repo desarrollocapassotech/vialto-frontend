@@ -158,6 +158,7 @@ export type ViajeEditModalProps = {
   transportistas: Transportista[];
   vehiculos: Vehiculo[];
   choferesPropios: Chofer[];
+  choferesExterno: Chofer[];
   vehiculosPropios: Vehiculo[];
   onModoChange: (m: ViajeOperacionModo) => void;
   ayudaFlota: { chofer?: string; vehiculo?: string };
@@ -234,6 +235,7 @@ export function ViajeEditModal({
   transportistas,
   vehiculos,
   choferesPropios,
+  choferesExterno,
   vehiculosPropios,
   onModoChange,
   ayudaFlota,
@@ -307,11 +309,6 @@ export function ViajeEditModal({
       ...localTransportistas.filter((t) => !ids.has(t.id)),
     ];
   }, [transportistas, localTransportistas]);
-
-  const todosChoferes = useMemo(() => {
-    const ids = new Set(choferes.map((c) => c.id));
-    return [...choferes, ...localChoferes.filter((c) => !ids.has(c.id))];
-  }, [choferes, localChoferes]);
 
   const todosChoferesPropios = useMemo(() => {
     const ids = new Set(choferesPropios.map((c) => c.id));
@@ -1383,7 +1380,7 @@ export function ViajeEditModal({
                         <div className="flex min-w-0 flex-col gap-1 max-w-md">
                           <span className={labelClass}>Chofer</span>
                           <ChoferSearchSelect
-                            choferes={todosChoferes}
+                            choferes={choferesExterno}
                             value={draft.choferExternoId}
                             onChange={(id) =>
                               setDraft((p) =>

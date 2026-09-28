@@ -3294,6 +3294,7 @@ export function ViajesTenantPage({
               }
               vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
               choferesPropios={viajeEditor.choferesPropios}
+              choferesExterno={viajeEditor.choferesExterno}
               vehiculosPropios={viajeEditor.vehiculosPropios}
               onModoChange={viajeEditor.applyDraftModo}
               ayudaFlota={viajeEditor.ayudaFlota}
