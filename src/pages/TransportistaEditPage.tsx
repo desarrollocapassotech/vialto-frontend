@@ -29,6 +29,8 @@ import { VencimientoPermisoInput } from "@/components/forms/VencimientoPermisoIn
 import { TelefonoInput } from "@/components/forms/TelefonoInput";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useArcaPadron } from "@/hooks/useArcaPadron";
+import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
 
 export function TransportistaEditPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -41,6 +43,7 @@ export function TransportistaEditPage() {
   const [nombre, setNombre] = useState("");
   const [pais, setPais] = useState<PaisCodigo | "">("");
   const [idFiscal, setIdFiscal] = useState("");
+  const [idFiscalGuardado, setIdFiscalGuardado] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [domicilio, setDomicilio] = useState("");
@@ -74,6 +77,16 @@ export function TransportistaEditPage() {
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
   const faltanDatosFiscales = faltanPais || faltanIdFiscal;
 
+  const arca = useArcaPadron({
+    getToken,
+    pais,
+    idFiscal: idFiscalVisible ? idFiscal : "",
+    nombre: { value: nombre, set: setNombre },
+    domicilio: domicilioVisible ? { value: domicilio, set: setDomicilio } : undefined,
+    condicionIva: condicionVisible ? { value: condicionIva, set: setCondicionIva } : undefined,
+    cuitInicial: idFiscalGuardado,
+  });
+
   useEffect(() => {
     if (!id) return;
     if (!isLoaded || !isSignedIn) return;
@@ -101,6 +114,7 @@ export function TransportistaEditPage() {
           setNombre(row.nombre);
           setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
+          setIdFiscalGuardado(row.idFiscal ?? "");
           setEmail(row.email ?? "");
           setTelefono(row.telefono ?? "");
           setDomicilio(row.domicilio ?? "");
@@ -292,6 +306,7 @@ export function TransportistaEditPage() {
                       value={idFiscal}
                       error={idFiscalError || undefined}
                       onChange={(e) => setIdFiscal(e.target.value)}
+                      onBlur={arca.onIdFiscalBlur}
                     />
                     <CrudFieldError message={idFiscalError} />
                   </label>
@@ -326,6 +341,7 @@ export function TransportistaEditPage() {
                 )}
               </div>
             )}
+            <ArcaPadronStatus {...arca} />
             {faltanDatosFiscales && (
               <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p>
