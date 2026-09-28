@@ -27,6 +27,7 @@ const TIPO_OPCIONES = [
   { value: "tractor", label: "Tractor" },
   { value: "semirremolque", label: "Semirremolque" },
   { value: "camion", label: "Camión" },
+  { value: "acoplado", label: "Acoplado" },
   { value: "utilitario", label: "Utilitario" },
   { value: "otro", label: "Otro" },
 ] as const;
