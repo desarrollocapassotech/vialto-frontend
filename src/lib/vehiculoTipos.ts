@@ -3,6 +3,7 @@ export const VEHICULO_TIPO_VALORES = [
   'tractor',
   'semirremolque',
   'camion',
+  'acoplado',
   'utilitario',
   'otro',
 ] as const;
@@ -13,6 +14,7 @@ export const VEHICULO_TIPO_LABEL: Record<string, string> = {
   tractor: 'Tractor',
   semirremolque: 'Semirremolque',
   camion: 'Camión',
+  acoplado: 'Acoplado',
   utilitario: 'Utilitario',
   otro: 'Otro',
 };
