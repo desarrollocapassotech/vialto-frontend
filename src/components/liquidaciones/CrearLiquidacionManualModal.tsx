@@ -789,7 +789,7 @@ export function CrearLiquidacionManualModal({
   let ivaGeneral = 0;
   if (selectedViajes.length > 0) {
     for (const v of selectedViajes) {
-      const vIva = v.precioTransportistaIvaIncluidoPct ?? ivaPctNum;
+      const vIva = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
       const vSubtotal = v.precioTransportistaExterno ?? 0;
       const vComision = (vSubtotal * comisionNum) / 100;
       const vBase = vSubtotal - vComision;
