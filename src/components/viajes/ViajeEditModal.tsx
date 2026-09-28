@@ -231,7 +231,6 @@ export function ViajeEditModal({
   snapshotViaje,
   opcionesProducto,
   clientes,
-  choferes,
   transportistas,
   vehiculos,
   choferesPropios,
