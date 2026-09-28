@@ -26,6 +26,8 @@ import {
 import type { PaisCodigo } from "@/lib/ciudades";
 import type { Cliente } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useArcaPadron } from "@/hooks/useArcaPadron";
+import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
 
 export function ClienteEditPage() {
   const { getToken } = useAuth();
@@ -39,6 +41,7 @@ export function ClienteEditPage() {
 
   const [nombre, setNombre] = useState("");
   const [idFiscal, setIdFiscal] = useState("");
+  const [idFiscalGuardado, setIdFiscalGuardado] = useState("");
   const [condicionIva, setCondicionIva] = useState<number | null>(null);
   const [condicionTributaria, setCondicionTributaria] = useState("");
   const [email, setEmail] = useState("");
@@ -66,6 +69,16 @@ export function ClienteEditPage() {
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
   const faltanDatosFiscales = faltanPais || faltanIdFiscal;
 
+  const arca = useArcaPadron({
+    getToken,
+    pais,
+    idFiscal: idFiscalVisible ? idFiscal : "",
+    nombre: { value: nombre, set: setNombre },
+    domicilio: direccionVisible ? { value: direccion, set: setDireccion } : undefined,
+    condicionIva: condicionVisible ? { value: condicionIva, set: setCondicionIva } : undefined,
+    cuitInicial: idFiscalGuardado,
+  });
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -80,6 +93,7 @@ export function ClienteEditPage() {
           setNombre(row.nombre);
           setPais(paisCodigoDesdeTexto(row.pais ?? ""));
           setIdFiscal(row.idFiscal ?? "");
+          setIdFiscalGuardado(row.idFiscal ?? "");
           setCondicionIva(row.condicionIva ?? null);
           setCondicionTributaria(row.condicionTributaria ?? "");
           setEmail(row.email ?? "");
@@ -252,6 +266,7 @@ export function ClienteEditPage() {
                       placeholder={idFiscalPorPais(pais).placeholder}
                       error={idFiscalError || undefined}
                       onChange={(e) => setIdFiscal(e.target.value)}
+                      onBlur={arca.onIdFiscalBlur}
                     />
                     <CrudFieldError message={idFiscalError} />
                   </label>
@@ -286,6 +301,7 @@ export function ClienteEditPage() {
                 )}
               </div>
             )}
+            <ArcaPadronStatus {...arca} />
             {faltanDatosFiscales && (
               <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p>

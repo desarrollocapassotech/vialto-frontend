@@ -6,6 +6,7 @@ export {
   inferirPaisDesdeUbicacion,
   idFiscalPorPais,
   validarIdFiscal,
+  cuitDigitoVerificadorValido,
   condicionTributariaPorPais,
   type PaisOpcion,
   type CondicionInfo,

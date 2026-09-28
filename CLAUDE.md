@@ -391,6 +391,17 @@ Aplicar la clase `border-red-400` de forma condicional:
 
 ---
 
+## CUIT de Cliente/Transportista: validación contra ARCA (`useArcaPadron`)
+
+Todo formulario que cargue el CUIT de un Cliente o Transportista (hoy: `ClienteCreatePage`, `ClienteEditPage`, `TransportistaCreatePage`, `TransportistaEditPage`, `ClienteModal`, `TransportistaModal`) usa `hooks/useArcaPadron.ts` + `components/shared/ArcaPadronStatus.tsx`. Disponible para **todo tenant** (el backend usa un certificado de plataforma, ver `core/padron` en el CLAUDE.md del backend) — nunca gatear por módulo ARCA.
+
+- Solo corre con país `AR` y CUIT con dígito verificador válido. Se dispara en el `onBlur` del input de CUIT si el CUIT cambió; en edición se pasa `cuitInicial` para no consultar al abrir la pantalla (queda el botón "Validar CUIT con ARCA").
+- **Autocompletado**: si ARCA devuelve `activo`/`con_observaciones`, pisa solo campos vacíos o que todavía tienen el último valor que puso ARCA. Si el usuario escribió algo distinto (o el registro ya tenía datos), no se toca: aparece "Usar datos de ARCA". El nombre se completa exactamente como figura en ARCA.
+- Pasar `domicilio`/`condicionIva` solo si el campo está visible (`useFieldConfig`); omitirlos si el form no los tiene.
+- **Nunca bloquea el guardado**: `inactivo`/`no_encontrado` muestran aviso rojo; error de conexión muestra "No se pudo validar" + reintentar. El único bloqueo es el dígito verificador, que vive en `validarIdFiscal` (`lib/ciudades/paises.ts`).
+
+---
+
 ## Panel del tenant: pestañas por módulo en el dashboard
 
 **Regla global para toda sección nueva del dashboard de tenant (`src/components/tenant/TenantOwnerDashboard.tsx`).**
