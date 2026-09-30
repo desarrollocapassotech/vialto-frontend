@@ -191,6 +191,8 @@ export function CamposEmpresaPage() {
   const [savingUnidadCantidadViajes, setSavingUnidadCantidadViajes] = useState(false);
   const [empresaPaisOculto, setEmpresaPaisOculto] = useState(false);
   const [savingPaisOculto, setSavingPaisOculto] = useState(false);
+  const [empresaValidacionCuitArca, setEmpresaValidacionCuitArca] = useState(false);
+  const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
   const [savingPaisFijo, setSavingPaisFijo] = useState(false);
   const [paisesEmpresa, setPaisesEmpresa] = useState<Pais[]>([]);
@@ -236,6 +238,7 @@ export function CamposEmpresaPage() {
           );
           setEmpresaPaisOculto(tenant.paisOrigenDestinoOculto ?? false);
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
+          setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -380,6 +383,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingImportToggle(false);
+    }
+  }
+
+  async function toggleValidacionCuitArca() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaValidacionCuitArca;
+    setSavingValidacionCuitArca(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ validacionCuitArcaHabilitada: nuevoValor }),
+      });
+      setEmpresaValidacionCuitArca(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingValidacionCuitArca(false);
     }
   }
 
@@ -1089,6 +1113,28 @@ export function CamposEmpresaPage() {
                             </td>
                           </tr>
                         )}
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Validar CUIT con ARCA (Clientes y Transportistas)
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Al cargar un CUIT argentino, lo consulta en ARCA y
+                              autocompleta nombre, domicilio y condición IVA. No
+                              requiere el módulo ARCA.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaValidacionCuitArca}
+                              disabled={savingValidacionCuitArca}
+                              onChange={() => void toggleValidacionCuitArca()}
+                              label={
+                                empresaValidacionCuitArca
+                                  ? "Deshabilitar validación de CUIT con ARCA"
+                                  : "Habilitar validación de CUIT con ARCA"
+                              }
+                            />
+                          </td>
+                        </tr>
                       </>
                     )}
                   </tbody>

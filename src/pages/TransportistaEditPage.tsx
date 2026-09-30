@@ -62,7 +62,7 @@ export function TransportistaEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("transportistas");
-  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const paisVisible = isVisible("edicion_transportista", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("edicion_transportista", "idFiscal");
   const condicionVisible = isVisible("edicion_transportista", "condicionIvaTributaria");
@@ -79,6 +79,7 @@ export function TransportistaEditPage() {
 
   const arca = useArcaPadron({
     getToken,
+    habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
     pais,
     idFiscal: idFiscalVisible ? idFiscal : "",
     nombre: { value: nombre, set: setNombre },

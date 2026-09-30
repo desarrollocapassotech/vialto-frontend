@@ -8,6 +8,11 @@ import type { Tenant } from '@/types/api';
 export type TenantPaisFijoResult = {
   paisFijo: PaisCodigo | null;
   loading: boolean;
+  /**
+   * Tenant efectivo ya resuelto (propio u override de superadmin), para leer
+   * otros flags de empresa sin volver a pedirlo — ej. `validacionCuitArcaHabilitada`.
+   */
+  tenant: Tenant | null;
 };
 
 /**
@@ -61,7 +66,7 @@ export function useTenantPaisFijo(tenantId?: string): TenantPaisFijoResult {
   const loading = tenantId ? !isLoaded || platformLoading : ownTenantLoading;
 
   if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoCodigo) {
-    return { paisFijo: null, loading };
+    return { paisFijo: null, loading, tenant };
   }
-  return { paisFijo: tenant.paisOrigenDestinoFijoCodigo, loading };
+  return { paisFijo: tenant.paisOrigenDestinoFijoCodigo, loading, tenant };
 }

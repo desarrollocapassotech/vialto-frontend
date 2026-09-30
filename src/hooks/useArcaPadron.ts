@@ -23,8 +23,9 @@ type Campo<T> = { value: T; set: (v: T) => void };
 
 /**
  * Valida un CUIT contra el padrón de ARCA y autocompleta nombre, domicilio y
- * condición IVA en formularios de Cliente/Transportista. Disponible para todo
- * tenant (el backend usa el certificado de plataforma, no el ARCA del tenant).
+ * condición IVA en formularios de Cliente/Transportista. No depende del módulo
+ * ARCA del tenant (el backend usa el certificado de plataforma), pero cada
+ * empresa lo tiene que tener habilitado (`habilitado`).
  *
  * Reglas de autocompletado (solo si ARCA devuelve activo / con observaciones):
  * - un campo vacío, o que todavía tiene el último valor que puso ARCA, se pisa solo;
@@ -34,6 +35,7 @@ type Campo<T> = { value: T; set: (v: T) => void };
  */
 export function useArcaPadron({
   getToken,
+  habilitado,
   pais,
   idFiscal,
   nombre,
@@ -42,6 +44,12 @@ export function useArcaPadron({
   cuitInicial,
 }: {
   getToken: () => Promise<string | null>;
+  /**
+   * Opt-in por empresa: `Tenant.validacionCuitArcaHabilitada` (deshabilitado por
+   * defecto, lo prende el superadmin en "Campos por empresa" → General). En false
+   * no consulta ni muestra nada.
+   */
+  habilitado: boolean;
   pais: PaisCodigo | "";
   idFiscal: string;
   nombre: Campo<string>;
@@ -62,7 +70,7 @@ export function useArcaPadron({
   campos.current = { nombre, domicilio, condicionIva };
 
   const cuit = idFiscal.replace(/\D/g, "");
-  const aplica = pais === "AR";
+  const aplica = habilitado && pais === "AR";
   const cuitValido = aplica && cuitDigitoVerificadorValido(cuit);
   // Un resultado de otro CUIT (el usuario lo cambió después) no se muestra.
   const estadoVisible: ArcaPadronEstado =

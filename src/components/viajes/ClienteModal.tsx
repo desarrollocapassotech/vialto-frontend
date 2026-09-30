@@ -37,10 +37,11 @@ export function ClienteModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
+  const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
 
   const arca = useArcaPadron({
     getToken,
+    habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
     pais,
     idFiscal,
     nombre: { value: nombre, set: setNombre },

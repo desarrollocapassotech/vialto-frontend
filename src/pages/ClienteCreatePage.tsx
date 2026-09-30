@@ -49,7 +49,7 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const paisVisible = isVisible("alta_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
   const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
@@ -63,6 +63,7 @@ export function ClienteCreatePage() {
 
   const arca = useArcaPadron({
     getToken,
+    habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
     pais,
     idFiscal: idFiscalVisible ? idFiscal : "",
     nombre: { value: nombre, set: setNombre },

@@ -432,6 +432,8 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /** true = valida el CUIT de clientes/transportistas contra ARCA y autocompleta datos. Default false; solo lo cambia superadmin. */
+  validacionCuitArcaHabilitada?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
