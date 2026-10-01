@@ -114,7 +114,10 @@ export function useImportWizard(
       }
 
       setFase("modulo");
-      void previewModuloActual(f, 0);
+      // Con await (no fire-and-forget): si no, el `finally` de abajo apaga
+      // `loading` mientras el preview todavía está en curso y el paso del
+      // módulo queda en blanco, sin spinner, hasta que llega la respuesta.
+      await previewModuloActual(f, 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al validar archivo.");
     } finally {
