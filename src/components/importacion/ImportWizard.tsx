@@ -30,6 +30,7 @@ import { descargarPlantillaImportacion } from "@/lib/importacionPlantillaExcelEx
 import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useMaestroData } from "@/hooks/useMaestroData";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
@@ -104,6 +105,11 @@ export function ImportWizard({
   const hasLiquidaciones = tenantModules.includes("liquidaciones");
   const puedeLiquidaciones = hasLiquidaciones || hasLiquidoProductoArca;
   const puedeFacturas = hasFacturasArca || hasFacturacion;
+  // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
+  // el paso "Transportes" no se ofrece ni se recorre.
+  const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
+  const moduloPermitido = (m: ModuloWizard) =>
+    m !== "transportistas" || transportistaExternoVisible;
 
   // Un tenant nuevo (sin nada cargado todavía, y sin liquidaciones/facturas
   // que ofrecer) arranca directo con la secuencia completa — es el caso de
@@ -231,7 +237,7 @@ export function ImportWizard({
 
   const wizard = useImportWizard(
     tenantId,
-    modulosElegidos ?? [...MODULOS_SECUENCIA],
+    (modulosElegidos ?? [...MODULOS_SECUENCIA]).filter(moduloPermitido),
     () => getToken(),
   );
 
@@ -307,8 +313,11 @@ export function ImportWizard({
     }
   }
 
+  const seleccionadosPermitidos = new Set(
+    [...seleccionados].filter(moduloPermitido),
+  );
   const ordenadosSeleccion = MODULOS_SECUENCIA.filter((m) =>
-    seleccionados.has(m),
+    seleccionadosPermitidos.has(m),
   );
 
   if (!tieneDatos) {
@@ -337,7 +346,8 @@ export function ImportWizard({
           puedeLiquidaciones={puedeLiquidaciones}
           puedeFacturas={puedeFacturas}
           columnasEsperadas={columnasEsperadas}
-          seleccionados={seleccionados}
+          seleccionados={seleccionadosPermitidos}
+          moduloPermitido={moduloPermitido}
           onToggleModulo={toggleModulo}
           liquidacionesSel={liquidacionesSel}
           onToggleLiquidaciones={setLiquidacionesSel}
@@ -893,6 +903,7 @@ function SelectorModulos({
   puedeFacturas,
   columnasEsperadas,
   seleccionados,
+  moduloPermitido,
   onToggleModulo,
   liquidacionesSel,
   onToggleLiquidaciones,
@@ -906,6 +917,8 @@ function SelectorModulos({
   columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
   /** Estado de los checks vive en ImportWizard (no acá) para que el stepper de arriba se actualice en vivo a medida que se tildan/destildan módulos. */
   seleccionados: Set<ModuloWizard>;
+  /** false = la empresa no usa ese módulo (ej. Transportes en una empresa solo de flota propia). */
+  moduloPermitido: (modulo: ModuloWizard) => boolean;
   onToggleModulo: (modulo: ModuloWizard) => void;
   liquidacionesSel: boolean;
   onToggleLiquidaciones: (checked: boolean) => void;
@@ -924,7 +937,7 @@ function SelectorModulos({
 
       <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left lg:grid-cols-2 lg:items-stretch">
         <div className="flex h-full flex-col divide-y divide-black/10 border border-black/10 bg-white">
-          {MODULOS_SELECTOR.map(({ key, tieneDatosKey }) => (
+          {MODULOS_SELECTOR.filter(({ key }) => moduloPermitido(key)).map(({ key, tieneDatosKey }) => (
             <label
               key={key}
               className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
