@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import { useUser } from "@clerk/clerk-react";
+import { isPlatformSuperadmin } from "@/lib/roleLabels";
 import { ApiError, apiJson } from "@/lib/api";
 import { cuitDigitoVerificadorValido } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
@@ -60,6 +62,9 @@ export function useArcaPadron({
   /** Edición: CUIT ya guardado — no se consulta solo al salir del campo si no cambió. */
   cuitInicial?: string;
 }) {
+  const { user } = useUser();
+  const isSuperadmin = isPlatformSuperadmin(user?.publicMetadata);
+
   const [estado, setEstado] = useState<ArcaPadronEstado>({ status: "idle" });
   const ultimoConsultado = useRef<string | null>(null);
   const ultimoAutocompletado = useRef<{ nombre?: string; domicilio?: string; condicionIva?: number | null }>({});
@@ -70,7 +75,7 @@ export function useArcaPadron({
   campos.current = { nombre, domicilio, condicionIva };
 
   const cuit = idFiscal.replace(/\D/g, "");
-  const aplica = habilitado && pais === "AR";
+  const aplica = (habilitado || isSuperadmin) && pais === "AR";
   const cuitValido = aplica && cuitDigitoVerificadorValido(cuit);
   // Un resultado de otro CUIT (el usuario lo cambió después) no se muestra.
   const estadoVisible: ArcaPadronEstado =
