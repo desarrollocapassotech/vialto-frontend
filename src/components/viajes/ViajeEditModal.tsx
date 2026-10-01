@@ -92,6 +92,7 @@ import {
   type ViajeDestinoRowDraft,
 } from "@/lib/viajesDestinos";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import {
   ViajeClientesFieldset,
   ClienteCard,
@@ -276,6 +277,8 @@ export function ViajeEditModal({
     | "pais";
   const { user } = useUser();
   const { isVisible } = useFieldConfig("viajes");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible();
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "edicion_viaje",
@@ -994,6 +997,8 @@ export function ViajeEditModal({
               <ViajeOperacionTipoFieldset
                 modo={draft.operacionModo}
                 onModoChange={onModoChange}
+                externoVisible={transportistaExternoVisible}
+                propioVisible={flotaPropiaVisible}
                 groupName={`viaje-edit-${draft.numero || "e"}`}
                 externoContent={
                   <div className="grid gap-3">

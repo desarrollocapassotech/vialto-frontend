@@ -77,6 +77,7 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import {
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
@@ -112,6 +113,8 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible();
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "alta_viaje",
@@ -555,6 +558,15 @@ export function ViajeCreatePage() {
       setPagosTransportista([]);
     }
   }
+
+  // Empresa solo de flota propia: el alta arranca en "externo" por defecto,
+  // así que en cuanto carga la config se pasa a flota propia.
+  useEffect(() => {
+    if (!transportistaExternoVisible && modoOperacion === "externo") {
+      applyModoOperacion("propio");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transportistaExternoVisible, modoOperacion]);
 
   function buildGananciaDraft(): GananciaBrutaManualDraftSlice {
     return {
@@ -1138,6 +1150,8 @@ export function ViajeCreatePage() {
               <ViajeCreateStep2Operacion
                 modoOperacion={modoOperacion}
                 onModoChange={applyModoOperacion}
+                externoVisible={transportistaExternoVisible}
+                propioVisible={flotaPropiaVisible}
                 transportistaId={transportistaId}
                 onTransportistaIdChange={(id) => {
                   setTransportistaId(id);

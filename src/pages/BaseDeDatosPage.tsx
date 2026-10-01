@@ -34,7 +34,7 @@ import { UsuariosTenantPage } from "./UsuariosTenantPage";
 import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
-import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import {
   canAccessViajes,
   canAccessStock,
@@ -87,10 +87,10 @@ export function BaseDeDatosPage() {
   const { tenant, loading: tenantLoading } = useCurrentTenant();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isVisible: isChoferOpcionVisible } = useFieldConfig("choferes");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible();
   const hasAlgunaPertenenciaChofer =
-    isChoferOpcionVisible("alta_chofer", "flotaPropia") ||
-    isChoferOpcionVisible("alta_chofer", "transportistaExterno");
+    flotaPropiaVisible || transportistaExternoVisible;
 
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
   const tabsLoading = !isLoaded || tenantLoading;
@@ -111,7 +111,9 @@ export function BaseDeDatosPage() {
       case "clientes":
         return hasViajes || hasStock || hasFacturacion;
       case "transportistas":
-        return hasViajes;
+        // Empresa solo de flota propia (superadmin deshabilitó la opción
+        // "Transportista externo" del chofer): no trabaja con transportistas.
+        return hasViajes && (superadmin || transportistaExternoVisible);
       case "vehiculos":
         return hasViajes || hasCombustible;
       case "destinatarios":

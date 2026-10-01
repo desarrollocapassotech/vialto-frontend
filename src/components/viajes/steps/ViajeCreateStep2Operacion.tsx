@@ -41,6 +41,8 @@ function fmtReadonlyMoney(n: number) {
 interface Props {
   modoOperacion: ViajeOperacionModo;
   onModoChange: (m: ViajeOperacionModo) => void;
+  externoVisible: boolean;
+  propioVisible: boolean;
 
   // Transportista externo
   transportistaId: string;
@@ -132,6 +134,8 @@ interface Props {
 export function ViajeCreateStep2Operacion({
   modoOperacion,
   onModoChange,
+  externoVisible,
+  propioVisible,
   transportistaId,
   onTransportistaIdChange,
   transportistas,
@@ -201,6 +205,8 @@ export function ViajeCreateStep2Operacion({
       <ViajeOperacionTipoFieldset
         modo={modoOperacion}
         onModoChange={onModoChange}
+        externoVisible={externoVisible}
+        propioVisible={propioVisible}
         className="min-w-0 space-y-3 border-0 p-0 [&:disabled]:opacity-60"
         externoContent={
           <div className="grid gap-3">
