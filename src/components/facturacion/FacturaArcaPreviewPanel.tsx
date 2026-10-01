@@ -11,6 +11,7 @@ import {
 } from "@/lib/arcaCbteTipo";
 import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
+import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
@@ -241,21 +242,9 @@ export function FacturaArcaPreviewPanel({
         </div>
       </div>
 
-      {sinConfigArca && (
-        <div
-          className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-          role="alert"
-        >
-          <p className="font-medium">Falta configuración ARCA del tenant</p>
-          <p className="mt-1">
-            {platform
-              ? "Completala en Superadmin → ARCA / AFIP antes de emitir."
-              : "Completala en Configuración ARCA antes de emitir."}
-          </p>
-        </div>
-      )}
+      {sinConfigArca && <SinConfigArcaAviso platform={platform} />}
 
-      {datosEmitIncompletos && !sinConfigArca && (
+      {datosEmitIncompletos && (
         <DatosFiscalesFaltantesAlerta
           missingEmitFields={
             clienteDetalle

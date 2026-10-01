@@ -587,15 +587,8 @@ export function FacturaCreateModal({
         );
         return;
       }
-      if (sinConfigArca) {
-        setArcaConfigMissing(true);
-        notifyError(
-          platform
-            ? "Este tenant no tiene configuración ARCA. Configurala en Superadmin → ARCA / AFIP."
-            : "No hay configuración ARCA para este tenant. Completala en Configuración ARCA.",
-        );
-        return;
-      }
+      // Sin configuración ARCA no se bloquea: el tenant está en homologación y
+      // el backend emite con datos de prueba (solo producción la necesita).
       if (datosEmitIncompletos) {
         notifyError(missingEmitMessage ?? "Faltan datos para emitir.");
         return;

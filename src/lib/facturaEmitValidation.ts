@@ -37,12 +37,18 @@ export function collectFacturaEmitMissingFields(args: {
   cliente: FacturaEmitCliente | null | undefined;
 }): string[] {
   const missing: string[] = [];
+  // Sin configuración ARCA (`emisor` null) el tenant está en homologación y el
+  // backend emite con datos de emisor de prueba (ver
+  // `ArcaConfigService.configHomologacionPorDefecto`) — no hay nada que pedir.
+  // Si tiene configuración, sus datos sí tienen que estar completos.
   const e = args.emisor;
-  if (!e || blank(e.cuitEmisor)) missing.push("Emisor: CUIT");
-  if (!e || blank(e.razonSocial)) missing.push("Emisor: razón social");
-  if (!e || blank(e.domicilioEmisor)) missing.push("Emisor: domicilio");
-  if (!e || blank(e.ingBrutos)) missing.push("Emisor: Ingresos Brutos");
-  if (!e || blank(e.inicActEmisor)) missing.push("Emisor: inicio de actividad");
+  if (e) {
+    if (blank(e.cuitEmisor)) missing.push("Emisor: CUIT");
+    if (blank(e.razonSocial)) missing.push("Emisor: razón social");
+    if (blank(e.domicilioEmisor)) missing.push("Emisor: domicilio");
+    if (blank(e.ingBrutos)) missing.push("Emisor: Ingresos Brutos");
+    if (blank(e.inicActEmisor)) missing.push("Emisor: inicio de actividad");
+  }
 
   const c = args.cliente;
   if (!c || blank(c.nombre)) missing.push("Cliente: nombre");
