@@ -10,6 +10,7 @@ import {
   facturaLetraLabel,
 } from "@/lib/arcaCbteTipo";
 import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import type { ArcaConfig, Cliente } from "@/types/api";
@@ -29,14 +30,8 @@ function fmtMoney(n: number) {
   return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
 }
 
-function fmtDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+// Fecha sin hora: siempre en UTC, si no en Argentina se ve un día antes (ver CLAUDE.md del frontend).
+const fmtDate = fmtDateUtc;
 
 export type FacturaArcaPreviewPanelProps = {
   arcaConfig: ArcaConfig | null;
