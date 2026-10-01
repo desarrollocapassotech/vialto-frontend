@@ -278,7 +278,7 @@ export function ViajeEditModal({
   const { user } = useUser();
   const { isVisible } = useFieldConfig("viajes");
   const { flotaPropiaVisible, transportistaExternoVisible } =
-    useTipoFlotaVisible();
+    useTipoFlotaVisible(tenantId || undefined);
   const desgloseActivo = isVisible("edicion_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "edicion_viaje",

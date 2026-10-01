@@ -17,7 +17,7 @@ import {
   LiquidacionAnulacionMetodoRadios,
   type LiquidacionAnulacionMetodo,
 } from "@/components/superadmin/LiquidacionAnulacionMetodoFields";
-import type { Pais, Tenant } from "@/types/api";
+import type { Pais, Tenant, TipoFlota } from "@/types/api";
 
 /**
  * Módulos de `FIELD_CATALOG` que son módulos vendibles reales (`Tenant.modules`)
@@ -193,6 +193,8 @@ export function CamposEmpresaPage() {
   const [savingPaisOculto, setSavingPaisOculto] = useState(false);
   const [empresaValidacionCuitArca, setEmpresaValidacionCuitArca] = useState(false);
   const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
+  const [empresaTipoFlota, setEmpresaTipoFlota] = useState<TipoFlota>("mixta");
+  const [savingTipoFlota, setSavingTipoFlota] = useState(false);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
   const [savingPaisFijo, setSavingPaisFijo] = useState(false);
   const [paisesEmpresa, setPaisesEmpresa] = useState<Pais[]>([]);
@@ -239,6 +241,7 @@ export function CamposEmpresaPage() {
           setEmpresaPaisOculto(tenant.paisOrigenDestinoOculto ?? false);
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
+          setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -449,6 +452,28 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingLiquidacionAnulacionMetodo(false);
+    }
+  }
+
+  async function guardarTipoFlota(valor: TipoFlota) {
+    if (!filtroEmpresa || valor === empresaTipoFlota) return;
+    const anterior = empresaTipoFlota;
+    setEmpresaTipoFlota(valor);
+    setSavingTipoFlota(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ tipoFlota: valor }),
+      });
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      setEmpresaTipoFlota(anterior);
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingTipoFlota(false);
     }
   }
 
@@ -1133,6 +1158,32 @@ export function CamposEmpresaPage() {
                                   : "Habilitar validación de CUIT con ARCA"
                               }
                             />
+                          </td>
+                        </tr>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Tipo de flota
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Define qué opciones de pertenencia ven Choferes y
+                              Vehículos, el tipo de flota al cargar un Viaje y si
+                              se muestra la pestaña Transportistas.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <select
+                              value={empresaTipoFlota}
+                              disabled={savingTipoFlota}
+                              onChange={(e) =>
+                                void guardarTipoFlota(e.target.value as TipoFlota)
+                              }
+                              className="h-9 w-full max-w-xs border border-black/15 bg-white px-2 text-sm text-left disabled:opacity-50"
+                            >
+                              <option value="mixta">
+                                Flota propia y transportistas externos
+                              </option>
+                              <option value="propia">Solo flota propia</option>
+                              <option value="externa">Solo transportistas externos</option>
+                            </select>
                           </td>
                         </tr>
                       </>

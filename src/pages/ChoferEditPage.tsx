@@ -24,6 +24,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { canAccessCombustible } from "@/lib/tenantModules";
 import type { Chofer } from "@/types/api";
 
@@ -68,8 +69,9 @@ export function ChoferEditPage() {
   const [showPinInput, setShowPinInput] = useState(false);
 
   const { isVisible } = useFieldConfig("choferes");
-  const flotaPropiaVisible = isVisible("edicion_chofer", "flotaPropia");
-  const transportistaExternoVisible = isVisible("edicion_chofer", "transportistaExterno");
+  const { flotaPropiaVisible, transportistaExternoVisible } = useTipoFlotaVisible(
+    tenantId || undefined,
+  );
   const dniVisible = isVisible("edicion_chofer", "dni");
   const cuitVisible = isVisible("edicion_chofer", "cuit");
   const telefonoVisible = isVisible("edicion_chofer", "telefono");

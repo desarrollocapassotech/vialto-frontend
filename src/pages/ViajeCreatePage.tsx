@@ -114,7 +114,7 @@ export function ViajeCreatePage() {
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
   const { flotaPropiaVisible, transportistaExternoVisible } =
-    useTipoFlotaVisible();
+    useTipoFlotaVisible(tenantId || undefined);
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "alta_viaje",

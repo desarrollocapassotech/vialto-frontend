@@ -23,6 +23,7 @@ import {
 } from "@/lib/vehiculoForm";
 import type { Vehiculo } from "@/types/api";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 
 const TIPOS = [
   "tractor",
@@ -74,6 +75,11 @@ export function VehiculoEditPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("vehiculos");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible(tenantId || undefined);
+  // Pertenencia con la que vino el registro: si ya estaba en una opción que la
+  // empresa después deshabilitó, se sigue mostrando para poder corregirla.
+  const [modoOriginal, setModoOriginal] = useState<AsignacionModo | null>(null);
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => (prev ? { ...prev, ...p } : prev));
@@ -97,7 +103,9 @@ export function VehiculoEditPage() {
         if (!cancelled) {
           const next = vehiculoFormStateFromApi(row);
           setForm(next);
-          setAsignacionModo(next.transportistaId.trim() ? "externo" : "propio");
+          const modo = next.transportistaId.trim() ? "externo" : "propio";
+          setAsignacionModo(modo);
+          setModoOriginal(modo);
           setError(null);
         }
       } catch (e) {
@@ -321,7 +329,17 @@ export function VehiculoEditPage() {
                 }}
                 transportistas={transportistas}
                 loadingTransportistas={loadingTransportistas}
+                mostrarFlotaPropia={flotaPropiaVisible || modoOriginal === "propio"}
+                mostrarTransportistaExterno={
+                  transportistaExternoVisible || modoOriginal === "externo"
+                }
               />
+              {asignacionModo === "externo" && !transportistaExternoVisible && (
+                <p className="text-xs text-amber-800/90">
+                  La empresa no trabaja con transportistas externos. Pasá este
+                  vehículo a flota propia si corresponde.
+                </p>
+              )}
               <CrudFieldError message={fieldErrors.transportistaId} />
             </div>
             <div className="md:col-span-2">
