@@ -97,7 +97,7 @@ export function TransportistaModal({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe un transportista con ese ID fiscal.'
+          ? `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`
           : friendlyError(e, 'transportistas'),
       );
     } finally {

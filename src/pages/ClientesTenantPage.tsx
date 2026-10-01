@@ -15,6 +15,7 @@ import {
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { Cliente, PaginatedMeta } from "@/types/api";
 
 type ClientesPaginatedResponse = {
@@ -37,6 +38,7 @@ export function ClientesTenantPage() {
   const condicionVisible = isVisible("detalle_cliente", "condicionIvaTributaria");
   const emailVisible = isVisible("detalle_cliente", "email");
   const telefonoVisible = isVisible("detalle_cliente", "telefono");
+  const idFiscalLabel = useIdFiscalLabel();
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -185,7 +187,7 @@ export function ClientesTenantPage() {
             {idFiscalVisible && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
-                  title="ID Fiscal"
+                  title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
                 >
@@ -198,7 +200,7 @@ export function ClientesTenantPage() {
                     className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                       filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por ID Fiscal"
+                    aria-label={`Filtrar por ${idFiscalLabel}`}
                   >
                     <option value="">Todos</option>
                     {opcionesIdFiscal.map((o) => (
@@ -268,7 +270,7 @@ export function ClientesTenantPage() {
           },
           ...(idFiscalVisible ? [{
             id: "idFiscal",
-            header: "ID Fiscal",
+            header: idFiscalLabel,
             cell: (c: Cliente) => c.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),

@@ -8,6 +8,7 @@ import { EmpresaFilterBar } from "@/components/superadmin/EmpresaFilterBar";
 import { useTenantsList } from "@/hooks/useTenantsList";
 import { useTenantFiltroUrl } from "@/hooks/useTenantFiltroUrl";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
 import {
@@ -35,6 +36,7 @@ export function TransportistasSuperadminPage() {
   const tenants = useTenantsList();
 
   const { isVisible } = useFieldConfig("transportistas");
+  const idFiscalLabel = useIdFiscalLabel(filtroEmpresa || undefined);
   const idFiscalVisible = isVisible("detalle_transportista", "idFiscal");
   const paisVisible = isVisible("detalle_transportista", "pais");
   const emailVisible = isVisible("detalle_transportista", "email");
@@ -243,7 +245,7 @@ export function TransportistasSuperadminPage() {
             {idFiscalVisible && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
-                  title="ID Fiscal"
+                  title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
                 >
@@ -256,7 +258,7 @@ export function TransportistasSuperadminPage() {
                     className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                       filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por ID Fiscal"
+                    aria-label={`Filtrar por ${idFiscalLabel}`}
                   >
                     <option value="">Todos</option>
                     {opcionesIdFiscal.map((o) => (
@@ -344,7 +346,7 @@ export function TransportistasSuperadminPage() {
           },
           ...(idFiscalVisible ? [{
             id: "idFiscal",
-            header: "ID Fiscal",
+            header: idFiscalLabel,
             cell: (t: Transportista) => t.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),

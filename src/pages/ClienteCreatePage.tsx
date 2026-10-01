@@ -104,7 +104,9 @@ export function ClienteCreatePage() {
         (c) => (c.idFiscal ?? "").trim() === idFiscal.trim(),
       );
       if (yaExiste) {
-        setFieldErrors({ idFiscal: "Ya existe un cliente con ese ID Fiscal." });
+        setFieldErrors({
+          idFiscal: `Ya existe un cliente con ese ${idFiscalPorPais(pais).label}.`,
+        });
         return;
       }
     }

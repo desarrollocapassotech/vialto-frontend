@@ -178,7 +178,7 @@ export function TransportistaEditPage() {
       );
       if (yaExiste) {
         setFieldErrors({
-          idFiscal: "Ya existe un transportista con ese ID Fiscal.",
+          idFiscal: `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`,
         });
         return;
       }

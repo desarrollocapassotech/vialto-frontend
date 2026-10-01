@@ -98,7 +98,7 @@ export function ClienteModal({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe un cliente con ese ID fiscal.'
+          ? `Ya existe un cliente con ese ${idFiscalPorPais(pais).label}.`
           : friendlyError(e, 'clientes'),
       );
     } finally {

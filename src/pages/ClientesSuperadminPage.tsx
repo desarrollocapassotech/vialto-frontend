@@ -19,6 +19,7 @@ import {
 import { LISTADO_PAGE_SIZE_OPTIONS } from "@/lib/listadoPaginacion";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { Cliente, ConEmpresa, PaginatedMeta } from "@/types/api";
 
 export function ClientesSuperadminPage() {
@@ -35,6 +36,7 @@ export function ClientesSuperadminPage() {
   const tenants = useTenantsList();
   
   const { isVisible } = useFieldConfig("clientes");
+  const idFiscalLabel = useIdFiscalLabel(filtroEmpresa || undefined);
   const idFiscalVisible = isVisible("detalle_cliente", "idFiscal");
   const paisVisible = isVisible("detalle_cliente", "pais");
   const condicionVisible = isVisible("detalle_cliente", "condicionIvaTributaria");
@@ -243,7 +245,7 @@ export function ClientesSuperadminPage() {
             {idFiscalVisible && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
-                  title="ID Fiscal"
+                  title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
                 >
@@ -256,7 +258,7 @@ export function ClientesSuperadminPage() {
                     className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                       filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por ID Fiscal"
+                    aria-label={`Filtrar por ${idFiscalLabel}`}
                   >
                     <option value="">Todos</option>
                     {opcionesIdFiscal.map((o) => (
@@ -326,7 +328,7 @@ export function ClientesSuperadminPage() {
           },
           ...(idFiscalVisible ? [{
             id: "idFiscal",
-            header: "ID Fiscal",
+            header: idFiscalLabel,
             cell: (c: Cliente) => c.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),
