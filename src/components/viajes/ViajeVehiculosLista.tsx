@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react';
 import { VehiculoPatenteSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { VehiculoModal } from '@/components/viajes/VehiculoModal';
-import { VEHICULO_TIPO_VALORES, labelTipoVehiculo, vehiculosPorTipo } from '@/lib/vehiculoTipos';
 import type { Vehiculo } from '@/types/api';
 
+/** `tipo` se deriva del vehículo elegido; no lo elige el usuario. */
 export type ViajeVehiculoRowDraft = { tipo: string; vehiculoId: string };
+
+function tipoDeVehiculo(vehiculos: Vehiculo[], id: string, fallback: string): string {
+  return vehiculos.find((v) => v.id === id)?.tipo ?? fallback;
+}
 
 const LABEL =
   'text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.15em] text-vialto-steel';
@@ -18,9 +22,6 @@ type Props = {
   crearVehiculoHref: string;
   /** Para agrupar radios / ids accesibles */
   groupId: string;
-  /** Recargar maestro de vehículos sin refrescar la página (p. ej. tras crear un vehículo en otra pestaña). */
-  onRefreshVehiculos?: () => void;
-  refreshingVehiculos?: boolean;
   /** Cuando se provee, habilita la creación rápida de vehículos desde el selector de patente. */
   getToken?: () => Promise<string | null>;
   tenantId?: string;
@@ -40,8 +41,6 @@ export function ViajeVehiculosLista({
   vehiculos,
   crearVehiculoHref,
   groupId,
-  onRefreshVehiculos,
-  refreshingVehiculos,
   getToken,
   tenantId,
   onVehiculoCreado,
@@ -80,63 +79,40 @@ export function ViajeVehiculosLista({
     <div className="flex flex-col gap-3 md:col-span-2 lg:col-span-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <span className={LABEL}>{titulo}</span>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {onRefreshVehiculos && (
-            <button
-              type="button"
-              onClick={onRefreshVehiculos}
-              disabled={refreshingVehiculos}
-              className="text-[11px] text-vialto-steel/85 hover:text-vialto-charcoal underline-offset-2 hover:underline disabled:pointer-events-none disabled:opacity-45"
-            >
-              {refreshingVehiculos ? 'Actualizando…' : 'Actualizar listado'}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={addRow}
-            className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
-          >
-            + Agregar vehículo
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={addRow}
+          className="text-xs uppercase tracking-wider px-2 py-1 border border-black/20 hover:bg-vialto-mist"
+        >
+          + Agregar vehículo
+        </button>
       </div>
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
-          const candidatos = vehiculosPorTipo<Vehiculo>(todosLosVehiculos, row.tipo);
+          // El tipo no se elige acá: es el del vehículo elegido (Vehiculo.tipo).
           const idsUsados = new Set(
             rows.map((r, j) => (j !== i && r.vehiculoId ? r.vehiculoId : null)).filter(Boolean) as string[],
           );
-          const opciones = candidatos.filter((v) => !idsUsados.has(v.id) || v.id === row.vehiculoId);
+          const opciones = todosLosVehiculos.filter(
+            (v) => !idsUsados.has(v.id) || v.id === row.vehiculoId,
+          );
           const sinOpciones = opciones.length === 0;
           return (
             <div
               key={`${groupId}-vh-${i}`}
-              className="grid grid-cols-1 gap-2 rounded border border-black/10 bg-white/60 p-3 sm:grid-cols-[1fr_1fr_auto]"
+              className="grid grid-cols-1 gap-2 rounded border border-black/10 bg-white/60 p-3 sm:grid-cols-[1fr_auto]"
             >
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className={LABEL}>Tipo</span>
-                <select
-                  value={row.tipo}
-                  onChange={(e) => {
-                    const tipo = e.target.value;
-                    setRow(i, { tipo, vehiculoId: '' });
-                  }}
-                  className={INPUT}
-                  aria-label={`Tipo de vehículo ${i + 1}`}
-                >
-                  {VEHICULO_TIPO_VALORES.map((t) => (
-                    <option key={t} value={t}>
-                      {labelTipoVehiculo(t)}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <span className={LABEL}>Vehículo</span>
                 <VehiculoPatenteSearchSelect
                   vehiculos={opciones}
                   value={row.vehiculoId}
-                  onChange={(id) => setRow(i, { vehiculoId: id })}
+                  onChange={(id) =>
+                    setRow(i, {
+                      vehiculoId: id,
+                      tipo: tipoDeVehiculo(todosLosVehiculos, id, row.tipo),
+                    })
+                  }
                   sinOpciones={sinOpciones}
                   inputClassName={INPUT}
                   aria-label={`Vehículo ${i + 1}`}
@@ -144,8 +120,8 @@ export function ViajeVehiculosLista({
                 />
                 {sinOpciones && !getToken ? (
                   <p className="text-xs text-amber-800/90">
-                    No hay vehículos de tipo «{labelTipoVehiculo(row.tipo)}»
-                    {alMenosUno ? ' en flota propia' : ' en el maestro'}.{' '}
+                    No hay vehículos
+                    {alMenosUno ? ' de flota propia' : ' cargados'}.{' '}
                     <a
                       href={crearVehiculoHref}
                       target="_blank"
@@ -188,7 +164,7 @@ export function ViajeVehiculosLista({
           setLocalVehiculos((prev) => [...prev, v]);
           onVehiculoCreado?.(v);
           if (nuevoParaRowIndex !== null) {
-            setRow(nuevoParaRowIndex, { vehiculoId: v.id });
+            setRow(nuevoParaRowIndex, { vehiculoId: v.id, tipo: v.tipo });
           }
           setShowNuevoVehiculo(false);
           setNuevoParaRowIndex(null);

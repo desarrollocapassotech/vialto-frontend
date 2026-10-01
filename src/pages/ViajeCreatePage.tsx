@@ -48,7 +48,6 @@ import {
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { type ViajeVehiculoRowDraft } from "@/components/viajes/ViajeVehiculosLista";
-import { vehiculosPorTipo } from "@/lib/vehiculoTipos";
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
 import { ChoferModal } from "@/components/viajes/ChoferModal";
@@ -316,7 +315,6 @@ export function ViajeCreatePage() {
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
   const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
-  const [refreshingFlota, setRefreshingFlota] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
 
@@ -422,86 +420,6 @@ export function ViajeCreatePage() {
       cancelled = true;
     };
   }, [getToken, isLoaded, isSignedIn, tenantId]);
-
-  // ─── FUNCIONES DE REFRESCO DE MAESTROS ───────────────────────────────────
-  async function refreshVehiculosMaestro() {
-    if (refreshingFlota) return;
-    setRefreshingFlota(true);
-    setError(null);
-    try {
-      let vehiculosData: Vehiculo[];
-      if (tenantId) {
-        vehiculosData = await apiJson<Vehiculo[]>(
-          `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`,
-          () => getToken(),
-        );
-        setLocalVehiculos(vehiculosData);
-      } else {
-        vehiculosData = await maestro.refreshVehiculos();
-      }
-      setVehiculosExternosRows((rows) =>
-        rows.map((row) => {
-          const candidatos = vehiculosPorTipo(vehiculosData, row.tipo);
-          return {
-            ...row,
-            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
-          };
-        }),
-      );
-    } catch (e) {
-      setError(friendlyError(e, "viajes"));
-    } finally {
-      setRefreshingFlota(false);
-    }
-  }
-
-  async function refreshFlotaVehiculos() {
-    if (refreshingFlota) return;
-    setRefreshingFlota(true);
-    setError(null);
-    try {
-      let choferesData: Chofer[];
-      let vehiculosData: Vehiculo[];
-      if (tenantId) {
-        [choferesData, vehiculosData] = await Promise.all([
-          apiJson<Chofer[]>(
-            `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`,
-            () => getToken(),
-          ),
-          apiJson<Vehiculo[]>(
-            `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`,
-            () => getToken(),
-          ),
-        ]);
-        setLocalChoferes(choferesData);
-        setLocalVehiculos(vehiculosData);
-      } else {
-        [choferesData, vehiculosData] = await Promise.all([
-          maestro.refreshChoferes(),
-          maestro.refreshVehiculos(),
-        ]);
-      }
-      const cp = choferesFlotaPropia(
-        mergeMaestroPorId(choferesData, sessionChoferes),
-      );
-      const vp = vehiculosFlotaPropia(vehiculosData);
-      setChoferId((prev) => mantenerIdSiEnLista(prev, cp));
-      choferIdRef.current = mantenerIdSiEnLista(choferIdRef.current, cp);
-      setVehiculosRows((rows) =>
-        rows.map((row) => {
-          const candidatos = vehiculosPorTipo(vp, row.tipo);
-          return {
-            ...row,
-            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
-          };
-        }),
-      );
-    } catch (e) {
-      setError(friendlyError(e, "viajes"));
-    } finally {
-      setRefreshingFlota(false);
-    }
-  }
 
   // ─── DERIVACIONES DE FLOTA ───────────────────────────────────────────────
   const choferesPropios = useMemo(
@@ -1220,9 +1138,6 @@ export function ViajeCreatePage() {
                 vehiculosPropios={vehiculosPropios}
                 ayudaFlotaVehiculo={ayudaFlota.vehiculo}
                 vehiculos={vehiculos}
-                onRefreshVehiculosPropios={() => void refreshFlotaVehiculos()}
-                onRefreshVehiculosExternos={() => void refreshVehiculosMaestro()}
-                refreshingFlota={refreshingFlota}
                 getToken={getToken}
                 tenantId={tenantId}
                 onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}

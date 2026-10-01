@@ -23,11 +23,3 @@ export function labelTipoVehiculo(tipo: string): string {
   const k = tipo.trim().toLowerCase();
   return VEHICULO_TIPO_LABEL[k] ?? tipo;
 }
-
-export function vehiculosPorTipo<T extends { id: string; tipo: string }>(
-  vehiculos: T[],
-  tipo: string,
-): T[] {
-  const t = tipo.trim().toLowerCase();
-  return vehiculos.filter((v) => (v.tipo ?? '').trim().toLowerCase() === t);
-}

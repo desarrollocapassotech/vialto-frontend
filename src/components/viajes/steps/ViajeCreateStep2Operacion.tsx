@@ -102,9 +102,6 @@ interface Props {
   ayudaFlotaVehiculo?: string;
 
   vehiculos: Vehiculo[];
-  onRefreshVehiculosPropios: () => void;
-  onRefreshVehiculosExternos: () => void;
-  refreshingFlota: boolean;
   getToken: () => Promise<string | null>;
   tenantId: string;
   onVehiculoCreado: (v: Vehiculo) => void;
@@ -180,9 +177,6 @@ export function ViajeCreateStep2Operacion({
   vehiculosPropios,
   ayudaFlotaVehiculo,
   vehiculos,
-  onRefreshVehiculosPropios,
-  onRefreshVehiculosExternos,
-  refreshingFlota,
   getToken,
   tenantId,
   onVehiculoCreado,
@@ -446,8 +440,6 @@ export function ViajeCreateStep2Operacion({
                   onChange={onVehiculosExternosRowsChange}
                   vehiculos={vehiculos}
                   alMenosUno={false}
-                  onRefreshVehiculos={onRefreshVehiculosExternos}
-                  refreshingVehiculos={refreshingFlota}
                   getToken={getToken}
                   tenantId={tenantId || undefined}
                   onVehiculoCreado={onVehiculoCreado}
@@ -483,8 +475,6 @@ export function ViajeCreateStep2Operacion({
                   onChange={onVehiculosRowsChange}
                   vehiculos={vehiculosPropios}
                   alMenosUno={true}
-                  onRefreshVehiculos={onRefreshVehiculosPropios}
-                  refreshingVehiculos={refreshingFlota}
                   getToken={getToken}
                   tenantId={tenantId || undefined}
                   onVehiculoCreado={onVehiculoCreado}
