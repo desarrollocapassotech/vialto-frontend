@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileDown } from 'lucide-react';
 import { useMaestroData } from '@/hooks/useMaestroData';
+import { useTipoFlotaVisible } from '@/hooks/useTipoFlotaVisible';
 import { ClienteSearchSelect, TransportistaSearchSelect } from '@/components/forms/MaestroSearchSelects';
 import { ClienteModal } from '@/components/viajes/ClienteModal';
 import { TransportistaModal } from '@/components/viajes/TransportistaModal';
@@ -25,7 +26,11 @@ function toggleButtonClass(active: boolean): string {
 export function CuentaCorrienteTenantPage() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tipoContraparte, setTipoContraparte] = useState<TipoContraparte>('cliente');
+  const [tipoElegido, setTipoContraparte] = useState<TipoContraparte>('cliente');
+  // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
+  // así que no hay cuentas de proveedores — queda fijo en Clientes, sin selector.
+  const { transportistaExternoVisible: hayProveedores } = useTipoFlotaVisible();
+  const tipoContraparte: TipoContraparte = hayProveedores ? tipoElegido : 'cliente';
   const [contraparteId, setContraparteId] = useState('');
   const [contraparteNombre, setContraparteNombre] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
@@ -118,22 +123,24 @@ export function CuentaCorrienteTenantPage() {
 
       <div className="mt-6">
         <div className="mb-6 flex flex-wrap items-end gap-3">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => elegirTipo('cliente')}
-              className={toggleButtonClass(tipoContraparte === 'cliente')}
-            >
-              Clientes
-            </button>
-            <button
-              type="button"
-              onClick={() => elegirTipo('proveedor')}
-              className={toggleButtonClass(tipoContraparte === 'proveedor')}
-            >
-              Proveedores
-            </button>
-          </div>
+          {hayProveedores && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => elegirTipo('cliente')}
+                className={toggleButtonClass(tipoContraparte === 'cliente')}
+              >
+                Clientes
+              </button>
+              <button
+                type="button"
+                onClick={() => elegirTipo('proveedor')}
+                className={toggleButtonClass(tipoContraparte === 'proveedor')}
+              >
+                Proveedores
+              </button>
+            </div>
+          )}
           <div className="w-full sm:w-80">
             {tipoContraparte === 'cliente' ? (
               <ClienteSearchSelect

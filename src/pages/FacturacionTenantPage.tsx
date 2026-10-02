@@ -156,7 +156,13 @@ export function FacturacionTenantPage({
   const clientes = platform ? clientesPlatform : maestro.clientes;
 
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
+  // true solo cuando el backend confirmó que el tenant no tiene config ARCA
+  // (no mientras carga): sin config se emite en homologación, ver
+  // `ArcaConfigService.configHomologacionPorDefecto` en el backend.
+  const [sinConfigArca, setSinConfigArca] = useState(false);
+  const ambienteArca = sinConfigArca ? "homologacion" : arcaConfig?.ambiente;
   useEffect(() => {
+    setSinConfigArca(false);
     if (
       !hasArca ||
       (platform && !tid) ||
@@ -174,7 +180,10 @@ export function FacturacionTenantPage({
         const cfg = await apiJson<ArcaConfig | null>(configUrl, () =>
           getToken(),
         );
-        if (!cancelled) setArcaConfig(cfg);
+        if (!cancelled) {
+          setArcaConfig(cfg);
+          setSinConfigArca(cfg == null);
+        }
       } catch {
         if (!cancelled) setArcaConfig(null);
       }
@@ -1238,7 +1247,7 @@ export function FacturacionTenantPage({
                 Emisión electrónica vía ARCA
               </div>
               <AmbienteTestBadge
-                ambiente={arcaConfig?.ambiente}
+                ambiente={ambienteArca}
                 to="/configuracion/arca?tab=ambiente"
               />
             </div>
@@ -1252,7 +1261,7 @@ export function FacturacionTenantPage({
             <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
             Emisión electrónica vía ARCA
           </div>
-          <AmbienteTestBadge ambiente={arcaConfig?.ambiente} />
+          <AmbienteTestBadge ambiente={ambienteArca} />
         </div>
       )}
 

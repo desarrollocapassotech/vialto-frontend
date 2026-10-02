@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Receipt } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
+import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import {
   computeFacturaTotales,
   defaultFacturaLineas,
@@ -235,15 +236,8 @@ export function EmitirFacturaModal({
       notifyEmitBlock("La factura ya tiene CAE autorizado.");
       return;
     }
-    if (sinConfigArca) {
-      setArcaConfigMissing(true);
-      notifyEmitBlock(
-        platform
-          ? "Este tenant no tiene configuración ARCA. Configurala en Superadmin → ARCA / AFIP."
-          : "No hay configuración ARCA para este tenant. Completala en Configuración ARCA.",
-      );
-      return;
-    }
+    // Sin configuración ARCA no se bloquea: el tenant está en homologación y
+    // el backend emite con datos de prueba (solo producción la necesita).
     if (missingHiddenFields.length > 0) {
       notifyEmitBlock(
         `No se puede emitir la factura. Faltan los siguientes datos: ${missingClienteFields.map(formatMissingFiscalField).join(", ")}. Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.`
@@ -531,23 +525,9 @@ export function EmitirFacturaModal({
                     </span>
                   </div>
 
-                  {sinConfigArca && (
-                    <div
-                      className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-                      role="alert"
-                    >
-                      <p className="font-medium">
-                        Falta configuración ARCA del tenant
-                      </p>
-                      <p className="mt-1">
-                        {platform
-                          ? "Completala en Superadmin → ARCA / AFIP antes de emitir."
-                          : "Completala en Configuración ARCA antes de emitir."}
-                      </p>
-                    </div>
-                  )}
+                  {sinConfigArca && <SinConfigArcaAviso platform={platform} />}
 
-                  {missingEmisorFields.length > 0 && !sinConfigArca && (
+                  {missingEmisorFields.length > 0 && (
                     <div
                       className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                       role="alert"
@@ -564,7 +544,6 @@ export function EmitirFacturaModal({
                   )}
 
                   {missingHiddenFields.length === 0 && missingClienteFields.length > 0 &&
-                    !sinConfigArca &&
                     factura.clienteId && (
                       <CompletarDatosFiscalesInline
                         entidad="cliente"
