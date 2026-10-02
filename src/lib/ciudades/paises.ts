@@ -111,6 +111,20 @@ export function condicionTributariaPorPais(
 }
 
 /**
+ * Dígito verificador (módulo 11) de un CUIT/CUIL de 11 dígitos. Espejo de
+ * `shared/util/cuit.ts` del backend. Un resultado de 10 nunca es válido.
+ */
+export function cuitDigitoVerificadorValido(cuit: string): boolean {
+  const d = cuit.replace(/\D/g, "");
+  if (d.length !== 11) return false;
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const suma = pesos.reduce((acc, p, i) => acc + p * Number(d[i]), 0);
+  const resto = 11 - (suma % 11);
+  const dv = resto === 11 ? 0 : resto;
+  return dv !== 10 && dv === Number(d[10]);
+}
+
+/**
  * Valida el formato del identificador fiscal según el país.
  * Retorna un mensaje de error o null si el valor es válido (o vacío).
  */
@@ -128,6 +142,8 @@ export function validarIdFiscal(
       const d = valor.replace(/-/g, "");
       if (d.length !== 11)
         return `El CUIT/CUIL debe tener 11 dígitos (se ingresaron ${d.length}).`;
+      if (!cuitDigitoVerificadorValido(d))
+        return "El CUIT/CUIL no es válido: revisá los números (el dígito verificador no coincide).";
       break;
     }
     case "UY": {

@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 // ---> IMPORTAMOS EL HOOK (Ajustá la ruta según tu estructura)
@@ -23,6 +23,7 @@ import {
   type VehiculoFormState,
 } from "@/lib/vehiculoForm";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 
 const TIPOS = [
   "tractor",
@@ -77,6 +78,8 @@ export function VehiculoCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("vehiculos");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible(tenantId || undefined);
 
   function patch(p: Partial<VehiculoFormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -86,6 +89,16 @@ export function VehiculoCreatePage() {
     setAsignacionModo(modo);
     if (modo === "propio") patch({ transportistaId: "" });
   }
+
+  // Mismo criterio que el alta de chofer: si el superadmin dejó una sola
+  // opción de pertenencia habilitada, el modo queda forzado a esa opción.
+  useEffect(() => {
+    if (!transportistaExternoVisible && asignacionModo !== "propio") {
+      applyAsignacionModo("propio");
+    } else if (!flotaPropiaVisible && asignacionModo !== "externo") {
+      applyAsignacionModo("externo");
+    }
+  }, [flotaPropiaVisible, transportistaExternoVisible, asignacionModo]);
 
   async function onSubmit() {
     const errs: Record<string, string> = {};
@@ -262,6 +275,8 @@ export function VehiculoCreatePage() {
             }}
             transportistas={transportistas}
             loadingTransportistas={loadingTransportistas}
+            mostrarFlotaPropia={flotaPropiaVisible}
+            mostrarTransportistaExterno={transportistaExternoVisible}
           />
           <CrudFieldError message={fieldErrors.transportistaId} />
         </div>

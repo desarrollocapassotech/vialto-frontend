@@ -23,6 +23,8 @@ import {
 } from "@/lib/ciudades";
 import type { PaisCodigo } from "@/lib/ciudades";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useArcaPadron } from "@/hooks/useArcaPadron";
+import { ArcaPadronStatus } from "@/components/shared/ArcaPadronStatus";
 
 export function ClienteCreatePage() {
   const { getToken } = useAuth();
@@ -47,7 +49,7 @@ export function ClienteCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId || undefined);
+  const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId || undefined);
   const paisVisible = isVisible("alta_cliente", "pais") && !paisFijo;
   const idFiscalVisible = isVisible("alta_cliente", "idFiscal");
   const condicionVisible = isVisible("alta_cliente", "condicionIvaTributaria");
@@ -58,6 +60,16 @@ export function ClienteCreatePage() {
   const faltanPais = paisVisible && !pais;
   const faltanIdFiscal = idFiscalVisible && !idFiscal.trim();
   const faltanDatosFiscales = faltanPais || faltanIdFiscal;
+
+  const arca = useArcaPadron({
+    getToken,
+    habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
+    pais,
+    idFiscal: idFiscalVisible ? idFiscal : "",
+    nombre: { value: nombre, set: setNombre },
+    domicilio: direccionVisible ? { value: direccion, set: setDireccion } : undefined,
+    condicionIva: condicionVisible ? { value: condicionIva, set: setCondicionIva } : undefined,
+  });
 
   function handlePaisChange(newPais: PaisCodigo | "") {
     setPais(newPais);
@@ -92,7 +104,9 @@ export function ClienteCreatePage() {
         (c) => (c.idFiscal ?? "").trim() === idFiscal.trim(),
       );
       if (yaExiste) {
-        setFieldErrors({ idFiscal: "Ya existe un cliente con ese ID Fiscal." });
+        setFieldErrors({
+          idFiscal: `Ya existe un cliente con ese ${idFiscalPorPais(pais).label}.`,
+        });
         return;
       }
     }
@@ -194,6 +208,7 @@ export function ClienteCreatePage() {
                   value={idFiscal}
                   error={idFiscalError || undefined}
                   onChange={(e) => setIdFiscal(e.target.value)}
+                  onBlur={arca.onIdFiscalBlur}
                 />
                 <CrudFieldError message={idFiscalError} />
               </label>
@@ -228,6 +243,7 @@ export function ClienteCreatePage() {
             )}
           </div>
         )}
+        <ArcaPadronStatus {...arca} />
         {faltanDatosFiscales && (
           <div className="space-y-2 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p>

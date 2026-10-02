@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import useSWR from 'swr';
 import { apiJson } from '@/lib/api';
 import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import type { PaisCodigo } from '@/lib/ciudades';
@@ -8,6 +8,11 @@ import type { Tenant } from '@/types/api';
 export type TenantPaisFijoResult = {
   paisFijo: PaisCodigo | null;
   loading: boolean;
+  /**
+   * Tenant efectivo ya resuelto (propio u override de superadmin), para leer
+   * otros flags de empresa sin volver a pedirlo — ej. `validacionCuitArcaHabilitada`.
+   */
+  tenant: Tenant | null;
 };
 
 /**
@@ -28,40 +33,19 @@ export type TenantPaisFijoResult = {
 export function useTenantPaisFijo(tenantId?: string): TenantPaisFijoResult {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { tenant: ownTenant, loading: ownTenantLoading } = useCurrentTenant();
-  const [platformTenant, setPlatformTenant] = useState<Tenant | null>(null);
-  const [platformLoading, setPlatformLoading] = useState(Boolean(tenantId));
 
-  useEffect(() => {
-    if (!tenantId || !isLoaded || !isSignedIn) {
-      setPlatformTenant(null);
-      setPlatformLoading(Boolean(tenantId));
-      return;
-    }
-    let cancelled = false;
-    setPlatformLoading(true);
-    (async () => {
-      try {
-        const data = await apiJson<Tenant>(
-          `/api/tenants/${encodeURIComponent(tenantId)}`,
-          () => getToken(),
-        );
-        if (!cancelled) setPlatformTenant(data);
-      } catch {
-        if (!cancelled) setPlatformTenant(null);
-      } finally {
-        if (!cancelled) setPlatformLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, isLoaded, isSignedIn, tenantId]);
+  const shouldFetchPlatform = Boolean(tenantId && isLoaded && isSignedIn);
 
-  const tenant = tenantId ? platformTenant : ownTenant;
+  const { data: platformTenant, isLoading: platformLoading } = useSWR<Tenant>(
+    shouldFetchPlatform ? `/api/tenants/${encodeURIComponent(tenantId!)}` : null,
+    async (url: string) => apiJson<Tenant>(url, () => getToken())
+  );
+
+  const tenant = tenantId ? (platformTenant ?? null) : ownTenant;
   const loading = tenantId ? !isLoaded || platformLoading : ownTenantLoading;
 
   if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoCodigo) {
-    return { paisFijo: null, loading };
+    return { paisFijo: null, loading, tenant };
   }
-  return { paisFijo: tenant.paisOrigenDestinoFijoCodigo, loading };
+  return { paisFijo: tenant.paisOrigenDestinoFijoCodigo, loading, tenant };
 }

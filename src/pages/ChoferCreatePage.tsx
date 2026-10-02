@@ -22,6 +22,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTransportistasList } from "@/hooks/useTransportistasList";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { canAccessCombustible } from "@/lib/tenantModules";
 
 const emptyForm = (): ChoferFormState => ({
@@ -63,8 +64,9 @@ export function ChoferCreatePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { isVisible } = useFieldConfig("choferes");
-  const flotaPropiaVisible = isVisible("alta_chofer", "flotaPropia");
-  const transportistaExternoVisible = isVisible("alta_chofer", "transportistaExterno");
+  const { flotaPropiaVisible, transportistaExternoVisible } = useTipoFlotaVisible(
+    tenantId || undefined,
+  );
   const dniVisible = isVisible("alta_chofer", "dni");
   const cuitVisible = isVisible("alta_chofer", "cuit");
   const telefonoVisible = isVisible("alta_chofer", "telefono");

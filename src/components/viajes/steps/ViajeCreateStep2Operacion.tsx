@@ -41,6 +41,8 @@ function fmtReadonlyMoney(n: number) {
 interface Props {
   modoOperacion: ViajeOperacionModo;
   onModoChange: (m: ViajeOperacionModo) => void;
+  externoVisible: boolean;
+  propioVisible: boolean;
 
   // Transportista externo
   transportistaId: string;
@@ -100,9 +102,6 @@ interface Props {
   ayudaFlotaVehiculo?: string;
 
   vehiculos: Vehiculo[];
-  onRefreshVehiculosPropios: () => void;
-  onRefreshVehiculosExternos: () => void;
-  refreshingFlota: boolean;
   getToken: () => Promise<string | null>;
   tenantId: string;
   onVehiculoCreado: (v: Vehiculo) => void;
@@ -132,6 +131,8 @@ interface Props {
 export function ViajeCreateStep2Operacion({
   modoOperacion,
   onModoChange,
+  externoVisible,
+  propioVisible,
   transportistaId,
   onTransportistaIdChange,
   transportistas,
@@ -176,9 +177,6 @@ export function ViajeCreateStep2Operacion({
   vehiculosPropios,
   ayudaFlotaVehiculo,
   vehiculos,
-  onRefreshVehiculosPropios,
-  onRefreshVehiculosExternos,
-  refreshingFlota,
   getToken,
   tenantId,
   onVehiculoCreado,
@@ -201,6 +199,8 @@ export function ViajeCreateStep2Operacion({
       <ViajeOperacionTipoFieldset
         modo={modoOperacion}
         onModoChange={onModoChange}
+        externoVisible={externoVisible}
+        propioVisible={propioVisible}
         className="min-w-0 space-y-3 border-0 p-0 [&:disabled]:opacity-60"
         externoContent={
           <div className="grid gap-3">
@@ -440,8 +440,6 @@ export function ViajeCreateStep2Operacion({
                   onChange={onVehiculosExternosRowsChange}
                   vehiculos={vehiculos}
                   alMenosUno={false}
-                  onRefreshVehiculos={onRefreshVehiculosExternos}
-                  refreshingVehiculos={refreshingFlota}
                   getToken={getToken}
                   tenantId={tenantId || undefined}
                   onVehiculoCreado={onVehiculoCreado}
@@ -477,8 +475,6 @@ export function ViajeCreateStep2Operacion({
                   onChange={onVehiculosRowsChange}
                   vehiculos={vehiculosPropios}
                   alMenosUno={true}
-                  onRefreshVehiculos={onRefreshVehiculosPropios}
-                  refreshingVehiculos={refreshingFlota}
                   getToken={getToken}
                   tenantId={tenantId || undefined}
                   onVehiculoCreado={onVehiculoCreado}

@@ -1,4 +1,5 @@
 import { SearchableEntitySelect } from '@/components/forms/SearchableEntitySelect';
+import { labelTipoVehiculo } from '@/lib/vehiculoTipos';
 import {
   filtrarChoferes,
   filtrarClientesPorQuery,
@@ -35,7 +36,7 @@ export function ClienteSearchSelect({
   className,
   inputClassName = INPUT,
   placeholderCerrado = 'Elegí un cliente…',
-  placeholderBuscar = 'Buscar por nombre o ID Fiscal…',
+  placeholderBuscar = 'Buscar cliente…',
   allowEmptyValue = false,
   emptyListChoiceLabel = 'Sin selección',
   id,
@@ -328,7 +329,7 @@ export function VehiculoPatenteSearchSelect({
           className={`${inputClassName} flex items-center text-vialto-steel`}
           aria-label={ariaLabel}
         >
-          Sin vehículos de este tipo…
+          Sin vehículos cargados…
         </div>
       </div>
     );
@@ -344,7 +345,11 @@ export function VehiculoPatenteSearchSelect({
       inputClassName={inputClassName}
       filterItems={filtrarVehiculos}
       getPrimaryLabel={(v) => v.patente}
-      getSecondaryLabel={(v) => [v.marca, v.modelo].filter(Boolean).join(' · ') || null}
+      getSecondaryLabel={(v) =>
+        [v.tipo ? labelTipoVehiculo(v.tipo) : null, v.marca, v.modelo]
+          .filter(Boolean)
+          .join(' · ') || null
+      }
       placeholderCerrado={placeholderCerrado}
       placeholderBuscar="Buscar patente o marca…"
       searchAriaLabel="Filtrar vehículos"

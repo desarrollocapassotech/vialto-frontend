@@ -10,7 +10,7 @@ export function useHiddenFiscalFields(missingFields: string[]) {
     
     // Validaciones de Cliente
     if (missingFields.includes("Cliente: CUIT") && !isClienteVisible("edicion_cliente", "idFiscal")) {
-      hidden.push("Cliente (ID Fiscal)");
+      hidden.push("Cliente (CUIT)");
     }
     if (missingFields.includes("Cliente: domicilio") && !isClienteVisible("edicion_cliente", "direccion")) {
       hidden.push("Cliente (Domicilio)");
@@ -21,7 +21,7 @@ export function useHiddenFiscalFields(missingFields: string[]) {
 
     // Validaciones de Transportista
     if (missingFields.includes("Transportista: CUIT") && !isTransportistaVisible("edicion_transportista", "idFiscal")) {
-      hidden.push("Transportista (ID Fiscal)");
+      hidden.push("Transportista (CUIT)");
     }
     if (missingFields.includes("Transportista: domicilio") && !isTransportistaVisible("edicion_transportista", "domicilio")) {
       hidden.push("Transportista (Domicilio)");
@@ -40,14 +40,14 @@ export function useHiddenFiscalFields(missingFields: string[]) {
 export function formatMissingFiscalField(field: string): string {
   switch (field) {
     case "Transportista: CUIT":
-      return "Transportista (ID Fiscal)";
+      return "Transportista (CUIT)";
     case "Transportista: domicilio":
       return "Transportista (Domicilio)";
     case "Transportista: condición de IVA (país Argentina + campo AFIP)":
       return "Transportista (Condición frente al IVA)";
       
     case "Cliente: CUIT":
-      return "Cliente (ID Fiscal)";
+      return "Cliente (CUIT)";
     case "Cliente: domicilio":
       return "Cliente (Domicilio)";
     case "Cliente: condición de IVA (país Argentina + campo AFIP)":

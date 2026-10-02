@@ -397,6 +397,9 @@ export interface Deposito {
 }
 
 /** Empresa registrada en Vialto. */
+/** 'mixta' = flota propia + transportistas externos; 'propia' / 'externa' = solo uno de los dos. */
+export type TipoFlota = "mixta" | "propia" | "externa";
+
 export interface Tenant {
   id: string;
   clerkOrgId: string;
@@ -432,6 +435,10 @@ export interface Tenant {
   paisOrigenDestinoFijoCodigo?: string | null;
   /** Nombre resuelto de paisOrigenDestinoFijoId (computado por el backend, no se persiste). */
   paisOrigenDestinoFijoNombre?: string | null;
+  /** true = valida el CUIT de clientes/transportistas contra ARCA y autocompleta datos. Default false; solo lo cambia superadmin. */
+  validacionCuitArcaHabilitada?: boolean;
+  /** Con qué flota trabaja la empresa. Default 'mixta'; solo lo cambia superadmin (ver `useTipoFlotaVisible`). */
+  tipoFlota?: TipoFlota;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los

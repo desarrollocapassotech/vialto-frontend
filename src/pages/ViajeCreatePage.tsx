@@ -48,7 +48,6 @@ import {
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { type ViajeVehiculoRowDraft } from "@/components/viajes/ViajeVehiculosLista";
-import { vehiculosPorTipo } from "@/lib/vehiculoTipos";
 import { ClienteModal } from "@/components/viajes/ClienteModal";
 import { TransportistaModal } from "@/components/viajes/TransportistaModal";
 import { ChoferModal } from "@/components/viajes/ChoferModal";
@@ -77,6 +76,7 @@ import type {
 } from "@/types/api";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import {
   labelIdentificacionPersonalizadaViajes,
   idSistemaHabilitado,
@@ -112,6 +112,8 @@ export function ViajeCreatePage() {
   const tenantId = searchParams.get("tenantId")?.trim() ?? "";
   const maestro = useMaestroData();
   const { isVisible } = useFieldConfig("viajes");
+  const { flotaPropiaVisible, transportistaExternoVisible } =
+    useTipoFlotaVisible(tenantId || undefined);
   const desgloseActivo = isVisible("alta_viaje", "desgloseMontos");
   const ivaTransportistaVisible = isVisible(
     "alta_viaje",
@@ -313,7 +315,6 @@ export function ViajeCreatePage() {
   const [loading, setLoading] = useState(false);
   const [localLoadingRefs, setLocalLoadingRefs] = useState(true);
   const loadingRefs = tenantId ? localLoadingRefs : maestro.loading;
-  const [refreshingFlota, setRefreshingFlota] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitBusyRef = useRef(false);
 
@@ -420,95 +421,17 @@ export function ViajeCreatePage() {
     };
   }, [getToken, isLoaded, isSignedIn, tenantId]);
 
-  // ─── FUNCIONES DE REFRESCO DE MAESTROS ───────────────────────────────────
-  async function refreshVehiculosMaestro() {
-    if (refreshingFlota) return;
-    setRefreshingFlota(true);
-    setError(null);
-    try {
-      let vehiculosData: Vehiculo[];
-      if (tenantId) {
-        vehiculosData = await apiJson<Vehiculo[]>(
-          `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`,
-          () => getToken(),
-        );
-        setLocalVehiculos(vehiculosData);
-      } else {
-        vehiculosData = await maestro.refreshVehiculos();
-      }
-      setVehiculosExternosRows((rows) =>
-        rows.map((row) => {
-          const candidatos = vehiculosPorTipo(vehiculosData, row.tipo);
-          return {
-            ...row,
-            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
-          };
-        }),
-      );
-    } catch (e) {
-      setError(friendlyError(e, "viajes"));
-    } finally {
-      setRefreshingFlota(false);
-    }
-  }
-
-  async function refreshFlotaVehiculos() {
-    if (refreshingFlota) return;
-    setRefreshingFlota(true);
-    setError(null);
-    try {
-      let choferesData: Chofer[];
-      let vehiculosData: Vehiculo[];
-      if (tenantId) {
-        [choferesData, vehiculosData] = await Promise.all([
-          apiJson<Chofer[]>(
-            `/api/platform/choferes?tenantId=${encodeURIComponent(tenantId)}`,
-            () => getToken(),
-          ),
-          apiJson<Vehiculo[]>(
-            `/api/platform/vehiculos?tenantId=${encodeURIComponent(tenantId)}`,
-            () => getToken(),
-          ),
-        ]);
-        setLocalChoferes(choferesData);
-        setLocalVehiculos(vehiculosData);
-      } else {
-        [choferesData, vehiculosData] = await Promise.all([
-          maestro.refreshChoferes(),
-          maestro.refreshVehiculos(),
-        ]);
-      }
-      const cp = choferesFlotaPropia(
-        mergeMaestroPorId(choferesData, sessionChoferes),
-      );
-      const vp = vehiculosFlotaPropia(vehiculosData);
-      setChoferId((prev) => mantenerIdSiEnLista(prev, cp));
-      choferIdRef.current = mantenerIdSiEnLista(choferIdRef.current, cp);
-      setVehiculosRows((rows) =>
-        rows.map((row) => {
-          const candidatos = vehiculosPorTipo(vp, row.tipo);
-          return {
-            ...row,
-            vehiculoId: mantenerIdSiEnLista(row.vehiculoId, candidatos),
-          };
-        }),
-      );
-    } catch (e) {
-      setError(friendlyError(e, "viajes"));
-    } finally {
-      setRefreshingFlota(false);
-    }
-  }
-
   // ─── DERIVACIONES DE FLOTA ───────────────────────────────────────────────
   const choferesPropios = useMemo(
     () => choferesFlotaPropia(todosChoferes),
     [todosChoferes],
   );
-  const choferesExterno = useMemo(
-    () => choferesParaTransportistaExterno(todosChoferes, transportistaId),
-    [todosChoferes, transportistaId],
-  );
+  const choferesExterno = useMemo(() => {
+    const tid = !realizaFlete && transportistaEfectivoId.trim()
+      ? transportistaEfectivoId
+      : transportistaId;
+    return choferesParaTransportistaExterno(todosChoferes, tid);
+  }, [todosChoferes, transportistaId, transportistaEfectivoId, realizaFlete]);
   const vehiculosPropios = useMemo(
     () => vehiculosFlotaPropia(vehiculos),
     [vehiculos],
@@ -553,6 +476,15 @@ export function ViajeCreatePage() {
       setPagosTransportista([]);
     }
   }
+
+  // Empresa solo de flota propia: el alta arranca en "externo" por defecto,
+  // así que en cuanto carga la config se pasa a flota propia.
+  useEffect(() => {
+    if (!transportistaExternoVisible && modoOperacion === "externo") {
+      applyModoOperacion("propio");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transportistaExternoVisible, modoOperacion]);
 
   function buildGananciaDraft(): GananciaBrutaManualDraftSlice {
     return {
@@ -1136,6 +1068,8 @@ export function ViajeCreatePage() {
               <ViajeCreateStep2Operacion
                 modoOperacion={modoOperacion}
                 onModoChange={applyModoOperacion}
+                externoVisible={transportistaExternoVisible}
+                propioVisible={flotaPropiaVisible}
                 transportistaId={transportistaId}
                 onTransportistaIdChange={(id) => {
                   setTransportistaId(id);
@@ -1204,9 +1138,6 @@ export function ViajeCreatePage() {
                 vehiculosPropios={vehiculosPropios}
                 ayudaFlotaVehiculo={ayudaFlota.vehiculo}
                 vehiculos={vehiculos}
-                onRefreshVehiculosPropios={() => void refreshFlotaVehiculos()}
-                onRefreshVehiculosExternos={() => void refreshVehiculosMaestro()}
-                refreshingFlota={refreshingFlota}
                 getToken={getToken}
                 tenantId={tenantId}
                 onVehiculoCreado={(v) => setSessionVehiculos((prev) => [...prev, v])}

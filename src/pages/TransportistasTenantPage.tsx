@@ -15,6 +15,7 @@ import {
 } from "@/lib/listadoTabla";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useIdFiscalLabel } from "@/hooks/useIdFiscalLabel";
 import type { PaginatedMeta, Transportista } from "@/types/api";
 
 type TransportistasPaginatedResponse = {
@@ -37,6 +38,7 @@ export function TransportistasTenantPage() {
   const idFiscalVisible = isVisible("detalle_transportista", "idFiscal");
   const emailVisible = isVisible("detalle_transportista", "email");
   const telefonoVisible = isVisible("detalle_transportista", "telefono");
+  const idFiscalLabel = useIdFiscalLabel();
 
   // Estados de los filtros de columna
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -188,7 +190,7 @@ export function TransportistasTenantPage() {
             {idFiscalVisible && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
-                  title="ID Fiscal"
+                  title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
                 >
@@ -201,7 +203,7 @@ export function TransportistasTenantPage() {
                     className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
                       filtroIdFiscal ? "text-vialto-fire" : "text-vialto-charcoal"
                     }`}
-                    aria-label="Filtrar por ID Fiscal"
+                    aria-label={`Filtrar por ${idFiscalLabel}`}
                   >
                     <option value="">Todos</option>
                     {opcionesIdFiscal.map((o) => (
@@ -238,7 +240,7 @@ export function TransportistasTenantPage() {
           },
           ...(idFiscalVisible ? [{
             id: "idFiscal",
-            header: "ID Fiscal",
+            header: idFiscalLabel,
             cell: (t: Transportista) => t.idFiscal ?? "—",
             tdClassName: `${listadoTablaTdClass} text-vialto-steel`,
           }] : []),

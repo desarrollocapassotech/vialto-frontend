@@ -5,6 +5,7 @@ import { useMaestroData } from "@/hooks/useMaestroData";
 import { useViajeEditor } from "@/hooks/useViajeEditor";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
+import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
@@ -392,6 +393,10 @@ export function ViajesTenantPage({
       canAccessLiquidaciones(tenantModules ?? [])
     : hasLiquidaciones;
   const tid = tenantId?.trim() ?? "";
+  // Empresa solo de flota propia (Tenant.tipoFlota): no terceriza transporte,
+  // la columna "Transporte" diría siempre "Flota propia".
+  const { transportistaExternoVisible: mostrarColumnaTransporte } =
+    useTipoFlotaVisible(tid || undefined);
 
   const [clientesP, setClientesP] = useState<Cliente[]>([]);
   const [choferesP, setChoferesP] = useState<Chofer[]>([]);
@@ -1963,6 +1968,7 @@ export function ViajesTenantPage({
   // campo oculto, tampoco se ofrece como columna en la exportación a Excel.
   const viajesExportColumnsDisponibles = VIAJES_EXPORT_COLUMNS.filter((c) => {
     if (c.id === "chofer") return mostrarColumnaChofer;
+    if (c.id === "transportista") return mostrarColumnaTransporte;
     if (c.id === "estadoPago") return mostrarPagosTransportista;
     if (c.id === "idPropio2") return mostrarColumnaIdPropio2;
     if (c.id === "numero") return mostrarColumnaIdSistema;
@@ -1971,6 +1977,7 @@ export function ViajesTenantPage({
   });
   const tableColSpanBase =
     (mostrarColumnaChofer ? 8 : 7) +
+    (mostrarColumnaTransporte ? 0 : -1) +
     (mostrarColumnaIdPropio2 ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
     (mostrarColumnaIdPropio1 ? 0 : -1);
@@ -1996,6 +2003,11 @@ export function ViajesTenantPage({
       aplicarFiltroColumnaIdPropio2("");
     }
   }, [mostrarColumnaIdPropio2]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!mostrarColumnaTransporte && transportistaIdFiltroActivo.trim()) {
+      aplicarFiltroColumnaTransportista("");
+    }
+  }, [mostrarColumnaTransporte]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
   const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
@@ -2089,26 +2101,28 @@ export function ViajesTenantPage({
           }`}
         />
       </ListadoFiltroCampo>
-      <ListadoFiltroCampo
-        label="Transporte"
-        active={!!transportistaIdFiltroActivo.trim()}
-      >
-        <TransportistaSearchSelect
-          id="viajes-filtro-transporte"
-          transportistas={transportistas}
-          value={transportistaIdFiltroActivo}
-          onChange={(id) => aplicarFiltroColumnaTransportista(id)}
-          placeholderCerrado="Todos"
-          emptyListChoiceLabel="Todos"
-          disabled={listadoRefetching}
-          aria-label="Filtrar listado por transporte"
-          inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-            transportistaIdFiltroActivo.trim()
-              ? "text-vialto-fire"
-              : "text-vialto-charcoal"
-          }`}
-        />
-      </ListadoFiltroCampo>
+      {mostrarColumnaTransporte && (
+        <ListadoFiltroCampo
+          label="Transporte"
+          active={!!transportistaIdFiltroActivo.trim()}
+        >
+          <TransportistaSearchSelect
+            id="viajes-filtro-transporte"
+            transportistas={transportistas}
+            value={transportistaIdFiltroActivo}
+            onChange={(id) => aplicarFiltroColumnaTransportista(id)}
+            placeholderCerrado="Todos"
+            emptyListChoiceLabel="Todos"
+            disabled={listadoRefetching}
+            aria-label="Filtrar listado por transporte"
+            inputClassName={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
+              transportistaIdFiltroActivo.trim()
+                ? "text-vialto-fire"
+                : "text-vialto-charcoal"
+            }`}
+          />
+        </ListadoFiltroCampo>
+      )}
       {mostrarColumnaChofer && (
         <ListadoFiltroCampo
           label="Chofer"
@@ -2528,6 +2542,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarColumnaTransporte && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Transporte"
@@ -2551,6 +2566,7 @@ export function ViajesTenantPage({
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             {mostrarColumnaChofer && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
@@ -2809,6 +2825,7 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
+              {mostrarColumnaTransporte && (
               <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
                 <span className="block truncate" title={nombreTransp}>
                   {nombreTransp}
@@ -2822,6 +2839,7 @@ export function ViajesTenantPage({
                   </span>
                 )}
               </td>
+              )}
               {mostrarColumnaChofer && (
                 <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
                   <span className="block truncate" title={nombreChofer}>
@@ -3129,7 +3147,9 @@ export function ViajesTenantPage({
                       },
                     ]
                   : []),
-                { label: "Transporte", value: transporteValue },
+                ...(mostrarColumnaTransporte
+                  ? [{ label: "Transporte", value: transporteValue }]
+                  : []),
                 ...(mostrarColumnaChofer
                   ? [{ label: "Chofer", value: nombreChofer }]
                   : []),
@@ -3294,6 +3314,7 @@ export function ViajesTenantPage({
               }
               vehiculos={viajeEditor.edicionMaestro?.vehiculos ?? vehiculos}
               choferesPropios={viajeEditor.choferesPropios}
+              choferesExterno={viajeEditor.choferesExterno}
               vehiculosPropios={viajeEditor.vehiculosPropios}
               onModoChange={viajeEditor.applyDraftModo}
               ayudaFlota={viajeEditor.ayudaFlota}

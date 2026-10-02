@@ -10,7 +10,9 @@ import {
   facturaLetraLabel,
 } from "@/lib/arcaCbteTipo";
 import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
+import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
+import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
@@ -28,14 +30,8 @@ function fmtMoney(n: number) {
   return `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
 }
 
-function fmtDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+// Fecha sin hora: siempre en UTC, si no en Argentina se ve un día antes (ver CLAUDE.md del frontend).
+const fmtDate = fmtDateUtc;
 
 export type FacturaArcaPreviewPanelProps = {
   arcaConfig: ArcaConfig | null;
@@ -241,21 +237,9 @@ export function FacturaArcaPreviewPanel({
         </div>
       </div>
 
-      {sinConfigArca && (
-        <div
-          className="border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-          role="alert"
-        >
-          <p className="font-medium">Falta configuración ARCA del tenant</p>
-          <p className="mt-1">
-            {platform
-              ? "Completala en Superadmin → ARCA / AFIP antes de emitir."
-              : "Completala en Configuración ARCA antes de emitir."}
-          </p>
-        </div>
-      )}
+      {sinConfigArca && <SinConfigArcaAviso platform={platform} />}
 
-      {datosEmitIncompletos && !sinConfigArca && (
+      {datosEmitIncompletos && (
         <DatosFiscalesFaltantesAlerta
           missingEmitFields={
             clienteDetalle

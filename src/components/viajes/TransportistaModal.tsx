@@ -9,6 +9,8 @@ import { useTenantPaisFijo } from '@/hooks/useTenantPaisFijo';
 import type { PaisCodigo } from '@/lib/ciudades';
 import type { Transportista } from '@/types/api';
 import { modalQuickCreateOverlayClass } from '@/lib/modalLayers';
+import { useArcaPadron } from '@/hooks/useArcaPadron';
+import { ArcaPadronStatus } from '@/components/shared/ArcaPadronStatus';
 
 export function TransportistaModal({
   getToken,
@@ -34,7 +36,16 @@ export function TransportistaModal({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const { paisFijo, loading: paisFijoLoading } = useTenantPaisFijo(tenantId);
+  const { paisFijo, loading: paisFijoLoading, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+
+  const arca = useArcaPadron({
+    getToken,
+    habilitado: tenantEfectivo?.validacionCuitArcaHabilitada === true,
+    pais,
+    idFiscal,
+    nombre: { value: nombre, set: setNombre },
+    condicionIva: { value: condicionIva, set: setCondicionIva },
+  });
 
   function handlePaisChange(newPais: PaisCodigo | '') {
     setPais(newPais);
@@ -86,7 +97,7 @@ export function TransportistaModal({
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
-          ? 'Ya existe un transportista con ese ID fiscal.'
+          ? `Ya existe un transportista con ese ${idFiscalPorPais(pais).label}.`
           : friendlyError(e, 'transportistas'),
       );
     } finally {
@@ -149,11 +160,13 @@ export function TransportistaModal({
               <input
                 value={idFiscal}
                 onChange={(e) => setIdFiscal(e.target.value)}
+                onBlur={arca.onIdFiscalBlur}
                 placeholder={idFiscalPorPais(pais).placeholder}
                 className={`${I} ${idFiscalError ? 'border-red-400' : 'border-black/15'}`}
               />
               <CrudFieldError message={idFiscalError} />
             </label>
+            <ArcaPadronStatus {...arca} />
             {pais && (
               <label className="flex flex-col gap-1">
                 <span className={L}>{condInfo.label}</span>

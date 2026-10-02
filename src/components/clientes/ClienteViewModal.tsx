@@ -7,6 +7,7 @@ import {
   viewModalGridClass,
 } from '@/components/ui/ViewModalShell';
 import { condicionIvaLabel } from '@/lib/arcaCbteTipo';
+import { idFiscalPorPais, paisCodigoDesdeTexto } from '@/lib/ciudades/paises';
 import type { Cliente } from '@/types/api';
 import { useFieldConfig } from '@/hooks/useFieldConfig';
 
@@ -59,7 +60,11 @@ export function ClienteViewModal({
       <div className={viewModalGridClass}>
         {[
           { key: 'nombre', label: 'Nombre', value: cliente.nombre },
-          { key: 'idFiscal', label: 'ID Fiscal', value: cliente.idFiscal },
+          {
+            key: 'idFiscal',
+            label: idFiscalPorPais(paisCodigoDesdeTexto(cliente.pais ?? '')).label,
+            value: cliente.idFiscal,
+          },
           { key: 'pais', label: 'País', value: cliente.pais },
           {
             key: 'condicionIvaTributaria',
