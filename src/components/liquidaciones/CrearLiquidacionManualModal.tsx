@@ -788,15 +788,16 @@ export function CrearLiquidacionManualModal({
   const ivaPctNum = ivaPct.trim() !== "" ? Number(ivaPct) : 0;
   let ivaGeneral = 0;
   if (selectedViajes.length > 0) {
+    let ivaFletes = 0;
     for (const v of selectedViajes) {
       const vIva = v.precioTransportistaIvaIncluidoPct || ivaPctNum;
-      const vSubtotal = v.precioTransportistaExterno ?? 0;
-      const vComision = (vSubtotal * comisionNum) / 100;
-      const vBase = vSubtotal - vComision;
+      const vBruto = v.precioTransportistaExterno ?? 0;
       if (vIva > 0) {
-        ivaGeneral += (vBase * vIva) / 100;
+        ivaFletes += (vBruto * vIva) / 100;
       }
     }
+    const ivaComision = ivaPctNum > 0 ? (comisionMonto * ivaPctNum) / 100 : 0;
+    ivaGeneral = ivaFletes - ivaComision;
   } else {
     ivaGeneral = ((bruto - comisionMonto) * ivaPctNum) / 100;
   }
