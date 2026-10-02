@@ -29,6 +29,7 @@ import {
   defaultFacturaLineasFromDraft,
   toFacturaLineasPayload,
   validateFacturaLineasDraft,
+  type FacturaLineaDraft,
 } from "@/components/facturacion/FacturaLineasEditor";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
@@ -412,9 +413,11 @@ export function FacturaCreateModal({
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
 
+  const [frozenLineas, setFrozenLineas] = useState<FacturaLineaDraft[] | null>(null);
+
   const totales = useMemo(
-    () => computeFacturaTotales(lineas, ivaPctDefault),
-    [lineas, ivaPctDefault],
+    () => computeFacturaTotales(frozenLineas ?? lineas, ivaPctDefault),
+    [lineas, frozenLineas, ivaPctDefault],
   );
 
   const condicionIva = clienteDetalle?.condicionIva ?? null;
@@ -428,6 +431,7 @@ export function FacturaCreateModal({
       setLineasIncomplete([]);
       setTramosIncomplete([]);
       setArcaConfigMissing(false);
+      setFrozenLineas(null);
       setFacturaEmitida(null);
       setPreviewComprobanteUrl(null);
       setDatosReady(false);
@@ -633,6 +637,7 @@ export function FacturaCreateModal({
       });
 
       setFacturaEmitida(updated);
+      setFrozenLineas(lineas);
       setStep("autorizada");
       onFacturaEmitida?.(updated);
       showToast("Factura emitida a ARCA.", "success");

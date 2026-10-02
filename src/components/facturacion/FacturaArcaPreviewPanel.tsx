@@ -30,6 +30,13 @@ function fmtMoney(n: number) {
 
 function fmtDate(iso: string) {
   if (!iso) return "—";
+  
+  // Evitar desfase de UTC al parsear strings "YYYY-MM-DD"
+  const parts = iso.split(/[-T]/);
+  if (parts.length >= 3 && parts[0].length === 4) {
+    return `${parts[2].slice(0, 2)}/${parts[1]}/${parts[0]}`;
+  }
+
   return new Date(iso).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
