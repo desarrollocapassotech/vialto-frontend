@@ -49,6 +49,8 @@ export type CombustibleAlerta = {
 /** COMB-07-T5: carga que el chofer intentó sincronizar offline y el backend rechazó. */
 export type CombustibleErrorSincronizacion = {
   id: string;
+  /** Opcionales: backends anteriores a oct 2026 no los mandan. */
+  origen?: string;
   mensaje: string;
   fechaCarga: string | null;
   reportadoEn: string;
@@ -56,6 +58,9 @@ export type CombustibleErrorSincronizacion = {
   patente: string;
   litros: number | null;
   importe: number | null;
+  precioPorLitro?: number | null;
+  km?: number | null;
+  formaPago?: string | null;
   estacion: string | null;
 };
 

@@ -100,8 +100,9 @@ export function fmtMensajeErrorSincronizacion(mensaje: string): string {
   // devuelve Nest); si CADA fragmento matchea un patrón técnico conocido, se traducen y
   // se juntan. Si algún fragmento no matchea, se asume que el mensaje completo ya es una
   // oración de negocio en español y se devuelve sin modificar.
+  // "·" es el separador del registro server-side (ChoferErrorLogInterceptor).
   const fragmentos = mensaje
-    .split(",")
+    .split(/[,·]/)
     .map((f) => f.trim())
     .filter(Boolean);
   const traducidos = fragmentos.map(traducirFragmentoValidacion);
@@ -111,23 +112,8 @@ export function fmtMensajeErrorSincronizacion(mensaje: string): string {
   return mensaje;
 }
 
-// Etiqueta corta para la columna "Tipo" de la tabla (el mensaje completo, que puede ser
-// largo, va en el modal de detalle vía fmtMensajeErrorSincronizacion). Reconoce los mismos
-// mensajes de negocio conocidos del backend (combustible.service.ts); ante uno nuevo o no
-// reconocido, cae a una etiqueta genérica en vez de truncar el texto a lo bruto.
-const REGLAS_MOTIVO_CORTO: { patron: RegExp; label: string }[] = [
-  { patron: /should not be empty|must be a (number|string)|must be a valid ISO/, label: "Datos incompletos" },
-  { patron: /^El importe ingresado/, label: "Importe inconsistente" },
-  { patron: /^El kilometraje ingresado/, label: "Kilometraje inconsistente" },
-  { patron: /^No se encontró el vehículo/, label: "Vehículo no encontrado" },
-];
-
-export function motivoCortoErrorSincronizacion(mensaje: string): string {
-  const texto = mensaje?.trim();
-  if (!texto) return "Error de sincronización";
-  const regla = REGLAS_MOTIVO_CORTO.find((r) => r.patron.test(texto));
-  return regla?.label ?? "Error de sincronización";
-}
+// La etiqueta corta de la columna "Tipo" y la explicación para el admin viven en
+// combustibleErrorExplicacion.ts (explicarErrorChofer).
 
 // precioPorLitro = montoTotal / litros, redondeado al entero más cercano
 // (sin decimales: más claro para el usuario que un valor con centavos).

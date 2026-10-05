@@ -6,12 +6,8 @@ import {
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import {
-  fmtTipoVehiculo,
-  fmtFormaPago,
-  fmtMensajeErrorSincronizacion,
-  motivoCortoErrorSincronizacion,
-} from "@/lib/combustibleLabels";
+import { fmtTipoVehiculo, fmtFormaPago } from "@/lib/combustibleLabels";
+import { explicarErrorChofer } from "@/lib/combustibleErrorExplicacion";
 import { CargaCombustibleViewModal } from "./CargaCombustibleViewModal";
 import { motivoShortLabel } from "./SospechaBadge";
 import {
@@ -643,9 +639,29 @@ function SyncErrorViewModal({
   error: CombustibleErrorSincronizacion;
   onClose: () => void;
 }) {
+  const explicacion = explicarErrorChofer(error);
+  const datos: { label: string; valor: string }[] = [
+    { label: "Fecha de la carga", valor: error.fechaCarga ? fmtFecha(error.fechaCarga) : "—" },
+    { label: "Error registrado", valor: fmtFecha(error.reportadoEn) },
+    { label: "Conductor", valor: error.choferNombre || "—" },
+    { label: "Vehículo", valor: patenteOSinIdentificar(error.patente) },
+    { label: "Kilometraje", valor: error.km != null ? `${fmtNum(error.km)} km` : "—" },
+    { label: "Estación", valor: error.estacion ?? "—" },
+    { label: "Litros", valor: error.litros != null ? fmtLitros(error.litros) : "—" },
+    {
+      label: "Precio por litro",
+      valor: error.precioPorLitro != null ? fmtMoney(error.precioPorLitro) : "—",
+    },
+    { label: "Monto", valor: error.importe != null ? fmtMoney(error.importe) : "—" },
+    {
+      label: "Forma de pago",
+      valor: error.formaPago ? fmtFormaPago(error.formaPago.toLowerCase()) : "—",
+    },
+  ];
+
   return (
     <ViewModalShell
-      title="Error de sincronización"
+      title={explicacion.titulo}
       onClose={onClose}
       footer={
         <button type="button" onClick={onClose} className={viewModalBtnGhost}>
@@ -653,67 +669,54 @@ function SyncErrorViewModal({
         </button>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div>
+      <div className="flex flex-col gap-5">
+        <section className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3">
+          <p className="text-xs uppercase tracking-[0.08em] text-rose-800">
+            ¿Qué pasó?
+          </p>
+          <p className="mt-1 text-sm text-vialto-charcoal">{explicacion.quePaso}</p>
+        </section>
+
+        <section>
           <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-            Motivo
+            ¿Cómo quedó?
           </p>
-          <p className="mt-1 text-sm text-rose-800">
-            {fmtMensajeErrorSincronizacion(error.mensaje)}
+          <p className="mt-1 text-sm text-vialto-charcoal">{explicacion.estado}</p>
+        </section>
+
+        <section>
+          <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            ¿Qué hacer?
           </p>
-        </div>
-        <div className={viewModalGridClass}>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Carga realizada
-            </p>
-            <p className="mt-1 text-sm">
-              {error.fechaCarga ? fmtFecha(error.fechaCarga) : "—"}
-            </p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-vialto-charcoal">
+            {explicacion.queHacer.map((paso) => (
+              <li key={paso}>{paso}</li>
+            ))}
+          </ol>
+        </section>
+
+        <section>
+          <p className="mb-2 text-xs uppercase tracking-[0.08em] text-vialto-steel">
+            Lo que intentó cargar el conductor
+          </p>
+          <div className={viewModalGridClass}>
+            {datos.map((d) => (
+              <div key={d.label}>
+                <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
+                  {d.label}
+                </p>
+                <p className="mt-1 text-sm">{d.valor}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Error registrado
-            </p>
-            <p className="mt-1 text-sm">{fmtFecha(error.reportadoEn)}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Conductor
-            </p>
-            <p className="mt-1 text-sm">{error.choferNombre || "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Vehículo
-            </p>
-            <p className="mt-1 text-sm">
-              {patenteOSinIdentificar(error.patente)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Estación
-            </p>
-            <p className="mt-1 text-sm">{error.estacion ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Litros
-            </p>
-            <p className="mt-1 text-sm">
-              {error.litros != null ? fmtLitros(error.litros) : "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-vialto-steel">
-              Monto
-            </p>
-            <p className="mt-1 text-sm">
-              {error.importe != null ? fmtMoney(error.importe) : "—"}
-            </p>
-          </div>
-        </div>
+        </section>
+
+        <details className="text-xs text-vialto-steel">
+          <summary className="cursor-pointer select-none">
+            Mensaje técnico (para soporte)
+          </summary>
+          <p className="mt-1 break-words font-mono">{error.mensaje || "—"}</p>
+        </details>
       </div>
     </ViewModalShell>
   );
@@ -851,13 +854,12 @@ export function AlertasList({
                   <div className="flex flex-col items-start gap-0.5">
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <SemaforoDot color="rojo" />
-                      Error de sincronización
+                      {explicarErrorChofer(e).titulo}
                     </span>
-                    <span
-                      className="text-xs text-vialto-steel"
-                      title={fmtMensajeErrorSincronizacion(e.mensaje)}
-                    >
-                      {motivoCortoErrorSincronizacion(e.mensaje)}
+                    <span className="text-xs text-vialto-steel">
+                      {e.origen === "sincronizacion_offline" || !e.origen
+                        ? "Carga no registrada"
+                        : "Error en la app del conductor"}
                     </span>
                   </div>
                 </td>
@@ -885,7 +887,7 @@ export function AlertasList({
                     onClick={() => setViewingError(e)}
                     className="inline-flex items-center whitespace-nowrap text-xs uppercase tracking-wider text-vialto-steel hover:text-vialto-fire"
                   >
-                    Ver carga →
+                    Ver qué pasó →
                   </button>
                 </td>
               </tr>
