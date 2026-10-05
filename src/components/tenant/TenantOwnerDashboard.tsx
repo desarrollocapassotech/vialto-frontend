@@ -20,6 +20,7 @@ import {
   Warehouse,
   Fuel,
   HandCoins,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
@@ -224,23 +225,6 @@ function AlertTriangleIcon({ className }: { className?: string }) {
   );
 }
 
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
-    </svg>
-  );
-}
-
 function montosPorMonedaCompat(bloque: {
   montoTotal: number;
   montosPorMoneda?: { ARS: number; USD: number };
@@ -295,18 +279,10 @@ export function AlertsPanel({
     montoTotal: 0,
   };
   const margenBajo = alertas.margenBajo ?? { cantidad: 0, montoTotal: 0 };
-  const totalAlertasBadge =
-    (alertas.facturasVencidas.cantidad > 0
-      ? alertas.facturasVencidas.cantidad
-      : 0) +
-    (alertas.viajesSinFactura.cantidad > 0
-      ? alertas.viajesSinFactura.cantidad
-      : 0) +
-    (cargasSospechosas.cantidad > 0 ? cargasSospechosas.cantidad : 0) +
-    (margenBajo.cantidad > 0 ? margenBajo.cantidad : 0);
-  const badgeText = totalAlertasBadge > 99 ? "99+" : String(totalAlertasBadge);
-  const resumenMobile =
-    totalAlertasBadge === 1 ? "1 pendiente" : `${totalAlertasBadge} pendientes`;
+  const erroresChofer = alertas.erroresChofer?.cantidad ?? 0;
+  // Sin contador a propósito: la campana del menú superior es el único lugar con número
+  // de avisos (ver NotificationBell). Este panel es solo el detalle de lo que sigue abierto.
+  const resumenMobile = "Situaciones abiertas del período";
 
   function closePanel() {
     setAbierto(false);
@@ -575,6 +551,37 @@ export function AlertsPanel({
           </div>
         )}
 
+        {erroresChofer > 0 && (
+          <div className="flex gap-3 rounded-md border-2 border-rose-500/70 bg-rose-950/30 px-3 py-3">
+            <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.2em] text-rose-200/80">
+                {erroresChofer === 1
+                  ? "Carga de chofer sin registrar"
+                  : "Cargas de choferes sin registrar"}
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl text-white">
+                {erroresChofer}{" "}
+                <span className="font-body text-base text-white/70">
+                  {erroresChofer === 1 ? "carga" : "cargas"}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-rose-100/90">
+                Rechazadas al sincronizar: siguen en el celular del chofer hasta que se corrijan.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  to="/?combustibleTab=alertas"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded border border-rose-400/40 bg-rose-950/40 px-2 py-2 text-center font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.15em] text-rose-100 hover:bg-rose-900/55 hover:border-rose-300/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 transition-colors"
+                  onClick={closePanel}
+                >
+                  Ir a alertas de combustible →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {margenBajo.cantidad > 0 && (
           <div className="flex gap-3 rounded-md border-2 border-amber-500/70 bg-amber-950/30 px-3 py-3">
             <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
@@ -619,23 +626,17 @@ export function AlertsPanel({
           onClick={() => setAbierto(true)}
           aria-haspopup="dialog"
           aria-expanded={abierto}
-          aria-label={`Alertas: ${resumenMobile}, ver detalle`}
+          aria-label="Resumen de alertas: ver situaciones abiertas"
           className="group flex min-h-11 w-full items-center gap-3 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-3 text-left shadow-md ring-1 ring-vialto-fire/35 transition-[border-color,box-shadow] hover:border-vialto-bright hover:ring-vialto-fire/60"
         >
-          <span
-            className="inline-flex shrink-0 text-vialto-fire motion-reduce:animate-none animate-alarm-bell origin-top"
-            aria-hidden
-          >
-            <BellIcon className="h-5 w-5" />
+          <span className="inline-flex shrink-0 text-vialto-fire" aria-hidden>
+            <TriangleAlert className="h-5 w-5" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors">
-              Alertas
+              Resumen de alertas
             </span>
             <span className="block text-xs text-white/60">{resumenMobile}</span>
-          </span>
-          <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 text-[10px] font-bold text-white ring-2 ring-vialto-charcoal">
-            {badgeText}
           </span>
           <ChevronDown
             className="h-4 w-4 shrink-0 text-white/50"
@@ -663,14 +664,14 @@ export function AlertsPanel({
                   className="inline-flex shrink-0 text-vialto-fire"
                   aria-hidden
                 >
-                  <BellIcon className="h-5 w-5" />
+                  <TriangleAlert className="h-5 w-5" strokeWidth={2} />
                 </span>
                 <div className="min-w-0">
                   <h2
                     id={`${headingId}-mobile-title`}
                     className="font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
                   >
-                    Alertas
+                    Resumen de alertas
                   </h2>
                   <p className="mt-0.5 text-xs text-white/50">
                     {resumenMobile}
@@ -709,30 +710,19 @@ export function AlertsPanel({
             onClick={() => setAbierto(true)}
             aria-expanded="false"
             aria-controls={panelId}
-            aria-label={`Alertas: ${totalAlertasBadge} pendiente${totalAlertasBadge === 1 ? "" : "s"}, ver detalle`}
-            className="group flex items-center gap-2.5 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-2.5 text-left shadow-md ring-1 ring-vialto-fire/35 animate-alarm-chip-pulse motion-reduce:animate-none hover:border-vialto-bright hover:ring-vialto-fire/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-vialto-mist)] active:scale-[0.98] transition-[border-color,box-shadow,transform] cursor-pointer"
+            aria-label="Resumen de alertas: ver situaciones abiertas"
+            className="group flex items-center gap-2.5 rounded-lg border-2 border-vialto-fire bg-gradient-to-br from-vialto-charcoal to-vialto-graphite px-4 py-2.5 text-left shadow-md ring-1 ring-vialto-fire/35 hover:border-vialto-bright hover:ring-vialto-fire/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-vialto-fire focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-vialto-mist)] active:scale-[0.98] transition-[border-color,box-shadow,transform] cursor-pointer"
           >
-            <span
-              className="inline-flex text-vialto-fire motion-reduce:animate-none animate-alarm-bell origin-top"
-              aria-hidden
-            >
-              <BellIcon className="w-6 h-6" />
+            <span className="inline-flex text-vialto-fire" aria-hidden>
+              <TriangleAlert className="w-6 h-6" strokeWidth={2} />
             </span>
             <span className="inline-flex items-center gap-2.5 pl-1">
               <span
                 id={headingId}
                 className="font-[family-name:var(--font-ui)] text-sm uppercase tracking-[0.2em] text-white group-hover:text-vialto-bright transition-colors"
               >
-                Alertas
+                Resumen de alertas
               </span>
-              {totalAlertasBadge > 0 ? (
-                <span
-                  className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
-                  aria-hidden
-                >
-                  {badgeText}
-                </span>
-              ) : null}
             </span>
           </button>
         ) : (
@@ -748,21 +738,13 @@ export function AlertsPanel({
                   className="inline-flex shrink-0 text-vialto-fire"
                   aria-hidden
                 >
-                  <BellIcon className="h-5 w-5" />
+                  <TriangleAlert className="h-5 w-5" strokeWidth={2} />
                 </span>
                 <h2
                   id={headingId}
                   className="inline-flex min-w-0 items-center gap-2.5 pl-1 font-[family-name:var(--font-display)] text-lg tracking-wide text-white"
                 >
-                  <span className="max-w-[10rem] truncate">Alertas</span>
-                  {totalAlertasBadge > 0 ? (
-                    <span
-                      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-body)] text-[10px] font-bold leading-none text-white shadow ring-2 ring-vialto-charcoal"
-                      aria-hidden
-                    >
-                      {badgeText}
-                    </span>
-                  ) : null}
+                  <span className="max-w-[14rem] truncate">Resumen de alertas</span>
                 </h2>
               </div>
               <button

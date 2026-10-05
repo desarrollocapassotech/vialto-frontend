@@ -1,51 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Bell } from "lucide-react";
+import { Bell, BellOff, ChevronRight, Settings } from "lucide-react";
 import { apiJson } from "@/lib/api";
-import { resolveNotificacionRoute } from "@/lib/notificacionRoutes";
-import type { NotificacionFeed, NotificacionFeedItem } from "@/types/notificaciones";
+import {
+  avisosSinAgrupar,
+  EVENTO_NOTIFICACIONES_VISTAS,
+  fechaRelativa,
+  MAX_AVISOS_SIN_AGRUPAR,
+  tipoNotificacionUI,
+} from "@/lib/notificacionTipos";
+import type { NotificacionFeedGrupo } from "@/types/notificaciones";
 
-const DROPDOWN_LIMIT = 3;
-const FETCH_LIMIT = DROPDOWN_LIMIT + 1; // uno de más solo para saber si "ver todas" tiene sentido
 const POLL_MS = 60_000;
 
-function formatRelative(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60_000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const hs = Math.floor(min / 60);
-  if (hs < 24) return `hace ${hs} h`;
-  const dias = Math.floor(hs / 24);
-  return `hace ${dias} d`;
-}
-
+/**
+ * Campana del menú superior: el único contador de avisos del sistema — cuenta solo los no
+ * vistos. El desplegable lista los avisos sueltos si son pocos (MAX_AVISOS_SIN_AGRUPAR), o
+ * un resumen por tipo si son más; cada fila lleva a /notificaciones con ese tipo abierto,
+ * donde se marcan como vistos.
+ */
 export function NotificationBell() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [feed, setFeed] = useState<NotificacionFeed | null>(null);
+  const [grupos, setGrupos] = useState<NotificacionFeedGrupo[] | null>(null);
+  const noLeidas = grupos?.reduce((s, g) => s + g.noLeidas, 0) ?? 0;
+  // El desplegable muestra solo lo no visto; el historial completo está en /notificaciones.
+  const sueltos = grupos ? avisosSinAgrupar(grupos)?.filter((i) => !i.leido) ?? null : null;
+  const gruposConNuevas = grupos?.filter((g) => g.noLeidas > 0) ?? [];
+  const sinNuevas = sueltos ? sueltos.length === 0 : gruposConNuevas.length === 0;
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const fetchFeed = useCallback(async () => {
+  const fetchGrupos = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return;
     try {
-      const data = await apiJson<NotificacionFeed>(
-        `/api/notificaciones/feed?limit=${FETCH_LIMIT}`,
+      // porTipo=MAX_AVISOS_SIN_AGRUPAR: con pocos avisos en total se listan sueltos, y así ya
+      // vienen todos; con muchos, solo se usan los totales por grupo.
+      const data = await apiJson<NotificacionFeedGrupo[]>(
+        `/api/notificaciones/feed/agrupado?porTipo=${MAX_AVISOS_SIN_AGRUPAR}`,
         () => getToken(),
       );
-      setFeed(data);
+      setGrupos(data);
     } catch {
       // silencioso: si falla, la campana simplemente no muestra novedades hasta el próximo poll
     }
   }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
-    fetchFeed();
-    const id = setInterval(fetchFeed, POLL_MS);
+    void fetchGrupos();
+    const id = setInterval(() => void fetchGrupos(), POLL_MS);
     return () => clearInterval(id);
-  }, [fetchFeed]);
+  }, [fetchGrupos]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,31 +64,22 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  async function handleToggle() {
-    const next = !open;
-    setOpen(next);
-    if (next && feed && feed.noLeidas > 0) {
-      setFeed((prev) => (prev ? { ...prev, noLeidas: 0 } : prev));
-      try {
-        await apiJson("/api/notificaciones/feed/marcar-leidas", () => getToken(), {
-          method: "POST",
-          body: JSON.stringify({}),
-        });
-      } catch {
-        // si falla, el próximo poll vuelve a traer el contador real
-      }
-    }
+  // La página de Notificaciones avisa cuando marca avisos como vistos: actualizar ya.
+  useEffect(() => {
+    const onVistas = () => void fetchGrupos();
+    window.addEventListener(EVENTO_NOTIFICACIONES_VISTAS, onVistas);
+    return () => window.removeEventListener(EVENTO_NOTIFICACIONES_VISTAS, onVistas);
+  }, [fetchGrupos]);
+
+  // Abrir la campana NO marca nada como visto: un aviso cuenta como visto recién cuando
+  // se muestra en la página de Notificaciones.
+  function handleToggle() {
+    setOpen((prev) => !prev);
   }
 
-  const items = feed?.items.slice(0, DROPDOWN_LIMIT) ?? [];
-  const hayMas = (feed?.items.length ?? 0) > DROPDOWN_LIMIT;
-  const noLeidas = feed?.noLeidas ?? 0;
-
-  function handleItemClick(item: NotificacionFeedItem) {
-    const to = resolveNotificacionRoute(item);
-    if (!to) return;
+  function irA(ruta: string) {
     setOpen(false);
-    navigate(to);
+    navigate(ruta);
   }
 
   return (
@@ -104,60 +101,86 @@ export function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-md border border-black/10 bg-white text-vialto-charcoal shadow-lg">
-          <div className="max-h-80 overflow-y-auto">
-            {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-vialto-steel">
-                Sin notificaciones por ahora.
-              </p>
-            ) : (
-              <ul className="divide-y divide-black/5">
-                {items.map((item) => {
-                  const clickable = resolveNotificacionRoute(item) !== null;
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleItemClick(item)}
-                        disabled={!clickable}
-                        className={`block w-full px-4 py-3 text-left ${
-                          clickable ? "cursor-pointer hover:bg-vialto-mist" : "cursor-default"
-                        }`}
-                      >
-                        <p className="text-sm font-medium text-vialto-charcoal">{item.titulo}</p>
-                        <p className="mt-0.5 text-xs text-vialto-steel">{item.detalle}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-wide text-vialto-steel/70">
-                          {formatRelative(item.enviadoAt)}
-                        </p>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {hayMas && (
+          <div className="flex items-center justify-between border-b border-black/10 px-4 py-2.5">
+            <span className="text-sm font-semibold">Notificaciones</span>
             <button
               type="button"
-              onClick={() => {
-                setOpen(false);
-                navigate("/notificaciones");
-              }}
-              className="block w-full border-t border-black/10 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              onClick={() => irA("/configuracion/notificaciones")}
+              aria-label="Ajustes de notificaciones"
+              title="Ajustes"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
             >
-              Ver todas
+              <Settings className="h-4 w-4" strokeWidth={1.75} />
             </button>
+          </div>
+
+          {sinNuevas ? (
+            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+              <BellOff className="h-5 w-5 text-vialto-steel/60" aria-hidden />
+              <p className="text-sm text-vialto-steel">Sin notificaciones nuevas</p>
+            </div>
+          ) : sueltos ? (
+            // Pocos avisos en total: uno por fila, sin agrupar.
+            <ul className="divide-y divide-black/5">
+              {sueltos.map((item) => {
+                const { icono: Icono } = tipoNotificacionUI(item.tipo, item.label);
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => irA(`/notificaciones?tipo=${encodeURIComponent(item.tipo)}`)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-vialto-mist"
+                    >
+                      <span className="relative shrink-0">
+                        <Icono className="h-4 w-4 text-vialto-steel" strokeWidth={1.75} aria-hidden />
+                        {!item.leido && (
+                          <span
+                            className="absolute -left-1.5 -top-1 h-2 w-2 rounded-full bg-vialto-fire"
+                            aria-label="Nueva"
+                          />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm">{item.titulo}</span>
+                      <span className="shrink-0 text-[11px] text-vialto-steel">
+                        {fechaRelativa(item.enviadoAt)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <ul className="divide-y divide-black/5">
+              {gruposConNuevas.map((g) => {
+                const { nombre, icono: Icono } = tipoNotificacionUI(g.tipo, g.label);
+                return (
+                  <li key={g.tipo}>
+                    <button
+                      type="button"
+                      onClick={() => irA(`/notificaciones?tipo=${encodeURIComponent(g.tipo)}`)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-vialto-mist"
+                    >
+                      <Icono className="h-4 w-4 shrink-0 text-vialto-steel" strokeWidth={1.75} aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-sm">{nombre}</span>
+                      {g.noLeidas > 0 && (
+                        <span className="shrink-0 rounded-full bg-vialto-fire px-2 py-0.5 text-[11px] font-semibold text-white">
+                          {g.noLeidas} {g.noLeidas === 1 ? "nueva" : "nuevas"}
+                        </span>
+                      )}
+                      <ChevronRight className="h-4 w-4 shrink-0 text-vialto-steel/60" aria-hidden />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
 
           <button
             type="button"
-            onClick={() => {
-              setOpen(false);
-              navigate("/configuracion/notificaciones");
-            }}
-            className="block w-full border-t border-black/10 px-4 py-2.5 text-center text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+            onClick={() => irA("/notificaciones")}
+            className="block w-full border-t border-black/10 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
           >
-            Ajustes
+            Ver todas
           </button>
         </div>
       )}

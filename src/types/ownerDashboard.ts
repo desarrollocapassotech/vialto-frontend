@@ -53,6 +53,10 @@ export type OwnerDashboardResponse = {
       cantidad: number;
       montoTotal: number;
     };
+    /** Cargas de choferes rechazadas al sincronizar, sin resolver (mismo criterio que la pestaña Alertas de Combustible). */
+    erroresChofer?: {
+      cantidad: number;
+    };
     /** Viajes del período con margen bajo o negativo. `montoTotal` solo suma el margen negativo en ARS. */
     margenBajo?: {
       cantidad: number;

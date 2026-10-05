@@ -129,20 +129,15 @@ export function CombustibleDashboardSection({
     return () => clearInterval(interval);
   }, [tab, fetchDashboard]);
 
-  const cantAlertas =
-    (data?.alertas.length ?? 0) + (data?.erroresSincronizacion.length ?? 0);
   const periodo = periodToDates(dash.period, dash.customFrom, dash.customTo);
 
-  const tabs: { id: CombustibleTab; label: string; badge?: number }[] = [
+  // Sin contador en "Alertas": la campana del menú superior es el único lugar con número.
+  const tabs: { id: CombustibleTab; label: string }[] = [
     { id: "resumen", label: "Resumen" },
     { id: "vehiculo", label: "Por vehículo" },
     { id: "chofer", label: "Por chofer" },
     { id: "distribucion", label: "Distribución" },
-    {
-      id: "alertas",
-      label: "Alertas",
-      badge: cantAlertas > 0 ? cantAlertas : undefined,
-    },
+    { id: "alertas", label: "Alertas" },
     ...(showViajes ? [{ id: "viajes" as const, label: "Viajes" }] : []),
   ];
 
@@ -167,14 +162,6 @@ export function CombustibleDashboardSection({
             }`}
           >
             {t.label}
-            {t.badge !== undefined && (
-              <span
-                className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-vialto-fire px-1 text-[10px] font-semibold leading-none text-white"
-                aria-hidden
-              >
-                {t.badge}
-              </span>
-            )}
           </button>
         ))}
       </div>

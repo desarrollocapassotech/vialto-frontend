@@ -23,3 +23,12 @@ export type NotificacionFeed = {
   noLeidas: number;
   items: NotificacionFeedItem[];
 };
+
+/** GET /notificaciones/feed/agrupado — un grupo por tipo de aviso. */
+export type NotificacionFeedGrupo = {
+  tipo: string;
+  label: string;
+  total: number;
+  noLeidas: number;
+  items: NotificacionFeedItem[];
+};
