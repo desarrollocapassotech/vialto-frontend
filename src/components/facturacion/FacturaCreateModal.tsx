@@ -610,8 +610,12 @@ export function FacturaCreateModal({
     setLocalError(null);
     setSubmitAction(action);
 
+    // Para saber en el catch si la factura se llegó a crear
+    let facturaCreada: Factura | null = null;
+
     try {
       const factura = await persistFactura();
+      facturaCreada = factura;
 
       if (action === "borrador") {
         showToast("Factura guardada como borrador.", "success");
@@ -635,6 +639,17 @@ export function FacturaCreateModal({
       onFacturaEmitida?.(updated);
       showToast("Factura emitida a ARCA.", "success");
     } catch (err) {
+      // Se creó pero falló ARCA: refrescar y cerrar
+      if (facturaCreada) {
+        onFacturaGuardada?.(facturaCreada);
+        showToast(
+          "La factura quedó en borrador pero no se pudo emitir a ARCA. Podés reintentar desde el listado.",
+          "error",
+        );
+        onClose();
+        return;
+      }
+
       const msg =
         action === "emitir" &&
         err instanceof ApiError &&
