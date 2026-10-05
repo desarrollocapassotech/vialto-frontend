@@ -738,7 +738,7 @@ export function FacturaCreateModal({
     monedaUnicaDeViajes(draft.viajeIds, derivedViajes) === null;
 
   const compactFields = (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
         {!hasArca && (
           <div className="flex flex-col gap-1">
@@ -804,7 +804,7 @@ export function FacturaCreateModal({
           />
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+      <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
         <div className="flex shrink-0 items-baseline justify-between gap-2">
           <label className={compactLabelClass}>
             Viajes vinculados{" "}
@@ -1132,7 +1132,7 @@ export function FacturaCreateModal({
             {step === "form" ? (
               unifiedArca ? (
                 <>
-                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-hidden lg:border-b-0 lg:border-r">
+                  <div className="flex min-h-0 flex-col overflow-y-auto border-b border-black/10 px-4 py-4 sm:px-5 lg:w-[65%] lg:max-w-[65%] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
                     {compactFields}
                   </div>
                   <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:w-[35%] lg:max-w-[35%] lg:shrink-0 lg:min-w-0">
