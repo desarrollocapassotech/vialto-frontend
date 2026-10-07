@@ -120,6 +120,8 @@ type FacturaNuevaNavState = {
   };
   expandFacturaId?: string;
   viewFacturaId?: string;
+  /** "Reintentar factura" desde Viajes: abre directo la emisión si sigue con error de ARCA. */
+  emitirFacturaId?: string;
 };
 
 export function FacturacionTenantPage({
@@ -639,16 +641,17 @@ export function FacturacionTenantPage({
   }, [location.state, getToken, facturaUrl]);
 
   useEffect(() => {
-    const viewId = (
-      location.state as FacturaNuevaNavState | null
-    )?.viewFacturaId?.trim();
+    const state = location.state as FacturaNuevaNavState | null;
+    const emitirId = state?.emitirFacturaId?.trim();
+    const viewId = emitirId || state?.viewFacturaId?.trim();
     if (!viewId || viewFacturaHandledRef.current) return;
     viewFacturaHandledRef.current = true;
     window.history.replaceState({}, "");
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
-        setViewingFactura(f);
+        if (emitirId && f.arcaEstado === "error" && !f.cae) abrirEmitirArca(f);
+        else setViewingFactura(f);
       } catch {
         // si falla, simplemente no se abre el modal de vista automático
       }

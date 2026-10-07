@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Ban, Banknote, Eye, FileText, Receipt, Trash2 } from 'lucide-react';
+import { Ban, Banknote, Eye, FileText, Receipt, RotateCw, Trash2 } from 'lucide-react';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -58,10 +58,11 @@ export function FacturaAccionesMenu({
       !anulada &&
       !tieneCaeOriginal;
     if (puedeEmitirArca && onEmitirArca) {
+      const conError = factura.arcaEstado === 'error';
       opts.push({
-        id: 'emitir-arca',
-        label: 'Emitir a ARCA',
-        icon: Receipt,
+        id: conError ? 'reintentar' : 'emitir-arca',
+        label: conError ? 'Reintentar emisión' : 'Emitir a ARCA',
+        icon: conError ? RotateCw : Receipt,
         onClick: onEmitirArca,
       });
     }
@@ -153,6 +154,7 @@ export function FacturaAccionesMenu({
 
 /** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
 const FACTURA_ACCIONES_DESTACADAS = [
+  'reintentar',
   'ver',
   'emitir-arca',
   'marcar-cobrada',

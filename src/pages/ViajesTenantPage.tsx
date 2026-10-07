@@ -1906,6 +1906,36 @@ export function ViajesTenantPage({
     }
   }
 
+  /** Factura del viaje (o de alguno de sus clientes) que quedó con error de ARCA. */
+  function facturaIdConErrorDeViaje(v: Viaje): string | undefined {
+    if (v.facturacionEstado === "error_afip" && v.facturaId) return v.facturaId;
+    return (
+      v.clientesViaje?.find(
+        (c) => c.facturacionEstado === "error_afip" && c.facturaId,
+      )?.facturaId ?? undefined
+    );
+  }
+
+  /** Liquidación del viaje que quedó con error de ARCA. */
+  function liquidacionIdConErrorDeViaje(v: Viaje): string | undefined {
+    return v.liquidacionesViaje?.find((lv) => lv.liquidacion.estado === "error")
+      ?.liquidacion.id;
+  }
+
+  function reintentarFacturaDeViaje(facturaId: string) {
+    navigate("/facturacion", {
+      state: { ...facturacionNavExtras(), emitirFacturaId: facturaId },
+    });
+  }
+
+  function reintentarLiquidacionDeViaje(liquidacionId: string) {
+    const params = new URLSearchParams();
+    if (platform && tid) params.set("tenantId", tid);
+    params.set("liquidacion", liquidacionId);
+    params.set("emitir", "1");
+    navigate(`/liquidaciones?${params.toString()}`);
+  }
+
   function abrirLiquidacionEnContexto(v: Viaje) {
     const elegida = liquidacionElegidaDeViaje(v);
     if (!elegida) return;
@@ -3017,6 +3047,16 @@ export function ViajesTenantPage({
                       ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
+                  onReintentarFactura={(() => {
+                    const id = facturaIdConErrorDeViaje(v);
+                    return id ? () => reintentarFacturaDeViaje(id) : undefined;
+                  })()}
+                  onReintentarLiquidacion={(() => {
+                    const id = liquidacionIdConErrorDeViaje(v);
+                    return id
+                      ? () => reintentarLiquidacionDeViaje(id)
+                      : undefined;
+                  })()}
                   onEliminar={() => requestDeleteViaje(v)}
                 />
               </td>
@@ -3259,6 +3299,16 @@ export function ViajesTenantPage({
                       ? () => abrirLiquidacionEnContexto(v)
                       : undefined
                   }
+                  onReintentarFactura={(() => {
+                    const id = facturaIdConErrorDeViaje(v);
+                    return id ? () => reintentarFacturaDeViaje(id) : undefined;
+                  })()}
+                  onReintentarLiquidacion={(() => {
+                    const id = liquidacionIdConErrorDeViaje(v);
+                    return id
+                      ? () => reintentarLiquidacionDeViaje(id)
+                      : undefined;
+                  })()}
                   onEliminar={() => requestDeleteViaje(v)}
                 />
               }

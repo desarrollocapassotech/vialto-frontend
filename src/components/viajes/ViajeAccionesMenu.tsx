@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Banknote, Download, Eye, FileText, Calculator, PlusCircle, Receipt, Trash2 } from 'lucide-react';
+import { Banknote, Download, Eye, FileText, Calculator, PlusCircle, Receipt, RotateCw, Trash2 } from 'lucide-react';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
@@ -22,6 +22,10 @@ interface Props {
   onExportar: () => void;
   onVerFactura?: () => void;
   onVerLiquidacion?: () => void;
+  /** Solo si la factura del viaje quedó con error de ARCA. */
+  onReintentarFactura?: () => void;
+  /** Solo si la liquidación del viaje quedó con error de ARCA. */
+  onReintentarLiquidacion?: () => void;
   onEliminar?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
@@ -39,6 +43,8 @@ export function ViajeAccionesMenu({
   onExportar,
   onVerFactura,
   onVerLiquidacion,
+  onReintentarFactura,
+  onReintentarLiquidacion,
   onEliminar,
   open: openProp,
   onOpenChange,
@@ -61,6 +67,23 @@ export function ViajeAccionesMenu({
 
   const options = useMemo(() => {
     const items: AccionOpcion[] = [{ id: 'ver', label: 'Ver', icon: Eye, onClick: onVer }];
+
+    if (onReintentarFactura) {
+      items.push({
+        id: 'reintentar-factura',
+        label: 'Reintentar factura',
+        icon: RotateCw,
+        onClick: onReintentarFactura,
+      });
+    }
+    if (onReintentarLiquidacion) {
+      items.push({
+        id: 'reintentar-liquidacion',
+        label: 'Reintentar liquidación',
+        icon: RotateCw,
+        onClick: onReintentarLiquidacion,
+      });
+    }
 
     if (viaje.facturaId && onVerFactura) {
       items.push({ id: 'ver-factura', label: 'Ver factura', icon: FileText, onClick: onVerFactura });
@@ -102,6 +125,8 @@ export function ViajeAccionesMenu({
     onVer,
     onVerFactura,
     onVerLiquidacion,
+    onReintentarFactura,
+    onReintentarLiquidacion,
     permiteFacturar,
     facturarBloqueoArcaUsd,
     onFacturar,
@@ -130,6 +155,8 @@ export function ViajeAccionesMenu({
  * "Ver" queda solo en el desplegable: tocar la fila ya abre las acciones.
  */
 const VIAJE_ACCIONES_DESTACADAS = [
+  'reintentar-factura',
+  'reintentar-liquidacion',
   'facturar',
   'gasto',
   'pago',

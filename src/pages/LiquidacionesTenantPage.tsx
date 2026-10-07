@@ -8,6 +8,7 @@ import {
   FileText,
   Landmark,
   Receipt,
+  RotateCw,
   Trash2,
 } from "lucide-react";
 import { ListadoCard } from "@/components/listado/ListadoCard";
@@ -27,6 +28,7 @@ import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 
 /** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
 const LIQUIDACION_ACCIONES_DESTACADAS = [
+  "reintentar",
   "ver",
   "emitir",
   "pdf",
@@ -176,10 +178,11 @@ function LiquidacionAccionesMenu({
     { id: "ver", label: "Ver", icon: Eye, onClick: onVer },
   ];
   if (puedeEmitir) {
+    const conError = liq.estado === "error";
     options.push({
-      id: "emitir",
-      label: isBusy ? "Emitiendo…" : "Emitir",
-      icon: Receipt,
+      id: conError ? "reintentar" : "emitir",
+      label: isBusy ? "Emitiendo…" : conError ? "Reintentar emisión" : "Emitir",
+      icon: conError ? RotateCw : Receipt,
       onClick: onEmitir,
       disabled: isBusy,
     });
@@ -472,12 +475,17 @@ export function LiquidacionesTenantPage() {
     };
   }, [getToken, isLoaded, isSignedIn, activeTenantId, hasArca]);
 
-  /** Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje). */
+  /**
+   * Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje).
+   * Con `&emitir=1` (botón "Reintentar liquidación" de Viajes) abre directo la emisión si
+   * la liquidación sigue con error de ARCA; si no, cae en la vista normal.
+   */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !activeTenantId) return;
     const id = searchParams.get("liquidacion")?.trim();
     if (!id) return;
+    const emitir = searchParams.get("emitir") === "1";
     let cancelled = false;
     void (async () => {
       try {
@@ -486,10 +494,14 @@ export function LiquidacionesTenantPage() {
           () => getToken(),
         );
         if (cancelled) return;
-        setDetail({
-          mode: "view",
-          liq: { ...full, conceptosLineas: full.conceptosLineas ?? [] },
-        });
+        const liq = { ...full, conceptosLineas: full.conceptosLineas ?? [] };
+        // Solo `error`: implica que ya se intentó emitir a ARCA (no depende de que los
+        // módulos del tenant ya hayan cargado).
+        if (emitir && liq.estado === "error") {
+          setPendingEmitir(liq);
+        } else {
+          setDetail({ mode: "view", liq });
+        }
       } catch {
         // Si no se pudo resolver (id inválido, sin permisos), no bloqueamos la pantalla.
       } finally {
@@ -498,6 +510,7 @@ export function LiquidacionesTenantPage() {
             (p) => {
               const next = new URLSearchParams(p);
               next.delete("liquidacion");
+              next.delete("emitir");
               return next;
             },
             { replace: true },
