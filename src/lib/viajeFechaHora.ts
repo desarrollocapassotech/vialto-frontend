@@ -143,3 +143,19 @@ export function formatIsoFechaHoraListadoEsAr(iso: string | null | undefined): s
     return '—';
   }
 }
+
+/** Listados compactos (una línea por fila): `dd/mm` en Argentina, sin año ni hora (van en el tooltip). */
+export function formatIsoFechaCortaListadoEsAr(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = parseIsoFlexible(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  // Armado a mano: sin año, algunos navegadores ignoran '2-digit' en es-AR y devuelven "1/9".
+  const parts = new Intl.DateTimeFormat('es-AR', {
+    timeZone: TZ_LISTADOS_AR,
+    day: 'numeric',
+    month: 'numeric',
+  }).formatToParts(d);
+  const dia = (parts.find((p) => p.type === 'day')?.value ?? '').padStart(2, '0');
+  const mes = (parts.find((p) => p.type === 'month')?.value ?? '').padStart(2, '0');
+  return `${dia}/${mes}`;
+}

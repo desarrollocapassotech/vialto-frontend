@@ -64,7 +64,10 @@ import { otroGastoDraftFromApi } from "@/components/viajes/OtrosGastosFieldset";
 import { pagoTransportistaDraftFromApi } from "@/components/viajes/PagosTransportistaFieldset";
 import { type PaisCodigo } from "@/lib/ciudades";
 import { paisCodigoDesdeTexto } from "@/lib/ciudades/paises";
-import { formatIsoFechaHoraListadoEsAr } from "@/lib/viajeFechaHora";
+import {
+  formatIsoFechaCortaListadoEsAr,
+  formatIsoFechaHoraListadoEsAr,
+} from "@/lib/viajeFechaHora";
 import {
   viajePermiteBotonFacturar,
   viajePendienteComprobanteCliente,
@@ -132,7 +135,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { Download, Filter, Upload } from "lucide-react";
+import { CornerDownRight, Download, Filter, Upload } from "lucide-react";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -2445,7 +2448,7 @@ export function ViajesTenantPage({
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             {mostrarColumnaFacturarLote && (
-              <th className="px-2 py-3 w-10 text-center align-middle">
+              <th className="px-2 py-2.5 w-10 text-center align-middle">
                 <span className="sr-only">
                   Seleccionar para facturación conjunta
                 </span>
@@ -2783,7 +2786,7 @@ export function ViajesTenantPage({
             >
               {mostrarColumnaFacturarLote && (
                 <td
-                  className="px-2 py-3 align-middle text-center"
+                  className="px-2 py-2 align-middle text-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {esElegibleFacturarLote(v) ? (
@@ -2798,57 +2801,75 @@ export function ViajesTenantPage({
                 </td>
               )}
               {mostrarColumnaIdSistema && (
-                <td className="px-4 py-3 max-w-24 break-words text-vialto-steel tabular-nums">
-                  #{v.numero}
+                <td className="px-3 py-2 text-vialto-steel tabular-nums">
+                  <span
+                    className="block max-w-[5rem] truncate"
+                    title={`#${v.numero}`}
+                  >
+                    #{v.numero}
+                  </span>
                 </td>
               )}
               {mostrarColumnaIdPropio1 && (
-                <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
-                  {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                <td className="px-3 py-2 text-vialto-steel tabular-nums">
+                  <span
+                    className="block max-w-[5rem] truncate"
+                    title={v.numeroIdentificacionPersonalizado?.trim() || undefined}
+                  >
+                    {v.numeroIdentificacionPersonalizado?.trim() || "—"}
+                  </span>
                 </td>
               )}
               {mostrarColumnaIdPropio2 && (
-                <td className="px-4 py-3 whitespace-nowrap text-vialto-steel tabular-nums">
-                  {v.idPropio2?.trim() || "—"}
+                <td className="px-3 py-2 text-vialto-steel tabular-nums">
+                  <span
+                    className="block max-w-[5rem] truncate"
+                    title={v.idPropio2?.trim() || undefined}
+                  >
+                    {v.idPropio2?.trim() || "—"}
+                  </span>
                 </td>
               )}
-              <td className="px-4 py-3 max-w-[12rem] text-vialto-charcoal">
-                <span
-                  className="block truncate font-medium"
+              <td className="px-3 py-2 text-vialto-charcoal">
+                <div
+                  className="flex min-w-0 max-w-[9rem] items-center gap-1"
                   title={clientesRuta.map((c) => c.nombre).join(", ")}
                 >
-                  {nombreCliente}
-                </span>
-                {clientesRuta.length > 1 && (
-                  <span className="block text-[11px] text-vialto-fire">
-                    +{clientesRuta.length - 1} más
-                  </span>
-                )}
+                  <span className="truncate font-medium">{nombreCliente}</span>
+                  {clientesRuta.length > 1 && (
+                    <span className="shrink-0 rounded-sm bg-vialto-fire/10 px-1 text-[11px] text-vialto-fire">
+                      +{clientesRuta.length - 1}
+                    </span>
+                  )}
+                </div>
               </td>
               {mostrarColumnaTransporte && (
-              <td className="px-4 py-3 max-w-[12rem] text-vialto-steel">
-                <span className="block truncate" title={nombreTransp}>
-                  {nombreTransp}
-                </span>
-                {nombreTranspEfectivo && (
-                  <span
-                    className="block truncate text-[11px] text-vialto-steel/70"
-                    title={`Ejecuta: ${nombreTranspEfectivo}`}
-                  >
-                    Ejecuta: {nombreTranspEfectivo}
+              <td className="px-3 py-2 text-vialto-steel">
+                <div className="flex min-w-0 max-w-[9rem] items-center gap-1">
+                  <span className="truncate" title={nombreTransp}>
+                    {nombreTransp}
                   </span>
-                )}
+                  {nombreTranspEfectivo && (
+                    <span
+                      className="shrink-0 text-vialto-steel/70"
+                      title={`Ejecuta: ${nombreTranspEfectivo}`}
+                      aria-label={`Ejecuta: ${nombreTranspEfectivo}`}
+                    >
+                      <CornerDownRight className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                  )}
+                </div>
               </td>
               )}
               {mostrarColumnaChofer && (
-                <td className="px-4 py-3 max-w-[4rem] text-vialto-steel">
-                  <span className="block truncate" title={nombreChofer}>
+                <td className="px-3 py-2 text-vialto-steel">
+                  <span className="block max-w-[6rem] truncate" title={nombreChofer}>
                     {nombreChofer}
                   </span>
                 </td>
               )}
               {mostrarColumnaEtapa && (
-                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex w-full flex-col gap-0.5">
                     {isViajeFieldVisible("detalle_viaje", "etapa") && (
                       estadoQuickId === v.id ? (
@@ -2924,40 +2945,49 @@ export function ViajesTenantPage({
                   </div>
                 </td>
               )}
-              <td className="px-4 py-3 align-top text-vialto-steel min-w-0 max-w-[7rem]">
+              <td className="px-3 py-2">
                 <ViajeOrigenDestinoLinea
                   origen={v.origen}
                   destino={v.destino}
                   destinosViaje={v.destinosViaje}
+                  compacto
+                  className="max-w-[11rem]"
                 />
-                {clientesRuta.length > 1 && (
-                  <span className="mt-0.5 block text-[11px] text-vialto-fire">
-                    +{clientesRuta.length - 1} más
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 max-w-[6rem] text-vialto-steel tabular-nums align-top">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span
-                    className={`block whitespace-nowrap ${ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""}`}
-                    title={v.fechaCarga ?? undefined}
-                  >
-                    {formatIsoFechaHoraListadoEsAr(v.fechaCarga)}
-                  </span>
-                  <span
-                    className={`block whitespace-nowrap text-xs ${
-                      ordenResaltaFechaDescarga
-                        ? "font-medium text-vialto-charcoal"
-                        : "text-vialto-steel/90"
-                    }`}
-                    title={v.fechaDescarga ?? undefined}
-                  >
-                    {formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}
-                  </span>
-                </div>
               </td>
               <td
-                className="px-4 py-3 text-right"
+                className="px-3 py-2 whitespace-nowrap text-vialto-steel tabular-nums"
+                title={
+                  v.fechaDescarga
+                    ? `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}\nDescarga: ${formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}`
+                    : `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}`
+                }
+              >
+                <span
+                  className={
+                    ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""
+                  }
+                >
+                  {formatIsoFechaCortaListadoEsAr(v.fechaCarga)}
+                </span>
+                {v.fechaDescarga && (
+                  <>
+                    <span className="mx-1 text-vialto-steel/75" aria-hidden>
+                      →
+                    </span>
+                    <span
+                      className={
+                        ordenResaltaFechaDescarga
+                          ? "font-medium text-vialto-charcoal"
+                          : ""
+                      }
+                    >
+                      {formatIsoFechaCortaListadoEsAr(v.fechaDescarga)}
+                    </span>
+                  </>
+                )}
+              </td>
+              <td
+                className="px-3 py-2 text-right"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ViajeAccionesMenu

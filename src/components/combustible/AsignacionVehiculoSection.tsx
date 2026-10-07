@@ -4,8 +4,8 @@ import { History, Gauge, ListOrdered, Trash2, Truck } from "lucide-react";
 import { ListadoDatos, type ListadoColumn } from "@/components/listado/ListadoDatos";
 import { ViajesListadoHeaderFiltro } from "@/components/viajes/ViajesListadoHeaderFiltro";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import { AccionesMenuTrigger } from "@/components/ui/AccionesMenuTrigger";
-import { AccionesOpcionesSheet, type AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 import { listadoTablaHeadRowClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { apiJson } from "@/lib/api";
 import { friendlyError } from "@/lib/friendlyError";
@@ -76,15 +76,13 @@ function FilaAccionesMenu({
   }
 
   return (
-    <>
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={fila.nombre}
-        options={options}
-      />
-    </>
+    <AccionesFila
+      options={options}
+      destacadas={["asignar", "editar-km", "historial", "historial-km"]}
+      subtitle={fila.nombre}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
 

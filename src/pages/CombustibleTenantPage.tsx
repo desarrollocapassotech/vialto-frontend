@@ -7,6 +7,9 @@ import {
 } from "@/components/listado/ListadoDatos";
 import { ListadoPagination } from "@/components/listado/ListadoPagination";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+import { Eye, Trash2 } from "lucide-react";
 import { CargaCombustibleCreateModal } from "@/components/combustible/CargaCombustibleCreateModal";
 import { CargaCombustibleViewModal } from "@/components/combustible/CargaCombustibleViewModal";
 import { AsignacionVehiculoSection } from "@/components/combustible/AsignacionVehiculoSection";
@@ -590,38 +593,39 @@ export function CombustibleTenantPage({
             </span>
           ) : null,
         showInCard: false,
-        thClassName: "w-8 px-2 py-3",
-        tdClassName: "w-8 px-2 py-3",
+        thClassName: "w-8 px-2 py-2.5",
+        tdClassName: "w-8 px-2 py-2",
       },
       ...BASE_COLUMNS,
       {
         id: "acciones",
         header: "Acciones",
-        cell: (r) => (
-          <div className="flex items-center gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setViewTargetId(r.id)}
-              className="inline-flex h-8 items-center px-3 border border-black/15 bg-white text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist/80 transition-colors"
-              aria-label={`Ver detalle de carga del ${fmtFecha(r.fecha)}`}
-            >
-              Ver
-            </button>
-            {!isReadOnly && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteError(null);
-                  setDeleteTarget(r);
-                }}
-                className="inline-flex h-8 items-center px-3 border border-red-200 bg-white text-xs uppercase tracking-wider text-red-600 hover:bg-red-50 transition-colors"
-                aria-label={`Eliminar carga del ${fmtFecha(r.fecha)}`}
-              >
-                Eliminar
-              </button>
-            )}
-          </div>
-        ),
+        cell: (r) => {
+          const options: AccionOpcion[] = [
+            { id: "ver", label: "Ver", icon: Eye, onClick: () => setViewTargetId(r.id) },
+          ];
+          if (!isReadOnly) {
+            options.push({
+              id: "eliminar",
+              label: "Eliminar",
+              icon: Trash2,
+              danger: true,
+              onClick: () => {
+                setDeleteError(null);
+                setDeleteTarget(r);
+              },
+            });
+          }
+          return (
+            <div className="flex justify-end">
+              <AccionesFila
+                options={options}
+                destacadas={["ver"]}
+                subtitle={`Carga del ${fmtFecha(r.fecha)}`}
+              />
+            </div>
+          );
+        },
       },
     ],
     [isReadOnly],
@@ -814,7 +818,7 @@ export function CombustibleTenantPage({
         tableColSpan={9}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
-            <th scope="col" className="w-8 px-2 py-3 align-top"></th>
+            <th scope="col" className="w-8 px-2 py-2.5 align-top"></th>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Fecha"

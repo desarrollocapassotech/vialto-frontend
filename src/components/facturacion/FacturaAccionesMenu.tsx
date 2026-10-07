@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Ban, Banknote, Eye, FileText, Receipt, Trash2 } from 'lucide-react';
-import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
-import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
 
 interface Props {
@@ -141,15 +141,21 @@ export function FacturaAccionesMenu({
   ]);
 
   return (
-    <>
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={factura.numero}
-        options={options}
-      />
-    </>
+    <AccionesFila
+      options={options}
+      destacadas={FACTURA_ACCIONES_DESTACADAS}
+      subtitle={factura.numero}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
+
+/** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
+const FACTURA_ACCIONES_DESTACADAS = [
+  'ver',
+  'emitir-arca',
+  'marcar-cobrada',
+  'comprobante',
+  'nota-credito',
+];

@@ -1489,18 +1489,18 @@ export function FacturacionTenantPage({
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
-            <td className="px-4 py-3 font-medium break-all">{f.numero || "—"}</td>
-            <td className="px-4 py-3 truncate" title={nombreContraparte(f)}>
+            <td className="px-3 py-2 font-medium break-all">{f.numero || "—"}</td>
+            <td className="px-3 py-2 truncate" title={nombreContraparte(f)}>
               {nombreContraparte(f)}
             </td>
-            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaEmision)}
             </td>
-            <td className="px-4 py-3 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaVencimiento)}
             </td>
-            <td className="px-4 py-3">{renderEstadoBadges(f)}</td>
-            <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">
+            <td className="px-3 py-2">{renderEstadoBadges(f)}</td>
+            <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
               <div className="flex flex-col items-end gap-0.5">
                 <span>
                   {textoImporteFacturaListado(f, viajes, { hasArca })}
@@ -1517,7 +1517,7 @@ export function FacturacionTenantPage({
               </div>
             </td>
             <td
-              className="px-4 py-3 text-right"
+              className="px-3 py-2 text-right"
               onClick={(e) => e.stopPropagation()}
             >
               <FacturaAccionesMenu

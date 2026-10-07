@@ -6,7 +6,8 @@ import {
   useOrganization,
   useUser,
 } from "@clerk/clerk-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { tooltipFlotanteClass } from "@/components/ui/TooltipsDelegados";
 import {
   ArrowLeftRight,
   Bell,
@@ -78,6 +79,8 @@ type NavGroup = {
   tooltip?: string;
   /** Grupo secundario: va pegado al fondo del menú, sin fondo, con borde tenue y texto algo más apagado. */
   subtle?: boolean;
+  /** true = en el riel colapsado muestra cada ítem por separado, aunque haya varios. */
+  itemsSueltosEnRiel?: boolean;
 };
 
 const HEADER_HEIGHT_CLASS = "h-16";
@@ -117,6 +120,19 @@ export function AppShell() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  // Desktop: con el menú expandido, un click fuera de él lo colapsa.
+  const sidebarDesktopRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (sidebarCollapsed) return;
+    function onMouseDown(e: MouseEvent) {
+      if (sidebarDesktopRef.current?.contains(e.target as Node)) return;
+      setSidebarCollapsed(true);
+      setNavTooltip(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -286,6 +302,7 @@ export function AppShell() {
       groups.push({
         title: "Facturación",
         tooltip: "Facturación y liquidaciones",
+        itemsSueltosEnRiel: true,
         items: facturacionItems,
       });
     }
@@ -488,6 +505,7 @@ export function AppShell() {
                 collapsed &&
                 sidebarUsesAccordion &&
                 group.title !== null &&
+                !group.itemsSueltosEnRiel &&
                 group.items.length > 1;
               return (
                 <div
@@ -720,7 +738,10 @@ export function AppShell() {
           />
         )}
 
-        <div className="sidebar-control-zone hidden lg:block fixed left-0 top-16 z-30 h-[calc(100dvh-4rem)]">
+        <div
+          ref={sidebarDesktopRef}
+          className="sidebar-control-zone hidden lg:block fixed left-0 top-16 z-30 h-[calc(100dvh-4rem)]"
+        >
           <aside
             className={[
               "flex h-full",
@@ -805,7 +826,7 @@ export function AppShell() {
       {navTooltip &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md bg-vialto-charcoal px-3.5 py-2 font-[family-name:var(--font-ui)] text-sm font-medium tracking-wide text-white shadow-lg"
+            className={`${tooltipFlotanteClass} -translate-y-1/2 whitespace-nowrap`}
             style={{ top: navTooltip.top, left: navTooltip.left }}
           >
             {navTooltip.label}

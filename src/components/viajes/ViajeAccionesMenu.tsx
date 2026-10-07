@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Banknote, Download, Eye, FileText, Calculator, PlusCircle, Receipt, Trash2 } from 'lucide-react';
-import { AccionesMenuTrigger } from '@/components/ui/AccionesMenuTrigger';
-import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
+import { AccionesFila } from '@/components/ui/AccionesFila';
+import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Viaje } from '@/types/api';
 import { motivoBloqueoAccionFacturarArcaUsd } from '@/lib/arcaUsdRestriction';
 import { viajePermiteAgregarGasto } from '@/lib/viajesIndicadores';
@@ -115,15 +115,25 @@ export function ViajeAccionesMenu({
   ]);
 
   return (
-    <>
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
-        options={options}
-      />
-    </>
+    <AccionesFila
+      options={options}
+      destacadas={VIAJE_ACCIONES_DESTACADAS}
+      subtitle={`Viaje #${numeroVisibleViaje(viaje)}`}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
+
+/**
+ * Orden de prioridad de las acciones que se muestran como ícono en la grilla.
+ * "Ver" queda solo en el desplegable: tocar la fila ya abre las acciones.
+ */
+const VIAJE_ACCIONES_DESTACADAS = [
+  'facturar',
+  'gasto',
+  'pago',
+  'ver-factura',
+  'ver-liquidacion',
+  'exportar',
+];

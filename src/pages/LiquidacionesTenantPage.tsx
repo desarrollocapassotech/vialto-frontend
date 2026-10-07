@@ -22,11 +22,17 @@ import {
 } from "@/components/liquidaciones/LiquidacionViewModal";
 import { LiquidacionEditModal } from "@/components/liquidaciones/LiquidacionEditModal";
 import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
-import { AccionesMenuTrigger } from "@/components/ui/AccionesMenuTrigger";
-import {
-  AccionesOpcionesSheet,
-  type AccionOpcion,
-} from "@/components/ui/AccionesOpcionesSheet";
+import { AccionesFila } from "@/components/ui/AccionesFila";
+import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
+
+/** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
+const LIQUIDACION_ACCIONES_DESTACADAS = [
+  "ver",
+  "emitir",
+  "pdf",
+  "comprobante",
+  "pdf-nc",
+];
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnularLiquidacionModal } from "@/components/liquidaciones/AnularLiquidacionModal";
 import { ConfirmarAnulacionManualModal } from "@/components/liquidaciones/ConfirmarAnulacionManualModal";
@@ -249,12 +255,12 @@ function LiquidacionAccionesMenu({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <AccionesMenuTrigger open={open} onClick={() => setOpen(true)} />
-      <AccionesOpcionesSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        subtitle={transportistaNombre(liq)}
+      <AccionesFila
         options={options}
+        destacadas={LIQUIDACION_ACCIONES_DESTACADAS}
+        subtitle={transportistaNombre(liq)}
+        open={open}
+        onOpenChange={setOpen}
       />
       {actionErrorMsg && (
         <ArcaErrorMessage

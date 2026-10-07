@@ -26,20 +26,20 @@ export const listadoCardActionsClass =
 export const listadoTablaWrapperClass =
   'overflow-x-auto rounded border border-black/5 bg-white [-webkit-overflow-scrolling:touch]';
 
-export const listadoTablaClass = 'w-full border-collapse text-left text-base';
+export const listadoTablaClass = 'w-full border-collapse text-left text-sm';
 
 export const listadoTablaTheadClass = '[&_th]:border-b [&_th]:border-black/10';
 
 export const listadoTablaTbodyClass = '[&_td]:border-b [&_td]:border-black/5';
 
 export const listadoTablaHeadRowClass =
-  'bg-vialto-mist font-[family-name:var(--font-ui)] text-[13px] uppercase tracking-[0.15em] text-vialto-fire md:text-[15px] md:tracking-[0.2em]';
+  'bg-vialto-mist font-[family-name:var(--font-ui)] text-[13px] uppercase tracking-[0.08em] text-vialto-fire';
 
 export const listadoTablaBodyRowClass = 'hover:bg-vialto-mist';
 
-export const listadoTablaThClass = 'px-3 py-3 md:px-4';
+export const listadoTablaThClass = 'px-3 py-2.5';
 
-export const listadoTablaTdClass = 'px-3 py-3 text-vialto-charcoal md:px-4';
+export const listadoTablaTdClass = 'px-3 py-2 text-vialto-charcoal';
 
 export const listadoTablaEmptyCellClass = 'px-4 py-8 text-vialto-steel';
 
