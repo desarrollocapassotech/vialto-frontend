@@ -12,6 +12,8 @@ import type {
   ImportLiquidacionesPreviewRespuesta,
   ImportFacturaClientePreviewGrupo,
   ImportFacturasClientesPreviewRespuesta,
+  ImportDeteccionHoja,
+  ImportDeteccionHojas,
 } from "@/types/api";
 
 /** Orden fijo de dependencia: cada módulo puede referenciar a los anteriores. */
@@ -31,14 +33,40 @@ type Fase =
   | "post-facturas"
   | "terminado";
 
+/** Hoja del Excel elegida para un módulo (detectada o resuelta por el usuario). */
+export interface AsignacionHoja {
+  modulo: ModuloWizard;
+  hoja: string;
+  filas: number;
+}
+
+/**
+ * Lo que la detección no pudo resolver sola: hojas encontradas sin las
+ * columnas obligatorias, hojas que encajan en más de un módulo y hojas que no
+ * se parecen a ninguno. Mientras no sea null, el wizard sigue en "upload"
+ * mostrando esta revisión.
+ */
+export interface RevisionArchivo {
+  /** Hojas listas para importar (se importan al continuar). */
+  listas: AsignacionHoja[];
+  /** Encontradas por nombre pero sin columnas obligatorias: no se importan. */
+  conFaltantes: ImportDeteccionHoja[];
+  /** El usuario elige a qué módulo corresponden (o no importarlas). */
+  ambiguas: { hoja: string; filas: number; candidatos: ModuloWizard[] }[];
+  /** Hojas con datos que no se parecen a ningún módulo: solo se informan. */
+  noReconocidas: { hoja: string; filas: number }[];
+}
+
 export interface EtapaCompletada {
   modulo: ModuloWizard;
   log: ImportLog;
 }
 
 /**
- * Orquesta el import por etapas: sube el archivo una sola vez y llama
- * preview/confirm una vez por módulo, en orden de dependencia, reusando el
+ * Orquesta el import por etapas. Primero detecta qué módulos trae el Excel
+ * (`POST detectar-hojas`, por nombre de hoja o encabezados) y arma la
+ * secuencia solo con esos; después llama preview/confirm una vez por módulo,
+ * en orden de dependencia, reusando el
  * mismo mecanismo que ya existe (una ImportSession por módulo) — no hace
  * falta ninguna sesión nueva "encadenada" en el backend. Al terminar Viajes,
  * ofrece (opcional, con su propio preview) generar liquidaciones borrador y
@@ -46,12 +74,23 @@ export interface EtapaCompletada {
  */
 export function useImportWizard(
   tenantId: string,
-  modulosDisponibles: ModuloWizard[],
+  /** Módulos que la empresa puede importar (ej. sin Transportes si es solo flota propia). */
+  modulosPermitidos: ModuloWizard[],
   getToken: () => Promise<string | null>,
 ) {
-  const secuencia = MODULOS_SECUENCIA.filter((m) =>
-    modulosDisponibles.includes(m),
-  );
+  /** Hojas detectadas (o elegidas) para importar, en orden de dependencia. */
+  const [detectados, setDetectados] = useState<AsignacionHoja[]>([]);
+  /** Detectados que el usuario marcó "no importar" antes de llegar a su paso. */
+  const [omitidos, setOmitidos] = useState<Set<ModuloWizard>>(new Set());
+  const [revision, setRevision] = useState<RevisionArchivo | null>(null);
+  // Copia sincrónica de la secuencia y de la hoja de cada módulo: la primera
+  // vista previa se pide en el mismo ciclo en que se fija la secuencia, antes
+  // de que el state se re-renderice.
+  const secuenciaRef = useRef<ModuloWizard[]>([]);
+  const hojaPorModuloRef = useRef<Partial<Record<ModuloWizard, string>>>({});
+  const secuencia = detectados
+    .map((d) => d.modulo)
+    .filter((m) => !omitidos.has(m));
 
   const [fase, setFase] = useState<Fase>("upload");
   const [file, setFile] = useState<File | null>(null);
@@ -87,48 +126,107 @@ export function useImportWizard(
     null,
   );
 
-  const [preflightErrors, setPreflightErrors] = useState<{ modulo: string; faltantes: string[] }[] | null>(null);
-
   const moduloActual: ModuloWizard | null = secuencia[moduloIndex] ?? null;
 
+  /** Sube el Excel, detecta qué módulos trae y, si no hay nada que resolver, arranca. */
   async function startFile(f: File) {
     setFile(f);
     setError(null);
-    setPreflightErrors(null);
+    setRevision(null);
     setLoading(true);
-
     try {
-      if (secuencia.length > 0) {
-        const form = new FormData();
-        form.append("file", f);
-        const modulosStr = secuencia.join(",");
-        const res = await apiJson<{ valid: boolean; errores: { modulo: string; faltantes: string[] }[] }>(
-          `/api/importaciones/pre-flight?tenantId=${encodeURIComponent(tenantId)}&modulos=${encodeURIComponent(modulosStr)}`,
-          getToken,
-          { method: "POST", body: form },
-        );
-        if (!res.valid) {
-          setPreflightErrors(res.errores);
-          return;
-        }
-      }
+      const form = new FormData();
+      form.append("file", f);
+      const det = await apiJson<ImportDeteccionHojas>(
+        `/api/importaciones/detectar-hojas?tenantId=${encodeURIComponent(tenantId)}`,
+        getToken,
+        { method: "POST", body: form },
+      );
+      const permitido = (m: string): m is ModuloWizard =>
+        modulosPermitidos.includes(m as ModuloWizard);
+      const listas: AsignacionHoja[] = det.hojas
+        .filter((h) => permitido(h.modulo) && h.faltantes.length === 0)
+        .map((h) => ({ modulo: h.modulo as ModuloWizard, hoja: h.hoja, filas: h.filas }));
+      const conFaltantes = det.hojas.filter(
+        (h) => permitido(h.modulo) && h.faltantes.length > 0,
+      );
+      const ambiguas = det.sinIdentificar
+        .map((s) => ({
+          hoja: s.hoja,
+          filas: s.filas,
+          candidatos: s.candidatos.filter(
+            (c): c is ModuloWizard =>
+              permitido(c) && !listas.some((l) => l.modulo === c),
+          ),
+        }))
+        .filter((s) => s.candidatos.length > 0);
+      const noReconocidas = det.sinIdentificar
+        .filter((s) => !ambiguas.some((a) => a.hoja === s.hoja))
+        .map(({ hoja, filas }) => ({ hoja, filas }));
 
-      setFase("modulo");
-      // Con await (no fire-and-forget): si no, el `finally` de abajo apaga
-      // `loading` mientras el preview todavía está en curso y el paso del
-      // módulo queda en blanco, sin spinner, hasta que llega la respuesta.
-      await previewModuloActual(f, 0);
+      if (conFaltantes.length === 0 && ambiguas.length === 0 && listas.length > 0) {
+        await iniciarImportacion(listas, f);
+        return;
+      }
+      setRevision({ listas, conFaltantes, ambiguas, noReconocidas });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al validar archivo.");
+      setError(e instanceof Error ? e.message : "Error al leer el archivo.");
     } finally {
       setLoading(false);
     }
   }
 
+  /** Arranca la secuencia con las hojas elegidas (detectadas y/o resueltas en la revisión). */
+  async function iniciarImportacion(asignaciones: AsignacionHoja[], f: File | null = file) {
+    if (!f) return;
+    const ordenadas = MODULOS_SECUENCIA.flatMap((m) =>
+      asignaciones.filter((a) => a.modulo === m).slice(0, 1),
+    );
+    if (ordenadas.length === 0) return;
+    secuenciaRef.current = ordenadas.map((a) => a.modulo);
+    hojaPorModuloRef.current = Object.fromEntries(
+      ordenadas.map((a) => [a.modulo, a.hoja]),
+    );
+    setDetectados(ordenadas);
+    setOmitidos(new Set());
+    setRevision(null);
+    setModuloIndex(0);
+    setFase("modulo");
+    // Con await (no fire-and-forget): si no, el `finally` del que llama apaga
+    // `loading` mientras el preview todavía está en curso y el paso del
+    // módulo queda en blanco, sin spinner, hasta que llega la respuesta.
+    setLoading(true);
+    try {
+      await previewModuloActual(f, 0);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Marca (o desmarca) un módulo detectado como "no importar" antes de llegar
+   * a su paso — evita pedir su vista previa solo para saltearlo. Solo vale
+   * para pasos que todavía no empezaron.
+   */
+  function omitirModulo(modulo: ModuloWizard, omitir: boolean) {
+    const actual = secuenciaRef.current[moduloIndex];
+    const posActual = detectados.findIndex((d) => d.modulo === actual);
+    const pos = detectados.findIndex((d) => d.modulo === modulo);
+    if (pos < 0 || (fase === "modulo" && pos <= posActual)) return;
+    const next = new Set(omitidos);
+    if (omitir) next.add(modulo);
+    else next.delete(modulo);
+    setOmitidos(next);
+    secuenciaRef.current = detectados
+      .map((d) => d.modulo)
+      .filter((m) => !next.has(m));
+  }
+
   /** Núcleo del preview de un módulo, sin tocar correcciones/exclusiones ya hechas — lo usa tanto el cambio de módulo como "reintentar". */
   async function ejecutarPreviewModulo(f: File, idx: number) {
-    const modulo = secuencia[idx];
+    const modulo = secuenciaRef.current[idx];
     if (!modulo) return;
+    const hoja = hojaPorModuloRef.current[modulo];
     setLoading(true);
     setError(null);
     setPreview(null);
@@ -136,7 +234,7 @@ export function useImportWizard(
       const form = new FormData();
       form.append("file", f);
       const data = await apiJson<ImportPreviewResult>(
-        `/api/importaciones/preview?modulo=${encodeURIComponent(modulo)}&tenantId=${encodeURIComponent(tenantId)}`,
+        `/api/importaciones/preview?modulo=${encodeURIComponent(modulo)}&tenantId=${encodeURIComponent(tenantId)}${hoja ? `&hoja=${encodeURIComponent(hoja)}` : ""}`,
         getToken,
         { method: "POST", body: form },
       );
@@ -392,7 +490,7 @@ export function useImportWizard(
     setPreview(null);
     setError(null);
     const nextIdx = moduloIndex + 1;
-    if (nextIdx >= secuencia.length) {
+    if (nextIdx >= secuenciaRef.current.length) {
       const idsCreados = viajeIdsCreadosOverride ?? viajeIdsCreados;
       setFase(idsCreados.length > 0 ? "post-liquidaciones" : "terminado");
       return;
@@ -574,6 +672,11 @@ export function useImportWizard(
     setFase("upload");
     setFile(null);
     setModuloIndex(0);
+    setDetectados([]);
+    setOmitidos(new Set());
+    setRevision(null);
+    secuenciaRef.current = [];
+    hojaPorModuloRef.current = {};
     setError(null);
     setPreview(null);
     setValidandoCiudades(false);
@@ -591,12 +694,14 @@ export function useImportWizard(
     file,
     fase,
     secuencia,
+    detectados,
+    omitidos,
+    revision,
     moduloActual,
     moduloIndex,
     loading,
     validandoCiudades,
     error,
-    preflightErrors,
     setError,
     preview,
     etapasCompletadas,
@@ -608,6 +713,8 @@ export function useImportWizard(
     facturasOmitidasUsdCount,
     facturasCreadas,
     startFile,
+    iniciarImportacion,
+    omitirModulo,
     confirmarModuloActual,
     saltearModuloActual,
     reintentarPreview,

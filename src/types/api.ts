@@ -705,6 +705,25 @@ export interface ImportColumnaEsperada {
   lookupModel?: string;
 }
 
+/** Hoja del Excel asignada a un módulo por `POST /importaciones/detectar-hojas`. */
+export interface ImportDeteccionHoja {
+  modulo: string;
+  /** Nombre real de la hoja — se manda como `hoja` al preview. */
+  hoja: string;
+  /** Filas con datos. */
+  filas: number;
+  /** Encabezados obligatorios que faltan (solo si se detectó por nombre). */
+  faltantes: string[];
+  detectadaPor: "nombre" | "encabezados";
+}
+
+export interface ImportDeteccionHojas {
+  /** En orden de importación. */
+  hojas: ImportDeteccionHoja[];
+  /** Hojas con datos sin asignar; `candidatos` = módulos empatados (vacío = no se parece a ninguno). */
+  sinIdentificar: { hoja: string; filas: number; candidatos: string[] }[];
+}
+
 export interface ImportColumnasEsperadasModulo {
   modulo: string;
   sheet: string;

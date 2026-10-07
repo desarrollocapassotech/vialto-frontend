@@ -6,7 +6,6 @@ import { Spinner } from "@/components/ui/Spinner";
 import {
   ViewModalShell,
   viewModalBtnGhost,
-  viewModalBtnPrimary,
 } from "@/components/ui/ViewModalShell";
 import { ListadoCard } from "@/components/listado/ListadoCard";
 import { ListadoDatos } from "@/components/listado/ListadoDatos";
@@ -22,6 +21,7 @@ import {
 import {
   MODULOS_SECUENCIA,
   useImportWizard,
+  type AsignacionHoja,
   type ModuloWizard,
 } from "@/hooks/useImportWizard";
 import { CiudadAdvertenciasPanel } from "@/components/importacion/CiudadAdvertenciasPanel";
@@ -71,30 +71,25 @@ const TIPOS_VEHICULO = [
 ];
 
 /**
- * Wizard paso a paso del import: Clientes → Transportes → Choferes →
- * Vehículos → Viajes → (opcional) Liquidaciones borrador → (opcional)
- * Facturar a clientes. Cada etapa se previsualiza y confirma por separado —
- * no hay un botón único que confirme todo el archivo de una vez.
+ * Etapas post-viajes ("Liquidaciones a transportistas" / "Facturas a
+ * clientes": borradores generados con los viajes recién importados).
+ * Ocultas a pedido (oct 2026): nunca se eligen, y las fases
+ * `post-liquidaciones`/`post-facturas` del wizard se saltean solas
+ * (`AvanceSilencioso`). Toda la lógica sigue; para reactivarlas hay que volver
+ * a ofrecer los checks (ver CLAUDE.md, "Importación masiva desde Excel").
+ */
+const POST_VIAJES_ELEGIDO = { liquidaciones: false, facturas: false } as const;
+
+/**
+ * Wizard paso a paso del import. Arranca por el archivo: el backend detecta
+ * qué módulos trae (`useImportWizard.startFile`) y la secuencia se arma solo
+ * con esos, en orden Clientes → Transportes → Choferes → Vehículos → Viajes.
+ * Cada etapa se previsualiza y confirma (o se saltea) por separado — no hay
+ * un botón único que confirme todo el archivo de una vez.
  * Compartido entre tenant-admin y superadmin: la única diferencia entre
  * ambos es qué `tenantId`/`tenantModules` se le pasa desde la página que lo
  * hostea.
  */
-interface TenantTieneDatos {
-  clientes: boolean;
-  transportistas: boolean;
-  choferes: boolean;
-  vehiculos: boolean;
-}
-
-/**
- * Ofrecer en la selección los checks "Liquidaciones a transportistas" y
- * "Facturas a clientes" (borradores generados al terminar Viajes).
- * Ocultos a pedido (oct 2026): con `false` nunca se tildan, y las etapas
- * `post-liquidaciones`/`post-facturas` del wizard se saltean solas
- * (`AvanceSilencioso`). Toda la lógica sigue: para reactivarlos, poner `true`.
- */
-const OFRECER_POST_VIAJES = false;
-
 export function ImportWizard({
   tenantId,
   tenantModules,
@@ -110,53 +105,13 @@ export function ImportWizard({
   const hasLiquidoProductoArca = tenantModules.includes(
     "emision-liquido-producto-arca",
   );
-  const hasFacturacion = tenantModules.includes("facturacion");
-  const hasLiquidaciones = tenantModules.includes("liquidaciones");
-  // Checks "Liquidaciones a transportistas" / "Facturas a clientes" ocultos
-  // (oct 2026): ver OFRECER_POST_VIAJES. La lógica de las etapas post-viajes
-  // sigue intacta para reactivarlas a futuro.
-  const puedeLiquidaciones =
-    OFRECER_POST_VIAJES && (hasLiquidaciones || hasLiquidoProductoArca);
-  const puedeFacturas =
-    OFRECER_POST_VIAJES && (hasFacturasArca || hasFacturacion);
+  const postViajesElegido = POST_VIAJES_ELEGIDO;
   // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
   // el paso "Transportes" no se ofrece ni se recorre.
   const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
   const moduloPermitido = (m: ModuloWizard) =>
     m !== "transportistas" || transportistaExternoVisible;
 
-  // Un tenant nuevo (sin nada cargado todavía, y sin liquidaciones/facturas
-  // que ofrecer) arranca directo con la secuencia completa — es el caso de
-  // uso principal. Si ya tiene datos, o si puede generar liquidaciones/
-  // facturas al final, se le pregunta primero qué quiere hacer en esta
-  // importación, para no forzarlo a pasar por hojas que no le interesan.
-  const [tieneDatos, setTieneDatos] = useState<TenantTieneDatos | null>(null);
-  const [modulosElegidos, setModulosElegidos] = useState<ModuloWizard[] | null>(
-    null,
-  );
-  // Checks de la pantalla de selección — viven acá (no en SelectorModulos)
-  // para que el stepper de arriba se pueda actualizar en vivo a medida que
-  // se tildan/destildan módulos, antes de confirmar con "Continuar →".
-  const [seleccionados, setSeleccionados] = useState<Set<ModuloWizard>>(
-    new Set(),
-  );
-  // Generar liquidaciones/facturas borrador después de Viajes es opcional y
-  // arranca siempre destildado — el usuario lo elige a propósito, no por
-  // default. Si no seleccionó nada (selector salteado), queda en false.
-  const [postViajesElegido, setPostViajesElegido] = useState<{
-    liquidaciones: boolean;
-    facturas: boolean;
-  }>({ liquidaciones: false, facturas: false });
-  // Checks de Liquidaciones/Facturas en la pantalla de selección — misma
-  // razón que `seleccionados`: viven acá para que el stepper reaccione en
-  // vivo. `postViajesElegido` (arriba) recién se fija cuando se confirma con
-  // "Continuar →".
-  const [liquidacionesSel, setLiquidacionesSel] = useState(false);
-  const [facturasSel, setFacturasSel] = useState(false);
-  // Se incrementa al "Volver a importar" para forzar un re-chequeo de
-  // tenant-tiene-datos — después de una corrida puede haber cambiado (ej. se
-  // acaban de crear los clientes que antes faltaban).
-  const [refetchTieneDatos, setRefetchTieneDatos] = useState(0);
   // Puramente informativo (qué columnas espera cada módulo) — no bloquea el
   // selector si todavía no llegó o si falla.
   const [columnasEsperadas, setColumnasEsperadas] = useState<
@@ -189,69 +144,9 @@ export function ImportWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, refetchColumnas]);
 
-  // Por defecto solo quedan tildados Viajes (siempre) y los módulos que
-  // todavía no tienen datos cargados — los que ya tienen algo se destildan
-  // para no forzar un re-import de lo que ya está, aunque se puedan sumar a mano.
-  function seleccionPorDefecto(data: TenantTieneDatos): Set<ModuloWizard> {
-    return new Set(
-      MODULOS_SELECTOR.filter(
-        ({ key, tieneDatosKey }) =>
-          key === "viajes" || !tieneDatosKey || !data[tieneDatosKey],
-      ).map(({ key }) => key),
-    );
-  }
-
-  useEffect(() => {
-    let cancelado = false;
-    setTieneDatos(null);
-    setModulosElegidos(null);
-    setPostViajesElegido({ liquidaciones: false, facturas: false });
-    setSeleccionados(new Set());
-    setLiquidacionesSel(false);
-    setFacturasSel(false);
-    (async () => {
-      try {
-        const data = await apiJson<TenantTieneDatos>(
-          `/api/importaciones/tenant-tiene-datos?tenantId=${encodeURIComponent(tenantId)}`,
-          getToken,
-        );
-        if (cancelado) return;
-        setTieneDatos(data);
-        setSeleccionados(seleccionPorDefecto(data));
-        if (
-          !data.clientes &&
-          !data.transportistas &&
-          !data.choferes &&
-          !data.vehiculos &&
-          !puedeLiquidaciones &&
-          !puedeFacturas
-        ) {
-          setModulosElegidos([...MODULOS_SECUENCIA]);
-        }
-      } catch {
-        // Si falla la consulta, no bloqueamos el import: se arranca con la secuencia completa.
-        if (!cancelado) {
-          const data: TenantTieneDatos = {
-            clientes: false,
-            transportistas: false,
-            choferes: false,
-            vehiculos: false,
-          };
-          setTieneDatos(data);
-          setSeleccionados(seleccionPorDefecto(data));
-          setModulosElegidos([...MODULOS_SECUENCIA]);
-        }
-      }
-    })();
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, refetchTieneDatos]);
-
   const wizard = useImportWizard(
     tenantId,
-    (modulosElegidos ?? [...MODULOS_SECUENCIA]).filter(moduloPermitido),
+    MODULOS_SECUENCIA.filter(moduloPermitido),
     () => getToken(),
   );
 
@@ -304,75 +199,8 @@ export function ImportWizard({
 
   function reiniciarImportacion() {
     wizard.reset();
-    setModulosElegidos(null);
-    setPostViajesElegido({ liquidaciones: false, facturas: false });
     setPasoRevisando(null);
-    setRefetchTieneDatos((n) => n + 1);
     setRefetchColumnas((n) => n + 1);
-  }
-
-  function toggleModulo(modulo: ModuloWizard) {
-    setSeleccionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(modulo)) next.delete(modulo);
-      else next.add(modulo);
-      return next;
-    });
-    // Liquidaciones/Facturas se generan a partir de los viajes recién
-    // creados en esta corrida — sin Viajes tildado no tienen de dónde salir,
-    // así que se destildan solas para no dejar una selección que no hace nada.
-    if (modulo === "viajes" && seleccionados.has("viajes")) {
-      setLiquidacionesSel(false);
-      setFacturasSel(false);
-    }
-  }
-
-  const seleccionadosPermitidos = new Set(
-    [...seleccionados].filter(moduloPermitido),
-  );
-  const ordenadosSeleccion = MODULOS_SECUENCIA.filter((m) =>
-    seleccionadosPermitidos.has(m),
-  );
-
-  if (!tieneDatos) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (!modulosElegidos) {
-    return (
-      <div className="flex flex-col gap-6">
-        <WizardStepper
-          wizard={wizard}
-          secuencia={ordenadosSeleccion}
-          postViajesElegido={{
-            liquidaciones: liquidacionesSel,
-            facturas: facturasSel,
-          }}
-          seleccionCompleta={false}
-          onVerPaso={setPasoRevisando}
-        />
-        <SelectorModulos
-          tieneDatos={tieneDatos}
-          puedeLiquidaciones={puedeLiquidaciones}
-          puedeFacturas={puedeFacturas}
-          seleccionados={seleccionadosPermitidos}
-          moduloPermitido={moduloPermitido}
-          onToggleModulo={toggleModulo}
-          liquidacionesSel={liquidacionesSel}
-          onToggleLiquidaciones={setLiquidacionesSel}
-          facturasSel={facturasSel}
-          onToggleFacturas={setFacturasSel}
-          onElegir={(modulos, postViajes) => {
-            setModulosElegidos(modulos);
-            setPostViajesElegido(postViajes);
-          }}
-        />
-      </div>
-    );
   }
 
   return (
@@ -380,18 +208,18 @@ export function ImportWizard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <WizardStepper
           wizard={wizard}
-          secuencia={wizard.secuencia}
           postViajesElegido={postViajesElegido}
-          seleccionCompleta
           onVerPaso={setPasoRevisando}
         />
-        <button
-          type="button"
-          onClick={reiniciarImportacion}
-          className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
-        >
-          Volver a selección
-        </button>
+        {(wizard.fase !== "upload" || wizard.revision) && (
+          <button
+            type="button"
+            onClick={reiniciarImportacion}
+            className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
+          >
+            Cambiar archivo
+          </button>
+        )}
       </div>
 
       {wizard.error && columnasFaltantes && (
@@ -421,13 +249,25 @@ export function ImportWizard({
             </p>
           )}
           {!wizard.preview && (
-            <button
-              type="button"
-              onClick={reiniciarImportacion}
-              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
-            >
-              Volver a importar
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reiniciarImportacion}
+                className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+              >
+                Volver a importar
+              </button>
+              {wizard.fase === "modulo" && (
+                <button
+                  type="button"
+                  disabled={wizard.loading}
+                  onClick={wizard.saltearModuloActual}
+                  className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100 disabled:opacity-50"
+                >
+                  No importar {moduloLabel} y seguir
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -436,13 +276,25 @@ export function ImportWizard({
         <div className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
           <p>{wizard.error}</p>
           {!wizard.preview && (
-            <button
-              type="button"
-              onClick={reiniciarImportacion}
-              className="mt-3 border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
-            >
-              Volver a importar
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reiniciarImportacion}
+                className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100"
+              >
+                Volver a importar
+              </button>
+              {wizard.fase === "modulo" && (
+                <button
+                  type="button"
+                  disabled={wizard.loading}
+                  onClick={wizard.saltearModuloActual}
+                  className="border border-red-300 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-red-800 hover:bg-red-100 disabled:opacity-50"
+                >
+                  No importar {moduloLabel} y seguir
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -451,23 +303,18 @@ export function ImportWizard({
         <div className="border border-black/10 bg-white p-6">
           {wizard.fase === "upload" && (
             <div className="flex flex-col gap-4">
-              {wizard.preflightErrors && wizard.preflightErrors.length > 0 && (
-                <div className="border border-red-300 bg-red-50 p-4">
-                  <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-red-800">
-                    Error en la estructura del archivo
-                  </h3>
-                  <p className="mt-2 text-sm text-red-700">
-                    Faltan encabezados obligatorios. Corregí las siguientes columnas en tu Excel antes de seguir:
-                  </p>
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {wizard.preflightErrors.map((e) => (
-                      <li key={e.modulo} className="text-sm text-red-800">
-                        <strong>{labelModulo(e.modulo)}:</strong> {e.faltantes.join(", ")}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {wizard.revision ? (
+                <RevisionArchivo
+                  revision={wizard.revision}
+                  nombreArchivo={wizard.file?.name ?? ""}
+                  loading={wizard.loading}
+                  onContinuar={(asignaciones) =>
+                    void wizard.iniciarImportacion(asignaciones)
+                  }
+                  onCambiarArchivo={reiniciarImportacion}
+                />
+              ) : (
+              <>
               <div
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => {
@@ -493,7 +340,7 @@ export function ImportWizard({
                   <>
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-vialto-charcoal border-t-transparent" />
                     <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
-                      Revisando estructura del archivo...
+                      Leyendo el archivo…
                     </span>
                   </>
                 ) : (
@@ -502,7 +349,10 @@ export function ImportWizard({
                     <span className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
                       Arrastrá el archivo o hacé clic para seleccionarlo
                     </span>
-                    <span className="text-xs">.xlsx o .xls</span>
+                    <span className="text-xs">
+                      .xlsx o .xls — detectamos solos qué hojas trae (clientes,
+                      transportes, choferes, vehículos, viajes)
+                    </span>
                   </>
                 )}
               </div>
@@ -516,15 +366,14 @@ export function ImportWizard({
                 }}
                 className="hidden"
               />
-              {wizard.secuencia.length > 0 && (
-                <div className="flex justify-end">
+              <div className="flex justify-end">
                   <button
                     type="button"
                     disabled={!columnasEsperadas}
                     onClick={() =>
                       descargarPlantillaImportacion(
                         (columnasEsperadas ?? []).filter((m) =>
-                          wizard.secuencia.includes(m.modulo as ModuloWizard),
+                          moduloPermitido(m.modulo as ModuloWizard),
                         ),
                       )
                     }
@@ -533,7 +382,8 @@ export function ImportWizard({
                     <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     Descargar planilla
                   </button>
-                </div>
+              </div>
+              </>
               )}
             </div>
           )}
@@ -884,189 +734,179 @@ export function ImportWizard({
         <ResumenPasoModal
           paso={pasoRevisando}
           wizard={wizard}
-          modulosElegidos={modulosElegidos}
-          postViajesElegido={postViajesElegido}
           onClose={() => setPasoRevisando(null)}
-          onSeleccionarNuevos={reiniciarImportacion}
         />
       )}
     </div>
   );
 }
 
-/** Etiqueta + hint de "ya tenés N cargados" para cada módulo del selector inicial — Viajes no tiene chequeo propio. */
-const MODULOS_SELECTOR: { key: ModuloWizard; tieneDatosKey?: keyof TenantTieneDatos }[] =
-  [
-    { key: "clientes", tieneDatosKey: "clientes" },
-    { key: "transportistas", tieneDatosKey: "transportistas" },
-    { key: "choferes", tieneDatosKey: "choferes" },
-    { key: "vehiculos", tieneDatosKey: "vehiculos" },
-    { key: "viajes" },
-  ];
-
 /**
- * Pantalla previa al upload cuando el tenant ya tiene datos cargados: en vez
- * de forzar la secuencia completa (pensada para un tenant nuevo), deja
- * elegir qué hojas importar. Dejar todo tildado equivale al recorrido
- * completo de siempre.
+ * Revisión del archivo cuando la detección no pudo resolver todo sola: hojas
+ * con columnas obligatorias faltantes (no se importan), hojas que encajan en
+ * más de un módulo (elige el usuario) y hojas que no se parecen a ninguno.
  */
-function SelectorModulos({
-  tieneDatos,
-  puedeLiquidaciones,
-  puedeFacturas,
-  seleccionados,
-  moduloPermitido,
-  onToggleModulo,
-  liquidacionesSel,
-  onToggleLiquidaciones,
-  facturasSel,
-  onToggleFacturas,
-  onElegir,
+function RevisionArchivo({
+  revision,
+  nombreArchivo,
+  loading,
+  onContinuar,
+  onCambiarArchivo,
 }: {
-  tieneDatos: TenantTieneDatos;
-  puedeLiquidaciones: boolean;
-  puedeFacturas: boolean;
-  /** Estado de los checks vive en ImportWizard (no acá) para que el stepper de arriba se actualice en vivo a medida que se tildan/destildan módulos. */
-  seleccionados: Set<ModuloWizard>;
-  /** false = la empresa no usa ese módulo (ej. Transportes en una empresa solo de flota propia). */
-  moduloPermitido: (modulo: ModuloWizard) => boolean;
-  onToggleModulo: (modulo: ModuloWizard) => void;
-  liquidacionesSel: boolean;
-  onToggleLiquidaciones: (checked: boolean) => void;
-  facturasSel: boolean;
-  onToggleFacturas: (checked: boolean) => void;
-  onElegir: (
-    modulos: ModuloWizard[],
-    postViajes: { liquidaciones: boolean; facturas: boolean },
-  ) => void;
+  revision: NonNullable<ReturnType<typeof useImportWizard>["revision"]>;
+  nombreArchivo: string;
+  loading: boolean;
+  onContinuar: (asignaciones: AsignacionHoja[]) => void;
+  onCambiarArchivo: () => void;
 }) {
-  const ordenados = MODULOS_SECUENCIA.filter((m) => seleccionados.has(m));
-  const viajesSel = seleccionados.has("viajes");
+  // hoja → módulo elegido ("" = sin elegir, "no" = no importar)
+  const [eleccion, setEleccion] = useState<Record<string, string>>({});
+  const { listas, conFaltantes, ambiguas, noReconocidas } = revision;
+
+  const elegidas: AsignacionHoja[] = ambiguas
+    .filter((a) => eleccion[a.hoja] && eleccion[a.hoja] !== "no")
+    .map((a) => ({
+      modulo: eleccion[a.hoja] as ModuloWizard,
+      hoja: a.hoja,
+      filas: a.filas,
+    }));
+  const asignaciones = [...listas, ...elegidas];
+  const faltaElegir = ambiguas.some((a) => !eleccion[a.hoja]);
+  const nadaParaImportar = listas.length === 0 && ambiguas.length === 0;
 
   return (
-    <div className="flex flex-col ">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 text-sm">
+      <h3 className="font-[family-name:var(--font-ui)] text-sm font-semibold uppercase tracking-wider text-vialto-charcoal">
+        Revisá el archivo{nombreArchivo ? ` «${nombreArchivo}»` : ""}
+      </h3>
 
-      <div className="mx-auto w-full max-w-xl text-left">
-        <div className="flex flex-col divide-y divide-black/10 border border-black/10 bg-white">
-          {MODULOS_SELECTOR.filter(({ key }) => moduloPermitido(key)).map(({ key, tieneDatosKey }) => (
-            <label
-              key={key}
-              className="flex cursor-pointer items-center justify-between gap-4 px-5 py-3.5 hover:bg-vialto-mist/60"
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  {labelModulo(key)}
-                </span>
-                {tieneDatosKey && tieneDatos[tieneDatosKey] && (
-                  <span className="text-xs text-vialto-steel">
-                    Ya tenés datos cargados
-                  </span>
-                )}
-              </span>
-              <input
-                type="checkbox"
-                checked={seleccionados.has(key)}
-                onChange={() => onToggleModulo(key)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal"
-              />
-            </label>
-          ))}
-          {puedeLiquidaciones && (
-            <label
-              className={[
-                "flex items-center justify-between gap-4 px-5 py-3.5",
-                viajesSel
-                  ? "cursor-pointer hover:bg-vialto-mist/60"
-                  : "cursor-not-allowed opacity-50",
-              ].join(" ")}
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  Liquidaciones a transportistas
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {viajesSel
-                    ? "Genera un borrador por transportista al terminar viajes."
-                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={liquidacionesSel}
-                disabled={!viajesSel}
-                onChange={(e) => onToggleLiquidaciones(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
-              />
-            </label>
-          )}
-          {puedeFacturas && (
-            <label
-              className={[
-                "flex items-center justify-between gap-4 px-5 py-3.5",
-                viajesSel
-                  ? "cursor-pointer hover:bg-vialto-mist/60"
-                  : "cursor-not-allowed opacity-50",
-              ].join(" ")}
-            >
-              <span className="flex flex-col">
-                <span className="font-[family-name:var(--font-ui)] text-sm font-semibold text-vialto-charcoal">
-                  Facturas a clientes
-                </span>
-                <span className="text-xs text-vialto-steel">
-                  {viajesSel
-                    ? "Genera un borrador por cliente al terminar viajes."
-                    : "Requiere también tildar Viajes — se generan a partir de los viajes recién importados."}
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={facturasSel}
-                disabled={!viajesSel}
-                onChange={(e) => onToggleFacturas(e.target.checked)}
-                className="h-5 w-5 shrink-0 accent-vialto-charcoal disabled:cursor-not-allowed"
-              />
-            </label>
-          )}
+      {nadaParaImportar && (
+        <div className="border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+          No encontramos nada para importar en este archivo. Tiene que tener
+          hojas de Clientes, Transportes, Choferes, Vehículos o Viajes con sus
+          columnas obligatorias — podés bajar la planilla modelo con
+          &quot;Descargar planilla&quot;.
         </div>
-      </div>
+      )}
 
-      <div className="mx-auto mt-6 flex w-full max-w-xl items-center justify-end gap-3">
+      {listas.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            Se va a importar
+          </p>
+          <ul className="mt-1.5 divide-y divide-black/10 border border-black/10 bg-white">
+            {listas.map((l) => (
+              <li key={l.modulo} className="flex justify-between gap-3 px-4 py-2">
+                <span className="font-semibold text-vialto-charcoal">
+                  {labelModulo(l.modulo)}
+                </span>
+                <span className="text-vialto-steel">
+                  hoja «{l.hoja}» · {l.filas} fila{l.filas !== 1 ? "s" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {ambiguas.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wider text-vialto-steel">
+            ¿Qué tiene cada una de estas hojas?
+          </p>
+          <ul className="mt-1.5 divide-y divide-black/10 border border-black/10 bg-white">
+            {ambiguas.map((a) => {
+              const tomados = new Set<string>([
+                ...listas.map((l) => l.modulo),
+                ...Object.entries(eleccion)
+                  .filter(([hoja]) => hoja !== a.hoja)
+                  .map(([, m]) => m),
+              ]);
+              return (
+                <li key={a.hoja} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+                  <span className="text-vialto-charcoal">
+                    Hoja «{a.hoja}» · {a.filas} fila{a.filas !== 1 ? "s" : ""}
+                  </span>
+                  <select
+                    value={eleccion[a.hoja] ?? ""}
+                    onChange={(e) =>
+                      setEleccion((prev) => ({ ...prev, [a.hoja]: e.target.value }))
+                    }
+                    className="h-9 border border-black/15 bg-white px-2 text-sm"
+                    aria-label={`Qué contiene la hoja ${a.hoja}`}
+                  >
+                    <option value="">Elegí…</option>
+                    {a.candidatos.map((m) => (
+                      <option key={m} value={m} disabled={tomados.has(m)}>
+                        {labelModulo(m)}
+                      </option>
+                    ))}
+                    <option value="no">No importar</option>
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {conFaltantes.length > 0 && (
+        <div className="border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+          <p>
+            Estas hojas no se pueden importar porque les faltan columnas
+            obligatorias. Corregí el Excel y volvé a subirlo, o seguí sin ellas:
+          </p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {conFaltantes.map((h) => (
+              <li key={h.modulo}>
+                <strong>{labelModulo(h.modulo)}</strong> (hoja «{h.hoja}»):
+                faltan {h.faltantes.join(", ")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {noReconocidas.length > 0 && (
+        <p className="text-xs text-vialto-steel">
+          No reconocimos {noReconocidas.length === 1 ? "la hoja" : "las hojas"}{" "}
+          {noReconocidas.map((h) => `«${h.hoja}»`).join(", ")} — no se{" "}
+          {noReconocidas.length === 1 ? "va" : "van"} a importar.
+        </p>
+      )}
+
+      <div className="flex justify-end gap-3">
         <button
           type="button"
-          disabled={ordenados.length === 0}
-          onClick={() =>
-            onElegir(ordenados, {
-              liquidaciones: liquidacionesSel,
-              facturas: facturasSel,
-            })
-          }
-          className="border border-black/15 bg-vialto-charcoal px-8 py-3 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+          onClick={onCambiarArchivo}
+          className="border border-black/15 bg-white px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-charcoal hover:bg-vialto-mist"
         >
-          Continuar →
+          Elegir otro archivo
         </button>
+        {!nadaParaImportar && (
+          <button
+            type="button"
+            disabled={loading || faltaElegir || asignaciones.length === 0}
+            onClick={() => onContinuar(asignaciones)}
+            className="border border-black/15 bg-vialto-charcoal px-6 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+          >
+            Continuar →
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
+type EstadoPaso = "done" | "current" | "pending" | "omitido";
+
 function WizardStepper({
   wizard,
-  secuencia,
   postViajesElegido,
-  seleccionCompleta,
   onVerPaso,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
-  /**
-   * Módulos a mostrar en el stepper. Mientras `!seleccionCompleta` es la
-   * selección en vivo de la pantalla de checks (cambia con cada tilde);
-   * una vez confirmada, es siempre `wizard.secuencia` (fija para toda la
-   * corrida).
-   */
-  secuencia: ModuloWizard[];
   postViajesElegido: { liquidaciones: boolean; facturas: boolean };
-  /** false mientras se está en la pantalla de checks (paso "Selección" todavía no confirmado). */
-  seleccionCompleta: boolean;
   /** Se llama solo al clickear un paso ya completado ("done") — abre un resumen de solo lectura, no navega el wizard. */
   onVerPaso: (paso: string) => void;
 }) {
@@ -1074,68 +914,94 @@ function WizardStepper({
   // alcanzables si "viajes" está en la secuencia de este import — sin viajes,
   // useImportWizard salta directo a "terminado" (ver avanzarModulo). Mostrar
   // el paso igual, aunque nunca se vaya a visitar, confunde al usuario.
-  const tieneViajes = secuencia.includes("viajes");
+  const tieneViajes = wizard.secuencia.includes("viajes");
   const ofreceLiquidaciones = tieneViajes && postViajesElegido.liquidaciones;
-
   const ofreceFacturas = tieneViajes && postViajesElegido.facturas;
+  const enModulos = wizard.fase === "modulo";
+  const pasadosModulos = !enModulos && wizard.fase !== "upload";
+  const confirmados = new Set(wizard.etapasCompletadas.map((e) => e.modulo));
 
-  const pasos = [
-    // Paso 0: la pantalla de checks (qué módulos importar, liquidaciones/
-    // facturas sí o no). No es parte de la máquina de fases de
-    // useImportWizard — vive en el estado de ImportWizard (modulosElegidos)
-    // — así que su estado "done"/"current" se resuelve aparte, con
-    // `seleccionCompleta`, en vez de con `wizard.fase`.
-    { key: "seleccion", label: "Selección" },
-    ...secuencia.map((m) => ({ key: m as string, label: labelModulo(m) })),
+  const estadoModulo = (m: ModuloWizard): EstadoPaso => {
+    if (wizard.omitidos.has(m)) return "omitido";
+    const idx = wizard.secuencia.indexOf(m);
+    const yaPaso = pasadosModulos || (enModulos && idx < wizard.moduloIndex);
+    if (yaPaso) return confirmados.has(m) ? "done" : "omitido"; // salteado en su paso
+    return enModulos && idx === wizard.moduloIndex ? "current" : "pending";
+  };
+  const estadoPost = (fase: string, despuesDe: string[]): EstadoPaso =>
+    wizard.fase === fase
+      ? "current"
+      : despuesDe.includes(wizard.fase)
+        ? "done"
+        : "pending";
+
+  const pasos: { key: string; label: string; estado: EstadoPaso; modulo?: ModuloWizard }[] = [
+    // Paso 0: subir el archivo (y revisar lo que se detectó).
+    {
+      key: "archivo",
+      label: "Archivo",
+      estado: wizard.fase === "upload" ? "current" : "done",
+    },
+    ...wizard.detectados.map((d) => ({
+      key: d.modulo as string,
+      label: labelModulo(d.modulo),
+      estado: estadoModulo(d.modulo),
+      modulo: d.modulo,
+    })),
     ...(ofreceLiquidaciones
-      ? [{ key: "post-liquidaciones", label: "Liquidaciones" }]
+      ? [{
+          key: "post-liquidaciones",
+          label: "Liquidaciones",
+          estado: estadoPost("post-liquidaciones", ["post-facturas", "terminado"]),
+        }]
       : []),
-    // "Facturas" es un paso propio solo si el usuario lo tildó (igual que
-    // "Liquidaciones" arriba). "Resumen" es aparte: el paso final genérico,
-    // siempre presente si corrió Viajes — es la pantalla de "terminado" que
-    // se ve al final, se hayan generado o no facturas/liquidaciones.
-    ...(ofreceFacturas ? [{ key: "post-facturas", label: "Facturas" }] : []),
-    ...(tieneViajes ? [{ key: "terminado", label: "Resumen" }] : []),
+    ...(ofreceFacturas
+      ? [{
+          key: "post-facturas",
+          label: "Facturas",
+          estado: estadoPost("post-facturas", ["terminado"]),
+        }]
+      : []),
+    // "Resumen": la pantalla de "terminado", siempre presente si corre Viajes.
+    ...(tieneViajes
+      ? [{
+          key: "terminado",
+          label: "Resumen",
+          estado: (wizard.fase === "terminado" ? "current" : "pending") as EstadoPaso,
+        }]
+      : []),
   ];
-
-  const indiceActual = !seleccionCompleta
-    ? 0
-    : wizard.fase === "upload"
-      ? 1
-      : wizard.fase === "modulo"
-        ? 1 + wizard.moduloIndex
-        : wizard.fase === "post-liquidaciones"
-          ? 1 + secuencia.length
-          : wizard.fase === "post-facturas"
-            ? 1 + secuencia.length + (ofreceLiquidaciones ? 1 : 0)
-            : wizard.fase === "terminado" && tieneViajes
-              ? pasos.length - 1
-              : pasos.length;
 
   return (
     <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
       {pasos.map((p, i) => {
-        const estado =
-          i < indiceActual ? "done" : i === indiceActual ? "current" : "pending";
         const burbuja = (
           <span
             className={[
               "flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] text-[11px] font-semibold",
-              estado === "done" ? "bg-vialto-charcoal text-white" : "",
-              estado === "current"
-                ? "bg-vialto-fire text-white"
-                : "",
-              estado === "pending"
-                ? "border border-black/15 text-vialto-steel"
-                : "",
+              p.estado === "done" ? "bg-vialto-charcoal text-white" : "",
+              p.estado === "current" ? "bg-vialto-fire text-white" : "",
+              p.estado === "pending" ? "border border-black/15 text-vialto-steel" : "",
+              p.estado === "omitido" ? "border border-dashed border-black/20 text-vialto-steel/60" : "",
             ].join(" ")}
           >
-            {estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+            {p.estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
           </span>
         );
+        const etiqueta = (clase: string) => (
+          <span className={`font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider ${clase}`}>
+            {p.label}
+          </span>
+        );
+        // Un módulo que todavía no empezó se puede marcar "no importar" (y
+        // volver a incluir) sin esperar a su vista previa.
+        const alternable =
+          p.modulo != null &&
+          (p.estado === "pending" ||
+            (p.estado === "omitido" && wizard.omitidos.has(p.modulo)));
         return (
           <li key={p.key} className="flex items-center gap-1.5">
-            {estado === "done" ? (
+            {p.estado === "done" ? (
               <button
                 type="button"
                 onClick={() => onVerPaso(p.key)}
@@ -1143,21 +1009,37 @@ function WizardStepper({
                 title={`Ver resumen de ${p.label}`}
               >
                 {burbuja}
-                <span className="font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider text-vialto-steel underline decoration-dotted underline-offset-2">
-                  {p.label}
-                </span>
+                {etiqueta("text-vialto-steel underline decoration-dotted underline-offset-2")}
+              </button>
+            ) : alternable ? (
+              <button
+                type="button"
+                disabled={wizard.loading}
+                onClick={() => wizard.omitirModulo(p.modulo!, p.estado !== "omitido")}
+                className="group flex items-center gap-1.5 rounded hover:opacity-75 disabled:cursor-not-allowed"
+                title={
+                  p.estado === "omitido"
+                    ? `${p.label}: no se va a importar. Click para volver a incluirla.`
+                    : `Click para no importar ${p.label}`
+                }
+              >
+                {burbuja}
+                {etiqueta(
+                  p.estado === "omitido"
+                    ? "text-vialto-steel/60 line-through"
+                    : "text-vialto-steel group-hover:line-through",
+                )}
               </button>
             ) : (
               <>
                 {burbuja}
-                <span
-                  className={[
-                    "font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider",
-                    estado === "current" ? "text-vialto-charcoal font-semibold" : "text-vialto-steel",
-                  ].join(" ")}
-                >
-                  {p.label}
-                </span>
+                {etiqueta(
+                  p.estado === "current"
+                    ? "text-vialto-charcoal font-semibold"
+                    : p.estado === "omitido"
+                      ? "text-vialto-steel/60 line-through"
+                      : "text-vialto-steel",
+                )}
               </>
             )}
             {i < pasos.length - 1 && (
@@ -1182,22 +1064,15 @@ function WizardStepper({
 function ResumenPasoModal({
   paso,
   wizard,
-  modulosElegidos,
-  postViajesElegido,
   onClose,
-  onSeleccionarNuevos,
 }: {
   paso: string;
   wizard: ReturnType<typeof useImportWizard>;
-  modulosElegidos: ModuloWizard[] | null;
-  postViajesElegido: { liquidaciones: boolean; facturas: boolean };
   onClose: () => void;
-  /** Solo se usa en el resumen de "Selección" — vuelve a la pantalla de checks para elegir otros módulos. */
-  onSeleccionarNuevos: () => void;
 }) {
   const titulo =
-    paso === "seleccion"
-      ? "Selección"
+    paso === "archivo"
+      ? "Archivo"
       : paso === "post-liquidaciones"
         ? "Liquidaciones"
         : paso === "post-facturas"
@@ -1206,32 +1081,28 @@ function ResumenPasoModal({
 
   let contenido: React.ReactNode;
 
-  if (paso === "seleccion") {
+  if (paso === "archivo") {
     contenido = (
       <div className="flex flex-col gap-3 text-sm">
         <div>
           <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Módulos elegidos
+            Archivo
           </p>
-          <p className="mt-1">
-            {modulosElegidos?.map((m) => labelModulo(m)).join(", ") || "—"}
-          </p>
+          <p className="mt-1">{wizard.file?.name ?? "—"}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Liquidaciones a transportistas
+            Hojas detectadas
           </p>
-          <p className="mt-1">
-            {postViajesElegido.liquidaciones ? "Sí, al terminar Viajes" : "No"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wider text-vialto-steel">
-            Facturas a clientes
-          </p>
-          <p className="mt-1">
-            {postViajesElegido.facturas ? "Sí, al terminar Viajes" : "No"}
-          </p>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {wizard.detectados.map((d) => (
+              <li key={d.modulo}>
+                {labelModulo(d.modulo)}: hoja «{d.hoja}» · {d.filas} fila
+                {d.filas !== 1 ? "s" : ""}
+                {wizard.omitidos.has(d.modulo) ? " — no se importa" : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     );
@@ -1301,20 +1172,9 @@ function ResumenPasoModal({
       title={`Resumen — ${titulo}`}
       onClose={onClose}
       footer={
-        <>
-          {paso === "seleccion" && (
-            <button
-              type="button"
-              onClick={onSeleccionarNuevos}
-              className={viewModalBtnPrimary}
-            >
-              Seleccionar nuevos
-            </button>
-          )}
-          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-            Cerrar
-          </button>
-        </>
+        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+          Cerrar
+        </button>
       }
     >
       {contenido}
@@ -1976,7 +1836,7 @@ function EtapaModulo({
             onClick={wizard.saltearModuloActual}
             className="border border-black/15 px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-vialto-steel hover:bg-black/[0.04] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Saltear esta hoja
+            No importar esta hoja
           </button>
           <button
             type="button"
