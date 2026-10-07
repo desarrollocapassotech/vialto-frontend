@@ -11,7 +11,14 @@ export function descargarPlantillaImportacion(
   filename = "plantilla_importacion",
 ) {
   const workbook = XLSX.utils.book_new();
-  for (const m of modulos) {
+  // Viajes va primera: es la hoja que más se completa. El orden de las hojas
+  // no afecta al import (se detectan por nombre/encabezados y se importan en
+  // orden de dependencia igual).
+  const ordenados = [
+    ...modulos.filter((m) => m.modulo === "viajes"),
+    ...modulos.filter((m) => m.modulo !== "viajes"),
+  ];
+  for (const m of ordenados) {
     if (m.columnas.length === 0) continue;
     const headers = m.columnas.map((c) => c.excelHeader);
     const ws = XLSX.utils.aoa_to_sheet([headers]);
