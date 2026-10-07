@@ -108,6 +108,13 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** "dd/mm" sin año, como las fechas de carga/descarga de la grilla de Viajes. Fecha sin hora: se lee del string, sin zona horaria. */
+function fmtDateCorta(iso: string) {
+  if (!iso) return "—";
+  const [, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}`;
+}
+
 function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
@@ -1109,9 +1116,15 @@ export function LiquidacionesTenantPage() {
                   id: "periodo",
                   header: "Período",
                   cell: (liq: LiquidacionConTransportista) => (
-                    <div className="flex flex-col leading-tight">
-                      <span>{fmtDate(liq.periodoDesde)}</span>
-                      <span>{fmtDate(liq.periodoHasta)}</span>
+                    <div
+                      className="tabular-nums"
+                      title={`Desde: ${fmtDate(liq.periodoDesde)}\nHasta: ${fmtDate(liq.periodoHasta)}`}
+                    >
+                      <span>{fmtDateCorta(liq.periodoDesde)}</span>
+                      <span className="mx-1 text-vialto-steel/75" aria-hidden>
+                        →
+                      </span>
+                      <span>{fmtDateCorta(liq.periodoHasta)}</span>
                     </div>
                   ),
                   tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
