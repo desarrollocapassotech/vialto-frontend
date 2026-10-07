@@ -70,6 +70,7 @@ type ViajeItem = Pick<
   | "numeroIdentificacionPersonalizado"
   | "idPropio2"
   | "fechaCarga"
+  | "fechaDescarga"
   | "origen"
   | "destino"
   | "precioTransportistaExterno"
@@ -132,6 +133,9 @@ const labelClass =
 interface Props {
   /** Viaje puntual: el viaje queda fijo; el transportista solo se elige si hay contratante + ejecutor distintos. */
   viajeInicial?: Viaje;
+  /** Liquidación de varios viajes desde la grilla: transportista fijo y viajes preseleccionados (sin `viajeInicial`). */
+  transportistaIdInicial?: string;
+  viajeIdsIniciales?: string[];
   transportistas: Transportista[];
   /** true = el host todavía está armando la lista de transportistas: bloquea el modal con un loader. */
   transportistasLoading?: boolean;
@@ -157,6 +161,8 @@ interface Props {
 
 export function CrearLiquidacionManualModal({
   viajeInicial,
+  transportistaIdInicial,
+  viajeIdsIniciales,
   transportistas,
   transportistasLoading = false,
   config: configProp,
@@ -204,8 +210,15 @@ export function CrearLiquidacionManualModal({
   // — Campos del formulario —
   const [transportistaId, setTransportistaId] = useState(
     () =>
-      (viajeInicial ? transportistaOpcionesViaje[0]?.id : "") ??
-      "",
+      (viajeInicial
+        ? transportistaOpcionesViaje[0]?.id
+        : transportistaIdInicial) ?? "",
+  );
+  /** Viajes a marcar apenas cargue la lista del transportista inicial (una sola vez). */
+  const preseleccionPendiente = useRef<string[] | null>(
+    !viajeInicial && transportistaIdInicial && viajeIdsIniciales?.length
+      ? viajeIdsIniciales
+      : null,
   );
 
   const [transportistaActualizado, setTransportistaActualizado] =
@@ -374,7 +387,31 @@ export function CrearLiquidacionManualModal({
           () => getToken(),
         );
         if (!cancelled) {
-          setViajes(res.items ?? []);
+          const items = res.items ?? [];
+          setViajes(items);
+          const preseleccion = preseleccionPendiente.current;
+          preseleccionPendiente.current = null;
+          if (preseleccion && transportistaId === transportistaIdInicial) {
+            const elegidos = items.filter((v) => preseleccion.includes(v.id));
+            setSelectedViajeIds(new Set(elegidos.map((v) => v.id)));
+            if (elegidos.length < preseleccion.length) {
+              showToast(
+                `${preseleccion.length - elegidos.length} de los viajes elegidos ya no están disponibles para liquidar a este transportista.`,
+                "error",
+              );
+            }
+            const desde = elegidos
+              .map((v) => dateInputValueFromIso(v.fechaCarga))
+              .filter(Boolean)
+              .sort();
+            const hasta = elegidos
+              .map((v) => dateInputValueFromIso(v.fechaDescarga ?? v.fechaCarga))
+              .filter(Boolean)
+              .sort();
+            if (desde.length > 0) setPeriodoDesde((p) => p || desde[0]);
+            if (hasta.length > 0)
+              setPeriodoHasta((p) => p || hasta[hasta.length - 1]);
+          }
         }
       } catch {
         if (!cancelled) setViajes([]);
@@ -385,7 +422,7 @@ export function CrearLiquidacionManualModal({
     return () => {
       cancelled = true;
     };
-  }, [transportistaId, viajeInicial, getToken]);
+  }, [transportistaId, transportistaIdInicial, viajeInicial, getToken, showToast]);
 
   const [clienteDetalle, setClienteDetalle] = useState<Cliente | null>(null);
 
