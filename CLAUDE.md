@@ -438,6 +438,16 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 
 El wizard recorre los módulos en orden fijo de dependencia (`MODULOS_SECUENCIA`: `clientes → transportistas → choferes → vehiculos → viajes`), llamando preview/confirm **una vez por módulo** contra `/api/importaciones/preview` y `/confirm` (ver `vialto-backend/CLAUDE.md`, sección `importaciones`). Después de Viajes hay dos etapas opcionales (`post-liquidaciones`/`post-facturas`) si el tenant tiene `integracion-arca`/`facturacion`.
 
+**Etapas post-viajes ocultas (oct 2026).** Los checks "Liquidaciones a transportistas" y "Facturas a clientes" de la pantalla de selección (generan un borrador por transportista/cliente con los viajes recién importados) **se ocultaron a pedido, pero la lógica sigue entera**. Se apagan con la constante `OFRECER_POST_VIAJES = false` en `ImportWizard.tsx`, que fuerza `puedeLiquidaciones`/`puedeFacturas` a `false`. Efectos:
+- Los checks no se muestran, `postViajesElegido` queda siempre en `{ liquidaciones: false, facturas: false }` y el stepper no muestra esas etapas.
+- Las fases `post-liquidaciones`/`post-facturas` de `useImportWizard` se siguen recorriendo, pero se saltean solas (`AvanceSilencioso` → `saltearLiquidaciones`/`saltearFacturas`).
+- Un tenant sin datos cargados ahora arranca directo con la secuencia completa aunque tenga Facturación/Liquidaciones, porque ya no hay nada extra que preguntarle.
+- Los endpoints del backend (`preview/confirmarLiquidaciones`, `preview/confirmarFacturasClientes` de `importaciones-post-viajes.service.ts`) no se tocaron.
+
+**Para reactivarlas**: poner `OFRECER_POST_VIAJES = true`; no hace falta nada más. No borrar las fases, los componentes de preview ni los endpoints mientras esto siga en pausa.
+
+En el mismo período se sacó de la pantalla de selección el panel "Columnas esperadas del Excel" (y su componente `ColumnasEsperadasLista`). Las columnas se siguen pudiendo bajar con "Descargar planilla" en la pantalla de carga.
+
 - **Regla de correctitud async (no fire-and-forget entre pasos)**: `avanzarModulo()`, `saltearModuloActual()`, `reintentarPreview()` y `confirmarModuloActual()` encadenan con `await` de punta a punta. Bug real corregido ago 2026: `confirmarModuloActual()` liberaba `loading` (`finally { setLoading(false) }`) **antes** de que el `setLoading(true)` del preview del módulo siguiente llegara a "pegar", mostrando un flash de pantalla en blanco entre pasos. Si se agrega un paso nuevo al wizard, seguir el mismo patrón (todo el camino de transición entre pasos es una sola cadena `await`, nunca una llamada suelta sin awaitear).
 - **Exclusión de filas y normalización de ciudad son 100% client-side** (`lib/importacionViajesCiudades.ts`): el backend no valida `origen`/`destino` contra ningún catálogo — el wizard lo hace contra un catálogo externo antes de mostrar el preview de Viajes, y solo manda `ciudadesNormalizadas`/`filasExcluidas` al confirmar. Si se corrige o elige una ciudad después de que el preview ya trajo el diff "antes/después" (`PreviewViaje.cambios`, ver abajo), hay que **resincronizar** las entradas "Origen"/"Destino" de `cambios` con el valor final (`sincronizarCambioCiudad` en el mismo archivo) — si no, el modal de cambios muestra el texto crudo del Excel en vez de la ciudad corregida. Bug real corregido ago 2026.
 
