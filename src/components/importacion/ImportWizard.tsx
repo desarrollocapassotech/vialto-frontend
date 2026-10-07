@@ -112,37 +112,33 @@ export function ImportWizard({
   const moduloPermitido = (m: ModuloWizard) =>
     m !== "transportistas" || transportistaExternoVisible;
 
-  // Puramente informativo (qué columnas espera cada módulo) — no bloquea el
-  // selector si todavía no llegó o si falla.
-  const [columnasEsperadas, setColumnasEsperadas] = useState<
-    ImportColumnasEsperadasModulo[] | null
-  >(null);
-  // Refrescar columnas esperadas al reiniciar la importación
-  const [refetchColumnas, setRefetchColumnas] = useState(0);
+  // La planilla modelo se pide al hacer clic (no al montar): así el botón no
+  // queda deshabilitado esperando una consulta, y siempre refleja la
+  // configuración de campos vigente de la empresa.
+  const [descargandoPlantilla, setDescargandoPlantilla] = useState(false);
+  const [errorPlantilla, setErrorPlantilla] = useState<string | null>(null);
   // Paso ya completado que el usuario quiere volver a mirar (no navega el
   // wizard hacia atrás, solo abre un resumen de lo que ya pasó en esa etapa
   // — los pasos futuros o el actual no son clickeables).
   const [pasoRevisando, setPasoRevisando] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelado = false;
-    setColumnasEsperadas(null);
-    (async () => {
-      try {
-        const data = await apiJson<ImportColumnasEsperadasModulo[]>(
-          `/api/importaciones/columnas-esperadas?tenantId=${encodeURIComponent(tenantId)}`,
-          getToken,
-        );
-        if (!cancelado) setColumnasEsperadas(data);
-      } catch {
-        // Si falla, el selector se muestra igual sin la info de columnas.
-      }
-    })();
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, refetchColumnas]);
+  async function descargarPlanilla() {
+    setDescargandoPlantilla(true);
+    setErrorPlantilla(null);
+    try {
+      const data = await apiJson<ImportColumnasEsperadasModulo[]>(
+        `/api/importaciones/columnas-esperadas?tenantId=${encodeURIComponent(tenantId)}`,
+        getToken,
+      );
+      descargarPlantillaImportacion(
+        data.filter((m) => moduloPermitido(m.modulo as ModuloWizard)),
+      );
+    } catch {
+      setErrorPlantilla("No se pudo generar la planilla. Probá de nuevo.");
+    } finally {
+      setDescargandoPlantilla(false);
+    }
+  }
 
   const wizard = useImportWizard(
     tenantId,
@@ -200,7 +196,6 @@ export function ImportWizard({
   function reiniciarImportacion() {
     wizard.reset();
     setPasoRevisando(null);
-    setRefetchColumnas((n) => n + 1);
   }
 
   return (
@@ -366,22 +361,23 @@ export function ImportWizard({
                 }}
                 className="hidden"
               />
-              <div className="flex justify-end">
+              <div className="flex flex-col items-end gap-1">
                   <button
                     type="button"
-                    disabled={!columnasEsperadas}
-                    onClick={() =>
-                      descargarPlantillaImportacion(
-                        (columnasEsperadas ?? []).filter((m) =>
-                          moduloPermitido(m.modulo as ModuloWizard),
-                        ),
-                      )
-                    }
+                    disabled={descargandoPlantilla}
+                    onClick={() => void descargarPlanilla()}
                     className="inline-flex items-center gap-2 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal hover:bg-vialto-mist disabled:opacity-50"
                   >
-                    <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Descargar planilla
+                    {descargandoPlantilla ? (
+                      <Spinner className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    )}
+                    {descargandoPlantilla ? "Generando…" : "Descargar planilla"}
                   </button>
+                  {errorPlantilla && (
+                    <p className="text-xs font-medium text-red-600">{errorPlantilla}</p>
+                  )}
               </div>
               </>
               )}
