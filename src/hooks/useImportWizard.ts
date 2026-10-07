@@ -82,6 +82,14 @@ export function useImportWizard(
   const [detectados, setDetectados] = useState<AsignacionHoja[]>([]);
   /** Detectados que el usuario marcó "no importar" antes de llegar a su paso. */
   const [omitidos, setOmitidos] = useState<Set<ModuloWizard>>(new Set());
+  /**
+   * Módulos que se pasaron con "Continuar" porque todas sus filas ya estaban
+   * cargadas igual (`continuarSinCambios`): no se confirmaron (no hay nada que
+   * escribir), pero cuentan como hechos, no como omitidos.
+   */
+  const [sinCambiosModulos, setSinCambiosModulos] = useState<Set<ModuloWizard>>(
+    new Set(),
+  );
   const [revision, setRevision] = useState<RevisionArchivo | null>(null);
   // Copia sincrónica de la secuencia y de la hoja de cada módulo: la primera
   // vista previa se pide en el mismo ciclo en que se fija la secuencia, antes
@@ -189,6 +197,7 @@ export function useImportWizard(
     );
     setDetectados(ordenadas);
     setOmitidos(new Set());
+    setSinCambiosModulos(new Set());
     setRevision(null);
     setModuloIndex(0);
     setFase("modulo");
@@ -407,6 +416,14 @@ export function useImportWizard(
 
   /** Saltea el módulo actual sin confirmarlo (ej. sin template configurado, o a propósito sin esa hoja). */
   function saltearModuloActual() {
+    void avanzarModulo();
+  }
+
+  /** Todas las filas del módulo ya están cargadas igual: avanza sin confirmar, pero el paso queda como hecho. */
+  function continuarSinCambios() {
+    if (moduloActual) {
+      setSinCambiosModulos((prev) => new Set(prev).add(moduloActual));
+    }
     void avanzarModulo();
   }
 
@@ -674,6 +691,7 @@ export function useImportWizard(
     setModuloIndex(0);
     setDetectados([]);
     setOmitidos(new Set());
+    setSinCambiosModulos(new Set());
     setRevision(null);
     secuenciaRef.current = [];
     hojaPorModuloRef.current = {};
@@ -696,6 +714,7 @@ export function useImportWizard(
     secuencia,
     detectados,
     omitidos,
+    sinCambiosModulos,
     revision,
     moduloActual,
     moduloIndex,
@@ -717,6 +736,7 @@ export function useImportWizard(
     omitirModulo,
     confirmarModuloActual,
     saltearModuloActual,
+    continuarSinCambios,
     reintentarPreview,
     crearVehiculosFaltantes,
     crearEntidadesFaltantesSimple,

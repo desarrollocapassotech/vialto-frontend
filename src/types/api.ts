@@ -670,6 +670,8 @@ export interface ImportPreviewFilaEntidad {
   fila: number;
   /** true = alta nueva, false = actualiza un registro ya existente. */
   esNuevo: boolean;
+  /** Solo si `esNuevo` es false: la fila no cambia nada del registro existente. */
+  sinCambios?: boolean;
   campos: ImportPreviewFilaCampo[];
 }
 

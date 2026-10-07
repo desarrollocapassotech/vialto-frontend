@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { Check, Download, Upload } from "lucide-react";
@@ -192,18 +192,22 @@ export function ImportWizard({
   useEffect(() => {
     if (wizard.fase !== "terminado") return;
     const etapas = wizard.etapasCompletadas;
-    if (etapas.length === 0 || etapas.some((e) => e.log.errores > 0)) return;
+    const huboSinCambios = wizard.sinCambiosModulos.size > 0;
+    if (etapas.length === 0 && !huboSinCambios) return;
+    if (etapas.some((e) => e.log.errores > 0)) return;
     const contar = (pred: (d: (typeof etapas)[number]["log"]["detalles"][number]) => boolean) =>
       etapas.reduce((n, e) => n + e.log.detalles.filter(pred).length, 0);
     const creados = contar((d) => d.estado === "ok" && d.creado === true);
     const actualizados = contar((d) => d.estado === "ok" && d.creado === false);
     showToast(
-      `Importación completada: ${creados} creados · ${actualizados} actualizados`,
+      creados + actualizados === 0
+        ? "Importación completada: todo ya estaba cargado, no hubo cambios"
+        : `Importación completada: ${creados} creados · ${actualizados} actualizados`,
       "success",
     );
-    navigate(etapas.some((e) => e.modulo === "viajes") ? viajesTo : backTo, {
-      replace: true,
-    });
+    const incluyoViajes =
+      etapas.some((e) => e.modulo === "viajes") || wizard.sinCambiosModulos.has("viajes");
+    navigate(incluyoViajes ? viajesTo : backTo, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizard.fase]);
 
@@ -957,7 +961,10 @@ function WizardStepper({
     if (wizard.omitidos.has(m)) return "omitido";
     const idx = wizard.secuencia.indexOf(m);
     const yaPaso = pasadosModulos || (enModulos && idx < wizard.moduloIndex);
-    if (yaPaso) return confirmados.has(m) ? "done" : "omitido"; // salteado en su paso
+    // Salteado en su paso = omitido; pasado con "Continuar" porque no había
+    // cambios = hecho.
+    if (yaPaso)
+      return confirmados.has(m) || wizard.sinCambiosModulos.has(m) ? "done" : "omitido";
     return enModulos && idx === wizard.moduloIndex ? "current" : "pending";
   };
   const estadoPost = (fase: string, despuesDe: string[]): EstadoPaso =>
@@ -1166,7 +1173,9 @@ function ResumenPasoModal({
     if (!etapa) {
       contenido = (
         <p className="text-sm text-vialto-steel">
-          Este módulo se salteó, no se importó nada.
+          {wizard.sinCambiosModulos.has(paso as ModuloWizard)
+            ? "Todas las filas ya estaban cargadas igual — no hubo nada que guardar."
+            : "Este módulo se salteó, no se importó nada."}
         </p>
       );
     } else {
@@ -1415,6 +1424,18 @@ function EtapaModulo({
 
   const advertenciasCampoUnicoDuplicado =
     p?.advertenciasCampoUnicoDuplicado ?? [];
+  // Ninguna fila trae algo nuevo o distinto a lo ya cargado: no hay nada que
+  // guardar, así que el paso se reduce a un "Continuar" (sin avisos que pidan
+  // confirmar nada).
+  const todoSinCambios =
+    !!p &&
+    filasConError === 0 &&
+    advertenciasCampoUnicoDuplicado.length === 0 &&
+    (hasViajes
+      ? advertenciasCiudad.length === 0 &&
+        p.viajes!.every((v) => !v.nuevo && (!v.cambios || v.cambios.length === 0))
+      : (p.filasDetalle?.length ?? 0) > 0 &&
+        p.filasDetalle!.every((f) => !f.esNuevo && f.sinCambios));
   const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
     (c) => !decisionesCampoUnico[c.fila],
   );
@@ -1508,34 +1529,21 @@ function EtapaModulo({
               <p className="mb-1.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
                 {labelModulo(wizard.moduloActual ?? "")} en este archivo
               </p>
-              <div className="flex flex-col gap-2">
-                {p.filasDetalle.map((f) => {
-                  const conflicto = advertenciasCampoUnicoDuplicado.find(
-                    (c) => c.fila === f.fila,
-                  );
-                  return (
-                    <FilaDetalleCard
-                      key={f.fila}
-                      fila={{
-                        ...f,
-                        campos: f.campos.filter((c) =>
-                          campoVisible(wizard.moduloActual, c.campo),
-                        ),
-                      }}
-                      conflicto={conflicto}
-                      decision={
-                        conflicto ? decisionesCampoUnico[conflicto.fila] : undefined
-                      }
-                      onElegirDecision={(accion) =>
-                        setDecisionesCampoUnico((prev) => ({
-                          ...prev,
-                          [f.fila]: accion,
-                        }))
-                      }
-                    />
-                  );
-                })}
-              </div>
+              <FilasDetalleTabla
+                filas={p.filasDetalle.map((f) => ({
+                  ...f,
+                  campos: f.campos.filter((c) =>
+                    campoVisible(wizard.moduloActual, c.campo),
+                  ),
+                }))}
+                conflictoDe={(fila) =>
+                  advertenciasCampoUnicoDuplicado.find((c) => c.fila === fila)
+                }
+                decisionDe={(fila) => decisionesCampoUnico[fila]}
+                onElegirDecision={(fila, accion) =>
+                  setDecisionesCampoUnico((prev) => ({ ...prev, [fila]: accion }))
+                }
+              />
             </div>
           )}
 
@@ -1749,7 +1757,7 @@ function EtapaModulo({
             );
           })}
 
-          {advertenciasCamposFaltantes.length > 0 && (
+          {advertenciasCamposFaltantes.length > 0 && !todoSinCambios && (
             <ImportAlert
               color="amber"
               collapsible={false}
@@ -1861,7 +1869,22 @@ function EtapaModulo({
             )}
         </fieldset>
       )}
-      {p && (
+      {p && todoSinCambios && (
+        <div className="flex items-center justify-end gap-4">
+          <p className="text-sm text-vialto-steel">
+            Todo ya está cargado igual — no hay nada para guardar.
+          </p>
+          <button
+            type="button"
+            disabled={wizard.loading}
+            onClick={wizard.continuarSinCambios}
+            className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
+          >
+            Continuar →
+          </button>
+        </div>
+      )}
+      {p && !todoSinCambios && (
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -2182,115 +2205,129 @@ function ViajesCambiosList({
     );
   }
 
-  return (
-    <div className="divide-y divide-black/10 border border-black/10">
-      {viajes.map((v) => (
-        <div key={v.fila} className="px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-vialto-charcoal">
-              {v.filasAgrupadas && v.filasAgrupadas.length > 1 ? (
-                <>
-                  Filas {v.filasAgrupadas.join(", ")} <span className="font-normal opacity-70">(Duplicadas)</span>
-                </>
-              ) : (
-                <>Fila {v.fila}</>
-              )} · {fmt(v.cliente)}
-            </p>
-            <div className="flex shrink-0 items-center gap-2">
-              {v.filasAgrupadas && v.filasAgrupadas.length > 1 && (
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-700">
-                  Unificado
-                </span>
-              )}
-              {v.nuevo ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-700">
-                  Nuevo
-                </span>
-              ) : (
-                <>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
-                    Actualiza
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onIgnorarFila(v.fila)}
-                    className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
-                  >
-                    Ignorar (no actualizar)
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {v.advertenciaSobrescritura && (
-            <div className="mt-3 border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
-              <strong className="block font-semibold uppercase tracking-wider text-[10px] mb-1">Atención: Datos distintos</strong>
-              <p className="mb-2">
-                Estas filas fueron unificadas pero tenían datos diferentes. Se conservarán los datos de la <strong>primera fila</strong> ({v.fila}). A continuación se detallan los datos o IDs que se van a perder:
-              </p>
-              {v.cambiosSobrescritura && v.cambiosSobrescritura.length > 0 && (
-                <div className="space-y-1 bg-white p-2 border border-amber-200">
-                  {v.cambiosSobrescritura.map((c, i) => (
-                    <div key={i} className="text-xs">
-                      <span className="font-medium text-vialto-charcoal">
-                        {c.campo}:
-                      </span>{" "}
-                      <span className="text-vialto-steel line-through decoration-red-400">
-                        {fmt(c.antes)}
-                      </span>
-                      <span className="mx-1 text-vialto-steel">→</span>
-                      <span className="font-medium text-vialto-charcoal">
-                        {fmt(c.despues)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
-            <p className="mt-1 text-[11px] text-amber-700">
-              ⚠ Tiene ciudad sin confirmar — revisala en "Revisar ciudades".
-            </p>
-          )}
-
-          {v.nuevo ? (
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
-              {CAMPOS_VIAJE_MOSTRAR.filter(
-                (c) => v[c.key] != null && v[c.key] !== "",
-              ).map((c) => (
-                <div key={c.key}>
-                  <dt className="text-[10px] uppercase tracking-wider text-vialto-steel">
-                    {c.label}
-                  </dt>
-                  <dd className="text-vialto-charcoal">{fmt(v[c.key])}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : v.cambios && v.cambios.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              {v.cambios.map((c, i) => (
-                <div key={i} className="text-xs">
-                  <span className="font-medium text-vialto-charcoal">
-                    {c.campo}:
-                  </span>{" "}
-                  <span className="text-vialto-steel line-through decoration-red-400">
-                    {fmt(c.antes)}
-                  </span>
-                  <span className="mx-1 text-vialto-steel">→</span>
-                  <span className="font-medium text-vialto-charcoal">
-                    {fmt(c.despues)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-vialto-steel">Sin cambios.</p>
-          )}
-        </div>
+  // Solo las columnas que tienen dato en alguna fila de la página.
+  const columnas = CAMPOS_VIAJE_MOSTRAR.filter((c) =>
+    viajes.some((v) => v[c.key] != null && v[c.key] !== ""),
+  );
+  const th =
+    "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.1em] text-vialto-steel whitespace-nowrap";
+  const td = "px-3 py-2 text-sm text-vialto-charcoal whitespace-nowrap";
+  const colSpan = columnas.length + 2;
+  const listaCambios = (cambios: { campo: string; antes: unknown; despues: unknown }[]) => (
+    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+      {cambios.map((c, i) => (
+        <span key={i} className="text-xs">
+          <span className="font-medium text-vialto-charcoal">{c.campo}:</span>{" "}
+          <span className="text-vialto-steel line-through decoration-red-400">
+            {fmt(c.antes)}
+          </span>
+          <span className="mx-1 text-vialto-steel">→</span>
+          <span className="font-medium text-vialto-charcoal">{fmt(c.despues)}</span>
+        </span>
       ))}
+    </div>
+  );
+
+  return (
+    <div className="overflow-x-auto border border-black/10">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-black/10 bg-vialto-mist/50">
+            <th className={`${th} w-14`}>Fila</th>
+            {columnas.map((c) => (
+              <th key={c.key} className={th}>
+                {c.label}
+              </th>
+            ))}
+            <th className={`${th} text-right`}>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {viajes.map((v) => {
+            const unificado = !!v.filasAgrupadas && v.filasAgrupadas.length > 1;
+            const sinCambios = !v.nuevo && (!v.cambios || v.cambios.length === 0);
+            return (
+              <Fragment key={v.fila}>
+                <tr className="border-t border-black/5 first:border-t-0">
+                  <td className={`${td} text-vialto-steel tabular-nums`}>
+                    {unificado ? v.filasAgrupadas!.join(", ") : v.fila}
+                  </td>
+                  {columnas.map((c) => (
+                    <td key={c.key} className={td}>
+                      {v[c.key] != null && v[c.key] !== "" ? (
+                        String(v[c.key])
+                      ) : (
+                        <span className="text-vialto-steel/50">—</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className={`${td} text-right`}>
+                    <div className="flex items-center justify-end gap-1.5">
+                      {unificado && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 uppercase tracking-wider">
+                          Unificado
+                        </span>
+                      )}
+                      {v.nuevo ? (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 uppercase tracking-wider">
+                          Nuevo
+                        </span>
+                      ) : sinCambios ? (
+                        <span className="text-[10px] px-1.5 py-0.5 border border-black/10 text-vialto-steel/70 uppercase tracking-wider">
+                          Sin cambios
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+                            Actualiza
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onIgnorarFila(v.fila)}
+                            className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
+                          >
+                            Ignorar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Fila que actualiza un viaje existente: qué cambia. */}
+                {!v.nuevo && !sinCambios && (
+                  <tr>
+                    <td colSpan={colSpan} className="px-3 pb-2">
+                      {listaCambios(v.cambios!)}
+                    </td>
+                  </tr>
+                )}
+
+                {v.advertenciaSobrescritura && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={colSpan} className="px-3 py-2 text-xs text-amber-900">
+                      <p className="mb-1">
+                        <strong>Datos distintos entre las filas unificadas</strong> — se
+                        conservan los de la fila {v.fila}; se pierden:
+                      </p>
+                      {v.cambiosSobrescritura && v.cambiosSobrescritura.length > 0 &&
+                        listaCambios(v.cambiosSobrescritura)}
+                    </td>
+                  </tr>
+                )}
+
+                {v.advertenciasCiudad && v.advertenciasCiudad.length > 0 && (
+                  <tr>
+                    <td colSpan={colSpan} className="px-3 pb-2 text-[11px] text-amber-700">
+                      ⚠ Tiene ciudad sin confirmar — revisala en "Revisar ciudades".
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -2373,83 +2410,136 @@ function valorFilaDetalle(campo: string, valor: string): string {
   return valor;
 }
 
-function FilaDetalleCard({
-  fila,
-  conflicto,
-  decision,
+/**
+ * Filas del archivo para los módulos "simples" (Clientes, Transportes,
+ * Choferes, Vehículos): tabla compacta, una columna por campo + Estado. Las
+ * filas con ID Fiscal/DNI duplicado llevan debajo una franja con la decisión
+ * (Ignorar / Actualizar) — ver "Conflicto de campo único" en CLAUDE.md.
+ */
+function FilasDetalleTabla({
+  filas,
+  conflictoDe,
+  decisionDe,
   onElegirDecision,
 }: {
-  fila: ImportPreviewFilaEntidad;
-  conflicto?: ImportCampoUnicoConflicto;
-  decision?: "ignorar" | "actualizar";
-  onElegirDecision?: (accion: "ignorar" | "actualizar") => void;
+  filas: ImportPreviewFilaEntidad[];
+  conflictoDe: (fila: number) => ImportCampoUnicoConflicto | undefined;
+  decisionDe: (fila: number) => "ignorar" | "actualizar" | undefined;
+  onElegirDecision: (fila: number, accion: "ignorar" | "actualizar") => void;
 }) {
+  // Columnas = unión de campos en el orden en que aparecen (una fila puede
+  // no traer todos los campos si la celda venía vacía).
+  const columnas: { campo: string; label: string }[] = [];
+  for (const f of filas) {
+    for (const c of f.campos) {
+      if (!columnas.some((col) => col.campo === c.campo)) {
+        columnas.push({ campo: c.campo, label: c.label });
+      }
+    }
+  }
+  const th =
+    "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.1em] text-vialto-steel whitespace-nowrap";
+  const td = "px-3 py-2 text-sm text-vialto-charcoal";
+  const botonDecision = (activo: boolean) =>
+    `px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+      activo
+        ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+        : "border-amber-300 text-amber-900 hover:bg-amber-100"
+    }`;
+
   return (
-    <div
-      className={`rounded border p-3 ${conflicto ? "border-amber-300 bg-amber-50/50" : "border-black/10"
-        }`}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-steel">
-          Fila {fila.fila}
-        </span>
-        {conflicto ? (
-          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
-            {conflicto.campoLabel} duplicado
-          </span>
-        ) : fila.esNuevo ? (
-          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
-            Nuevo
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
-            Actualiza
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-        {fila.campos.map((c) => (
-          <div key={c.campo}>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-vialto-steel">
-              {c.label}
-            </p>
-            <p className="text-sm text-vialto-charcoal">
-              {valorFilaDetalle(c.campo, c.valor)}
-            </p>
-          </div>
-        ))}
-      </div>
-      {conflicto && (
-        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
-          <span>
-            {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
-            de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
-            qué hacer:
-          </span>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => onElegirDecision?.("ignorar")}
-              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "ignorar"
-                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                }`}
-            >
-              Ignorar fila
-            </button>
-            <button
-              type="button"
-              onClick={() => onElegirDecision?.("actualizar")}
-              className={`px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${decision === "actualizar"
-                ? "border-vialto-charcoal bg-vialto-charcoal text-white"
-                : "border-amber-300 text-amber-900 hover:bg-amber-100"
-                }`}
-            >
-              Actualizar {conflicto.entidadExistenteNombre}
-            </button>
-          </div>
-        </div>
-      )}
+    <div className="overflow-x-auto border border-black/10">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-black/10 bg-vialto-mist/50">
+            <th className={`${th} w-14`}>Fila</th>
+            {columnas.map((col) => (
+              <th key={col.campo} className={th}>
+                {col.label}
+              </th>
+            ))}
+            <th className={`${th} text-right`}>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => {
+            const conflicto = conflictoDe(f.fila);
+            const decision = decisionDe(f.fila);
+            const valores = new Map(f.campos.map((c) => [c.campo, c.valor]));
+            return (
+              <Fragment key={f.fila}>
+                <tr
+                  className={`border-t border-black/5 first:border-t-0 ${
+                    conflicto ? "bg-amber-50/60" : ""
+                  }`}
+                >
+                  <td className={`${td} text-vialto-steel tabular-nums`}>{f.fila}</td>
+                  {columnas.map((col) => {
+                    const valor = valores.get(col.campo);
+                    return (
+                      <td key={col.campo} className={td}>
+                        {valor ? (
+                          valorFilaDetalle(col.campo, valor)
+                        ) : (
+                          <span className="text-vialto-steel/50">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className={`${td} text-right whitespace-nowrap`}>
+                    {conflicto ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+                        {conflicto.campoLabel} duplicado
+                      </span>
+                    ) : f.esNuevo ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+                        Nuevo
+                      </span>
+                    ) : f.sinCambios ? (
+                      <span className="text-[10px] px-1.5 py-0.5 border border-black/10 text-vialto-steel/70 uppercase tracking-wider">
+                        Sin cambios
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+                        Actualiza
+                      </span>
+                    )}
+                  </td>
+                </tr>
+                {conflicto && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={columnas.length + 2} className="px-3 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+                        <span>
+                          {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
+                          de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
+                          qué hacer:
+                        </span>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onElegirDecision(f.fila, "ignorar")}
+                            className={botonDecision(decision === "ignorar")}
+                          >
+                            Ignorar fila
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onElegirDecision(f.fila, "actualizar")}
+                            className={botonDecision(decision === "actualizar")}
+                          >
+                            Actualizar {conflicto.entidadExistenteNombre}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
