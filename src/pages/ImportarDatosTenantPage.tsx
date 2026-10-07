@@ -22,19 +22,16 @@ export function ImportarDatosTenantPage() {
   }
 
   return (
-    <div>
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Importar datos
-      </h1>
-
-      <div className="mt-6">
-        <ImportWizard
-          tenantId={tenant.clerkOrgId}
-          tenantModules={tenant.modules}
-          backTo={backTo}
-          viajesTo="/viajes"
-        />
-      </div>
-    </div>
+    <ImportWizard
+      tenantId={tenant.clerkOrgId}
+      tenantModules={tenant.modules}
+      backTo={backTo}
+      viajesTo="/viajes"
+      encabezado={
+        <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+          Importar datos
+        </h1>
+      }
+    />
   );
 }

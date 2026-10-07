@@ -40,38 +40,40 @@ export function SuperadminImportarPage() {
   return (
     <SuperadminOnly>
       <div>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-              Importar datos
-            </h1>
-            {tenant && <p className="mt-2 text-vialto-steel">{tenant.name}</p>}
-          </div>
-          {orgId && (
-            <Link
-              className="shrink-0 whitespace-nowrap border border-vialto-fire bg-vialto-fire px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm hover:bg-vialto-bright hover:border-vialto-bright"
-              to={`/superadmin/empresas/${orgId}/importar/templates`}
-            >
-              Configurar templates →
-            </Link>
-          )}
-        </div>
-
+        {(loading || error) && (
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+            Importar datos
+          </h1>
+        )}
         {loading && (
           <p className="mt-6 text-sm text-vialto-steel">Cargando empresa…</p>
         )}
         {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
 
         {!loading && tenant && orgId && (
-          <div className="mt-6">
-            <ImportWizard
-              tenantId={orgId}
-              tenantModules={tenant.modules}
-              backTo="/superadmin/empresas"
-              viajesTo={`/viajes?tenantId=${encodeURIComponent(orgId)}`}
-              templatesTo={`/superadmin/empresas/${orgId}/importar/templates`}
-            />
-          </div>
+          <ImportWizard
+            tenantId={orgId}
+            tenantModules={tenant.modules}
+            backTo="/superadmin/empresas"
+            viajesTo={`/viajes?tenantId=${encodeURIComponent(orgId)}`}
+            templatesTo={`/superadmin/empresas/${orgId}/importar/templates`}
+            encabezado={
+              <div>
+                <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+                  Importar datos
+                </h1>
+                <p className="text-sm text-vialto-steel">{tenant.name}</p>
+              </div>
+            }
+            acciones={
+              <Link
+                className="shrink-0 whitespace-nowrap border border-vialto-fire bg-vialto-fire px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-white shadow-sm hover:bg-vialto-bright hover:border-vialto-bright"
+                to={`/superadmin/empresas/${orgId}/importar/templates`}
+              >
+                Configurar templates →
+              </Link>
+            }
+          />
         )}
       </div>
     </SuperadminOnly>

@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/lib/toast";
 import { Check, Download, Upload } from "lucide-react";
@@ -63,6 +63,10 @@ interface ImportWizardProps {
    * le pida el ajuste a su administrador.
    */
   templatesTo?: string;
+  /** Título de la página: va a la izquierda, en la misma línea que los pasos. */
+  encabezado?: ReactNode;
+  /** Botones extra a la derecha de "Cambiar archivo" (ej. "Configurar templates" en superadmin). */
+  acciones?: ReactNode;
 }
 
 const th = "px-3 py-2 text-left font-semibold text-vialto-steel";
@@ -105,6 +109,8 @@ export function ImportWizard({
   backTo,
   viajesTo,
   templatesTo,
+  encabezado,
+  acciones,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
   const maestro = useMaestroData();
@@ -240,21 +246,28 @@ export function ImportWizard({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <WizardStepper
-          wizard={wizard}
-          postViajesElegido={postViajesElegido}
-          onVerPaso={setPasoRevisando}
-        />
-        {(wizard.fase !== "upload" || wizard.revision) && (
-          <button
-            type="button"
-            onClick={reiniciarImportacion}
-            className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
-          >
-            Cambiar archivo
-          </button>
-        )}
+      {/* Una sola línea: título de la página, pasos y acciones. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {encabezado && <div className="shrink-0">{encabezado}</div>}
+        <div className="min-w-0 flex-1">
+          <WizardStepper
+            wizard={wizard}
+            postViajesElegido={postViajesElegido}
+            onVerPaso={setPasoRevisando}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {(wizard.fase !== "upload" || wizard.revision) && (
+            <button
+              type="button"
+              onClick={reiniciarImportacion}
+              className="shrink-0 border border-black/15 bg-white px-4 py-2 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal shadow-sm hover:bg-vialto-mist"
+            >
+              Cambiar archivo
+            </button>
+          )}
+          {acciones}
+        </div>
       </div>
 
       {wizard.error && columnasFaltantes && (
