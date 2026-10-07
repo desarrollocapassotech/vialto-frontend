@@ -46,6 +46,7 @@ const MODULOS_CAMPOS_COMPARTIDOS = new Set([
   "transportistas",
   "vehiculos",
   "choferes",
+  "liquidaciones",
 ]);
 
 function calcularModulosDisponibles(
@@ -791,23 +792,23 @@ export function CamposEmpresaPage() {
     if (!filtroEmpresa) return;
     setLoading(true);
     try {
-      for (const f of ["alta_liquidacion", "edicion_liquidacion"]) {
-        for (const c of ["fechaDesde", "fechaHasta"]) {
-          await apiJson(
-            `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
-            () => getToken(),
-            {
-              method: "POST",
-              body: JSON.stringify({
-                modulo: "liquidaciones",
-                formulario: f,
-                campo: c,
-                visible,
-                aplicarATodosLosFormularios: true,
-              }),
-            },
-          );
-        }
+      // La visibilidad de Liquidaciones es compartida entre alta y edición
+      // (MODULOS_CAMPOS_COMPARTIDOS): un toggle por campo alcanza para ambas.
+      for (const c of ["fechaDesde", "fechaHasta"]) {
+        await apiJson(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
+          () => getToken(),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              modulo: "liquidaciones",
+              formulario: "alta_liquidacion",
+              campo: c,
+              visible,
+              aplicarATodosLosFormularios: true,
+            }),
+          },
+        );
       }
       if (modulo && formulario) {
         const resp = await apiJson<CampoConfig[]>(
