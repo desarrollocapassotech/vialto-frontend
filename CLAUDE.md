@@ -438,22 +438,35 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 
 El wizard recorre los módulos en orden fijo de dependencia (`MODULOS_SECUENCIA`: `clientes → transportistas → choferes → vehiculos → viajes`), llamando preview/confirm **una vez por módulo** contra `/api/importaciones/preview` y `/confirm` (ver `vialto-backend/CLAUDE.md`, sección `importaciones`). Después de Viajes hay dos etapas opcionales (`post-liquidaciones`/`post-facturas`) si el tenant tiene `integracion-arca`/`facturacion`.
 
-**Etapas post-viajes ocultas (oct 2026).** Los checks "Liquidaciones a transportistas" y "Facturas a clientes" de la pantalla de selección (generan un borrador por transportista/cliente con los viajes recién importados) **se ocultaron a pedido, pero la lógica sigue entera**. Se apagan con la constante `OFRECER_POST_VIAJES = false` en `ImportWizard.tsx`, que fuerza `puedeLiquidaciones`/`puedeFacturas` a `false`. Efectos:
-- Los checks no se muestran, `postViajesElegido` queda siempre en `{ liquidaciones: false, facturas: false }` y el stepper no muestra esas etapas.
+**Etapas post-viajes ocultas (oct 2026).** "Liquidaciones a transportistas" y "Facturas a clientes" (generan un borrador por transportista/cliente con los viajes recién importados) **se ocultaron a pedido, pero la lógica sigue entera**. `ImportWizard.tsx` fija `postViajesElegido` con la constante `POST_VIAJES_ELEGIDO = { liquidaciones: false, facturas: false }`. Efectos:
+- El stepper no muestra esas etapas.
 - Las fases `post-liquidaciones`/`post-facturas` de `useImportWizard` se siguen recorriendo, pero se saltean solas (`AvanceSilencioso` → `saltearLiquidaciones`/`saltearFacturas`).
-- Un tenant sin datos cargados ahora arranca directo con la secuencia completa aunque tenga Facturación/Liquidaciones, porque ya no hay nada extra que preguntarle.
 - Los endpoints del backend (`preview/confirmarLiquidaciones`, `preview/confirmarFacturasClientes` de `importaciones-post-viajes.service.ts`) no se tocaron.
 
-**Para reactivarlas**: poner `OFRECER_POST_VIAJES = true`; no hace falta nada más. No borrar las fases, los componentes de preview ni los endpoints mientras esto siga en pausa.
-
-En el mismo período se sacó de la pantalla de selección el panel "Columnas esperadas del Excel" (y su componente `ColumnasEsperadasLista`). Las columnas se siguen pudiendo bajar con "Descargar planilla" en la pantalla de carga.
+**Para reactivarlas**: hay que volver a ofrecer los dos checks. La pantalla de selección donde vivían ya no existe (ver "Detección de hojas" abajo); el lugar natural es el panel de revisión del archivo (`RevisionArchivo`) o un paso propio antes de Viajes. Después, reemplazar la constante por un state. No borrar las fases, los componentes de preview ni los endpoints mientras esto siga en pausa.
 
 - **Regla de correctitud async (no fire-and-forget entre pasos)**: `avanzarModulo()`, `saltearModuloActual()`, `reintentarPreview()` y `confirmarModuloActual()` encadenan con `await` de punta a punta. Bug real corregido ago 2026: `confirmarModuloActual()` liberaba `loading` (`finally { setLoading(false) }`) **antes** de que el `setLoading(true)` del preview del módulo siguiente llegara a "pegar", mostrando un flash de pantalla en blanco entre pasos. Si se agrega un paso nuevo al wizard, seguir el mismo patrón (todo el camino de transición entre pasos es una sola cadena `await`, nunca una llamada suelta sin awaitear).
 - **Exclusión de filas y normalización de ciudad son 100% client-side** (`lib/importacionViajesCiudades.ts`): el backend no valida `origen`/`destino` contra ningún catálogo — el wizard lo hace contra un catálogo externo antes de mostrar el preview de Viajes, y solo manda `ciudadesNormalizadas`/`filasExcluidas` al confirmar. Si se corrige o elige una ciudad después de que el preview ya trajo el diff "antes/después" (`PreviewViaje.cambios`, ver abajo), hay que **resincronizar** las entradas "Origen"/"Destino" de `cambios` con el valor final (`sincronizarCambioCiudad` en el mismo archivo) — si no, el modal de cambios muestra el texto crudo del Excel en vez de la ciudad corregida. Bug real corregido ago 2026.
 
-### Selector de módulos previo al upload (cuando el tenant ya tiene datos)
+### Detección de hojas: el wizard arranca por el archivo (oct 2026)
 
-Antes de mostrar el dropzone, `ImportWizard` consulta `GET /api/importaciones/tenant-tiene-datos?tenantId=...`. Si el tenant **no tiene nada** cargado (clientes/transportistas/choferes/vehículos en cero), arranca directo con la secuencia completa — es el caso de uso principal (alta de un tenant nuevo). Si **ya tiene algo**, se muestra `SelectorModulos` — una pantalla dedicada, no un dropdown ni checkboxes al costado — con un checkbox por módulo. Por defecto solo quedan tildados **Viajes** (siempre) y los módulos que todavía no tienen datos; dejarlos todos tildados equivale al recorrido completo de siempre. La selección alimenta directo el `modulosDisponibles` de `useImportWizard` — no hay un modo "elegir un módulo suelto" separado del wizard secuencial, solo se acorta la secuencia.
+No hay pantalla de checks para elegir módulos: el primer paso ("Archivo") es el dropzone. Al soltar el Excel, `useImportWizard.startFile` llama `POST /api/importaciones/detectar-hojas` (ver `vialto-backend/CLAUDE.md`, sección `importaciones`), que devuelve qué módulos trae el archivo y en qué hoja. La detección es primero por nombre de hoja y, si no, por encabezados (ej. "Hoja1" con columnas de Viajes).
+
+- **Todo resuelto** (hojas detectadas sin columnas obligatorias faltantes, nada ambiguo): arranca directo con la secuencia de esas hojas, en el orden de `MODULOS_SECUENCIA`. Un Excel con solo Viajes va derecho a la vista previa de Viajes.
+- **Algo para revisar**: se queda en "upload" mostrando `RevisionArchivo` (`wizard.revision`). Ahí se ve:
+  - lo que se va a importar;
+  - un select por cada hoja ambigua (encaja igual en varios módulos, ej. una hoja con solo "Nombre"), con la opción "No importar";
+  - las hojas con columnas obligatorias faltantes (no se importan);
+  - las que no se reconocieron.
+  "Continuar →" llama `wizard.iniciarImportacion(asignaciones)`.
+- **Hoja por módulo**: el hook guarda la hoja elegida (`hojaPorModuloRef`) y la manda como `&hoja=` al preview. Así se lee aunque no se llame como en la plantilla.
+- **Secuencia en ref**: `secuencia` es state (para renderizar), pero el hook lee `secuenciaRef`, porque la primera vista previa se pide en el mismo ciclo en que se fija. Si se toca este flujo, no volver a leer `secuencia` dentro de `ejecutarPreviewModulo`/`avanzarModulo`.
+- **No importar una hoja**:
+  - en su paso, con el botón "No importar esta hoja" (`saltearModuloActual`), también disponible si su vista previa falló;
+  - antes de llegar, tocando su paso pendiente en el stepper (`wizard.omitirModulo`), que se tacha y se puede volver a incluir.
+  Los pasos salteados se muestran tachados, no con el check de "hecho".
+- La planilla modelo ("Descargar planilla", en el paso Archivo) trae todos los módulos que la empresa puede importar.
+- `GET /importaciones/tenant-tiene-datos` y el `pre-flight` del backend ya no los usa el wizard.
 
 ### Preview de Viajes: "Ver cambios" con diff antes/después
 
@@ -463,7 +476,7 @@ El modal "Detalle de filas" (trigger: botón "Ver cambios →", alineado a la de
 - Fila nueva → grilla compacta con los campos no vacíos.
 - Fila que actualiza → una línea por campo que cambió: `Campo: valor anterior (tachado) → valor nuevo` (`PreviewViaje.cambios`, calculado server-side en `compararCamposViaje` — ver backend). Sin cambios reales → "Sin cambios."
 
-Las pestañas Clientes/Transportistas de este mismo modal solo se muestran si esos módulos están en `wizard.secuencia` de la corrida actual — el preview de Viajes siempre trae los nombres que referencia (para marcar cuáles son nuevos), pero si el usuario no eligió importar esos módulos en el selector, no tiene sentido mostrarlos como si fueran parte de lo que se está por guardar.
+Las pestañas Clientes/Transportistas de este mismo modal solo se muestran si esos módulos están en `wizard.secuencia` de la corrida actual — el preview de Viajes siempre trae los nombres que referencia (para marcar cuáles son nuevos), pero si el archivo no trae esas hojas (o el usuario eligió no importarlas), no tiene sentido mostrarlos como si fueran parte de lo que se está por guardar.
 
 Paginación de estas tablas/listas: **no** usar el componente `ListadoPagination` completo (su selector de page-size está limitado a `[10, 25, 50]`, no sirve para "5 en Viajes, 10 en el resto"). Usar el pager liviano de `lib/listadoPaginacion.ts` (`metaPaginacionCliente`/`slicePaginaCliente`/`paginasVisibles`), construido inline.
 
