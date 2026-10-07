@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/lib/toast";
 import { Check, Download, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -31,6 +32,8 @@ import { condicionIvaLabel } from "@/lib/arcaCbteTipo";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import type { PaisCodigo } from "@/lib/ciudades";
 import type {
   ImportPreviewViaje,
   ImportPreviewFactura,
@@ -45,6 +48,12 @@ interface ImportWizardProps {
   tenantModules: string[];
   /** Adónde vuelve el botón "Listo" al terminar el wizard. */
   backTo: string;
+  /**
+   * Listado de Viajes de esta empresa (con `?tenantId=` para superadmin).
+   * Si la importación termina sin errores y se importaron viajes, el wizard
+   * redirige acá en vez de mostrar el resumen; sin viajes, a `backTo`.
+   */
+  viajesTo: string;
   /**
    * Base de la URL de configuración de templates (ej.
    * `/superadmin/empresas/:orgId/importar/templates`). Solo el superadmin la
@@ -94,6 +103,7 @@ export function ImportWizard({
   tenantId,
   tenantModules,
   backTo,
+  viajesTo,
   templatesTo,
 }: ImportWizardProps) {
   const { getToken } = useAuth();
@@ -109,6 +119,8 @@ export function ImportWizard({
   // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
   // el paso "Transportes" no se ofrece ni se recorre.
   const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
+  // País fijo de la empresa: las ciudades a confirmar se buscan solo en ese país.
+  const { paisFijo } = useTenantPaisFijo(tenantId);
   const moduloPermitido = (m: ModuloWizard) =>
     m !== "transportistas" || transportistaExternoVisible;
 
@@ -168,6 +180,30 @@ export function ImportWizard({
     } else {
       refrescoMaestroHecho.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizard.fase]);
+
+  // Importación terminada sin errores: no hay nada que revisar en el resumen,
+  // se va directo al listado (Viajes si se importaron viajes) con un toast.
+  // Con errores (o si no se importó nada) se queda en el resumen para que se
+  // vea el detalle.
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  useEffect(() => {
+    if (wizard.fase !== "terminado") return;
+    const etapas = wizard.etapasCompletadas;
+    if (etapas.length === 0 || etapas.some((e) => e.log.errores > 0)) return;
+    const contar = (pred: (d: (typeof etapas)[number]["log"]["detalles"][number]) => boolean) =>
+      etapas.reduce((n, e) => n + e.log.detalles.filter(pred).length, 0);
+    const creados = contar((d) => d.estado === "ok" && d.creado === true);
+    const actualizados = contar((d) => d.estado === "ok" && d.creado === false);
+    showToast(
+      `Importación completada: ${creados} creados · ${actualizados} actualizados`,
+      "success",
+    );
+    navigate(etapas.some((e) => e.modulo === "viajes") ? viajesTo : backTo, {
+      replace: true,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizard.fase]);
 
@@ -385,7 +421,7 @@ export function ImportWizard({
           )}
 
           {wizard.fase === "modulo" && wizard.moduloActual && (
-            <EtapaModulo wizard={wizard} />
+            <EtapaModulo wizard={wizard} paisFijo={paisFijo} />
           )}
 
           {wizard.fase === "post-liquidaciones" && postViajesElegido.liquidaciones && (
@@ -958,34 +994,41 @@ function WizardStepper({
           estado: estadoPost("post-facturas", ["terminado"]),
         }]
       : []),
-    // "Resumen": la pantalla de "terminado", siempre presente si corre Viajes.
-    ...(tieneViajes
-      ? [{
-          key: "terminado",
-          label: "Resumen",
-          estado: (wizard.fase === "terminado" ? "current" : "pending") as EstadoPaso,
-        }]
-      : []),
+    // Sin paso "Resumen": al terminar sin errores el wizard redirige solo; con
+    // errores muestra el resumen, pero no como un paso más del stepper.
   ];
 
   return (
     <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
       {pasos.map((p, i) => {
+        const esActual = p.estado === "current";
         const burbuja = (
-          <span
-            className={[
-              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] text-[11px] font-semibold",
-              p.estado === "done" ? "bg-vialto-charcoal text-white" : "",
-              p.estado === "current" ? "bg-vialto-fire text-white" : "",
-              p.estado === "pending" ? "border border-black/15 text-vialto-steel" : "",
-              p.estado === "omitido" ? "border border-dashed border-black/20 text-vialto-steel/60" : "",
-            ].join(" ")}
-          >
-            {p.estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+          <span className="relative flex shrink-0 items-center justify-center">
+            {/* Paso actual: halo que late detrás de la burbuja. */}
+            {esActual && (
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-vialto-fire/40 motion-safe:animate-ping"
+              />
+            )}
+            <span
+              className={[
+                "relative flex shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-ui)] font-semibold",
+                esActual ? "h-8 w-8 text-sm" : "h-6 w-6 text-[11px]",
+                p.estado === "done" ? "bg-vialto-charcoal text-white" : "",
+                esActual ? "bg-vialto-fire text-white" : "",
+                p.estado === "pending" ? "border border-black/15 text-vialto-steel" : "",
+                p.estado === "omitido" ? "border border-dashed border-black/20 text-vialto-steel/60" : "",
+              ].join(" ")}
+            >
+              {p.estado === "done" ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+            </span>
           </span>
         );
         const etiqueta = (clase: string) => (
-          <span className={`font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider ${clase}`}>
+          <span
+            className={`font-[family-name:var(--font-ui)] uppercase tracking-wider ${esActual ? "text-[15px]" : "text-[11px]"} ${clase}`}
+          >
             {p.label}
           </span>
         );
@@ -1231,8 +1274,11 @@ type PreviewTab = "viajes" | "facturas" | "clientes" | "transportistas";
 
 function EtapaModulo({
   wizard,
+  paisFijo,
 }: {
   wizard: ReturnType<typeof useImportWizard>;
+  /** País fijo de la empresa — oculta el selector de país en "Ciudades a confirmar". */
+  paisFijo: PaisCodigo | null;
 }) {
   const p = wizard.preview;
   const [tiposVehiculo, setTiposVehiculo] = useState<Record<string, string>>(
@@ -1500,15 +1546,6 @@ function EtapaModulo({
               subtitle="— no bloquean la importación"
             >
               <p>{p.headersNoMapeados.join(", ")}</p>
-            </ImportAlert>
-          )}
-
-          {p.columnasOpcionalesFaltantes.length > 0 && (
-            <ImportAlert
-              color="amber"
-              title={`${p.columnasOpcionalesFaltantes.length} columna${p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} del template no encontrada${p.columnasOpcionalesFaltantes.length !== 1 ? "s" : ""} en el Excel`}
-            >
-              <p>{p.columnasOpcionalesFaltantes.join(", ")}</p>
             </ImportAlert>
           )}
 
@@ -1897,6 +1934,7 @@ function EtapaModulo({
                 advertencias={advertenciasCiudad}
                 onElegir={wizard.elegirCiudad}
                 onIgnorarFila={wizard.ignorarFila}
+                paisFijo={paisFijo}
               />
             </div>
             <div className="flex justify-end border-t border-black/10 px-6 py-4">

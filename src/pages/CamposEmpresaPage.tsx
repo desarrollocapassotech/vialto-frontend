@@ -54,22 +54,33 @@ const MODULOS_CAMPOS_COMPARTIDOS = new Set([
  * campos de Viajes): además de los viajes, ocultan la pestaña de Base de datos
  * y las columnas/hojas de la planilla de importación.
  */
-const SWITCHES_ENTIDAD_VIAJES = [
+const SWITCHES_ENTIDAD_VIAJES: readonly {
+  campos: readonly string[];
+  label: string;
+  ayuda: string;
+}[] = [
   {
-    campo: "vehiculosRows",
+    // Los dos campos de chofer de Viajes (flota propia / externo) van juntos.
+    campos: ["choferId", "choferExternoId"],
+    label: "Choferes",
+    ayuda:
+      "Apagado: no se cargan choferes en los viajes, no se muestra la pestaña Choferes de Base de datos (salvo que la empresa tenga Combustible o Stock) ni la hoja Choferes de la planilla de importación.",
+  },
+  {
+    campos: ["vehiculosRows"],
     label: "Vehículos",
     ayuda:
       "Apagado: no se cargan vehículos en los viajes, no se muestra la pestaña Vehículos de Base de datos ni la hoja Vehículos de la planilla de importación.",
   },
   {
-    campo: "productoItems",
+    campos: ["productoItems"],
     label: "Productos",
     ayuda:
       "Apagado: no se cargan productos en los viajes, no se muestra la pestaña Productos de Base de datos (salvo que la empresa tenga Stock) ni las columnas de producto en la planilla de importación.",
   },
-] as const;
+];
 const CAMPOS_SWITCH_ENTIDAD: ReadonlySet<string> = new Set(
-  SWITCHES_ENTIDAD_VIAJES.map((s) => s.campo),
+  SWITCHES_ENTIDAD_VIAJES.flatMap((s) => s.campos),
 );
 const FORMULARIO_SWITCH_ENTIDAD = "alta_viaje";
 
@@ -222,7 +233,7 @@ export function CamposEmpresaPage() {
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
   const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
   const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
-  // Vehículos/Productos no son flags del Tenant: son campos de Viajes
+  // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
     Record<string, boolean>
@@ -260,9 +271,9 @@ export function CamposEmpresaPage() {
         if (!cancelled) {
           setEmpresaSwitchEntidad(
             Object.fromEntries(
-              SWITCHES_ENTIDAD_VIAJES.map((s) => [
-                s.campo,
-                camposViaje.find((c) => c.campo === s.campo)?.visible ?? true,
+              [...CAMPOS_SWITCH_ENTIDAD].map((campo) => [
+                campo,
+                camposViaje.find((c) => c.campo === campo)?.visible ?? true,
               ]),
             ),
           );
@@ -479,27 +490,34 @@ export function CamposEmpresaPage() {
     }
   }
 
-  async function toggleSwitchEntidad(campo: string) {
+  /** Prendido si al menos uno de sus campos está visible. */
+  function switchEntidadHabilitado(campos: readonly string[]): boolean {
+    return campos.some((c) => empresaSwitchEntidad[c] ?? true);
+  }
+
+  async function toggleSwitchEntidad(label: string, campos: readonly string[]) {
     if (!filtroEmpresa) return;
-    const nuevoValor = !(empresaSwitchEntidad[campo] ?? true);
-    setSavingSwitchEntidad(campo);
+    const nuevoValor = !switchEntidadHabilitado(campos);
+    setSavingSwitchEntidad(label);
     setEmpresaConfigError(null);
     try {
-      await apiJson(
-        `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
-        () => getToken(),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            modulo: "viajes",
-            formulario: FORMULARIO_SWITCH_ENTIDAD,
-            campo,
-            visible: nuevoValor,
-            aplicarATodosLosFormularios: true,
-          }),
-        },
-      );
-      setEmpresaSwitchEntidad((prev) => ({ ...prev, [campo]: nuevoValor }));
+      for (const campo of campos) {
+        await apiJson(
+          `/api/platform/field-config/${encodeURIComponent(filtroEmpresa)}/toggle`,
+          () => getToken(),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              modulo: "viajes",
+              formulario: FORMULARIO_SWITCH_ENTIDAD,
+              campo,
+              visible: nuevoValor,
+              aplicarATodosLosFormularios: true,
+            }),
+          },
+        );
+        setEmpresaSwitchEntidad((prev) => ({ ...prev, [campo]: nuevoValor }));
+      }
       showToast("Cambios guardados", "success");
     } catch (e) {
       const msg = friendlyError(e, "camposEmpresa");
@@ -909,7 +927,7 @@ export function CamposEmpresaPage() {
     catalogo && modulo ? Object.keys(catalogo[modulo].formularios) : [];
   // Los campos obligatorios del sistema no se pueden ocultar — no tiene
   // sentido mostrarlos en esta pantalla, solo agregan ruido.
-  // Vehículos/Productos de Viajes se configuran desde General (SWITCHES_ENTIDAD_VIAJES).
+  // Choferes/Vehículos/Productos de Viajes se configuran desde General (SWITCHES_ENTIDAD_VIAJES).
   const camposConfigurables =
     campos?.filter(
       (c) =>
@@ -1062,9 +1080,9 @@ export function CamposEmpresaPage() {
                           </td>
                         </tr>
                         {SWITCHES_ENTIDAD_VIAJES.map((s) => {
-                          const habilitado = empresaSwitchEntidad[s.campo] ?? true;
+                          const habilitado = switchEntidadHabilitado(s.campos);
                           return (
-                            <tr key={s.campo} className="border-t border-black/10">
+                            <tr key={s.label} className="border-t border-black/10">
                               <td className="px-4 py-2.5">
                                 {s.label}
                                 <p className="mt-0.5 text-xs font-normal text-vialto-steel">
@@ -1074,8 +1092,8 @@ export function CamposEmpresaPage() {
                               <td className="px-4 py-2.5 text-right">
                                 <ToggleSwitch
                                   checked={habilitado}
-                                  disabled={savingSwitchEntidad === s.campo}
-                                  onChange={() => void toggleSwitchEntidad(s.campo)}
+                                  disabled={savingSwitchEntidad === s.label}
+                                  onChange={() => void toggleSwitchEntidad(s.label, s.campos)}
                                   label={`${habilitado ? "Deshabilitar" : "Habilitar"} ${s.label.toLowerCase()}`}
                                 />
                               </td>

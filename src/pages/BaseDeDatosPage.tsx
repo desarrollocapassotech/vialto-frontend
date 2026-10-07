@@ -129,9 +129,17 @@ export function BaseDeDatosPage() {
         // Si el superadmin deshabilitó las 2 opciones de pertenencia (Flota
         // propia / Transportista externo — ver Configuración por empresa), no
         // se puede crear ningún chofer: no tiene sentido dejar la pestaña.
+        // Además, sin Combustible ni Stock (que siempre usan choferes), depende
+        // del switch "Choferes" (Configuración por empresa → General, campos
+        // `choferId`/`choferExternoId` de Viajes).
         return (
           (hasViajes || hasStock || hasCombustible) &&
-          (superadmin || hasAlgunaPertenenciaChofer)
+          (superadmin || hasAlgunaPertenenciaChofer) &&
+          (superadmin ||
+            hasCombustible ||
+            hasStock ||
+            isViajesFieldVisible("alta_viaje", "choferId") ||
+            isViajesFieldVisible("alta_viaje", "choferExternoId"))
         );
       case "productos":
         // Stock siempre necesita productos. Sin Stock, depende del switch

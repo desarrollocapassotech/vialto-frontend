@@ -32,6 +32,7 @@ export function ImportarDatosTenantPage() {
           tenantId={tenant.clerkOrgId}
           tenantModules={tenant.modules}
           backTo={backTo}
+          viajesTo="/viajes"
         />
       </div>
     </div>

@@ -68,6 +68,7 @@ export function SuperadminImportarPage() {
               tenantId={orgId}
               tenantModules={tenant.modules}
               backTo="/superadmin/empresas"
+              viajesTo={`/viajes?tenantId=${encodeURIComponent(orgId)}`}
               templatesTo={`/superadmin/empresas/${orgId}/importar/templates`}
             />
           </div>

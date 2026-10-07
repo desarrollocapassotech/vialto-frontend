@@ -466,6 +466,7 @@ No hay pantalla de checks para elegir módulos: el primer paso ("Archivo") es el
   - antes de llegar, tocando su paso pendiente en el stepper (`wizard.omitirModulo`), que se tacha y se puede volver a incluir.
   Los pasos salteados se muestran tachados, no con el check de "hecho".
 - La planilla modelo ("Descargar planilla", en el paso Archivo) trae todos los módulos que la empresa puede importar.
+- **Sin paso "Resumen" (oct 2026)**: al llegar a `terminado` sin errores en ninguna etapa, el wizard muestra un toast con creados/actualizados y redirige solo — a `viajesTo` (prop: `/viajes` en tenant, `/viajes?tenantId=` en superadmin) si se importaron viajes, si no a `backTo`. Con errores, o si no se importó nada, se queda en la pantalla de resumen (que ya no figura como paso del stepper) para ver el detalle.
 - `GET /importaciones/tenant-tiene-datos` y el `pre-flight` del backend ya no los usa el wizard.
 
 ### Preview de Viajes: "Ver cambios" con diff antes/después
