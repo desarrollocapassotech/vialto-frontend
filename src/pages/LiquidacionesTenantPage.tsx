@@ -7,6 +7,7 @@ import {
   Eye,
   FileMinus,
   FileText,
+  FlaskConical,
   Landmark,
   Receipt,
   RotateCw,
@@ -54,6 +55,7 @@ import { liquidacionContratoPdfUrl } from "@/lib/liquidacionContratoPdf";
 import { friendlyError } from "@/lib/friendlyError";
 import { getArcaErrorDetalle } from "@/lib/arcaErrorDetalle";
 import { ArcaErrorMessage } from "@/components/ui/ArcaErrorMessage";
+import { modalOverlayClass } from "@/lib/modalLayers";
 import { listadoTablaHeadRowClass, listadoTablaTdClass, listadoTablaThClass } from "@/lib/listadoTabla";
 import { useMaestroData } from "@/hooks/useMaestroData";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -116,8 +118,6 @@ function LiquidacionAccionesMenu({
   metodoAnulacion,
   isBusy,
   isDownloading,
-  actionErrorMsg,
-  actionErrorDetalle,
   onVer,
   onEmitir,
   onPdf,
@@ -135,8 +135,6 @@ function LiquidacionAccionesMenu({
   metodoAnulacion: "nota_credito_debito" | "manual";
   isBusy: boolean;
   isDownloading: boolean;
-  actionErrorMsg?: string;
-  actionErrorDetalle?: string;
   onVer: () => void;
   onEmitir: () => void;
   onPdf: () => void;
@@ -259,24 +257,16 @@ function LiquidacionAccionesMenu({
     });
   }
 
+  // El error de una acción (emitir, anular, PDF) ya no se muestra debajo de los íconos
+  // — agrandaba la fila —: lo muestra un modal a nivel de página (`actionError`).
   return (
-    <div className="flex flex-col items-end gap-1">
-      <AccionesFila
-        options={options}
-        destacadas={LIQUIDACION_ACCIONES_DESTACADAS}
-        subtitle={transportistaNombre(liq)}
-        open={open}
-        onOpenChange={setOpen}
-      />
-      {actionErrorMsg && (
-        <ArcaErrorMessage
-          message={actionErrorMsg}
-          detalle={actionErrorDetalle}
-          align="right"
-          className="text-xs"
-        />
-      )}
-    </div>
+    <AccionesFila
+      options={options}
+      destacadas={LIQUIDACION_ACCIONES_DESTACADAS}
+      subtitle={transportistaNombre(liq)}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }
 
@@ -310,7 +300,12 @@ export function LiquidacionesTenantPage() {
       ? "manual"
       : "nota_credito_debito";
 
-  useFieldConfig("liquidaciones");
+  const { isVisible: isLiqFieldVisible } = useFieldConfig("liquidaciones");
+  // Columna "Período": se oculta si el superadmin desactivó las dos fechas
+  // (desde/hasta) en el alta de liquidación de esta empresa.
+  const mostrarPeriodo =
+    isLiqFieldVisible("alta_liquidacion", "fechaDesde") ||
+    isLiqFieldVisible("alta_liquidacion", "fechaHasta");
 
   const [rows, setRows] = useState<LiquidacionConTransportista[] | null>(null);
   const [page, setPage] = useState(1);
@@ -793,9 +788,6 @@ export function LiquidacionesTenantPage() {
       metodoAnulacion,
       isBusy: busyId === liq.id,
       isDownloading: downloading === liq.id,
-      actionErrorMsg: actionError?.id === liq.id ? actionError.msg : undefined,
-      actionErrorDetalle:
-        actionError?.id === liq.id ? actionError.detalle : undefined,
       open: accionesAbiertoLiqId === liq.id,
       onOpenChange: (o: boolean) => setAccionesAbiertoLiqId(o ? liq.id : null),
       onVer: () => {
@@ -986,7 +978,7 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={hasArca ? 7 : 6}
+        tableColSpan={(hasArca ? 7 : 6) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1011,6 +1003,7 @@ export function LiquidacionesTenantPage() {
                 />
               </ViajesListadoHeaderFiltro>
             </th>
+            {mostrarPeriodo && (
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
               <ViajesListadoHeaderFiltro
                 title="Período"
@@ -1045,6 +1038,7 @@ export function LiquidacionesTenantPage() {
                 </div>
               </ViajesListadoHeaderFiltro>
             </th>
+            )}
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Bruto
             </th>
@@ -1107,17 +1101,21 @@ export function LiquidacionesTenantPage() {
             ),
             tdClassName: listadoTablaTdClass,
           },
-          {
-            id: "periodo",
-            header: "Período",
-            cell: (liq) => (
-              <div className="flex flex-col leading-tight">
-                <span>{fmtDate(liq.periodoDesde)}</span>
-                <span>{fmtDate(liq.periodoHasta)}</span>
-              </div>
-            ),
-            tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
-          },
+          ...(mostrarPeriodo
+            ? [
+                {
+                  id: "periodo",
+                  header: "Período",
+                  cell: (liq: LiquidacionConTransportista) => (
+                    <div className="flex flex-col leading-tight">
+                      <span>{fmtDate(liq.periodoDesde)}</span>
+                      <span>{fmtDate(liq.periodoHasta)}</span>
+                    </div>
+                  ),
+                  tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
+                },
+              ]
+            : []),
           {
             id: "bruto",
             header: "Bruto",
@@ -1149,14 +1147,24 @@ export function LiquidacionesTenantPage() {
                 {
                   id: "estado",
                   header: "Estado",
+                  // Una sola línea, igual que Facturas: el ambiente de pruebas va
+                  // como ícono con tooltip.
                   cell: (liq: LiquidacionConTransportista) => (
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-nowrap items-center gap-1">
                       <span
-                        className={`inline-block px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
+                        className={`inline-block whitespace-nowrap px-2 py-0.5 text-xs rounded ${ESTADO_CLASS[liq.estado]}`}
                       >
                         {ESTADO_LABEL[liq.estado]}
                       </span>
-                      <AmbienteTestBadge ambiente={liq.ambiente} />
+                      {liq.ambiente === "homologacion" && (
+                        <span
+                          title="Emitida en ambiente de pruebas (homologación)"
+                          aria-label="Emitida en ambiente de pruebas"
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+                        >
+                          <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
+                        </span>
+                      )}
                     </div>
                   ),
                   tdClassName: listadoTablaTdClass,
@@ -1186,10 +1194,14 @@ export function LiquidacionesTenantPage() {
             onClick={() => setAccionesAbiertoLiqId(liq.id)}
             primary={transportistaNombre(liq)}
             fields={[
-              {
-                label: "Período",
-                value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
-              },
+              ...(mostrarPeriodo
+                ? [
+                    {
+                      label: "Período",
+                      value: `${fmtDate(liq.periodoDesde)} — ${fmtDate(liq.periodoHasta)}`,
+                    },
+                  ]
+                : []),
               { label: "Bruto", value: fmtMoney(liq.bruto) },
               {
                 label: "Comisión",
@@ -1238,6 +1250,45 @@ export function LiquidacionesTenantPage() {
             }}
           />
         )}
+
+      {/* Error de una acción de la grilla (emitir, anular, PDF): modal con el detalle
+          en vez de texto bajo los íconos, para que la fila no crezca. */}
+      {actionError && (
+        <div
+          className={modalOverlayClass}
+          role="presentation"
+          onClick={() => setActionError(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="liq-accion-error-titulo"
+            className="w-full max-w-md border border-black/10 bg-white p-5 shadow-lg sm:rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="liq-accion-error-titulo"
+              className="font-[family-name:var(--font-display)] text-lg tracking-wide text-vialto-charcoal"
+            >
+              No se pudo completar la acción
+            </h2>
+            <ArcaErrorMessage
+              message={actionError.msg}
+              detalle={actionError.detalle}
+              className="mt-3 text-sm"
+            />
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                className="inline-flex h-10 items-center px-4 border border-black/15 bg-white text-sm uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingEmitir && hasArca && activeTenantId && (
         <EmitirLiquidacionModal
