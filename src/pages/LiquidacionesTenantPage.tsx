@@ -1090,14 +1090,16 @@ export function LiquidacionesTenantPage() {
             header: "Transportista",
             primary: true,
             cell: (liq) => (
-              <>
-                <p className="font-medium">{transportistaNombre(liq)}</p>
-                {liq.transportista?.idFiscal && (
-                  <p className="text-xs text-vialto-steel">
-                    {liq.transportista.idFiscal}
-                  </p>
-                )}
-              </>
+              <p
+                className="font-medium"
+                title={
+                  liq.transportista?.idFiscal
+                    ? `CUIT: ${liq.transportista.idFiscal}`
+                    : undefined
+                }
+              >
+                {transportistaNombre(liq)}
+              </p>
             ),
             tdClassName: listadoTablaTdClass,
           },
