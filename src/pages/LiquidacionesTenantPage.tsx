@@ -1144,23 +1144,37 @@ export function LiquidacionesTenantPage() {
           {
             id: "comision",
             header: "Comisión",
+            // La comisión siempre se resta del bruto: en rojo.
             cell: (liq) => (
-              <span title={fmtMoney(liq.comision)}>{liq.comisionPct}%</span>
+              <span
+                className="text-red-700"
+                title={`Se resta: ${fmtMoney(liq.comision)}`}
+              >
+                {liq.comisionPct}%
+              </span>
             ),
             thClassName: `${listadoTablaThClass} text-right`,
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "iva",
             header: "IVA",
             // Mismo monto que la línea de IVA del detalle (LiquidacionMontosBreakdown).
-            cell: (liq) => (
-              <span title={liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : undefined}>
-                {fmtMoney(Number(liq.gastosAdminIva) || 0)}
-              </span>
-            ),
+            // Verde si se suma al líquido, rojo si se resta (IVA negativo).
+            cell: (liq) => {
+              const iva = Number(liq.gastosAdminIva) || 0;
+              const pct = liq.ivaPct != null ? ` ${liq.ivaPct}%` : "";
+              return (
+                <span
+                  className={iva < 0 ? "text-red-700" : "text-emerald-700"}
+                  title={`IVA${pct} — ${iva < 0 ? "se resta" : "se suma"}`}
+                >
+                  {fmtMoney(Math.abs(iva))}
+                </span>
+              );
+            },
             thClassName: `${listadoTablaThClass} text-right`,
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "liquido",
