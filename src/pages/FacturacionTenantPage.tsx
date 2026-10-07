@@ -33,7 +33,7 @@ import {
   MSG_ARCA_NO_FACTURA_USD,
   arcaBloqueaFacturarUsd,
 } from "@/lib/arcaUsdRestriction";
-import { Download, Landmark } from "lucide-react";
+import { Clock, Download, FlaskConical, Landmark } from "lucide-react";
 import {
   clientesConViajesPendientesFactura,
   monedaUnicaDeViajes,
@@ -837,7 +837,13 @@ export function FacturacionTenantPage({
   }
 
   function puedeMarcarCobrada(f: Factura) {
-    return f.tipo === "cliente" && f.arcaEstado !== "anulado" && !f.cobrado;
+    // Con error de AFIP no se cobra: primero hay que reintentar la emisión.
+    return (
+      f.tipo === "cliente" &&
+      f.arcaEstado !== "anulado" &&
+      f.arcaEstado !== "error" &&
+      !f.cobrado
+    );
   }
 
   function abrirMarcarCobrada(f: Factura) {
@@ -852,35 +858,34 @@ export function FacturacionTenantPage({
   function renderEstadoBadges(f: Factura) {
     const badgeBase =
       "border rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap";
+    // Una sola línea: ciclo de vida + (COBRADO | VENCIDA) como badges aditivos.
+    // Excepción: ANULADO es estado final — no se muestra COBRADO/VENCIDA al lado
+    // (una factura anulada ya no tiene validez). "Marcar como cobrada" vive en la
+    // columna de acciones; el ambiente de pruebas va como ícono con tooltip.
+    const anulada = f.estado === "anulado";
     return (
-      <span className="inline-flex flex-wrap items-center gap-1">
+      <span className="inline-flex flex-nowrap items-center gap-1">
         <span className={[badgeBase, ESTADO_BADGE[f.estado] ?? ""].join(" ")}>
           {ESTADO_LABEL[f.estado] ?? f.estado}
         </span>
-        {f.cobrado ? (
+        {anulada ? null : f.cobrado ? (
           <span className={[badgeBase, COBRADO_BADGE_CLASS].join(" ")}>
             COBRADO
           </span>
-        ) : puedeMarcarCobrada(f) ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              abrirMarcarCobrada(f);
-            }}
-            title="Marcar como cobrada"
-            className={[
-              badgeBase,
-              "cursor-pointer hover:brightness-95",
-              f.vencida
-                ? VENCIDA_BADGE_CLASS
-                : "border-black/15 text-vialto-steel",
-            ].join(" ")}
-          >
-            {f.vencida ? "VENCIDA" : "MARCAR COBRADA"}
-          </button>
+        ) : f.vencida && puedeMarcarCobrada(f) ? (
+          <span className={[badgeBase, VENCIDA_BADGE_CLASS].join(" ")}>
+            VENCIDA
+          </span>
         ) : null}
-        <AmbienteTestBadge ambiente={f.ambiente} />
+        {f.ambiente === "homologacion" && (
+          <span
+            title="Emitida en ambiente de pruebas (homologación)"
+            aria-label="Emitida en ambiente de pruebas"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-50 text-amber-800"
+          >
+            <FlaskConical className="h-3 w-3" strokeWidth={2} aria-hidden />
+          </span>
+        )}
       </span>
     );
   }
@@ -1491,31 +1496,52 @@ export function FacturacionTenantPage({
             className={`${listadoTablaBodyRowClass} cursor-pointer`}
             onClick={() => setAccionesAbiertoFacturaId(f.id)}
           >
-            <td className="px-3 py-2 font-medium break-all">{f.numero || "—"}</td>
-            <td className="px-3 py-2 truncate" title={nombreContraparte(f)}>
-              {nombreContraparte(f)}
+            <td className="px-3 py-2 font-medium tabular-nums">
+              <span
+                className="block max-w-[8rem] truncate"
+                title={f.numero || undefined}
+              >
+                {f.numero || "—"}
+              </span>
+            </td>
+            <td className="px-3 py-2">
+              <span
+                className="block max-w-[12rem] truncate"
+                title={nombreContraparte(f)}
+              >
+                {nombreContraparte(f)}
+              </span>
             </td>
             <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
               {fmtFecha(f.fechaEmision)}
             </td>
-            <td className="px-3 py-2 text-vialto-steel tabular-nums whitespace-nowrap">
+            <td
+              className={`px-3 py-2 tabular-nums whitespace-nowrap ${
+                f.vencida && !f.cobrado ? "text-red-700" : "text-vialto-steel"
+              }`}
+            >
               {fmtFecha(f.fechaVencimiento)}
             </td>
             <td className="px-3 py-2">{renderEstadoBadges(f)}</td>
             <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
-              <div className="flex flex-col items-end gap-0.5">
-                <span>
-                  {textoImporteFacturaListado(f, viajes, { hasArca })}
-                </span>
+              <div className="flex items-center justify-end gap-1.5">
+                {/* Saldo pendiente (por tramo, sin ARCA, cobro parcial): ícono con
+                    tooltip para que la fila no crezca a dos líneas. */}
                 {!hasArca &&
                   f.facturarPorTramo &&
                   !f.cobrado &&
                   (f.saldoPendiente ?? 0) > 0.005 && (
-                    <span className="text-xs font-normal text-amber-800/90">
-                      Saldo{" "}
-                      {textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}
+                    <span
+                      title={`Saldo pendiente: ${textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}`}
+                      aria-label={`Saldo pendiente: ${textoImporteMonedaFactura(f.moneda, f.saldoPendiente!)}`}
+                      className="inline-flex text-amber-700"
+                    >
+                      <Clock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                     </span>
                   )}
+                <span>
+                  {textoImporteFacturaListado(f, viajes, { hasArca })}
+                </span>
               </div>
             </td>
             <td

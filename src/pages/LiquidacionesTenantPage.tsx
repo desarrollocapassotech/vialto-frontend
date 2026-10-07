@@ -5,6 +5,7 @@ import {
   Ban,
   Download,
   Eye,
+  FileMinus,
   FileText,
   Landmark,
   Receipt,
@@ -29,9 +30,11 @@ import type { AccionOpcion } from "@/components/ui/AccionesOpcionesSheet";
 /** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
 const LIQUIDACION_ACCIONES_DESTACADAS = [
   "reintentar",
-  "ver",
   "emitir",
   "pdf",
+  "anular",
+  "marcar-pendiente-anulacion",
+  "confirmar-anulacion-manual",
   "comprobante",
   "pdf-nc",
 ];
@@ -202,7 +205,7 @@ function LiquidacionAccionesMenu({
       id: "pdf-nc",
       label: isDownloading ? "Descargando…" : "PDF anulación",
       description: comprobanteLabel,
-      icon: Download,
+      icon: FileMinus,
       onClick: onPdfNc,
       disabled: isDownloading,
     });

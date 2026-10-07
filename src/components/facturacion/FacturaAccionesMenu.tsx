@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Ban, Banknote, Eye, FileText, Receipt, RotateCw, Trash2 } from 'lucide-react';
+import { Ban, Banknote, Eye, FileMinus, FileText, Receipt, RotateCw, Trash2 } from 'lucide-react';
 import { AccionesFila } from '@/components/ui/AccionesFila';
 import type { AccionOpcion } from '@/components/ui/AccionesOpcionesSheet';
 import type { Factura } from '@/types/api';
@@ -87,6 +87,8 @@ export function FacturaAccionesMenu({
       onMarcarCobrada &&
       factura.tipo === 'cliente' &&
       !anulada &&
+      // Con error de AFIP no se cobra: primero hay que reintentar la emisión.
+      factura.arcaEstado !== 'error' &&
       !factura.cobrado
     ) {
       opts.push({
@@ -112,7 +114,7 @@ export function FacturaAccionesMenu({
       opts.push({
         id: 'nota-credito',
         label: 'Ver Nota de Crédito',
-        icon: FileText,
+        icon: FileMinus,
         onClick: onVerNotaCredito,
       });
     }
@@ -153,11 +155,12 @@ export function FacturaAccionesMenu({
 }
 
 /** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
+/** "Ver" queda solo en el desplegable: tocar la fila ya abre las acciones (igual que Viajes). */
 const FACTURA_ACCIONES_DESTACADAS = [
   'reintentar',
-  'ver',
   'emitir-arca',
   'marcar-cobrada',
+  'anular',
   'comprobante',
   'nota-credito',
 ];

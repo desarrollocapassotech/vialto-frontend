@@ -6,7 +6,9 @@ import {
   Eye,
   FilePen,
   FileText,
+  FileWarning,
   HandCoins,
+  PencilLine,
   PlusCircle,
   Receipt,
   RotateCw,
@@ -121,7 +123,7 @@ export function ViajeAccionesMenu({
       items.push({
         id: 'reintentar-factura',
         label: 'Reintentar factura',
-        icon: RotateCw,
+        icon: FileWarning,
         onClick: onReintentarFactura,
       });
     }
@@ -147,7 +149,7 @@ export function ViajeAccionesMenu({
         id: 'continuar-liquidacion',
         label: 'Continuar liquidación',
         description: 'Tiene una liquidación en borrador sin emitir',
-        icon: FilePen,
+        icon: PencilLine,
         onClick: onContinuarLiquidacion,
       });
     }

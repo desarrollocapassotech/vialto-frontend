@@ -283,6 +283,7 @@ El modelo de datos completo (por qué `estado` de Factura no incluye `cobrado`, 
 
 - Los labels van siempre en **MAYÚSCULA**: `BORRADOR`, `ESPERANDO AFIP`, `FACTURADO`, `COBRADO`, `ERROR DE AFIP`, `ANULADO`, `VENCIDA`.
 - El badge `ANULADO` lleva `line-through` y el mismo gris (`bg-gray-100 text-gray-500 border-gray-300/80`) en Facturas y Liquidaciones — no un color propio por pantalla.
+- **Única excepción a "aditivos": `ANULADO` es estado final.** Con el comprobante anulado no se muestran `COBRADO` ni `VENCIDA` al lado (una factura anulada ya no tiene validez; lo cobrado se resuelve por nota de crédito/devolución, no por esa factura). `AmbienteTestBadge` sí se mantiene (dice en qué ambiente se emitió). Aplica a la grilla, a los modales de detalle y a **Cuenta corriente**: un movimiento de una factura anulada no debe mostrarse como cobrado/imputado vigente.
 - Patrón de referencia a copiar (no reinventar un badge combinado): `renderEstadoBadges` en `FacturacionTenantPage.tsx` (grilla) y el header de `FacturaViewModal.tsx` / snapshot de `FacturaEditModal.tsx` — un `<span>` de ciclo de vida seguido de badges condicionales para `cobrado`/`vencida`/`AmbienteTestBadge`.
 - `AmbienteTestBadge` (`components/liquidaciones/AmbienteTestBadge.tsx`) es compartido por Facturas y Liquidaciones y acepta `to?: string`:
   - **Sin `to`** → badge estático. Usar en snapshots por-comprobante (`factura.ambiente`, `liquidacion.ambiente`).

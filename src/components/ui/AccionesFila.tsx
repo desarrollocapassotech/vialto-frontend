@@ -39,11 +39,17 @@ export function AccionesFila({ options, destacadas, subtitle, open: openProp, on
 
   const iconos = destacadas
     .map((id) => options.find((o) => o.id === id))
-    .filter((o): o is AccionOpcion => Boolean(o && o.icon && !o.danger))
+    // Una acción `danger` solo va como ícono si la pantalla la lista explícitamente
+    // en `destacadas` (ej. Anular en Liquidaciones).
+    .filter((o): o is AccionOpcion => Boolean(o && o.icon))
     .slice(0, MAX_ICONOS);
   // "Eliminar" solo va como ícono si sobra lugar (igual pide confirmación al tocarlo).
   const eliminar = options.find((o) => o.id === ID_ELIMINAR && o.icon);
-  if (eliminar && iconos.length < MAX_ICONOS) iconos.push(eliminar);
+  if (eliminar && iconos.length < MAX_ICONOS && !iconos.includes(eliminar)) {
+    iconos.push(eliminar);
+  }
+  // Las acciones peligrosas (Anular, Eliminar) nunca van primero: siempre al final.
+  iconos.sort((a, b) => Number(Boolean(a.danger)) - Number(Boolean(b.danger)));
 
   return (
     <>
