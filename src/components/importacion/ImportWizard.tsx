@@ -345,7 +345,6 @@ export function ImportWizard({
           tieneDatos={tieneDatos}
           puedeLiquidaciones={puedeLiquidaciones}
           puedeFacturas={puedeFacturas}
-          columnasEsperadas={columnasEsperadas}
           seleccionados={seleccionadosPermitidos}
           moduloPermitido={moduloPermitido}
           onToggleModulo={toggleModulo}
@@ -901,7 +900,6 @@ function SelectorModulos({
   tieneDatos,
   puedeLiquidaciones,
   puedeFacturas,
-  columnasEsperadas,
   seleccionados,
   moduloPermitido,
   onToggleModulo,
@@ -914,7 +912,6 @@ function SelectorModulos({
   tieneDatos: TenantTieneDatos;
   puedeLiquidaciones: boolean;
   puedeFacturas: boolean;
-  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
   /** Estado de los checks vive en ImportWizard (no acá) para que el stepper de arriba se actualice en vivo a medida que se tildan/destildan módulos. */
   seleccionados: Set<ModuloWizard>;
   /** false = la empresa no usa ese módulo (ej. Transportes en una empresa solo de flota propia). */
@@ -935,8 +932,8 @@ function SelectorModulos({
   return (
     <div className="flex flex-col ">
 
-      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 text-left lg:grid-cols-2 lg:items-stretch">
-        <div className="flex h-full flex-col divide-y divide-black/10 border border-black/10 bg-white">
+      <div className="mx-auto w-full max-w-xl text-left">
+        <div className="flex flex-col divide-y divide-black/10 border border-black/10 bg-white">
           {MODULOS_SELECTOR.filter(({ key }) => moduloPermitido(key)).map(({ key, tieneDatosKey }) => (
             <label
               key={key}
@@ -1017,29 +1014,9 @@ function SelectorModulos({
             </label>
           )}
         </div>
-
-        <div className="flex h-full min-h-[24rem] flex-col border border-black/10 bg-white lg:max-h-[32rem]">
-          <div className="shrink-0 border-b border-black/10 px-5 py-3">
-            <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-wider text-vialto-charcoal">
-              Columnas esperadas del Excel
-            </p>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-            {ordenados.length === 0 ? (
-              <p className="text-xs text-vialto-steel">
-                Elegí al menos un módulo para ver qué columnas espera.
-              </p>
-            ) : (
-              <ColumnasEsperadasLista
-                modulos={ordenados}
-                columnasEsperadas={columnasEsperadas}
-              />
-            )}
-          </div>
-        </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-end gap-3">
+      <div className="mx-auto mt-6 flex w-full max-w-xl items-center justify-end gap-3">
         <button
           type="button"
           disabled={ordenados.length === 0}
@@ -1056,105 +1033,6 @@ function SelectorModulos({
       </div>
     </div>
   );
-}
-
-/** Lista pura (sin wrapper ni botón) de las columnas esperadas — una pestaña por módulo tildado, reusada en el selector y en la pantalla de carga. */
-function ColumnasEsperadasLista({
-  modulos,
-  columnasEsperadas,
-}: {
-  modulos: ModuloWizard[];
-  columnasEsperadas: ImportColumnasEsperadasModulo[] | null;
-}) {
-  const [tabElegido, setTabElegido] = useState<ModuloWizard | null>(null);
-
-  if (modulos.length === 0) return null;
-  const tab = tabElegido && modulos.includes(tabElegido) ? tabElegido : modulos[0];
-  const info = columnasEsperadas?.find((m) => m.modulo === tab);
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap border-b border-black/10">
-        {modulos.map((modulo) => (
-          <button
-            key={modulo}
-            type="button"
-            onClick={() => setTabElegido(modulo)}
-            className={[
-              "px-4 py-2 text-[11px] uppercase tracking-wider border-b-2 -mb-px transition-colors",
-              modulo === tab
-                ? "border-vialto-fire text-vialto-fire"
-                : "border-transparent text-vialto-steel hover:text-vialto-charcoal",
-            ].join(" ")}
-          >
-            {labelModulo(modulo)}
-          </button>
-        ))}
-      </div>
-      {!columnasEsperadas ? (
-        <p className="text-xs text-vialto-steel">Cargando…</p>
-      ) : !info || info.columnas.length === 0 ? (
-        <p className="text-xs text-vialto-steel">
-          Este módulo no tiene columnas configuradas.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-vialto-steel">Hoja "{info.sheet}"</p>
-          <div className="overflow-x-auto border border-black/10">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-vialto-mist/60">
-                  <th className={th}>Columna</th>
-                  <th className={th}>Tipo</th>
-                  <th className={th}>¿Obligatoria?</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/10">
-                {info.columnas.map((c) => (
-                  <tr key={c.excelHeader}>
-                    <td className={td}>{c.excelHeader}</td>
-                    <td className={td}>{tipoLabelColumna(c)}</td>
-                    <td className={td}>
-                      {c.requerido
-                        ? "Sí"
-                        : c.recomendado
-                          ? "Recomendada"
-                          : "No"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function tipoLabelColumna(c: {
-  tipo: string;
-  allowedValues?: string[];
-  lookupModel?: string;
-}): string {
-  switch (c.tipo) {
-    case "number":
-      return "Número";
-    case "date":
-      return "Fecha (DD/MM/AAAA)";
-    case "boolean":
-      return "Sí / No";
-    case "enum":
-      return c.allowedValues?.length
-        ? `Lista (${c.allowedValues.join(", ")})`
-        : "Lista";
-    case "lookup":
-      return c.lookupModel
-        ? `Búsqueda por ${labelModulo(c.lookupModel).toLowerCase()}`
-        : "Búsqueda";
-    default:
-      return "Texto";
-  }
 }
 
 function WizardStepper({
