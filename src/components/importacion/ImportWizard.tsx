@@ -86,6 +86,15 @@ interface TenantTieneDatos {
   vehiculos: boolean;
 }
 
+/**
+ * Ofrecer en la selección los checks "Liquidaciones a transportistas" y
+ * "Facturas a clientes" (borradores generados al terminar Viajes).
+ * Ocultos a pedido (oct 2026): con `false` nunca se tildan, y las etapas
+ * `post-liquidaciones`/`post-facturas` del wizard se saltean solas
+ * (`AvanceSilencioso`). Toda la lógica sigue: para reactivarlos, poner `true`.
+ */
+const OFRECER_POST_VIAJES = false;
+
 export function ImportWizard({
   tenantId,
   tenantModules,
@@ -103,8 +112,13 @@ export function ImportWizard({
   );
   const hasFacturacion = tenantModules.includes("facturacion");
   const hasLiquidaciones = tenantModules.includes("liquidaciones");
-  const puedeLiquidaciones = hasLiquidaciones || hasLiquidoProductoArca;
-  const puedeFacturas = hasFacturasArca || hasFacturacion;
+  // Checks "Liquidaciones a transportistas" / "Facturas a clientes" ocultos
+  // (oct 2026): ver OFRECER_POST_VIAJES. La lógica de las etapas post-viajes
+  // sigue intacta para reactivarlas a futuro.
+  const puedeLiquidaciones =
+    OFRECER_POST_VIAJES && (hasLiquidaciones || hasLiquidoProductoArca);
+  const puedeFacturas =
+    OFRECER_POST_VIAJES && (hasFacturasArca || hasFacturacion);
   // Empresa solo de flota propia (Tenant.tipoFlota): no tiene transportistas,
   // el paso "Transportes" no se ofrece ni se recorre.
   const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
