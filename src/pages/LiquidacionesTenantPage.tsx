@@ -1142,10 +1142,7 @@ export function LiquidacionesTenantPage() {
             id: "comision",
             header: "Comisión",
             cell: (liq) => (
-              <>
-                {fmtMoney(liq.comision)}
-                <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
-              </>
+              <span title={fmtMoney(liq.comision)}>{liq.comisionPct}%</span>
             ),
             thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
