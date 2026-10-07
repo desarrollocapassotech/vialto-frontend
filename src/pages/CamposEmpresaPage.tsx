@@ -195,6 +195,8 @@ export function CamposEmpresaPage() {
   const [savingValidacionCuitArca, setSavingValidacionCuitArca] = useState(false);
   const [empresaTipoFlota, setEmpresaTipoFlota] = useState<TipoFlota>("mixta");
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
+  const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
+  const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
   const [empresaPaisFijoId, setEmpresaPaisFijoId] = useState("");
   const [savingPaisFijo, setSavingPaisFijo] = useState(false);
   const [paisesEmpresa, setPaisesEmpresa] = useState<Pais[]>([]);
@@ -242,6 +244,7 @@ export function CamposEmpresaPage() {
           setEmpresaPaisFijoId(tenant.paisOrigenDestinoFijoId ?? "");
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
+          setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -407,6 +410,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingValidacionCuitArca(false);
+    }
+  }
+
+  async function toggleDashboardHabilitado() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaDashboardHabilitado;
+    setSavingDashboardHabilitado(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ dashboardHabilitado: nuevoValor }),
+      });
+      setEmpresaDashboardHabilitado(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingDashboardHabilitado(false);
     }
   }
 
@@ -938,6 +962,23 @@ export function CamposEmpresaPage() {
                       </tr>
                     ) : (
                       <>
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Mostrar dashboard (pantalla de inicio)
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaDashboardHabilitado}
+                              disabled={savingDashboardHabilitado}
+                              onChange={() => void toggleDashboardHabilitado()}
+                              label={
+                                empresaDashboardHabilitado
+                                  ? "Ocultar dashboard"
+                                  : "Mostrar dashboard"
+                              }
+                            />
+                          </td>
+                        </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             ID Sistema (módulo Viajes)

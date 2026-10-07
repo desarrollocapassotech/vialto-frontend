@@ -50,6 +50,7 @@ import {
   canAccessStock,
   canAccessViajes,
 } from "@/lib/tenantModules";
+import { dashboardHabilitado } from "@/lib/tenantHome";
 import {
   isPlatformSuperadmin,
   isOrgMember,
@@ -150,14 +151,19 @@ export function AppShell() {
     puedeGestionarComoAdminEmpresa(orgRole, user?.publicMetadata);
 
   const navGroups = useMemo((): NavGroup[] => {
+    // Sin dashboard, "/" solo redirige al primer módulo: no tiene sentido el ítem "Inicio".
+    const inicioGroups: NavGroup[] =
+      superadmin || dashboardHabilitado(tenant)
+        ? [
+            {
+              title: null,
+              items: [{ to: "/", label: "Inicio", icon: House, end: true }],
+            },
+          ]
+        : [];
+
     if (isOrgMember(roleCtx)) {
-      // 1. Inicializamos el grupo de navegación del Miembro incluyendo "Inicio"
-      const memberGroups: NavGroup[] = [
-        {
-          title: null,
-          items: [{ to: "/", label: "Inicio", icon: House, end: true }],
-        },
-      ];
+      const memberGroups: NavGroup[] = [...inicioGroups];
 
       if (canAccessStock(tenant?.modules ?? [])) {
         memberGroups.push({
@@ -227,12 +233,7 @@ export function AppShell() {
       return [];
     }
 
-    const groups: NavGroup[] = [
-      {
-        title: null,
-        items: [{ to: "/", label: "Inicio", icon: House, end: true }],
-      },
-    ];
+    const groups: NavGroup[] = [...inicioGroups];
 
     if (superadmin) {
       groups.push({
@@ -397,7 +398,7 @@ export function AppShell() {
     }
 
     return groups;
-  }, [superadmin, tenant?.modules, roleCtx]);
+  }, [superadmin, tenant, roleCtx]);
 
   useEffect(() => {
     try {

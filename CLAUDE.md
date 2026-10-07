@@ -416,6 +416,10 @@ Cuando el tenant tiene contratado más de un módulo con contenido propio en el 
 - Mobile: botón `selectorTriggerClass` + `<SelectorOpcionesSheet>` (ambos de `@/components/ui/SelectorOpcionesSheet`), igual que en Base de Datos.
 - El contenido de cada módulo se gatea con `moduloActivo === 'x' && showX` (nunca solo `moduloActivo === 'x'`, para no romper el caso de un solo tab donde `moduloActivo` cae por default en el primero de la lista).
 
+### Dashboard deshabilitable por empresa (oct 2026)
+
+`Tenant.dashboardHabilitado` (default `true`) se apaga desde superadmin ("Configuración por empresa" → General). Con `false`, `HomePage.tsx` redirige `/` a `primeraRutaModulo()` de `lib/tenantHome.ts` (primer módulo contratado en el **mismo orden que el menú lateral**, según rol) y `AppShell.tsx` oculta el ítem "Inicio". **Si se agrega un módulo nuevo al menú lateral, sumarlo también a `primeraRutaModulo` en la misma posición.**
+
 ### Al agregar el dashboard de un módulo nuevo
 
 1. Crear su sección propia en `src/components/<modulo>/<Modulo>DashboardSection.tsx` (fetch propio a su endpoint, pestañas internas si corresponde — ver Combustible/Financiero como referencia).

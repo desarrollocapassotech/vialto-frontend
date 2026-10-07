@@ -439,6 +439,8 @@ export interface Tenant {
   validacionCuitArcaHabilitada?: boolean;
   /** Con qué flota trabaja la empresa. Default 'mixta'; solo lo cambia superadmin (ver `useTipoFlotaVisible`). */
   tipoFlota?: TipoFlota;
+  /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
+  dashboardHabilitado?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los
