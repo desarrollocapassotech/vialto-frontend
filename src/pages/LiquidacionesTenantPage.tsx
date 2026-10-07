@@ -985,7 +985,7 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={(hasArca ? 7 : 6) - (mostrarPeriodo ? 0 : 1)}
+        tableColSpan={(hasArca ? 8 : 7) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1051,6 +1051,9 @@ export function LiquidacionesTenantPage() {
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               Comisión
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              IVA
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
               A liquidar
@@ -1143,6 +1146,18 @@ export function LiquidacionesTenantPage() {
             header: "Comisión",
             cell: (liq) => (
               <span title={fmtMoney(liq.comision)}>{liq.comisionPct}%</span>
+            ),
+            thClassName: `${listadoTablaThClass} text-right`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+          },
+          {
+            id: "iva",
+            header: "IVA",
+            // Mismo monto que la línea de IVA del detalle (LiquidacionMontosBreakdown).
+            cell: (liq) => (
+              <span title={liq.ivaPct != null ? `IVA ${liq.ivaPct}%` : undefined}>
+                {fmtMoney(Number(liq.gastosAdminIva) || 0)}
+              </span>
             ),
             thClassName: `${listadoTablaThClass} text-right`,
             tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
