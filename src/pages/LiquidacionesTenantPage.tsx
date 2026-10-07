@@ -1148,7 +1148,7 @@ export function LiquidacionesTenantPage() {
             cell: (liq) => (
               <span
                 className="text-red-700"
-                title={`Se resta: ${fmtMoney(liq.comision)}`}
+                title={`−${fmtMoney(liq.comision)}`}
               >
                 {liq.comisionPct}%
               </span>
@@ -1163,13 +1163,12 @@ export function LiquidacionesTenantPage() {
             // Verde si se suma al líquido, rojo si se resta (IVA negativo).
             cell: (liq) => {
               const iva = Number(liq.gastosAdminIva) || 0;
-              const pct = liq.ivaPct != null ? ` ${liq.ivaPct}%` : "";
               return (
                 <span
                   className={iva < 0 ? "text-red-700" : "text-emerald-700"}
-                  title={`IVA${pct} — ${iva < 0 ? "se resta" : "se suma"}`}
+                  title={`${iva < 0 ? "−" : "+"}${fmtMoney(Math.abs(iva))}`}
                 >
-                  {fmtMoney(Math.abs(iva))}
+                  {liq.ivaPct != null ? `${liq.ivaPct}%` : "—"}
                 </span>
               );
             },
