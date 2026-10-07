@@ -1450,11 +1450,19 @@ function EtapaModulo({
       )
     )
   ).join(" o ");
-  const tieneDesgloseActualizacion =
-    p != null &&
-    p.entidadesNuevas != null &&
-    p.entidadesActualizadas != null &&
-    (p.entidadesActualizadas > 0 || (p.filasFusionadas ?? 0) > 0);
+  // Tarjetas "Filas nuevas" / "Filas a actualizar": a actualizar cuenta solo
+  // las filas que cambian algo (las "Sin cambios" no se escriben).
+  const filasNuevasCount = hasViajes
+    ? p!.viajes!.filter((v) => v.nuevo).length
+    : p?.filasDetalle
+      ? p.filasDetalle.filter((f) => f.esNuevo).length
+      : (p?.entidadesNuevas ?? p?.exitosas ?? 0);
+  const filasActualizarCount = hasViajes
+    ? p!.viajes!.filter((v) => !v.nuevo && (v.cambios?.length ?? 0) > 0).length
+    : p?.filasDetalle
+      ? p.filasDetalle.filter((f) => !f.esNuevo && !f.sinCambios).length
+      : (p?.entidadesActualizadas ?? 0);
+  const cantStatBoxes = 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0);
 
   // Si el usuario resolvió (o excluyó) la última ciudad pendiente estando
   // dentro del modal, se cierra solo.
@@ -1476,12 +1484,11 @@ function EtapaModulo({
           <div
             className={`grid gap-2 ${
               // Cantidad real de StatBox renderizados (3 fijos + Facturas +
-              // Adv. ciudades, cada uno independiente) — si el grid asume
-              // siempre 5 columnas cuando solo hay 4 boxes, queda un hueco
-              // en blanco a la derecha.
-              3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 5
+              // Adv. ciudades) — si el grid asume más columnas que boxes,
+              // queda un hueco en blanco a la derecha.
+              cantStatBoxes === 5
                 ? "grid-cols-2 sm:grid-cols-5"
-                : 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0) === 4
+                : cantStatBoxes === 4
                   ? "grid-cols-2 sm:grid-cols-4"
                   : "grid-cols-3"
               }`}
@@ -1490,11 +1497,6 @@ function EtapaModulo({
             {hasFacturas && (
               <StatBox label="Facturas" value={p.facturas?.length ?? 0} />
             )}
-            <StatBox
-              label="Filas con error"
-              value={filasConError}
-              highlight={filasConError > 0 ? "error" : undefined}
-            />
             {hasViajes && (
               <StatBox
                 label="Adv. ciudades"
@@ -1503,24 +1505,19 @@ function EtapaModulo({
               />
             )}
             <StatBox
-              label={
-                tieneDesgloseActualizacion
-                  ? `Filas a importar`
-                  : p.entidadesNuevas != null
-                    ? `${labelModulo(wizard.moduloActual ?? "")} a crear`
-                    : `${labelModulo(wizard.moduloActual ?? "")} a crear`
-              }
-              value={p.entidadesNuevas ?? p.exitosas}
+              label="Filas nuevas"
+              value={filasNuevasCount}
               highlight="ok"
               caption={
-                tieneDesgloseActualizacion
-                  ? [
-                    `${p.entidadesNuevas} nuevas`,
-                    p.entidadesActualizadas! > 0 ? `${p.entidadesActualizadas} a actualizar` : null,
-                    (p.filasFusionadas ?? 0) > 0 ? `${p.filasFusionadas} fila${p.filasFusionadas! !== 1 ? 's' : ''} ignorada${p.filasFusionadas! !== 1 ? 's' : ''}` : null
-                  ].filter(Boolean).join(" · ")
+                (p.filasFusionadas ?? 0) > 0
+                  ? `${p.filasFusionadas} fila${p.filasFusionadas! !== 1 ? "s" : ""} duplicada${p.filasFusionadas! !== 1 ? "s" : ""} unificada${p.filasFusionadas! !== 1 ? "s" : ""}`
                   : undefined
               }
+            />
+            <StatBox
+              label="Filas a actualizar"
+              value={filasActualizarCount}
+              highlight="warn"
             />
           </div>
 
@@ -1593,15 +1590,14 @@ function EtapaModulo({
             </div>
           )}
 
-          {hasViajes && tieneDesgloseActualizacion && p.entidadesActualizadas! > 0 && (
+          {hasViajes && filasActualizarCount > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
               <span>
-                <strong>{p.entidadesActualizadas}</strong> viaje
-                {p.entidadesActualizadas !== 1 ? "s" : ""} de este archivo ya{" "}
-                {p.entidadesActualizadas !== 1 ? "existen" : "existe"} en
+                <strong>{filasActualizarCount}</strong> viaje
+                {filasActualizarCount !== 1 ? "s" : ""} de este archivo ya{" "}
+                {filasActualizarCount !== 1 ? "existen" : "existe"} en
                 el sistema y se{" "}
-                {p.entidadesActualizadas !== 1 ? "van" : "va"} a actualizar —
-                el resto ({p.entidadesNuevas}) son altas nuevas.
+                {filasActualizarCount !== 1 ? "van" : "va"} a actualizar.
               </span>
               <button
                 type="button"
@@ -1871,9 +1867,6 @@ function EtapaModulo({
       )}
       {p && todoSinCambios && (
         <div className="flex items-center justify-end gap-4">
-          <p className="text-sm text-vialto-steel">
-            Todo ya está cargado igual — no hay nada para guardar.
-          </p>
           <button
             type="button"
             disabled={wizard.loading}
