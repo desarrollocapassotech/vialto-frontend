@@ -35,6 +35,7 @@ import { DireccionesEntregaPage } from "./DireccionesEntregaPage";
 import { PaisesPage } from "./PaisesPage";
 import { useCurrentTenant } from "@/hooks/useCurrentTenant";
 import { useTipoFlotaVisible } from "@/hooks/useTipoFlotaVisible";
+import { useFieldConfig } from "@/hooks/useFieldConfig";
 import {
   canAccessViajes,
   canAccessStock,
@@ -91,6 +92,7 @@ export function BaseDeDatosPage() {
     useTipoFlotaVisible();
   const hasAlgunaPertenenciaChofer =
     flotaPropiaVisible || transportistaExternoVisible;
+  const { isVisible: isViajesFieldVisible } = useFieldConfig("viajes");
 
   const superadmin = isLoaded && isPlatformSuperadmin(user?.publicMetadata);
   const tabsLoading = !isLoaded || tenantLoading;
@@ -115,7 +117,12 @@ export function BaseDeDatosPage() {
         // "Transportista externo" del chofer): no trabaja con transportistas.
         return hasViajes && (superadmin || transportistaExternoVisible);
       case "vehiculos":
-        return hasViajes || hasCombustible;
+        // Superadmin apagó "Vehículos" (Configuración por empresa → General,
+        // campo `vehiculosRows` de Viajes): la empresa no trabaja con vehículos.
+        return (
+          (hasViajes || hasCombustible) &&
+          (superadmin || isViajesFieldVisible("alta_viaje", "vehiculosRows"))
+        );
       case "destinatarios":
         return hasStock;
       case "choferes":
@@ -127,7 +134,14 @@ export function BaseDeDatosPage() {
           (superadmin || hasAlgunaPertenenciaChofer)
         );
       case "productos":
-        return hasViajes || hasStock;
+        // Stock siempre necesita productos. Sin Stock, depende del switch
+        // "Productos" (Configuración por empresa → General, campo
+        // `productoItems` de Viajes).
+        return (
+          hasStock ||
+          (hasViajes &&
+            (superadmin || isViajesFieldVisible("alta_viaje", "productoItems")))
+        );
       case "presentaciones":
         return hasStock;
       case "depositos":
