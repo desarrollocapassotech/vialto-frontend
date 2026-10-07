@@ -50,6 +50,7 @@ import {
   idPropio1Habilitado,
   idPropio2Habilitado,
   idPropio2Label,
+  transportistaEfectivoIdDesdeViaje,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -69,6 +70,8 @@ import {
 } from "@/lib/viajeFechaHora";
 import {
   viajePermiteBotonFacturar,
+  viajePendienteComprobanteTransportista,
+  viajeTieneLiquidacionActivaParaTransportista,
   liquidacionElegidaDeViaje,
   facturaBorradorIdDeViaje,
   liquidacionBorradorIdDeViaje,
@@ -514,9 +517,15 @@ export function ViajesTenantPage({
   const [listadoRefetching, setListadoRefetching] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
-  const [idsFacturarSeleccion, setIdsFacturarSeleccion] = useState<string[]>(
+  const [idsSeleccionLote, setIdsSeleccionLote] = useState<string[]>(
     [],
   );
+  /** Viajes seleccionados para facturar/liquidar en lote (la selección puede abarcar varias páginas). */
+  const viajesSeleccionLote = useRef(new Map<string, Viaje>());
+  const [liquidarLote, setLiquidarLote] = useState<{
+    transportistaId: string;
+    viajeIds: string[];
+  } | null>(null);
 
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
@@ -1402,8 +1411,47 @@ export function ViajesTenantPage({
   ]);
 
   useEffect(() => {
-    setIdsFacturarSeleccion([]);
-  }, [clienteIdFiltroActivo]);
+    setIdsSeleccionLote([]);
+    viajesSeleccionLote.current.clear();
+  }, [clienteIdFiltroActivo, transportistaIdFiltroActivo]);
+
+  const loteFacturarActivo = clienteIdFiltroActivo.trim() !== "";
+  const loteLiquidarActivo =
+    hasLiquidaciones && transportistaIdFiltroActivo.trim() !== "";
+
+  function esElegibleLiquidarLote(v: Viaje): boolean {
+    const tid = transportistaIdFiltroActivo.trim();
+    if (!tid) return false;
+    if (v.etapa?.toLowerCase() === "cancelado") return false;
+    const esDelTransportista =
+      String(v.transportistaId ?? "").trim() === tid ||
+      transportistaEfectivoIdDesdeViaje(v) === tid;
+    if (!esDelTransportista) return false;
+    if (!viajePendienteComprobanteTransportista(v)) return false;
+    if (viajeTieneLiquidacionActivaParaTransportista(v, tid)) return false;
+    if (
+      arcaBloqueaLiquidarUsd(
+        hasLiquidoProductoArca,
+        v.monedaPrecioTransportistaExterno,
+      )
+    )
+      return false;
+    return true;
+  }
+
+  /** Fila con checkbox: elegible para alguna de las acciones en lote activas. */
+  function esElegibleLote(v: Viaje): boolean {
+    return (
+      (loteFacturarActivo && esElegibleFacturarLote(v)) ||
+      (loteLiquidarActivo && esElegibleLiquidarLote(v))
+    );
+  }
+
+  function viajesSeleccionados(): Viaje[] {
+    return idsSeleccionLote
+      .map((id) => viajesSeleccionLote.current.get(id))
+      .filter((v): v is Viaje => Boolean(v));
+  }
 
   function esElegibleFacturarLote(v: Viaje): boolean {
     if (v.etapa?.toLowerCase() === "cancelado") return false;
@@ -1412,30 +1460,50 @@ export function ViajesTenantPage({
     return true;
   }
 
-  function toggleFacturarLote(id: string) {
-    setIdsFacturarSeleccion((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+  function toggleSeleccionLote(v: Viaje) {
+    viajesSeleccionLote.current.set(v.id, v);
+    setIdsSeleccionLote((prev) =>
+      prev.includes(v.id) ? prev.filter((x) => x !== v.id) : [...prev, v.id],
     );
   }
 
   function toggleSeleccionarTodosEnPagina() {
-    const elegibles = (rows ?? [])
-      .filter(esElegibleFacturarLote)
-      .map((v) => v.id);
+    const elegiblesViajes = (rows ?? []).filter(esElegibleLote);
+    for (const v of elegiblesViajes) viajesSeleccionLote.current.set(v.id, v);
+    const elegibles = elegiblesViajes.map((v) => v.id);
     if (elegibles.length === 0) return;
     const todosMarcados = elegibles.every((id) =>
-      idsFacturarSeleccion.includes(id),
+      idsSeleccionLote.includes(id),
     );
     if (todosMarcados) {
       const setE = new Set(elegibles);
-      setIdsFacturarSeleccion((prev) => prev.filter((id) => !setE.has(id)));
+      setIdsSeleccionLote((prev) => prev.filter((id) => !setE.has(id)));
     } else {
-      setIdsFacturarSeleccion((prev) => [...new Set([...prev, ...elegibles])]);
+      setIdsSeleccionLote((prev) => [...new Set([...prev, ...elegibles])]);
     }
   }
 
+  function liquidarSeleccionMultiple() {
+    const tid = transportistaIdFiltroActivo.trim();
+    const seleccion = viajesSeleccionados().filter(esElegibleLiquidarLote);
+    if (seleccion.length === 0 || !tid) return;
+    const monedas = new Set(
+      seleccion.map((v) => v.monedaPrecioTransportistaExterno || "ARS"),
+    );
+    if (monedas.size > 1) {
+      showToast(
+        "Una liquidación no puede mezclar viajes en distintas monedas.",
+        "error",
+      );
+      return;
+    }
+    setLiquidarLote({ transportistaId: tid, viajeIds: seleccion.map((v) => v.id) });
+  }
+
   function facturarSeleccionMultiple() {
-    const ids = idsFacturarSeleccion;
+    const ids = viajesSeleccionados()
+      .filter(esElegibleFacturarLote)
+      .map((v) => v.id);
     const cid = clienteIdFiltroActivo.trim();
     if (ids.length === 0 || !cid) return;
     if (hasFacturasArca) {
@@ -1476,7 +1544,7 @@ export function ViajesTenantPage({
     showToast("Viaje eliminado correctamente", "success");
     setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
     setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
-    setIdsFacturarSeleccion((ids) => ids.filter((id) => id !== v.id));
+    setIdsSeleccionLote((ids) => ids.filter((id) => id !== v.id));
     if (viajeEditor.editingId === v.id) cancelEdit();
     if (viewingViaje?.id === v.id) setViewingViaje(null);
     if (exportarViaje?.id === v.id) setExportarViaje(null);
@@ -1978,7 +2046,7 @@ export function ViajesTenantPage({
     });
   }
 
-  const mostrarColumnaFacturarLote = clienteIdFiltroActivo.trim() !== "";
+  const mostrarColumnaSeleccionLote = loteFacturarActivo || loteLiquidarActivo;
   // Si el tenant tiene ocultos tanto "Chofer (flota propia)" como "Chofer
   // (externo)" en Configuración por empresa, no tiene sentido mostrar la
   // columna (quedaría siempre vacía).
@@ -2063,7 +2131,7 @@ export function ViajesTenantPage({
     (mostrarColumnaIdPropio2 ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
     (mostrarColumnaIdPropio1 ? 0 : -1);
-  const tableColSpan = mostrarColumnaFacturarLote
+  const tableColSpan = mostrarColumnaSeleccionLote
     ? tableColSpanBase + 1
     : tableColSpanBase;
 
@@ -2092,10 +2160,16 @@ export function ViajesTenantPage({
   }, [mostrarColumnaTransporte]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarCargandoListado = !error && (rows === null || listadoRefetching);
-  const elegiblesEnPagina = (rows ?? []).filter(esElegibleFacturarLote);
+  const elegiblesEnPagina = (rows ?? []).filter(esElegibleLote);
+  const cantidadFacturarLote = loteFacturarActivo
+    ? viajesSeleccionados().filter(esElegibleFacturarLote).length
+    : 0;
+  const cantidadLiquidarLote = loteLiquidarActivo
+    ? viajesSeleccionados().filter(esElegibleLiquidarLote).length
+    : 0;
   const todosElegiblesMarcados =
     elegiblesEnPagina.length > 0 &&
-    elegiblesEnPagina.every((v) => idsFacturarSeleccion.includes(v.id));
+    elegiblesEnPagina.every((v) => idsSeleccionLote.includes(v.id));
 
   // ─── RENDER DE LA BARRA DE FILTROS ─────────────────────────────────────────
   const viajesListadoFiltros = (
@@ -2488,22 +2562,37 @@ export function ViajesTenantPage({
         </p>
       )}
 
-      {mostrarColumnaFacturarLote && idsFacturarSeleccion.length > 0 && (
+      {mostrarColumnaSeleccionLote && idsSeleccionLote.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-black/10 bg-white px-4 py-3 shadow-sm">
           <p className="text-sm text-vialto-steel">
             <span className="font-medium text-vialto-charcoal">
-              {idsFacturarSeleccion.length}
+              {idsSeleccionLote.length}
             </span>{" "}
-            viaje{idsFacturarSeleccion.length !== 1 ? "s" : ""} seleccionado
-            {idsFacturarSeleccion.length !== 1 ? "s" : ""}
+            viaje{idsSeleccionLote.length !== 1 ? "s" : ""} seleccionado
+            {idsSeleccionLote.length !== 1 ? "s" : ""}
           </p>
-          <button
-            type="button"
-            onClick={facturarSeleccionMultiple}
-            className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Facturar
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {cantidadFacturarLote > 0 && (
+              <button
+                type="button"
+                onClick={facturarSeleccionMultiple}
+                className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+              >
+                Facturar
+                {loteLiquidarActivo ? ` (${cantidadFacturarLote})` : ""}
+              </button>
+            )}
+            {cantidadLiquidarLote > 0 && (
+              <button
+                type="button"
+                onClick={liquidarSeleccionMultiple}
+                className="inline-flex h-10 items-center px-5 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+              >
+                Liquidar
+                {loteFacturarActivo ? ` (${cantidadLiquidarLote})` : ""}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -2523,10 +2612,10 @@ export function ViajesTenantPage({
         filtersTitle="Filtrar viajes"
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
-            {mostrarColumnaFacturarLote && (
+            {mostrarColumnaSeleccionLote && (
               <th className="px-2 py-2.5 w-10 text-center align-middle">
                 <span className="sr-only">
-                  Seleccionar para facturación conjunta
+                  Seleccionar para facturar o liquidar en lote
                 </span>
                 {elegiblesEnPagina.length > 0 ? (
                   <input
@@ -2534,8 +2623,8 @@ export function ViajesTenantPage({
                     checked={todosElegiblesMarcados}
                     onChange={toggleSeleccionarTodosEnPagina}
                     className="accent-vialto-charcoal"
-                    title="Marcar o desmarcar todos los viajes facturables en esta página"
-                    aria-label="Marcar o desmarcar todos los viajes facturables en esta página"
+                    title="Marcar o desmarcar todos los viajes seleccionables en esta página"
+                    aria-label="Marcar o desmarcar todos los viajes seleccionables en esta página"
                   />
                 ) : null}
               </th>
@@ -2913,18 +3002,18 @@ export function ViajesTenantPage({
               className={`${listadoTablaBodyRowClass} cursor-pointer`}
               onClick={() => setAccionesAbiertoViajeId(v.id)}
             >
-              {mostrarColumnaFacturarLote && (
+              {mostrarColumnaSeleccionLote && (
                 <td
                   className="px-2 py-2 align-middle text-center"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {esElegibleFacturarLote(v) ? (
+                  {esElegibleLote(v) ? (
                     <input
                       type="checkbox"
-                      checked={idsFacturarSeleccion.includes(v.id)}
-                      onChange={() => toggleFacturarLote(v.id)}
+                      checked={idsSeleccionLote.includes(v.id)}
+                      onChange={() => toggleSeleccionLote(v)}
                       className="accent-vialto-charcoal"
-                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
+                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en la selección en lote`}
                     />
                   ) : null}
                 </td>
@@ -3226,14 +3315,14 @@ export function ViajesTenantPage({
               onClick={() => setAccionesAbiertoViajeId(v.id)}
               primary={
                 <div className="flex items-start gap-2">
-                  {mostrarColumnaFacturarLote && esElegibleFacturarLote(v) ? (
+                  {mostrarColumnaSeleccionLote && esElegibleLote(v) ? (
                     <input
                       type="checkbox"
-                      checked={idsFacturarSeleccion.includes(v.id)}
-                      onChange={() => toggleFacturarLote(v.id)}
+                      checked={idsSeleccionLote.includes(v.id)}
+                      onChange={() => toggleSeleccionLote(v)}
                       onClick={(e) => e.stopPropagation()}
                       className="mt-1 accent-vialto-charcoal"
-                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en facturación conjunta`}
+                      aria-label={`Incluir viaje ${numeroVisibleViaje(v)} en la selección en lote`}
                     />
                   ) : null}
                   <span className="min-w-0">
@@ -3697,6 +3786,35 @@ export function ViajesTenantPage({
           />
         )}
 
+        {liquidarLote && (
+          <CrearLiquidacionManualModal
+            transportistaIdInicial={liquidarLote.transportistaId}
+            viajeIdsIniciales={liquidarLote.viajeIds}
+            transportistas={maestro.transportistas}
+            hasLiquidoProductoArca={hasLiquidoProductoArca}
+            getToken={getToken}
+            idSistemaHabilitado={idSistemaHabilitado(currentTenant)}
+            idPropio1Habilitado={idPropio1Habilitado(currentTenant)}
+            idPropio1Label={labelIdentificacionPersonalizadaViajes(currentTenant)}
+            idPropio2Habilitado={idPropio2Habilitado(currentTenant)}
+            idPropio2Label={idPropio2Label(currentTenant)}
+            onDataSaved={() => {
+              void maestro.refreshTransportistas();
+              void maestro.refreshClientes();
+            }}
+            onLiquidacionEmitida={() => {
+              setIdsSeleccionLote([]);
+              setListadoQueryVersion((v) => v + 1);
+            }}
+            onSuccess={() => {
+              setLiquidarLote(null);
+              setIdsSeleccionLote([]);
+              setListadoQueryVersion((v) => v + 1);
+            }}
+            onClose={() => setLiquidarLote(null)}
+          />
+        )}
+
         {viajeDeleteConfirm != null && (
           <ConfirmDialog
             open={true}
@@ -3973,11 +4091,11 @@ export function ViajesTenantPage({
                 : "/api/facturacion/facturas"
             }
             onFacturaGuardada={() => {
-              setIdsFacturarSeleccion([]);
+              setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
             }}
             onFacturaEmitida={() => {
-              setIdsFacturarSeleccion([]);
+              setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
             }}
           />

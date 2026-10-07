@@ -108,6 +108,13 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** "dd/mm" sin año, como las fechas de carga/descarga de la grilla de Viajes. Fecha sin hora: se lee del string, sin zona horaria. */
+function fmtDateCorta(iso: string) {
+  if (!iso) return "—";
+  const [, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}`;
+}
+
 function transportistaNombre(liq: LiquidacionConTransportista) {
   return liq.transportista?.nombre ?? liq.transportistaId;
 }
@@ -978,7 +985,7 @@ export function LiquidacionesTenantPage() {
 
       <ListadoDatos
         className="mt-6"
-        tableColSpan={(hasArca ? 7 : 6) - (mostrarPeriodo ? 0 : 1)}
+        tableColSpan={(hasArca ? 8 : 7) - (mostrarPeriodo ? 0 : 1)}
         tableHead={
           <tr className={listadoTablaHeadRowClass}>
             <th scope="col" className={`${listadoTablaThClass} align-top`}>
@@ -1046,6 +1053,9 @@ export function LiquidacionesTenantPage() {
               Comisión
             </th>
             <th scope="col" className={`${listadoTablaThClass} text-right`}>
+              IVA
+            </th>
+            <th scope="col" className={`${listadoTablaThClass} text-right`}>
               A liquidar
             </th>
             {hasArca && (
@@ -1090,14 +1100,16 @@ export function LiquidacionesTenantPage() {
             header: "Transportista",
             primary: true,
             cell: (liq) => (
-              <>
-                <p className="font-medium">{transportistaNombre(liq)}</p>
-                {liq.transportista?.idFiscal && (
-                  <p className="text-xs text-vialto-steel">
-                    {liq.transportista.idFiscal}
-                  </p>
-                )}
-              </>
+              <p
+                className="font-medium"
+                title={
+                  liq.transportista?.idFiscal
+                    ? `CUIT: ${liq.transportista.idFiscal}`
+                    : undefined
+                }
+              >
+                {transportistaNombre(liq)}
+              </p>
             ),
             tdClassName: listadoTablaTdClass,
           },
@@ -1107,9 +1119,15 @@ export function LiquidacionesTenantPage() {
                   id: "periodo",
                   header: "Período",
                   cell: (liq: LiquidacionConTransportista) => (
-                    <div className="flex flex-col leading-tight">
-                      <span>{fmtDate(liq.periodoDesde)}</span>
-                      <span>{fmtDate(liq.periodoHasta)}</span>
+                    <div
+                      className="tabular-nums"
+                      title={`Desde: ${fmtDate(liq.periodoDesde)}\nHasta: ${fmtDate(liq.periodoHasta)}`}
+                    >
+                      <span>{fmtDateCorta(liq.periodoDesde)}</span>
+                      <span className="mx-1 text-vialto-steel/75" aria-hidden>
+                        →
+                      </span>
+                      <span>{fmtDateCorta(liq.periodoHasta)}</span>
                     </div>
                   ),
                   tdClassName: `${listadoTablaTdClass} text-vialto-steel whitespace-nowrap`,
@@ -1126,14 +1144,36 @@ export function LiquidacionesTenantPage() {
           {
             id: "comision",
             header: "Comisión",
+            // La comisión siempre se resta del bruto: en rojo.
             cell: (liq) => (
-              <>
-                {fmtMoney(liq.comision)}
-                <span className="ml-1 text-xs">({liq.comisionPct}%)</span>
-              </>
+              <span
+                className="text-red-700"
+                title={`−${fmtMoney(liq.comision)}`}
+              >
+                {liq.comisionPct}%
+              </span>
             ),
             thClassName: `${listadoTablaThClass} text-right`,
-            tdClassName: `${listadoTablaTdClass} text-right tabular-nums text-vialto-steel`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
+          },
+          {
+            id: "iva",
+            header: "IVA",
+            // Mismo monto que la línea de IVA del detalle (LiquidacionMontosBreakdown).
+            // Verde si se suma al líquido, rojo si se resta (IVA negativo).
+            cell: (liq) => {
+              const iva = Number(liq.gastosAdminIva) || 0;
+              return (
+                <span
+                  className={iva < 0 ? "text-red-700" : "text-emerald-700"}
+                  title={`${iva < 0 ? "−" : "+"}${fmtMoney(Math.abs(iva))}`}
+                >
+                  {liq.ivaPct != null ? `${liq.ivaPct}%` : "—"}
+                </span>
+              );
+            },
+            thClassName: `${listadoTablaThClass} text-right`,
+            tdClassName: `${listadoTablaTdClass} text-right tabular-nums`,
           },
           {
             id: "liquido",

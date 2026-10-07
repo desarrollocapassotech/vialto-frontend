@@ -236,7 +236,7 @@ export function ViajeAccionesMenu({
 
 /**
  * Orden de prioridad de las acciones que se muestran como ícono en la grilla.
- * "Ver" queda solo en el desplegable: tocar la fila ya abre las acciones.
+ * "Ver" no se lista: `AccionesFila` lo agrega como ícono solo si sobra lugar.
  */
 const VIAJE_ACCIONES_DESTACADAS = [
   'reintentar-factura',

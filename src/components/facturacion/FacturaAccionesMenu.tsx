@@ -155,7 +155,7 @@ export function FacturaAccionesMenu({
 }
 
 /** Orden de prioridad de las acciones que se muestran como ícono en la grilla. */
-/** "Ver" queda solo en el desplegable: tocar la fila ya abre las acciones (igual que Viajes). */
+/** "Ver" no se lista: `AccionesFila` lo agrega como ícono solo si sobra lugar (igual que Viajes). */
 const FACTURA_ACCIONES_DESTACADAS = [
   'reintentar',
   'emitir-arca',

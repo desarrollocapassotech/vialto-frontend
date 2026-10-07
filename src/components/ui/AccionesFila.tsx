@@ -8,14 +8,15 @@ import { AccionesOpcionesSheet, type AccionOpcion } from '@/components/ui/Accion
 const MAX_ICONOS = 2;
 const DROPDOWN_WIDTH_PX = 240;
 const ID_ELIMINAR = 'eliminar';
+const ID_VER = 'ver';
 
 type Props = {
   options: AccionOpcion[];
   /**
    * Ids de las acciones a mostrar como ícono, en orden de prioridad. Se muestran las
    * primeras {@link MAX_ICONOS} que estén disponibles en `options` para esa fila.
-   * Las acciones `danger` no se listan acá; la única que puede ir como ícono es
-   * "Eliminar" (id `eliminar`), y solo si sobra lugar.
+   * Si sobra lugar se completa con "Ver" (id `ver`) y después con "Eliminar" (id
+   * `eliminar`); las demás acciones `danger` no se listan acá salvo que la pantalla lo pida.
    */
   destacadas: string[];
   /** Subtítulo del modal de acciones (ej. "Viaje #123"). */
@@ -43,6 +44,12 @@ export function AccionesFila({ options, destacadas, subtitle, open: openProp, on
     // en `destacadas` (ej. Anular en Liquidaciones).
     .filter((o): o is AccionOpcion => Boolean(o && o.icon))
     .slice(0, MAX_ICONOS);
+  // "Ver" va como ícono si sobra lugar (ej. la fila tiene una sola acción destacada):
+  // primero, y con prioridad sobre "Eliminar".
+  const ver = options.find((o) => o.id === ID_VER && o.icon);
+  if (ver && iconos.length < MAX_ICONOS && !iconos.includes(ver)) {
+    iconos.unshift(ver);
+  }
   // "Eliminar" solo va como ícono si sobra lugar (igual pide confirmación al tocarlo).
   const eliminar = options.find((o) => o.id === ID_ELIMINAR && o.icon);
   if (eliminar && iconos.length < MAX_ICONOS && !iconos.includes(eliminar)) {
