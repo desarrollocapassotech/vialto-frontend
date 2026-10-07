@@ -194,6 +194,10 @@ export type ViajeEditModalProps = {
   onLiquidar?: () => void;
   /** Motivo para deshabilitar Liquidar (ej. ARCA + USD). */
   liquidarBloqueoMotivo?: string | null;
+  /** Solo si el viaje tiene una factura en borrador: lleva a emitirla en vez de crear otra. */
+  onContinuarFactura?: () => void;
+  /** Solo si el viaje tiene una liquidación en borrador. */
+  onContinuarLiquidacion?: () => void;
   onEliminar?: () => void;
   saving: boolean;
   error: string | null;
@@ -263,6 +267,8 @@ export function ViajeEditModal({
   facturarBloqueoMotivo = null,
   onLiquidar,
   liquidarBloqueoMotivo = null,
+  onContinuarFactura,
+  onContinuarLiquidacion,
   onEliminar,
   saving,
   error,
@@ -1724,6 +1730,28 @@ export function ViajeEditModal({
                   className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Liquidar
+                </button>
+              ) : null}
+              {onContinuarFactura ? (
+                <button
+                  type="button"
+                  onClick={onContinuarFactura}
+                  disabled={saving}
+                  title="El viaje tiene una factura en borrador sin emitir"
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continuar factura
+                </button>
+              ) : null}
+              {onContinuarLiquidacion ? (
+                <button
+                  type="button"
+                  onClick={onContinuarLiquidacion}
+                  disabled={saving}
+                  title="El viaje tiene una liquidación en borrador sin emitir"
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Continuar liquidación
                 </button>
               ) : null}
               {onEliminar ? (

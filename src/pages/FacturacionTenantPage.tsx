@@ -120,7 +120,10 @@ type FacturaNuevaNavState = {
   };
   expandFacturaId?: string;
   viewFacturaId?: string;
-  /** "Reintentar factura" desde Viajes: abre directo la emisión si sigue con error de ARCA. */
+  /**
+   * "Reintentar"/"Continuar factura" desde Viajes: abre directo la emisión si la factura
+   * sigue con error de ARCA o en borrador sin emitir.
+   */
   emitirFacturaId?: string;
 };
 
@@ -650,7 +653,9 @@ export function FacturacionTenantPage({
     void (async () => {
       try {
         const f = await apiJson<Factura>(facturaUrl(viewId), () => getToken());
-        if (emitirId && f.arcaEstado === "error" && !f.cae) abrirEmitirArca(f);
+        // Error de ARCA (reintentar) o borrador nunca emitido (continuar).
+        const emitible = (f.arcaEstado === "error" || f.arcaEstado == null) && !f.cae;
+        if (emitirId && emitible) abrirEmitirArca(f);
         else setViewingFactura(f);
       } catch {
         // si falla, simplemente no se abre el modal de vista automático
@@ -1738,6 +1743,7 @@ export function FacturacionTenantPage({
           viajes={viajes}
           viajesEdicion={viajesEdicionFactura}
           viajesLoading={viajesLoading}
+          hasArca={hasArca}
           onClose={cancelEdit}
           onSave={() => void saveEdit()}
           saving={savingEditId === editingId}

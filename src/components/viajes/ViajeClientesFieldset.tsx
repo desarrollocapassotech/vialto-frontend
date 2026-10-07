@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { maskCurrencyForMoneda, parseCurrencyForMoneda, preserveAmountOnMonedaChange } from '@/lib/currencyMask';
 import { textoRutaViaje } from '@/lib/viajesDestinos';
 import { ultimoDestinoCargado, type ViajeClienteDraft } from '@/lib/viajesClientes';
+import { facturacionPermiteVincular } from '@/lib/viajesIndicadores';
 import type { OpcionProducto } from '@/lib/productosViaje';
 import type { Cliente, Pais, Producto } from '@/types/api';
 
@@ -198,7 +199,7 @@ export function ViajeClientesFieldset({
   return (
     <div className={className}>
       {rows.map((row, i) => {
-        const bloqueado = !!row.facturacionEstado && !['sin_facturar', 'anulado'].includes(row.facturacionEstado);
+        const bloqueado = !!row.facturacionEstado && !facturacionPermiteVincular(row.facturacionEstado);
         const nombre = clientes.find((c) => c.id === row.clienteId)?.nombre;
         // Sugerencias "para la vuelta": solo tienen sentido a partir del 2do cliente.
         const sugerenciaOrigen = i > 0 ? ultimoDestinoCargado(rows[i - 1]) : null;

@@ -131,7 +131,7 @@ export function tramoDisponibleParaFacturaNueva(t: {
 
 export const facturacionEstadoLabel: Record<FacturacionEstado, string> = {
   sin_facturar: 'Sin facturar',
-  borrador: 'Borrador',
+  borrador: 'Factura en borrador',
   esperando_afip: 'Factura esperando AFIP',
   facturado_parcial: 'Facturado Parcial',
   facturado: 'Facturado',
@@ -220,12 +220,14 @@ export function facturacionEstadoAgregado(
   const todosFacturados = estados.every(isFacturado);
   const algunoError = estados.some((e) => e === 'error_afip');
   const algunoEsperando = estados.some((e) => e === 'esperando_afip');
+  const algunoBorrador = estados.some((e) => e === 'borrador');
   const algunoFacturado = estados.some(isFacturado);
   const todosAnulados = estados.every((e) => e === 'anulado');
   const todosSinFacturarOAnulados = estados.every((e) => e === 'sin_facturar' || e === 'anulado');
 
   if (algunoError) return 'error_afip';
   if (algunoEsperando) return 'esperando_afip';
+  if (algunoBorrador) return 'borrador';
   if (todosAnulados) return 'anulado';
   if (todosSinFacturarOAnulados) return 'sin_facturar';
   if (algunoFacturado && !todosFacturados) return 'facturado_parcial';
@@ -250,6 +252,7 @@ export function tooltipFacturacionEstado(viaje: Pick<Viaje, 'facturacionEstado' 
 
 export type LiquidacionEstado =
   | 'sin_liquidar'
+  | 'borrador'
   | 'esperando_afip'
   | 'liquidado'
   | 'error_afip'
@@ -263,6 +266,7 @@ export function liquidacionPermiteVincular(liquidacionEstado: string | null): bo
 
 export const liquidacionEstadoLabel: Record<LiquidacionEstado, string> = {
   sin_liquidar: 'Sin liquidar',
+  borrador: 'Liquidación en borrador',
   esperando_afip: 'Liquidación esperando AFIP',
   liquidado: 'Liquidado',
   error_afip: 'Error de AFIP en liquidación',
@@ -271,8 +275,9 @@ export const liquidacionEstadoLabel: Record<LiquidacionEstado, string> = {
 
 export const liquidacionEstadoBadgeClass: Record<LiquidacionEstado, string> = {
   sin_liquidar: 'bg-zinc-100 text-zinc-800 border-zinc-300/90',
+  borrador: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   esperando_afip: 'bg-amber-50 text-amber-950 border-amber-200/95',
-  liquidado: 'bg-emerald-100 text-emerald-950 border-emerald-500/80',
+  liquidado:'bg-emerald-100 text-emerald-950 border-emerald-500/80',
   error_afip: 'bg-red-100 text-red-950 border-red-400/80',
   anulado: 'bg-red-50 text-red-900 border-red-300/80',
 };

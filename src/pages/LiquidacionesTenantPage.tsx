@@ -477,8 +477,9 @@ export function LiquidacionesTenantPage() {
 
   /**
    * Deep-link `?liquidacion=<id>` (ej. desde el detalle de facturación/liquidación de un viaje).
-   * Con `&emitir=1` (botón "Reintentar liquidación" de Viajes) abre directo la emisión si
-   * la liquidación sigue con error de ARCA; si no, cae en la vista normal.
+   * Con `&emitir=1` (botones "Reintentar"/"Continuar liquidación" de Viajes) abre directo
+   * la emisión si la liquidación sigue con error de ARCA o en borrador; si no, cae en la
+   * vista normal.
    */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
@@ -495,9 +496,9 @@ export function LiquidacionesTenantPage() {
         );
         if (cancelled) return;
         const liq = { ...full, conceptosLineas: full.conceptosLineas ?? [] };
-        // Solo `error`: implica que ya se intentó emitir a ARCA (no depende de que los
-        // módulos del tenant ya hayan cargado).
-        if (emitir && liq.estado === "error") {
+        // `error` (reintentar) o `borrador` (continuar). Viajes solo manda `emitir=1`
+        // para tenants con ARCA, así que no depende de que los módulos ya hayan cargado.
+        if (emitir && (liq.estado === "error" || liq.estado === "borrador")) {
           setPendingEmitir(liq);
         } else {
           setDetail({ mode: "view", liq });

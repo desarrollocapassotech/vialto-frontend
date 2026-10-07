@@ -71,6 +71,8 @@ import {
 import {
   viajePermiteBotonFacturar,
   liquidacionElegidaDeViaje,
+  facturaBorradorIdDeViaje,
+  liquidacionBorradorIdDeViaje,
 } from "@/lib/viajesComprobantes";
 import {
   etapaViajeBadgeClass,
@@ -1928,13 +1930,17 @@ export function ViajesTenantPage({
       ?.liquidacion.id;
   }
 
-  function reintentarFacturaDeViaje(facturaId: string) {
+  /**
+   * "Reintentar" (error de ARCA) y "Continuar" (borrador sin emitir): lleva a la pantalla
+   * del comprobante y abre directo su emisión, en vez de crear uno nuevo.
+   */
+  function abrirEmisionFactura(facturaId: string) {
     navigate("/facturacion", {
       state: { ...facturacionNavExtras(), emitirFacturaId: facturaId },
     });
   }
 
-  function reintentarLiquidacionDeViaje(liquidacionId: string) {
+  function abrirEmisionLiquidacion(liquidacionId: string) {
     const params = new URLSearchParams();
     if (platform && tid) params.set("tenantId", tid);
     params.set("liquidacion", liquidacionId);
@@ -3063,12 +3069,22 @@ export function ViajesTenantPage({
                   }
                   onReintentarFactura={(() => {
                     const id = facturaIdConErrorDeViaje(v);
-                    return id ? () => reintentarFacturaDeViaje(id) : undefined;
+                    return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
                   onReintentarLiquidacion={(() => {
                     const id = liquidacionIdConErrorDeViaje(v);
                     return id
-                      ? () => reintentarLiquidacionDeViaje(id)
+                      ? () => abrirEmisionLiquidacion(id)
+                      : undefined;
+                  })()}
+                  onContinuarFactura={(() => {
+                    const id = facturaBorradorIdDeViaje(v);
+                    return id ? () => abrirEmisionFactura(id) : undefined;
+                  })()}
+                  onContinuarLiquidacion={(() => {
+                    const id = liquidacionBorradorIdDeViaje(v);
+                    return id
+                      ? () => abrirEmisionLiquidacion(id)
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
@@ -3323,12 +3339,22 @@ export function ViajesTenantPage({
                   }
                   onReintentarFactura={(() => {
                     const id = facturaIdConErrorDeViaje(v);
-                    return id ? () => reintentarFacturaDeViaje(id) : undefined;
+                    return id ? () => abrirEmisionFactura(id) : undefined;
                   })()}
                   onReintentarLiquidacion={(() => {
                     const id = liquidacionIdConErrorDeViaje(v);
                     return id
-                      ? () => reintentarLiquidacionDeViaje(id)
+                      ? () => abrirEmisionLiquidacion(id)
+                      : undefined;
+                  })()}
+                  onContinuarFactura={(() => {
+                    const id = facturaBorradorIdDeViaje(v);
+                    return id ? () => abrirEmisionFactura(id) : undefined;
+                  })()}
+                  onContinuarLiquidacion={(() => {
+                    const id = liquidacionBorradorIdDeViaje(v);
+                    return id
+                      ? () => abrirEmisionLiquidacion(id)
                       : undefined;
                   })()}
                   onEliminar={() => requestDeleteViaje(v)}
@@ -3462,6 +3488,14 @@ export function ViajesTenantPage({
                   ? MSG_ARCA_NO_LIQUIDA_USD
                   : null
               }
+              onContinuarFactura={(() => {
+                const id = facturaBorradorIdDeViaje(viajeEditor.viajeSnapshot);
+                return id ? () => abrirEmisionFactura(id) : undefined;
+              })()}
+              onContinuarLiquidacion={(() => {
+                const id = liquidacionBorradorIdDeViaje(viajeEditor.viajeSnapshot);
+                return id ? () => abrirEmisionLiquidacion(id) : undefined;
+              })()}
               onEliminar={() => requestDeleteViaje(viajeEditor.viajeSnapshot!)}
               saving={viajeEditor.saving}
               error={viajeEditor.error}

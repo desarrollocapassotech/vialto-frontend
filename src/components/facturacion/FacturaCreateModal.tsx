@@ -874,18 +874,21 @@ export function FacturaCreateModal({
   const standardFields = (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
-            Número (opcional)
-          </label>
-          <input
-            type="text"
-            value={draft.numero}
-            onChange={(e) => patch({ numero: e.target.value })}
-            placeholder="0001-00000001"
-            className="h-9 border border-black/20 bg-white px-3 text-sm"
-          />
-        </div>
+        {/* Con ARCA el número lo asigna AFIP al emitir: no se carga a mano. */}
+        {!hasArca && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-[family-name:var(--font-ui)] uppercase tracking-[0.08em] text-vialto-steel">
+              Número (opcional)
+            </label>
+            <input
+              type="text"
+              value={draft.numero}
+              onChange={(e) => patch({ numero: e.target.value })}
+              placeholder="0001-00000001"
+              className="h-9 border border-black/20 bg-white px-3 text-sm"
+            />
+          </div>
+        )}
         <FacturaContraparteField
           clienteId={draft.clienteId}
           clientes={filteredClientes}

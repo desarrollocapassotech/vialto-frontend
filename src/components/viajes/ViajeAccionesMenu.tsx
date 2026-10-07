@@ -4,6 +4,7 @@ import {
   Calculator,
   Download,
   Eye,
+  FilePen,
   FileText,
   HandCoins,
   PlusCircle,
@@ -52,6 +53,10 @@ interface Props {
   onReintentarFactura?: () => void;
   /** Solo si la liquidación del viaje quedó con error de ARCA. */
   onReintentarLiquidacion?: () => void;
+  /** Solo si el viaje tiene una factura en borrador (sin emitir): reemplaza a "Facturar". */
+  onContinuarFactura?: () => void;
+  /** Solo si el viaje tiene una liquidación en borrador (sin emitir). */
+  onContinuarLiquidacion?: () => void;
   onEliminar?: () => void;
   /** Si se pasa junto con `onOpenChange`, el abierto/cerrado pasa a ser controlado por el padre (ej. click en la fila de la tabla). */
   open?: boolean;
@@ -73,6 +78,8 @@ export function ViajeAccionesMenu({
   onVerLiquidacion,
   onReintentarFactura,
   onReintentarLiquidacion,
+  onContinuarFactura,
+  onContinuarLiquidacion,
   onEliminar,
   open: openProp,
   onOpenChange,
@@ -124,6 +131,24 @@ export function ViajeAccionesMenu({
         label: 'Reintentar liquidación',
         icon: RotateCw,
         onClick: onReintentarLiquidacion,
+      });
+    }
+    if (onContinuarFactura) {
+      items.push({
+        id: 'continuar-factura',
+        label: 'Continuar factura',
+        description: 'Tiene una factura en borrador sin emitir',
+        icon: FilePen,
+        onClick: onContinuarFactura,
+      });
+    }
+    if (onContinuarLiquidacion) {
+      items.push({
+        id: 'continuar-liquidacion',
+        label: 'Continuar liquidación',
+        description: 'Tiene una liquidación en borrador sin emitir',
+        icon: FilePen,
+        onClick: onContinuarLiquidacion,
       });
     }
 
@@ -179,6 +204,8 @@ export function ViajeAccionesMenu({
     onVerLiquidacion,
     onReintentarFactura,
     onReintentarLiquidacion,
+    onContinuarFactura,
+    onContinuarLiquidacion,
     permiteFacturar,
     facturarBloqueoArcaUsd,
     onFacturar,
@@ -212,6 +239,8 @@ export function ViajeAccionesMenu({
 const VIAJE_ACCIONES_DESTACADAS = [
   'reintentar-factura',
   'reintentar-liquidacion',
+  'continuar-factura',
+  'continuar-liquidacion',
   'facturar',
   'liquidar',
   'gasto',
