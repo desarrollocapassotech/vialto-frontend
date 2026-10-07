@@ -102,6 +102,32 @@
   animation: sidebar-expand-hint 1.2s ease-in-out infinite;
 }
 
+/* Flecha de "hay más columnas" en tablas con scroll horizontal: mismo pulso que la
+   flecha del menú lateral. `--hint-dir` = 1 (derecha) / -1 (izquierda). */
+@keyframes tabla-scroll-hint {
+  0%,
+  100% {
+    transform: translateX(0);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
+  }
+  50% {
+    transform: translateX(calc(var(--hint-dir, 1) * 4px));
+    box-shadow:
+      0 0 0 5px rgb(232 71 10 / 0.2),
+      4px 4px 26px rgb(232 71 10 / 0.9);
+  }
+}
+
+.tabla-scroll-hint {
+  animation: tabla-scroll-hint 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabla-scroll-hint {
+    animation: none;
+  }
+}
+
 @media screen and (max-width: 768px) {
   input,
   textarea,
