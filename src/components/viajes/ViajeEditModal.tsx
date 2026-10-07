@@ -56,7 +56,11 @@ import {
   VIAJE_ETAPAS_TODAS,
   tooltipEtapaViaje,
 } from "@/lib/viajesIndicadores";
-import { viajePermiteBotonFacturar } from "@/lib/viajesComprobantes";
+import {
+  viajePendienteComprobanteCliente,
+  viajePendienteComprobanteTransportista,
+  viajeRequiereComprobanteDual,
+} from "@/lib/viajesComprobantes";
 import {
   numeroFacturaVisibleViaje,
   numeroVisibleViaje,
@@ -182,10 +186,14 @@ export type ViajeEditModalProps = {
   ) => void;
   onClose: () => void;
   onSave: () => void;
-  /** Misma acción que «Facturar» en el menú de acciones del listado (navegación / modal de facturas). */
+  /** Misma acción que «Facturar» en el menú de acciones del listado (factura al cliente). */
   onFacturar?: () => void;
   /** Motivo para deshabilitar Facturar (ej. ARCA + USD). */
   facturarBloqueoMotivo?: string | null;
+  /** Misma acción que «Liquidar» en el menú de acciones del listado (liquidación al transportista). */
+  onLiquidar?: () => void;
+  /** Motivo para deshabilitar Liquidar (ej. ARCA + USD). */
+  liquidarBloqueoMotivo?: string | null;
   onEliminar?: () => void;
   saving: boolean;
   error: string | null;
@@ -253,6 +261,8 @@ export function ViajeEditModal({
   onSave,
   onFacturar,
   facturarBloqueoMotivo = null,
+  onLiquidar,
+  liquidarBloqueoMotivo = null,
   onEliminar,
   saving,
   error,
@@ -509,18 +519,27 @@ export function ViajeEditModal({
 
   if (!open) return null;
 
+  const viajeComprobantes = {
+    ...snapshotViaje,
+    etapa: draft.estado,
+    transportistaId:
+      draft.operacionModo === "externo"
+        ? draft.transportistaId
+        : snapshotViaje.transportistaId,
+  };
+  const comprobantesHabilitados = draft.estado !== "cancelado";
   const muestraBotonFacturar =
     typeof onFacturar === "function" &&
-    viajePermiteBotonFacturar({
-      ...snapshotViaje,
-      etapa: draft.estado,
-      transportistaId:
-        draft.operacionModo === "externo"
-          ? draft.transportistaId
-          : snapshotViaje.transportistaId,
-    });
+    comprobantesHabilitados &&
+    viajePendienteComprobanteCliente(viajeComprobantes);
   const facturarDeshabilitado =
     saving || !draft.clienteId.trim() || Boolean(facturarBloqueoMotivo);
+  const muestraBotonLiquidar =
+    typeof onLiquidar === "function" &&
+    comprobantesHabilitados &&
+    viajeRequiereComprobanteDual(viajeComprobantes) &&
+    viajePendienteComprobanteTransportista(viajeComprobantes);
+  const liquidarDeshabilitado = saving || Boolean(liquidarBloqueoMotivo);
 
   const muestraPagosTransportista = viajeRequierePagosTransportista({
     transportistaId:
@@ -1694,6 +1713,17 @@ export function ViajeEditModal({
                   className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Facturar
+                </button>
+              ) : null}
+              {muestraBotonLiquidar ? (
+                <button
+                  type="button"
+                  onClick={onLiquidar}
+                  disabled={liquidarDeshabilitado}
+                  title={liquidarBloqueoMotivo ?? undefined}
+                  className="inline-flex h-10 items-center px-5 text-xs uppercase tracking-wider bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Liquidar
                 </button>
               ) : null}
               {onEliminar ? (
