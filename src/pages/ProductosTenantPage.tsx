@@ -204,23 +204,27 @@ export function ProductosTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Productos
-      </h1>
-      <p className="mt-2 text-vialto-steel max-w-2xl">
-        {"Los productos que manipulás."}
-      </p>
-
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-        {puedeGestionar && (
-          <button
-            type="button"
-            onClick={() => setModal({ mode: "create" })}
-            className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-          >
-            Nuevo producto
-          </button>
-        )}
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+            Productos
+          </h1>
+          <p className="mt-2 text-vialto-steel max-w-2xl">
+            {"Los productos que manipulás."}
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {puedeGestionar && (
+            <button
+              type="button"
+              onClick={() => setModal({ mode: "create" })}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nuevo producto
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (

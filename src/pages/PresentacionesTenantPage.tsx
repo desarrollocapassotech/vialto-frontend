@@ -197,33 +197,37 @@ export function PresentacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Presentaciones
-      </h1>
-      <p className="mt-2 text-vialto-steel max-w-2xl">
-        Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
-      </p>
-
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-        {anyFiltroActivo && (
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+            Presentaciones
+          </h1>
+          <p className="mt-2 text-vialto-steel max-w-2xl">
+            Catálogo de unidades para cantidad 1 y cantidad 2 de los productos.
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {anyFiltroActivo && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Limpiar filtros
+            </button>
+          )}
           <button
             type="button"
-            onClick={limpiarFiltros}
-            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            onClick={() => {
+              setEditingId(null);
+              setIsFormOpen(true);
+            }}
+            className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
           >
-            Limpiar filtros
+            Nueva presentación
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setEditingId(null);
-            setIsFormOpen(true);
-          }}
-          className="inline-flex h-10 w-fit max-w-full shrink-0 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-        >
-          Nueva presentación
-        </button>
+        </div>
       </div>
 
       {actionError && (

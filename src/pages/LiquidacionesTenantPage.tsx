@@ -916,9 +916,48 @@ export function LiquidacionesTenantPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Liquidaciones
-      </h1>
+      {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
+          Liquidaciones
+        </h1>
+
+        {hasArca && activeTenantId && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+              Emisión electrónica vía ARCA
+            </div>
+            <AmbienteTestBadge ambiente={config?.ambiente} />
+          </div>
+        )}
+
+        {activeTenantId && (!error || !isSuperAdmin) && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {exportButton}
+            {anyFiltroActivo && (
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+              >
+                Limpiar filtros
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCrear(true);
+                void ensureViajesTodosLoaded();
+              }}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nueva liquidación
+            </button>
+          </div>
+        )}
+      </div>
 
       {isSuperAdmin && (
         <div className="mt-6">
@@ -936,52 +975,11 @@ export function LiquidacionesTenantPage() {
         </div>
       )}
 
-      {hasArca && activeTenantId && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-            Emisión electrónica vía ARCA
-          </div>
-          <AmbienteTestBadge ambiente={config?.ambiente} />
+      {isSuperAdmin && error && (
+        <div className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
         </div>
       )}
-
-      <div className="mt-4">
-        {isSuperAdmin && error && (
-          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
-            {error}
-          </div>
-        )}
-
-        {activeTenantId && (!error || !isSuperAdmin) && (
-          <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-            <div className="flex shrink-0 items-center gap-2">{exportButton}</div>
-
-            <div className="flex gap-2 ml-auto">
-              {anyFiltroActivo && (
-                <button
-                  type="button"
-                  onClick={limpiarFiltros}
-                  className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCrear(true);
-                  void ensureViajesTodosLoaded();
-                }}
-                className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-              >
-                Nueva liquidación
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
       <ListadoDatos
         className="mt-6"

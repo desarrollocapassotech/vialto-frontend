@@ -2423,7 +2423,8 @@ export function ViajesTenantPage({
       {filtroRapidoPortalTarget
         ? createPortal(filtroRapidoContent, filtroRapidoPortalTarget)
         : null}
-      <div className="flex flex-wrap items-center gap-4">
+      {/* Título + filtros rápidos a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {!embeddedInSuperadmin && (
           <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide text-vialto-charcoal">
             Viajes
@@ -2431,10 +2432,8 @@ export function ViajesTenantPage({
         )}
 
         {!filtroRapidoPortalTarget && filtroRapidoContent}
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {puedeImportar && (
             <Link
               to="/importar?volverA=/viajes"
@@ -2459,9 +2458,7 @@ export function ViajesTenantPage({
             <Download className="h-4 w-4" aria-hidden />
             {exportandoExcel ? "Generando..." : "Exportar"}
           </button>
-        </div>
 
-        <div className="ml-auto flex shrink-0 gap-2">
           <ViajesOrdenamientoMenu
             sortBy={sortBy}
             sortDir={sortDir}

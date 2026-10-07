@@ -218,13 +218,29 @@ export function ProductosSuperadminPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
-        Productos
-      </h1>
-      <p className="mt-2 text-vialto-steel max-w-2xl">
-        Catálogo de productos por empresa. Elegí una empresa para gestionar su
-        catálogo.
-      </p>
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide text-vialto-charcoal">
+            Productos
+          </h1>
+          <p className="mt-2 text-vialto-steel max-w-2xl">
+            Catálogo de productos por empresa. Elegí una empresa para gestionar su
+            catálogo.
+          </p>
+        </div>
+        {filtroEmpresa && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setModal({ mode: "create" })}
+              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
+            >
+              Nuevo producto
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-6">
         <EmpresaFilterBar
@@ -239,16 +255,6 @@ export function ProductosSuperadminPage() {
 
       {filtroEmpresa && (
         <>
-          <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setModal({ mode: "create" })}
-              className="inline-flex h-10 items-center px-4 bg-vialto-charcoal text-white text-sm uppercase tracking-wider hover:bg-vialto-graphite"
-            >
-              Nuevo producto
-            </button>
-          </div>
-
           {error && (
             <p className="mt-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded px-3 py-2">
               {error}

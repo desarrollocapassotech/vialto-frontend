@@ -149,13 +149,17 @@ export function IngresosStockHistorialTenantPage({
 
   return (
     <div className="w-full space-y-6">
-      {!embeddedInSuperadmin && (
-        <h1 className="text-2xl font-semibold text-vialto-charcoal">
-          Historial de ingresos
-        </h1>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">{exportButton}</div>
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          {!embeddedInSuperadmin && (
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">
+              Historial de ingresos
+            </h1>
+          )}
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{exportButton}</div>
+      </div>
 
       {error && (
         <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

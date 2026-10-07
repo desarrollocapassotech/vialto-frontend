@@ -703,21 +703,24 @@ export function StockPanelTenantPage({
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-vialto-charcoal">
-          Inventario
-        </h1>
-        <p className="mt-1 text-sm text-vialto-steel">
-          Stock disponible en cada depósito, en tiempo real.
-        </p>
-      </div>
-
-      {/* Solo mostramos el botón de Excel si no estamos en la pantalla inicial de plataforma */}
-      {(!isPlatform || activeTenantId) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {exportExcelButton}
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold text-vialto-charcoal">
+            Inventario
+          </h1>
+          <p className="mt-1 text-sm text-vialto-steel">
+            Stock disponible en cada depósito, en tiempo real.
+          </p>
         </div>
-      )}
+
+        {/* Solo mostramos el botón de Excel si no estamos en la pantalla inicial de plataforma */}
+        {(!isPlatform || activeTenantId) && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {exportExcelButton}
+          </div>
+        )}
+      </div>
 
       {/* Buscador debajo del título para Superadmins */}
       {isPlatform && (

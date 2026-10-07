@@ -1240,45 +1240,33 @@ export function FacturacionTenantPage({
 
   return (
     <div className="w-full">
-      {!embeddedInSuperadmin && (
-        <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
-          Facturas
-        </h1>
-      )}
+      {/* Título + badges ARCA a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        {!embeddedInSuperadmin && (
+          <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl tracking-wide">
+            Facturas
+          </h1>
+        )}
 
-      {!embeddedInSuperadmin && (
-        <>
-          {hasArca && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-                <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-                Emisión electrónica vía ARCA
-              </div>
-              <AmbienteTestBadge
-                ambiente={ambienteArca}
-                to="/configuracion/arca?tab=ambiente"
-              />
+        {hasArca && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
+              <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+              Emisión electrónica vía ARCA
             </div>
-          )}
-        </>
-      )}
-
-      {embeddedInSuperadmin && hasArca && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-xs text-emerald-800">
-            <Landmark className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-            Emisión electrónica vía ARCA
+            <AmbienteTestBadge
+              ambiente={ambienteArca}
+              to={
+                embeddedInSuperadmin
+                  ? undefined
+                  : "/configuracion/arca?tab=ambiente"
+              }
+            />
           </div>
-          <AmbienteTestBadge ambiente={ambienteArca} />
-        </div>
-      )}
+        )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {exportButton}
-          {error && <CrudFormErrorAlert message={error} />}
-        </div>
-        <div className="flex gap-2 ml-auto">
           {anyFiltroActivo && (
             <button
               type="button"
@@ -1303,6 +1291,12 @@ export function FacturacionTenantPage({
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mt-4">
+          <CrudFormErrorAlert message={error} />
+        </div>
+      )}
 
       <ListadoDatos
         className="mt-6"

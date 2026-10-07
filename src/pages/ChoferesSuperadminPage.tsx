@@ -159,12 +159,43 @@ export function ChoferesSuperadminPage() {
 
   return (
     <div className="w-full">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
-        Choferes
-      </h1>
-      <p className="mt-2 text-vialto-steel max-w-3xl">
-        Elegí una empresa para ver sus choferes. El listado lo arma el servidor.
-      </p>
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+            Choferes
+          </h1>
+          <p className="mt-2 text-vialto-steel max-w-3xl">
+            Elegí una empresa para ver sus choferes. El listado lo arma el servidor.
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {anyFiltroActivo && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
+            >
+              Limpiar filtros
+            </button>
+          )}
+          <Link
+            to={
+              filtroEmpresa
+                ? `/choferes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
+                : "#"
+            }
+            className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
+              filtroEmpresa
+                ? "bg-vialto-charcoal hover:bg-vialto-graphite"
+                : "bg-vialto-charcoal/50 pointer-events-none"
+            }`}
+            aria-disabled={!filtroEmpresa}
+          >
+            Crear chofer
+          </Link>
+        </div>
+      </div>
 
       <div className="mt-6">
         <EmpresaFilterBar
@@ -176,33 +207,6 @@ export function ChoferesSuperadminPage() {
             onChangeTenant(id);
           }}
         />
-      </div>
-
-      <div className="mt-4 flex justify-end gap-2">
-        {anyFiltroActivo && (
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="hidden lg:inline-flex h-10 items-center px-4 border border-black/20 text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist"
-          >
-            Limpiar filtros
-          </button>
-        )}
-        <Link
-          to={
-            filtroEmpresa
-              ? `/choferes/nuevo?tenantId=${encodeURIComponent(filtroEmpresa)}`
-              : "#"
-          }
-          className={`inline-flex h-10 items-center px-4 text-white text-sm uppercase tracking-wider ${
-            filtroEmpresa
-              ? "bg-vialto-charcoal hover:bg-vialto-graphite"
-              : "bg-vialto-charcoal/50 pointer-events-none"
-          }`}
-          aria-disabled={!filtroEmpresa}
-        >
-          Crear chofer
-        </Link>
       </div>
 
       {error && (

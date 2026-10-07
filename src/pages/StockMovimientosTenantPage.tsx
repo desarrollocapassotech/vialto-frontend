@@ -272,20 +272,22 @@ export function StockMovimientosTenantPage({
 
   return (
     <div className="w-full space-y-6">
-      {!platform && (
-        <div>
-          <h1 className="text-2xl font-semibold text-vialto-charcoal">
-            Movimientos
-          </h1>
-          <p className="mt-1 text-sm text-vialto-steel">
-            Ingresos, egresos y divisiones consolidados por comprobante (una
-            fila por operación).
-          </p>
+      {/* Título a la izquierda; acciones a la derecha, en la misma línea. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        {!platform && (
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-vialto-charcoal">
+              Movimientos
+            </h1>
+            <p className="mt-1 text-sm text-vialto-steel">
+              Ingresos, egresos y divisiones consolidados por comprobante (una
+              fila por operación).
+            </p>
+          </div>
+        )}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {exportExcelButton}
         </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        {exportExcelButton}
       </div>
 
       {error && (
