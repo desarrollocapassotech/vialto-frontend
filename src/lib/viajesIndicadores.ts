@@ -282,6 +282,40 @@ export const liquidacionEstadoBadgeClass: Record<LiquidacionEstado, string> = {
   anulado: 'bg-red-50 text-red-900 border-red-300/80',
 };
 
+/** Mini-símbolo del ícono de estado de factura/liquidación en la grilla de Viajes. */
+export type EstadoGlifo =
+  | 'borrador'
+  | 'esperando'
+  | 'ok'
+  | 'cobrado'
+  | 'error'
+  | 'anulado'
+  | 'parcial'
+  | null;
+
+/** Glifo según el estado de facturación o liquidación del viaje (null = sin comprobante). */
+export function glifoEstadoComprobante(estado: string | null | undefined): EstadoGlifo {
+  switch (estado) {
+    case 'borrador':
+      return 'borrador';
+    case 'esperando_afip':
+      return 'esperando';
+    case 'facturado':
+    case 'liquidado':
+      return 'ok';
+    case 'cobrado':
+      return 'cobrado';
+    case 'facturado_parcial':
+      return 'parcial';
+    case 'error_afip':
+      return 'error';
+    case 'anulado':
+      return 'anulado';
+    default:
+      return null;
+  }
+}
+
 export function tooltipLiquidacionEstado(
   viaje: Pick<Viaje, 'liquidacionEstado' | 'liquidacionesViaje'>,
 ): string {

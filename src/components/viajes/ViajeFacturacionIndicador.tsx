@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { Receipt } from 'lucide-react';
+import { EstadoIcono } from '@/components/viajes/EstadoIcono';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import {
+  glifoEstadoComprobante,
   facturacionEstadoAgregado,
   facturacionEstadoBadgeClass,
   facturacionEstadoLabel,
@@ -22,6 +25,8 @@ type Props = {
   onClickOverride?: () => void;
   /** Columna ETAPA del listado: el badge ocupa todo el ancho disponible en vez de su ancho de contenido. */
   fullWidth?: boolean;
+  /** `icono`: ícono compacto de una sola línea (columna "Factura" de la grilla). */
+  variante?: "badge" | "icono";
 };
 
 const badgeClass =
@@ -38,7 +43,13 @@ function facturaUrl(id: string, tenantId?: string) {
  * si ya hay una factura vinculada, va directo a su vista completa (ahorra el paso del
  * modal intermedio); si todavía no hay factura, muestra el modal de detalle actual.
  */
-export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride, fullWidth = false }: Props) {
+export function ViajeFacturacionIndicador({
+  viaje,
+  tenantId,
+  onClickOverride,
+  fullWidth = false,
+  variante = "badge",
+}: Props) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -70,21 +81,38 @@ export function ViajeFacturacionIndicador({ viaje, tenantId, onClickOverride, fu
     }
   }
 
+  // En viajes multi-cliente el tooltip de `tooltipFacturacionEstado` solo mira al
+  // principal: con más de un cliente se muestra el label del estado agregado.
+  const tooltip =
+    (viaje.clientesViaje ?? []).length > 0 ? displayLabel : tooltipFacturacionEstado(viaje);
+
   return (
     <>
-      <span
-        className={`flex flex-wrap items-center gap-1 ${fullWidth ? "w-full" : "inline-flex"}`}
-      >
-        <button
-          type="button"
+      {variante === "icono" ? (
+        <EstadoIcono
+          icon={Receipt}
+          glifo={glifoEstadoComprobante(agregado)}
+          colorClass={displayClass}
+          title={`Factura: ${tooltip}`}
+          tachado={agregado === "anulado"}
           onClick={() => void handleClick()}
           disabled={cargando}
-          title={`Facturación: ${tooltipFacturacionEstado(viaje)}`}
-          className={`${badgeClass} ${fullWidth ? "w-full" : ""} ${displayClass}`}
+        />
+      ) : (
+        <span
+          className={`flex flex-wrap items-center gap-1 ${fullWidth ? "w-full" : "inline-flex"}`}
         >
-          {displayLabel}
-        </button>
-      </span>
+          <button
+            type="button"
+            onClick={() => void handleClick()}
+            disabled={cargando}
+            title={`Facturación: ${tooltipFacturacionEstado(viaje)}`}
+            className={`${badgeClass} ${fullWidth ? "w-full" : ""} ${displayClass}`}
+          >
+            {displayLabel}
+          </button>
+        </span>
+      )}
       {open && (
         <ViajeFacturacionDetalleModal
           viaje={viaje}

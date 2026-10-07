@@ -54,7 +54,6 @@ import {
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
 import { ViajeEditModal } from "@/components/viajes/ViajeEditModal";
-import { gananciaBrutaManualEnPatchParcial } from "@/lib/viajesGananciaBruta";
 import { ViajeViewModal } from "@/components/viajes/ViajeViewModal";
 import { ViajeAccionesMenu } from "@/components/viajes/ViajeAccionesMenu";
 import { ViajesResumenFiltros } from "@/components/viajes/ViajesResumenFiltros";
@@ -82,6 +81,7 @@ import {
   VIAJE_ETAPAS_TODAS,
 } from "@/lib/viajesIndicadores";
 import { ViajeFacturacionIndicador } from "@/components/viajes/ViajeFacturacionIndicador";
+import { ViajeEtapaIcono } from "@/components/viajes/ViajeEtapaIcono";
 import { ViajeLiquidacionIndicador } from "@/components/viajes/ViajeLiquidacionIndicador";
 import { ViajePagoTransportistaIndicador } from "@/components/viajes/ViajePagoTransportistaIndicador";
 import {
@@ -431,8 +431,6 @@ export function ViajesTenantPage({
   const [meta, setMeta] = useState<PaginatedMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [estadoQuickId, setEstadoQuickId] = useState<string | null>(null);
-  const [savingEstadoId, setSavingEstadoId] = useState<string | null>(null);
   const [exportarViaje, setExportarViaje] = useState<Viaje | null>(null);
   const [viewingViaje, setViewingViaje] = useState<Viaje | null>(null);
   /** Fila/card clickeada: abre el menú de acciones de ese viaje en vez del modal de detalle. */
@@ -473,6 +471,7 @@ export function ViajesTenantPage({
     choferId: "",
     estado: initialEstadoFromUrl,
     facturacionEstado: "",
+    liquidacionEstado: "",
     pagoTransportista:
       initialPagoTransportistaFromUrl as ViajePagoTransportistaFiltro,
     tipoFecha: "" as "" | "carga" | "descarga",
@@ -492,6 +491,7 @@ export function ViajesTenantPage({
   const [choferIdFiltroActivo, setChoferIdFiltroActivo] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState(initialEstadoFromUrl);
   const [facturacionFiltro, setFacturacionFiltro] = useState("");
+  const [liquidacionFiltro, setLiquidacionFiltro] = useState("");
   const [pagoTransportistaFiltro, setPagoTransportistaFiltro] =
     useState<ViajePagoTransportistaFiltro>(initialPagoTransportistaFromUrl);
   const [showFiltrosRapidos, setShowFiltrosRapidos] = useState(false);
@@ -723,12 +723,10 @@ export function ViajesTenantPage({
   }, [location.pathname, location.search, location.state, navigate]);
 
   function beginEditViaje(v: Viaje, origen: "listado" | "remoto" = "listado") {
-    setEstadoQuickId(null);
     return viajeEditor.beginEditViaje(v, origen);
   }
 
   function cancelEdit() {
-    setEstadoQuickId(null);
     viajeEditor.cancelEdit();
   }
 
@@ -834,6 +832,7 @@ export function ViajesTenantPage({
           choferId: choferFiltro,
           estado: estF,
           facturacionEstado: facEstF,
+          liquidacionEstado: liqEstF,
           pagoTransportista: pagoTranspF,
           tipoFecha: tf,
           fechaDesde: fd,
@@ -867,6 +866,7 @@ export function ViajesTenantPage({
         if (choferFiltro) filtros.set("choferId", choferFiltro);
         if (estF.trim()) filtros.set("etapa", estF.trim());
         if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
+        if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
         if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
           filtros.set("pagoTransportista", pagoTranspF);
         }
@@ -1142,6 +1142,18 @@ export function ViajesTenantPage({
     setListadoQueryVersion((v) => v + 1);
   }
 
+  function aplicarFiltroLiquidacion(val: string) {
+    const l = val.trim();
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      liquidacionEstado: l,
+    };
+    setLiquidacionFiltro(l);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
   function alinearOrdenConFiltroFecha(
     tf: "" | "carga" | "descarga",
     fd: string,
@@ -1305,6 +1317,7 @@ export function ViajesTenantPage({
       choferId: "",
       estado: "",
       facturacionEstado: "",
+      liquidacionEstado: "",
       pagoTransportista: "",
       tipoFecha: "",
       fechaDesde: "",
@@ -1322,6 +1335,7 @@ export function ViajesTenantPage({
     setChoferIdFiltroActivo("");
     setEstadoFiltro("");
     setFacturacionFiltro("");
+    setLiquidacionFiltro("");
     setPagoTransportistaFiltro("");
     setTipoFechaFiltro("");
     setFechaDesdeFiltro("");
@@ -1347,6 +1361,7 @@ export function ViajesTenantPage({
     !!choferIdFiltroActivo.trim() ||
     !!estadoFiltro.trim() ||
     !!facturacionFiltro.trim() ||
+    !!liquidacionFiltro.trim() ||
     !!pagoTransportistaFiltro.trim() ||
     !!fechaDesdeFiltro.trim() ||
     !!fechaHastaFiltro.trim() ||
@@ -1363,6 +1378,7 @@ export function ViajesTenantPage({
     if (choferIdFiltroActivo.trim()) n += 1;
     if (estadoFiltro.trim()) n += 1;
     if (facturacionFiltro.trim()) n += 1;
+    if (liquidacionFiltro.trim()) n += 1;
     if (pagoTransportistaFiltro.trim()) n += 1;
     if (ubicacionFiltro.trim()) n += 1;
     if (fechaDesdeFiltro.trim() || fechaHastaFiltro.trim()) n += 1;
@@ -1377,6 +1393,7 @@ export function ViajesTenantPage({
     choferIdFiltroActivo,
     estadoFiltro,
     facturacionFiltro,
+    liquidacionFiltro,
     pagoTransportistaFiltro,
     ubicacionFiltro,
     fechaDesdeFiltro,
@@ -1530,6 +1547,7 @@ export function ViajesTenantPage({
         choferId: choferFiltro,
         estado: estF,
         facturacionEstado: facEstF,
+        liquidacionEstado: liqEstF,
         pagoTransportista: pagoTranspF,
         tipoFecha: tf,
         fechaDesde: fd,
@@ -1557,6 +1575,7 @@ export function ViajesTenantPage({
       if (choferFiltro) filtros.set("choferId", choferFiltro);
       if (estF.trim()) filtros.set("etapa", estF.trim());
       if (facEstF.trim()) filtros.set("facturacionEstado", facEstF.trim());
+      if (liqEstF.trim()) filtros.set("liquidacionEstado", liqEstF.trim());
       if (pagoTranspF === "sin_pagar" || pagoTranspF === "pagado") {
         filtros.set("pagoTransportista", pagoTranspF);
       }
@@ -1723,38 +1742,6 @@ export function ViajesTenantPage({
     setSearchParams,
     viajeApiUrl,
   ]);
-
-  async function patchEstadoDesdeListado(v: Viaje, nuevaEtapa: string) {
-    if (nuevaEtapa === v.etapa) {
-      setEstadoQuickId(null);
-      return;
-    }
-    setSavingEstadoId(v.id);
-    setError(null);
-    try {
-      const updated = await apiJson<Viaje>(
-        viajeApiUrl(v.id),
-        () => getToken(),
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            etapa: nuevaEtapa,
-            ...gananciaBrutaManualEnPatchParcial(v),
-          }),
-        },
-      );
-      setRows((prev) =>
-        prev ? prev.map((r) => (r.id === v.id ? updated : r)) : prev,
-      );
-      setEstadoQuickId(null);
-      showToast("Estado actualizado correctamente", "success");
-    } catch (e) {
-      setError(friendlyError(e, "viajes"));
-      showToast("No se pudo actualizar el estado", "error");
-    } finally {
-      setSavingEstadoId(null);
-    }
-  }
 
   function openVerFacturaFlow(v: Viaje) {
     if ((v.clientesViaje ?? []).length > 0) {
@@ -1998,10 +1985,59 @@ export function ViajesTenantPage({
   const mostrarColumnaChofer =
     isViajeFieldVisible("edicion_viaje", "choferId") ||
     isViajeFieldVisible("edicion_viaje", "choferExternoId");
-  const mostrarColumnaEtapa =
-    isViajeFieldVisible("detalle_viaje", "etapa") ||
-    isViajeFieldVisible("detalle_viaje", "facturacionEstado") ||
-    isViajeFieldVisible("detalle_viaje", "liquidacionEstado");
+  // Columna "Etapa": una sola línea con hasta 3 íconos (etapa, factura, liquidación),
+  // cada uno visible según la configuración de campos del tenant.
+  const mostrarColumnaEtapa = isViajeFieldVisible("detalle_viaje", "etapa");
+  const mostrarColumnaFactura = isViajeFieldVisible(
+    "detalle_viaje",
+    "facturacionEstado",
+  );
+  const mostrarColumnaLiquidacion = isViajeFieldVisible(
+    "detalle_viaje",
+    "liquidacionEstado",
+  );
+  const mostrarColumnaEstado =
+    mostrarColumnaEtapa || mostrarColumnaFactura || mostrarColumnaLiquidacion;
+  const cantidadColumnasEstado = mostrarColumnaEstado ? 1 : 0;
+
+  // Filtros de la columna Etapa. Los estados de AFIP solo se ofrecen si el tenant
+  // emite por ARCA (sin ARCA nunca existen y el filtro siempre vendría vacío).
+  const arcaFacturasResuelto = platform
+    ? canAccessEmisionFacturasArca(tenantModules ?? [])
+    : hasFacturasArca;
+  const opcionesFiltroFacturacion: { value: string; label: string }[] = [
+    { value: "", label: "Todas" },
+    { value: "sin_facturar", label: "Sin facturar" },
+    ...(arcaFacturasResuelto
+      ? [
+          { value: "borrador", label: "En borrador" },
+          { value: "esperando_afip", label: "Esperando AFIP" },
+        ]
+      : []),
+    { value: "facturado", label: "Facturado" },
+    { value: "cobrado", label: "Cobrado" },
+    ...(arcaFacturasResuelto
+      ? [
+          { value: "error_afip", label: "Error de AFIP" },
+          { value: "anulado", label: "Anulada" },
+        ]
+      : []),
+  ];
+  const opcionesFiltroLiquidacion: { value: string; label: string }[] = [
+    { value: "", label: "Todas" },
+    { value: "sin_liquidar", label: "Sin liquidar" },
+    ...(hasLiquidoProductoArcaResuelto
+      ? [
+          { value: "borrador", label: "En borrador" },
+          { value: "esperando_afip", label: "Esperando AFIP" },
+        ]
+      : []),
+    { value: "liquidado", label: "Liquidado" },
+    ...(hasLiquidoProductoArcaResuelto
+      ? [{ value: "error_afip", label: "Error de AFIP" }]
+      : []),
+    { value: "anulado", label: "Anulada" },
+  ];
   const mostrarPagosTransportista = isViajeFieldVisible(
     "edicion_viaje",
     "pagosTransportista",
@@ -2021,7 +2057,8 @@ export function ViajesTenantPage({
     return true;
   });
   const tableColSpanBase =
-    (mostrarColumnaChofer ? 8 : 7) +
+    (mostrarColumnaChofer ? 7 : 6) +
+    cantidadColumnasEstado +
     (mostrarColumnaTransporte ? 0 : -1) +
     (mostrarColumnaIdPropio2 ? 1 : 0) +
     (mostrarColumnaIdSistema ? 0 : -1) +
@@ -2639,40 +2676,93 @@ export function ViajesTenantPage({
                 </ViajesListadoHeaderFiltro>
               </th>
             )}
-            {mostrarColumnaEtapa && (
+            {mostrarColumnaEstado && (
               <th scope="col" className={`${listadoTablaThClass} align-top`}>
                 <ViajesListadoHeaderFiltro
                   title="Etapa"
-                  filterActive={!!estadoFiltro.trim()}
-                  filterSignature={estadoFiltro}
+                  filterActive={
+                    !!estadoFiltro.trim() ||
+                    !!facturacionFiltro.trim() ||
+                    !!liquidacionFiltro.trim()
+                  }
+                  filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
                   minWidthClass="min-w-0"
                   titleNoWrap
                 >
-                  <select
-                    value={estadoFiltro}
-                    onChange={(e) => aplicarFiltroEstado(e.target.value)}
-                    disabled={listadoRefetching}
-                    className={`h-9 w-full border border-black/15 bg-white px-2 text-sm ${
-                      estadoFiltro.trim()
-                        ? "text-vialto-fire"
-                        : "text-vialto-charcoal"
-                    }`}
-                    aria-label="Filtrar listado por etapa"
-                  >
-                    <option value="">TODOS</option>
-                    <option value="cancelado">CANCELADO</option>
-                    {VIAJE_ETAPAS_TODAS.filter((x) => x !== "cancelado").map(
-                      (est) => (
-                        <option
-                          key={est}
-                          value={est}
-                          title={tooltipEtapaViaje(est)}
+                  <div className="flex flex-col gap-2">
+                    {mostrarColumnaEtapa && (
+                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                        Etapa
+                        <select
+                          value={estadoFiltro}
+                          onChange={(e) => aplicarFiltroEstado(e.target.value)}
+                          disabled={listadoRefetching}
+                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                            estadoFiltro.trim()
+                              ? "text-vialto-fire"
+                              : "text-vialto-charcoal"
+                          }`}
                         >
-                          {etapaViajeLabel[est] ?? est}
-                        </option>
-                      ),
+                          <option value="">Todas</option>
+                          {VIAJE_ETAPAS_TODAS.map((est) => (
+                            <option
+                              key={est}
+                              value={est}
+                              title={tooltipEtapaViaje(est)}
+                            >
+                              {etapaViajeLabel[est] ?? est}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     )}
-                  </select>
+                    {mostrarColumnaFactura && (
+                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                        Factura
+                        <select
+                          value={facturacionFiltro}
+                          onChange={(e) =>
+                            aplicarFiltroFacturacion(e.target.value)
+                          }
+                          disabled={listadoRefetching}
+                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                            facturacionFiltro.trim()
+                              ? "text-vialto-fire"
+                              : "text-vialto-charcoal"
+                          }`}
+                        >
+                          {opcionesFiltroFacturacion.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {mostrarColumnaLiquidacion && (
+                      <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
+                        Liquidación
+                        <select
+                          value={liquidacionFiltro}
+                          onChange={(e) =>
+                            aplicarFiltroLiquidacion(e.target.value)
+                          }
+                          disabled={listadoRefetching}
+                          className={`h-9 w-full border border-black/15 bg-white px-2 text-sm normal-case tracking-normal ${
+                            liquidacionFiltro.trim()
+                              ? "text-vialto-fire"
+                              : "text-vialto-charcoal"
+                          }`}
+                        >
+                          {opcionesFiltroLiquidacion.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
                 </ViajesListadoHeaderFiltro>
               </th>
             )}
@@ -2910,56 +3000,17 @@ export function ViajesTenantPage({
                   </span>
                 </td>
               )}
-              {mostrarColumnaEtapa && (
+              {mostrarColumnaEstado && (
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex w-full flex-col gap-0.5">
-                    {isViajeFieldVisible("detalle_viaje", "etapa") && (
-                      estadoQuickId === v.id ? (
-                        <select
-                          autoFocus
-                          value={v.etapa}
-                          disabled={savingEstadoId === v.id}
-                          onChange={(e) =>
-                            void patchEstadoDesdeListado(v, e.target.value)
-                          }
-                          onBlur={() => setEstadoQuickId(null)}
-                          className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
-                          aria-label="Cambiar etapa del viaje"
-                        >
-                          {VIAJE_ETAPAS_TODAS.map((x) => (
-                            <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                              {etapaViajeLabel[x] ?? x}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <button
-                          type="button"
-                          title={tooltipEtapaViaje(v.etapa)}
-                          aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
-                          disabled={savingEstadoId === v.id}
-                          onClick={() => {
-                            if (savingEstadoId) return;
-                            setEstadoQuickId(v.id);
-                          }}
-                          className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-                            etapaViajeBadgeClass[v.etapa] ??
-                            etapaViajeBadgeClassDefault
-                          }`}
-                        >
-                          {savingEstadoId === v.id
-                            ? "…"
-                            : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
-                        </button>
-                      )
-                    )}
+                  <div className="flex items-center gap-1.5">
+                    {mostrarColumnaEtapa && <ViajeEtapaIcono etapa={v.etapa} />}
                     {v.etapa?.toLowerCase() !== "cancelado" && (
                       <>
-                        {isViajeFieldVisible("detalle_viaje", "facturacionEstado") && (
+                        {mostrarColumnaFactura && (
                           <ViajeFacturacionIndicador
                             viaje={v}
                             tenantId={platform ? tid : undefined}
-                            fullWidth
+                            variante="icono"
                             onClickOverride={
                               (v.clientesViaje ?? []).length > 0
                                 ? () => openVerFacturaFlow(v)
@@ -2967,21 +3018,22 @@ export function ViajesTenantPage({
                             }
                           />
                         )}
-                        {isViajeFieldVisible("detalle_viaje", "liquidacionEstado") && (
-                          hasLiquidacionesResuelto ? (
+                        {mostrarColumnaLiquidacion &&
+                          (hasLiquidacionesResuelto ? (
                             <ViajeLiquidacionIndicador
                               viaje={v}
                               tenantId={platform ? tid : undefined}
                               hasArca={hasLiquidoProductoArcaResuelto}
                               onRegistrarPago={() => setRegistrarPagoViaje(v)}
+                              variante="icono"
                             />
                           ) : (
                             <ViajePagoTransportistaIndicador
                               viaje={v}
                               onClick={() => setRegistrarPagoViaje(v)}
+                              variante="icono"
                             />
-                          )
-                        )}
+                          ))}
                       </>
                     )}
                   </div>
@@ -2996,37 +3048,39 @@ export function ViajesTenantPage({
                   className="max-w-[11rem]"
                 />
               </td>
-              <td
-                className="px-3 py-2 whitespace-nowrap text-vialto-steel tabular-nums"
-                title={
-                  v.fechaDescarga
-                    ? `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}\nDescarga: ${formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}`
-                    : `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}`
-                }
-              >
-                <span
-                  className={
-                    ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""
+              <td className="px-3 py-2 text-vialto-steel tabular-nums">
+                <div
+                  className="max-w-[6.5rem] truncate"
+                  title={
+                    v.fechaDescarga
+                      ? `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}\nDescarga: ${formatIsoFechaHoraListadoEsAr(v.fechaDescarga)}`
+                      : `Carga: ${formatIsoFechaHoraListadoEsAr(v.fechaCarga)}`
                   }
                 >
-                  {formatIsoFechaCortaListadoEsAr(v.fechaCarga)}
-                </span>
-                {v.fechaDescarga && (
-                  <>
-                    <span className="mx-1 text-vialto-steel/75" aria-hidden>
-                      →
-                    </span>
-                    <span
-                      className={
-                        ordenResaltaFechaDescarga
-                          ? "font-medium text-vialto-charcoal"
-                          : ""
-                      }
-                    >
-                      {formatIsoFechaCortaListadoEsAr(v.fechaDescarga)}
-                    </span>
-                  </>
-                )}
+                  <span
+                    className={
+                      ordenResaltaFechaCarga ? "font-medium text-vialto-charcoal" : ""
+                    }
+                  >
+                    {formatIsoFechaCortaListadoEsAr(v.fechaCarga)}
+                  </span>
+                  {v.fechaDescarga && (
+                    <>
+                      <span className="mx-1 text-vialto-steel/75" aria-hidden>
+                        →
+                      </span>
+                      <span
+                        className={
+                          ordenResaltaFechaDescarga
+                            ? "font-medium text-vialto-charcoal"
+                            : ""
+                        }
+                      >
+                        {formatIsoFechaCortaListadoEsAr(v.fechaDescarga)}
+                      </span>
+                    </>
+                  )}
+                </div>
               </td>
               <td
                 className="px-3 py-2 text-right"
@@ -3125,44 +3179,17 @@ export function ViajesTenantPage({
               className="flex w-full flex-col gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
-              {isViajeFieldVisible("detalle_viaje", "etapa") && (
-                estadoQuickId === v.id ? (
-                  <select
-                    autoFocus
-                    value={v.etapa}
-                    disabled={savingEstadoId === v.id}
-                    onChange={(e) =>
-                      void patchEstadoDesdeListado(v, e.target.value)
-                    }
-                    onBlur={() => setEstadoQuickId(null)}
-                    className="h-9 w-full min-w-[9rem] border border-black/15 bg-white px-2 text-sm disabled:opacity-60"
-                    aria-label="Cambiar etapa del viaje"
-                  >
-                    {VIAJE_ETAPAS_TODAS.map((x) => (
-                      <option key={x} value={x} title={tooltipEtapaViaje(x)}>
-                        {etapaViajeLabel[x] ?? x}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <button
-                    type="button"
-                    title={tooltipEtapaViaje(v.etapa)}
-                    aria-label={`Etapa ${etapaViajeLabel[v.etapa] ?? v.etapa}. Abrir selector para cambiar.`}
-                    disabled={savingEstadoId === v.id}
-                    onClick={() => {
-                      if (savingEstadoId) return;
-                      setEstadoQuickId(v.id);
-                    }}
-                    className={`inline-block whitespace-nowrap rounded-sm border text-left font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 cursor-pointer hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
-                      etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
-                    }`}
-                  >
-                    {savingEstadoId === v.id
-                      ? "…"
-                      : (etapaViajeLabel[v.etapa] ?? "Sin clasificar")}
-                  </button>
-                )
+              {mostrarColumnaEtapa && (
+                // Solo lectura: la etapa se actualiza sola por fechas; los cambios
+                // manuales (cancelar, viajes sin fechas) se hacen desde el modal del viaje.
+                <span
+                  title={tooltipEtapaViaje(v.etapa)}
+                  className={`inline-block self-start whitespace-nowrap rounded-sm border font-[family-name:var(--font-ui)] text-[11px] uppercase tracking-wider px-2 py-0.5 ${
+                    etapaViajeBadgeClass[v.etapa] ?? etapaViajeBadgeClassDefault
+                  }`}
+                >
+                  {etapaViajeLabel[v.etapa] ?? "Sin clasificar"}
+                </span>
               )}
               {v.etapa?.toLowerCase() !== "cancelado" && (
                 <>
@@ -3253,7 +3280,7 @@ export function ViajesTenantPage({
                 ...(mostrarColumnaChofer
                   ? [{ label: "Chofer", value: nombreChofer }]
                   : []),
-                ...(mostrarColumnaEtapa
+                ...(mostrarColumnaEstado
                   ? [{ label: "Etapa", value: estadoValue }]
                   : []),
                 {
