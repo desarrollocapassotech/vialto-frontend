@@ -54,6 +54,8 @@ export type FacturaArcaPreviewPanelProps = {
   onClienteUpdated?: (c: Cliente) => void;
   /** true = el contenedor muestra el aviso de datos faltantes (fijo) y el form del cliente (modal); el panel no los repite. */
   avisoFaltantesExterno?: boolean;
+  /** Línea debajo del nombre del receptor (ej. estado de la validación contra ARCA). */
+  estadoReceptor?: ReactNode;
   feedbackSlot?: ReactNode;
 };
 
@@ -75,6 +77,7 @@ export function FacturaArcaPreviewPanel({
   getToken,
   onClienteUpdated,
   avisoFaltantesExterno = false,
+  estadoReceptor,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
   const condicionIva = clienteDetalle?.condicionIva ?? null;
@@ -127,6 +130,7 @@ export function FacturaArcaPreviewPanel({
                   .join("\n")
               : undefined
           }
+          estado={estadoReceptor}
         />
       </div>
 

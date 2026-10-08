@@ -1590,6 +1590,32 @@ export function CrearLiquidacionManualModal({
                           ) : undefined
                         }
                       />
+                      {/* Cliente de los viajes elegidos: también se valida contra ARCA. */}
+                      {clienteDetalle && (
+                        <ParteFacturaResumen
+                          titulo="Cliente"
+                          nombre={clienteDetalle.nombre}
+                          detalle={[
+                            condicionIvaLabel(clienteDetalle.condicionIva ?? null),
+                            clienteDetalle.idFiscal
+                              ? `CUIT ${clienteDetalle.idFiscal}`
+                              : null,
+                            clienteDetalle.direccion?.trim(),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
+                          estado={
+                            <PadronValidacionEstado
+                              habilitado={validacionPadronHabilitada}
+                              pendiente={padronCliente.pendiente}
+                              resultado={padronCliente.resultado}
+                              consultado={padronCliente.consultado}
+                              onRevisar={() => setModalDatos("cliente")}
+                              onReintentar={() => void padronCliente.revalidar()}
+                            />
+                          }
+                        />
+                      )}
                     </div>
 
                     {(showFechaDesde || showFechaHasta) && (

@@ -16,6 +16,9 @@ import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPre
 import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
 import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
 import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
+import { useValidacionPadronRegistro } from "@/hooks/useValidacionPadronRegistro";
+import { useTenantPaisFijo } from "@/hooks/useTenantPaisFijo";
+import { PadronValidacionEstado } from "@/components/shared/PadronValidacionEstado";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaTotalesPreview,
@@ -415,6 +418,28 @@ export function FacturaCreateModal({
   const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
   const datosClienteAvisadoRef = useRef<string | null>(null);
 
+  // Al elegir el cliente se valida su CUIT contra el padrón de ARCA (opt-in por empresa,
+  // mismo circuito que el transportista en "Nueva liquidación"): si ARCA informa otra
+  // condición IVA / domicilio, el modal se abre con eso precargado y al guardar queda la
+  // huella de validado (no se vuelve a consultar mientras esos datos no cambien).
+  const { tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
+  const validacionPadronHabilitada =
+    unifiedArca && tenantEfectivo?.validacionCuitArcaHabilitada === true;
+  const clienteElegidoId =
+    clienteDetalle && clienteDetalle.id === draft.clienteId ? clienteDetalle.id : null;
+  const padronCliente = useValidacionPadronRegistro({
+    entidad: "clientes",
+    id: open ? clienteElegidoId : null,
+    habilitado: validacionPadronHabilitada,
+    tenantId,
+    getToken,
+  });
+  const padronClienteAviso =
+    padronCliente.resultado?.resultado === "diferencias" ||
+    padronCliente.resultado?.resultado === "rechazado"
+      ? padronCliente.resultado
+      : null;
+
   // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
   const zumbidoAviso = useZumbidoAviso();
   useEffect(() => {
@@ -423,13 +448,22 @@ export function FacturaCreateModal({
       setDatosClienteModalOpen(false);
       return;
     }
-    if (!unifiedArca || !datosReady || !clienteDetalle) return;
-    if (clienteDetalle.id !== draft.clienteId) return;
-    if (missingClienteFields.length === 0) return;
-    if (datosClienteAvisadoRef.current === clienteDetalle.id) return;
-    datosClienteAvisadoRef.current = clienteDetalle.id;
+    if (!unifiedArca || !datosReady || !clienteElegidoId) return;
+    // Se espera la respuesta de ARCA para abrir el modal ya precargado.
+    if (padronCliente.pendiente) return;
+    if (missingClienteFields.length === 0 && !padronClienteAviso) return;
+    if (datosClienteAvisadoRef.current === clienteElegidoId) return;
+    datosClienteAvisadoRef.current = clienteElegidoId;
     setDatosClienteModalOpen(true);
-  }, [open, unifiedArca, datosReady, clienteDetalle, draft.clienteId, missingClienteFields.length]);
+  }, [
+    open,
+    unifiedArca,
+    datosReady,
+    clienteElegidoId,
+    missingClienteFields.length,
+    padronCliente.pendiente,
+    padronClienteAviso,
+  ]);
 
   const [frozenLineas, setFrozenLineas] = useState<FacturaLineaDraft[] | null>(null);
 
@@ -1180,6 +1214,18 @@ export function FacturaCreateModal({
                         onDataSaved?.();
                       }}
                       avisoFaltantesExterno
+                      estadoReceptor={
+                        clienteElegidoId ? (
+                          <PadronValidacionEstado
+                            habilitado={validacionPadronHabilitada}
+                            pendiente={padronCliente.pendiente}
+                            resultado={padronCliente.resultado}
+                            consultado={padronCliente.consultado}
+                            onRevisar={() => setDatosClienteModalOpen(true)}
+                            onReintentar={() => void padronCliente.revalidar()}
+                          />
+                        ) : undefined
+                      }
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError &&
@@ -1415,31 +1461,52 @@ export function FacturaCreateModal({
         />
       )}
 
-      {clienteDetalle && missingClienteFields.length > 0 && (
-        <DatosFiscalesFaltantesModal
-          open={datosClienteModalOpen && step === "form"}
-          entidad="cliente"
-          id={clienteDetalle.id}
-          nombre={clienteDetalle.nombre}
-          initial={{
-            nombre: clienteDetalle.nombre ?? "",
-            pais: clienteDetalle.pais ?? null,
-            idFiscal: clienteDetalle.idFiscal ?? null,
-            condicionIva: clienteDetalle.condicionIva ?? null,
-            condicionTributaria: clienteDetalle.condicionTributaria ?? null,
-            direccion: clienteDetalle.direccion ?? null,
-          }}
-          missingFields={missingClienteFields}
-          accion="emitir una factura"
-          tenantId={tenantId}
-          getToken={getToken}
-          onSaved={(c) => {
-            setClienteDetalle(c as Cliente);
-            onDataSaved?.();
-          }}
-          onClose={() => setDatosClienteModalOpen(false)}
-        />
-      )}
+      {clienteDetalle &&
+        (missingClienteFields.length > 0 || padronClienteAviso) && (
+          <DatosFiscalesFaltantesModal
+            // Remonta al llegar la respuesta de ARCA para que el formulario tome lo precargado.
+            key={`${clienteDetalle.id}-${padronClienteAviso?.resultado ?? "sin-arca"}`}
+            open={datosClienteModalOpen && step === "form"}
+            entidad="cliente"
+            id={clienteDetalle.id}
+            nombre={clienteDetalle.nombre}
+            initial={{
+              nombre: clienteDetalle.nombre ?? "",
+              pais: clienteDetalle.pais ?? null,
+              idFiscal: clienteDetalle.idFiscal ?? null,
+              condicionIva:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("condicionIva")
+                  ? padronClienteAviso.padron.condicionIva
+                  : (clienteDetalle.condicionIva ?? null),
+              condicionTributaria: clienteDetalle.condicionTributaria ?? null,
+              direccion:
+                padronClienteAviso?.resultado === "diferencias" &&
+                padronClienteAviso.diferencias.includes("domicilio")
+                  ? padronClienteAviso.padron.domicilio
+                  : (clienteDetalle.direccion ?? null),
+            }}
+            missingFields={missingClienteFields}
+            padron={padronClienteAviso}
+            accion="emitir una factura"
+            tenantId={tenantId}
+            getToken={getToken}
+            onSaved={(c) => {
+              setClienteDetalle(c as Cliente);
+              onDataSaved?.();
+              if (padronClienteAviso) {
+                // Revisó y guardó contra lo de ARCA: se guarda la huella de validado.
+                void padronCliente.confirmar();
+              } else {
+                // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
+                // coincide se guarda la huella, si no, el modal se reabre precargado.
+                datosClienteAvisadoRef.current = null;
+                void padronCliente.revalidar();
+              }
+            }}
+            onClose={() => setDatosClienteModalOpen(false)}
+          />
+        )}
     </>
   );
 }
