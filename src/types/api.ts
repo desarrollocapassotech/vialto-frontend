@@ -674,7 +674,17 @@ export interface ImportPreviewFilaEntidad {
   esNuevo: boolean;
   /** Solo si `esNuevo` es false: la fila no cambia nada del registro existente. */
   sinCambios?: boolean;
+  /** Solo si actualiza un registro existente: qué campos cambian (valor actual → valor del Excel). */
+  cambios?: ImportPreviewFilaCambio[];
   campos: ImportPreviewFilaCampo[];
+}
+
+export interface ImportPreviewFilaCambio {
+  campo: string;
+  /** Encabezado de la columna en el Excel. */
+  label: string;
+  antes: string | null;
+  despues: string | null;
 }
 
 /** Clientes/Transportistas/Choferes: fila cuyo campo único (ID Fiscal o DNI) ya pertenece a otra entidad existente (nombre distinto) — requiere elegir "ignorar" o "actualizar" antes de confirmar. */

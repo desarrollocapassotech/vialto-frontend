@@ -533,6 +533,8 @@ export function useImportWizard(
   async function confirmarModuloActual(
     confirmarCamposFaltantes?: boolean,
     decisionesCampoUnicoDuplicado?: { fila: number; accion: "ignorar" | "actualizar" }[],
+    /** Filas que el usuario eligió no importar en este paso (ej. "Ignorar fila" en una que actualiza). */
+    filasIgnoradas?: number[],
   ) {
     if (!preview || !moduloActual) return;
     setLoading(true);
@@ -552,9 +554,11 @@ export function useImportWizard(
       if (moduloActual === "viajes" && ciudadesNormalizadasRef.current.length > 0) {
         body.ciudadesNormalizadas = ciudadesNormalizadasRef.current;
       }
-      if (moduloActual === "viajes" && filasExcluidasRef.current.size > 0) {
-        body.filasExcluidas = [...filasExcluidasRef.current];
+      const excluidas = new Set(filasIgnoradas ?? []);
+      if (moduloActual === "viajes") {
+        for (const f of filasExcluidasRef.current) excluidas.add(f);
       }
+      if (excluidas.size > 0) body.filasExcluidas = [...excluidas];
       if (confirmarCamposFaltantes) {
         body.confirmarCamposFaltantes = true;
       }
