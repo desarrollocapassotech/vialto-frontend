@@ -14,6 +14,7 @@ import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
 import { DatosClienteFaltantesModal } from "@/components/facturacion/DatosClienteFaltantesModal";
+import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaTotalesPreview,
   facturaPayloadFromDraft,
@@ -1096,23 +1097,31 @@ export function FacturaCreateModal({
           ) : null}
           <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/10 px-4 py-4 sm:px-6">
             <div className="min-w-0">
-              <h2
-                id="factura-create-modal-title"
-                className="text-base font-semibold text-vialto-charcoal"
-              >
-                {step === "autorizada" ? (
-                  "Factura emitida"
-                ) : (
-                  <>
-                    Nueva factura
-                    {draft.letraComprobante === "a"
-                      ? " A"
-                      : draft.letraComprobante === "b"
-                        ? " B"
-                        : ""}
-                  </>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="factura-create-modal-title"
+                  className="text-base font-semibold text-vialto-charcoal"
+                >
+                  {step === "autorizada" ? (
+                    "Factura emitida"
+                  ) : (
+                    <>
+                      Nueva factura
+                      {draft.letraComprobante === "a"
+                        ? " A"
+                        : draft.letraComprobante === "b"
+                          ? " B"
+                          : ""}
+                    </>
+                  )}
+                </h2>
+                {/* Mismo distintivo que "Nueva liquidación": ambiente de ARCA del tenant (o el de la factura ya emitida). */}
+                {unifiedArca && (
+                  <AmbienteTestBadge
+                    ambiente={facturaEmitida?.ambiente ?? arcaConfig?.ambiente}
+                  />
                 )}
-              </h2>
+              </div>
               <p className="mt-1 text-xs text-vialto-steel">
                 {step === "autorizada" ? (
                   "El comprobante fue autorizado por ARCA."
