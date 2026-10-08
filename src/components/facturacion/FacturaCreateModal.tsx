@@ -266,21 +266,6 @@ export function FacturaCreateModal({
     return Array.from(map.values());
   }, [clientes, viajes, viajesLoading]);
 
-  const allowedClienteIds = useMemo(() => {
-    if (draft.viajeIds.length === 0) return null;
-
-    const activeTrips = viajes.filter((v) => draft.viajeIds.includes(v.id));
-    const ids = new Set<string>();
-
-    activeTrips.forEach((v) => {
-      if (v.clienteId) ids.add(v.clienteId);
-      v.clientesViaje?.forEach((cv) => {
-        if (cv.clienteId) ids.add(cv.clienteId);
-      });
-    });
-    return ids;
-  }, [draft.viajeIds, viajes]);
-
   const derivedViajes = useMemo(() => {
     return viajes.map((v) => {
       if (draft.clienteId && v.clientesViaje) {
@@ -343,10 +328,12 @@ export function FacturaCreateModal({
   const [tramosIncomplete, setTramosIncomplete] = useState<number[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig | null>(null);
 
+  // No se restringe a los clientes de los viajes ya tildados: cambiar de cliente limpia
+  // la selección de viajes (`onClienteChange`), así que siempre se ofrece el catálogo completo.
+  // (Antes se filtraba por los clientes de los viajes tildados y el select quedaba solo
+  // con el cliente actual.)
   const filteredClientes = useMemo(() => {
-    const base = !allowedClienteIds
-      ? allAvailableClientes
-      : allAvailableClientes.filter((c) => allowedClienteIds.has(c.id));
+    const base = allAvailableClientes;
 
     if (draft.clienteId && !base.some((c) => c.id === draft.clienteId)) {
       const fallback =
@@ -357,7 +344,7 @@ export function FacturaCreateModal({
     }
 
     return base;
-  }, [allAvailableClientes, allowedClienteIds, draft.clienteId, clienteDetalle]);
+  }, [allAvailableClientes, draft.clienteId, clienteDetalle]);
 
   // Si el cliente elegido queda sin ningún viaje disponible una vez que `viajes` ya
   // terminó de cargar (p. ej. se lo seleccionó durante la ventana de carga inicial, o el
