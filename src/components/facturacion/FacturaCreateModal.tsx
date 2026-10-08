@@ -9,11 +9,13 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { AlertTriangle, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
-import { DatosClienteFaltantesModal } from "@/components/facturacion/DatosClienteFaltantesModal";
+import { DatosFiscalesFaltantesModal } from "@/components/shared/DatosFiscalesFaltantesModal";
+import { AvisoFaltantesEmision } from "@/components/shared/AvisoFaltantesEmision";
+import { useZumbidoAviso } from "@/hooks/useZumbidoAviso";
 import { AmbienteTestBadge } from "@/components/liquidaciones/AmbienteTestBadge";
 import {
   FacturaTotalesPreview,
@@ -413,13 +415,8 @@ export function FacturaCreateModal({
   const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
   const datosClienteAvisadoRef = useRef<string | null>(null);
 
-  // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes. Si ya estaba
-  // zumbando, se quita la clase y se vuelve a poner en el próximo frame para reiniciarlo.
-  const [zumbidoAviso, setZumbidoAviso] = useState(false);
-  const dispararZumbidoAviso = useCallback(() => {
-    setZumbidoAviso(false);
-    requestAnimationFrame(() => setZumbidoAviso(true));
-  }, []);
+  // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes.
+  const zumbidoAviso = useZumbidoAviso();
   useEffect(() => {
     if (!open) {
       datosClienteAvisadoRef.current = null;
@@ -1320,35 +1317,21 @@ export function FacturaCreateModal({
             <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
               {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
               {unifiedArca && datosEmitIncompletos && (
-                <div
-                  role="alert"
-                  onAnimationEnd={() => setZumbidoAviso(false)}
-                  className={`${zumbidoAviso ? "aviso-zumbido " : ""}mr-auto flex min-w-0 flex-1 basis-full items-center gap-2 rounded border px-3 py-1.5 text-xs sm:basis-0 ${
-                    missingHiddenClienteFields.length > 0
-                      ? "border-red-500/40 bg-red-50 text-red-900"
-                      : "border-amber-400/50 bg-amber-50 text-amber-900"
-                  }`}
-                >
-                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-                  <p className="min-w-0 flex-1 font-medium">
-                    {missingClienteFields.length === missingEmitFields.length
+                <AvisoFaltantesEmision
+                  mensaje={
+                    missingClienteFields.length === missingEmitFields.length
                       ? "Faltan datos del cliente para poder facturar."
-                      : "Faltan datos para poder facturar."}
-                    {missingHiddenClienteFields.length > 0 &&
-                      " Hay campos ocultos: contactá al administrador para habilitarlos."}
-                  </p>
-                  {clienteDetalle &&
-                    missingClienteFields.length > 0 &&
-                    missingHiddenClienteFields.length === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setDatosClienteModalOpen(true)}
-                        className="shrink-0 border border-amber-500/60 bg-white px-2.5 py-1 text-[10px] uppercase tracking-wider text-amber-900 hover:bg-amber-100"
-                      >
-                        Completar datos
-                      </button>
-                    )}
-                </div>
+                      : "Faltan datos para poder facturar."
+                  }
+                  hayOcultos={missingHiddenClienteFields.length > 0}
+                  onCompletar={
+                    clienteDetalle && missingClienteFields.length > 0
+                      ? () => setDatosClienteModalOpen(true)
+                      : undefined
+                  }
+                  zumbando={zumbidoAviso.zumbando}
+                  onZumbidoEnd={zumbidoAviso.terminar}
+                />
               )}
               <button
                 type="button"
@@ -1381,7 +1364,7 @@ export function FacturaCreateModal({
                     aria-disabled={datosEmitIncompletos || undefined}
                     onClick={() => {
                       if (datosEmitIncompletos) {
-                        dispararZumbidoAviso();
+                        zumbidoAviso.disparar();
                         return;
                       }
                       void handleUnifiedSubmit("emitir");
@@ -1433,14 +1416,25 @@ export function FacturaCreateModal({
       )}
 
       {clienteDetalle && missingClienteFields.length > 0 && (
-        <DatosClienteFaltantesModal
+        <DatosFiscalesFaltantesModal
           open={datosClienteModalOpen && step === "form"}
-          cliente={clienteDetalle}
-          missingClienteFields={missingClienteFields}
+          entidad="cliente"
+          id={clienteDetalle.id}
+          nombre={clienteDetalle.nombre}
+          initial={{
+            nombre: clienteDetalle.nombre ?? "",
+            pais: clienteDetalle.pais ?? null,
+            idFiscal: clienteDetalle.idFiscal ?? null,
+            condicionIva: clienteDetalle.condicionIva ?? null,
+            condicionTributaria: clienteDetalle.condicionTributaria ?? null,
+            direccion: clienteDetalle.direccion ?? null,
+          }}
+          missingFields={missingClienteFields}
+          accion="emitir una factura"
           tenantId={tenantId}
           getToken={getToken}
-          onClienteUpdated={(c) => {
-            setClienteDetalle(c);
+          onSaved={(c) => {
+            setClienteDetalle(c as Cliente);
             onDataSaved?.();
           }}
           onClose={() => setDatosClienteModalOpen(false)}

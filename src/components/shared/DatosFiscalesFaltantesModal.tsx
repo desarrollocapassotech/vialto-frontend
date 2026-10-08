@@ -1,39 +1,59 @@
 import { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
-import { CompletarDatosFiscalesInline } from "@/components/shared/CompletarDatosFiscalesInline";
+import {
+  CompletarDatosFiscalesInline,
+  type CompletarDatosFiscalesInitial,
+} from "@/components/shared/CompletarDatosFiscalesInline";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { MODAL_Z_STACKED } from "@/lib/modalLayers";
-import type { Cliente } from "@/types/api";
+import type { Cliente, Transportista } from "@/types/api";
+
+type Entidad = "cliente" | "transportista";
+
+const ENTIDAD_LABEL: Record<Entidad, string> = {
+  cliente: "cliente",
+  transportista: "transportista",
+};
 
 /**
- * Se abre sobre "Nueva factura" al elegir un cliente al que le faltan datos fiscales
- * que ARCA exige para emitir. Permite completarlos ahí mismo; si alguno es un campo
- * oculto para la empresa, solo informa (no se puede editar desde la UI).
+ * Se abre sobre "Nueva factura" / "Nueva liquidación" cuando el cliente o transportista
+ * elegido no tiene los datos fiscales que ARCA exige para emitir. Permite completarlos
+ * ahí mismo; si alguno es un campo oculto para la empresa, solo informa.
  */
-export function DatosClienteFaltantesModal({
+export function DatosFiscalesFaltantesModal({
   open,
-  cliente,
-  missingClienteFields,
+  entidad,
+  id,
+  nombre,
+  initial,
+  missingFields,
+  accion,
   tenantId,
   getToken,
-  onClienteUpdated,
+  onSaved,
   onClose,
 }: {
   open: boolean;
-  cliente: Cliente;
-  /** Campos faltantes con prefijo "Cliente: ..." (de `collectFacturaEmitMissingFields`). */
-  missingClienteFields: string[];
+  entidad: Entidad;
+  id: string;
+  nombre: string;
+  initial: CompletarDatosFiscalesInitial;
+  /** Campos faltantes de esta entidad, con prefijo "Cliente: ..." / "Transportista: ...". */
+  missingFields: string[];
+  /** Qué se quiere hacer: "emitir una factura", "emitir una liquidación"... */
+  accion: string;
   tenantId?: string;
   getToken: () => Promise<string | null>;
-  onClienteUpdated: (c: Cliente) => void;
+  onSaved: (updated: Cliente | Transportista) => void;
   onClose: () => void;
 }) {
   const titleId = useId();
-  const missingHiddenFields = useHiddenFiscalFields(missingClienteFields);
+  const missingHiddenFields = useHiddenFiscalFields(missingFields);
   const hayOcultos = missingHiddenFields.length > 0;
+  const label = ENTIDAD_LABEL[entidad];
 
-  // Escape cierra solo este modal: se corta en captura para que no llegue al de la factura.
+  // Escape cierra solo este modal: se corta en captura para que no llegue al de abajo.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -51,7 +71,11 @@ export function DatosClienteFaltantesModal({
     <div
       className={`fixed inset-0 ${MODAL_Z_STACKED} flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4`}
       role="presentation"
-      onClick={onClose}
+      // stopPropagation: el portal igual burbujea por el árbol de React hasta el modal de abajo.
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         role="dialog"
@@ -64,14 +88,14 @@ export function DatosClienteFaltantesModal({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-semibold text-vialto-charcoal">
-              Faltan datos del cliente
+              Faltan datos del {label}
             </h2>
             <p className="mt-1 text-xs text-vialto-steel">
-              Para emitir una factura a ARCA, <strong className="text-vialto-charcoal">{cliente.nombre}</strong>{" "}
+              Para {accion} a ARCA, <strong className="text-vialto-charcoal">{nombre}</strong>{" "}
               necesita tener cargados:
             </p>
             <ul className="mt-1.5 list-disc pl-4 text-xs text-vialto-charcoal">
-              {missingClienteFields.map((f) => (
+              {missingFields.map((f) => (
                 <li key={f}>{formatMissingFiscalField(f)}</li>
               ))}
             </ul>
@@ -108,24 +132,17 @@ export function DatosClienteFaltantesModal({
             </div>
           ) : (
             <CompletarDatosFiscalesInline
-              entidad="cliente"
-              id={cliente.id}
+              entidad={entidad}
+              id={id}
               tenantId={tenantId}
               getToken={getToken}
               forceArcaFields
-              initial={{
-                nombre: cliente.nombre ?? "",
-                pais: cliente.pais ?? null,
-                idFiscal: cliente.idFiscal ?? null,
-                condicionIva: cliente.condicionIva ?? null,
-                condicionTributaria: cliente.condicionTributaria ?? null,
-                direccion: cliente.direccion ?? null,
-              }}
+              initial={initial}
               onCancel={onClose}
               cancelLabel="Completar después"
               saveLabel="Guardar"
-              onSaved={(c) => {
-                onClienteUpdated(c as Cliente);
+              onSaved={(updated) => {
+                onSaved(updated);
                 onClose();
               }}
             />

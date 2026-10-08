@@ -100,6 +100,7 @@ export function ConceptosLiquidacionLineasEditor({
   onChange,
   disabled,
   incompleteIndices,
+  mostrarEfectoNeto = true,
   viajesDisponibles = [],
   autoFillBlockedConcepts = false,
 }: {
@@ -109,6 +110,8 @@ export function ConceptosLiquidacionLineasEditor({
   disabled?: boolean;
   /** Índices de filas a marcar tras un intento de guardar con conceptos incompletos. */
   incompleteIndices?: number[];
+  /** false = no muestra la fila "Efecto neto" (ej. cuando el resumen ya lo refleja en otro panel). */
+  mostrarEfectoNeto?: boolean;
   /** Viajes incluidos en la liquidación para permitir la asignación por línea. */
   viajesDisponibles?: ViajeOpcionDraft[];
   /** Si es true, autoinyecta los conceptos bloqueados al cargar el catálogo (solo para creación). */
@@ -579,7 +582,7 @@ export function ConceptosLiquidacionLineasEditor({
         </div>
       )}
 
-      {lineas.length > 0 && (
+      {mostrarEfectoNeto && lineas.length > 0 && (
         <div className="flex justify-between border-t border-black/10 pt-2 text-xs">
           <span className="uppercase tracking-[0.12em] text-vialto-steel">
             Efecto neto
