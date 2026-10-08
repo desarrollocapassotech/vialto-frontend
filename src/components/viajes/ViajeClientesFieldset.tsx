@@ -132,6 +132,8 @@ interface Props {
   labelPrefix?: string;
   /** Si se muestra la sección de Carga (productos) por fila. Default true. */
   mostrarProductos?: boolean;
+  /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
+  sugerenciasCiudad?: boolean;
 }
 
 /**
@@ -159,6 +161,7 @@ export function ViajeClientesFieldset({
   labelPrefix = 'Cliente adicional',
   mostrarProductos = true,
   paisFijo = null,
+  sugerenciasCiudad = true,
 }: Props) {
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(
@@ -274,6 +277,7 @@ export function ViajeClientesFieldset({
                       onChange={(next) => update(i, { origen: next })}
                       inputClassName={inputClass}
                       disableBrowserAutocomplete
+                      sugerencias={sugerenciasCiudad}
                     />
                   </div>
                 </div>
@@ -290,6 +294,7 @@ export function ViajeClientesFieldset({
                   onNuevoPais={(destinoIndex) => onNuevoPaisDestino(i, destinoIndex)}
                   paisFijo={paisFijo}
                   sugerenciaPrimerDestino={sugerenciaDestino}
+                  sugerenciasCiudad={sugerenciasCiudad}
                 />
               </div>
               {mostrarProductos && (

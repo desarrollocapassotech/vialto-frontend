@@ -233,6 +233,8 @@ export function CamposEmpresaPage() {
   const [savingTipoFlota, setSavingTipoFlota] = useState(false);
   const [empresaDashboardHabilitado, setEmpresaDashboardHabilitado] = useState(true);
   const [savingDashboardHabilitado, setSavingDashboardHabilitado] = useState(false);
+  const [empresaRecomendacionCiudades, setEmpresaRecomendacionCiudades] = useState(true);
+  const [savingRecomendacionCiudades, setSavingRecomendacionCiudades] = useState(false);
   // Choferes/Vehículos/Productos no son flags del Tenant: son campos de Viajes
   // (tenant-field-config), ver SWITCHES_ENTIDAD_VIAJES. campo → visible.
   const [empresaSwitchEntidad, setEmpresaSwitchEntidad] = useState<
@@ -301,6 +303,7 @@ export function CamposEmpresaPage() {
           setEmpresaValidacionCuitArca(tenant.validacionCuitArcaHabilitada ?? false);
           setEmpresaTipoFlota(tenant.tipoFlota ?? "mixta");
           setEmpresaDashboardHabilitado(tenant.dashboardHabilitado ?? true);
+          setEmpresaRecomendacionCiudades(tenant.recomendacionCiudadesHabilitada ?? true);
           setEmpresaTenant(tenant);
         }
       } catch (e) {
@@ -466,6 +469,27 @@ export function CamposEmpresaPage() {
       showToast(msg, "error");
     } finally {
       setSavingValidacionCuitArca(false);
+    }
+  }
+
+  async function toggleRecomendacionCiudades() {
+    if (!filtroEmpresa) return;
+    const nuevoValor = !empresaRecomendacionCiudades;
+    setSavingRecomendacionCiudades(true);
+    setEmpresaConfigError(null);
+    try {
+      await apiJson(`/api/tenants/${encodeURIComponent(filtroEmpresa)}`, () => getToken(), {
+        method: "PATCH",
+        body: JSON.stringify({ recomendacionCiudadesHabilitada: nuevoValor }),
+      });
+      setEmpresaRecomendacionCiudades(nuevoValor);
+      showToast("Cambios guardados", "success");
+    } catch (e) {
+      const msg = friendlyError(e, "camposEmpresa");
+      setEmpresaConfigError(msg);
+      showToast(msg, "error");
+    } finally {
+      setSavingRecomendacionCiudades(false);
     }
   }
 
@@ -1300,6 +1324,28 @@ export function CamposEmpresaPage() {
                             </td>
                           </tr>
                         )}
+                        <tr className="border-t border-black/10">
+                          <td className="px-4 py-2.5">
+                            Recomendación de ciudades (Viajes)
+                            <p className="mt-0.5 text-xs font-normal text-vialto-steel">
+                              Prendido: origen y destino se eligen de un buscador
+                              de ciudades, y la importación valida las ciudades
+                              del Excel. Apagado: se escriben como texto libre.
+                            </p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <ToggleSwitch
+                              checked={empresaRecomendacionCiudades}
+                              disabled={savingRecomendacionCiudades}
+                              onChange={() => void toggleRecomendacionCiudades()}
+                              label={
+                                empresaRecomendacionCiudades
+                                  ? "Deshabilitar recomendación de ciudades"
+                                  : "Habilitar recomendación de ciudades"
+                              }
+                            />
+                          </td>
+                        </tr>
                         <tr className="border-t border-black/10">
                           <td className="px-4 py-2.5">
                             Validar CUIT con ARCA (Clientes y Transportistas)

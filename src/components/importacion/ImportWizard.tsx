@@ -126,7 +126,7 @@ export function ImportWizard({
   // el paso "Transportes" no se ofrece ni se recorre.
   const { transportistaExternoVisible } = useTipoFlotaVisible(tenantId);
   // País fijo de la empresa: las ciudades a confirmar se buscan solo en ese país.
-  const { paisFijo } = useTenantPaisFijo(tenantId);
+  const { paisFijo, tenant: tenantEfectivo } = useTenantPaisFijo(tenantId);
   const moduloPermitido = (m: ModuloWizard) =>
     m !== "transportistas" || transportistaExternoVisible;
 
@@ -162,6 +162,7 @@ export function ImportWizard({
     tenantId,
     MODULOS_SECUENCIA.filter(moduloPermitido),
     () => getToken(),
+    tenantEfectivo?.recomendacionCiudadesHabilitada !== false,
   );
 
   // El wizard crea clientes/transportistas/choferes/vehículos por fuera del
@@ -1419,8 +1420,6 @@ function EtapaModulo({
     wizard.secuencia.includes("transportistas") &&
     (p?.transportistas?.length ?? 0) > 0;
   const advertenciasCiudad = p?.advertenciasCiudad ?? [];
-  const totalAdvertenciasCiudad =
-    p?.totalAdvertenciasCiudad ?? advertenciasCiudad.length;
   const nuevosClientes = p?.clientes?.filter((c) => c.esNuevo).length ?? 0;
   const nuevosTransp =
     p?.transportistas?.filter((t) => t.esNuevo).length ?? 0;
@@ -1475,7 +1474,7 @@ function EtapaModulo({
     : p?.filasDetalle
       ? p.filasDetalle.filter((f) => !f.esNuevo && !f.sinCambios).length
       : (p?.entidadesActualizadas ?? 0);
-  const cantStatBoxes = 3 + (hasFacturas ? 1 : 0) + (hasViajes ? 1 : 0);
+  const cantStatBoxes = 3 + (hasFacturas ? 1 : 0);
 
   // Si el usuario resolvió (o excluyó) la última ciudad pendiente estando
   // dentro del modal, se cierra solo.
@@ -1496,26 +1495,15 @@ function EtapaModulo({
         >
           <div
             className={`grid gap-2 ${
-              // Cantidad real de StatBox renderizados (3 fijos + Facturas +
-              // Adv. ciudades) — si el grid asume más columnas que boxes,
-              // queda un hueco en blanco a la derecha.
-              cantStatBoxes === 5
-                ? "grid-cols-2 sm:grid-cols-5"
-                : cantStatBoxes === 4
-                  ? "grid-cols-2 sm:grid-cols-4"
-                  : "grid-cols-3"
+              // Cantidad real de StatBox renderizados (3 fijos + Facturas) —
+              // si el grid asume más columnas que boxes, queda un hueco en
+              // blanco a la derecha.
+              cantStatBoxes === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
               }`}
           >
             <StatBox label="Filas en el Excel" value={p.totalFilas} />
             {hasFacturas && (
               <StatBox label="Facturas" value={p.facturas?.length ?? 0} />
-            )}
-            {hasViajes && (
-              <StatBox
-                label="Adv. ciudades"
-                value={totalAdvertenciasCiudad}
-                highlight={totalAdvertenciasCiudad > 0 ? "warn" : undefined}
-              />
             )}
             <StatBox
               label="Filas nuevas"

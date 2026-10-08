@@ -441,6 +441,8 @@ export interface Tenant {
   tipoFlota?: TipoFlota;
   /** false = sin dashboard; el inicio es el primer módulo contratado (`lib/tenantHome.ts`). Default true; solo lo cambia superadmin. */
   dashboardHabilitado?: boolean;
+  /** Default true. false = origen/destino de Viajes en texto libre, sin buscador de ciudades ni validación en el import. */
+  recomendacionCiudadesHabilitada?: boolean;
   /**
    * Unidad de cantidad de flete del tenant — 'TN' (default, toneladas) | 'UD' (unidades).
    * Afecta los PDFs de Factura A/B, Liquidación (CVLP) y Contrato de liquidación, y los

@@ -23,6 +23,8 @@ interface Props {
   getToken: () => Promise<string | null>;
   onProductoCreado: (p: Producto) => void;
   paisFijo?: Pais | null;
+  /** `Tenant.recomendacionCiudadesHabilitada`: false = origen/destinos en texto libre. */
+  sugerenciasCiudad?: boolean;
 
   error: string | null;
   onContinuar: () => void;
@@ -44,6 +46,7 @@ export function ViajeCreateStep1ClientesYCarga({
   getToken,
   onProductoCreado,
   paisFijo = null,
+  sugerenciasCiudad = true,
   error,
   onContinuar,
 }: Props) {
@@ -69,6 +72,7 @@ export function ViajeCreateStep1ClientesYCarga({
           minRows={1}
           labelPrefix="Cliente"
           paisFijo={paisFijo}
+          sugerenciasCiudad={sugerenciasCiudad}
         />
         <button
           type="button"

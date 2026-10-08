@@ -23,10 +23,20 @@ type Props = {
   disableBrowserAutocomplete?: boolean;
   /** Marca borde rojo cuando el campo tiene error de validación. */
   error?: boolean;
+  /**
+   * false = texto libre, sin buscador ni lista (`Tenant.recomendacionCiudadesHabilitada`
+   * apagado). Default true: hay que elegir una ciudad de la lista.
+   */
+  sugerencias?: boolean;
 };
 
 const MIN_CHARS = 2;
 
+/**
+ * Campo de ciudad: buscador con lista (hay que elegir una opción) o, con
+ * `sugerencias={false}`, texto libre. Separado en dos componentes para no
+ * llamar hooks condicionalmente.
+ */
 export function CiudadCombobox({
   pais,
   paisNombre,
@@ -40,7 +50,66 @@ export function CiudadCombobox({
   'aria-label': ariaLabel,
   disableBrowserAutocomplete = false,
   error = false,
+  sugerencias = true,
 }: Props) {
+  if (!sugerencias) {
+    return (
+      <div className={className}>
+        <input
+          id={idProp}
+          type="text"
+          autoComplete="off"
+          disabled={disabled}
+          placeholder={placeholder ?? 'Ciudad o localidad'}
+          aria-label={ariaLabel}
+          aria-invalid={error || undefined}
+          className={
+            error
+              ? `${inputClassName.replace(/\bborder-black\/\d+\b/g, '').replace(/\s+/g, ' ').trim()} border-red-400`
+              : inputClassName
+          }
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => {
+            const trimmed = e.target.value.trim();
+            if (trimmed !== e.target.value) onChange(trimmed);
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <CiudadComboboxBuscador
+      pais={pais}
+      paisNombre={paisNombre}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={className}
+      inputClassName={inputClassName}
+      disabled={disabled}
+      id={idProp}
+      aria-label={ariaLabel}
+      disableBrowserAutocomplete={disableBrowserAutocomplete}
+      error={error}
+    />
+  );
+}
+
+function CiudadComboboxBuscador({
+  pais,
+  paisNombre,
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  inputClassName = 'h-9 w-full border border-black/15 bg-white px-2 text-sm',
+  disabled,
+  id: idProp,
+  'aria-label': ariaLabel,
+  disableBrowserAutocomplete = false,
+  error = false,
+}: Omit<Props, 'sugerencias'>) {
   const defaultPlaceholder = paisNombre
     ? `Buscá ciudad o localidad en ${paisNombre}…`
     : 'Buscá ciudad o localidad…';

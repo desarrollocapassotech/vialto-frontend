@@ -215,6 +215,7 @@ export type ViajeEditModalProps = {
     | "idPropio1Habilitado"
     | "idPropio2Habilitado"
     | "idPropio2Label"
+    | "recomendacionCiudadesHabilitada"
   > | null;
   /** Tenant con emision-liquido-producto-arca: habilita los campos ARCA en el detalle de la liquidación vinculada. */
   hasLiquidoProductoArca?: boolean;
@@ -359,6 +360,8 @@ export function ViajeEditModal({
     if (!tenant?.paisOrigenDestinoOculto || !tenant.paisOrigenDestinoFijoId) return null;
     return todosPaises.find((p) => p.id === tenant.paisOrigenDestinoFijoId) ?? null;
   }, [tenant, todosPaises]);
+  /** `Tenant.recomendacionCiudadesHabilitada` (default true): false = ciudades en texto libre. */
+  const sugerenciasCiudad = tenant?.recomendacionCiudadesHabilitada !== false;
 
   // El selector de país queda oculto en la UI cuando `paisFijo` está seteado (ver
   // `PaisUbicacionSelect`/`ViajeDestinosLista`/`ViajeClientesFieldset` más abajo) — acá se
@@ -779,6 +782,7 @@ export function ViajeEditModal({
                             )
                           }
                           inputClassName={`${inputClass} w-full`}
+                          sugerencias={sugerenciasCiudad}
                         />
                       </div>
                     </div>
@@ -801,6 +805,7 @@ export function ViajeEditModal({
                           setQuickCreate("pais");
                         }}
                         paisFijo={paisFijo}
+                        sugerenciasCiudad={sugerenciasCiudad}
                       />
                       <CrudFieldError message={destinosError} />
                     </div>
@@ -997,6 +1002,7 @@ export function ViajeEditModal({
                   getToken={getToken}
                   onProductoCreado={onProductoCreado}
                   paisFijo={paisFijo}
+                  sugerenciasCiudad={sugerenciasCiudad}
                 />
                 <button
                   type="button"

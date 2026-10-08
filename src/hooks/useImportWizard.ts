@@ -77,7 +77,17 @@ export function useImportWizard(
   /** Módulos que la empresa puede importar (ej. sin Transportes si es solo flota propia). */
   modulosPermitidos: ModuloWizard[],
   getToken: () => Promise<string | null>,
+  /**
+   * `Tenant.recomendacionCiudadesHabilitada` (default true). false = no se
+   * validan las ciudades de Viajes contra el catálogo: se importan tal cual
+   * vienen en el Excel, sin "Ciudades a confirmar".
+   */
+  validarCiudades = true,
 ) {
+  // En ref: el tenant puede terminar de cargar después de montar el hook, y
+  // el preview lee el valor en el momento de pedirse.
+  const validarCiudadesRef = useRef(validarCiudades);
+  validarCiudadesRef.current = validarCiudades;
   /** Hojas detectadas (o elegidas) para importar, en orden de dependencia. */
   const [detectados, setDetectados] = useState<AsignacionHoja[]>([]);
   /** Detectados que el usuario marcó "no importar" antes de llegar a su paso. */
@@ -249,7 +259,11 @@ export function useImportWizard(
       );
 
       let previewResult = data;
-      if (modulo === "viajes" && (previewResult.viajes?.length ?? 0) > 0) {
+      if (
+        modulo === "viajes" &&
+        validarCiudadesRef.current &&
+        (previewResult.viajes?.length ?? 0) > 0
+      ) {
         setValidandoCiudades(true);
         ciudadesAbortRef.current?.abort();
         const ac = new AbortController();
