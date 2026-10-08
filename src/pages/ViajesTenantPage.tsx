@@ -549,6 +549,7 @@ export function ViajesTenantPage({
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
     sinCobrar: number;
+    sinLiquidar: number;
     sinPagar: number;
     pagados: number;
   } | null>(null);
@@ -790,13 +791,18 @@ export function ViajesTenantPage({
       const base = platform
         ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
         : "/api/viajes/paginated?";
-      const [estadoSF, estadoSC, pagoSP, pagoPag] = await Promise.allSettled([
+      const [estadoSF, estadoSC, estadoSL, pagoSP, pagoPag] = await Promise.allSettled([
         apiJson<ViajesPaginatedResponse>(
           `${base}etapa=finalizado&facturacionEstado=sin_facturar&page=1&pageSize=1`,
           () => getToken(),
         ),
         apiJson<ViajesPaginatedResponse>(
           `${base}facturacionEstado=facturado&page=1&pageSize=1`,
+          () => getToken(),
+        ),
+        // Mismo filtro que aplica el chip "Sin liquidar" (columna Liquidación).
+        apiJson<ViajesPaginatedResponse>(
+          `${base}liquidacionEstado=sin_liquidar&page=1&pageSize=1`,
           () => getToken(),
         ),
         contarViajesPagoTransportistaDesdeApi(
@@ -816,6 +822,8 @@ export function ViajesTenantPage({
           estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : 0,
         sinCobrar:
           estadoSC.status === "fulfilled" ? estadoSC.value.meta.total : 0,
+        sinLiquidar:
+          estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : 0,
         sinPagar: pagoSP.status === "fulfilled" ? pagoSP.value : 0,
         pagados: pagoPag.status === "fulfilled" ? pagoPag.value : 0,
       });
@@ -2467,10 +2475,13 @@ export function ViajesTenantPage({
           <ViajesResumenFiltros
             resumen={resumen}
             facturacionFiltro={facturacionFiltro}
+            liquidacionFiltro={liquidacionFiltro}
             pagoTransportistaFiltro={pagoTransportistaFiltro}
             onFiltroFacturacion={aplicarFiltroFacturacion}
+            onFiltroLiquidacion={aplicarFiltroLiquidacion}
             onFiltroPago={aplicarFiltroPagoTransportista}
             mostrarFiltroPago={mostrarPagosTransportista}
+            mostrarFiltroLiquidacion={mostrarColumnaLiquidacion}
           />
         </div>
       )}
