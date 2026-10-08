@@ -470,17 +470,15 @@ No hay pantalla de checks para elegir módulos: el primer paso ("Archivo") es el
 - **Sin paso "Resumen" (oct 2026)**: al llegar a `terminado` sin errores en ninguna etapa, el wizard muestra un toast con creados/actualizados y redirige solo — a `viajesTo` (prop: `/viajes` en tenant, `/viajes?tenantId=` en superadmin) si se importaron viajes, si no a `backTo`. Con errores, o si no se importó nada, se queda en la pantalla de resumen (que ya no figura como paso del stepper) para ver el detalle.
 - `GET /importaciones/tenant-tiene-datos` y el `pre-flight` del backend ya no los usa el wizard.
 
-### Preview de Viajes: "Ver cambios" con diff antes/después
+### Preview de Viajes: tabla "Viajes en este archivo" con diff antes/después
 
-El modal "Detalle de filas" (trigger: botón "Ver cambios →", alineado a la derecha y con fondo `vialto-charcoal` para destacarse del resto de acciones) muestra, para la pestaña Viajes, la lista `ViajesCambiosList` en vez de una tabla plana:
+Desde oct 2026 la tabla va **directo en el paso**, debajo de las tarjetas, igual que "Clientes en este archivo" — ya no hay botón "Ver cambios →" ni modal "Detalle de filas" (se sacaron, junto con sus pestañas Facturas/Clientes/Transportistas y el aviso "Revisar actualizaciones"). Paginada de a 10 (`VIAJES_PAGE_SIZE`), con "Ignorar todas las actualizaciones" arriba a la derecha si hay filas que actualizan. Usa `ViajesCambiosList`:
 
-- Badge verde **"Nuevo"** vs. ámbar **"Actualiza"** por fila (`PreviewViaje.nuevo`).
+- Badge verde **"Nuevo"** vs. ámbar **"Actualiza"** (o gris **"Sin cambios"**) por fila (`PreviewViaje.nuevo` / `cambios`).
 - Tabla (oct 2026, antes eran tarjetas): una fila por viaje, con las columnas de `CAMPOS_VIAJE_MOSTRAR` que tienen dato en alguna fila de la página. Los avisos (cambios, datos perdidos al unificar, ciudad sin confirmar) van en una franja debajo de la fila (`colSpan`). Mismo estilo que la tabla de filas de Clientes/Transportes/Choferes/Vehículos (`FilasDetalleTabla`).
 - Fila que actualiza → franja con cada campo que cambió: `Campo: valor anterior (tachado) → valor nuevo` (`PreviewViaje.cambios`, calculado server-side en `compararCamposViaje` — ver backend). Sin cambios reales → "Sin cambios."
 
-Las pestañas Clientes/Transportistas de este mismo modal solo se muestran si esos módulos están en `wizard.secuencia` de la corrida actual — el preview de Viajes siempre trae los nombres que referencia (para marcar cuáles son nuevos), pero si el archivo no trae esas hojas (o el usuario eligió no importarlas), no tiene sentido mostrarlos como si fueran parte de lo que se está por guardar.
-
-Paginación de estas tablas/listas: **no** usar el componente `ListadoPagination` completo (su selector de page-size está limitado a `[10, 25, 50]`, no sirve para "5 en Viajes, 10 en el resto"). Usar el pager liviano de `lib/listadoPaginacion.ts` (`metaPaginacionCliente`/`slicePaginaCliente`/`paginasVisibles`), construido inline.
+Paginación: **no** usar el componente `ListadoPagination` completo (trae selector de tamaño de página y es más pesado de lo que hace falta acá). Usar el pager liviano de `lib/listadoPaginacion.ts` (`metaPaginacionCliente`/`slicePaginaCliente`/`paginasVisibles`), construido inline.
 
 ### Bloqueo de UI durante carga
 
