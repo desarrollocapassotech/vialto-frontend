@@ -38,6 +38,10 @@ interface Props {
   onSaved: (updated: Cliente | Transportista) => void;
   /** Si se pasa, muestra un botón "Cancelar" (formulario mostrado en un toggle). */
   onCancel?: () => void;
+  /** Texto del botón de `onCancel` (default "Cancelar"). */
+  cancelLabel?: string;
+  /** Texto del botón de guardar (default "Guardar y continuar"). */
+  saveLabel?: string;
   /** Si es true, ignora la configuración del tenant y hace obligatorios los campos de facturación/AFIP. */
   forceArcaFields?: boolean;
 }
@@ -53,6 +57,8 @@ export function CompletarDatosFiscalesInline({
   getToken,
   onSaved,
   onCancel,
+  cancelLabel = 'Cancelar',
+  saveLabel = 'Guardar y continuar',
   forceArcaFields,
 }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
@@ -268,7 +274,7 @@ export function CompletarDatosFiscalesInline({
             onClick={onCancel}
             className="h-8 px-3 border border-black/20 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist disabled:opacity-50"
           >
-            Cancelar
+            {cancelLabel}
           </button>
         )}
         <button
@@ -277,7 +283,7 @@ export function CompletarDatosFiscalesInline({
           onClick={() => void onSave()}
           className="h-8 px-4 bg-vialto-charcoal text-white text-xs uppercase tracking-wider hover:bg-vialto-charcoal/90 disabled:opacity-50"
         >
-          {saving ? 'Guardando…' : 'Guardar y continuar'}
+          {saving ? 'Guardando…' : saveLabel}
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { CalendarDays, Filter, Search, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { numeroVisibleViaje } from "@/lib/viajesFlota";
 import { useFieldConfig } from "@/hooks/useFieldConfig";
@@ -127,74 +128,107 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
     <div
       className={
         fillHeight
-          ? "flex h-full min-h-0 flex-col gap-2"
-          : "flex flex-col gap-2"
+          ? "flex h-full min-h-0 flex-col overflow-hidden rounded border border-black/15"
+          : "flex flex-col overflow-hidden rounded border border-black/15"
       }
     >
-      <div className="flex shrink-0 flex-wrap items-end gap-2">
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-          Buscar
+      {/* Barra de filtros de la tabla: fondo propio + ícono/etiqueta "Filtros", para que no se lea como campos del formulario. */}
+      <div
+        role="search"
+        aria-label="Filtros de viajes"
+        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-black/10 bg-vialto-mist px-3 py-2"
+      >
+        <span className="flex items-center gap-1.5 pr-1 font-[family-name:var(--font-ui)] text-[10px] uppercase tracking-[0.18em] text-vialto-steel">
+          <Filter
+            className={`h-3.5 w-3.5 ${hayFiltrosActivos ? "text-vialto-fire" : ""}`}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Filtros
+        </span>
+        <div className="relative min-w-[10rem] flex-1">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-vialto-steel"
+            aria-hidden
+          />
           <input
-            type="text"
+            type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Número, origen, destino, chofer, producto o transporte…"
-            className="h-9 w-full border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+            placeholder="Buscar…"
+            aria-label="Buscar viajes"
+            className={`h-8 w-full rounded-full border bg-white pl-8 pr-3 text-xs text-vialto-charcoal placeholder:text-vialto-steel/80 focus:outline-none focus:ring-1 focus:ring-vialto-charcoal/30 ${
+              busqueda.trim() ? "border-vialto-charcoal/40" : "border-black/10"
+            }`}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-          Desde
+        </div>
+        <div
+          className={`flex h-8 items-center gap-1.5 rounded-full border bg-white pl-2.5 pr-1 text-xs ${
+            fechaDesde || fechaHasta ? "border-vialto-charcoal/40" : "border-black/10"
+          }`}
+        >
+          <CalendarDays className="h-3.5 w-3.5 shrink-0 text-vialto-steel" aria-hidden />
           <input
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="h-9 border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+            aria-label="Fecha desde"
+            className="h-7 bg-transparent text-xs text-vialto-charcoal focus:outline-none"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
-          Hasta
+          <span className="text-vialto-steel" aria-hidden>–</span>
           <input
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            className="h-9 border border-black/15 bg-white px-2 text-sm text-vialto-charcoal"
+            aria-label="Fecha hasta"
+            className="h-7 bg-transparent text-xs text-vialto-charcoal focus:outline-none"
           />
-        </label>
-        {hayFiltrosActivos && (
-          <button
-            type="button"
-            onClick={() => {
-              setBusqueda("");
-              setFechaDesde("");
-              setFechaHasta("");
-            }}
-            className="h-9 shrink-0 border border-black/15 bg-white px-3 text-xs uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist"
-          >
-            Limpiar
-          </button>
-        )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          {!loading && viajes.length > 0 && (
+            <span className="text-[11px] tabular-nums text-vialto-steel">
+              {hayFiltrosActivos
+                ? `${filtrados.length} de ${viajes.length}`
+                : `${viajes.length} viaje${viajes.length !== 1 ? "s" : ""}`}
+            </span>
+          )}
+          {hayFiltrosActivos && (
+            <button
+              type="button"
+              onClick={() => {
+                setBusqueda("");
+                setFechaDesde("");
+                setFechaHasta("");
+              }}
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] uppercase tracking-wider text-vialto-steel hover:bg-white hover:text-vialto-charcoal"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 py-3 text-xs text-vialto-steel">
+        <div className="flex items-center gap-2 px-3 py-3 text-xs text-vialto-steel">
           <Spinner /> Cargando viajes…
         </div>
       ) : viajes.length === 0 ? (
-        <p className="py-2 text-xs text-vialto-steel">{emptyMessage}</p>
+        <p className="px-3 py-3 text-xs text-vialto-steel">{emptyMessage}</p>
       ) : filtrados.length === 0 ? (
-        <p className="py-2 text-xs text-vialto-steel">
+        <p className="px-3 py-3 text-xs text-vialto-steel">
           Ningún viaje coincide con el filtro.
         </p>
       ) : (
         <div
           className={
             fillHeight
-              ? "h-0 min-h-0 flex-1 overflow-auto rounded border border-black/15"
-              : `${maxHeightClass} overflow-auto rounded border border-black/15`
+              ? "h-0 min-h-0 flex-1 overflow-auto"
+              : `${maxHeightClass} overflow-auto`
           }
         >
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-vialto-mist text-[10px] uppercase tracking-wider text-vialto-steel">
+            <thead className="sticky top-0 bg-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] text-[10px] uppercase tracking-wider text-vialto-steel">
               <tr>
                 <th className="w-8 px-2 py-2 text-left" />
                 {idSistemaHabilitado && (

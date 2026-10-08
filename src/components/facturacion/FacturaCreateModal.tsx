@@ -9,9 +9,11 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Receipt } from "lucide-react";
+import { AlertTriangle, Receipt } from "lucide-react";
+import { useHiddenFiscalFields } from "@/hooks/useHiddenFiscalFields";
 import { CrudFormErrorAlert } from "@/components/crud/CrudFormErrorAlert";
 import { FacturaArcaPreviewPanel } from "@/components/facturacion/FacturaArcaPreviewPanel";
+import { DatosClienteFaltantesModal } from "@/components/facturacion/DatosClienteFaltantesModal";
 import {
   FacturaTotalesPreview,
   facturaPayloadFromDraft,
@@ -413,6 +415,37 @@ export function FacturaCreateModal({
   const datosEmitIncompletos = datosReady && missingEmitFields.length > 0;
   const sinConfigArca = datosReady && !arcaConfig;
 
+  // Al elegir un cliente sin los datos fiscales que ARCA exige, se abre un modal para
+  // completarlos — una sola vez por cliente; después se reabre desde el aviso del panel.
+  const missingClienteFields = useMemo(
+    () => missingEmitFields.filter((f) => f.startsWith("Cliente:")),
+    [missingEmitFields],
+  );
+  const missingHiddenClienteFields = useHiddenFiscalFields(missingClienteFields);
+  const [datosClienteModalOpen, setDatosClienteModalOpen] = useState(false);
+  const datosClienteAvisadoRef = useRef<string | null>(null);
+
+  // Zumbido del aviso del pie al tocar "Emitir a ARCA" con datos faltantes. Si ya estaba
+  // zumbando, se quita la clase y se vuelve a poner en el próximo frame para reiniciarlo.
+  const [zumbidoAviso, setZumbidoAviso] = useState(false);
+  const dispararZumbidoAviso = useCallback(() => {
+    setZumbidoAviso(false);
+    requestAnimationFrame(() => setZumbidoAviso(true));
+  }, []);
+  useEffect(() => {
+    if (!open) {
+      datosClienteAvisadoRef.current = null;
+      setDatosClienteModalOpen(false);
+      return;
+    }
+    if (!unifiedArca || !datosReady || !clienteDetalle) return;
+    if (clienteDetalle.id !== draft.clienteId) return;
+    if (missingClienteFields.length === 0) return;
+    if (datosClienteAvisadoRef.current === clienteDetalle.id) return;
+    datosClienteAvisadoRef.current = clienteDetalle.id;
+    setDatosClienteModalOpen(true);
+  }, [open, unifiedArca, datosReady, clienteDetalle, draft.clienteId, missingClienteFields.length]);
+
   const [frozenLineas, setFrozenLineas] = useState<FacturaLineaDraft[] | null>(null);
 
   const totales = useMemo(
@@ -737,6 +770,24 @@ export function FacturaCreateModal({
     draft.viajeIds.length > 0 &&
     monedaUnicaDeViajes(draft.viajeIds, derivedViajes) === null;
 
+  const compactIvaField = (
+    <div className="flex flex-col gap-1">
+      <label className={compactLabelClass}>
+        {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
+      </label>
+      <input
+        type="number"
+        min="0"
+        max="100"
+        step="0.01"
+        value={draft.ivaPct}
+        onChange={(e) => patch({ ivaPct: e.target.value })}
+        placeholder="21"
+        className={`${compactInputClass} sm:max-w-[8rem]`}
+      />
+    </div>
+  );
+
   const compactFields = (
     <div className="flex flex-1 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
@@ -766,6 +817,8 @@ export function FacturaCreateModal({
           }
           compact
         />
+        {/* Con ARCA no hay campo Número: el IVA ocupa el lugar libre al lado del cliente. */}
+        {hasArca && compactIvaField}
         <div className="grid grid-cols-2 gap-3 sm:col-span-2">
           <div className="flex flex-col gap-1">
             <label className={compactLabelClass}>
@@ -788,34 +841,9 @@ export function FacturaCreateModal({
             />
           </div>
         </div>
-        <div className="flex flex-col gap-1 sm:col-span-2">
-          <label className={compactLabelClass}>
-            {draft.facturarPorTramo ? "IVA (%) viajes sin tramo" : "IVA (%)"}
-          </label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            value={draft.ivaPct}
-            onChange={(e) => patch({ ivaPct: e.target.value })}
-            placeholder="21"
-            className={`${compactInputClass} sm:max-w-[8rem]`}
-          />
-        </div>
+        {!hasArca && <div className="sm:col-span-2">{compactIvaField}</div>}
       </div>
       <div className="flex min-h-[14rem] flex-1 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 items-baseline justify-between gap-2">
-          <label className={compactLabelClass}>
-            Viajes vinculados{" "}
-            {draft.viajeIds.length > 0 && `(${draft.viajeIds.length})`}
-          </label>
-          {draft.viajeIds.length > 0 && (
-            <span className="text-xs font-medium tabular-nums text-vialto-charcoal">
-              {textoImporteFacturaSeleccion(draft.viajeIds, derivedViajes)}
-            </span>
-          )}
-        </div>
         <div className="min-h-0 flex-1 overflow-hidden">
           <ViajesVinculadosEditor
             viajes={derivedViajes}
@@ -1103,9 +1131,6 @@ export function FacturaCreateModal({
                   "El comprobante fue autorizado por ARCA."
                 ) : (
                   <>
-                    {unifiedArca
-                      ? "Completá los datos a la izquierda y revisá el comprobante en tiempo real a la derecha."
-                      : "Completá los datos y opcionalmente vinculá viajes a esta factura."}
                     {draft.letraComprobante
                       ? ` Tipo elegido: Factura ${draft.letraComprobante.toUpperCase()}.`
                       : ""}
@@ -1142,7 +1167,6 @@ export function FacturaCreateModal({
                     <FacturaArcaPreviewPanel
                       arcaConfig={arcaConfig}
                       clienteDetalle={clienteDetalle}
-                      numero={draft.numero}
                       fechaEmision={draft.fechaEmision}
                       lineas={lineas}
                       onLineasChange={() => {}} /* Bloqueado, las líneas son fijas */
@@ -1162,6 +1186,7 @@ export function FacturaCreateModal({
                         setClienteDetalle(c);
                         onDataSaved?.();
                       }}
+                      avisoFaltantesExterno
                       feedbackSlot={
                         <div ref={feedbackRef} className="space-y-2">
                           {displayError &&
@@ -1296,7 +1321,39 @@ export function FacturaCreateModal({
           </div>
 
           {step === "form" && (
-            <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+            <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-black/10 bg-vialto-mist/40 px-4 py-3 sm:px-6">
+              {/* Faltantes para emitir: fijo en el pie, al lado de "Emitir a ARCA", para que se vea siempre. */}
+              {unifiedArca && datosEmitIncompletos && (
+                <div
+                  role="alert"
+                  onAnimationEnd={() => setZumbidoAviso(false)}
+                  className={`${zumbidoAviso ? "aviso-zumbido " : ""}mr-auto flex min-w-0 flex-1 basis-full items-center gap-2 rounded border px-3 py-1.5 text-xs sm:basis-0 ${
+                    missingHiddenClienteFields.length > 0
+                      ? "border-red-500/40 bg-red-50 text-red-900"
+                      : "border-amber-400/50 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                  <p className="min-w-0 flex-1 font-medium">
+                    {missingClienteFields.length === missingEmitFields.length
+                      ? "Faltan datos del cliente para poder facturar."
+                      : "Faltan datos para poder facturar."}
+                    {missingHiddenClienteFields.length > 0 &&
+                      " Hay campos ocultos: contactá al administrador para habilitarlos."}
+                  </p>
+                  {clienteDetalle &&
+                    missingClienteFields.length > 0 &&
+                    missingHiddenClienteFields.length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDatosClienteModalOpen(true)}
+                        className="shrink-0 border border-amber-500/60 bg-white px-2.5 py-1 text-[10px] uppercase tracking-wider text-amber-900 hover:bg-amber-100"
+                      >
+                        Completar datos
+                      </button>
+                    )}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -1320,16 +1377,24 @@ export function FacturaCreateModal({
                       ? "Guardando…"
                       : "Guardar borrador"}
                   </button>
+                  {/* Con datos faltantes no se usa `disabled` (no dispararía el click): se ve
+                      deshabilitado y el click hace zumbar el aviso del pie. */}
                   <button
                     type="button"
-                    disabled={
-                      busy ||
-                      monedaInvalida ||
-                      bloqueadoUsd ||
+                    disabled={busy || monedaInvalida || bloqueadoUsd}
+                    aria-disabled={datosEmitIncompletos || undefined}
+                    onClick={() => {
+                      if (datosEmitIncompletos) {
+                        dispararZumbidoAviso();
+                        return;
+                      }
+                      void handleUnifiedSubmit("emitir");
+                    }}
+                    className={`inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white disabled:opacity-60 ${
                       datosEmitIncompletos
-                    }
-                    onClick={() => void handleUnifiedSubmit("emitir")}
-                    className="inline-flex items-center gap-2 text-xs uppercase tracking-wider px-4 py-2 border border-black/20 bg-vialto-charcoal text-white hover:bg-vialto-graphite disabled:opacity-60"
+                        ? "cursor-not-allowed opacity-60"
+                        : "hover:bg-vialto-graphite"
+                    }`}
                   >
                     {submitAction === "emitir" ? (
                       <Spinner className="h-3.5 w-3.5" />
@@ -1368,6 +1433,21 @@ export function FacturaCreateModal({
           url={previewComprobanteUrl}
           title="Comprobante"
           onClose={() => setPreviewComprobanteUrl(null)}
+        />
+      )}
+
+      {clienteDetalle && missingClienteFields.length > 0 && (
+        <DatosClienteFaltantesModal
+          open={datosClienteModalOpen && step === "form"}
+          cliente={clienteDetalle}
+          missingClienteFields={missingClienteFields}
+          tenantId={tenantId}
+          getToken={getToken}
+          onClienteUpdated={(c) => {
+            setClienteDetalle(c);
+            onDataSaved?.();
+          }}
+          onClose={() => setDatosClienteModalOpen(false)}
         />
       )}
     </>

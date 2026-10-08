@@ -128,6 +128,36 @@
   }
 }
 
+/* Zumbido de un aviso al intentar una acción bloqueada por él (ej. "Emitir a ARCA" con
+   datos faltantes). Se dispara agregando la clase y quitándola al terminar (onAnimationEnd). */
+@keyframes aviso-zumbido {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15%,
+  45%,
+  75% {
+    transform: translateX(-6px);
+  }
+  30%,
+  60%,
+  90% {
+    transform: translateX(6px);
+  }
+}
+
+.aviso-zumbido {
+  animation: aviso-zumbido 0.5s ease-in-out;
+  box-shadow: 0 0 0 3px rgb(232 71 10 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-zumbido {
+    animation: none;
+  }
+}
+
 @media screen and (max-width: 768px) {
   input,
   textarea,

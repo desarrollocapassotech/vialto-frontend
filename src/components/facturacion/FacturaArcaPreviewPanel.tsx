@@ -13,6 +13,8 @@ import { MSG_ARCA_NO_FACTURA_USD } from "@/lib/arcaUsdRestriction";
 import { fmtDateUtc } from "@/lib/fmtDateUtc";
 import { DatosFiscalesFaltantesAlerta } from "@/components/shared/DatosFiscalesFaltantesAlerta";
 import { SinConfigArcaAviso } from "@/components/facturacion/SinConfigArcaAviso";
+import { EmisorArcaResumen } from "@/components/facturacion/EmisorArcaResumen";
+import { ParteFacturaResumen } from "@/components/facturacion/ParteFacturaResumen";
 import type { ArcaConfig, Cliente } from "@/types/api";
 import { useHiddenFiscalFields, formatMissingFiscalField } from "@/hooks/useHiddenFiscalFields";
 import { paisCodigoDesdeTexto, idFiscalPorPais } from "@/lib/ciudades/paises";
@@ -36,7 +38,6 @@ const fmtDate = fmtDateUtc;
 export type FacturaArcaPreviewPanelProps = {
   arcaConfig: ArcaConfig | null;
   clienteDetalle: Cliente | null;
-  numero: string;
   fechaEmision: string;
   lineas: FacturaLineaDraft[];
   onLineasChange: (next: FacturaLineaDraft[]) => void;
@@ -51,13 +52,14 @@ export type FacturaArcaPreviewPanelProps = {
   tenantId?: string;
   getToken?: () => Promise<string | null>;
   onClienteUpdated?: (c: Cliente) => void;
+  /** true = el contenedor muestra el aviso de datos faltantes (fijo) y el form del cliente (modal); el panel no los repite. */
+  avisoFaltantesExterno?: boolean;
   feedbackSlot?: ReactNode;
 };
 
 export function FacturaArcaPreviewPanel({
   arcaConfig,
   clienteDetalle,
-  numero,
   fechaEmision,
   lineas,
   onLineasChange,
@@ -72,6 +74,7 @@ export function FacturaArcaPreviewPanel({
   tenantId,
   getToken,
   onClienteUpdated,
+  avisoFaltantesExterno = false,
   feedbackSlot,
 }: FacturaArcaPreviewPanelProps) {
   const condicionIva = clienteDetalle?.condicionIva ?? null;
@@ -94,9 +97,6 @@ export function FacturaArcaPreviewPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-[10px] font-[family-name:var(--font-ui)] uppercase tracking-[0.18em] text-vialto-steel">
-        Vista previa del comprobante
-      </p>
 
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs uppercase tracking-wider text-vialto-steel">
@@ -110,73 +110,40 @@ export function FacturaArcaPreviewPanel({
         </span>
       </div>
 
-      <section className="space-y-1">
-        <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-          Emisor
-        </p>
-        <p className="text-sm text-vialto-charcoal font-medium">
-          {arcaConfig?.razonSocial ?? "—"}
-        </p>
-        <p className="text-xs text-vialto-steel">
-          CUIT {arcaConfig?.cuitEmisor ?? "—"}
-          {arcaConfig?.domicilioEmisor
-            ? ` · ${arcaConfig.domicilioEmisor}`
-            : ""}
-        </p>
-        {arcaConfig && (
-          <p className="text-xs text-vialto-steel">
-            Ing. Brutos: {arcaConfig.ingBrutos?.trim() || "—"}
-            {" · "}
-            Inic. act.: {arcaConfig.inicActEmisor?.trim() || "—"}
-          </p>
-        )}
-      </section>
+      <div className="grid grid-cols-2 gap-4">
+        <EmisorArcaResumen arcaConfig={arcaConfig} />
+        <ParteFacturaResumen
+          titulo="Receptor"
+          nombre={clienteDetalle?.nombre}
+          detalle={
+            clienteDetalle
+              ? [
+                  condicionLabel,
+                  clienteDetalle.idFiscal ? `${idFiscalLabel} ${clienteDetalle.idFiscal}` : null,
+                  clienteDetalle.direccion?.trim(),
+                  clienteDetalle.pais ? `País: ${clienteDetalle.pais}` : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n")
+              : undefined
+          }
+        />
+      </div>
 
-      <section className="space-y-1">
-        <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
-          Receptor (cliente)
-        </p>
-        <p className="text-sm text-vialto-charcoal font-medium">
-          {clienteDetalle?.nombre ?? "—"}
-        </p>
-        <p className="text-xs text-vialto-steel">
-          {condicionLabel}
-          {clienteDetalle?.idFiscal ? ` · ${idFiscalLabel} ${clienteDetalle.idFiscal}` : ""}
-        </p>
-        {clienteDetalle?.direccion && (
-          <p className="text-xs text-vialto-steel">
-            {clienteDetalle.direccion}
+      {datosEmitIncompletos && !avisoFaltantesExterno && missingHiddenFields.length > 0 && (
+        <div className="rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
+          <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
+          <p className="mt-1">
+            Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
+            <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
           </p>
-        )}
-        {clienteDetalle?.pais && (
-          <p className="text-xs text-vialto-steel">
-            País: {clienteDetalle.pais}
-          </p>
-        )}
-        {datosEmitIncompletos && missingHiddenFields.length > 0 ? (
-          <div className="mt-2 rounded border border-red-500/40 bg-red-50 px-3 py-2 text-xs text-red-900" role="alert">
-            <p className="font-semibold">Faltan datos fiscales requeridos por ARCA</p>
-            <p className="mt-1">
-              Faltan los siguientes datos del cliente: <strong>{missingClienteFields.map(formatMissingFiscalField).join(", ")}</strong>.
-              <br />Hay campos ocultos que no se pueden editar. Por favor contactá al administrador para habilitarlos.
-            </p>
-          </div>
-        ) : datosEmitIncompletos && missingHiddenFields.length === 0 && missingClienteFields.length > 0 && clienteDetalle && (
-          <div className="mt-2 rounded border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
-            <p className="font-medium">
-              Faltan datos del cliente: {missingClienteFields.map(formatMissingFiscalField).join(", ")}.
-              <br />
-              <strong className="font-bold">Desplazate hacia abajo para completarlos.</strong>
-            </p>
-          </div>
-        )}
-      </section>
+        </div>
+      )}
 
       <section className="space-y-1">
         <p className="text-xs uppercase tracking-wider text-vialto-steel border-b border-black/10 pb-1">
           Comprobante
         </p>
-        <Row label="Número local" value={numero.trim() || "—"} />
         <Row label="Fecha de emisión" value={fmtDate(fechaEmision)} />
       </section>
 
@@ -239,7 +206,8 @@ export function FacturaArcaPreviewPanel({
 
       {sinConfigArca && <SinConfigArcaAviso platform={platform} />}
 
-      {datosEmitIncompletos && (
+      {/* Con `avisoFaltantesExterno` el aviso de faltantes (y el form del cliente) los muestra el contenedor. */}
+      {datosEmitIncompletos && !avisoFaltantesExterno && (
         <DatosFiscalesFaltantesAlerta
           missingEmitFields={
             clienteDetalle
