@@ -41,7 +41,6 @@ import {
 } from "@/components/facturacion/FacturaLineasEditor";
 import { ClienteSearchSelect } from "@/components/forms/MaestroSearchSelects";
 import { ComprobanteAdjuntoField } from "@/components/shared/ComprobanteAdjuntoField";
-import { AdjuntoPreviewModal } from "@/components/shared/AdjuntoPreviewModal";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import {
@@ -372,9 +371,6 @@ export function FacturaCreateModal({
   const [arcaConfigMissing, setArcaConfigMissing] = useState(false);
   const [facturaEmitida, setFacturaEmitida] = useState<Factura | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [previewComprobanteUrl, setPreviewComprobanteUrl] = useState<
-    string | null
-  >(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
 
   const busy = saving || submitAction != null;
@@ -488,7 +484,6 @@ export function FacturaCreateModal({
       setArcaConfigMissing(false);
       setFrozenLineas(null);
       setFacturaEmitida(null);
-      setPreviewComprobanteUrl(null);
       setDatosReady(false);
       return;
     }
@@ -785,6 +780,30 @@ export function FacturaCreateModal({
       setLocalError(friendlyError(err, "arca"));
     } finally {
       setDownloading(false);
+    }
+  }
+
+  /**
+   * Abre el PDF de la factura emitida en una pestaña nueva — mismo patrón que
+   * `verComprobante` de "Nueva liquidación": la pestaña se abre de forma síncrona en
+   * el click (si no, el bloqueador de pop-ups la corta por venir después de un await)
+   * y recién cuando llega el PDF se le asigna la URL.
+   */
+  async function verComprobante() {
+    if (!facturaEmitida) return;
+    const pdfUrl = platform
+      ? `/api/platform/arca/facturas/${encodeURIComponent(facturaEmitida.id)}/pdf?tenantId=${encodeURIComponent(tenantId!)}`
+      : `/api/integracion-arca/facturas/${encodeURIComponent(facturaEmitida.id)}/pdf`;
+    const ventana = window.open("", "_blank");
+    try {
+      const res = await apiFetch(pdfUrl, () => getToken());
+      if (!res.ok) throw new Error("Error al generar el PDF");
+      const blobUrl = URL.createObjectURL(await res.blob());
+      if (ventana) ventana.location.href = blobUrl;
+      else window.open(blobUrl, "_blank");
+    } catch {
+      ventana?.close();
+      showToast("No se pudo cargar el PDF del comprobante", "error");
     }
   }
 
@@ -1336,14 +1355,10 @@ export function FacturaCreateModal({
                     >
                       {downloading ? "Generando…" : "Descargar PDF"}
                     </button>
-                    {facturaEmitida?.comprobanteUrl && (
+                    {facturaEmitida && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setPreviewComprobanteUrl(
-                            facturaEmitida.comprobanteUrl!,
-                          )
-                        }
+                        onClick={() => void verComprobante()}
                         className="h-9 px-4 border border-black/20 text-xs uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
                       >
                         Ver comprobante
@@ -1455,14 +1470,6 @@ export function FacturaCreateModal({
           )}
         </div>
       </div>
-
-      {previewComprobanteUrl && (
-        <AdjuntoPreviewModal
-          url={previewComprobanteUrl}
-          title="Comprobante"
-          onClose={() => setPreviewComprobanteUrl(null)}
-        />
-      )}
 
       {clienteDetalle &&
         (missingClienteFields.length > 0 || padronClienteAviso) && (
