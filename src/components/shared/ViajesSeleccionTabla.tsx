@@ -16,6 +16,7 @@ export type ViajeSeleccionable = {
   chofer?: { nombre: string } | null;
   productosViaje?: Array<{ producto: { nombre: string } }>;
   transportista?: { nombre: string } | null;
+  cliente?: { nombre: string } | null;
 };
 
 function fmtDate(iso: string | null) {
@@ -54,11 +55,15 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   idPropio1Label = "ID personalizado",
   idPropio2Habilitado = false,
   idPropio2Label = "ID Propio 2",
+  mostrarCliente = false,
+  mostrarTransporte = true,
+  monedaDe,
 }: {
   viajes: T[];
   selectedIds: string[];
   onToggle: (id: string) => void;
-  renderMonto: (v: T) => ReactNode;
+  /** `conMoneda` = false cuando la moneda ya está en el encabezado (ver `monedaDe`). */
+  renderMonto: (v: T, conMoneda: boolean) => ReactNode;
   /** Permite deshabilitar la selección de un viaje puntual (p. ej. moneda incompatible con la selección actual). */
   disabledCheck?: (v: T) => { disabled: boolean; title?: string };
   loading?: boolean;
@@ -76,6 +81,18 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
   idPropio2Habilitado?: boolean;
   /** Label configurable de la columna "ID Propio 2". */
   idPropio2Label?: string;
+  /**
+   * Muestra la columna "Cliente" (y la incluye en el buscador). Off por defecto: en factura
+   * los viajes ya vienen filtrados por cliente; en liquidación (por transportista) sí suma.
+   */
+  mostrarCliente?: boolean;
+  /** false = oculta la columna "Transporte" (ej. liquidación: todos son del mismo transportista). */
+  mostrarTransporte?: boolean;
+  /**
+   * Moneda del monto de cada viaje. Si todos los viajes comparten la misma, va en el
+   * encabezado ("Monto (ARS)") y `renderMonto` recibe `conMoneda: false` (solo "$").
+   */
+  monedaDe?: (v: T) => string;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -99,14 +116,20 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
         const productos = mostrarProducto
           ? nombresProductosSeleccion(v).toLowerCase()
           : "";
-        const transporte = (v.transportista?.nombre ?? "").toLowerCase();
+        const transporte = mostrarTransporte
+          ? (v.transportista?.nombre ?? "").toLowerCase()
+          : "";
+        const cliente = mostrarCliente
+          ? (v.cliente?.nombre ?? "").toLowerCase()
+          : "";
         if (
           !numero.includes(q) &&
           !origen.includes(q) &&
           !destino.includes(q) &&
           !chofer.includes(q) &&
           !productos.includes(q) &&
-          !transporte.includes(q)
+          !transporte.includes(q) &&
+          !cliente.includes(q)
         )
           return false;
       }
@@ -115,9 +138,17 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
       if (fechaHasta && (!fecha || fecha > fechaHasta)) return false;
       return true;
     });
-  }, [viajes, busqueda, fechaDesde, fechaHasta, mostrarChofer, mostrarProducto]);
+  }, [viajes, busqueda, fechaDesde, fechaHasta, mostrarChofer, mostrarProducto, mostrarCliente, mostrarTransporte]);
 
-  const hayFiltrosActivos = !!busqueda.trim() || !!fechaDesde || !!fechaHasta;
+  // Moneda común a todos los viajes de la tabla (no solo los filtrados: el encabezado no
+  // cambia al buscar). Con monedas mezcladas, cada monto conserva la suya.
+  const monedaUnica = useMemo(() => {
+    if (!monedaDe || viajes.length === 0) return null;
+    const monedas = new Set(viajes.map(monedaDe));
+    return monedas.size === 1 ? [...monedas][0] : null;
+  }, [viajes, monedaDe]);
+
+  const hayFiltrosActivos =!!busqueda.trim() || !!fechaDesde || !!fechaHasta;
 
   function handleRowClick(v: T, disabled: boolean, selected: boolean) {
     if (disabled && !selected) return;
@@ -241,15 +272,22 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                   <th className="px-2 py-2 text-left">{idPropio2Label}</th>
                 )}
                 <th className="px-2 py-2 text-left">Fecha</th>
+                {mostrarCliente && (
+                  <th className="px-2 py-2 text-left">Cliente</th>
+                )}
                 <th className="px-2 py-2 text-left">Origen → Destino</th>
                 {mostrarProducto && (
-                  <th className="px-2 py-2 text-left">Producto</th>
+                  <th className="px-2 py-2 text-left">Carga</th>
                 )}
                 {mostrarChofer && (
                   <th className="px-2 py-2 text-left">Chofer</th>
                 )}
-                <th className="px-2 py-2 text-left">Transporte</th>
-                <th className="px-2 py-2 text-right">Monto</th>
+                {mostrarTransporte && (
+                  <th className="px-2 py-2 text-left">Transporte</th>
+                )}
+                <th className="px-2 py-2 text-right">
+                  Monto{monedaUnica ? ` (${monedaUnica})` : ""}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 bg-white">
@@ -296,6 +334,11 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                     <td className="whitespace-nowrap px-2 py-1.5 text-vialto-steel">
                       {fmtDate(v.fechaCarga)}
                     </td>
+                    {mostrarCliente && (
+                      <td className="px-2 py-1.5 text-vialto-steel">
+                        {v.cliente?.nombre ?? "—"}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-vialto-steel">
                       {v.origen ?? "—"} → {v.destino ?? "—"}
                     </td>
@@ -309,11 +352,13 @@ export function ViajesSeleccionTabla<T extends ViajeSeleccionable>({
                         {nombreChoferSeleccion(v)}
                       </td>
                     )}
-                    <td className="px-2 py-1.5 text-vialto-steel">
-                      {v.transportista?.nombre ?? "—"}
-                    </td>
+                    {mostrarTransporte && (
+                      <td className="px-2 py-1.5 text-vialto-steel">
+                        {v.transportista?.nombre ?? "—"}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-right tabular-nums text-vialto-steel">
-                      {renderMonto(v)}
+                      {renderMonto(v, !monedaUnica)}
                     </td>
                   </tr>
                 );

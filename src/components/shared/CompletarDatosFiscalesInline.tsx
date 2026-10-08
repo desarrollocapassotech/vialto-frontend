@@ -180,22 +180,25 @@ export function CompletarDatosFiscalesInline({
         <CrudFieldError message={fieldErrors.nombre} />
       </label>
 
-      {(paisVisible || idFiscalVisible) && (
+      {/* Orden: País (si aplica) · CUIT + condición IVA en una fila · domicilio a todo el ancho. */}
+      {paisVisible && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {paisVisible && (
-            <label className="grid gap-1">
-              <CrudFieldLabel required>País</CrudFieldLabel>
-              <PaisUbicacionSelect
-                value={pais}
-                onChange={handlePaisChange}
-                placeholder="Seleccioná un país"
-                disabled={saving}
-                className={isPaisMissing ? redInputClass : undefined}
-              />
-              <CrudFieldError message={fieldErrors.pais} />
-            </label>
-          )}
+          <label className="grid gap-1">
+            <CrudFieldLabel required>País</CrudFieldLabel>
+            <PaisUbicacionSelect
+              value={pais}
+              onChange={handlePaisChange}
+              placeholder="Seleccioná un país"
+              disabled={saving}
+              className={isPaisMissing ? redInputClass : undefined}
+            />
+            <CrudFieldError message={fieldErrors.pais} />
+          </label>
+        </div>
+      )}
 
+      {(idFiscalVisible || condicionVisible) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {idFiscalVisible && (
             <label className="grid gap-1">
               <CrudFieldLabel required>{idFiscalPorPais(pais).label}</CrudFieldLabel>
@@ -210,11 +213,7 @@ export function CompletarDatosFiscalesInline({
               <CrudFieldError message={idFiscalError} />
             </label>
           )}
-        </div>
-      )}
 
-      {(condicionVisible || direccionVisible) && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {condicionVisible && (
             <label className="grid gap-1">
               <CrudFieldLabel required>{condInfo.label}</CrudFieldLabel>
@@ -245,19 +244,19 @@ export function CompletarDatosFiscalesInline({
               )}
             </label>
           )}
-
-          {direccionVisible && (
-            <label className="grid gap-1">
-              <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
-              <CrudInput
-                value={direccion}
-                disabled={saving}
-                className={isDireccionMissing ? redInputClass : undefined}
-                onChange={(e) => setDireccion(e.target.value)}
-              />
-            </label>
-          )}
         </div>
+      )}
+
+      {direccionVisible && (
+        <label className="grid gap-1">
+          <CrudFieldLabel required>{direccionLabel}</CrudFieldLabel>
+          <CrudInput
+            value={direccion}
+            disabled={saving}
+            className={isDireccionMissing ? redInputClass : undefined}
+            onChange={(e) => setDireccion(e.target.value)}
+          />
+        </label>
       )}
 
       {error && (

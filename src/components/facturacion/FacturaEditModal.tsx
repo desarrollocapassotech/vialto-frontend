@@ -25,6 +25,7 @@ import {
   textoImporteFacturaSeleccion,
   textoMontoFacturarListado,
 } from "@/lib/viajesFlota";
+import { normalizeViajeMoneda } from "@/lib/currencyMask";
 import {
   computeFacturaTotalesFromBases,
   importeNetoViajeParaFactura,
@@ -345,7 +346,8 @@ export function ViajesVinculadosEditor({
           viajes={pool}
           selectedIds={selected}
           onToggle={toggle}
-          renderMonto={(v) => textoMontoFacturarListado(v)}
+          renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
+          monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
           loading={loading}
           fillHeight
           emptyMessage="No hay viajes disponibles para vincular."
@@ -364,7 +366,8 @@ export function ViajesVinculadosEditor({
       viajes={pool}
       selectedIds={selected}
       onToggle={toggle}
-      renderMonto={(v) => textoMontoFacturarListado(v)}
+      renderMonto={(v, conMoneda) => textoMontoFacturarListado(v, conMoneda)}
+      monedaDe={(v) => normalizeViajeMoneda(v.monedaMonto)}
       loading={loading}
       maxHeightClass="max-h-72"
       emptyMessage="No hay viajes disponibles para vincular."

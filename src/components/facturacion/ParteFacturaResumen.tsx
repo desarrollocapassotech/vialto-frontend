@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { TooltipsDelegados } from "@/components/ui/TooltipsDelegados";
 
 /**
@@ -9,10 +9,13 @@ export function ParteFacturaResumen({
   titulo,
   nombre,
   detalle,
+  estado,
 }: {
   titulo: string;
   nombre: string | null | undefined;
   detalle?: string;
+  /** Línea chica debajo del nombre (ej. estado de la validación contra ARCA). */
+  estado?: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   // El nombre va primero en el tooltip: si es largo, a la vista queda truncado.
@@ -31,6 +34,7 @@ export function ParteFacturaResumen({
       >
         {nombre ?? "—"}
       </p>
+      {estado && <div>{estado}</div>}
       <TooltipsDelegados contenedorRef={ref} />
     </section>
   );

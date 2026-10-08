@@ -457,25 +457,31 @@ export function clientesConViajesPendientesFactura(todos: Viaje[]): Set<string> 
   return ids;
 }
 
-/** Formato de importe de viaje alineado con listados (ARS / USD). */
+/**
+ * Formato de importe de viaje alineado con listados (ARS / USD).
+ * `conMoneda: false` = solo "$" (cuando la moneda ya figura en el encabezado de la columna).
+ */
 export function formatViajeImporteForListado(
   m: number,
   moneda?: string | null,
+  conMoneda = true,
 ): string {
   const mon = normalizeViajeMoneda(moneda);
   const locale = mon === "USD" ? "en-US" : "es-AR";
   const formatted = m.toLocaleString(locale);
+  if (!conMoneda) return `$ ${formatted}`;
   return mon === "USD" ? `US$ ${formatted}` : `ARS $ ${formatted}`;
 }
 
 /** Celda de tabla: monto a facturar. */
-export function textoMontoFacturarListado(v: Viaje): string {
+export function textoMontoFacturarListado(v: Viaje, conMoneda = true): string {
   const hasDesglose =
     v.cantidadFactura != null && v.precioUnitarioFactura != null;
   if (!hasDesglose && v.monto == null) return "—";
   return formatViajeImporteForListado(
     importeNetoViajeParaFactura(v),
     v.monedaMonto,
+    conMoneda,
   );
 }
 
