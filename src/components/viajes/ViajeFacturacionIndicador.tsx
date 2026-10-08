@@ -19,10 +19,15 @@ import { useToast } from '@/lib/toast';
 import type { Factura, Viaje } from '@/types/api';
 
 type Props = {
-  viaje: Pick<Viaje, 'facturacionEstado' | 'factura' | 'cliente' | 'clienteId' | 'clientesViaje'>;
+  viaje: Pick<
+    Viaje,
+    'facturacionEstado' | 'factura' | 'cliente' | 'clienteId' | 'clientesViaje' | 'etapa'
+  >;
   /** Clerk org id: solo se pasa en vista superadmin (cross-tenant). */
   tenantId?: string;
   onClickOverride?: () => void;
+  /** Si se pasa, el modal de detalle (sin factura vinculada) ofrece "Facturar". */
+  onFacturar?: () => void;
   /** Columna ETAPA del listado: el badge ocupa todo el ancho disponible en vez de su ancho de contenido. */
   fullWidth?: boolean;
   /** `icono`: ícono compacto de una sola línea (columna "Factura" de la grilla). */
@@ -47,6 +52,7 @@ export function ViajeFacturacionIndicador({
   viaje,
   tenantId,
   onClickOverride,
+  onFacturar,
   fullWidth = false,
   variante = "badge",
 }: Props) {
@@ -118,6 +124,7 @@ export function ViajeFacturacionIndicador({
           viaje={viaje}
           tenantId={tenantId}
           onClose={() => setOpen(false)}
+          onFacturar={onFacturar}
         />
       )}
       {facturaCompleta && (
