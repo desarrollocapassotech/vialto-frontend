@@ -245,6 +245,10 @@ export function ProductosTenantPage() {
                 title="Código"
                 filterActive={!!codigoFiltro.trim()}
                 filterSignature={codigoFiltro}
+                onClear={() => {
+                  setCodigoFiltroInput("");
+                  setCodigoFiltro("");
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -278,6 +282,10 @@ export function ProductosTenantPage() {
                 title="Nombre"
                 filterActive={!!nombreFiltro.trim()}
                 filterSignature={nombreFiltro}
+                onClear={() => {
+                  setNombreFiltroInput("");
+                  setNombreFiltro("");
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -311,6 +319,7 @@ export function ProductosTenantPage() {
                 title="Estado"
                 filterActive={filtroActivo !== "todos"}
                 filterSignature={filtroActivo}
+                onClear={() => setFiltroActivo("todos")}
               >
                 <select
                   value={filtroActivo}

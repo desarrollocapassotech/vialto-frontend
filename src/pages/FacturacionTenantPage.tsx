@@ -1323,6 +1323,12 @@ export function FacturacionTenantPage({
                 title="Número"
                 filterActive={!!numFiltro.trim()}
                 filterSignature={numFiltro}
+                onClear={() => {
+                  setListadoRefetching(true);
+                  setPage(1);
+                  setNumFiltroInput("");
+                  setNumFiltro("");
+                }}
               >
                 <div className="flex gap-1">
                   <input
@@ -1355,6 +1361,11 @@ export function FacturacionTenantPage({
                 title="Cliente"
                 filterActive={!!clienteIdFiltro}
                 filterSignature={clienteIdFiltro}
+                onClear={() => {
+                  setListadoRefetching(true);
+                  setPage(1);
+                  setClienteIdFiltro("");
+                }}
               >
                 <ClienteSearchSelect
                   id="facturas-col-filtro-cliente"
@@ -1382,6 +1393,12 @@ export function FacturacionTenantPage({
                 title="Emisión"
                 filterActive={!!emisionDesdeFiltro || !!emisionHastaFiltro}
                 filterSignature={`${emisionDesdeFiltro}|${emisionHastaFiltro}`}
+                onClear={() => {
+                  setListadoRefetching(true);
+                  setPage(1);
+                  setEmisionDesdeFiltro("");
+                  setEmisionHastaFiltro("");
+                }}
               >
                 <div className="flex flex-col gap-1.5">
                   <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -1420,6 +1437,12 @@ export function FacturacionTenantPage({
                   !!vencimientoDesdeFiltro || !!vencimientoHastaFiltro
                 }
                 filterSignature={`${vencimientoDesdeFiltro}|${vencimientoHastaFiltro}`}
+                onClear={() => {
+                  setListadoRefetching(true);
+                  setPage(1);
+                  setVencimientoDesdeFiltro("");
+                  setVencimientoHastaFiltro("");
+                }}
               >
                 <div className="flex flex-col gap-1.5">
                   <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -1456,6 +1479,11 @@ export function FacturacionTenantPage({
                 title="Estado"
                 filterActive={!!estadoFiltro}
                 filterSignature={estadoFiltro}
+                onClear={() => {
+                  setListadoRefetching(true);
+                  setPage(1);
+                  setEstadoFiltro("");
+                }}
               >
                 <select
                   value={estadoFiltro}

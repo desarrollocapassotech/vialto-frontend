@@ -300,6 +300,7 @@ export function MantenimientoTenantPage() {
                       title="Vehículo"
                       filterActive={!!vehiculoIdFiltro}
                       filterSignature={vehiculoIdFiltro}
+                      onClear={() => handleVehiculoFiltroChange("")}
                     >
                       <SearchableEntitySelect<Vehiculo>
                         id="mantenimiento-filtro-vehiculo"
@@ -328,6 +329,7 @@ export function MantenimientoTenantPage() {
                       title="Tipo"
                       filterActive={!!tipoFiltro.trim()}
                       filterSignature={tipoFiltro}
+                      onClear={() => setTipoFiltro("")}
                     >
                       <input
                         type="text"
@@ -346,6 +348,10 @@ export function MantenimientoTenantPage() {
                       title="Fecha de intervención"
                       filterActive={!!fechaDesdeFiltro || !!fechaHastaFiltro}
                       filterSignature={`${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                      onClear={() => {
+                        setFechaDesdeFiltro("");
+                        setFechaHastaFiltro("");
+                      }}
                     >
                       <div className="flex flex-col gap-2">
                         <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">

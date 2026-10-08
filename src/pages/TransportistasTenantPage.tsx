@@ -170,6 +170,10 @@ export function TransportistasTenantPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -197,6 +201,10 @@ export function TransportistasTenantPage() {
                   title={idFiscalLabel}
                   filterActive={!!filtroIdFiscal}
                   filterSignature={filtroIdFiscal}
+                  onClear={() => {
+                    setFiltroIdFiscal("");
+                    setPage(1);
+                  }}
                 >
                   <select
                     value={filtroIdFiscal}

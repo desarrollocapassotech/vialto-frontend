@@ -225,6 +225,10 @@ export function ChoferesSuperadminPage() {
                 title="Nombre"
                 filterActive={!!filtroNombre}
                 filterSignature={filtroNombre}
+                onClear={() => {
+                  setFiltroNombre("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroNombre}
@@ -254,6 +258,10 @@ export function ChoferesSuperadminPage() {
                 title="Pertenencia"
                 filterActive={!!filtroPertenencia}
                 filterSignature={filtroPertenencia}
+                onClear={() => {
+                  setFiltroPertenencia("");
+                  setPage(1);
+                }}
               >
                 <select
                   value={filtroPertenencia}

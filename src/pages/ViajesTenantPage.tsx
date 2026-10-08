@@ -135,7 +135,7 @@ import {
   type ViajeSortField,
 } from "@/lib/viajesOrdenamiento";
 import { ViajesOrdenamientoMenu } from "@/components/viajes/ViajesOrdenamientoMenu";
-import { CornerDownRight, Download, Filter, Upload } from "lucide-react";
+import { CornerDownRight, Download, Filter, Upload, X } from "lucide-react";
 import { ExcelExportModal } from "@/components/stock/ExcelExportModal";
 import {
   VIAJES_EXPORT_COLUMNS,
@@ -548,11 +548,13 @@ export function ViajesTenantPage({
 
   const [resumen, setResumen] = useState<{
     sinFacturar: number;
-    sinCobrar: number;
     sinLiquidar: number;
     sinPagar: number;
     pagados: number;
   } | null>(null);
+  /** Se incrementa tras cada operación que puede cambiar los conteos de los chips. */
+  const [resumenVersion, setResumenVersion] = useState(0);
+  const refrescarResumen = () => setResumenVersion((v) => v + 1);
 
   // Funciones asincrónicas de búsqueda de Autocompletado
   const searchNumero = useCallback(
@@ -710,11 +712,13 @@ export function ViajesTenantPage({
       setRows((prev) =>
         prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
       );
+      refrescarResumen();
     },
     onViajeSaved: (viaje) => {
       setRows((prev) =>
         prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
       );
+      refrescarResumen();
     },
     fetchProductosCatalogo: fetchProductosCatalogoParaEditor,
   });
@@ -791,13 +795,11 @@ export function ViajesTenantPage({
       const base = platform
         ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
         : "/api/viajes/paginated?";
-      const [estadoSF, estadoSC, estadoSL, pagoSP, pagoPag] = await Promise.allSettled([
+      // Cada conteo usa exactamente el mismo filtro que aplica su chip; si no, el número
+      // no coincide con lo que muestra la grilla al tocarlo.
+      const [estadoSF, estadoSL, pagoSP, pagoPag] = await Promise.allSettled([
         apiJson<ViajesPaginatedResponse>(
-          `${base}etapa=finalizado&facturacionEstado=sin_facturar&page=1&pageSize=1`,
-          () => getToken(),
-        ),
-        apiJson<ViajesPaginatedResponse>(
-          `${base}facturacionEstado=facturado&page=1&pageSize=1`,
+          `${base}facturacionEstado=sin_facturar&page=1&pageSize=1`,
           () => getToken(),
         ),
         // Mismo filtro que aplica el chip "Sin liquidar" (columna Liquidación).
@@ -820,8 +822,6 @@ export function ViajesTenantPage({
       setResumen({
         sinFacturar:
           estadoSF.status === "fulfilled" ? estadoSF.value.meta.total : 0,
-        sinCobrar:
-          estadoSC.status === "fulfilled" ? estadoSC.value.meta.total : 0,
         sinLiquidar:
           estadoSL.status === "fulfilled" ? estadoSL.value.meta.total : 0,
         sinPagar: pagoSP.status === "fulfilled" ? pagoSP.value : 0,
@@ -831,7 +831,7 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, platform, tid]);
+  }, [getToken, isLoaded, isSignedIn, platform, tid, resumenVersion]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -1166,6 +1166,22 @@ export function ViajesTenantPage({
       liquidacionEstado: l,
     };
     setLiquidacionFiltro(l);
+    setListadoRefetching(true);
+    setPage(1);
+    setListadoQueryVersion((v) => v + 1);
+  }
+
+  /** La columna Etapa agrupa tres filtros (etapa, facturación, liquidación): los quita juntos. */
+  function quitarFiltroEtapa() {
+    filtrosAplicadosRef.current = {
+      ...filtrosAplicadosRef.current,
+      estado: "",
+      facturacionEstado: "",
+      liquidacionEstado: "",
+    };
+    setEstadoFiltro("");
+    setFacturacionFiltro("");
+    setLiquidacionFiltro("");
     setListadoRefetching(true);
     setPage(1);
     setListadoQueryVersion((v) => v + 1);
@@ -1554,6 +1570,7 @@ export function ViajesTenantPage({
   function onViajeEliminadoOk(v: Viaje) {
     showToast("Viaje eliminado correctamente", "success");
     setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
+    refrescarResumen();
     setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
     setIdsSeleccionLote((ids) => ids.filter((id) => id !== v.id));
     if (viajeEditor.editingId === v.id) cancelEdit();
@@ -2491,16 +2508,11 @@ export function ViajesTenantPage({
           type="button"
           onClick={limpiarFiltrosColumnas}
           disabled={listadoRefetching}
-          className="hidden h-10 shrink-0 items-center gap-2 px-4 border border-black/15 bg-white text-vialto-steel text-sm uppercase tracking-wider hover:bg-vialto-mist/80 hover:text-vialto-charcoal transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
+          className="hidden h-10 shrink-0 items-center gap-1 px-2 text-xs text-vialto-steel underline-offset-4 hover:text-vialto-charcoal hover:underline transition-colors disabled:opacity-50 disabled:pointer-events-none lg:inline-flex"
           aria-label={`Limpiar filtros (${cantidadFiltrosColumnasActivos} columna${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""} filtrada${cantidadFiltrosColumnasActivos !== 1 ? "s" : ""})`}
         >
-          Limpiar filtros
-          <span
-            className="inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-vialto-fire px-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold tabular-nums leading-none text-white"
-            aria-hidden
-          >
-            {cantidadFiltrosColumnasActivos}
-          </span>
+          <X className="h-3.5 w-3.5" aria-hidden />
+          Limpiar filtros ({cantidadFiltrosColumnasActivos})
         </button>
       )}
     </>
@@ -2649,6 +2661,7 @@ export function ViajesTenantPage({
                   title="ID"
                   filterActive={!!numeroFiltroActivo.trim()}
                   filterSignature={numeroFiltroActivo}
+                  onClear={() => aplicarFiltroColumnaNumero("")}
                   minWidthClass="min-w-0"
                 >
                   <AutocompleteInput
@@ -2670,6 +2683,7 @@ export function ViajesTenantPage({
                   }
                   filterActive={!!ctgFiltroActivo.trim()}
                   filterSignature={ctgFiltroActivo}
+                  onClear={() => aplicarFiltroColumnaCTG("")}
                   minWidthClass="min-w-0"
                 >
                   <AutocompleteInput
@@ -2688,6 +2702,7 @@ export function ViajesTenantPage({
                   title={idPropio2Label(currentTenant)}
                   filterActive={!!idPropio2FiltroActivo.trim()}
                   filterSignature={idPropio2FiltroActivo}
+                  onClear={() => aplicarFiltroColumnaIdPropio2("")}
                   minWidthClass="min-w-0"
                 >
                   <AutocompleteInput
@@ -2705,6 +2720,7 @@ export function ViajesTenantPage({
                 title="Cliente"
                 filterActive={!!clienteIdFiltroActivo.trim()}
                 filterSignature={clienteIdFiltroActivo}
+                onClear={() => aplicarFiltroColumnaCliente("")}
               >
                 <ClienteSearchSelect
                   id="viajes-col-filtro-cliente"
@@ -2730,6 +2746,7 @@ export function ViajesTenantPage({
                 title="Transporte"
                 filterActive={!!transportistaIdFiltroActivo.trim()}
                 filterSignature={transportistaIdFiltroActivo}
+                onClear={() => aplicarFiltroColumnaTransportista("")}
               >
                 <TransportistaSearchSelect
                   id="viajes-col-filtro-transporte"
@@ -2755,6 +2772,7 @@ export function ViajesTenantPage({
                   title="Chofer"
                   filterActive={!!choferIdFiltroActivo.trim()}
                   filterSignature={choferIdFiltroActivo}
+                  onClear={() => aplicarFiltroColumnaChofer("")}
                   minWidthClass="min-w-0"
                 >
                   <ChoferSearchSelect
@@ -2786,6 +2804,7 @@ export function ViajesTenantPage({
                     !!liquidacionFiltro.trim()
                   }
                   filterSignature={`${estadoFiltro}|${facturacionFiltro}|${liquidacionFiltro}`}
+                  onClear={quitarFiltroEtapa}
                   minWidthClass="min-w-0"
                   titleNoWrap
                 >
@@ -2871,6 +2890,7 @@ export function ViajesTenantPage({
                 title="Origen — Destino"
                 filterActive={!!ubicacionFiltro.trim()}
                 filterSignature={`${tipoUbicacionFiltro}|${paisUbicacionFiltro}|${ubicacionFiltro}`}
+                onClear={() => aplicarTipoUbicacionFiltro("")}
                 minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
@@ -2938,6 +2958,7 @@ export function ViajesTenantPage({
                   !!fechaDesdeFiltro.trim() || !!fechaHastaFiltro.trim()
                 }
                 filterSignature={`${tipoFechaFiltro}|${fechaDesdeFiltro}|${fechaHastaFiltro}`}
+                onClear={() => aplicarTipoFechaFiltro("")}
                 minWidthClass="min-w-0"
               >
                 <div className="flex flex-col gap-2">
@@ -3741,6 +3762,7 @@ export function ViajesTenantPage({
                 viajeEditor.patchViajeSnapshot(updated);
               }
               setRegistrarPagoViaje(null);
+              refrescarResumen();
             }}
             onClose={() => setRegistrarPagoViaje(null)}
           />
@@ -3778,6 +3800,7 @@ export function ViajesTenantPage({
               viajeEditor.patchViajeSnapshot(updated);
             }
             setRegistrarPagoViaje(null);
+            refrescarResumen();
           }}
           onClose={() => setRegistrarPagoViaje(null)}
         />
@@ -3807,10 +3830,12 @@ export function ViajesTenantPage({
             }}
             onLiquidacionEmitida={() => {
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onSuccess={() => {
               setCrearLiqViaje(null);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onClose={() => setCrearLiqViaje(null)}
           />
@@ -3835,11 +3860,13 @@ export function ViajesTenantPage({
             onLiquidacionEmitida={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onSuccess={() => {
               setLiquidarLote(null);
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onClose={() => setLiquidarLote(null)}
           />
@@ -4123,10 +4150,12 @@ export function ViajesTenantPage({
             onFacturaGuardada={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onFacturaEmitida={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
           />
         )}

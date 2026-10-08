@@ -912,6 +912,7 @@ export function StockPanelTenantPage({
                         title="Cliente"
                         filterActive={!!filtroClienteId.trim()}
                         filterSignature={filtroClienteId}
+                        onClear={() => setFiltroClienteId("")}
                       >
                         <ClienteSearchSelect
                           id="stock-panel-filtro-cliente"
@@ -939,6 +940,7 @@ export function StockPanelTenantPage({
                         title="Producto"
                         filterActive={!!filtroProductoId.trim()}
                         filterSignature={filtroProductoId}
+                        onClear={() => setFiltroProductoId("")}
                       >
                         <SearchableEntitySelect<ProductoFiltro>
                           items={productosEnDeposito}
@@ -974,6 +976,7 @@ export function StockPanelTenantPage({
                         alignRight
                         filterActive={soloConStockCant1}
                         filterSignature={soloConStockCant1 ? "1" : ""}
+                        onClear={() => setSoloConStockCant1(false)}
                       >
                         <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
                           <input
@@ -1004,6 +1007,7 @@ export function StockPanelTenantPage({
                           alignRight
                           filterActive={soloConStockCant2}
                           filterSignature={soloConStockCant2 ? "1" : ""}
+                          onClear={() => setSoloConStockCant2(false)}
                         >
                           <label className="flex cursor-pointer items-center justify-end gap-2 text-sm text-vialto-charcoal">
                             <input

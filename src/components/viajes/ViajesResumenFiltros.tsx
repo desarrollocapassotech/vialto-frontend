@@ -3,14 +3,13 @@ import type { ViajePagoTransportistaFiltro } from '@/lib/viajesFiltroPagoTranspo
 
 export type ViajesResumenFiltrosData = {
   sinFacturar: number;
-  sinCobrar: number;
   /** Viajes con liquidación al transportista pendiente (`liquidacionEstado=sin_liquidar`). */
   sinLiquidar: number;
   sinPagar: number;
   pagados: number;
 };
 
-type FiltroId = 'sin_facturar' | 'facturado' | 'sin_liquidar' | 'sin_pagar' | 'pagado';
+type FiltroId = 'sin_facturar' |'sin_liquidar' | 'sin_pagar' | 'pagado';
 type Tipo = 'facturacion' | 'liquidacion' | 'pago';
 
 const OPCIONES: Array<{
@@ -20,7 +19,6 @@ const OPCIONES: Array<{
   tipo: Tipo;
 }> = [
   { id: 'sin_facturar', label: 'Sin facturar', countKey: 'sinFacturar', tipo: 'facturacion' },
-  { id: 'facturado', label: 'Sin cobrar', countKey: 'sinCobrar', tipo: 'facturacion' },
   { id: 'sin_liquidar', label: 'Sin liquidar', countKey: 'sinLiquidar', tipo: 'liquidacion' },
   { id: 'sin_pagar', label: 'Sin pagar', countKey: 'sinPagar', tipo: 'pago' },
   { id: 'pagado', label: 'Pagados', countKey: 'pagados', tipo: 'pago' },
@@ -88,7 +86,11 @@ export function ViajesResumenFiltros({
             role="tab"
             aria-selected={active}
             onClick={() => toggle(o.id, o.tipo)}
-            className={selectorTabClass(active)}
+            className={
+              active
+                ? 'rounded border border-vialto-fire bg-vialto-fire px-4 py-2 text-sm font-[family-name:var(--font-ui)] uppercase tracking-wider text-white transition-colors'
+                : selectorTabClass(false)
+            }
           >
             <span className="inline-flex items-center gap-2">
               {o.label}
@@ -96,7 +98,7 @@ export function ViajesResumenFiltros({
                 <span
                   className={[
                     'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-none',
-                    active ? 'bg-vialto-fire/20 text-vialto-fire' : 'bg-black/10 text-vialto-steel',
+                    active ? 'bg-white/25 text-white' :'bg-black/10 text-vialto-steel',
                   ].join(' ')}
                 >
                   {count}

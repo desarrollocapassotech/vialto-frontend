@@ -294,6 +294,10 @@ export function PresentacionesSuperadminPage() {
                     title="Nombre"
                     filterActive={!!filtroNombre}
                     filterSignature={filtroNombre}
+                    onClear={() => {
+                      setFiltroNombre("");
+                      setPage(1);
+                    }}
                   >
                     <select
                       value={filtroNombre}
@@ -322,6 +326,10 @@ export function PresentacionesSuperadminPage() {
                     title="Estado"
                     filterActive={!!filtroEstado}
                     filterSignature={filtroEstado}
+                    onClear={() => {
+                      setFiltroEstado("");
+                      setPage(1);
+                    }}
                   >
                     <select
                       value={filtroEstado}

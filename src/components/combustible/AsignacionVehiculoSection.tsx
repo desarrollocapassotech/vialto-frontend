@@ -296,6 +296,7 @@ export function AsignacionVehiculoSection({
                 title="Chofer"
                 filterActive={!!choferFiltroId}
                 filterSignature={choferFiltroId}
+                onClear={() => setChoferFiltroId("")}
               >
                 <SearchableSelect
                   value={choferFiltroId}
@@ -313,6 +314,7 @@ export function AsignacionVehiculoSection({
                 title="Vehículo asignado"
                 filterActive={!!vehiculoFiltroId}
                 filterSignature={vehiculoFiltroId}
+                onClear={() => setVehiculoFiltroId("")}
               >
                 <SearchableSelect
                   value={vehiculoFiltroId}

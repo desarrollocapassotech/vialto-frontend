@@ -993,6 +993,7 @@ export function LiquidacionesTenantPage() {
                 title="Transportista"
                 filterActive={!!transportistaFilter}
                 filterSignature={transportistaFilter}
+                onClear={() => aplicarFiltroTransportista("")}
               >
                 <TransportistaSearchSelect
                   id="liquidaciones-col-filtro-transportista"
@@ -1018,6 +1019,11 @@ export function LiquidacionesTenantPage() {
                   !!periodoDesdeFilter.trim() || !!periodoHastaFilter.trim()
                 }
                 filterSignature={`${periodoDesdeFilter}|${periodoHastaFilter}`}
+                onClear={() => {
+                  setPeriodoDesdeFilter("");
+                  setPeriodoHastaFilter("");
+                  setPage(1);
+                }}
               >
                 <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                   <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wider text-vialto-steel">
@@ -1064,6 +1070,7 @@ export function LiquidacionesTenantPage() {
                   title="Estado"
                   filterActive={estadoFilter !== "todos"}
                   filterSignature={estadoFilter}
+                  onClear={() => aplicarFiltroEstado("todos")}
                 >
                   <select
                     value={estadoFilter}

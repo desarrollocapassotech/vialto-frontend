@@ -425,6 +425,10 @@ export function CuentaContraparteView({
                 title="Fecha"
                 filterActive={!!desdeFiltro || !!hastaFiltro}
                 filterSignature={`${desdeFiltro}|${hastaFiltro}`}
+                onClear={() => {
+                  setDesdeFiltro('');
+                  setHastaFiltro('');
+                }}
               >
                 {fechaFiltroCampos}
               </ViajesListadoHeaderFiltro>
@@ -434,6 +438,7 @@ export function CuentaContraparteView({
                 title="Concepto"
                 filterActive={!!conceptoFiltro.trim()}
                 filterSignature={conceptoFiltro}
+                onClear={() => setConceptoFiltro('')}
               >
                 {conceptoFiltroInput}
               </ViajesListadoHeaderFiltro>
@@ -444,6 +449,7 @@ export function CuentaContraparteView({
                   title="Comprobante"
                   filterActive={!!comprobanteFiltro.trim()}
                   filterSignature={comprobanteFiltro}
+                  onClear={() => setComprobanteFiltro('')}
                 >
                   {comprobanteFiltroInput}
                 </ViajesListadoHeaderFiltro>
@@ -466,6 +472,7 @@ export function CuentaContraparteView({
                 title="Estado"
                 filterActive={!!estadoFiltro}
                 filterSignature={estadoFiltro}
+                onClear={() => setEstadoFiltro('')}
               >
                 {estadoFiltroSelect}
               </ViajesListadoHeaderFiltro>
