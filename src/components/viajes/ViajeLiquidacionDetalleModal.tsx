@@ -1,7 +1,12 @@
 import {
   ViewModalShell,
   viewModalBtnGhost,
+  viewModalBtnPrimary,
 } from "@/components/ui/ViewModalShell";
+import {
+  viajePendienteComprobanteTransportista,
+  viajeRequiereComprobanteDual,
+} from "@/lib/viajesComprobantes";
 import {
   liquidacionEstadoBadgeClass,
   liquidacionEstadoLabel,
@@ -17,11 +22,14 @@ import type { Viaje } from "@/types/api";
  * (`ViajeLiquidacionIndicador` va directo a `LiquidacionViewModal` si ya existe una).
  * Mientras no haya liquidación, mostramos los pagos ya registrados al transportista
  * (si aplica) — es la única forma de saber si algo se le pagó antes de liquidar.
+ * Si el host pasa `onLiquidar`, ofrece "Liquidar" (mismo flujo que la acción de
+ * la fila en la grilla) mientras el viaje siga pendiente de liquidar.
  */
 export function ViajeLiquidacionDetalleModal({
   viaje,
   onClose,
   onRegistrarPago,
+  onLiquidar,
 }: {
   viaje: Viaje;
   onClose: () => void;
@@ -29,8 +37,15 @@ export function ViajeLiquidacionDetalleModal({
   tenantId?: string;
   /** Si se pasa, habilita "+ Registrar pago" en el resumen de pagos al transportista. */
   onRegistrarPago?: () => void;
+  /** Abre el alta de liquidación para este viaje. Sin pasar, el modal es solo informativo. */
+  onLiquidar?: () => void;
 }) {
   const estado = viaje.liquidacionEstado as LiquidacionEstado | null;
+  const puedeLiquidar =
+    Boolean(onLiquidar) &&
+    viaje.etapa?.toLowerCase() !== "cancelado" &&
+    viajeRequiereComprobanteDual(viaje) &&
+    viajePendienteComprobanteTransportista(viaje);
   const { isVisible } = useFieldConfig("viajes");
 
   return (
@@ -38,9 +53,23 @@ export function ViajeLiquidacionDetalleModal({
       title="Liquidación al transportista"
       onClose={onClose}
       footer={
-        <button type="button" onClick={onClose} className={viewModalBtnGhost}>
-          Cerrar
-        </button>
+        <>
+          <button type="button" onClick={onClose} className={viewModalBtnGhost}>
+            Cerrar
+          </button>
+          {puedeLiquidar && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onLiquidar?.();
+              }}
+              className={viewModalBtnPrimary}
+            >
+              Liquidar
+            </button>
+          )}
+        </>
       }
     >
       <div className="flex flex-col gap-4">

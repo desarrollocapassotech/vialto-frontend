@@ -1338,12 +1338,18 @@ function EtapaModulo({
   const [decisionesCampoUnico, setDecisionesCampoUnico] = useState<
     Record<number, "ignorar" | "actualizar">
   >({});
+  // Filas que actualizan un registro existente y el usuario eligió "Ignorar fila"
+  // (por defecto se actualizan). Se mandan como `filasExcluidas` al confirmar.
+  const [actualizacionesIgnoradas, setActualizacionesIgnoradas] = useState<
+    Set<number>
+  >(() => new Set());
   const [ciudadesModalOpen, setCiudadesModalOpen] = useState(false);
   // Cada preview nuevo (nuevo módulo, o "reintentar" tras crear entidades
   // faltantes) trae su propia sesión — no arrastrar una confirmación vieja.
   useEffect(() => {
     setConfirmarCamposFaltantes(false);
     setDecisionesCampoUnico({});
+    setActualizacionesIgnoradas(new Set());
     setTablaPage(1);
   }, [p?.sessionId]);
 
@@ -1522,6 +1528,17 @@ function EtapaModulo({
                 decisionDe={(fila) => decisionesCampoUnico[fila]}
                 onElegirDecision={(fila, accion) =>
                   setDecisionesCampoUnico((prev) => ({ ...prev, [fila]: accion }))
+                }
+                actualizacionDe={(fila) =>
+                  actualizacionesIgnoradas.has(fila) ? "ignorar" : "actualizar"
+                }
+                onElegirActualizacion={(fila, accion) =>
+                  setActualizacionesIgnoradas((prev) => {
+                    const next = new Set(prev);
+                    if (accion === "ignorar") next.add(fila);
+                    else next.delete(fila);
+                    return next;
+                  })
                 }
               />
             </div>
@@ -1931,6 +1948,7 @@ function EtapaModulo({
                   fila: Number(fila),
                   accion,
                 })),
+                [...actualizacionesIgnoradas],
               )
             }
             title={
@@ -2179,11 +2197,16 @@ function FilasDetalleTabla({
   conflictoDe,
   decisionDe,
   onElegirDecision,
+  actualizacionDe,
+  onElegirActualizacion,
 }: {
   filas: ImportPreviewFilaEntidad[];
   conflictoDe: (fila: number) => ImportCampoUnicoConflicto | undefined;
   decisionDe: (fila: number) => "ignorar" | "actualizar" | undefined;
   onElegirDecision: (fila: number, accion: "ignorar" | "actualizar") => void;
+  /** Filas que actualizan un registro existente: "actualizar" (default) o "ignorar". */
+  actualizacionDe: (fila: number) => "ignorar" | "actualizar";
+  onElegirActualizacion: (fila: number, accion: "ignorar" | "actualizar") => void;
 }) {
   // Columnas = unión de campos en el orden en que aparecen (una fila puede
   // no traer todos los campos si la celda venía vacía).
@@ -2224,11 +2247,14 @@ function FilasDetalleTabla({
             const conflicto = conflictoDe(f.fila);
             const decision = decisionDe(f.fila);
             const valores = new Map(f.campos.map((c) => [c.campo, c.valor]));
+            // Actualiza un registro existente: fila en amarillo + franja con qué cambia.
+            const actualiza = !conflicto && !f.esNuevo && !f.sinCambios;
+            const cambios = actualiza ? (f.cambios ?? []) : [];
             return (
               <Fragment key={f.fila}>
                 <tr
                   className={`border-t border-black/5 first:border-t-0 ${
-                    conflicto ? "bg-amber-50/60" : ""
+                    conflicto || actualiza ? "bg-amber-50/60" : ""
                   }`}
                 >
                   <td className={`${td} text-vialto-steel tabular-nums`}>{f.fila}</td>
@@ -2250,7 +2276,7 @@ function FilasDetalleTabla({
                         {conflicto.campoLabel} duplicado
                       </span>
                     ) : f.esNuevo ? (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 uppercase tracking-wider">
                         Nuevo
                       </span>
                     ) : f.sinCambios ? (
@@ -2258,20 +2284,66 @@ function FilasDetalleTabla({
                         Sin cambios
                       </span>
                     ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-vialto-mist text-vialto-steel uppercase tracking-wider">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
                         Actualiza
                       </span>
                     )}
                   </td>
                 </tr>
+                {actualiza && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={columnas.length + 2} className="px-3 pb-2.5">
+                      {/* Mismo formato que el duplicado de CUIT: antes → después + decisión por fila. */}
+                      <div
+                        className={`flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-xs text-amber-900 ${
+                          actualizacionDe(f.fila) === "ignorar" ? "opacity-60" : ""
+                        }`}
+                      >
+                        {cambios.map((c) => (
+                          <span key={c.campo}>
+                            {c.label}:{" "}
+                            <span className="line-through opacity-70">
+                              {c.antes ? valorFilaDetalle(c.campo, c.antes) : "—"}
+                            </span>{" "}
+                            →{" "}
+                            <strong>
+                              {c.despues ? valorFilaDetalle(c.campo, c.despues) : "—"}
+                            </strong>
+                          </span>
+                        ))}
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onElegirActualizacion(f.fila, "ignorar")}
+                            className={botonDecision(actualizacionDe(f.fila) === "ignorar")}
+                          >
+                            Ignorar fila
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onElegirActualizacion(f.fila, "actualizar")}
+                            className={botonDecision(actualizacionDe(f.fila) === "actualizar")}
+                          >
+                            Actualizar fila
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {conflicto && (
                   <tr className="bg-amber-50/60">
                     <td colSpan={columnas.length + 2} className="px-3 pb-2.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
-                        <span>
-                          {conflicto.campoLabel} <strong>{conflicto.valor}</strong> ya es
-                          de <strong>{conflicto.entidadExistenteNombre}</strong> — elegí
-                          qué hacer:
+                      <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-amber-900">
+                        {/* Pegado a la derecha, junto a los botones de la decisión. */}
+                        {/* Antes (el registro que ya tiene ese CUIT/RUT) → después (la fila del Excel). */}
+                        <span className="text-right">
+                          Antes:{" "}
+                          <span className="line-through opacity-70">
+                            {conflicto.entidadExistenteNombre}
+                          </span>{" "}
+                          → Después:{" "}
+                          <strong>{valores.get("nombre") || "—"}</strong>
                         </span>
                         <div className="flex gap-1.5">
                           <button
@@ -2286,7 +2358,7 @@ function FilasDetalleTabla({
                             onClick={() => onElegirDecision(f.fila, "actualizar")}
                             className={botonDecision(decision === "actualizar")}
                           >
-                            Actualizar {conflicto.entidadExistenteNombre}
+                            Actualizar fila
                           </button>
                         </div>
                       </div>

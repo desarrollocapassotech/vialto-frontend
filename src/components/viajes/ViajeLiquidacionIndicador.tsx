@@ -32,6 +32,8 @@ type Props = {
   hasArca?: boolean;
   /** Si se pasa, el modal de detalle (sin liquidación vinculada) habilita "+ Registrar pago". */
   onRegistrarPago?: () => void;
+  /** Si se pasa, el modal de detalle (sin liquidación vinculada) ofrece "Liquidar". */
+  onLiquidar?: () => void;
   /** `icono`: ícono compacto de una sola línea (columna "Liquidación" de la grilla). */
   variante?: "badge" | "icono";
 };
@@ -58,6 +60,7 @@ export function ViajeLiquidacionIndicador({
   tenantId,
   hasArca = false,
   onRegistrarPago,
+  onLiquidar,
   variante = "badge",
 }: Props) {
   const { getToken } = useAuth();
@@ -139,6 +142,7 @@ export function ViajeLiquidacionIndicador({
           viaje={viaje}
           tenantId={tenantId}
           onRegistrarPago={onRegistrarPago}
+          onLiquidar={onLiquidar}
           onClose={() => setOpen(false)}
         />
       )}
