@@ -553,6 +553,9 @@ export function ViajesTenantPage({
     sinPagar: number;
     pagados: number;
   } | null>(null);
+  /** Se incrementa tras cada operación que puede cambiar los conteos de los chips. */
+  const [resumenVersion, setResumenVersion] = useState(0);
+  const refrescarResumen = () => setResumenVersion((v) => v + 1);
 
   // Funciones asincrónicas de búsqueda de Autocompletado
   const searchNumero = useCallback(
@@ -710,11 +713,13 @@ export function ViajesTenantPage({
       setRows((prev) =>
         prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
       );
+      refrescarResumen();
     },
     onViajeSaved: (viaje) => {
       setRows((prev) =>
         prev ? prev.map((r) => (r.id === viaje.id ? viaje : r)) : prev,
       );
+      refrescarResumen();
     },
     fetchProductosCatalogo: fetchProductosCatalogoParaEditor,
   });
@@ -791,9 +796,11 @@ export function ViajesTenantPage({
       const base = platform
         ? `/api/platform/viajes/paginated?tenantId=${encodeURIComponent(tid)}&`
         : "/api/viajes/paginated?";
+      // Cada conteo usa exactamente el mismo filtro que aplica su chip; si no, el número
+      // no coincide con lo que muestra la grilla al tocarlo.
       const [estadoSF, estadoSC, estadoSL, pagoSP, pagoPag] = await Promise.allSettled([
         apiJson<ViajesPaginatedResponse>(
-          `${base}etapa=finalizado&facturacionEstado=sin_facturar&page=1&pageSize=1`,
+          `${base}facturacionEstado=sin_facturar&page=1&pageSize=1`,
           () => getToken(),
         ),
         apiJson<ViajesPaginatedResponse>(
@@ -831,7 +838,7 @@ export function ViajesTenantPage({
     return () => {
       cancelled = true;
     };
-  }, [getToken, isLoaded, isSignedIn, platform, tid]);
+  }, [getToken, isLoaded, isSignedIn, platform, tid, resumenVersion]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -1554,6 +1561,7 @@ export function ViajesTenantPage({
   function onViajeEliminadoOk(v: Viaje) {
     showToast("Viaje eliminado correctamente", "success");
     setRows((prev) => (prev ? prev.filter((r) => r.id !== v.id) : prev));
+    refrescarResumen();
     setMeta((m) => (m ? { ...m, total: Math.max(0, m.total - 1) } : m));
     setIdsSeleccionLote((ids) => ids.filter((id) => id !== v.id));
     if (viajeEditor.editingId === v.id) cancelEdit();
@@ -3741,6 +3749,7 @@ export function ViajesTenantPage({
                 viajeEditor.patchViajeSnapshot(updated);
               }
               setRegistrarPagoViaje(null);
+              refrescarResumen();
             }}
             onClose={() => setRegistrarPagoViaje(null)}
           />
@@ -3778,6 +3787,7 @@ export function ViajesTenantPage({
               viajeEditor.patchViajeSnapshot(updated);
             }
             setRegistrarPagoViaje(null);
+            refrescarResumen();
           }}
           onClose={() => setRegistrarPagoViaje(null)}
         />
@@ -3807,10 +3817,12 @@ export function ViajesTenantPage({
             }}
             onLiquidacionEmitida={() => {
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onSuccess={() => {
               setCrearLiqViaje(null);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onClose={() => setCrearLiqViaje(null)}
           />
@@ -3835,11 +3847,13 @@ export function ViajesTenantPage({
             onLiquidacionEmitida={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onSuccess={() => {
               setLiquidarLote(null);
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onClose={() => setLiquidarLote(null)}
           />
@@ -4123,10 +4137,12 @@ export function ViajesTenantPage({
             onFacturaGuardada={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
             onFacturaEmitida={() => {
               setIdsSeleccionLote([]);
               setListadoQueryVersion((v) => v + 1);
+              refrescarResumen();
             }}
           />
         )}
