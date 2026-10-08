@@ -1424,18 +1424,31 @@ function EtapaModulo({
 
   const advertenciasCampoUnicoDuplicado =
     p?.advertenciasCampoUnicoDuplicado ?? [];
-  // Ninguna fila trae algo nuevo o distinto a lo ya cargado: no hay nada que
-  // guardar, así que el paso se reduce a un "Continuar" (sin avisos que pidan
-  // confirmar nada).
+  // Ninguna fila tiene algo para guardar: todas sin cambios, viajes bloqueados (ya
+  // facturados/liquidados) o actualizaciones que el usuario eligió ignorar. El paso
+  // se reduce a un solo botón ("Finalizar" / "Continuar"), sin avisos que pidan
+  // confirmar nada — "Guardar" y "No importar esta hoja" harían lo mismo.
   const todoSinCambios =
     !!p &&
     filasConError === 0 &&
     advertenciasCampoUnicoDuplicado.length === 0 &&
     (hasViajes
       ? advertenciasCiudad.length === 0 &&
-        p.viajes!.every((v) => !v.nuevo && (!v.cambios || v.cambios.length === 0))
+        p.viajes!.every(
+          (v) =>
+            !v.nuevo &&
+            (!v.cambios ||
+              v.cambios.length === 0 ||
+              !!v.bloqueadoPor ||
+              actualizacionesIgnoradas.has(v.fila)),
+        )
       : (p.filasDetalle?.length ?? 0) > 0 &&
-        p.filasDetalle!.every((f) => !f.esNuevo && f.sinCambios));
+        p.filasDetalle!.every(
+          (f) => !f.esNuevo && (f.sinCambios || actualizacionesIgnoradas.has(f.fila)),
+        ));
+  const hayBloqueados =
+    hasViajes && p!.viajes!.some((v) => !v.nuevo && !!v.bloqueadoPor && (v.cambios?.length ?? 0) > 0);
+  const esUltimoPaso = wizard.moduloIndex >= wizard.secuencia.length - 1;
   const requiereResolverCampoUnicoDuplicado = advertenciasCampoUnicoDuplicado.some(
     (c) => !decisionesCampoUnico[c.fila],
   );
@@ -1458,7 +1471,10 @@ function EtapaModulo({
       ? p.filasDetalle.filter((f) => f.esNuevo).length
       : (p?.entidadesNuevas ?? p?.exitosas ?? 0);
   const filasActualizarCount = hasViajes
-    ? p!.viajes!.filter((v) => !v.nuevo && (v.cambios?.length ?? 0) > 0).length
+    ? p!.viajes!.filter(
+        // Los bloqueados (ya facturados/liquidados) no se actualizan: no cuentan.
+        (v) => !v.nuevo && !v.bloqueadoPor && (v.cambios?.length ?? 0) > 0,
+      ).length
     : p?.filasDetalle
       ? p.filasDetalle.filter((f) => !f.esNuevo && !f.sinCambios).length
       : (p?.entidadesActualizadas ?? 0);
@@ -1557,23 +1573,20 @@ function EtapaModulo({
                   <p className="font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.14em] text-vialto-charcoal">
                     Viajes en este archivo
                   </p>
-                  {filasActualizarCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        for (const v of p.viajes ?? []) {
-                          if (!v.nuevo) wizard.ignorarFila(v.fila);
-                        }
-                      }}
-                      className="border border-black/15 bg-white px-3 py-1.5 font-[family-name:var(--font-ui)] text-[11px] font-semibold uppercase tracking-wider text-vialto-charcoal hover:bg-vialto-mist"
-                    >
-                      Ignorar todas las actualizaciones
-                    </button>
-                  )}
                 </div>
                 <ViajesCambiosList
                   viajes={slicePaginaCliente(p.viajes!, tablaPage, VIAJES_PAGE_SIZE)}
-                  onIgnorarFila={wizard.ignorarFila}
+                  actualizacionDe={(fila) =>
+                    actualizacionesIgnoradas.has(fila) ? "ignorar" : "actualizar"
+                  }
+                  onElegirActualizacion={(fila, accion) =>
+                    setActualizacionesIgnoradas((prev) => {
+                      const next = new Set(prev);
+                      if (accion === "ignorar") next.add(fila);
+                      else next.delete(fila);
+                      return next;
+                    })
+                  }
                 />
                 {meta.totalPages > 1 && (
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1910,14 +1923,26 @@ function EtapaModulo({
         </fieldset>
       )}
       {p && todoSinCambios && (
-        <div className="flex items-center justify-end gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <p className="text-xs text-vialto-steel">
+            No hay nada para importar en esta hoja:{" "}
+            {[
+              "las filas ya están cargadas sin cambios",
+              hayBloqueados && "los viajes ya están facturados/liquidados",
+              actualizacionesIgnoradas.size > 0 && "marcaste las actualizaciones para ignorar",
+            ]
+              .filter(Boolean)
+              .join(", ")
+              .replace(/, ([^,]*)$/, " o $1")}
+            .
+          </p>
           <button
             type="button"
             disabled={wizard.loading}
             onClick={wizard.continuarSinCambios}
             className="inline-flex items-center gap-2 border border-black/15 bg-vialto-charcoal px-5 py-2.5 font-[family-name:var(--font-ui)] text-xs font-semibold uppercase tracking-[0.18em] text-white hover:bg-black disabled:opacity-50"
           >
-            Continuar →
+            {esUltimoPaso ? "Finalizar" : "Continuar →"}
           </button>
         </div>
       )}
@@ -1948,7 +1973,14 @@ function EtapaModulo({
                   fila: Number(fila),
                   accion,
                 })),
-                [...actualizacionesIgnoradas],
+                [
+                  ...actualizacionesIgnoradas,
+                  // Viajes ya facturados/liquidados: el backend no los deja reimportar,
+                  // se excluyen solos para que no terminen como error.
+                  ...(p.viajes ?? [])
+                    .filter((v) => !v.nuevo && v.bloqueadoPor)
+                    .flatMap((v) => v.filasAgrupadas ?? [v.fila]),
+                ],
               )
             }
             title={
@@ -2035,10 +2067,13 @@ const CAMPOS_VIAJE_MOSTRAR: { key: keyof ImportPreviewViaje; label: string }[] =
 
 function ViajesCambiosList({
   viajes,
-  onIgnorarFila,
+  actualizacionDe,
+  onElegirActualizacion,
 }: {
   viajes: ImportPreviewViaje[];
-  onIgnorarFila: (fila: number) => void;
+  /** Filas que actualizan un viaje existente: "actualizar" (default) o "ignorar". */
+  actualizacionDe: (fila: number) => "ignorar" | "actualizar";
+  onElegirActualizacion: (fila: number, accion: "ignorar" | "actualizar") => void;
 }) {
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "—");
 
@@ -2058,6 +2093,13 @@ function ViajesCambiosList({
     "px-3 py-2 text-left font-[family-name:var(--font-ui)] text-[10px] font-semibold uppercase tracking-[0.1em] text-vialto-steel whitespace-nowrap";
   const td = "px-3 py-2 text-sm text-vialto-charcoal whitespace-nowrap";
   const colSpan = columnas.length + 2;
+  // Mismo estilo de botón que la decisión por fila de Clientes/Transportes (FilasDetalleTabla).
+  const botonDecision = (activo: boolean) =>
+    `px-2.5 py-1 border text-[11px] font-semibold uppercase tracking-wide ${
+      activo
+        ? "border-vialto-charcoal bg-vialto-charcoal text-white"
+        : "border-amber-300 text-amber-900 hover:bg-amber-100"
+    }`;
   const listaCambios = (cambios: { campo: string; antes: unknown; despues: unknown }[]) => (
     <div className="flex flex-wrap gap-x-4 gap-y-0.5">
       {cambios.map((c, i) => (
@@ -2090,10 +2132,21 @@ function ViajesCambiosList({
         <tbody>
           {viajes.map((v) => {
             const unificado = !!v.filasAgrupadas && v.filasAgrupadas.length > 1;
-            const sinCambios = !v.nuevo && (!v.cambios || v.cambios.length === 0);
+            // Ya facturado/liquidado Y el Excel trae cambios: no se reimporta (el backend lo
+            // rechazaría). Sin cambios se muestra como "Sin cambios" aunque esté
+            // facturado. En los dos casos se excluye solo al confirmar.
+            const tieneCambios = !!v.cambios && v.cambios.length > 0;
+            const bloqueado = !v.nuevo && !!v.bloqueadoPor && tieneCambios;
+            const sinCambios = !v.nuevo && !tieneCambios;
+            const actualiza = !v.nuevo && tieneCambios && !bloqueado;
+            const ignorada = actualiza && actualizacionDe(v.fila) === "ignorar";
             return (
               <Fragment key={v.fila}>
-                <tr className="border-t border-black/5 first:border-t-0">
+                <tr
+                  className={`border-t border-black/5 first:border-t-0 ${
+                    actualiza ? "bg-amber-50/60" : bloqueado ? "bg-vialto-mist/40" : ""
+                  }`}
+                >
                   <td className={`${td} text-vialto-steel tabular-nums`}>
                     {unificado ? v.filasAgrupadas!.join(", ") : v.fila}
                   </td>
@@ -2117,33 +2170,65 @@ function ViajesCambiosList({
                         <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 uppercase tracking-wider">
                           Nuevo
                         </span>
+                      ) : bloqueado ? (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-700 uppercase tracking-wider">
+                          Bloqueado
+                        </span>
                       ) : sinCambios ? (
                         <span className="text-[10px] px-1.5 py-0.5 border border-black/10 text-vialto-steel/70 uppercase tracking-wider">
                           Sin cambios
                         </span>
                       ) : (
-                        <>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 uppercase tracking-wider">
-                            Actualiza
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onIgnorarFila(v.fila)}
-                            className="border border-black/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-vialto-steel hover:bg-vialto-mist hover:text-vialto-charcoal"
-                          >
-                            Ignorar
-                          </button>
-                        </>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-900 uppercase tracking-wider">
+                          Actualiza
+                        </span>
                       )}
                     </div>
                   </td>
                 </tr>
 
-                {/* Fila que actualiza un viaje existente: qué cambia. */}
-                {!v.nuevo && !sinCambios && (
-                  <tr>
-                    <td colSpan={colSpan} className="px-3 pb-2">
-                      {listaCambios(v.cambios!)}
+                {bloqueado && (
+                  <tr className="bg-vialto-mist/40">
+                    <td colSpan={colSpan} className="px-3 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-vialto-steel">
+                        <span className="opacity-70">{listaCambios(v.cambios!)}</span>
+                        <span className="text-xs">
+                          Ya está <strong className="text-vialto-charcoal">{v.bloqueadoPor}</strong>:
+                          no se actualiza desde el import. Si hace falta, editalo desde la ficha del viaje.
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {/* Fila que actualiza un viaje existente: qué cambia (a la derecha) + decisión,
+                    mismo formato que Clientes/Transportes. */}
+                {actualiza && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={colSpan} className="px-3 pb-2.5">
+                      <div
+                        className={`flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-amber-900 ${
+                          ignorada ? "opacity-60" : ""
+                        }`}
+                      >
+                        {listaCambios(v.cambios!)}
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onElegirActualizacion(v.fila, "ignorar")}
+                            className={botonDecision(ignorada)}
+                          >
+                            Ignorar fila
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onElegirActualizacion(v.fila, "actualizar")}
+                            className={botonDecision(!ignorada)}
+                          >
+                            Actualizar fila
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}

@@ -644,6 +644,8 @@ export interface ImportPreviewViaje {
   cambiosSobrescritura?: { campo: string; antes: string | number | null; despues: string | number | null }[];
   /** Solo si `nuevo` es false: campos que cambian respecto al valor actual en base de datos. */
   cambios?: { campo: string; antes: string | number | null; despues: string | number | null }[];
+  /** El viaje existente ya está "facturado" / "liquidado" / "facturado y liquidado": no se reimporta (se excluye solo al confirmar). */
+  bloqueadoPor?: string | null;
 }
 
 export interface ImportPreviewFactura {
