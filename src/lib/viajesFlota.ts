@@ -391,6 +391,16 @@ function tramoFacturableParaCliente(
 }
 
 /**
+ * El tramo del viaje correspondiente a `clienteId` se puede incluir en una factura nueva.
+ * Mismo criterio que `viajesFiltradosParaFactura` (los viajes que muestra "Nueva factura"):
+ * mira solo la facturación al cliente, no la liquidación al transportista.
+ */
+export function viajeFacturableParaCliente(v: Viaje, clienteId: string): boolean {
+  const cid = clienteId.trim();
+  return Boolean(cid) && tramoFacturableParaCliente(v, cid).facturable;
+}
+
+/**
  * Viajes que se pueden vincular a una factura de cliente: viajes del
  * `clienteId` elegido. Excluye viajes que ya tienen factura asignada,
  * cobrados y cancelados. Con `opciones` de edición, mantiene visibles los

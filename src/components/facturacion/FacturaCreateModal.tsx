@@ -452,8 +452,11 @@ export function FacturaCreateModal({
     // Se espera la respuesta de ARCA para abrir el modal ya precargado.
     if (padronCliente.pendiente) return;
     if (missingClienteFields.length === 0 && !padronClienteAviso) return;
-    if (datosClienteAvisadoRef.current === clienteElegidoId) return;
-    datosClienteAvisadoRef.current = clienteElegidoId;
+    // La marca distingue el motivo: avisar de datos faltantes no consume el aviso de
+    // "ARCA informa otros datos" que puede llegar después (ej. abriendo desde Viajes).
+    const key = `${clienteElegidoId}:${padronClienteAviso ? "arca" : "faltan"}`;
+    if (datosClienteAvisadoRef.current === key) return;
+    datosClienteAvisadoRef.current = key;
     setDatosClienteModalOpen(true);
   }, [
     open,

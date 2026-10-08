@@ -1,5 +1,4 @@
 import { useEffect, useId } from "react";
-import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import {
   CompletarDatosFiscalesInline,
@@ -76,11 +75,14 @@ export function DatosFiscalesFaltantesModal({
 
   if (!open) return null;
 
-  return createPortal(
+  // Sin portal a propósito: se dibuja en la misma capa (stacking context) que el modal que
+  // lo abre, así queda encima de él en cualquier pantalla. Con portal a <body> quedaba
+  // DETRÁS en la grilla de Viajes, que mete sus modales en un contenedor con zIndex 9999.
+  return (
     <div
       className={`fixed inset-0 ${MODAL_Z_STACKED} flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4`}
       role="presentation"
-      // stopPropagation: el portal igual burbujea por el árbol de React hasta el modal de abajo.
+      // stopPropagation: el click no tiene que llegar al overlay del modal de abajo.
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -193,7 +195,6 @@ export function DatosFiscalesFaltantesModal({
           )}
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

@@ -594,15 +594,30 @@ export function CrearLiquidacionManualModal({
       ? padronCliente.resultado
       : null;
 
+  // Hay algo para mostrar en cada modal (si no, el modal ni se renderiza).
+  const modalTransportistaDisponible = Boolean(
+    transportistaSeleccionadoId &&
+      (missingTransportistaFields.length > 0 || padronTransportistaAviso),
+  );
+  const modalClienteDisponible = Boolean(
+    clienteDetalle && (missingClienteFields.length > 0 || padronClienteAviso),
+  );
+  // Si el estado apunta a un modal que ya no corresponde mostrar, cuenta como cerrado:
+  // si no, bloquearía la apertura del otro (ej. abriendo desde la grilla de Viajes).
+  const modalDatosVisible =
+    (modalDatos === "transportista" && modalTransportistaDisponible) ||
+    (modalDatos === "cliente" && modalClienteDisponible)
+      ? modalDatos
+      : null;
+
   useEffect(() => {
-    if (!hasLiquidoProductoArca || modalDatos) return;
+    if (!hasLiquidoProductoArca || modalDatosVisible) return;
     // Se espera la respuesta de ARCA para abrir el modal del transportista ya precargado.
     if (padronTransportista.pendiente) return;
-    if (
-      transportistaSeleccionadoId &&
-      (missingTransportistaFields.length > 0 || padronTransportistaAviso)
-    ) {
-      const key = `t:${transportistaSeleccionadoId}`;
+    // La marca de "ya avisado" distingue el motivo: un aviso de datos faltantes no
+    // consume el de "ARCA informa otros datos" que puede llegar después.
+    if (modalTransportistaDisponible) {
+      const key = `t:${transportistaSeleccionadoId}:${padronTransportistaAviso ? "arca" : "faltan"}`;
       if (!datosAvisadosRef.current.has(key)) {
         datosAvisadosRef.current.add(key);
         setModalDatos("transportista");
@@ -611,11 +626,8 @@ export function CrearLiquidacionManualModal({
     }
     // Ídem para el cliente: se espera la respuesta de ARCA antes de abrir su modal.
     if (padronCliente.pendiente) return;
-    if (
-      clienteDetalle?.id &&
-      (missingClienteFields.length > 0 || padronClienteAviso)
-    ) {
-      const key = `c:${clienteDetalle.id}`;
+    if (modalClienteDisponible && clienteDetalle) {
+      const key = `c:${clienteDetalle.id}:${padronClienteAviso ? "arca" : "faltan"}`;
       if (!datosAvisadosRef.current.has(key)) {
         datosAvisadosRef.current.add(key);
         setModalDatos("cliente");
@@ -623,7 +635,9 @@ export function CrearLiquidacionManualModal({
     }
   }, [
     hasLiquidoProductoArca,
-    modalDatos,
+    modalDatosVisible,
+    modalTransportistaDisponible,
+    modalClienteDisponible,
     transportistaSeleccionadoId,
     clienteDetalle?.id,
     missingTransportistaFields.length,
@@ -1859,7 +1873,7 @@ export function CrearLiquidacionManualModal({
               } else {
                 // Completó datos que faltaban (ej. el CUIT): se valida ahora. Si ARCA
                 // informa algo distinto, el modal se vuelve a abrir con eso precargado.
-                datosAvisadosRef.current.delete(`t:${transportistaSeleccionadoId}`);
+                datosAvisadosRef.current.delete(`t:${transportistaSeleccionadoId}:arca`);
                 void padronTransportista.revalidar();
               }
             }}
@@ -1906,7 +1920,7 @@ export function CrearLiquidacionManualModal({
               } else {
                 // Completó datos que faltaban (ej. el CUIT): se valida ahora; si ARCA
                 // coincide se guarda la huella, si no, el modal se reabre precargado.
-                datosAvisadosRef.current.delete(`c:${clienteDetalle.id}`);
+                datosAvisadosRef.current.delete(`c:${clienteDetalle.id}:arca`);
                 void padronCliente.revalidar();
               }
             }}

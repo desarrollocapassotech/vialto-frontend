@@ -51,6 +51,7 @@ import {
   idPropio2Habilitado,
   idPropio2Label,
   transportistaEfectivoIdDesdeViaje,
+  viajeFacturableParaCliente,
   type MaestroListasViaje,
 } from "@/lib/viajesFlota";
 import { ViajeOrigenDestinoLinea } from "@/components/viajes/ViajeOrigenDestinoLinea";
@@ -69,7 +70,6 @@ import {
   formatIsoFechaHoraListadoEsAr,
 } from "@/lib/viajeFechaHora";
 import {
-  viajePermiteBotonFacturar,
   viajePendienteComprobanteTransportista,
   viajeTieneLiquidacionActivaParaTransportista,
   liquidacionElegidaDeViaje,
@@ -1455,7 +1455,10 @@ export function ViajesTenantPage({
 
   function esElegibleFacturarLote(v: Viaje): boolean {
     if (v.etapa?.toLowerCase() === "cancelado") return false;
-    if (!viajePermiteBotonFacturar(v)) return false;
+    // Solo la factura al cliente filtrado (su tramo, si el viaje tiene varios clientes).
+    // No usar `viajePermiteBotonFacturar`: también da true si falta la liquidación al
+    // transportista, y dejaba tildar viajes ya facturados al cliente.
+    if (!viajeFacturableParaCliente(v, clienteIdFiltroActivo)) return false;
     if (arcaBloqueaFacturarUsd(hasFacturasArca, v.monedaMonto)) return false;
     return true;
   }
